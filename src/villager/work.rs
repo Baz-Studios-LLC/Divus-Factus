@@ -44,7 +44,7 @@ const DOWN_TOOLS_HUNGER: f32 = HUNGRY_THRESHOLD + 0.1;
 const CARCASS_FOOD: f32 = 3.0;
 
 /// A calling. Rolled once at adulthood and kept.
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Vocation {
     Gatherer,
     Fisher,
@@ -144,7 +144,7 @@ pub struct Stockpile {
 pub const HOUSE_TIMBER: f32 = 6.0;
 
 /// What a building is for. Shape, cost and effect all follow from it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum BuildingKind {
     House,
     /// Mills felled timber: every tree yields more once it stands.
@@ -274,7 +274,7 @@ pub fn next_civic(
 
 /// One building's rolled shape and colours. No two houses need look alike:
 /// footprint, height, roof style and paint all vary within the kind.
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Blueprint {
     pub kind: BuildingKind,
     pub half_w: f32,
@@ -452,7 +452,7 @@ impl Blueprint {
 
 /// A building going up: how much timber has been worked into it so far, and
 /// which visual stage stands — the village is *seen* to rise.
-#[derive(Component, Debug, Default)]
+#[derive(Component, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct ConstructionSite {
     pub progress: f32,
     pub stage: u8,
@@ -762,7 +762,8 @@ pub(super) fn haul_wood(
 pub(super) fn update_woodpile(
     site: Option<Res<SettlementSite>>,
     stores: Query<&Stockpile>,
-    mut logs: Query<(&WoodpileLog, &mut Visibility)>,
+    moving: Query<&Rehouse>,
+    mut logs: Query<(&WoodpileLog, &ChildOf, &mut Visibility)>,
 ) {
     let Some(site) = site else {
         return;
@@ -770,8 +771,9 @@ pub(super) fn update_woodpile(
     let Ok(store) = stores.get(site.settlement) else {
         return;
     };
-    for (log, mut visibility) in &mut logs {
-        let shown = (log.0 as f32) < store.timber.min(24.0);
+    for (log, parent, mut visibility) in &mut logs {
+        let away = moving.get(parent.parent()).map_or(0.0, |r| r.hauled as f32);
+        let shown = (log.0 as f32) < store.timber.min(24.0) - away;
         let wanted = if shown {
             Visibility::Inherited
         } else {
@@ -779,6 +781,212 @@ pub(super) fn update_woodpile(
         };
         if *visibility != wanted {
             *visibility = wanted;
+        }
+    }
+}
+
+/// A pile being carried to its new home, one armload at a time.
+#[derive(Component)]
+pub struct Rehouse {
+    pub to: Vec3,
+    pub to_rot: Quat,
+    pub hauled: u8,
+    pub goal: u8,
+}
+
+/// The villager doing the carrying, and which pile they serve.
+#[derive(Component)]
+pub struct RehouseHauler(pub Entity);
+
+/// A load in a rehousing hauler's arms (visual already on their shoulder).
+#[derive(Component)]
+pub struct RehouseLoad;
+
+/// A sack on the shoulder, for carrying the food store home.
+pub(super) fn shoulder_sack(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    carrier: Entity,
+) {
+    commands.spawn((
+        WoodLoad,
+        Mesh3d(meshes.add(Cuboid::new(0.42, 0.36, 0.42))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: crate::palette::shade(&crate::palette::BONE, 0.6),
+            perceptual_roughness: 1.0,
+            ..default()
+        })),
+        Transform::from_xyz(0.0, 1.5, 0.1),
+        ChildOf(carrier),
+    ));
+}
+
+/// When the storehouse rises, the village carries its piles in under the
+/// eaves - and the granary takes the food sacks. Nothing teleports: each
+/// armload is walked across the square.
+#[allow(clippy::type_complexity)]
+pub(super) fn stores_move_indoors(
+    mut commands: Commands,
+    site: Option<Res<SettlementSite>>,
+    stores: Query<&Stockpile>,
+    mut notices: MessageWriter<crate::ui::Notice>,
+    new_buildings: Query<(&Transform, &Building), Added<Building>>,
+    piles: Query<(Entity, &StorePile), Without<Rehouse>>,
+) {
+    let Some(store) = site
+        .as_ref()
+        .and_then(|site| stores.get(site.settlement).ok())
+    else {
+        return;
+    };
+    for (at, building) in &new_buildings {
+        match building.kind {
+            BuildingKind::Storehouse => {
+                for (pile, kind) in &piles {
+                    let (local, goal) = match kind.0 {
+                        PileKind::Timber => {
+                            (Vec3::new(-0.7, 0.0, 2.5), store.timber.min(24.0) as u8)
+                        }
+                        PileKind::Stone => (Vec3::new(0.7, 0.0, -2.5), store.stone.min(12.0) as u8),
+                        PileKind::Food => continue,
+                    };
+                    commands.entity(pile).insert(Rehouse {
+                        to: at.translation + at.rotation * local,
+                        to_rot: at.rotation,
+                        hauled: 0,
+                        goal: goal.max(1),
+                    });
+                }
+                notices.write(crate::ui::Notice::new(
+                    "The village begins carrying its stores in under the storehouse roof",
+                ));
+            }
+            BuildingKind::Granary => {
+                for (pile, kind) in &piles {
+                    if kind.0 != PileKind::Food {
+                        continue;
+                    }
+                    commands.entity(pile).insert(Rehouse {
+                        to: at.translation + at.rotation * Vec3::new(0.0, 0.0, 2.4),
+                        to_rot: at.rotation,
+                        hauled: 0,
+                        goal: ((store.food.min(24.0) / 2.0).ceil() as u8).max(1),
+                    });
+                }
+                notices.write(crate::ui::Notice::new(
+                    "The harvest is being carried into the granary",
+                ));
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Walks each armload across: recruit an idle carrier, load at the old
+/// pile, set down at the new spot, repeat until the pile itself follows.
+#[allow(clippy::type_complexity)]
+pub(super) fn rehouse_stores(
+    mut commands: Commands,
+    mut site: Option<ResMut<SettlementSite>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    children: Query<&Children>,
+    loads: Query<Entity, With<WoodLoad>>,
+    mut piles: Query<(Entity, &StorePile, &mut Transform, &mut Rehouse)>,
+    mut carriers: Query<
+        (
+            Entity,
+            &Transform,
+            &mut Activity,
+            &mut MoveTarget,
+            Option<&RehouseHauler>,
+            Has<RehouseLoad>,
+        ),
+        (
+            With<Villager>,
+            Without<crate::creature::Corpse>,
+            Without<Held>,
+            Without<Airborne>,
+            Without<Rehouse>,
+        ),
+    >,
+) {
+    for (pile, kind, mut pile_at, mut rehouse) in &mut piles {
+        // Finished: the pile stands at its new spot; the fetch point follows.
+        if rehouse.hauled >= rehouse.goal {
+            pile_at.translation = rehouse.to;
+            pile_at.rotation = rehouse.to_rot;
+            if kind.0 == PileKind::Timber
+                && let Some(site) = site.as_mut()
+            {
+                site.woodpile = rehouse.to;
+            }
+            commands.entity(pile).remove::<Rehouse>();
+            for (carrier, _, mut activity, mut target, hauler, _) in &mut carriers {
+                if hauler.is_some_and(|h| h.0 == pile) {
+                    commands
+                        .entity(carrier)
+                        .remove::<(RehouseHauler, RehouseLoad)>();
+                    shed_wood(&mut commands, carrier, &children, &loads);
+                    *activity = Activity::Idle;
+                    target.0 = None;
+                }
+            }
+            continue;
+        }
+
+        // A carrier on the job walks the loop; if none, recruit one.
+        let mut have_carrier = false;
+        for (carrier, at, mut activity, mut target, hauler, loaded) in &mut carriers {
+            if !hauler.is_some_and(|h| h.0 == pile) {
+                continue;
+            }
+            have_carrier = true;
+            if *activity != Activity::Hauling {
+                // Pulled away by hunger or night; release the post.
+                commands
+                    .entity(carrier)
+                    .remove::<(RehouseHauler, RehouseLoad)>();
+                shed_wood(&mut commands, carrier, &children, &loads);
+                continue;
+            }
+            if !loaded {
+                if at.translation.distance(pile_at.translation) > 2.2 {
+                    target.0 = Some(pile_at.translation);
+                } else {
+                    match kind.0 {
+                        PileKind::Timber => {
+                            shoulder_wood(&mut commands, &mut meshes, &mut materials, carrier)
+                        }
+                        PileKind::Stone => {
+                            shoulder_stone(&mut commands, &mut meshes, &mut materials, carrier)
+                        }
+                        PileKind::Food => {
+                            shoulder_sack(&mut commands, &mut meshes, &mut materials, carrier)
+                        }
+                    }
+                    commands.entity(carrier).insert(RehouseLoad);
+                }
+            } else if at.translation.distance(rehouse.to) > 2.2 {
+                target.0 = Some(rehouse.to);
+            } else {
+                rehouse.hauled += 1;
+                shed_wood(&mut commands, carrier, &children, &loads);
+                commands.entity(carrier).remove::<RehouseLoad>();
+            }
+        }
+        if !have_carrier {
+            for (carrier, _, mut activity, _, hauler, _) in &mut carriers {
+                if hauler.is_some() {
+                    continue;
+                }
+                if matches!(*activity, Activity::Idle | Activity::Wandering) {
+                    *activity = Activity::Hauling;
+                    commands.entity(carrier).insert(RehouseHauler(pile));
+                    break;
+                }
+            }
         }
     }
 }

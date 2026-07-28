@@ -49,7 +49,7 @@ pub struct DivineEvent {
 }
 
 /// The kinds of act a villager can witness.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DivineEventKind {
     /// Someone was lifted off the ground.
     Lifted,
@@ -143,7 +143,7 @@ impl DivineEventKind {
 ///
 /// Rolled once and fixed for life. Two people seeing the same thing should not do
 /// the same thing about it.
-#[derive(Component, Debug, Clone, Copy)]
+#[derive(Component, Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Temperament {
     /// 0 bolts at anything, 1 walks toward it.
     pub boldness: f32,
@@ -201,7 +201,7 @@ impl ReactionKind {
 ///
 /// Capped and counted rather than kept whole. The complete record is what `history`
 /// will be for; this is only what the person themself carries.
-#[derive(Component, Default, Debug)]
+#[derive(Component, Default, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Witnessed {
     /// Most recent first.
     pub recent: Vec<DivineEventKind>,

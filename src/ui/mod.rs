@@ -91,6 +91,9 @@ fn speak(
                     speaker: say.speaker,
                     until: time.elapsed_secs() + 4.5,
                 },
+                // Under all interface chrome: a window dragged over a bubble
+                // must cover it.
+                GlobalZIndex(-10),
                 Node {
                     position_type: PositionType::Absolute,
                     left: px(-1000),

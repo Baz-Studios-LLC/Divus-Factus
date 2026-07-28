@@ -406,6 +406,11 @@ fn populate_chunks(
                 }) {
                     continue;
                 }
+                // Tilled fields and building pads are tended ground: nothing
+                // wild seeds there, however many times the chunk rebuilds.
+                if terrain.is_worked(x, z) {
+                    continue;
+                }
 
                 let slope = terrain.slope_at(x, z);
                 let moisture = terrain.moisture_at(x, z);

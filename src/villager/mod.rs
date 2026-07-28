@@ -133,6 +133,8 @@ impl Plugin for VillagerPlugin {
                         work::haul_wood,
                         work::update_woodpile,
                         work::update_store_piles,
+                        work::stores_move_indoors,
+                        work::rehouse_stores,
                         work::track_store_trends,
                         work::log_stores,
                     )
@@ -203,7 +205,7 @@ pub struct Parentage {
 /// Fixed at birth and never changed. Everything the belief system will eventually
 /// record — what they saw, what they concluded, who they told — hangs off a person
 /// rather than an entity id.
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Person {
     pub name: String,
 }
@@ -262,7 +264,7 @@ fn record_history(
 pub struct DivineName(pub String);
 
 /// One thing that happened to one person.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LifeEvent {
     pub day: u32,
     pub text: String,
@@ -271,7 +273,7 @@ pub struct LifeEvent {
 /// A person's own history, in their own order: born, wed, bereaved, seized by
 /// the hand of god. This is the raw material doctrine will be spun from — a
 /// believer's theology is a reading of their own life.
-#[derive(Component, Default, Debug, Clone)]
+#[derive(Component, Default, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Chronicle {
     pub events: Vec<LifeEvent>,
 }
@@ -344,7 +346,7 @@ pub struct SettlementCulture {
 
 /// Everything a villager currently wants. One field for now; the scoring in
 /// [`choose_activity`] is built to take more.
-#[derive(Component, Debug)]
+#[derive(Component, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Needs {
     /// 0 is fed, 1 is starving.
     pub hunger: f32,
@@ -366,7 +368,7 @@ impl Default for Needs {
 /// The first piece of a mind that can suffer: sleeplessness wears it down,
 /// good rest restores it. Grief and awe will hang off this same number when
 /// doctrine arrives — a mind is where belief will live.
-#[derive(Component, Debug)]
+#[derive(Component, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Morale {
     pub spirits: f32,
 }

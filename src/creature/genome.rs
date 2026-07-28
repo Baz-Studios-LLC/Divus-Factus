@@ -13,7 +13,7 @@ use crate::rng::Rng;
 ///
 /// Kept deliberately coarse. The variation that matters is within a plan, not
 /// between plans.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Species {
     /// Two legs, two arms, clothed. Villagers.
     Human,
@@ -49,7 +49,7 @@ impl Species {
 /// Biological sex. Half of who can bear a child with whom — which makes it
 /// half of demography, and demography is what decides whether a village that
 /// can die can also endure.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Sex {
     Female,
     Male,
@@ -60,7 +60,7 @@ pub enum Sex {
 /// The single biggest contributor to a crowd reading as a *population* rather than
 /// as a batch of clones: a settlement of uniformly adult-sized figures looks
 /// manufactured no matter how much its colours vary.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Age {
     Child,
     Adult,
@@ -98,7 +98,7 @@ impl Age {
 }
 
 /// How a villager wears their hair. Read almost entirely as silhouette.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum HairStyle {
     Bald,
     /// Close-cropped: a single thin slab over the crown.
@@ -122,7 +122,7 @@ impl HairStyle {
 }
 
 /// Something worn on the head.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Headwear {
     None,
     /// A flat cap sitting on the crown.
@@ -143,7 +143,7 @@ impl Headwear {
 }
 
 /// Cut of clothing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Garment {
     /// Torso only; legs bare.
     Tunic,
@@ -158,7 +158,7 @@ impl Garment {
 }
 
 /// Where a creature's head sits relative to its body, and how it carries itself.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Proportions {
     /// Overall size multiplier applied to every measurement.
     pub scale: f32,
@@ -177,7 +177,7 @@ pub struct Proportions {
 }
 
 /// A colour choice: which ramp, and how far up it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Tone {
     pub ramp: usize,
     pub step: usize,
@@ -201,7 +201,7 @@ impl Tone {
 
 /// How a creature moves. Separated from proportions because gait reads as
 /// personality, and we want to vary it independently of build.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Gait {
     /// Multiplier on stride frequency.
     pub stride_rate: f32,
@@ -216,7 +216,7 @@ pub struct Gait {
 }
 
 /// The complete description of one creature's body.
-#[derive(Clone, Debug, bevy::prelude::Component)]
+#[derive(Clone, Debug, bevy::prelude::Component, serde::Serialize, serde::Deserialize)]
 pub struct CreatureGenome {
     pub species: Species,
     pub sex: Sex,

@@ -12,7 +12,7 @@ use bevy::prelude::*;
 use crate::rng::Rng;
 
 /// One inclination, virtue or flaw.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Trait {
     // Virtues.
     Diligent,
@@ -47,7 +47,7 @@ impl Trait {
 
 /// The traits a person carries: at most one virtue and one flaw, rolled at
 /// birth and kept for life.
-#[derive(Component, Debug, Default)]
+#[derive(Component, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Traits(pub Vec<Trait>);
 
 impl Traits {

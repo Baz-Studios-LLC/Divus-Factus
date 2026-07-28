@@ -375,6 +375,10 @@ struct VillageGaugeValue(VillageStat);
 #[derive(Component)]
 struct VillageLand;
 
+/// The line under the happiness gauge saying WHY it stands where it does.
+#[derive(Component)]
+struct HappinessWhy;
+
 fn spawn_village_panel(mut commands: Commands) {
     let window = ui::big_window(&mut commands, "THE VILLAGE", 560.0);
     commands.entity(window.root).insert((
@@ -442,6 +446,15 @@ fn spawn_village_panel(mut commands: Commands) {
         VillageStat::Happiness,
         crate::palette::shade(&crate::palette::GRASS, 0.7),
     );
+    commands.spawn((
+        HappinessWhy,
+        ui::dim(""),
+        Node {
+            margin: UiRect::left(px(ui::theme::LABEL_WIDTH + 10.0)),
+            ..default()
+        },
+        ChildOf(window.body),
+    ));
     gauge(
         &mut commands,
         window.body,
@@ -512,6 +525,7 @@ fn update_village_panel(
             Option<&Morale>,
             Option<&crate::villager::belief::Faith>,
             Option<&crate::villager::home::Home>,
+            Has<crate::creature::Childhood>,
         ),
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
@@ -525,11 +539,20 @@ fn update_village_panel(
         ),
     >,
     graves: Query<(), With<crate::villager::rites::Grave>>,
+    mut whys: Query<
+        &mut Text,
+        (
+            With<HappinessWhy>,
+            Without<VillageCard>,
+            Without<VillageGaugeValue>,
+            Without<VillageLand>,
+        ),
+    >,
     mut gauges: ParamSet<(
         Query<(&VillageCard, &mut Text)>,
         Query<(&VillageGaugeFill, &mut Node)>,
         Query<(&VillageGaugeValue, &mut Text)>,
-        Query<&mut Text, With<VillageLand>>,
+        Query<&mut Text, (With<VillageLand>, Without<HappinessWhy>)>,
     )>,
 ) {
     if !panels.iter().any(|v| *v != Visibility::Hidden) {
@@ -542,11 +565,22 @@ fn update_village_panel(
     let mut housed = 0usize;
     let mut trust = 0.0;
     let mut believers = 0usize;
-    for (needs, morale, faith, home) in &villagers {
+    let mut roofless_adults = 0usize;
+    let mut weary = 0usize;
+    let mut hungry = 0usize;
+    for (needs, morale, faith, home, child) in &villagers {
         spirits += morale.map_or(0.6, |m| m.spirits);
         fed += 1.0 - needs.map_or(0.3, |n| n.hunger);
         if home.is_some() {
             housed += 1;
+        } else if !child {
+            roofless_adults += 1;
+        }
+        if needs.is_some_and(|n| n.rest > 0.7) {
+            weary += 1;
+        }
+        if needs.is_some_and(|n| n.hunger > 0.5) {
+            hungry += 1;
         }
         let t = faith.map_or(0.0, |f| f.trust);
         trust += t;
@@ -599,6 +633,37 @@ fn update_village_panel(
             *text = Text::new(fresh);
         }
     }
+    // Why the happiness bar stands where it does, biggest weights first.
+    let mut reasons: Vec<(usize, String)> = Vec::new();
+    if roofless_adults > 0 {
+        reasons.push((
+            roofless_adults,
+            format!("{roofless_adults} sleep without a roof"),
+        ));
+    }
+    if weary > 0 {
+        reasons.push((weary, format!("{weary} are worn out")));
+    }
+    if hungry > 0 {
+        reasons.push((hungry, format!("{hungry} go hungry")));
+    }
+    reasons.sort_by_key(|(n, _)| std::cmp::Reverse(*n));
+    let fresh = if reasons.is_empty() {
+        "no great weight on anyone".to_string()
+    } else {
+        reasons
+            .into_iter()
+            .take(3)
+            .map(|(_, why)| why)
+            .collect::<Vec<_>>()
+            .join("  -  ")
+    };
+    if let Ok(mut text) = whys.single_mut()
+        && text.0 != fresh
+    {
+        *text = Text::new(fresh);
+    }
+
     let standing = trees.iter().filter(|t| t.harvestable()).count();
     let fresh = format!(
         "{standing} trees standing  -  {} wild things  -  {} at rest in the ground",
@@ -2062,7 +2127,10 @@ fn update_inspector(
     >,
     names: Query<&Name>,
     mut panels: Query<&mut Visibility, (With<InspectorPanel>, Without<InspectorPersonBlock>)>,
-    mut person_block: Query<&mut Visibility, (With<InspectorPersonBlock>, Without<InspectorPanel>)>,
+    mut person_block: Query<
+        (&mut Visibility, &mut Node),
+        (With<InspectorPersonBlock>, Without<InspectorPanel>),
+    >,
     mut texts: ParamSet<(
         Query<&mut Text, With<InspectorName>>,
         Query<&mut Text, With<InspectorSubtitle>>,
@@ -2103,8 +2171,9 @@ fn update_inspector(
     // A pile in the square: the store it fronts, and which way it is going.
     if let Ok(pile) = cards.1.get(entity) {
         use crate::villager::work::PileKind;
-        for mut block in &mut person_block {
+        for (mut block, mut node) in &mut person_block {
             *block = Visibility::Hidden;
+            node.display = Display::None;
         }
         let store = cards
             .3
@@ -2152,8 +2221,9 @@ fn update_inspector(
 
     // A grave: the life that ended under it, read back from the stone.
     if let Ok((grave, person, story)) = cards.0.get(entity) {
-        for mut block in &mut person_block {
+        for (mut block, mut node) in &mut person_block {
             *block = Visibility::Hidden;
+            node.display = Display::None;
         }
         if let Ok(mut name) = texts.p0().single_mut() {
             *name = Text::new(format!("The grave of {}", person.name));
@@ -2193,8 +2263,9 @@ fn update_inspector(
     )) = people.get(entity)
         && corpse.is_err()
     {
-        for mut block in &mut person_block {
+        for (mut block, mut node) in &mut person_block {
             *block = Visibility::Inherited;
+            node.display = Display::Flex;
         }
         if let Ok(mut name) = texts.p0().single_mut() {
             *name = Text::new(person.name.clone());
@@ -2292,8 +2363,9 @@ fn update_inspector(
     }
 
     // Anything else — a corpse, an animal, a bush — gets a name and one line.
-    for mut block in &mut person_block {
+    for (mut block, mut node) in &mut person_block {
         *block = Visibility::Hidden;
+        node.display = Display::None;
     }
 
     let (title, description) = if huts.get(entity).is_ok() {

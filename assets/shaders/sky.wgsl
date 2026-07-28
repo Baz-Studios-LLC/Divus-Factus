@@ -72,6 +72,27 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     color += sky.cloud.rgb * pow(toward_sun, 900.0) * 4.0 * daylight;
     color += sky.horizon.rgb * pow(toward_sun, 7.0) * 0.20 * daylight;
 
+    // The night: stars prick through as the daylight drains, and the moon
+    // rides opposite the sun, so it rises as the sun sets.
+    let night = 1.0 - smoothstep(0.05, 0.35, daylight);
+    if (night > 0.0 && elevation > 0.02) {
+        // Stars: a hash over a coarse celestial grid; only the brightest
+        // cells light, so the field is sparse and steady. Twinkle is subtle.
+        let cell = floor(dir.xz / (elevation + 0.15) * 42.0);
+        let h = fract(sin(dot(cell, vec2<f32>(127.1, 311.7))) * 43758.5453);
+        let sparkle = 0.85 + 0.15 * sin(sky.misc.x * (1.5 + h * 3.0) + h * 40.0);
+        let star = smoothstep(0.985, 0.999, h) * sparkle;
+        color += vec3<f32>(0.9, 0.93, 1.0) * star * night * 0.85;
+
+        // The moon: a pale disc with a soft halo, anti-sunward.
+        let moon_dir = normalize(vec3<f32>(-sky.sun_dir.x, abs(sky.sun_dir.y), -sky.sun_dir.z));
+        let toward_moon = max(dot(dir, moon_dir), 0.0);
+        let disc = smoothstep(0.9996, 0.99985, toward_moon);
+        let halo = pow(toward_moon, 220.0) * 0.18;
+        color += (vec3<f32>(0.86, 0.88, 0.92) * disc + vec3<f32>(0.6, 0.65, 0.78) * halo)
+            * night;
+    }
+
     // Clouds, projected onto a plane overhead so they flatten toward the
     // horizon the way real cloud decks do, drifting with time.
     if (elevation > 0.015) {

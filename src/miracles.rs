@@ -68,7 +68,7 @@ impl Plugin for MiraclesPlugin {
 }
 
 /// The miracles the god can work.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Miracle {
     Flourish,
     Smite,

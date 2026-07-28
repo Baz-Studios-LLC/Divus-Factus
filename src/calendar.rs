@@ -34,7 +34,7 @@ impl Plugin for CalendarPlugin {
 }
 
 /// World time since founding, in seconds. Everything temporal derives from this.
-#[derive(Resource)]
+#[derive(Resource, serde::Serialize, serde::Deserialize)]
 pub struct WorldClock {
     pub elapsed: f64,
 }
