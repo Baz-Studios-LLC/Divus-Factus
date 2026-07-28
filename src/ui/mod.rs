@@ -72,6 +72,7 @@ fn speak(
     mut commands: Commands,
     time: Res<Time>,
     mut messages: MessageReader<Say>,
+    names: Query<&crate::villager::Person>,
     live: Query<&Bubble>,
 ) {
     for say in messages.read() {
@@ -99,7 +100,9 @@ fn speak(
                     position_type: PositionType::Absolute,
                     left: px(-1000),
                     top: px(-1000),
-                    padding: UiRect::axes(px(7), px(3)),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: px(1),
+                    padding: UiRect::axes(px(8), px(4)),
                     border: UiRect::all(px(1)),
                     border_radius: BorderRadius::all(px(8)),
                     max_width: px(230),
@@ -109,6 +112,18 @@ fn speak(
                 BorderColor::all(border),
             ))
             .id();
+        // The name over the words, so a crowd's chatter has owners.
+        if let Ok(person) = names.get(say.speaker) {
+            commands.spawn((
+                Text::new(person.name.clone()),
+                TextFont {
+                    font_size: FontSize::Px(10.0),
+                    ..default()
+                },
+                TextColor(theme::accent().with_alpha(0.9)),
+                ChildOf(bubble),
+            ));
+        }
         commands.spawn((
             Text::new(say.text.clone()),
             TextFont {
