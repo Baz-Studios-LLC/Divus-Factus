@@ -441,6 +441,7 @@ fn spawn_god_panel(mut commands: Commands) {
     for miracle in [
         Miracle::Flourish,
         Miracle::Smite,
+        Miracle::Bounty,
         Miracle::Mend,
         Miracle::Quake,
     ] {

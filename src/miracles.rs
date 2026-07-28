@@ -36,6 +36,14 @@ pub const SMITE_COST: f32 = 4.0;
 pub const MEND_COST: f32 = 8.0;
 pub const QUAKE_COST: f32 = 8.0;
 
+/// Belief Bounty costs. Deliberately affordable from the founding pool:
+/// a new god's first act can be kindness that pays for itself, since fed
+/// witnesses convert and belief flows back.
+pub const BOUNTY_COST: f32 = 2.0;
+
+/// How far Bounty's blessing reaches from the cast point.
+const BOUNTY_RADIUS: f32 = 9.0;
+
 /// How far Mend reaches from the cast point.
 const MEND_RADIUS: f32 = 12.0;
 
@@ -60,10 +68,207 @@ impl Plugin for MiraclesPlugin {
                     style_hotbar,
                     update_belief_meter,
                     fade_bolts,
+                    tick_glory,
                 )
                     .chain()
                     .after(CameraSet),
             );
+        if std::env::var("EGREGORE_GLORY_TEST").is_ok() {
+            app.add_systems(Update, glory_test_harness);
+        }
+    }
+}
+
+/// One aging piece of a miracle's visible glory — beam, mote, ring stone
+/// or light. Everything fades on the same clock and cleans itself up.
+#[derive(Component)]
+struct Glory {
+    age: f32,
+    life: f32,
+}
+
+/// A drifting spark: carries its own velocity.
+#[derive(Component)]
+struct GloryMote(Vec3);
+
+/// The central shaft of light; it thins as the glory passes.
+#[derive(Component)]
+struct GloryBeam;
+
+/// The cast's light, with the intensity it peaks at.
+#[derive(Component)]
+struct GloryLight(f32);
+
+/// Raises the full theophany at a point: a shaft of light out of the sky,
+/// a ring of sparks breaking outward along the ground, and a slow spiral
+/// of motes — rising for blessings poured into someone, falling for
+/// blessings poured onto the land. Entirely procedural, one material.
+pub(crate) fn spawn_glory(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    at: Vec3,
+    color: Color,
+    rising: bool,
+) {
+    let glow = materials.add(StandardMaterial {
+        base_color: color.with_alpha(0.85),
+        emissive: color.to_linear() * 14.0,
+        alpha_mode: AlphaMode::Blend,
+        unlit: true,
+        ..default()
+    });
+    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+    let life = 2.4;
+
+    // The shaft, sky to ground.
+    commands.spawn((
+        Glory { age: 0.0, life },
+        GloryBeam,
+        Mesh3d(cube.clone()),
+        MeshMaterial3d(glow.clone()),
+        Transform::from_translation(at + Vec3::Y * 14.0).with_scale(Vec3::new(0.6, 28.0, 0.6)),
+        bevy::light::NotShadowCaster,
+    ));
+    // The light of it, thrown across the ground and the faces around.
+    commands.spawn((
+        Glory { age: 0.0, life },
+        GloryLight(28_000_000.0),
+        PointLight {
+            color,
+            intensity: 0.0,
+            range: 55.0,
+            shadow_maps_enabled: false,
+            ..default()
+        },
+        Transform::from_translation(at + Vec3::Y * 4.0),
+    ));
+    // The ground ring: sparks breaking outward in a circle.
+    for i in 0..18 {
+        let angle = i as f32 / 18.0 * std::f32::consts::TAU;
+        let (sin, cos) = angle.sin_cos();
+        commands.spawn((
+            Glory { age: 0.0, life },
+            GloryMote(Vec3::new(cos * 5.5, 0.6, sin * 5.5)),
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(glow.clone()),
+            Transform::from_translation(at + Vec3::new(cos * 0.8, 0.25, sin * 0.8))
+                .with_scale(Vec3::splat(0.22)),
+            bevy::light::NotShadowCaster,
+        ));
+    }
+    // The spiral of motes. Golden-angle spread, no two alike.
+    for i in 0..26 {
+        let angle = i as f32 * 2.399963;
+        let (sin, cos) = angle.sin_cos();
+        let radius = 1.1 + (i % 5) as f32 * 0.45;
+        let lift = 1.6 + (i % 3) as f32 * 0.6;
+        let (start, velocity) = if rising {
+            (
+                at + Vec3::new(cos * radius, 0.3 + (i % 4) as f32 * 0.2, sin * radius),
+                Vec3::new(-sin * 1.1, lift, cos * 1.1),
+            )
+        } else {
+            (
+                at + Vec3::new(cos * radius * 1.6, 6.0 + (i % 5) as f32, sin * radius * 1.6),
+                Vec3::new(
+                    -cos * 0.4 - sin * 0.7,
+                    -1.4 - (i % 3) as f32 * 0.5,
+                    -sin * 0.4 + cos * 0.7,
+                ),
+            )
+        };
+        commands.spawn((
+            Glory { age: 0.0, life },
+            GloryMote(velocity),
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(glow.clone()),
+            Transform::from_translation(start)
+                .with_scale(Vec3::splat(0.14 + (i % 3) as f32 * 0.05)),
+            bevy::light::NotShadowCaster,
+        ));
+    }
+}
+
+/// Ages every piece of glory: motes drift, the beam thins, the light
+/// swells and dies, the shared material fades, and everything despawns
+/// together.
+#[allow(clippy::type_complexity)]
+fn tick_glory(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut parts: Query<(
+        Entity,
+        &mut Glory,
+        &mut Transform,
+        Option<&GloryMote>,
+        Option<&GloryBeam>,
+        Option<&GloryLight>,
+        Option<&mut PointLight>,
+        Option<&MeshMaterial3d<StandardMaterial>>,
+    )>,
+) {
+    let dt = time.delta_secs();
+    for (entity, mut glory, mut transform, mote, beam, peak, light, material) in &mut parts {
+        glory.age += dt;
+        let t = (glory.age / glory.life).min(1.0);
+        if let Some(GloryMote(velocity)) = mote {
+            transform.translation += *velocity * dt;
+        }
+        if beam.is_some() {
+            let girth = 0.6 * (1.0 - t * 0.85);
+            transform.scale.x = girth;
+            transform.scale.z = girth;
+        }
+        if let (Some(GloryLight(peak)), Some(mut light)) = (peak, light) {
+            // Fast attack, long decay: a struck bell of light.
+            light.intensity = peak * (t * 7.0).min(1.0) * (1.0 - t);
+        }
+        if let Some(material) = material {
+            let faded = 0.85 * (1.0 - t);
+            if let Some(mut glow) = materials.get_mut(&material.0) {
+                glow.base_color.set_alpha(faded);
+            }
+        }
+        if glory.age >= glory.life {
+            commands.entity(entity).despawn();
+        }
+    }
+}
+
+/// Raises one of each glory near the settlement, once, so a capture run
+/// can look at them. Only registered under EGREGORE_GLORY_TEST.
+fn glory_test_harness(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut fired: Local<bool>,
+    site: Option<Res<SettlementSite>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let Some(site) = site else {
+        return;
+    };
+    if !*fired && time.elapsed_secs() > 18.0 {
+        *fired = true;
+        info!("GLORY_TEST: raising bounty and mend glories");
+        spawn_glory(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            site.centre + Vec3::new(-7.0, 0.0, 0.0),
+            crate::palette::shade(&crate::palette::GRASS, 0.9),
+            false,
+        );
+        spawn_glory(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            site.centre + Vec3::new(7.0, 0.0, 0.0),
+            Color::srgb(1.0, 0.88, 0.55),
+            true,
+        );
     }
 }
 
@@ -72,6 +277,8 @@ impl Plugin for MiraclesPlugin {
 pub enum Miracle {
     Flourish,
     Smite,
+    /// The cheap early kindness: bushes near the touch fruit heavily.
+    Bounty,
     /// Earned by a legend of providence: the broken made whole.
     Mend,
     /// Earned by a legend of dread: the ground thrown like a blanket.
@@ -83,6 +290,7 @@ impl Miracle {
         match self {
             Miracle::Flourish => "Flourish",
             Miracle::Smite => "Smite",
+            Miracle::Bounty => "Bounty",
             Miracle::Mend => "Mend",
             Miracle::Quake => "Quake",
         }
@@ -92,6 +300,7 @@ impl Miracle {
         match self {
             Miracle::Flourish => FLOURISH_COST,
             Miracle::Smite => SMITE_COST,
+            Miracle::Bounty => BOUNTY_COST,
             Miracle::Mend => MEND_COST,
             Miracle::Quake => QUAKE_COST,
         }
@@ -101,8 +310,9 @@ impl Miracle {
         match self {
             Miracle::Flourish => KeyCode::Digit1,
             Miracle::Smite => KeyCode::Digit2,
-            // Whichever of the pair is earned takes the third slot.
-            Miracle::Mend | Miracle::Quake => KeyCode::Digit3,
+            Miracle::Bounty => KeyCode::Digit3,
+            // Whichever of the pair is earned takes the fourth slot.
+            Miracle::Mend | Miracle::Quake => KeyCode::Digit4,
         }
     }
 }
@@ -215,7 +425,7 @@ fn spawn_hotbar(mut commands: Commands) {
     for (index, miracle) in [
         Some(Miracle::Flourish),
         Some(Miracle::Smite),
-        None,
+        Some(Miracle::Bounty),
         None,
         None,
         None,
@@ -314,6 +524,35 @@ fn spawn_hotbar(mut commands: Commands) {
                         ))
                         .id();
                     commands.entity(jag).insert(ChildOf(slot));
+                }
+            }
+            // A cluster of berries under a leaf — the bounty.
+            Some(Miracle::Bounty) => {
+                for (l, t, s, red) in [
+                    (14.0, 20.0, 8.0, true),
+                    (22.0, 22.0, 8.0, true),
+                    (18.0, 14.0, 8.0, true),
+                    (16.0, 8.0, 12.0, false),
+                ] {
+                    let dot = commands
+                        .spawn((
+                            Node {
+                                position_type: PositionType::Absolute,
+                                left: px(l),
+                                top: px(t),
+                                width: px(s),
+                                height: px(if red { s } else { 5.0 }),
+                                border_radius: BorderRadius::all(px(4)),
+                                ..default()
+                            },
+                            BackgroundColor(if red {
+                                crate::palette::shade(&crate::palette::CLOTH_RED, 0.7)
+                            } else {
+                                crate::palette::shade(&crate::palette::GRASS, 0.7)
+                            }),
+                        ))
+                        .id();
+                    commands.entity(dot).insert(ChildOf(slot));
                 }
             }
             _ => {}
@@ -420,6 +659,7 @@ fn choose_miracle(
     for miracle in [
         Miracle::Flourish,
         Miracle::Smite,
+        Miracle::Bounty,
         Miracle::Mend,
         Miracle::Quake,
     ] {
@@ -475,6 +715,44 @@ fn cast(
     let god = name.as_ref().map_or("the god", |n| n.0.as_str());
 
     match miracle {
+        Miracle::Bounty => {
+            if belief.available() < BOUNTY_COST {
+                return;
+            }
+            // The blessing needs something living to land on.
+            let mut blessed = 0;
+            for (bush_at, mut bush) in &mut bushes {
+                if bush_at.translation().distance(at) <= BOUNTY_RADIUS {
+                    bush.amount = FoodSource::CAPACITY;
+                    blessed += 1;
+                }
+            }
+            if blessed == 0 {
+                notices.write(crate::ui::Notice::new(
+                    "Nothing grows there for Bounty to bless".to_string(),
+                ));
+                return;
+            }
+            belief.spent += BOUNTY_COST;
+            spawn_glory(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                at,
+                crate::palette::shade(&crate::palette::GRASS, 0.9),
+                false,
+            );
+            info!("{god} blessed the bushes with plenty");
+            notices.write(crate::ui::Notice::fanfare(format!(
+                "{god} blessed the bushes with plenty"
+            )));
+            witnessed.write(DivineEvent {
+                kind: DivineEventKind::Provided,
+                position: at,
+                subject: None,
+                intensity: 0.8,
+            });
+        }
         Miracle::Flourish => {
             let Some(site) = site else {
                 return;
@@ -482,6 +760,14 @@ fn cast(
             if !crate::villager::belief::flourish(&mut belief, &site, &mut bushes) {
                 return;
             }
+            spawn_glory(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                site.centre,
+                crate::palette::shade(&crate::palette::GRASS, 0.85),
+                true,
+            );
             info!("{god} made the land flourish");
             notices.write(crate::ui::Notice::fanfare(format!(
                 "{god} made the land flourish"
@@ -527,6 +813,18 @@ fn cast(
         Miracle::Mend | Miracle::Quake => {
             if belief.available() < miracle.cost() {
                 return;
+            }
+            // Mending arrives as warm rising light; the quake speaks for
+            // itself in thrown bodies.
+            if miracle == Miracle::Mend {
+                spawn_glory(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    at,
+                    Color::srgb(1.0, 0.88, 0.55),
+                    true,
+                );
             }
             cast_earned(
                 miracle,
