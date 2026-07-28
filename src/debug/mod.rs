@@ -2217,6 +2217,7 @@ fn update_inspector(
         Query<&crate::villager::work::StorePile>,
         Option<Res<crate::villager::work::StoreTrends>>,
         Option<Res<crate::villager::SettlementSite>>,
+        Query<&crate::villager::work::Building>,
     ),
     kin_names: Query<&Person>,
     settlements: Query<&Settlement>,
@@ -2323,6 +2324,72 @@ fn update_inspector(
             *detail_visibility = Visibility::Inherited;
         }
         return;
+    }
+
+    // A storehouse or granary: what shelters under its roof, and the drift.
+    if let Ok(building) = cards.4.get(entity) {
+        use crate::villager::work::{BuildingKind, PileKind};
+        let holds: &[(PileKind, &str)] = match building.kind {
+            BuildingKind::Storehouse => &[(PileKind::Timber, "logs"), (PileKind::Stone, "stone")],
+            BuildingKind::Granary => &[(PileKind::Food, "food")],
+            _ => &[],
+        };
+        if !holds.is_empty() {
+            for (mut block, mut node) in &mut person_block {
+                *block = Visibility::Hidden;
+                node.display = Display::None;
+            }
+            let store = cards
+                .3
+                .as_ref()
+                .and_then(|site| settlement_info.get(site.settlement).ok())
+                .map(|(_, store)| store);
+            if let Ok(mut name) = texts.p0().single_mut() {
+                *name = Text::new(building.kind.name());
+            }
+            if let Ok(mut subtitle) = texts.p1().single_mut() {
+                let fresh = holds
+                    .iter()
+                    .map(|(kind, word)| {
+                        let amount = store.map_or(0.0, |s| match kind {
+                            PileKind::Food => s.food,
+                            PileKind::Timber => s.timber,
+                            PileKind::Stone => s.stone,
+                        });
+                        format!("{amount:.0} {word}")
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let fresh = format!("{fresh} under its roof");
+                if subtitle.0 != fresh {
+                    *subtitle = Text::new(fresh);
+                }
+            }
+            if let Ok((mut detail, mut detail_visibility)) = texts.p2().single_mut() {
+                let fresh = holds
+                    .iter()
+                    .map(|(kind, word)| {
+                        let rate = cards
+                            .2
+                            .as_ref()
+                            .map_or(0.0, |trends| trends.rate_per_minute(*kind));
+                        if rate > 0.5 {
+                            format!("{word}: growing, about {rate:.0} a minute")
+                        } else if rate < -0.5 {
+                            format!("{word}: being drawn down, {:.0} a minute", -rate)
+                        } else {
+                            format!("{word}: holding steady")
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                if detail.0 != fresh {
+                    *detail = Text::new(fresh);
+                }
+                *detail_visibility = Visibility::Inherited;
+            }
+            return;
+        }
     }
 
     // A grave: the life that ended under it, read back from the stone.
