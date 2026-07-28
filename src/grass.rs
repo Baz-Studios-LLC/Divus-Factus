@@ -88,8 +88,33 @@ fn drive_wind(time: Res<Time>, mut materials: ResMut<Assets<GrassMaterial>>) {
 
 /// Grass chunks currently alive.
 #[derive(Resource, Default)]
-struct GrassChunks {
+pub struct GrassChunks {
     entities: HashMap<IVec2, Entity>,
+}
+
+impl GrassChunks {
+    /// Forget (and despawn) the grass over a circle - called when the ground
+    /// under it is worked, so the blades rebuild against the new terrain.
+    pub fn invalidate_near(&mut self, commands: &mut Commands, x: f32, z: f32, radius: f32) {
+        let min_x = ((x - radius) / crate::terrain::CHUNK_SIZE).floor() as i32;
+        let max_x = ((x + radius) / crate::terrain::CHUNK_SIZE).floor() as i32;
+        let min_z = ((z - radius) / crate::terrain::CHUNK_SIZE).floor() as i32;
+        let max_z = ((z + radius) / crate::terrain::CHUNK_SIZE).floor() as i32;
+        self.entities.retain(|coord, entity| {
+            let hit = coord.x >= min_x && coord.x <= max_x && coord.y >= min_z && coord.y <= max_z;
+            if hit {
+                commands.entity(*entity).despawn();
+            }
+            !hit
+        });
+    }
+
+    /// Forget everything, for a full world reload.
+    pub fn invalidate_all(&mut self, commands: &mut Commands) {
+        for (_, entity) in self.entities.drain() {
+            commands.entity(entity).despawn();
+        }
+    }
 }
 
 #[derive(Resource)]

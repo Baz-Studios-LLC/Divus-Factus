@@ -231,12 +231,12 @@ pub struct MemberOf(pub Entity);
 /// The written history of the world: every notice the simulation announces is
 /// also entered here, permanently. Personal chronicles forget their middles;
 /// the world's chronicle forgets nothing.
-#[derive(Resource, Default)]
+#[derive(Resource, Default, serde::Serialize, serde::Deserialize)]
 pub struct WorldChronicle {
     pub events: Vec<HistoryEvent>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HistoryEvent {
     pub stamp: String,
     pub text: String,

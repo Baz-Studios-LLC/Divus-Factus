@@ -34,6 +34,10 @@ struct SettingsButton;
 #[derive(Component)]
 struct QuitButton;
 
+/// A title-screen load button for one save slot.
+#[derive(Component)]
+struct TitleLoadButton(u8);
+
 /// The settings overlay, above the title.
 #[derive(Component)]
 struct SettingsScreen;
@@ -134,6 +138,11 @@ fn spawn_title(
 
     let begin = menu_button(&mut commands, screen, "Begin");
     commands.entity(begin).insert(BeginButton);
+    // A load button per occupied slot, labelled with the world it holds.
+    for (slot, label) in crate::save::slot_summaries() {
+        let load = menu_button(&mut commands, screen, &label);
+        commands.entity(load).insert(TitleLoadButton(slot));
+    }
     let settings = menu_button(&mut commands, screen, "Settings");
     commands.entity(settings).insert(SettingsButton);
     let quit = menu_button(&mut commands, screen, "Quit");
@@ -272,6 +281,7 @@ fn despawn_title(
 fn handle_choice(
     mut commands: Commands,
     begin: Query<&Interaction, (Changed<Interaction>, With<BeginButton>)>,
+    loads: Query<(&Interaction, &TitleLoadButton), Changed<Interaction>>,
     settings: Query<&Interaction, (Changed<Interaction>, With<SettingsButton>)>,
     quit: Query<&Interaction, (Changed<Interaction>, With<QuitButton>)>,
     open_settings: Query<Entity, With<SettingsScreen>>,
@@ -280,6 +290,14 @@ fn handle_choice(
 ) {
     for interaction in &begin {
         if *interaction == Interaction::Pressed {
+            next.set(GameState::Loading);
+        }
+    }
+    // Loading a slot restores the saved world behind the title, then enters
+    // it through the same door Begin uses.
+    for (interaction, button) in &loads {
+        if *interaction == Interaction::Pressed {
+            commands.insert_resource(crate::save::PendingLoad(button.0));
             next.set(GameState::Loading);
         }
     }

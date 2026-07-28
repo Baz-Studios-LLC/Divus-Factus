@@ -1673,7 +1673,11 @@ pub(super) fn do_work(
         Query<&super::Settlement>,
         MessageWriter<crate::ui::Notice>,
     ),
-    ground: (Res<Terrain>, ResMut<crate::terrain::LoadedChunks>),
+    ground: (
+        Res<Terrain>,
+        ResMut<crate::terrain::LoadedChunks>,
+        ResMut<crate::grass::GrassChunks>,
+    ),
     assets: (ResMut<Assets<Mesh>>, ResMut<Assets<StandardMaterial>>),
     mut prey_query: Query<
         (
@@ -1691,7 +1695,7 @@ pub(super) fn do_work(
     let (carrying, children, loads) = (carrying, children, loads);
     let (carrying_stone, mut patients, mut fields_mut, mut kitchen) = trades;
     let (mut build_sites, settlements, mut notices) = civic;
-    let (terrain, mut chunks) = ground;
+    let (terrain, mut chunks, mut grass) = ground;
     let (mut meshes, mut materials) = assets;
     let Some(site) = site else {
         return;
@@ -2140,6 +2144,7 @@ pub(super) fn do_work(
                     for chunk in chunks.take_near(job.site.x, job.site.z, 7.0) {
                         commands.entity(chunk).despawn();
                     }
+                    grass.invalidate_near(&mut commands, job.site.x, job.site.z, 7.0);
                     let at = Vec3::new(job.site.x, level, job.site.z);
                     let rotation = Quat::from_rotation_y({
                         let toward = (site.centre - at).with_y(0.0);
@@ -2616,7 +2621,10 @@ pub(super) fn plan_houses(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     standing: Query<(Entity, &GlobalTransform), With<crate::scatter::FellableTree>>,
-    mut chunks: ResMut<crate::terrain::LoadedChunks>,
+    mut ground: (
+        ResMut<crate::terrain::LoadedChunks>,
+        ResMut<crate::grass::GrassChunks>,
+    ),
     people: Query<(), (With<Villager>, Without<Corpse>)>,
     civics: Query<&Building>,
     pending: Query<&Blueprint, With<ConstructionSite>>,
@@ -2705,9 +2713,11 @@ pub(super) fn plan_houses(
         // into a slope. This is what a foundation is *for*.
         let pad = plan.half_w.max(plan.half_d) + 1.6;
         terrain.flatten(at.x, at.z, pad, 2.4, at.y);
+        let (chunks, grass) = &mut ground;
         for chunk in chunks.take_near(at.x, at.z, pad + 4.0) {
             commands.entity(chunk).despawn();
         }
+        grass.invalidate_near(&mut commands, at.x, at.z, pad + 4.0);
 
         // And clears it: any tree standing inside the footprint is felled
         // into the pile, not built around. Nobody roofs over a living oak.

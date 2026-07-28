@@ -40,6 +40,7 @@ impl Plugin for SavePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_saves_window)
             .add_systems(Update, (handle_slot_buttons, refresh_slot_labels))
+            .add_systems(Update, patch_wild)
             .add_systems(Update, process_requests.run_if(request_pending));
         if std::env::var("EGREGORE_SAVE_TEST").is_ok() {
             app.add_systems(Update, save_test_harness);
@@ -109,6 +110,31 @@ struct SaveGame {
     fields: Vec<(Vec3, Quat, f32, Option<usize>)>,
     graves: Vec<(Vec3, Quat, u32, Person, Chronicle)>,
     wildlife: Vec<(Vec3, CreatureGenome, f32, Vec3)>,
+    // --- version 2: the rest of everything ---
+    #[serde(default)]
+    history: Vec<crate::villager::HistoryEvent>,
+    #[serde(default)]
+    kitchen_until: f64,
+    #[serde(default)]
+    corpses: Vec<(
+        Vec3,
+        Quat,
+        Person,
+        CreatureGenome,
+        Option<Chronicle>,
+        Option<f64>,
+    )>,
+    #[serde(default)]
+    rehousing: Vec<(u8, Vec3, Quat, u8, u8)>,
+    /// Chunk coords whose wild contents were fully captured at save time.
+    #[serde(default)]
+    patched_chunks: Vec<IVec2>,
+    #[serde(default)]
+    trees: Vec<(Vec3, f32)>,
+    #[serde(default)]
+    bushes: Vec<(Vec3, f32)>,
+    #[serde(default)]
+    boulders: Vec<(Vec3, Vec3)>,
 }
 
 fn slots_dir() -> std::path::PathBuf {
@@ -439,6 +465,76 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         .map(|(t, genome, wild)| (t.translation, genome.clone(), wild.hunger, wild.home))
         .collect();
 
+    let history = world
+        .get_resource::<crate::villager::WorldChronicle>()
+        .map(|h| h.events.clone())
+        .unwrap_or_default();
+    let kitchen_until = world
+        .get_resource::<crate::villager::work::KitchenWarm>()
+        .map_or(0.0, |k| k.until);
+    let corpses: Vec<(
+        Vec3,
+        Quat,
+        Person,
+        CreatureGenome,
+        Option<Chronicle>,
+        Option<f64>,
+    )> = world
+        .query_filtered::<(
+            &Transform,
+            &Person,
+            &CreatureGenome,
+            Option<&Chronicle>,
+            Option<&rites::Passing>,
+        ), (With<Villager>, With<Corpse>)>()
+        .iter(world)
+        .map(|(t, person, genome, chronicle, passing)| {
+            (
+                t.translation,
+                t.rotation,
+                person.clone(),
+                genome.clone(),
+                chronicle.cloned(),
+                passing.map(|p| p.since),
+            )
+        })
+        .collect();
+    let rehousing: Vec<(u8, Vec3, Quat, u8, u8)> = world
+        .query::<(&StorePile, &crate::villager::work::Rehouse)>()
+        .iter(world)
+        .map(|(pile, r)| {
+            let kind = match pile.0 {
+                PileKind::Food => 0,
+                PileKind::Timber => 1,
+                PileKind::Stone => 2,
+            };
+            (kind, r.to, r.to_rot, r.hauled, r.goal)
+        })
+        .collect();
+    // The wild things whose chunks are loaded right now are fully known;
+    // their chunks go in the ledger so the loader only patches ground it
+    // truly knew.
+    let patched_chunks: Vec<IVec2> = world
+        .query::<(&TerrainChunk, &Transform)>()
+        .iter(world)
+        .map(|(chunk, _)| chunk.coord)
+        .collect();
+    let trees: Vec<(Vec3, f32)> = world
+        .query::<(&GlobalTransform, &crate::scatter::FellableTree)>()
+        .iter(world)
+        .map(|(t, tree)| (t.translation(), tree.maturity))
+        .collect();
+    let bushes: Vec<(Vec3, f32)> = world
+        .query::<(&GlobalTransform, &crate::scatter::FoodSource)>()
+        .iter(world)
+        .map(|(t, bush)| (t.translation(), bush.amount))
+        .collect();
+    let boulders: Vec<(Vec3, Vec3)> = world
+        .query_filtered::<&Transform, With<crate::matter::Boulder>>()
+        .iter(world)
+        .map(|t| (t.translation, t.scale))
+        .collect();
+
     let label_day = world.resource::<crate::calendar::WorldClock>().day();
     Some(SaveGame {
         version: 1,
@@ -465,6 +561,14 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         fields,
         graves,
         wildlife,
+        history,
+        kitchen_until,
+        corpses,
+        rehousing,
+        patched_chunks,
+        trees,
+        bushes,
+        boulders,
     })
 }
 
@@ -498,6 +602,11 @@ fn apply(world: &mut World, save: SaveGame) {
         }
     }
     world.resource_mut::<LoadedChunks>().take_all();
+    world.resource_scope(|world, mut grass: Mut<crate::grass::GrassChunks>| {
+        let mut commands = world.commands();
+        grass.invalidate_all(&mut commands);
+    });
+    world.flush();
     {
         let mut hand = world.resource_mut::<crate::hand::DivineHand>();
         hand.held = None;
@@ -557,6 +666,12 @@ fn apply(world: &mut World, save: SaveGame) {
         fire.tender = None;
     }
     world.insert_resource(save.known);
+    world.insert_resource(crate::villager::WorldChronicle {
+        events: save.history.clone(),
+    });
+    world.insert_resource(crate::villager::work::KitchenWarm {
+        until: save.kitchen_until,
+    });
     world.insert_resource(Belief {
         total: save.belief.0,
         spent: save.belief.1,
@@ -810,6 +925,61 @@ fn apply(world: &mut World, save: SaveGame) {
         });
         world.flush();
     }
+    for (pos, rot, person, genome, chronicle, passing) in &save.corpses {
+        let entity = world.resource_scope(|world, assets: Mut<CreatureAssets>| {
+            let mut commands = world.commands();
+            spawn_creature(&mut commands, &assets, genome.clone(), *pos, 0.0, 0.0)
+        });
+        world.flush();
+        {
+            let mut commands = world.commands();
+            let mut e = commands.entity(entity);
+            e.insert((Villager, person.clone(), Corpse));
+            if let Some(chronicle) = chronicle {
+                e.insert(chronicle.clone());
+            }
+            if let Some(since) = passing {
+                e.insert(rites::Passing { since: *since });
+            }
+        }
+        world.flush();
+        if let Some(mut transform) = world.get_mut::<Transform>(entity) {
+            transform.rotation = *rot;
+        }
+    }
+    world.insert_resource(WorldPatch {
+        chunks: save.patched_chunks.iter().copied().collect(),
+        trees: save.trees.clone(),
+        bushes: save.bushes.clone(),
+    });
+    world.resource_scope(|world, mut meshes: Mut<Assets<Mesh>>| {
+        world.resource_scope(|world, mut materials: Mut<Assets<StandardMaterial>>| {
+            world.resource_scope(|world, mut rng: Mut<crate::villager::SimRng>| {
+                let material = materials.add(StandardMaterial {
+                    base_color: crate::palette::shade(&crate::palette::STONE, 0.45),
+                    perceptual_roughness: 1.0,
+                    ..default()
+                });
+                let mut commands = world.commands();
+                for (pos, scale) in &save.boulders {
+                    let boulder = crate::scatter::spawn_boulder(
+                        &mut commands,
+                        &mut meshes,
+                        material.clone(),
+                        *pos,
+                        &mut rng.0,
+                    );
+                    commands.entity(boulder).insert(SavedBoulder);
+                    commands.entity(boulder).entry::<Transform>().and_modify({
+                        let scale = *scale;
+                        move |mut t| t.scale = scale
+                    });
+                }
+            });
+        });
+    });
+    world.flush();
+
     for (pos, genome, hunger, home) in &save.wildlife {
         let entity = world.resource_scope(|world, assets: Mut<CreatureAssets>| {
             let mut commands = world.commands();
@@ -829,6 +999,113 @@ fn apply(world: &mut World, save: SaveGame) {
     world.flush();
 }
 
+/// A saved boulder, exempt from the wild patch's dedupe sweep.
+#[derive(Component)]
+pub struct SavedBoulder;
+
+/// What the save knew about the wild ground, applied as chunks stream back
+/// in: known trees get their maturity, unknown trees in known chunks were
+/// felled before the save and despawn, bushes get their fruit back, and
+/// freshly scattered boulders in known chunks yield to the saved ones.
+#[derive(Resource)]
+pub struct WorldPatch {
+    chunks: std::collections::HashSet<IVec2>,
+    trees: Vec<(Vec3, f32)>,
+    bushes: Vec<(Vec3, f32)>,
+}
+
+#[allow(clippy::type_complexity)]
+fn patch_wild(
+    mut commands: Commands,
+    patch: Option<ResMut<WorldPatch>>,
+    terrain: Option<Res<Terrain>>,
+    chunk_transforms: Query<&Transform, With<TerrainChunk>>,
+    mut new_trees: Query<
+        (
+            Entity,
+            &ChildOf,
+            &Transform,
+            &mut crate::scatter::FellableTree,
+        ),
+        (Added<crate::scatter::FellableTree>, Without<TerrainChunk>),
+    >,
+    mut new_bushes: Query<
+        (
+            Entity,
+            &ChildOf,
+            &Transform,
+            &mut crate::scatter::FoodSource,
+        ),
+        (Added<crate::scatter::FoodSource>, Without<TerrainChunk>),
+    >,
+    new_boulders: Query<
+        (Entity, &Transform),
+        (
+            Added<crate::matter::Boulder>,
+            Without<SavedBoulder>,
+            Without<TerrainChunk>,
+        ),
+    >,
+) {
+    let (Some(mut patch), Some(terrain)) = (patch, terrain) else {
+        return;
+    };
+    let world_of = |childof: &ChildOf, local: &Transform| -> Option<Vec3> {
+        chunk_transforms
+            .get(childof.parent())
+            .ok()
+            .map(|chunk| chunk.translation + local.translation)
+    };
+    for (entity, childof, local, mut tree) in &mut new_trees {
+        let Some(at) = world_of(childof, local) else {
+            continue;
+        };
+        if !patch.chunks.contains(&terrain.chunk_of(at.x, at.z)) {
+            continue;
+        }
+        let found = patch
+            .trees
+            .iter()
+            .position(|(saved, _)| saved.distance(at) < 1.2);
+        match found {
+            Some(i) => {
+                tree.maturity = patch.trees.swap_remove(i).1;
+            }
+            None => {
+                // This tree was felled before the save; it stays felled.
+                commands.entity(entity).despawn();
+            }
+        }
+    }
+    for (entity, childof, local, mut bush) in &mut new_bushes {
+        let Some(at) = world_of(childof, local) else {
+            continue;
+        };
+        if !patch.chunks.contains(&terrain.chunk_of(at.x, at.z)) {
+            continue;
+        }
+        let found = patch
+            .bushes
+            .iter()
+            .position(|(saved, _)| saved.distance(at) < 1.2);
+        match found {
+            Some(i) => {
+                bush.amount = patch.bushes.swap_remove(i).1;
+            }
+            None => {
+                commands.entity(entity).despawn();
+            }
+        }
+    }
+    for (entity, transform) in &new_boulders {
+        let at = transform.translation;
+        if patch.chunks.contains(&terrain.chunk_of(at.x, at.z)) {
+            // The save's own boulders stand in for these.
+            commands.entity(entity).despawn();
+        }
+    }
+}
+
 /// Unattended round-trip check: save to slot 3 at 25 s, load it at 32 s.
 /// Only registered under EGREGORE_SAVE_TEST; greppable in the log.
 fn save_test_harness(mut commands: Commands, time: Res<Time>, mut fired: Local<u8>) {
@@ -842,6 +1119,23 @@ fn save_test_harness(mut commands: Commands, time: Res<Time>, mut fired: Local<u
         info!("SAVE_TEST: loading slot 3");
         commands.insert_resource(PendingLoad(3));
     }
+}
+
+/// The occupied slots and their card lines, for the title screen's menu.
+pub fn slot_summaries() -> Vec<(u8, String)> {
+    (1..=3u8)
+        .filter_map(|slot| {
+            read_slot(slot).ok().map(|save| {
+                (
+                    slot,
+                    format!(
+                        "Load: day {}, {} ({} souls)",
+                        save.label_day, save.label_settlement, save.label_souls
+                    ),
+                )
+            })
+        })
+        .collect()
 }
 
 // -------------------------------------------------------------------- the UI

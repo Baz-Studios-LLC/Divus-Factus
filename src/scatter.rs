@@ -583,7 +583,7 @@ fn spawn_tree(
 
 /// Spawns one loose boulder entity, near the settlement where the simulation
 /// (and the hand, and the miners) can touch it.
-fn spawn_boulder(
+pub(crate) fn spawn_boulder(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     material: Handle<StandardMaterial>,
