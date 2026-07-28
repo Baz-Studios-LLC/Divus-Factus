@@ -76,19 +76,26 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     // rides opposite the sun - it moves all night, mirroring the sun's arc.
     let night = 1.0 - smoothstep(0.05, 0.35, daylight);
     if (night > 0.0 && elevation > 0.01) {
-        // Stars on the celestial sphere itself: cells in longitude/latitude,
-        // so the field is even from horizon to zenith with no smearing. The
-        // hash avoids large sin() arguments, which lose precision on GPUs
-        // and were erasing whole bands of sky.
-        let sph = vec2<f32>(atan2(dir.z, dir.x), asin(clamp(dir.y, -1.0, 1.0)));
-        let cell = floor(sph * vec2<f32>(64.0, 44.0));
-        var p3 = fract(vec3<f32>(cell.xyx) * 0.1031);
-        p3 += dot(p3, p3.yzx + 33.33);
+        // Stars as points, not cells: the view direction indexes a 3D grid
+        // over the unit sphere; a winning cell draws one small round star
+        // at a hashed spot inside it, with distance falloff. Uniform from
+        // horizon to zenith - no poles, no rectangles.
+        let p = dir * 110.0;
+        let cell = floor(p);
+        var p3 = fract(cell * 0.1031);
+        p3 += dot(p3, p3.zyx + 31.32);
         let h = fract((p3.x + p3.y) * p3.z);
-        let sparkle = 0.82 + 0.18 * sin(sky.misc.x * (1.0 + h * 3.0) + h * 40.0);
+        var q3 = fract(cell * vec3<f32>(0.1031, 0.103, 0.0973));
+        q3 += dot(q3, q3.yxz + 33.33);
+        let jitter = fract(vec3<f32>((q3.x + q3.y) * q3.z, (q3.x + q3.z) * q3.y,
+            (q3.y + q3.z) * q3.x));
+        let centre_of = cell + 0.5 + (jitter - 0.5) * 0.7;
+        let dist = length(p - centre_of);
+        let point = smoothstep(0.38, 0.05, dist);
+        let sparkle = 0.8 + 0.2 * sin(sky.misc.x * (1.0 + h * 3.0) + h * 40.0);
         let horizon_fade = smoothstep(0.02, 0.14, elevation);
-        let star = smoothstep(0.978, 0.997, h) * sparkle * horizon_fade;
-        color += vec3<f32>(0.9, 0.93, 1.0) * star * night * 0.9;
+        let star = step(0.965, h) * point * sparkle * horizon_fade;
+        color += vec3<f32>(0.9, 0.93, 1.0) * star * night * 0.95;
 
         // The moon: a pale disc with a soft halo, exactly anti-sunward, so
         // it climbs while the sun sinks and sets as morning comes.
