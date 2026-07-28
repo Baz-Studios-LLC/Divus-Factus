@@ -294,13 +294,26 @@ The design's central claim, built at the smallest scale that can prove it.
       Chatty/Quiet (gossip rate), Hardy (endurance), Glutton (appetite);
       shown as the dossier's "manner" row, confessed in small talk
 
+- [x] Save slots (three, guarded delete, load from title through the same
+      window), everything captured down to per-tree forest state; the world
+      pauses behind the title
+- [x] Weather: eased fronts driving clouds, greyed light, rain, wind, felt
+      temperature; rain waters crops, weather slows work, the fire eats
+      faster, storms ground expeditions, cold wet nights grind the roofless
+- [x] **False attribution lives**: storm lightning is the same bolt, harm,
+      and witnessed event as a Smite, and it ignites trees - fire leaps in
+      the wind until rain quenches it. A forced-storm test converted a
+      witness and raised belief 4.2 to 7.5 with the god idle
+- [x] The village window is tabbed (OVERVIEW / FAITH: who believes and the
+      chronicle line that made them); tab bar is a kit piece
+
 **Agreed, next:** Guards and expedition parties (explorer + one or two
-guards; wolves as expedition danger; combat verbs for villagers). Then the
-life-cycle/calendar decision, seasons, and weather. After those: Milestone
-3.75, "the world is made of stuff" - substance states with one transfer
-rule, containers as objects, village animals, one ingestion pipeline - the
-batch that makes unscripted cross-system stories (the cat and the spillage,
-as a class) possible.
+guards; wolves as expedition danger; combat verbs for villagers). The
+life-cycle/calendar decision (recommendation: a day is a season) and
+seasons riding the weather system. Then Milestone 3.75, "the world is made
+of stuff" - substance states with one transfer rule (burning trees are the
+first citizen), containers as objects, village animals, one ingestion
+pipeline.
 
 - Witness system: who saw what, from how far, in what context
 - `Event` → `Interpretation` → `Doctrine`, with motivated (not random) misreading
