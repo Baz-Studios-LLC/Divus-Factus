@@ -420,6 +420,7 @@ fn handle_grab_and_release(
     mut hand: ResMut<DivineHand>,
     mut motions: Query<&mut CreatureMotion>,
     transforms: Query<&GlobalTransform>,
+    parents: Query<(), With<ChildOf>>,
     rooted: Query<(), With<Rooted>>,
     trees: Query<&crate::scatter::FellableTree>,
     matters: Query<&crate::matter::Matter>,
@@ -456,6 +457,18 @@ fn handle_grab_and_release(
             .remove::<crate::matter::Rolling>()
             .remove::<crate::matter::Floating>()
             .insert(MoveTarget(None));
+
+        // Anything living in a chunk's coordinate space leaves it the
+        // moment the god's hand closes: held transforms are written in
+        // world coordinates, and a boulder still parented to its chunk
+        // would teleport by the chunk's whole offset at the first tug —
+        // a stone that vanishes from the hand.
+        if parents.get(entity).is_ok() {
+            commands
+                .entity(entity)
+                .remove::<ChildOf>()
+                .insert(transform.compute_transform());
+        }
 
         // Grabbing a living tree is an uprooting: it leaves the ground's
         // ownership (and its chunk's coordinate space), becomes loose wood in
