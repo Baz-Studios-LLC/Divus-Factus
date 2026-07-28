@@ -95,7 +95,7 @@ fn speak(
                 Bubble {
                     speaker: say.speaker,
                     until: time.elapsed_secs() + 4.5,
-                    lift: if say.thought { 20.0 } else { 8.0 },
+                    lift: if say.thought { 26.0 } else { 8.0 },
                 },
                 // Under all interface chrome: a window dragged over a bubble
                 // must cover it.
@@ -118,41 +118,83 @@ fn speak(
                 BorderColor::all(border),
             ))
             .id();
-        // A little circle in the bubble's fill with a blue rim: the cloud
-        // puff and the thought trail are both built from these.
-        let mut puff = |left_pc: f32, top: Val, bottom: Val, size: f32| {
+        if say.thought {
+            // A thought is a cloud. The lobes are ringed circles sunk
+            // halfway into the box all around its edge; the interior
+            // cover spawned just after them paints the box's fill back
+            // over their inner halves. What survives is a scalloped blue
+            // edge — soft bulges outside, clean fill within — instead of
+            // beads threaded on a border.
+            let mut lobe = |left: Val, top: Val, right: Val, bottom: Val, size: f32| {
+                commands.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left,
+                        top,
+                        right,
+                        bottom,
+                        width: px(size),
+                        height: px(size),
+                        border: UiRect::all(px(1)),
+                        border_radius: BorderRadius::all(percent(50)),
+                        ..default()
+                    },
+                    BackgroundColor(theme::panel_bg()),
+                    BorderColor::all(border),
+                    ChildOf(bubble),
+                ));
+            };
+            let auto = Val::Auto;
+            for (pc, size) in [
+                (3.0, 15.0),
+                (17.0, 20.0),
+                (37.0, 17.0),
+                (56.0, 21.0),
+                (77.0, 16.0),
+            ] {
+                lobe(percent(pc), px(-size * 0.5), auto, auto, size);
+            }
+            lobe(px(-7.0), percent(30.0), auto, auto, 14.0);
+            lobe(auto, percent(40.0), px(-7.0), auto, 13.0);
+            for (pc, size) in [(6.0, 13.0), (26.0, 16.0), (60.0, 15.0), (80.0, 13.0)] {
+                lobe(percent(pc), auto, auto, px(-size * 0.5), size);
+            }
+            drop(lobe);
+            // The cover: the box's own fill, laid over every lobe's
+            // inner half. Spawned after the lobes, before the words.
             commands.spawn((
                 Node {
                     position_type: PositionType::Absolute,
-                    left: percent(left_pc),
-                    top,
-                    bottom,
-                    width: px(size),
-                    height: px(size),
-                    border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(percent(50)),
+                    left: px(1),
+                    top: px(1),
+                    right: px(1),
+                    bottom: px(1),
+                    border_radius: BorderRadius::all(px(13)),
                     ..default()
                 },
                 BackgroundColor(theme::panel_bg()),
-                BorderColor::all(border),
                 ChildOf(bubble),
             ));
-        };
-        if say.thought {
-            // A thought is a cloud: puffs straddling the top edge, smaller
-            // ones at the bottom corners, and a trail of shrinking circles
-            // drifting down toward whoever is thinking it.
-            for (left_pc, size) in [(4.0, 15.0), (24.0, 19.0), (48.0, 16.0), (72.0, 18.0)] {
-                puff(left_pc, px(-size * 0.45), Val::Auto, size);
+            // The trail: detached circles shrinking down toward whoever
+            // is thinking it. These keep their full rings.
+            for (pc, hang, size) in [(46.0, 12.0, 10.0), (43.0, 22.0, 6.0)] {
+                commands.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: percent(pc),
+                        bottom: px(-hang),
+                        width: px(size),
+                        height: px(size),
+                        border: UiRect::all(px(1)),
+                        border_radius: BorderRadius::all(percent(50)),
+                        ..default()
+                    },
+                    BackgroundColor(theme::panel_bg()),
+                    BorderColor::all(border),
+                    ChildOf(bubble),
+                ));
             }
-            puff(10.0, Val::Auto, px(-5.0), 11.0);
-            puff(82.0, Val::Auto, px(-5.0), 12.0);
-            for (left_pc, drop, size) in [(46.0, 10.0, 9.0), (43.0, 19.0, 5.5)] {
-                puff(left_pc, Val::Auto, px(-drop), size);
-            }
-            drop(puff);
         } else {
-            drop(puff);
             // The tail: a square in the bubble's own fill, turned 45
             // degrees and hung half out of the bottom edge. Only its two
             // lower edges wear the border, so what shows is a bordered
