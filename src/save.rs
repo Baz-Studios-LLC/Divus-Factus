@@ -39,7 +39,16 @@ pub struct SavePlugin;
 impl Plugin for SavePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_saves_window)
-            .add_systems(Update, (handle_slot_buttons, refresh_slot_labels))
+            .add_systems(
+                Update,
+                (
+                    handle_slot_buttons,
+                    relax_deletes,
+                    refresh_slot_labels,
+                    title_hides_save_buttons,
+                    enter_on_title_load,
+                ),
+            )
             .add_systems(Update, patch_wild)
             .add_systems(Update, process_requests.run_if(request_pending));
         if std::env::var("EGREGORE_SAVE_TEST").is_ok() {
@@ -1121,23 +1130,6 @@ fn save_test_harness(mut commands: Commands, time: Res<Time>, mut fired: Local<u
     }
 }
 
-/// The occupied slots and their card lines, for the title screen's menu.
-pub fn slot_summaries() -> Vec<(u8, String)> {
-    (1..=3u8)
-        .filter_map(|slot| {
-            read_slot(slot).ok().map(|save| {
-                (
-                    slot,
-                    format!(
-                        "Load: day {}, {} ({} souls)",
-                        save.label_day, save.label_settlement, save.label_souls
-                    ),
-                )
-            })
-        })
-        .collect()
-}
-
 // -------------------------------------------------------------------- the UI
 
 /// The saves window: three slots, each with its card and its two buttons.
@@ -1152,6 +1144,16 @@ struct SaveButton(u8);
 
 #[derive(Component)]
 struct LoadButton(u8);
+
+/// A slot's delete button; pressing arms it, pressing again deletes.
+#[derive(Component)]
+struct DeleteButton(u8);
+
+/// A delete button waiting for its confirming second press.
+#[derive(Component)]
+struct DeleteArmed {
+    until: f32,
+}
 
 fn spawn_saves_window(mut commands: Commands) {
     let window = ui::window(&mut commands, "SAVES", 340.0);
@@ -1180,7 +1182,7 @@ fn spawn_saves_window(mut commands: Commands) {
             },
             ChildOf(row),
         ));
-        for (label, save) in [("SAVE", true), ("LOAD", false)] {
+        for (label, role) in [("SAVE", 0u8), ("LOAD", 1), ("DEL", 2)] {
             let button = commands
                 .spawn((
                     ui::UiButton,
@@ -1195,10 +1197,16 @@ fn spawn_saves_window(mut commands: Commands) {
                     ChildOf(row),
                 ))
                 .id();
-            if save {
-                commands.entity(button).insert(SaveButton(slot));
-            } else {
-                commands.entity(button).insert(LoadButton(slot));
+            match role {
+                0 => {
+                    commands.entity(button).insert(SaveButton(slot));
+                }
+                1 => {
+                    commands.entity(button).insert(LoadButton(slot));
+                }
+                _ => {
+                    commands.entity(button).insert(DeleteButton(slot));
+                }
             }
             commands.spawn((ui::dim(label), ChildOf(button)));
         }
@@ -1207,8 +1215,21 @@ fn spawn_saves_window(mut commands: Commands) {
 
 fn handle_slot_buttons(
     mut commands: Commands,
+    time: Res<Time>,
     saves: Query<(&Interaction, &SaveButton), Changed<Interaction>>,
     loads: Query<(&Interaction, &LoadButton), Changed<Interaction>>,
+    mut deletes: Query<
+        (
+            Entity,
+            &Interaction,
+            &DeleteButton,
+            Option<&DeleteArmed>,
+            &Children,
+        ),
+        Changed<Interaction>,
+    >,
+    mut texts: Query<&mut Text>,
+    mut notices: MessageWriter<ui::Notice>,
 ) {
     for (interaction, button) in &saves {
         if *interaction == Interaction::Pressed {
@@ -1218,6 +1239,89 @@ fn handle_slot_buttons(
     for (interaction, button) in &loads {
         if *interaction == Interaction::Pressed {
             commands.insert_resource(PendingLoad(button.0));
+        }
+    }
+    // Deleting takes two presses: the first arms, the second, soon after,
+    // actually burns the world.
+    for (entity, interaction, button, armed, children) in &mut deletes {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        let now = time.elapsed_secs();
+        match armed {
+            Some(armed) if now < armed.until => {
+                let _ = std::fs::remove_file(slot_path(button.0));
+                commands.entity(entity).remove::<DeleteArmed>();
+                for &child in children {
+                    if let Ok(mut text) = texts.get_mut(child) {
+                        *text = Text::new("DEL");
+                    }
+                }
+                notices.write(ui::Notice::new(format!("Slot {} deleted", button.0)));
+            }
+            _ => {
+                commands
+                    .entity(entity)
+                    .insert(DeleteArmed { until: now + 3.0 });
+                for &child in children {
+                    if let Ok(mut text) = texts.get_mut(child) {
+                        *text = Text::new("SURE?");
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Armed deletes relax if the second press never comes.
+fn relax_deletes(
+    mut commands: Commands,
+    time: Res<Time>,
+    armed: Query<(Entity, &DeleteArmed, &Children)>,
+    mut texts: Query<&mut Text>,
+) {
+    for (entity, arm, children) in &armed {
+        if time.elapsed_secs() >= arm.until {
+            commands.entity(entity).remove::<DeleteArmed>();
+            for &child in children {
+                if let Ok(mut text) = texts.get_mut(child) {
+                    *text = Text::new("DEL");
+                }
+            }
+        }
+    }
+}
+
+/// On the title screen the window is a load menu: saving a world you have
+/// not entered means nothing, so those buttons step out.
+fn title_hides_save_buttons(
+    state: Res<State<crate::GameState>>,
+    mut buttons: Query<&mut Node, With<SaveButton>>,
+) {
+    let on_title = matches!(state.get(), crate::GameState::Title);
+    for mut node in &mut buttons {
+        let wanted = if on_title {
+            Display::None
+        } else {
+            Display::Flex
+        };
+        if node.display != wanted {
+            node.display = wanted;
+        }
+    }
+}
+
+/// Loading from the title enters the world through the same door Begin uses.
+fn enter_on_title_load(
+    state: Res<State<crate::GameState>>,
+    pending: Option<Res<PendingLoad>>,
+    mut next: ResMut<NextState<crate::GameState>>,
+    mut panels: Query<&mut Visibility, With<SavesPanel>>,
+) {
+    if pending.is_some() && matches!(state.get(), crate::GameState::Title) {
+        next.set(crate::GameState::Loading);
+        for mut visibility in &mut panels {
+            *visibility = Visibility::Hidden;
         }
     }
 }
