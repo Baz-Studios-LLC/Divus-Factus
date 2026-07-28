@@ -2476,7 +2476,10 @@ fn update_inspector(
     kin_names: Query<&Person>,
     settlements: Query<&Settlement>,
     huts: Query<(), With<crate::villager::work::Hut>>,
-    rising: Query<&crate::villager::work::ConstructionSite>,
+    rising: Query<(
+        &crate::villager::work::ConstructionSite,
+        &crate::villager::work::Blueprint,
+    )>,
     households: Query<
         (&Person, &crate::villager::home::Home, &Activity),
         Without<crate::creature::Corpse>,
@@ -2816,15 +2819,24 @@ fn update_inspector(
                 residents.join("\n")
             },
         )
-    } else if let Ok(construction) = rising.get(entity) {
-        (
-            "A rising house".to_string(),
+    } else if let Ok((construction, plan)) = rising.get(entity) {
+        // Say what the site is actually waiting on: a foundation short of
+        // stone blocks the carpenters, and that must be legible, or an
+        // honest wait reads as a broken village.
+        let stone_cost = plan.kind.stone_cost();
+        let line = if construction.stone_laid < stone_cost {
+            format!(
+                "waiting on stone - {:.0} of {:.0} laid in the foundation",
+                construction.stone_laid, stone_cost,
+            )
+        } else {
             format!(
                 "{:.0} of {:.0} timber worked into it",
-                construction.progress,
-                crate::villager::work::HOUSE_TIMBER,
-            ),
-        )
+                construction.progress.min(plan.kind.timber_cost()),
+                plan.kind.timber_cost(),
+            )
+        };
+        (format!("{}, rising", plan.kind.name()), line)
     } else if let Ok((settlement, store)) = settlement_info.get(entity) {
         // The banner: the settlement's own dossier.
         let mut grown = 0;

@@ -175,6 +175,9 @@ pub enum BuildingKind {
     Herbalist,
     /// A high post and a horn: wolves learn to keep their distance.
     Watchtower,
+    /// Planks run out over the water: fishers cast past the shallows,
+    /// and the catch comes home heavier.
+    Dock,
 }
 
 impl BuildingKind {
@@ -195,6 +198,7 @@ impl BuildingKind {
             BuildingKind::Weaver => 6.0,
             BuildingKind::Herbalist => 6.0,
             BuildingKind::Watchtower => 10.0,
+            BuildingKind::Dock => 5.0,
         }
     }
 
@@ -216,6 +220,8 @@ impl BuildingKind {
             BuildingKind::Weaver => 2.0,
             BuildingKind::Herbalist => 2.0,
             BuildingKind::Watchtower => 6.0,
+            // Pilings, not foundations: a dock is all carpentry.
+            BuildingKind::Dock => 0.0,
         }
     }
 
@@ -236,6 +242,7 @@ impl BuildingKind {
             BuildingKind::Herbalist => "The herbalist's hut",
             BuildingKind::Watchtower => "The watchtower",
             BuildingKind::Shrine => "The shrine",
+            BuildingKind::Dock => "The dock",
         }
     }
 }
@@ -262,6 +269,8 @@ pub struct CivicNeeds {
     pub fields: usize,
     pub wolves_near: usize,
     pub pending_builds: usize,
+    /// Whether walkable shore lies within working reach — no water, no dock.
+    pub shore_near: bool,
 }
 
 /// Chooses the next civic building by NEED, not by a fixed ladder: each
@@ -271,11 +280,11 @@ pub struct CivicNeeds {
 pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Option<BuildingKind> {
     use BuildingKind::*;
     let candidates = [
-        Well, Storehouse, Sawmill, Blacksmith, Smokehouse, Granary, Tavern, Mill, Bakery, Weaver,
-        Herbalist, Shrine, Watchtower, TownHall,
+        Well, Dock, Storehouse, Sawmill, Blacksmith, Smokehouse, Granary, Tavern, Mill, Bakery,
+        Weaver, Herbalist, Shrine, Watchtower, TownHall,
     ];
     let min_pop = |kind: BuildingKind| match kind {
-        Well => 5,
+        Well | Dock => 5,
         Storehouse => 7,
         Sawmill => 8,
         Smokehouse => 9,
@@ -294,6 +303,15 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
             // Water and the midday square: always wanted once there are
             // enough hands to dig it.
             Well => 0.6,
+            // The water feeds without emptying the land: fishers argue for
+            // planks, and a thin larder argues louder. No shore, no dock.
+            Dock => {
+                if needs.shore_near {
+                    needs.fishers as f32 * 0.3 + (35.0 - needs.food_stored).max(0.0) / 45.0 + 0.2
+                } else {
+                    0.0
+                }
+            }
             // Goods heaped in the open argue for a roof over them.
             Storehouse => (needs.timber_stored + needs.stone_stored) / 25.0,
             Granary => needs.food_stored / 70.0,
@@ -492,6 +510,17 @@ impl Blueprint {
                 wall_h: 3.6,
                 walls: pal::shade(&pal::STONE, 0.4),
                 roof: pal::shade(&pal::WOOD, 0.4),
+                shed_roof: false,
+            },
+            // No walls at all: a narrow deck run out over the water on
+            // pilings. half_d is the long axis, pointing seaward.
+            BuildingKind::Dock => Blueprint {
+                kind,
+                half_w: rng.range(1.0, 1.3),
+                half_d: rng.range(2.8, 3.4),
+                wall_h: 0.9,
+                walls: pal::shade(&pal::WOOD, 0.5),
+                roof: pal::shade(&pal::WOOD, 0.35),
                 shed_roof: false,
             },
         }
@@ -1170,7 +1199,9 @@ pub(super) fn lend_a_hand(
     time: Res<Time>,
     clock: Res<crate::calendar::WorldClock>,
     mut rng: ResMut<SimRng>,
-    mut sites: Query<(Entity, &Transform, &mut ConstructionSite), With<Blueprint>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut sites: Query<(Entity, &Transform, &mut ConstructionSite, &Blueprint)>,
     helpers_now: Query<&Helper>,
     mut folk: Query<
         (
@@ -1210,7 +1241,7 @@ pub(super) fn lend_a_hand(
             }
             continue;
         }
-        let Ok((_, site_at, mut construction)) = sites.get_mut(helper.0) else {
+        let Ok((_, site_at, mut construction, plan)) = sites.get_mut(helper.0) else {
             continue;
         };
         if at.translation.distance(site_at.translation) > 3.0 {
@@ -1218,12 +1249,37 @@ pub(super) fn lend_a_hand(
         } else {
             target.0 = None;
             motion.flail = motion.flail.max(0.25);
-            construction.progress += dt / WORK_SECONDS * 0.5;
+            // A neighbour's labour speeds the work but cannot finish it:
+            // the last of a building takes a carpenter's hand, so helped
+            // progress stops just short and never runs past the cost —
+            // "22 of 6 timber" is a lie no site should tell.
+            let cost = plan.kind.timber_cost();
+            construction.progress = (construction.progress + dt / WORK_SECONDS * 0.5)
+                .min(cost - 0.5)
+                .max(construction.progress);
+            // Helped work shows: the frame rises under many hands too.
+            let target_stage = stage_for(construction.progress, cost);
+            while construction.stage < target_stage {
+                construction.stage += 1;
+                raise_stage(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    helper.0,
+                    construction.stage,
+                    plan,
+                );
+            }
         }
     }
 
     // Recruit: an idle neighbour near an active site, two helpers at most.
-    for (site, site_at, _) in &sites {
+    // Only where the work can actually advance — a site still waiting on
+    // its foundation stone needs a mason, not a crowd.
+    for (site, site_at, construction, plan) in &sites {
+        if construction.stone_laid < plan.kind.stone_cost() {
+            continue;
+        }
         let already = helpers_now.iter().filter(|h| h.0 == site).count();
         if already >= 2 {
             continue;
@@ -1475,6 +1531,8 @@ pub(super) fn retrain(
     >,
     mut notices: MessageWriter<crate::ui::Notice>,
     hurt: Query<&Vitality, (With<Villager>, Without<Corpse>)>,
+    known: Option<Res<super::explore::KnownWorld>>,
+    trees: Query<(&GlobalTransform, &crate::scatter::FellableTree)>,
     mut workers: Query<
         (Entity, &Vocation, &Person, Option<&mut Chronicle>),
         (With<Villager>, Without<Corpse>),
@@ -1492,13 +1550,24 @@ pub(super) fn retrain(
     let count_of = |v: Vocation| workers.iter().filter(|(_, w, _, _)| **w == v).count();
     let has_vocation = |v: Vocation| count_of(v) > 0;
     let timber_low = stores.iter().next().is_none_or(|s| s.timber < 6.0);
+    // Whether any fellable tree stands on ground the village knows. When
+    // none does, more foresters are useless — someone has to go find woods.
+    let wood_known = known.as_ref().is_none_or(|k| {
+        trees
+            .iter()
+            .any(|(at, tree)| tree.harvestable() && k.knows(at.translation()))
+    });
 
     // The village's needs, in the order they kill. Every want here is a
     // deadlock somewhere else: no woodcutter starves the fire and every
     // build; no carpenter leaves the homeless in the rain; and so on.
     let mut wanted: Option<Vocation> = None;
-    if !has_vocation(Vocation::Forester) && timber_low {
+    if timber_low && !wood_known && !has_vocation(Vocation::Explorer) {
+        wanted = Some(Vocation::Explorer);
+    } else if !has_vocation(Vocation::Forester) && timber_low && wood_known {
         wanted = Some(Vocation::Forester);
+    } else if has_building(BuildingKind::Dock) && !has_vocation(Vocation::Fisher) {
+        wanted = Some(Vocation::Fisher);
     } else if !has_vocation(Vocation::Carpenter)
         && (!sites.is_empty() || homeless.iter().count() > 2)
     {
@@ -1703,7 +1772,7 @@ pub(super) fn take_up_work(
         let permitted = |at: Vec3| shunned.is_none_or(|shun| shun.site.distance(at) > SHUN_RADIUS);
         // Ground an explorer has brought home counts as workable even far
         // out: the pockets are why expeditions matter to the trades.
-        let known_far = |at: Vec3, d: f32| d < 420.0 && known.as_ref().is_some_and(|k| k.knows(at));
+        let known_far = |at: Vec3, d: f32| d < 700.0 && known.as_ref().is_some_and(|k| k.knows(at));
 
         let job = match vocation {
             Vocation::Gatherer => bushes
@@ -1754,9 +1823,20 @@ pub(super) fn take_up_work(
                         .map(|(prey, at, d)| Job::at(at, Some(prey), d))
                 }),
 
-            Vocation::Fisher => find_shore(&terrain, site.centre, &mut rng.0)
-                .filter(|at| permitted(*at))
-                .map(|at| Job::at(at, None, at.distance(transform.translation))),
+            // The dock is the fisher's post when one stands; the bare
+            // shore otherwise.
+            Vocation::Fisher => buildings
+                .iter()
+                .find(|(_, _, b)| b.kind == BuildingKind::Dock)
+                .map(|(dock, dock_at, _)| {
+                    let at = dock_at.translation();
+                    Job::at(at, Some(dock), at.distance(transform.translation))
+                })
+                .or_else(|| {
+                    find_shore(&terrain, site.centre, &mut rng.0)
+                        .filter(|at| permitted(*at))
+                        .map(|at| Job::at(at, None, at.distance(transform.translation)))
+                }),
 
             // Miners work real stone where any lies loose; failing that, the
             // high bare ground.
@@ -1781,8 +1861,10 @@ pub(super) fn take_up_work(
                     .map(|at| Job::at(at, None, at.distance(transform.translation)))
                 }),
 
-            // Foresters fell real trees where any stand tall enough; failing
-            // that, they forage deadfall in the deeper woods.
+            // Foresters fell real trees, and only real trees — where none
+            // stand on known ground, the want goes unmet until an explorer
+            // brings home a wood. Timber that appears from nowhere would
+            // let the village stay home forever, and staying home is death.
             Vocation::Forester => trees
                 .iter()
                 .filter(|(_, _, tree)| tree.harvestable())
@@ -1795,14 +1877,7 @@ pub(super) fn take_up_work(
                 })
                 .filter(|(_, at, d)| (*d < WORK_REACH || known_far(*at, *d)) && permitted(*at))
                 .min_by(|a, b| a.2.total_cmp(&b.2))
-                .map(|(tree, at, d)| Job::at(at, Some(tree), d))
-                .or_else(|| {
-                    find_ground(&terrain, site.centre, &mut rng.0, |t, x, z| {
-                        matches!(t.biome_at(x, z), Biome::Temperate | Biome::Boreal)
-                    })
-                    .filter(|at| permitted(*at))
-                    .map(|at| Job::at(at, None, at.distance(transform.translation)))
-                }),
+                .map(|(tree, at, d)| Job::at(at, Some(tree), d)),
 
             // Carpenters go where ground is broken — if there is timber to work.
             Vocation::Carpenter => {
@@ -2395,13 +2470,17 @@ pub(super) fn do_work(
                 }
             }
 
-            // A smokehouse cures the catch: one day's fishing feeds twice.
+            // A dock casts past the shallows, and a smokehouse cures the
+            // catch: one day's fishing can feed three days of village.
             Vocation::Fisher => {
-                store.food += if context.3.iter().any(|b| b.kind == BuildingKind::Smokehouse) {
-                    2.0
-                } else {
-                    1.0
+                let mut catch = 1.0;
+                if context.3.iter().any(|b| b.kind == BuildingKind::Dock) {
+                    catch += 0.5;
                 }
+                if context.3.iter().any(|b| b.kind == BuildingKind::Smokehouse) {
+                    catch *= 2.0;
+                }
+                store.food += catch;
             }
 
             Vocation::Miner | Vocation::Mason => match job.focus {
@@ -2425,12 +2504,11 @@ pub(super) fn do_work(
             },
 
             Vocation::Forester => match job.focus {
-                // Deadfall from the deep woods, carried home like everything else.
+                // No tree under the axe: the woods here are spent, and no
+                // free timber pretends otherwise. The want stands until
+                // someone walks far enough to answer it.
                 None => {
-                    commands.entity(entity).insert(CarryingWood { amount: 1.0 });
-                    shoulder_wood(&mut commands, &mut meshes, &mut materials, entity);
-                    *activity = Activity::Hauling;
-                    target.0 = None;
+                    *activity = Activity::Idle;
                     commands.entity(entity).remove::<Job>();
                 }
                 // A standing tree comes down and a sapling starts over.
@@ -2756,6 +2834,89 @@ pub(crate) fn raise_stage(
             ChildOf(site),
         ));
     };
+
+    // A dock is planks, not walls: pilings driven toward the water, a deck
+    // run out over it, and the trimmings of a working waterfront. The long
+    // local +Z axis points seaward; the site origin sits on the last dry
+    // ground, so everything past it hangs over the shallows.
+    if plan.kind == BuildingKind::Dock {
+        let deck = materials.add(StandardMaterial {
+            base_color: crate::palette::shade(&crate::palette::WOOD, 0.55),
+            perceptual_roughness: 0.95,
+            ..default()
+        });
+        match stage {
+            // Pilings first, in pairs marching off the shore. Tall enough
+            // that their heads stand proud of the deck to come — bollards,
+            // not an accident.
+            0 => {
+                for i in 0..4 {
+                    let z = d * (0.2 + i as f32 * 0.55);
+                    for x in [-w * 0.8, w * 0.8] {
+                        part(
+                            Vec3::new(x, 0.1, z),
+                            Vec3::new(0.16, 1.8, 0.16),
+                            0.0,
+                            &frame,
+                        );
+                    }
+                }
+            }
+            // The deck itself, shore to open water, with a short ramp
+            // where it leaves the grass.
+            1 => {
+                part(
+                    Vec3::new(0.0, 0.62, d * 0.9),
+                    Vec3::new(w * 1.8, 0.12, d * 2.2),
+                    0.0,
+                    &deck,
+                );
+                part(
+                    Vec3::new(0.0, 0.3, -d * 0.3),
+                    Vec3::new(w * 1.6, 0.1, d * 0.5),
+                    0.0,
+                    &deck,
+                );
+            }
+            // A rail down one side, a mooring post at the deck's end, and
+            // the crates a working morning leaves behind.
+            _ => {
+                part(
+                    Vec3::new(w * 0.85, 1.15, d * 0.9),
+                    Vec3::new(0.08, 0.08, d * 2.0),
+                    0.0,
+                    &frame,
+                );
+                for i in 0..3 {
+                    part(
+                        Vec3::new(w * 0.85, 0.9, d * (0.2 + i as f32 * 0.75)),
+                        Vec3::new(0.08, 0.5, 0.08),
+                        0.0,
+                        &frame,
+                    );
+                }
+                part(
+                    Vec3::new(-w * 0.6, 0.95, d * 1.85),
+                    Vec3::new(0.2, 0.8, 0.2),
+                    0.0,
+                    &frame,
+                );
+                part(
+                    Vec3::new(-w * 0.45, 0.85, d * 0.4),
+                    Vec3::new(0.44, 0.44, 0.44),
+                    0.0,
+                    &wall,
+                );
+                part(
+                    Vec3::new(-w * 0.5, 0.72, d * 0.9),
+                    Vec3::new(0.34, 0.3, 0.34),
+                    0.2,
+                    &wall,
+                );
+            }
+        }
+        return;
+    }
 
     // A well is its own shape entirely: a stone curb, two posts, a
     // windlass beam, a little peaked cap, and the bucket on its rope.
@@ -3161,43 +3322,108 @@ pub(super) fn plan_houses(
         return;
     }
 
+    let shore_near = find_shore(&terrain, site.centre, &mut rng.0).is_some();
+
     // A person needs a house, so a house gets built: ground breaks because
     // roofless people exist, not because a formula says the town is due.
     // Only when everyone sleeps under a roof does the village have the
-    // spare hands for what it merely wants.
-    let kind = if roofless_adults > 0 && !pending.iter().any(|b| b.kind == BuildingKind::House) {
-        BuildingKind::House
-    } else if roofless_adults > 0 {
-        return;
-    } else {
-        let needs = CivicNeeds {
-            population,
-            stone: store_now.stone,
-            timber_stored: store_now.timber,
-            stone_stored: store_now.stone,
-            food_stored: store_now.food,
-            avg_spirits: spirits_sum / population.max(1) as f32,
-            homeless: roofless_adults,
-            hurt,
-            believers,
-            fishers,
-            farmers,
-            foresters,
-            fields: fields.iter().count(),
-            wolves_near: wild
-                .iter()
-                .filter(|(at, genome)| {
-                    genome.species == Species::Wolf && at.translation.distance(site.centre) < 130.0
-                })
-                .count(),
-            pending_builds: pending.iter().count(),
+    // spare hands for what it merely wants. One need outranks even the
+    // roof: an empty larder beside open water breaks ground on the dock
+    // first, because hunger kills faster than rain.
+    let kind =
+        if population >= 5 && store_now.food < 8.0 && shore_near && !has_kind(BuildingKind::Dock) {
+            BuildingKind::Dock
+        } else if roofless_adults > 0 && !pending.iter().any(|b| b.kind == BuildingKind::House) {
+            BuildingKind::House
+        } else if roofless_adults > 0 {
+            return;
+        } else {
+            let needs = CivicNeeds {
+                population,
+                stone: store_now.stone,
+                timber_stored: store_now.timber,
+                stone_stored: store_now.stone,
+                food_stored: store_now.food,
+                avg_spirits: spirits_sum / population.max(1) as f32,
+                homeless: roofless_adults,
+                hurt,
+                believers,
+                fishers,
+                farmers,
+                foresters,
+                fields: fields.iter().count(),
+                wolves_near: wild
+                    .iter()
+                    .filter(|(at, genome)| {
+                        genome.species == Species::Wolf
+                            && at.translation.distance(site.centre) < 130.0
+                    })
+                    .count(),
+                pending_builds: pending.iter().count(),
+                shore_near,
+            };
+            match next_civic(&needs, has_kind) {
+                Some(kind) => kind,
+                None => return,
+            }
         };
-        match next_civic(&needs, has_kind) {
-            Some(kind) => kind,
-            None => return,
-        }
-    };
     let _ = roofs;
+
+    // A dock is sited by the water, not by the rings: the nearest walkable
+    // shore takes the pilings, and the deck points out over the water.
+    if kind == BuildingKind::Dock {
+        let Some(shore) = find_shore(&terrain, site.centre, &mut rng.0) else {
+            return;
+        };
+        let toward = shore - site.centre;
+        let yaw = toward.x.atan2(toward.z);
+        let plan = Blueprint::roll(kind, &mut rng.0);
+
+        // A small worked pad on the dry end; the rest stands on pilings.
+        terrain.flatten(shore.x, shore.z, plan.half_w + 1.2, 2.0, shore.y);
+        let (chunks, grass) = &mut ground;
+        for chunk in chunks.take_near(shore.x, shore.z, plan.half_w + 5.0) {
+            commands.entity(chunk).despawn();
+        }
+        grass.invalidate_near(&mut commands, shore.x, shore.z, plan.half_w + 5.0);
+        let mut cleared = 0.0;
+        for (tree, tree_at) in &standing {
+            if tree_at.translation().distance(shore) < plan.half_w + 4.0 {
+                commands.entity(tree).despawn();
+                cleared += 1.0;
+            }
+        }
+        if cleared > 0.0
+            && let Ok(mut store) = stores.get_mut(site.settlement)
+        {
+            store.timber += cleared;
+        }
+
+        let building = commands
+            .spawn((
+                Name::new(format!("{}, rising", plan.kind.name())),
+                ConstructionSite::default(),
+                plan.clone(),
+                Transform::from_translation(shore).with_rotation(Quat::from_rotation_y(yaw)),
+                Visibility::default(),
+                crate::hand::PickRadius(plan.half_d + 0.9),
+                crate::hand::Rooted,
+            ))
+            .id();
+        raise_stage(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            building,
+            0,
+            &plan,
+        );
+        info!("ground was broken: {}", plan.kind.name());
+        notices.write(crate::ui::Notice::new(
+            "Ground was broken for the dock".to_string(),
+        ));
+        return;
+    }
 
     // Civic buildings claim the inner ring; houses begin one ring out. The
     // first plot the terrain permits wins, so the village fills inside-out.
@@ -3501,6 +3727,30 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(next_civic(&broke, none), None, "no stone, no works");
+    }
+
+    #[test]
+    fn a_thin_larder_by_the_sea_builds_the_dock() {
+        let none = |_: BuildingKind| false;
+        // Hungry, on the water, fishers already at work: planks go up.
+        // (Docks cost no stone, so even a stone-poor village can build one.)
+        let coastal = CivicNeeds {
+            population: 6,
+            stone: 0.0,
+            food_stored: 5.0,
+            fishers: 1,
+            avg_spirits: 0.7,
+            shore_near: true,
+            ..Default::default()
+        };
+        assert_eq!(next_civic(&coastal, none), Some(BuildingKind::Dock));
+
+        // The same hunger inland stays hungry: no shore, no dock.
+        let inland = CivicNeeds {
+            shore_near: false,
+            ..coastal
+        };
+        assert_ne!(next_civic(&inland, none), Some(BuildingKind::Dock));
     }
 
     #[test]

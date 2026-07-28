@@ -88,8 +88,9 @@ pub(super) fn expeditions(
     mut rng: ResMut<super::SimRng>,
     mut notices: MessageWriter<crate::ui::Notice>,
     mut say: MessageWriter<crate::ui::Say>,
-    trees: Query<&GlobalTransform, With<FellableTree>>,
-    bushes: Query<&GlobalTransform, With<crate::scatter::FoodSource>>,
+    stores: Query<&crate::villager::work::Stockpile>,
+    trees: Query<(&GlobalTransform, &FellableTree)>,
+    bushes: Query<(&GlobalTransform, &crate::scatter::FoodSource)>,
     mut explorers: Query<
         (
             Entity,
@@ -113,6 +114,24 @@ pub(super) fn expeditions(
         return;
     };
     let dt = time.delta_secs();
+
+    // What the village wants and cannot reach is what sends people out.
+    // Scarcity is the engine of the map: a full woodpile keeps everyone
+    // home, an empty one with no known tree left to fell puts someone on
+    // the road. The two wants that kill are timber and food.
+    let timber_short = stores.iter().next().is_none_or(|s| s.timber < 8.0);
+    let wood_known = trees
+        .iter()
+        .any(|(at, tree)| tree.harvestable() && known.knows(at.translation()));
+    let wood_want = timber_short && !wood_known;
+    let food_short = stores.iter().next().is_none_or(|s| s.food < 10.0);
+    let berries_known = bushes
+        .iter()
+        .any(|(at, bush)| bush.amount > 0.5 && known.knows(at.translation()));
+    let food_want = food_short && !berries_known;
+    // Hungry villages muster expeditions in earnest; content ones only
+    // when wanderlust strikes.
+    let urgency = if wood_want || food_want { 0.02 } else { 0.002 };
 
     for (entity, at, vocation, person, mut activity, mut target, expedition, chronicle) in
         &mut explorers
@@ -153,11 +172,11 @@ pub(super) fn expeditions(
             let spot = expedition.target;
             let near_trees = trees
                 .iter()
-                .filter(|t| t.translation().distance(spot) < 45.0)
+                .filter(|(t, _)| t.translation().distance(spot) < 45.0)
                 .count();
             let near_bushes = bushes
                 .iter()
-                .filter(|b| b.translation().distance(spot) < 45.0)
+                .filter(|(b, _)| b.translation().distance(spot) < 45.0)
                 .count();
             let high_ground = terrain.height_at(spot.x, spot.z) > WATER_LEVEL + 12.0;
             let (what, radius) = if near_trees >= 6 {
@@ -200,7 +219,7 @@ pub(super) fn expeditions(
         if !matches!(*activity, Activity::Idle | Activity::Wandering) {
             continue;
         }
-        if !work::is_work_hour(clock.time_of_day()) || !rng.0.chance(0.002) {
+        if !work::is_work_hour(clock.time_of_day()) || !rng.0.chance(urgency) {
             continue;
         }
         // Nobody walks past the cairns into a storm.
@@ -210,9 +229,39 @@ pub(super) fn expeditions(
         {
             continue;
         }
-        // Pick a frontier point: out past the edge, on walkable ground.
+        // A want the village cannot meet aims the walk: a forest shows on
+        // the horizon long before anyone has stood under it, so a village
+        // short of wood heads for the nearest green it can see and does
+        // not yet know — likewise berries. Only the contented wander at
+        // random.
         let mut found = None;
+        if wood_want {
+            found = trees
+                .iter()
+                .filter(|(at, tree)| tree.harvestable() && !known.knows(at.translation()))
+                .map(|(at, _)| at.translation())
+                .min_by(|a, b| {
+                    a.distance(known.centre)
+                        .total_cmp(&b.distance(known.centre))
+                })
+                .map(|at| Vec3::new(at.x, terrain.height_at(at.x, at.z), at.z));
+        }
+        if found.is_none() && food_want {
+            found = bushes
+                .iter()
+                .filter(|(at, bush)| bush.amount > 0.5 && !known.knows(at.translation()))
+                .map(|(at, _)| at.translation())
+                .min_by(|a, b| {
+                    a.distance(known.centre)
+                        .total_cmp(&b.distance(known.centre))
+                })
+                .map(|at| Vec3::new(at.x, terrain.height_at(at.x, at.z), at.z));
+        }
+        // Otherwise, a frontier point: out past the edge, on walkable ground.
         for _ in 0..24 {
+            if found.is_some() {
+                break;
+            }
             let angle = rng.0.range(0.0, std::f32::consts::TAU);
             let reach = known.radius + rng.0.range(STRIDE * 0.4, STRIDE);
             let (sin, cos) = angle.sin_cos();
