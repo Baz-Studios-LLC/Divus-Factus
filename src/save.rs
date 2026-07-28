@@ -54,6 +54,9 @@ impl Plugin for SavePlugin {
         if std::env::var("EGREGORE_SAVE_TEST").is_ok() {
             app.add_systems(Update, save_test_harness);
         }
+        if std::env::var("EGREGORE_TITLE_LOAD_TEST").is_ok() {
+            app.add_systems(Update, title_load_test_harness);
+        }
     }
 }
 
@@ -189,6 +192,19 @@ fn process_requests(world: &mut World) {
             Err(why) => format!("Could not save: {why}"),
         };
         world.write_message(ui::Notice::new(text));
+    }
+    // A load requested on the title screen is NOT consumed here: it waits
+    // for enter_on_title_load to walk the state machine through the
+    // Loading door, and is honoured on the next frame, once the title has
+    // been left. Consuming it while still on the title restored the world
+    // invisibly behind the title screen and left the player stranded on
+    // it — the LOAD button that "did nothing". (Which of the two systems
+    // saw the request first was down to nondeterministic system order.)
+    let on_title = world
+        .get_resource::<State<crate::GameState>>()
+        .is_some_and(|state| matches!(state.get(), crate::GameState::Title));
+    if on_title {
+        return;
     }
     if let Some(PendingLoad(slot)) = world.remove_resource::<PendingLoad>() {
         match read_slot(slot) {
@@ -1152,6 +1168,27 @@ fn save_test_harness(mut commands: Commands, time: Res<Time>, mut fired: Local<u
     if *fired == 1 && time.elapsed_secs() > 32.0 {
         *fired = 2;
         info!("SAVE_TEST: loading slot 3");
+        commands.insert_resource(PendingLoad(3));
+    }
+}
+
+/// Presses the title screen's LOAD button from the environment: requests
+/// slot 3 while still on the title, then reports each state the flow
+/// passes through. Only registered under EGREGORE_TITLE_LOAD_TEST.
+fn title_load_test_harness(
+    mut commands: Commands,
+    time: Res<Time<Real>>,
+    state: Res<State<crate::GameState>>,
+    mut fired: Local<bool>,
+    mut last: Local<Option<crate::GameState>>,
+) {
+    if *last != Some(*state.get()) {
+        *last = Some(*state.get());
+        info!("TITLE_LOAD_TEST: state is now {:?}", state.get());
+    }
+    if !*fired && time.elapsed_secs() > 3.0 {
+        *fired = true;
+        info!("TITLE_LOAD_TEST: requesting load of slot 3 from the title");
         commands.insert_resource(PendingLoad(3));
     }
 }
