@@ -131,6 +131,7 @@ impl Plugin for VillagerPlugin {
                         work::sermons,
                         work::eat_from_store,
                         work::haul_wood,
+                        work::salvage_timber,
                         work::update_woodpile,
                         work::update_store_piles,
                         work::stores_move_indoors,

@@ -1107,6 +1107,144 @@ pub(super) fn update_store_piles(
     }
 }
 
+/// This villager is fetching a loose log home.
+#[derive(Component)]
+pub struct SalvageHauler(pub Entity);
+
+/// Loose felled timber near the village gets carried to the pile. A log
+/// still carrying the divine mark counts as providence when it lands.
+#[allow(clippy::type_complexity)]
+pub(super) fn salvage_timber(
+    mut commands: Commands,
+    clock: Res<crate::calendar::WorldClock>,
+    site: Option<Res<SettlementSite>>,
+    mut stores: Query<&mut Stockpile>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut witnessed: MessageWriter<crate::witness::DivineEvent>,
+    children: Query<&Children>,
+    loads: Query<Entity, With<WoodLoad>>,
+    logs: Query<
+        (
+            Entity,
+            &Transform,
+            &crate::matter::Matter,
+            Has<crate::hand::DivinelyPlaced>,
+        ),
+        (
+            Without<crate::scatter::FellableTree>,
+            Without<Held>,
+            Without<Airborne>,
+            Without<Villager>,
+        ),
+    >,
+    mut villagers: Query<
+        (
+            Entity,
+            &Transform,
+            &mut Activity,
+            &mut MoveTarget,
+            Option<&mut SalvageHauler>,
+            Option<&mut Chronicle>,
+        ),
+        (
+            With<Villager>,
+            Without<Corpse>,
+            Without<Held>,
+            Without<Airborne>,
+        ),
+    >,
+) {
+    let Some(site) = site else {
+        return;
+    };
+    let Ok(mut store) = stores.get_mut(site.settlement) else {
+        return;
+    };
+
+    // Carriers in progress first.
+    let mut carrying: Vec<Entity> = Vec::new();
+    for (villager, at, mut activity, mut target, hauler, chronicle) in &mut villagers {
+        let Some(hauler) = hauler else {
+            continue;
+        };
+        if *activity != Activity::Hauling {
+            commands.entity(villager).remove::<SalvageHauler>();
+            shed_wood(&mut commands, villager, &children, &loads);
+            continue;
+        }
+        match logs.get(hauler.0) {
+            Ok((log, log_at, _, marked)) => {
+                carrying.push(log);
+                if at.translation.distance(log_at.translation) > 2.0 {
+                    target.0 = Some(log_at.translation);
+                } else {
+                    // Shoulder it: the log entity vanishes into the load.
+                    commands.entity(log).despawn();
+                    shoulder_wood(&mut commands, &mut meshes, &mut materials, villager);
+                    if marked {
+                        // Collected straight from the god's hand.
+                        witnessed.write(crate::witness::DivineEvent {
+                            kind: crate::witness::DivineEventKind::Provided,
+                            position: at.translation,
+                            subject: Some(villager),
+                            intensity: 0.6,
+                        });
+                        if let Some(mut chronicle) = chronicle {
+                            chronicle
+                                .record(clock.day(), "gathered what the god set down".to_string());
+                        }
+                    }
+                    // Remember the errand is now homeward: retarget the pile.
+                    commands
+                        .entity(villager)
+                        .insert(SalvageHauler(Entity::PLACEHOLDER));
+                }
+            }
+            Err(_) => {
+                // Log gone (or already shouldered): walk it home.
+                if at.translation.distance(site.woodpile) > 2.2 {
+                    target.0 = Some(site.woodpile);
+                } else {
+                    store.timber += 2.0;
+                    shed_wood(&mut commands, villager, &children, &loads);
+                    commands.entity(villager).remove::<SalvageHauler>();
+                    *activity = Activity::Idle;
+                    target.0 = None;
+                }
+            }
+        }
+    }
+
+    // Recruit one idle villager per unclaimed log near the village.
+    for (log, log_at, matter, _) in &logs {
+        if matter.substance != crate::matter::Substance::Wood {
+            continue;
+        }
+        if carrying.contains(&log) {
+            continue;
+        }
+        if log_at.translation.distance(site.centre) > 70.0 {
+            continue;
+        }
+        let volunteer = villagers
+            .iter_mut()
+            .filter(|(_, _, activity, _, hauler, _)| {
+                hauler.is_none() && matches!(**activity, Activity::Idle | Activity::Wandering)
+            })
+            .min_by(|a, b| {
+                a.1.translation
+                    .distance(log_at.translation)
+                    .total_cmp(&b.1.translation.distance(log_at.translation))
+            });
+        let Some((villager, _, mut activity, _, _, _)) = volunteer else {
+            break;
+        };
+        *activity = Activity::Hauling;
+        commands.entity(villager).insert(SalvageHauler(log));
+    }
+}
+
 /// A worksite this worker gave up on reaching. Without this, the nearest tree
 /// across a river is chosen, abandoned, and chosen again, forever — the whole
 /// profession stuck on one impossible errand.
@@ -2815,24 +2953,29 @@ pub(super) fn plan_houses(
     let has_kind = |kind: BuildingKind| {
         civics.iter().any(|b| b.kind == kind) || pending.iter().any(|b| b.kind == kind)
     };
-    let civic = {
+    {
         let Ok(store) = stores.get(site.settlement) else {
             return;
         };
         if store.timber < 2.0 {
             return;
         }
-        next_civic(population, store.stone, has_kind)
-    };
+    }
 
-    let kind = if let Some(kind) = civic {
-        kind
-    } else {
-        let houses = roofs.iter().count();
-        if houses >= desired_houses(population) {
-            return;
-        }
+    // Shelter comes first: no village raises a tavern while its people
+    // sleep in the dirt. Civic works get their turn once the roofs catch
+    // up with the people.
+    let houses = roofs.iter().count();
+    let kind = if houses < desired_houses(population) {
         BuildingKind::House
+    } else {
+        let Ok(store) = stores.get(site.settlement) else {
+            return;
+        };
+        match next_civic(population, store.stone, has_kind) {
+            Some(kind) => kind,
+            None => return,
+        }
     };
 
     // Civic buildings claim the inner ring; houses begin one ring out. The
