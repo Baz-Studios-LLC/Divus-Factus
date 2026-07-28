@@ -1339,16 +1339,49 @@ fn title_hides_save_buttons(
 
 /// Loading from the title enters the world through the same door Begin uses.
 fn enter_on_title_load(
+    mut commands: Commands,
     state: Res<State<crate::GameState>>,
     pending: Option<Res<PendingLoad>>,
     mut next: ResMut<NextState<crate::GameState>>,
     mut panels: Query<&mut Visibility, With<SavesPanel>>,
+    mut notices: MessageWriter<ui::Notice>,
 ) {
-    if pending.is_some() && matches!(state.get(), crate::GameState::Title) {
-        next.set(crate::GameState::Loading);
-        for mut visibility in &mut panels {
-            *visibility = Visibility::Hidden;
+    let Some(pending) = pending else {
+        return;
+    };
+    if !matches!(state.get(), crate::GameState::Title) {
+        return;
+    }
+    // Prove the save reads before leaving the title: the Loading door
+    // begins a fresh world when nothing loads, and a failed load must
+    // never quietly become a new game.
+    if let Err(why) = read_slot(pending.0) {
+        commands.remove_resource::<PendingLoad>();
+        notices.write(ui::Notice::new(format!("Could not load: {why}")));
+        return;
+    }
+    next.set(crate::GameState::Loading);
+    for mut visibility in &mut panels {
+        *visibility = Visibility::Hidden;
+    }
+}
+
+/// A slot's card line, read tolerantly. A save written by an older
+/// version of the game may no longer parse as a whole SaveGame, but its
+/// label fields are still sitting right there in the file — and a slot
+/// with a world in it must never claim to be empty.
+fn label_line(slot: u8, raw: &str) -> String {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(raw) else {
+        return format!("Slot {slot} - an unreadable save");
+    };
+    let day = value.get("label_day").and_then(|v| v.as_u64());
+    let name = value.get("label_settlement").and_then(|v| v.as_str());
+    let souls = value.get("label_souls").and_then(|v| v.as_u64());
+    match (day, name, souls) {
+        (Some(day), Some(name), Some(souls)) => {
+            format!("Slot {slot} - day {day}, {name} ({souls} souls)")
         }
+        _ => format!("Slot {slot} - a saved world"),
     }
 }
 
@@ -1360,6 +1393,9 @@ fn refresh_slot_labels(
     mut labels: Query<(&SlotLabel, &mut Text)>,
 ) {
     if !panels.iter().any(|v| *v != Visibility::Hidden) {
+        // Held at the threshold while hidden, so the first open frame
+        // refreshes at once instead of flashing "empty" for a second.
+        *since_last = 1.0;
         return;
     }
     *since_last += time.delta_secs();
@@ -1368,15 +1404,35 @@ fn refresh_slot_labels(
     }
     *since_last = 0.0;
     for (slot, mut text) in &mut labels {
-        let fresh = match read_slot(slot.0) {
-            Ok(save) => format!(
-                "Slot {} - day {}, {} ({} souls)",
-                slot.0, save.label_day, save.label_settlement, save.label_souls
-            ),
+        // Only a missing file is "empty"; anything else in the slot gets
+        // the most honest label its contents allow.
+        let fresh = match std::fs::read_to_string(slot_path(slot.0)) {
             Err(_) => format!("Slot {} - empty", slot.0),
+            Ok(raw) => label_line(slot.0, &raw),
         };
         if text.0 != fresh {
             *text = Text::new(fresh);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_slot_with_a_world_in_it_never_reads_as_empty() {
+        // A healthy save labels in full.
+        let healthy = r#"{"label_day": 12, "label_settlement": "Deire", "label_souls": 14}"#;
+        assert_eq!(label_line(1, healthy), "Slot 1 - day 12, Deire (14 souls)");
+
+        // A save from an older age of the game — label fields renamed or
+        // missing — still admits a world is in there.
+        let elder = r#"{"seed": 7, "elapsed": 900.0}"#;
+        assert_eq!(label_line(2, elder), "Slot 2 - a saved world");
+
+        // Even a half-written file owns up instead of claiming vacancy.
+        let torn = r#"{"label_day": 12, "label_set"#;
+        assert_eq!(label_line(3, torn), "Slot 3 - an unreadable save");
     }
 }
