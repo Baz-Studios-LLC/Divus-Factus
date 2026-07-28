@@ -153,6 +153,7 @@ impl Plugin for VillagerPlugin {
                         .chain(),
                     (
                         home::assign_homes,
+                        home::burn_weathered,
                         home::tavern_evenings,
                         home::well_gatherings,
                         home::tavern_cheer,

@@ -24,6 +24,7 @@ mod title;
 mod ui;
 mod villager;
 mod water;
+mod weather;
 mod witness;
 
 use bevy::camera::visibility::RenderLayers;
@@ -135,6 +136,7 @@ fn main() {
             title::TitlePlugin,
             matter::MatterPlugin,
             save::SavePlugin,
+            weather::WeatherPlugin,
         ))
         .add_systems(Startup, spawn_lighting)
         .run();

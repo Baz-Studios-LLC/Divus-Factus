@@ -499,46 +499,7 @@ fn cast(
             }
             belief.spent += SMITE_COST;
 
-            // The bolt: jagged white-hot segments from the sky to the point.
-            let flash = materials.add(StandardMaterial {
-                base_color: Color::WHITE,
-                emissive: LinearRgba::WHITE * 24.0,
-                ..default()
-            });
-            let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
-            let bolt = commands
-                .spawn((
-                    Bolt { remaining: 0.4 },
-                    Transform::from_translation(at),
-                    Visibility::default(),
-                ))
-                .id();
-            let mut height = 0.0;
-            let mut sway = 0.0f32;
-            while height < 60.0 {
-                let segment = 7.0;
-                commands.spawn((
-                    Mesh3d(cube.clone()),
-                    MeshMaterial3d(flash.clone()),
-                    Transform::from_xyz(sway, height + segment * 0.5, sway * 0.6)
-                        .with_scale(Vec3::new(0.5, segment + 1.0, 0.5)),
-                    bevy::light::NotShadowCaster,
-                    ChildOf(bolt),
-                ));
-                height += segment;
-                sway = if sway > 0.0 { -1.1 } else { 1.3 };
-            }
-            commands.spawn((
-                PointLight {
-                    color: Color::WHITE,
-                    intensity: 40_000_000.0,
-                    range: 90.0,
-                    shadow_maps_enabled: false,
-                    ..default()
-                },
-                Transform::from_xyz(0.0, 6.0, 0.0),
-                ChildOf(bolt),
-            ));
+            lightning_bolt(&mut commands, &mut meshes, &mut materials, at);
 
             // The harm, and the first name it fell on.
             let mut struck: Option<Entity> = None;
@@ -717,6 +678,59 @@ fn style_hotbar(
             ui::theme::panel_bg().with_alpha(0.15)
         };
     }
+}
+
+/// The bolt: jagged white-hot segments from the sky to a point. Shared by
+/// the Smite miracle and the storm - deliberately indistinguishable,
+/// because the witnesses cannot tell heaven's wrath from the sky's.
+pub(crate) fn lightning_bolt(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    at: Vec3,
+) {
+    let flash = materials.add(StandardMaterial {
+        base_color: Color::WHITE,
+        emissive: LinearRgba::WHITE * 24.0,
+        ..default()
+    });
+    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+    let bolt = commands
+        .spawn((
+            Bolt { remaining: 0.4 },
+            Transform::from_translation(at),
+            Visibility::default(),
+        ))
+        .id();
+    let mut height = 0.0;
+    let mut sway = 0.0f32;
+    while height < 60.0 {
+        let segment = 7.0;
+        commands.spawn((
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(flash.clone()),
+            Transform::from_xyz(sway, height + segment * 0.5, sway * 0.6).with_scale(Vec3::new(
+                0.5,
+                segment + 1.0,
+                0.5,
+            )),
+            bevy::light::NotShadowCaster,
+            ChildOf(bolt),
+        ));
+        height += segment;
+        sway = if sway > 0.0 { -1.1 } else { 1.3 };
+    }
+    commands.spawn((
+        PointLight {
+            color: Color::WHITE,
+            intensity: 40_000_000.0,
+            range: 90.0,
+            shadow_maps_enabled: false,
+            ..default()
+        },
+        Transform::from_xyz(0.0, 6.0, 0.0),
+        ChildOf(bolt),
+    ));
 }
 
 /// Lightning does not linger.

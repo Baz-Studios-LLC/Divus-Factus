@@ -337,15 +337,13 @@ fn update_hover(
     cameras: Query<(&Camera, &GlobalTransform), With<GodCamera>>,
     candidates: Query<(Entity, &GlobalTransform, &PickRadius), Without<Held>>,
     pointer: Res<PointerContext>,
-    follow: Res<crate::camera::FollowTarget>,
     mut hand: ResMut<DivineHand>,
 ) {
     // A panel between the cursor and the world blocks the world. Hovering a
     // villager through the HUD and snatching them with a misclick is exactly the
     // kind of accident the interface layer exists to prevent. Likewise the
     // shoulder camera: a withdrawn hand touches nothing.
-    let shoulder = follow.entity.is_some() && follow.style == crate::camera::FollowStyle::Shoulder;
-    if hand.held.is_some() || pointer.over_ui || shoulder {
+    if hand.held.is_some() || pointer.over_ui {
         hand.hovered = None;
         return;
     }
@@ -400,15 +398,11 @@ fn toggle_follow(
             follow.entity = Some(other);
             follow.style = FollowStyle::Overhead;
         }
-        // Already following: any clean right-click advances the cycle —
-        // overhead, then the shoulder, then release. Nothing else ends it.
-        (Some(_), _) => match follow.style {
-            FollowStyle::Overhead => follow.style = FollowStyle::Shoulder,
-            FollowStyle::Shoulder => {
-                follow.entity = None;
-                follow.style = FollowStyle::Overhead;
-            }
-        },
+        // Already following: any clean right-click on nothing new lets go.
+        (Some(_), _) => {
+            follow.entity = None;
+            follow.style = FollowStyle::Overhead;
+        }
         // Not following and clicked someone: begin.
         (None, Some(creature)) => {
             follow.entity = Some(creature);
@@ -766,7 +760,6 @@ fn animate_hand(
     hand: Res<DivineHand>,
     pointer: Res<PointerContext>,
     buttons: Res<ButtonInput<MouseButton>>,
-    follow: Res<crate::camera::FollowTarget>,
     cameras: Query<&CameraRig>,
     anchors: Query<&GlobalTransform>,
     mut roots: Query<(&mut Transform, &mut Visibility, &mut HandRig), With<HandModel>>,
@@ -796,8 +789,7 @@ fn animate_hand(
 
     // Over the shoulder, the hand withdraws entirely — it would fill the frame
     // at that distance. It fades away and back rather than popping.
-    let withdrawn =
-        follow.entity.is_some() && follow.style == crate::camera::FollowStyle::Shoulder && !held;
+    let withdrawn = false && !held;
     let fade_ease = 1.0 - (-6.0 * dt).exp();
     rig.fade += ((!withdrawn as u32 as f32) - rig.fade) * fade_ease;
 

@@ -144,6 +144,8 @@ struct SaveGame {
     bushes: Vec<(Vec3, f32)>,
     #[serde(default)]
     boulders: Vec<(Vec3, Vec3)>,
+    #[serde(default)]
+    weather: (f32, f32, f64),
 }
 
 fn slots_dir() -> std::path::PathBuf {
@@ -578,6 +580,9 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         trees,
         bushes,
         boulders,
+        weather: world
+            .get_resource::<crate::weather::Weather>()
+            .map_or((0.15, 0.15, 0.0), |w| (w.intensity, w.target, w.next_front)),
     })
 }
 
@@ -680,6 +685,12 @@ fn apply(world: &mut World, save: SaveGame) {
     });
     world.insert_resource(crate::villager::work::KitchenWarm {
         until: save.kitchen_until,
+    });
+    world.insert_resource(crate::weather::Weather {
+        intensity: save.weather.0,
+        target: save.weather.1,
+        next_front: save.weather.2,
+        wind: 0.15 + save.weather.0 * 0.85,
     });
     world.insert_resource(Belief {
         total: save.belief.0,

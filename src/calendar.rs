@@ -205,8 +205,24 @@ fn sky_at(elevation: f32) -> Sky {
     }
 }
 
-fn drive_sky(clock: Res<WorldClock>, mut sky: ResMut<Sky>) {
+fn drive_sky(
+    clock: Res<WorldClock>,
+    weather: Option<Res<crate::weather::Weather>>,
+    mut sky: ResMut<Sky>,
+) {
     *sky = sky_at(clock.sun_elevation());
+    // Weather sits on top of the hour: the sun dims behind the deck and the
+    // horizon greys - and because fog reads the horizon, rain greys the
+    // whole distance with it.
+    if let Some(weather) = weather {
+        let i = weather.intensity;
+        sky.sun_illuminance *= 1.0 - i * 0.55;
+        sky.fill_illuminance *= 1.0 - i * 0.3;
+        sky.ambient_brightness *= 1.0 - i * 0.25;
+        let grey = Color::srgb(0.52, 0.55, 0.58);
+        sky.horizon = mix_colors(sky.horizon, grey, i * 0.45 * sky.daylight);
+        sky.sun_color = mix_colors(sky.sun_color, grey, i * 0.4);
+    }
 }
 
 /// Marks the key light.

@@ -84,6 +84,7 @@ pub(super) fn expeditions(
     terrain: Option<Res<Terrain>>,
     site: Option<Res<SettlementSite>>,
     mut known: ResMut<KnownWorld>,
+    weather: Option<Res<crate::weather::Weather>>,
     mut rng: ResMut<super::SimRng>,
     mut notices: MessageWriter<crate::ui::Notice>,
     mut say: MessageWriter<crate::ui::Say>,
@@ -200,6 +201,13 @@ pub(super) fn expeditions(
             continue;
         }
         if !work::is_work_hour(clock.time_of_day()) || !rng.0.chance(0.002) {
+            continue;
+        }
+        // Nobody walks past the cairns into a storm.
+        if weather
+            .as_ref()
+            .is_some_and(|w| w.kind() == crate::weather::WeatherKind::Storm)
+        {
             continue;
         }
         // Pick a frontier point: out past the edge, on walkable ground.

@@ -99,7 +99,8 @@ pub fn animate_creatures(
             let bob = -(motion.phase * 2.0).cos() * gait.bounce * rig.height * walk;
             let breathe = breath * 0.004 * rig.height * idle;
             let sway = sin_phase * gait.sway * walk;
-            let lean = gait.lean + walk * 0.09 + motion.flail * 0.25;
+            // Forward is negative-X in this rig: lean INTO the stride.
+            let lean = -(gait.lean + walk * 0.09) + motion.flail * 0.25;
 
             transform.translation = Vec3::new(0.0, bob + breathe, 0.0);
             transform.rotation = Quat::from_rotation_z(sway) * Quat::from_rotation_x(lean);

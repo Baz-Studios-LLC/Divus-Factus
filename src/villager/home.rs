@@ -203,6 +203,25 @@ pub(super) fn spawn_bonfire(
 }
 
 /// The fire burns down, and its flame and light follow the fuel.
+pub(super) fn burn_weathered(
+    weather: Option<Res<crate::weather::Weather>>,
+    mut fires: Query<&mut Bonfire>,
+    time: Res<Time>,
+) {
+    // The base burn happens in `burn`; weather adds its tax here, so the
+    // two systems stay simple.
+    let Some(weather) = weather else {
+        return;
+    };
+    let extra = weather.intensity * 0.5;
+    if extra <= 0.0 {
+        return;
+    }
+    for mut fire in &mut fires {
+        fire.fuel = (fire.fuel - time.delta_secs() * extra).max(0.0);
+    }
+}
+
 pub(super) fn burn(
     time: Res<Time>,
     mut fires: Query<&mut Bonfire>,
@@ -510,6 +529,8 @@ pub(super) fn tavern_evenings(
 pub(super) fn weariness(
     time: Res<Time>,
     clock: Res<crate::calendar::WorldClock>,
+    weather: Option<Res<crate::weather::Weather>>,
+    sky: Option<Res<crate::calendar::Sky>>,
     buildings: Query<&super::work::Building>,
     mut villagers: Query<
         (
@@ -558,7 +579,11 @@ pub(super) fn weariness(
         // roofless life above resignation.
         if home.is_none() {
             if night {
-                morale.spirits = (morale.spirits - dt / 200.0).max(0.0);
+                // A cold, wet night grinds harder than a mild one.
+                let chill = weather.as_ref().map_or(0.0, |w| {
+                    1.0 - w.temperature(sky.as_ref().map_or(0.0, |s| s.daylight))
+                });
+                morale.spirits = (morale.spirits - dt * (1.0 + chill) / 200.0).max(0.0);
             }
             morale.spirits = morale.spirits.min(roofless_ceiling);
         }

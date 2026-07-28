@@ -122,6 +122,7 @@ fn follow_camera(
 /// clouds gilded at dusk and swallowed at night.
 fn follow_the_hours(
     time: Res<Time>,
+    weather: Option<Res<crate::weather::Weather>>,
     sky: Option<Res<crate::calendar::Sky>>,
     mut materials: ResMut<Assets<SkyDomeMaterial>>,
     domes: Query<&MeshMaterial3d<SkyDomeMaterial>, With<SkyDome>>,
@@ -156,6 +157,10 @@ fn follow_the_hours(
             material.params.sun_dir = sky.sun_direction.extend(0.0);
             material.params.misc.x = time.elapsed_secs();
             material.params.misc.z = sky.daylight;
+            // The weather owns the cloud deck.
+            if let Some(weather) = &weather {
+                material.params.misc.y = 0.18 + weather.intensity * 0.8;
+            }
         }
     }
 }

@@ -645,12 +645,15 @@ pub fn raise_field(
 /// Crops grow on their own; a farmer's tending hurries them greatly.
 pub(super) fn grow_crops(
     time: Res<Time>,
+    weather: Option<Res<crate::weather::Weather>>,
     mut fields: Query<(&mut Field, &Children)>,
     mut rows: Query<(&mut Transform, &CropRow)>,
 ) {
     let dt = time.delta_secs();
+    // Rain is the farmer's other pair of hands.
+    let watered = weather.map_or(1.0, |w| 1.0 + w.intensity * 1.5);
     for (mut field, children) in &mut fields {
-        field.growth = (field.growth + dt / 600.0).min(1.0);
+        field.growth = (field.growth + dt * watered / 600.0).min(1.0);
         for &child in children {
             if let Ok((mut stalk, crop)) = rows.get_mut(child) {
                 let height = crop.height * (0.1 + field.growth * 0.9);
@@ -1704,6 +1707,7 @@ pub(super) fn do_work(
         Res<Terrain>,
         ResMut<crate::terrain::LoadedChunks>,
         ResMut<crate::grass::GrassChunks>,
+        Option<Res<crate::weather::Weather>>,
     ),
     assets: (ResMut<Assets<Mesh>>, ResMut<Assets<StandardMaterial>>),
     mut prey_query: Query<
@@ -1722,7 +1726,7 @@ pub(super) fn do_work(
     let (carrying, children, loads) = (carrying, children, loads);
     let (carrying_stone, mut patients, mut fields_mut, mut kitchen) = trades;
     let (mut build_sites, settlements, mut notices) = civic;
-    let (terrain, mut chunks, mut grass) = ground;
+    let (terrain, mut chunks, mut grass, weather) = ground;
     let (mut meshes, mut materials) = assets;
     let Some(site) = site else {
         return;
@@ -2066,12 +2070,14 @@ pub(super) fn do_work(
         motion.flail = motion.flail.max(0.3);
 
         // Blacksmith's tools quicken every trade's hands - and the diligent
-        // need less quickening than the slothful.
+        // need less quickening than the slothful. Foul weather slows all of
+        // them alike: nobody hammers well in a downpour.
         let cycle = if context.3.iter().any(|b| b.kind == BuildingKind::Blacksmith) {
             WORK_SECONDS * 0.75
         } else {
             WORK_SECONDS
-        } * manner.map_or(1.0, |m| m.work_pace());
+        } * manner.map_or(1.0, |m| m.work_pace())
+            * weather.as_ref().map_or(1.0, |w| w.toil());
         job.progress += dt;
         if job.progress < cycle {
             continue;

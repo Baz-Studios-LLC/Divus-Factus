@@ -39,15 +39,13 @@ pub enum FollowStyle {
     /// The god's view, pinned to them: orbit and zoom stay free.
     #[default]
     Overhead,
-    /// Down at their back, seeing what they see.
-    Shoulder,
 }
 
 /// Whom the camera is following, if anyone.
 ///
 /// Set by right-clicking a creature under the hand. Only right-clicks change
-/// it: the next clean click drops to the shoulder, the one after lets go, and
-/// clicking a different creature switches to them. Nothing else — not panning,
+/// it: the next clean click lets go, and clicking a different creature
+/// switches to them. Nothing else — not panning,
 /// not time — releases a follow.
 #[derive(Resource, Default)]
 pub struct FollowTarget {
@@ -76,14 +74,6 @@ fn apply_follow(
     rig.target_focus.z = at.z;
     // A followed zoom anchor fights the pin; the pin wins.
     rig.zoom_anchor = None;
-
-    if follow.style == FollowStyle::Shoulder {
-        // Behind them, low, close — the camera looks where they are walking.
-        let facing = target.rotation() * Vec3::NEG_Z;
-        rig.target_yaw = (-facing.x).atan2(-facing.z);
-        rig.target_pitch = 0.35;
-        rig.target_distance = 9.0;
-    }
 }
 
 /// Camera systems run as a unit so that anything needing a settled camera — the

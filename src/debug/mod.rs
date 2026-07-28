@@ -1773,6 +1773,7 @@ fn update_world_panel(
     site: Option<Res<crate::villager::SettlementSite>>,
     panels: Query<&Visibility, With<WorldPanel>>,
     mut values: Query<(&WorldValue, &mut Text)>,
+    weather: Option<Res<crate::weather::Weather>>,
 ) {
     if !panels.iter().any(|v| *v != Visibility::Hidden) {
         return;
@@ -1783,29 +1784,11 @@ fn update_world_panel(
             WorldValue::Date => clock
                 .as_ref()
                 .map_or_else(|| "-".into(), |c| c.date_phrase()),
-            WorldValue::SkyState => sky.as_ref().map_or_else(
-                || "-".to_string(),
-                |s| {
-                    if s.daylight < 0.1 {
-                        "night, scattered cloud".into()
-                    } else if s.daylight < 0.8 {
-                        "low sun, scattered cloud".into()
-                    } else {
-                        "clear blue, scattered cloud".into()
-                    }
-                },
-            ),
-            WorldValue::Temperature => match (&terrain, &site) {
-                (Some(terrain), Some(site)) => {
-                    let warmth = terrain.temperature_at(site.centre.x, site.centre.z);
-                    let night_chill = sky.as_ref().map_or(0.0, |s| (1.0 - s.daylight) * 0.15);
-                    match warmth - night_chill {
-                        w if w > 0.62 => "hot".to_string(),
-                        w if w > 0.45 => "mild".to_string(),
-                        w if w > 0.3 => "cool".to_string(),
-                        _ => "cold".to_string(),
-                    }
-                }
+            WorldValue::SkyState => weather
+                .as_ref()
+                .map_or_else(|| "-".to_string(), |w| w.kind().describe().to_string()),
+            WorldValue::Temperature => match (&weather, &sky) {
+                (Some(weather), Some(sky)) => weather.temperature_word(sky.daylight).to_string(),
                 _ => "-".to_string(),
             },
             WorldValue::Country => match (&terrain, &site) {

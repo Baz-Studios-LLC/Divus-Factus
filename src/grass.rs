@@ -80,9 +80,17 @@ impl MaterialExtension for GrassExtension {
 }
 
 /// Advances the wind clock.
-fn drive_wind(time: Res<Time>, mut materials: ResMut<Assets<GrassMaterial>>) {
+fn drive_wind(
+    time: Res<Time>,
+    weather: Option<Res<crate::weather::Weather>>,
+    mut materials: ResMut<Assets<GrassMaterial>>,
+) {
+    let wind = weather.map_or(0.3, |w| w.wind);
     for (_, material) in materials.iter_mut() {
         material.extension.params.clock.x = time.elapsed_secs();
+        // z: speed, w: strength - a storm's gusts run fast and bend hard.
+        material.extension.params.wind.z = 0.7 + wind * 1.6;
+        material.extension.params.wind.w = 0.5 + wind * 1.3;
     }
 }
 
