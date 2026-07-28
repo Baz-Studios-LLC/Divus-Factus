@@ -762,7 +762,7 @@ fn ui_cursor_placement(camera: &CameraRig, ray: Ray3d, tap: f32) -> (Vec3, Quat)
 
 /// Poses and places the hand every frame.
 fn animate_hand(
-    time: Res<Time>,
+    time: Res<Time<Real>>,
     hand: Res<DivineHand>,
     pointer: Res<PointerContext>,
     buttons: Res<ButtonInput<MouseButton>>,

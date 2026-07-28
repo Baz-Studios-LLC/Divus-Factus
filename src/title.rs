@@ -13,8 +13,8 @@ pub struct TitlePlugin;
 
 impl Plugin for TitlePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::Title), spawn_title)
-            .add_systems(OnExit(GameState::Title), despawn_title)
+        app.add_systems(OnEnter(GameState::Title), (spawn_title, hold_the_world))
+            .add_systems(OnExit(GameState::Title), (despawn_title, release_the_world))
             .add_systems(
                 Update,
                 (handle_choice, handle_settings).run_if(in_state(GameState::Title)),
@@ -144,6 +144,16 @@ fn spawn_title(
     commands.entity(settings).insert(SettingsButton);
     let quit = menu_button(&mut commands, screen, "Quit");
     commands.entity(quit).insert(QuitButton);
+}
+
+/// The world stands still behind the title: generated and visible, but not
+/// living. Nobody builds a village while the player reads the menu.
+fn hold_the_world(mut time: ResMut<Time<Virtual>>) {
+    time.pause();
+}
+
+fn release_the_world(mut time: ResMut<Time<Virtual>>) {
+    time.unpause();
 }
 
 /// The settings overlay: for now, one setting — the colour of the hand.
