@@ -55,6 +55,79 @@ pub struct Flame;
 #[derive(Component)]
 pub struct Firelight;
 
+/// When real rain sets in, the housed step indoors and wait it out, and
+/// the roofless crowd the fire. Work goes on - slower, already taxed by
+/// the weather - but idle hands do not stand in a downpour for nothing.
+#[allow(clippy::type_complexity)]
+pub(super) fn take_shelter(
+    clock: Res<crate::calendar::WorldClock>,
+    weather: Option<Res<crate::weather::Weather>>,
+    homes: Query<&Transform, (With<Hut>, Without<Villager>)>,
+    fires: Query<&GlobalTransform, (With<Bonfire>, Without<Villager>)>,
+    mut villagers: Query<
+        (
+            &Transform,
+            Option<&Home>,
+            &mut Activity,
+            &mut MoveTarget,
+            &mut Visibility,
+        ),
+        (
+            With<Villager>,
+            Without<Held>,
+            Without<crate::creature::Airborne>,
+            Without<Corpse>,
+        ),
+    >,
+) {
+    let Some(weather) = weather else {
+        return;
+    };
+    // Night hands everyone to the sleep routine instead.
+    if clock.is_night() {
+        return;
+    }
+    let pouring = weather.intensity > 0.6;
+    let fire_pos = fires.iter().next().map(|f| f.translation());
+
+    for (transform, home, mut activity, mut target, mut visibility) in &mut villagers {
+        if !pouring {
+            if *activity == Activity::Sheltering {
+                *visibility = Visibility::Inherited;
+                *activity = Activity::Idle;
+                target.0 = None;
+            }
+            continue;
+        }
+        match *activity {
+            Activity::Idle | Activity::Wandering | Activity::Sheltering => {}
+            _ => continue,
+        }
+        match home.and_then(|h| homes.get(h.0).ok()) {
+            Some(hut) => {
+                let door = hut.translation;
+                if transform.translation.distance(door) > 2.2 {
+                    *activity = Activity::Sheltering;
+                    target.0 = Some(door);
+                } else {
+                    *activity = Activity::Sheltering;
+                    target.0 = None;
+                    *visibility = Visibility::Hidden;
+                }
+            }
+            None => {
+                // No roof: the fire circle is the next best thing.
+                if let Some(fire) = fire_pos
+                    && transform.translation.distance(fire) > 5.0
+                    && matches!(*activity, Activity::Idle | Activity::Wandering)
+                {
+                    target.0 = Some(fire);
+                }
+            }
+        }
+    }
+}
+
 /// Midday at the well: the idle drift over for water and talk. The well is
 /// the daylight tavern - the place gossip crosses the village.
 #[allow(clippy::type_complexity)]

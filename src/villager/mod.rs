@@ -157,6 +157,7 @@ impl Plugin for VillagerPlugin {
                     (
                         home::assign_homes,
                         home::burn_weathered,
+                        home::take_shelter,
                         home::tavern_evenings,
                         home::well_gatherings,
                         home::tavern_cheer,
@@ -404,6 +405,8 @@ pub enum Activity {
     Mourning,
     /// Stopped face to face with a neighbour, trading news.
     Chatting,
+    /// Indoors, waiting out the weather.
+    Sheltering,
     /// Carrying a body to the resting ground.
     Bearing,
     /// On their knees, asking.
@@ -1758,6 +1761,7 @@ fn choose_activity(
                 | Activity::Mourning
                 | Activity::Bearing
                 | Activity::Chatting
+                | Activity::Sheltering
         ) {
             continue;
         }
@@ -1894,7 +1898,8 @@ fn pursue_activity(
             | Activity::Sleeping
             | Activity::Mourning
             | Activity::Bearing
-            | Activity::Chatting => {}
+            | Activity::Chatting
+            | Activity::Sheltering => {}
         }
 
         // Starvation shows in the body before it shows in any UI.
