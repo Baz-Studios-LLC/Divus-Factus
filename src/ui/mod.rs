@@ -108,10 +108,43 @@ fn speak(
                     max_width: px(230),
                     ..default()
                 },
-                BackgroundColor(theme::panel_bg().with_alpha(0.85)),
+                // Opaque, so the tail below can weld to it without a seam.
+                BackgroundColor(theme::panel_bg()),
                 BorderColor::all(border),
             ))
             .id();
+        // The tail: a square in the bubble's own fill, turned 45 degrees
+        // and hung half out of the bottom edge. Only its two lower edges
+        // wear the border, so what shows is a bordered triangle pointing
+        // at whoever is talking — and its plain upper half quietly covers
+        // the stretch of bubble border it hangs from.
+        commands.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: percent(50),
+                bottom: px(-4),
+                width: px(10),
+                height: px(10),
+                border: UiRect {
+                    right: px(1),
+                    bottom: px(1),
+                    ..default()
+                },
+                ..default()
+            },
+            UiTransform {
+                translation: Val2::new(percent(-50), px(0)),
+                rotation: Rot2::degrees(45.0),
+                ..default()
+            },
+            BackgroundColor(theme::panel_bg()),
+            BorderColor {
+                right: border,
+                bottom: border,
+                ..default()
+            },
+            ChildOf(bubble),
+        ));
         // The name over the words, so a crowd's chatter has owners.
         if let Ok(person) = names.get(say.speaker) {
             commands.spawn((
@@ -126,6 +159,13 @@ fn speak(
         }
         commands.spawn((
             Text::new(say.text.clone()),
+            // The text itself must know the wrap width: a shrink-wrapped
+            // bubble measures its text at full one-line width, and the
+            // late wrap spills lines out the bottom of the border.
+            Node {
+                max_width: px(212),
+                ..default()
+            },
             TextFont {
                 font_size: FontSize::Px(theme::SMALL_SIZE),
                 ..default()
@@ -168,7 +208,9 @@ fn float_bubbles(
             Ok(at) => {
                 let size = computed.size() * computed.inverse_scale_factor();
                 node.left = px(at.x - size.x * 0.5);
-                node.top = px(at.y - size.y);
+                // Lifted enough that the tail's point, not the box, meets
+                // the top of the speaker's head.
+                node.top = px(at.y - size.y - 8.0);
                 *visibility = Visibility::Visible;
             }
             Err(_) => {
