@@ -292,9 +292,9 @@ impl Blueprint {
         match kind {
             BuildingKind::House => Blueprint {
                 kind,
-                half_w: rng.range(1.25, 1.75),
-                half_d: rng.range(1.45, 2.05),
-                wall_h: rng.range(1.45, 1.95),
+                half_w: rng.range(1.9, 2.5),
+                half_d: rng.range(2.0, 2.7),
+                wall_h: rng.range(2.1, 2.6),
                 // Timber homes mostly; some whitewashed, a few painted in a
                 // cloth colour — a street, not a barracks.
                 walls: if rng.chance(0.55) {
@@ -1962,8 +1962,14 @@ pub(super) fn do_work(
                     ChildOf(site_entity),
                 ));
                 // Two stone steps down from the threshold, on the door side.
+                // (Not for the well - nobody steps up into a well.)
                 let step_mesh = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
-                for (out, top, depth) in [(0.32_f32, 0.24_f32, 0.6_f32), (0.78, 0.1, 0.55)] {
+                let steps: &[(f32, f32, f32)] = if plan.kind == BuildingKind::Well {
+                    &[]
+                } else {
+                    &[(0.32, 0.24, 0.6), (0.78, 0.1, 0.55)]
+                };
+                for &(out, top, depth) in steps {
                     commands.spawn((
                         Mesh3d(step_mesh.clone()),
                         MeshMaterial3d(stone_material.clone()),
@@ -2395,6 +2401,11 @@ pub(crate) fn raise_stage(
         perceptual_roughness: 1.0,
         ..default()
     });
+    let shadowed_water = materials.add(StandardMaterial {
+        base_color: crate::palette::shade(&crate::palette::CLOTH_BLUE, 0.12),
+        perceptual_roughness: 0.2,
+        ..default()
+    });
     let gold = materials.add(StandardMaterial {
         base_color: crate::palette::shade(&crate::palette::CLOTH_GOLD, 0.85),
         perceptual_roughness: 0.6,
@@ -2414,6 +2425,84 @@ pub(crate) fn raise_stage(
             ChildOf(site),
         ));
     };
+
+    // A well is its own shape entirely: a stone curb, two posts, a
+    // windlass beam, a little peaked cap, and the bucket on its rope.
+    if plan.kind == BuildingKind::Well {
+        match stage {
+            0 => {
+                for (x, z) in [(-w, -d), (w, -d), (-w, d), (w, d)] {
+                    part(
+                        Vec3::new(x, 0.3, z),
+                        Vec3::new(0.14, 0.6, 0.14),
+                        0.0,
+                        &frame,
+                    );
+                }
+            }
+            1 => {
+                // The curb: four low stone walls, no door, water dark within.
+                for (offset, size) in [
+                    (Vec3::new(0.0, 0.3, -d), Vec3::new(w * 2.2, 0.6, 0.24)),
+                    (Vec3::new(0.0, 0.3, d), Vec3::new(w * 2.2, 0.6, 0.24)),
+                    (Vec3::new(-w, 0.3, 0.0), Vec3::new(0.24, 0.6, d * 2.2)),
+                    (Vec3::new(w, 0.3, 0.0), Vec3::new(0.24, 0.6, d * 2.2)),
+                ] {
+                    part(offset, size, 0.0, &stonework);
+                }
+                part(
+                    Vec3::new(0.0, 0.5, 0.0),
+                    Vec3::new(w * 1.6, 0.05, d * 1.6),
+                    0.0,
+                    &shadowed_water,
+                );
+            }
+            _ => {
+                for x in [-w, w] {
+                    part(
+                        Vec3::new(x, 1.0, 0.0),
+                        Vec3::new(0.14, 1.4, 0.14),
+                        0.0,
+                        &frame,
+                    );
+                }
+                // The windlass beam and its handle.
+                part(
+                    Vec3::new(0.0, 1.62, 0.0),
+                    Vec3::new(w * 2.3, 0.14, 0.14),
+                    0.0,
+                    &frame,
+                );
+                // A little peaked cap over the beam.
+                part(
+                    Vec3::new(-w * 0.4, 1.95, 0.0),
+                    Vec3::new(w * 1.15, 0.08, d * 1.6),
+                    0.5,
+                    &roof,
+                );
+                part(
+                    Vec3::new(w * 0.4, 1.95, 0.0),
+                    Vec3::new(w * 1.15, 0.08, d * 1.6),
+                    -0.5,
+                    &roof,
+                );
+                // The rope and the bucket, hanging over the dark.
+                part(
+                    Vec3::new(0.0, 1.25, 0.0),
+                    Vec3::new(0.04, 0.7, 0.04),
+                    0.0,
+                    &frame,
+                );
+                part(
+                    Vec3::new(0.0, 0.86, 0.0),
+                    Vec3::new(0.3, 0.26, 0.3),
+                    0.0,
+                    &frame,
+                );
+            }
+        }
+        return;
+    }
 
     match stage {
         // Ground broken: corner posts and sill beams (plus laid stone for the
@@ -2466,7 +2555,7 @@ pub(crate) fn raise_stage(
                 0.0,
                 &wall,
             );
-            let gap = 0.5;
+            let gap = 1.0;
             let seg = (d * 2.0 - gap) * 0.5;
             part(
                 Vec3::new(w, h * 0.5, -(gap * 0.5 + seg * 0.5)),
@@ -2544,27 +2633,25 @@ pub(crate) fn raise_stage(
                     0.0,
                     &frame,
                 );
-                // Gable end-caps: stepped bands closing the triangle between
-                // wall top and ridge, so no house shows sky through its attic.
+                // Gable end-caps: bands whose widths follow the roof pitch,
+                // so the triangle fills without a single tooth poking
+                // through the slabs above it.
+                let ridge = 0.45 + w * 0.58;
+                let pitch = 0.613; // tan of the slab tilt
                 for zed in [-d, d] {
-                    part(
-                        Vec3::new(0.0, h + 0.2, zed),
-                        Vec3::new(w * 1.8, 0.44, 0.16),
-                        0.0,
-                        &wall,
-                    );
-                    part(
-                        Vec3::new(0.0, h + 0.56, zed),
-                        Vec3::new(w * 1.15, 0.38, 0.16),
-                        0.0,
-                        &wall,
-                    );
-                    part(
-                        Vec3::new(0.0, h + 0.88, zed),
-                        Vec3::new(w * 0.55, 0.34, 0.16),
-                        0.0,
-                        &wall,
-                    );
+                    let mut y = 0.02_f32;
+                    while y + 0.3 < ridge {
+                        let band_top = (y + 0.34).min(ridge - 0.04);
+                        let band_h = band_top - y;
+                        let half = ((ridge - band_top) / pitch - 0.1).max(0.12);
+                        part(
+                            Vec3::new(0.0, h + y + band_h * 0.5, zed),
+                            Vec3::new(half * 2.0, band_h, 0.16),
+                            0.0,
+                            &wall,
+                        );
+                        y += 0.34;
+                    }
                 }
             }
             if matches!(plan.kind, BuildingKind::TownHall | BuildingKind::Shrine) {
