@@ -116,7 +116,8 @@ impl Plugin for VillagerPlugin {
                         births,
                         bereave,
                         chronicle_divine_touch,
-                        gossip,
+                        meet_to_talk,
+                        hold_conversations,
                         choose_activity,
                     )
                         .chain(),
@@ -401,6 +402,8 @@ pub enum Activity {
     Hauling,
     /// Standing with the dead.
     Mourning,
+    /// Stopped face to face with a neighbour, trading news.
+    Chatting,
     /// Carrying a body to the resting ground.
     Bearing,
     /// On their knees, asking.
@@ -1229,23 +1232,40 @@ fn form_bonds(
 /// miracle for it to change them — they need to know someone who did. What a
 /// villager carries secondhand is counted apart from what they saw, because a
 /// faith built on rumour and a faith built on witness are different faiths,
-/// and doctrine will care which one it inherited.
-fn gossip(
+/// A conversation in progress: who with, when it ends, and how far the
+/// telling has got.
+#[derive(Component)]
+pub struct Conversing {
+    pub partner: Entity,
+    pub until: f64,
+    pub spoke_at: Option<f64>,
+    pub replied: bool,
+    pub kind: Option<crate::witness::DivineEventKind>,
+}
+
+/// Whoever has news finds an idle neighbour and goes TO them: both stop,
+/// meet, and hold an actual conversation instead of talking over their
+/// shoulders mid-stride.
+#[allow(clippy::type_complexity)]
+fn meet_to_talk(
+    mut commands: Commands,
     time: Res<Time>,
     clock: Res<crate::calendar::WorldClock>,
     mut since_last: Local<f32>,
-    mut say: MessageWriter<crate::ui::Say>,
     mut rng: Option<ResMut<SimRng>>,
-    mut people: Query<
+    talkers: Query<
         (
             Entity,
             &Transform,
-            &Person,
-            &mut crate::witness::Witnessed,
-            (Option<&mut Chronicle>, Option<&mut belief::Faith>),
+            &Activity,
+            &crate::witness::Witnessed,
             Option<&traits::Traits>,
         ),
-        (With<Villager>, Without<crate::creature::Corpse>),
+        (
+            With<Villager>,
+            Without<crate::creature::Corpse>,
+            Without<Conversing>,
+        ),
     >,
 ) {
     *since_last += time.delta_secs();
@@ -1257,82 +1277,169 @@ fn gossip(
         return;
     };
 
-    // Who has something to tell, and who is standing near enough to hear it.
-    struct Telling {
-        listener: Entity,
-        teller: Entity,
-        speaker: String,
-        kind: crate::witness::DivineEventKind,
-    }
-    let mut tellings = Vec::new();
-    let mut spoken_to = Vec::new();
-
-    for (speaker, at, person, witnessed, _, manner) in people.iter() {
+    let mut paired: Vec<Entity> = Vec::new();
+    for (teller, at, activity, witnessed, manner) in talkers.iter() {
+        if paired.contains(&teller) {
+            continue;
+        }
         let Some(&kind) = witnessed.recent.first() else {
             continue;
         };
-        let Some((listener, _)) = people
-            .iter()
-            .filter(|(other, _, _, _, _, _)| *other != speaker && !spoken_to.contains(other))
-            .map(|(other, transform, _, _, _, _)| {
-                (other, transform.translation.distance(at.translation))
-            })
-            .filter(|(_, distance)| *distance <= EARSHOT)
-            .min_by(|a, b| a.1.total_cmp(&b.1))
-        else {
+        if !matches!(*activity, Activity::Idle | Activity::Wandering) {
             continue;
-        };
-
+        }
         let tongue = manner.map_or(1.0, |m| m.talkativeness());
         if !rng.0.chance((0.4 * tongue).min(0.95)) {
             continue;
         }
-        spoken_to.push(listener);
-        tellings.push(Telling {
-            listener,
-            teller: speaker,
-            speaker: person.name.clone(),
-            kind,
-        });
-    }
-
-    let day = clock.day();
-    for telling in tellings {
-        let Ok((_, _, listener_person, mut witnessed, (chronicle, faith), _)) =
-            people.get_mut(telling.listener)
+        // The nearest idle neighbour becomes the audience.
+        let Some((listener, _)) = talkers
+            .iter()
+            .filter(|(other, _, other_activity, _, _)| {
+                *other != teller
+                    && !paired.contains(other)
+                    && matches!(**other_activity, Activity::Idle | Activity::Wandering)
+            })
+            .map(|(other, other_at, ..)| (other, other_at.translation.distance(at.translation)))
+            .filter(|(_, d)| *d <= EARSHOT * 2.0)
+            .min_by(|a, b| a.1.total_cmp(&b.1))
         else {
             continue;
         };
-        // A god heard of is a god made slightly more real: the story itself
-        // carries a grain of belief, whatever the story says the god did.
-        if let Some(mut faith) = faith {
-            faith.trust = (faith.trust + 0.02).min(0.8);
-        }
-        // No one needs the story of what they saw with their own eyes.
-        if witnessed.recent.contains(&telling.kind) {
+        paired.push(teller);
+        paired.push(listener);
+        let until = clock.elapsed + 14.0;
+        commands.entity(teller).insert((
+            Conversing {
+                partner: listener,
+                until,
+                spoke_at: None,
+                replied: false,
+                kind: Some(kind),
+            },
+            Activity::Chatting,
+        ));
+        commands.entity(listener).insert((
+            Conversing {
+                partner: teller,
+                until,
+                spoke_at: None,
+                replied: false,
+                kind: None,
+            },
+            Activity::Chatting,
+        ));
+    }
+}
+
+/// The meeting itself: close the distance, face each other, tell it, hear
+/// the reply, and part. The knowledge changes hands at the meeting.
+#[allow(clippy::type_complexity)]
+fn hold_conversations(
+    mut commands: Commands,
+    clock: Res<crate::calendar::WorldClock>,
+    name: Option<Res<DivineName>>,
+    mut say: MessageWriter<crate::ui::Say>,
+    mut rng: ResMut<SimRng>,
+    mut pairs: Query<
+        (
+            Entity,
+            &Transform,
+            &mut Conversing,
+            &mut Activity,
+            &mut MoveTarget,
+        ),
+        (With<Villager>, Without<crate::creature::Corpse>),
+    >,
+    mut minds: Query<(
+        &Person,
+        &mut crate::witness::Witnessed,
+        Option<&mut Chronicle>,
+        Option<&mut belief::Faith>,
+    )>,
+) {
+    // Positions snapshot so both halves of a pair can steer at each other.
+    let spots: Vec<(Entity, Vec3)> = pairs
+        .iter()
+        .map(|(entity, at, ..)| (entity, at.translation))
+        .collect();
+    let spot_of = |entity: Entity| spots.iter().find(|(e, _)| *e == entity).map(|(_, p)| *p);
+    let god = name.as_ref().map_or("the god", |n| n.0.as_str());
+
+    for (entity, at, mut talk, mut activity, mut target) in &mut pairs {
+        if *activity != Activity::Chatting || clock.elapsed > talk.until {
+            commands.entity(entity).remove::<Conversing>();
+            if *activity == Activity::Chatting {
+                *activity = Activity::Idle;
+                target.0 = None;
+            }
             continue;
         }
-        witnessed.secondhand = witnessed.secondhand.saturating_add(1);
-        say.write(crate::ui::Say {
-            speaker: telling.teller,
-            text: telling.kind.rumor().to_string(),
-            thought: false,
-        });
-        info!(
-            "{} told {} that {}",
-            telling.speaker,
-            listener_person.name,
-            telling.kind.rumor(),
-        );
-        if let Some(mut chronicle) = chronicle {
-            chronicle.hear(day, &telling.speaker, telling.kind.rumor());
+        let Some(partner_at) = spot_of(talk.partner) else {
+            commands.entity(entity).remove::<Conversing>();
+            *activity = Activity::Idle;
+            target.0 = None;
+            continue;
+        };
+        let distance = at.translation.distance(partner_at);
+        if distance > 1.9 {
+            target.0 = Some(partner_at);
+            continue;
+        }
+        target.0 = None;
+
+        // Met: the teller speaks once; the listener takes it in and replies.
+        if let Some(kind) = talk.kind
+            && talk.spoke_at.is_none()
+        {
+            talk.spoke_at = Some(clock.elapsed);
+            let teller_name = minds
+                .get(entity)
+                .map(|(p, ..)| p.name.clone())
+                .unwrap_or_default();
+            let told = kind.rumor().replace("the god", god);
+            say.write(crate::ui::Say {
+                speaker: entity,
+                text: told.clone(),
+                thought: false,
+            });
+            if let Ok((listener_person, mut witnessed, chronicle, faith)) =
+                minds.get_mut(talk.partner)
+            {
+                if !witnessed.recent.contains(&kind) {
+                    witnessed.secondhand = witnessed.secondhand.saturating_add(1);
+                    if let Some(mut chronicle) = chronicle {
+                        chronicle.hear(clock.day(), &teller_name, &told);
+                    }
+                    if let Some(mut faith) = faith {
+                        faith.trust = (faith.trust + 0.02).min(0.8);
+                    }
+                }
+                let _ = listener_person;
+            }
+        }
+        // The reply, a beat after the meeting settles, from the listener.
+        if talk.kind.is_none() && !talk.replied && clock.elapsed > talk.until - 9.0 {
+            talk.replied = true;
+            let reply = *rng.0.pick(&[
+                "truly?",
+                "I half believe it",
+                "the god again...",
+                "so the stories are true",
+                "keep your voice down",
+            ]);
+            say.write(crate::ui::Say {
+                speaker: entity,
+                text: reply.replace("the god", god),
+                thought: false,
+            });
         }
     }
 }
 
 /// Wants drive feet: the unwed go looking for company instead of waiting
-/// for it to wander past. Bonds still form by the old rule — nearness and
-/// time — but now the lonely close the distance themselves.
+/// for it to wander past. Bonds still form by the old rule - nearness and
+/// time - but now the lonely close the distance themselves.
 #[allow(clippy::type_complexity)]
 fn seek_company(
     time: Res<Time>,
@@ -1357,15 +1464,12 @@ fn seek_company(
         ),
     >,
 ) {
-    // A slow pulse, not a per-frame itch — the same feel at any framerate.
     *since_last += time.delta_secs();
     if *since_last < 2.0 {
         return;
     }
     *since_last = 0.0;
 
-    // The evening is for courting; the rest of the day, only the occasional
-    // long look across the square.
     let hour = clock.time_of_day();
     let ardour = if (0.58..0.78).contains(&hour) {
         0.3
@@ -1653,6 +1757,7 @@ fn choose_activity(
                 | Activity::Sleeping
                 | Activity::Mourning
                 | Activity::Bearing
+                | Activity::Chatting
         ) {
             continue;
         }
@@ -1788,7 +1893,8 @@ fn pursue_activity(
             | Activity::Praying
             | Activity::Sleeping
             | Activity::Mourning
-            | Activity::Bearing => {}
+            | Activity::Bearing
+            | Activity::Chatting => {}
         }
 
         // Starvation shows in the body before it shows in any UI.
@@ -1822,18 +1928,20 @@ mod tests {
     }
 
     #[test]
-    fn stories_spread_to_those_in_earshot() {
+    fn news_changes_hands_at_a_meeting() {
         let mut app = App::new();
         app.insert_resource(Time::<()>::default());
         app.init_resource::<crate::calendar::WorldClock>();
         app.insert_resource(SimRng(Rng::new(8)));
         app.add_message::<crate::ui::Say>();
-        app.add_systems(Update, gossip);
+        app.add_systems(Update, (meet_to_talk, hold_conversations).chain());
 
-        // Bob saw the god throw someone. Sue was elsewhere that day.
+        // Bob saw the god throw someone; Sue stands close enough to meet.
         app.world_mut().spawn((
             Villager,
             Transform::from_xyz(0.0, 0.0, 0.0),
+            Activity::Idle,
+            MoveTarget::default(),
             Person { name: "Bob".into() },
             crate::witness::Witnessed {
                 recent: vec![crate::witness::DivineEventKind::Thrown],
@@ -1846,14 +1954,15 @@ mod tests {
             .world_mut()
             .spawn((
                 Villager,
-                Transform::from_xyz(3.0, 0.0, 0.0),
+                Transform::from_xyz(1.4, 0.0, 0.0),
+                Activity::Idle,
+                MoveTarget::default(),
                 Person { name: "Sue".into() },
                 crate::witness::Witnessed::default(),
                 Chronicle::default(),
             ))
             .id();
 
-        // Enough rounds of talk that the 40% chance cannot plausibly miss.
         for _ in 0..30 {
             app.world_mut()
                 .resource_mut::<Time>()
@@ -1864,14 +1973,13 @@ mod tests {
         let heard = app.world().get::<crate::witness::Witnessed>(sue).unwrap();
         assert!(heard.secondhand > 0, "Sue never heard the story");
         assert!(heard.is_innocent(), "hearing is not seeing");
-
         let chronicle = app.world().get::<Chronicle>(sue).unwrap();
         assert!(
             chronicle
                 .events
                 .iter()
                 .any(|e| e.text.contains("heard from Bob")),
-            "the telling never entered Sue's chronicle: {:?}",
+            "the telling missed her chronicle: {:?}",
             chronicle.events,
         );
     }

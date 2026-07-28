@@ -3296,6 +3296,7 @@ pub(super) fn sermons(
     time: Res<Time>,
     mut since_last: Local<f32>,
     mut say: MessageWriter<crate::ui::Say>,
+    name: Option<Res<super::DivineName>>,
     clock: Res<crate::calendar::WorldClock>,
     shrines: Query<(&GlobalTransform, &Building)>,
     mut congregation: Query<
@@ -3338,9 +3339,10 @@ pub(super) fn sermons(
     else {
         return;
     };
+    let god = name.as_ref().map_or("the god", |n| n.0.as_str());
     say.write(crate::ui::Say {
         speaker: preacher,
-        text: format!("hear how {}", sermon.rumor()),
+        text: format!("hear how {}", sermon.rumor().replace("the god", god)),
         thought: false,
     });
 
@@ -3355,7 +3357,13 @@ pub(super) fn sermons(
         witnessed.secondhand = witnessed.secondhand.saturating_add(1);
         faith.trust = (faith.trust + 0.03).min(0.8);
         if let Some(mut chronicle) = chronicle {
-            chronicle.record(day, format!("heard the priest tell how {}", sermon.rumor()));
+            chronicle.record(
+                day,
+                format!(
+                    "heard the priest tell how {}",
+                    sermon.rumor().replace("the god", god)
+                ),
+            );
         }
     }
 }

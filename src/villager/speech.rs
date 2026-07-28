@@ -340,6 +340,7 @@ fn draw(pool: &[Line], rng: &mut Rng) -> Option<&'static str> {
 pub(super) fn small_talk(
     time: Res<Time>,
     mut since_last: Local<f32>,
+    name: Option<Res<super::DivineName>>,
     clock: Res<crate::calendar::WorldClock>,
     mut rng: ResMut<SimRng>,
     mut say: MessageWriter<crate::ui::Say>,
@@ -403,9 +404,10 @@ pub(super) fn small_talk(
     let heard = all.iter().any(|(other, other_at, ..)| {
         *other != speaker && other_at.translation.distance(at.translation) < EARSHOT
     });
+    let god = name.as_ref().map_or("the god", |n| n.0.as_str());
     say.write(crate::ui::Say {
         speaker,
-        text: line.to_string(),
+        text: line.replace("the god", god),
         thought: !heard,
     });
 }
