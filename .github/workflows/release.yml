@@ -1,0 +1,69 @@
+name: Release
+
+# Build the native game for macOS (Apple Silicon) + Windows (x64) and attach
+# the builds to the release for the tag, in the studio's launcher convention:
+# asset names end in -macos-aarch64.app.tar.gz / -windows-x86_64.zip.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build + attach assets to (e.g. v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: macos-aarch64
+          - os: windows-latest
+            platform: windows-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build (release)
+        run: cargo build --release
+
+      - name: Compute version (tag without leading v)
+        id: ver
+        shell: bash
+        run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Package — macOS .app.tar.gz
+        if: runner.os == 'macOS'
+        run: |
+          bash packaging/macos-app.sh target/release/egregore "${{ steps.ver.outputs.version }}" build
+          mkdir -p dist
+          tar -czf "dist/Egregore-macos-aarch64.app.tar.gz" -C build Egregore.app
+
+      - name: Package — Windows .zip (binary + assets)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist, stage | Out-Null
+          Copy-Item target\release\egregore.exe stage\Egregore.exe
+          Copy-Item -Recurse assets stage\assets
+          Compress-Archive -Path stage\* -DestinationPath dist\Egregore-windows-x86_64.zip -Force
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          files: dist/*
+          fail_on_unmatched_files: true
