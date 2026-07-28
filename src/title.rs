@@ -17,7 +17,12 @@ impl Plugin for TitlePlugin {
             .add_systems(OnExit(GameState::Title), (despawn_title, release_the_world))
             .add_systems(
                 Update,
-                (handle_choice, handle_settings).run_if(in_state(GameState::Title)),
+                (
+                    handle_choice.run_if(in_state(GameState::Title)),
+                    handle_settings,
+                    toggle_pause_menu.run_if(in_state(GameState::Playing)),
+                    handle_pause_menu,
+                ),
             );
     }
 }
@@ -37,6 +42,19 @@ struct QuitButton;
 /// Opens the saves window as a load menu.
 #[derive(Component)]
 struct LoadGameButton;
+
+/// The in-game pause menu and its buttons.
+#[derive(Component)]
+struct PauseMenu;
+
+#[derive(Component)]
+struct ResumeButton;
+
+#[derive(Component)]
+struct PauseSettingsButton;
+
+#[derive(Component)]
+struct ExitButton;
 
 /// The settings overlay, above the title.
 #[derive(Component)]
@@ -144,6 +162,78 @@ fn spawn_title(
     commands.entity(settings).insert(SettingsButton);
     let quit = menu_button(&mut commands, screen, "Quit");
     commands.entity(quit).insert(QuitButton);
+}
+
+/// Escape raises the pause menu - the world holds its breath while it is
+/// up, the same stillness the title uses. When a miracle is armed, Escape
+/// belongs to disarming it instead.
+fn toggle_pause_menu(
+    mut commands: Commands,
+    keys: Res<ButtonInput<KeyCode>>,
+    armed: Res<crate::miracles::SelectedMiracle>,
+    mut time: ResMut<Time<Virtual>>,
+    menus: Query<(Entity, &Visibility), With<PauseMenu>>,
+) {
+    if !keys.just_pressed(KeyCode::Escape) || armed.0.is_some() {
+        return;
+    }
+    match menus.single() {
+        Ok((menu, visibility)) => {
+            if *visibility == Visibility::Hidden {
+                commands.entity(menu).insert(Visibility::Visible);
+                time.pause();
+            } else {
+                commands.entity(menu).insert(Visibility::Hidden);
+                time.unpause();
+            }
+        }
+        Err(_) => {
+            // First press: build it, open.
+            let window = crate::ui::big_window(&mut commands, "PAUSED", 240.0);
+            commands
+                .entity(window.root)
+                .insert((Name::new("Pause Menu"), PauseMenu));
+            let resume = menu_button(&mut commands, window.body, "Resume");
+            commands.entity(resume).insert(ResumeButton);
+            let settings = menu_button(&mut commands, window.body, "Settings");
+            commands.entity(settings).insert(PauseSettingsButton);
+            let exit = menu_button(&mut commands, window.body, "Exit Game");
+            commands.entity(exit).insert(ExitButton);
+            time.pause();
+        }
+    }
+}
+
+/// The pause menu's three doors.
+#[allow(clippy::type_complexity)]
+fn handle_pause_menu(
+    mut commands: Commands,
+    resume: Query<&Interaction, (Changed<Interaction>, With<ResumeButton>)>,
+    settings: Query<&Interaction, (Changed<Interaction>, With<PauseSettingsButton>)>,
+    exit: Query<&Interaction, (Changed<Interaction>, With<ExitButton>)>,
+    open_settings: Query<Entity, With<SettingsScreen>>,
+    menus: Query<Entity, With<PauseMenu>>,
+    mut time: ResMut<Time<Virtual>>,
+    mut app_exit: MessageWriter<AppExit>,
+) {
+    for interaction in &resume {
+        if *interaction == Interaction::Pressed {
+            for menu in &menus {
+                commands.entity(menu).insert(Visibility::Hidden);
+            }
+            time.unpause();
+        }
+    }
+    for interaction in &settings {
+        if *interaction == Interaction::Pressed && open_settings.is_empty() {
+            commands.run_system_cached(spawn_settings);
+        }
+    }
+    for interaction in &exit {
+        if *interaction == Interaction::Pressed {
+            app_exit.write(AppExit::Success);
+        }
+    }
 }
 
 /// The world stands still behind the title: generated and visible, but not
