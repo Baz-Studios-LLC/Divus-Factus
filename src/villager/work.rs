@@ -955,6 +955,7 @@ pub(super) fn stores_move_indoors(
     stores: Query<&Stockpile>,
     mut notices: MessageWriter<crate::ui::Notice>,
     new_buildings: Query<(&Transform, &Building), Added<Building>>,
+    standing: Query<&Building>,
     piles: Query<(Entity, &StorePile), Without<Rehouse>>,
 ) {
     let Some(store) = site
@@ -966,12 +967,18 @@ pub(super) fn stores_move_indoors(
     for (at, building) in &new_buildings {
         match building.kind {
             BuildingKind::Storehouse => {
+                let granary_stands = standing.iter().any(|b| b.kind == BuildingKind::Granary);
                 for (pile, kind) in &piles {
                     let (local, goal) = match kind.0 {
                         PileKind::Timber => {
-                            (Vec3::new(-0.7, 0.0, 2.5), store.timber.min(24.0) as u8)
+                            (Vec3::new(-0.9, 0.0, 0.5), store.timber.min(24.0) as u8)
                         }
-                        PileKind::Stone => (Vec3::new(0.7, 0.0, -2.5), store.stone.min(12.0) as u8),
+                        PileKind::Stone => (Vec3::new(0.9, 0.0, -0.5), store.stone.min(12.0) as u8),
+                        // Food shelters here too, until a granary stands.
+                        PileKind::Food if !granary_stands => (
+                            Vec3::new(0.0, 0.0, 0.9),
+                            ((store.food.min(24.0) / 2.0).ceil() as u8).max(1),
+                        ),
                         PileKind::Food => continue,
                     };
                     commands.entity(pile).insert(Rehouse {
@@ -991,7 +998,7 @@ pub(super) fn stores_move_indoors(
                         continue;
                     }
                     commands.entity(pile).insert(Rehouse {
-                        to: at.translation + at.rotation * Vec3::new(0.0, 0.0, 2.4),
+                        to: at.translation + at.rotation * Vec3::new(0.0, 0.0, 0.4),
                         to_rot: at.rotation,
                         hauled: 0,
                         goal: ((store.food.min(24.0) / 2.0).ceil() as u8).max(1),
@@ -2621,7 +2628,7 @@ pub(super) fn eat_from_store(
     bakeries: Query<&Building>,
     site: Option<Res<SettlementSite>>,
     mut stores: Query<&mut Stockpile>,
-    bushes: Query<&FoodSource>,
+    bushes: Query<(&GlobalTransform, &FoodSource)>,
     mut hungry: Query<
         (
             &Transform,
@@ -2646,9 +2653,6 @@ pub(super) fn eat_from_store(
     let Ok(mut store) = stores.get_mut(site.settlement) else {
         return;
     };
-
-    // Only when the bushes genuinely have nothing left does the store open.
-    let bushes_bare = !bushes.iter().any(|b| b.amount > 0.1);
 
     for (transform, mut needs, mut morale, mut activity, mut target, manner) in &mut hungry {
         match *activity {
@@ -2680,7 +2684,13 @@ pub(super) fn eat_from_store(
                 }
             }
             Activity::Idle | Activity::Wandering => {
-                if bushes_bare && needs.hunger > DOWN_TOOLS_HUNGER && store.food >= 1.0 {
+                // The store opens for anyone hungry with no fruiting bush
+                // in reasonable reach - a berry heath three ridges away is
+                // no reason to starve beside a full larder.
+                let bush_near = bushes.iter().any(|(at, bush)| {
+                    bush.amount > 0.2 && at.translation().distance(transform.translation) < 30.0
+                });
+                if !bush_near && needs.hunger > DOWN_TOOLS_HUNGER && store.food >= 1.0 {
                     *activity = Activity::VisitingStore;
                     target.0 = Some(site.centre);
                 }
