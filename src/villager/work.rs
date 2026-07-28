@@ -1533,6 +1533,8 @@ pub(super) fn retrain(
     hurt: Query<&Vitality, (With<Villager>, Without<Corpse>)>,
     known: Option<Res<super::explore::KnownWorld>>,
     trees: Query<(&GlobalTransform, &crate::scatter::FellableTree)>,
+    terrain: Option<Res<Terrain>>,
+    site: Option<Res<SettlementSite>>,
     mut workers: Query<
         (Entity, &Vocation, &Person, Option<&mut Chronicle>),
         (With<Villager>, Without<Corpse>),
@@ -1561,8 +1563,40 @@ pub(super) fn retrain(
     // The village's needs, in the order they kill. Every want here is a
     // deadlock somewhere else: no woodcutter starves the fire and every
     // build; no carpenter leaves the homeless in the rain; and so on.
+    // Hunger kills first, so food hands top the ladder: a thin larder
+    // with too few of the trades that fill it retrains someone toward
+    // the water or the bushes before anything else gets a say.
+    let food_low = stores.iter().next().is_none_or(|s| s.food < 12.0);
+    let food_hands: usize = [
+        Vocation::Fisher,
+        Vocation::Gatherer,
+        Vocation::Hunter,
+        Vocation::Farmer,
+    ]
+    .into_iter()
+    .map(|v| count_of(v))
+    .sum();
+    let mouths = workers.iter().count();
+    // Whether water lies within a working walk of the square — twelve
+    // spokes, no dart-throwing, so no rng is needed here.
+    let shore_near = terrain.as_ref().zip(site.as_ref()).is_some_and(|(t, s)| {
+        (0..12).any(|i| {
+            let angle = i as f32 / 12.0 * std::f32::consts::TAU;
+            let (sin, cos) = angle.sin_cos();
+            (1..=14).any(|step| {
+                let d = step as f32 * 4.0;
+                t.height_at(s.centre.x + cos * d, s.centre.z + sin * d) <= WATER_LEVEL
+            })
+        })
+    });
     let mut wanted: Option<Vocation> = None;
-    if timber_low && !wood_known && !has_vocation(Vocation::Explorer) {
+    if food_low && food_hands * 5 < mouths.max(4) {
+        wanted = Some(if shore_near {
+            Vocation::Fisher
+        } else {
+            Vocation::Gatherer
+        });
+    } else if timber_low && !wood_known && !has_vocation(Vocation::Explorer) {
         wanted = Some(Vocation::Explorer);
     } else if !has_vocation(Vocation::Forester) && timber_low && wood_known {
         wanted = Some(Vocation::Forester);
@@ -1759,7 +1793,15 @@ pub(super) fn take_up_work(
         if !matches!(*activity, Activity::Idle | Activity::Wandering) {
             continue;
         }
-        if needs.hunger > HUNGRY_THRESHOLD {
+        // Hunger sends most trades off to find a meal — but the trades
+        // that MAKE food work through it, or the village deadlocks: a
+        // fisher too hungry to fish is how everyone starves beside an
+        // empty larder. The food trades eat from their own yield instead.
+        let feeds_the_village = matches!(
+            vocation,
+            Vocation::Fisher | Vocation::Gatherer | Vocation::Hunter | Vocation::Farmer
+        );
+        if needs.hunger > HUNGRY_THRESHOLD && !feeds_the_village {
             continue;
         }
         // The exhausted do not show up. Sleep is the cure, and the fire or a
@@ -2024,7 +2066,7 @@ pub(super) fn do_work(
         (
             Entity,
             &Transform,
-            &Needs,
+            &mut Needs,
             &Vocation,
             &mut Activity,
             &mut Job,
@@ -2102,7 +2144,7 @@ pub(super) fn do_work(
     for (
         entity,
         transform,
-        needs,
+        mut needs,
         vocation,
         mut activity,
         mut job,
@@ -2117,8 +2159,15 @@ pub(super) fn do_work(
             continue;
         }
 
-        // Shifts end: at day's end, or when hunger calls.
-        if !is_work_hour(clock.time_of_day()) || needs.hunger > DOWN_TOOLS_HUNGER {
+        // Shifts end: at day's end, or when hunger calls. The food trades
+        // do not down tools for hunger — their meal is at the worksite.
+        let feeds_the_village = matches!(
+            vocation,
+            Vocation::Fisher | Vocation::Gatherer | Vocation::Hunter | Vocation::Farmer
+        );
+        if !is_work_hour(clock.time_of_day())
+            || (needs.hunger > DOWN_TOOLS_HUNGER && !feeds_the_village)
+        {
             *activity = Activity::Idle;
             target.0 = None;
             commands.entity(entity).remove::<Job>();
@@ -2454,6 +2503,14 @@ pub(super) fn do_work(
         }
         job.progress = 0.0;
 
+        // The food trades eat where they work — the fisher at the water's
+        // edge, the gatherer over the basket. Without this, the hunger
+        // that no longer sends them home would starve them at their post.
+        let ate_at_work = feeds_the_village && needs.hunger > 0.35;
+        if ate_at_work {
+            needs.hunger = (needs.hunger - 0.5).max(0.0);
+        }
+
         match vocation {
             Vocation::Gatherer => {
                 let Some(mut source) = job.focus.and_then(|b| bushes.get_mut(b).ok()) else {
@@ -2461,8 +2518,12 @@ pub(super) fn do_work(
                     commands.entity(entity).remove::<Job>();
                     continue;
                 };
-                let picked = source.amount.min(1.0);
+                let mut picked = source.amount.min(1.0);
                 source.amount -= picked;
+                // What went into the gatherer does not also reach the sacks.
+                if ate_at_work {
+                    picked = (picked - 0.4).max(0.0);
+                }
                 store.food += picked;
                 if source.amount <= 0.1 {
                     *activity = Activity::Idle;
@@ -2473,12 +2534,15 @@ pub(super) fn do_work(
             // A dock casts past the shallows, and a smokehouse cures the
             // catch: one day's fishing can feed three days of village.
             Vocation::Fisher => {
-                let mut catch = 1.0;
+                let mut catch = 1.0_f32;
                 if context.3.iter().any(|b| b.kind == BuildingKind::Dock) {
                     catch += 0.5;
                 }
                 if context.3.iter().any(|b| b.kind == BuildingKind::Smokehouse) {
                     catch *= 2.0;
+                }
+                if ate_at_work {
+                    catch = (catch - 0.4).max(0.2);
                 }
                 store.food += catch;
             }
