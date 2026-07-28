@@ -360,79 +360,80 @@ fn locomotion(
     }
 }
 
-/// A translucent red shell flashed around a body the moment it takes harm.
-/// The body materials are shared across every creature, so the flash is its
-/// own short-lived thing rather than a tint.
+/// A body mid-flash: how long remains, and every part's true material so
+/// the red can be taken back off.
 #[derive(Component)]
 pub struct HurtFlash {
     remaining: f32,
+    restore: Vec<(Entity, Handle<StandardMaterial>)>,
 }
 
-/// Marks the flash shell mesh itself.
-#[derive(Component)]
-struct FlashShell;
+/// The one shared flash material.
+#[derive(Resource)]
+struct FlashMaterial(Handle<StandardMaterial>);
 
+/// Fresh harm turns the body itself red for a beat: every part's material
+/// swaps to the flash and swaps back. Corpses tick too - a killing blow
+/// still flashes, then lets the dead lie in their own colours.
 #[allow(clippy::type_complexity)]
 fn hurt_flashes(
     mut commands: Commands,
     time: Res<Time>,
-    mut meshes: ResMut<Assets<Mesh>>,
+    flash_material: Option<Res<FlashMaterial>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut hurt: Query<
-        (
-            Entity,
-            &mut Vitality,
-            &CreatureGenome,
-            Option<&mut HurtFlash>,
-        ),
-        (With<Creature>, Without<Corpse>),
-    >,
-    shells: Query<(Entity, &ChildOf), With<FlashShell>>,
+    children: Query<&Children>,
+    parts: Query<&MeshMaterial3d<StandardMaterial>>,
+    mut hurt: Query<(Entity, &mut Vitality, Option<&mut HurtFlash>), With<Creature>>,
 ) {
+    let red = match flash_material {
+        Some(handle) => handle.0.clone(),
+        None => {
+            let handle = materials.add(StandardMaterial {
+                base_color: crate::palette::shade(&crate::palette::CLOTH_RED, 0.9),
+                emissive: LinearRgba::from(crate::palette::shade(&crate::palette::CLOTH_RED, 0.9))
+                    * 6.0,
+                ..default()
+            });
+            commands.insert_resource(FlashMaterial(handle.clone()));
+            handle
+        }
+    };
+
     let dt = time.delta_secs();
-    for (entity, mut vitality, genome, flash) in &mut hurt {
+    for (entity, mut vitality, flash) in &mut hurt {
         let harm = vitality.harm;
         let fresh = harm > vitality.last_harm + 0.01;
         vitality.last_harm = harm;
         match flash {
             Some(mut flash) => {
                 if fresh {
-                    flash.remaining = 0.22;
+                    flash.remaining = 0.18;
                 } else {
                     flash.remaining -= dt;
                     if flash.remaining <= 0.0 {
-                        commands.entity(entity).remove::<HurtFlash>();
-                        for (shell, childof) in &shells {
-                            if childof.parent() == entity {
-                                commands.entity(shell).despawn();
+                        for (part, original) in flash.restore.drain(..) {
+                            if let Ok(mut e) = commands.get_entity(part) {
+                                e.insert(MeshMaterial3d(original));
                             }
                         }
+                        commands.entity(entity).remove::<HurtFlash>();
                     }
                 }
             }
             None if fresh => {
-                commands
-                    .entity(entity)
-                    .insert(HurtFlash { remaining: 0.22 });
-                let height = genome.height();
-                commands.spawn((
-                    FlashShell,
-                    Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
-                    MeshMaterial3d(materials.add(StandardMaterial {
-                        base_color:
-                            crate::palette::shade(&crate::palette::CLOTH_RED, 0.85).with_alpha(0.4),
-                        alpha_mode: AlphaMode::Blend,
-                        unlit: true,
-                        ..default()
-                    })),
-                    Transform::from_xyz(0.0, height * 0.55, 0.0).with_scale(Vec3::new(
-                        height * 0.62,
-                        height * 1.12,
-                        height * 0.52,
-                    )),
-                    bevy::light::NotShadowCaster,
-                    ChildOf(entity),
-                ));
+                let mut restore = Vec::new();
+                for part in children.iter_descendants(entity) {
+                    if let Ok(material) = parts.get(part) {
+                        restore.push((part, material.0.clone()));
+                        commands.entity(part).insert(MeshMaterial3d(red.clone()));
+                    }
+                }
+                if !restore.is_empty() {
+                    commands.entity(entity).insert(HurtFlash {
+                        remaining: 0.18,
+                        restore,
+                    });
+                }
             }
             None => {}
         }
