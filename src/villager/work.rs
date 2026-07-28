@@ -2671,24 +2671,41 @@ pub(crate) fn raise_stage(
                     0.0,
                     &frame,
                 );
-                // Gable end-caps: bands whose widths follow the roof pitch,
-                // so the triangle fills without a single tooth poking
-                // through the slabs above it.
-                let ridge = 0.45 + w * 0.58;
+                // Gable end-caps: each band's width comes from the roof
+                // slabs' actual underside line - the slabs pass through
+                // (0.55w, eaves) at slope 0.613 - so nothing ever pokes
+                // through the roof, on any rolled size.
                 let pitch = 0.613; // tan of the slab tilt
+                let eave = 0.45;
+                let peak = eave + w * 0.55 * pitch;
                 for zed in [-d, d] {
                     let mut y = 0.02_f32;
-                    while y + 0.3 < ridge {
-                        let band_top = (y + 0.34).min(ridge - 0.04);
-                        let band_h = band_top - y;
-                        let half = ((ridge - band_top) / pitch - 0.1).max(0.12);
+                    loop {
+                        let band_top = y + 0.26;
+                        let half = (w * 0.55 - (band_top - eave) / pitch).min(w * 0.92) - 0.06;
+                        if half < 0.12 {
+                            break;
+                        }
                         part(
-                            Vec3::new(0.0, h + y + band_h * 0.5, zed),
-                            Vec3::new(half * 2.0, band_h, 0.16),
+                            Vec3::new(0.0, h + y + 0.13, zed),
+                            Vec3::new(half * 2.0, 0.26, 0.16),
                             0.0,
                             &wall,
                         );
-                        y += 0.34;
+                        y += 0.26;
+                    }
+                    // The last sliver under the ridge, plugged with one
+                    // narrow block sized to what actually remains.
+                    let remaining = (peak - 0.05) - y;
+                    if remaining > 0.05 {
+                        let half =
+                            (w * 0.55 - (y + remaining * 0.7 - eave) / pitch).max(0.1) - 0.02;
+                        part(
+                            Vec3::new(0.0, h + y + remaining * 0.5, zed),
+                            Vec3::new((half * 2.0).max(0.14), remaining, 0.16),
+                            0.0,
+                            &wall,
+                        );
                     }
                 }
             }
