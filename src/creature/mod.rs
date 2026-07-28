@@ -39,6 +39,7 @@ impl Plugin for CreaturePlugin {
                     locomotion,
                     keep_apart,
                     drowning,
+                    carrion_fades,
                     apply_ballistics,
                     wildlife::wild_hunger,
                     wildlife::graze_and_flee,
@@ -349,6 +350,45 @@ fn locomotion(
         }
 
         motion.speed = speed;
+    }
+}
+
+/// What the wild leaves unclaimed does not lie there forever: an animal's
+/// carcass keeps a while for hunters and wolves, then sinks back into the
+/// ground. Villagers are never carrion - their dead get rites.
+#[derive(Component)]
+pub struct Carrion {
+    pub remaining: f32,
+}
+
+#[allow(clippy::type_complexity)]
+fn carrion_fades(
+    mut commands: Commands,
+    time: Res<Time>,
+    fresh: Query<
+        Entity,
+        (
+            With<Corpse>,
+            With<Creature>,
+            Without<crate::villager::Villager>,
+            Without<Carrion>,
+        ),
+    >,
+    mut fading: Query<(Entity, &mut Carrion, &mut Transform), Without<Held>>,
+) {
+    for corpse in &fresh {
+        commands.entity(corpse).insert(Carrion { remaining: 210.0 });
+    }
+    let dt = time.delta_secs();
+    for (entity, mut carrion, mut transform) in &mut fading {
+        carrion.remaining -= dt;
+        if carrion.remaining < 6.0 {
+            // The last moments: settling into the earth.
+            transform.translation.y -= dt * 0.14;
+        }
+        if carrion.remaining <= 0.0 {
+            commands.entity(entity).despawn();
+        }
     }
 }
 

@@ -1380,6 +1380,15 @@ pub(super) fn take_up_work(
             Without<Held>,
         ),
     >,
+    carcasses: Query<
+        (Entity, &Transform, &CreatureGenome),
+        (
+            With<Creature>,
+            With<Corpse>,
+            Without<Villager>,
+            Without<Held>,
+        ),
+    >,
 ) {
     let Some(site) = site else {
         return;
@@ -1423,21 +1432,39 @@ pub(super) fn take_up_work(
                 .min_by(|a, b| a.2.total_cmp(&b.2))
                 .map(|(bush, at, d)| Job::at(at, Some(bush), d)),
 
-            Vocation::Hunter => game
+            // A carcass already down is free meat: harvest before hunting,
+            // and the village stops drowning in carrion.
+            Vocation::Hunter => carcasses
                 .iter()
                 .filter(|(_, _, genome)| genome.species != Species::Human)
-                .map(|(prey, prey_transform, _)| {
+                .map(|(kill, kill_transform, _)| {
                     (
-                        prey,
-                        prey_transform.translation,
-                        prey_transform.translation.distance(transform.translation),
+                        kill,
+                        kill_transform.translation,
+                        kill_transform.translation.distance(transform.translation),
                     )
                 })
                 .filter(|(_, at, d)| {
                     (*d < WORK_REACH * 1.6 || known_far(*at, *d)) && permitted(*at)
                 })
                 .min_by(|a, b| a.2.total_cmp(&b.2))
-                .map(|(prey, at, d)| Job::at(at, Some(prey), d)),
+                .map(|(kill, at, d)| Job::at(at, Some(kill), d))
+                .or_else(|| {
+                    game.iter()
+                        .filter(|(_, _, genome)| genome.species != Species::Human)
+                        .map(|(prey, prey_transform, _)| {
+                            (
+                                prey,
+                                prey_transform.translation,
+                                prey_transform.translation.distance(transform.translation),
+                            )
+                        })
+                        .filter(|(_, at, d)| {
+                            (*d < WORK_REACH * 1.6 || known_far(*at, *d)) && permitted(*at)
+                        })
+                        .min_by(|a, b| a.2.total_cmp(&b.2))
+                        .map(|(prey, at, d)| Job::at(at, Some(prey), d))
+                }),
 
             Vocation::Fisher => find_shore(&terrain, site.centre, &mut rng.0)
                 .filter(|at| permitted(*at))
@@ -2458,9 +2485,11 @@ pub(crate) fn raise_stage(
                 );
             }
             _ => {
-                for x in [-w, w] {
+                // Posts on the cross-axis, so the beam spans the approach
+                // and the cap's slopes shed away from whoever draws water.
+                for z in [-d, d] {
                     part(
-                        Vec3::new(x, 1.0, 0.0),
+                        Vec3::new(0.0, 1.0, z),
                         Vec3::new(0.14, 1.4, 0.14),
                         0.0,
                         &frame,
@@ -2469,22 +2498,9 @@ pub(crate) fn raise_stage(
                 // The windlass beam and its handle.
                 part(
                     Vec3::new(0.0, 1.62, 0.0),
-                    Vec3::new(w * 2.3, 0.14, 0.14),
+                    Vec3::new(0.14, 0.14, d * 2.3),
                     0.0,
                     &frame,
-                );
-                // A little peaked cap over the beam.
-                part(
-                    Vec3::new(-w * 0.4, 1.95, 0.0),
-                    Vec3::new(w * 1.15, 0.08, d * 1.6),
-                    0.5,
-                    &roof,
-                );
-                part(
-                    Vec3::new(w * 0.4, 1.95, 0.0),
-                    Vec3::new(w * 1.15, 0.08, d * 1.6),
-                    -0.5,
-                    &roof,
                 );
                 // The rope and the bucket, hanging over the dark.
                 part(
@@ -2499,6 +2515,22 @@ pub(crate) fn raise_stage(
                     0.0,
                     &frame,
                 );
+                // A little peaked cap over the beam, pitched across it. The
+                // part helper only tilts around Z, so these two spawn by
+                // hand, after the closure's last use in this arm.
+                drop(part);
+                for (zed, tilt) in [(-d * 0.4, -0.5_f32), (d * 0.4, 0.5)] {
+                    commands.spawn((
+                        Mesh3d(cube.clone()),
+                        MeshMaterial3d(roof.clone()),
+                        Transform::from_translation(
+                            Vec3::new(0.0, 1.95, zed) + Vec3::Y * PLINTH_TOP,
+                        )
+                        .with_rotation(Quat::from_rotation_x(tilt))
+                        .with_scale(Vec3::new(w * 1.6, 0.08, d * 1.15)),
+                        ChildOf(site),
+                    ));
+                }
             }
         }
         return;
