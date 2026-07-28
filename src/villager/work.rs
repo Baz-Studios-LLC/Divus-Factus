@@ -244,32 +244,80 @@ impl BuildingKind {
 ///
 /// A pure priority ladder, so the village's growth arc is legible: industry,
 /// then tools, then an evening hearth, then civic pride.
-pub fn next_civic(
-    population: usize,
-    stone: f32,
-    has: impl Fn(BuildingKind) -> bool,
-) -> Option<BuildingKind> {
-    let wants = [
-        (BuildingKind::Well, 6),
-        (BuildingKind::Storehouse, 8),
-        (BuildingKind::Sawmill, 10),
-        (BuildingKind::Smokehouse, 11),
-        (BuildingKind::Blacksmith, 12),
-        (BuildingKind::Granary, 13),
-        (BuildingKind::Tavern, 14),
-        (BuildingKind::Mill, 15),
-        (BuildingKind::Shrine, 16),
-        (BuildingKind::Weaver, 17),
-        (BuildingKind::TownHall, 18),
-        (BuildingKind::Herbalist, 19),
-        (BuildingKind::Watchtower, 20),
+/// Everything the civic chooser weighs, gathered from the living village.
+#[derive(Default)]
+pub struct CivicNeeds {
+    pub population: usize,
+    pub stone: f32,
+    pub timber_stored: f32,
+    pub stone_stored: f32,
+    pub food_stored: f32,
+    pub avg_spirits: f32,
+    pub homeless: usize,
+    pub hurt: usize,
+    pub believers: usize,
+    pub fishers: usize,
+    pub farmers: usize,
+    pub foresters: usize,
+    pub fields: usize,
+    pub wolves_near: usize,
+    pub pending_builds: usize,
+}
+
+/// Chooses the next civic building by NEED, not by a fixed ladder: each
+/// candidate scores against what the village actually lacks, and the
+/// loudest need above a threshold gets ground broken. Soft population
+/// minimums keep hamlets from dreaming of town halls.
+pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Option<BuildingKind> {
+    use BuildingKind::*;
+    let candidates = [
+        Well, Storehouse, Sawmill, Blacksmith, Smokehouse, Granary, Tavern, Mill, Bakery, Weaver,
+        Herbalist, Shrine, Watchtower, TownHall,
     ];
-    for (kind, needed_people) in wants {
-        if population >= needed_people && !has(kind) && stone >= kind.stone_cost() {
-            return Some(kind);
+    let min_pop = |kind: BuildingKind| match kind {
+        Well => 5,
+        Storehouse => 7,
+        Sawmill => 8,
+        Smokehouse => 9,
+        Blacksmith | Granary | Tavern | Weaver | Herbalist | Watchtower => 10,
+        Mill | Shrine => 12,
+        Bakery => 14,
+        TownHall => 18,
+        House => 0,
+    };
+    let mut best: Option<(f32, BuildingKind)> = None;
+    for kind in candidates {
+        if has(kind) || needs.population < min_pop(kind) || needs.stone < kind.stone_cost() {
+            continue;
+        }
+        let score = match kind {
+            // Water and the midday square: always wanted once there are
+            // enough hands to dig it.
+            Well => 0.6,
+            // Goods heaped in the open argue for a roof over them.
+            Storehouse => (needs.timber_stored + needs.stone_stored) / 25.0,
+            Granary => needs.food_stored / 70.0,
+            // Working trades argue for the works that serve them.
+            Sawmill => needs.foresters as f32 * 0.25 + needs.pending_builds as f32 * 0.15,
+            Smokehouse => needs.fishers as f32 * 0.3,
+            Mill => needs.fields as f32 * 0.22 + needs.farmers as f32 * 0.1,
+            Bakery => needs.food_stored / 120.0 + if has(Granary) { 0.25 } else { 0.0 },
+            Blacksmith => needs.population as f32 / 20.0,
+            // Misery builds the tavern; cold builds the weaver.
+            Tavern => (0.75 - needs.avg_spirits).max(0.0) * 2.2,
+            Weaver => needs.homeless as f32 * 0.12,
+            Herbalist => needs.hurt as f32 * 0.35,
+            // Faith raises its own roof; fear raises a tower.
+            Shrine => needs.believers as f32 * 0.12,
+            Watchtower => needs.wolves_near as f32 * 0.4,
+            TownHall => (needs.population as f32 - 16.0) / 8.0,
+            House => 0.0,
+        };
+        if score > best.map_or(0.0, |(b, _)| b) {
+            best = Some((score, kind));
         }
     }
-    None
+    best.filter(|(score, _)| *score >= 0.45).map(|(_, k)| k)
 }
 
 /// One building's rolled shape and colours. No two houses need look alike:
@@ -469,11 +517,6 @@ pub struct Building {
 /// A finished house.
 #[derive(Component)]
 pub struct Hut;
-
-/// How many houses a population wants: one per family-sized knot of people.
-pub fn desired_houses(population: usize) -> usize {
-    population.div_ceil(4)
-}
 
 /// Which visual stage a build should show, at `progress` timber toward a
 /// total `cost`: frame, walls, roof, at thirds of the way.
@@ -1107,6 +1150,93 @@ pub(super) fn update_store_piles(
     }
 }
 
+/// A neighbour pitching in at someone else's build site.
+#[derive(Component)]
+pub struct Helper(pub Entity);
+
+/// The bored and good-hearted drift over to help a build in progress:
+/// steadying the frame adds real progress, at half a worker's pace. The
+/// slothful, famously, do not.
+#[allow(clippy::type_complexity)]
+pub(super) fn lend_a_hand(
+    mut commands: Commands,
+    time: Res<Time>,
+    clock: Res<crate::calendar::WorldClock>,
+    mut rng: ResMut<SimRng>,
+    mut sites: Query<(Entity, &Transform, &mut ConstructionSite), With<Blueprint>>,
+    helpers_now: Query<&Helper>,
+    mut folk: Query<
+        (
+            Entity,
+            &Transform,
+            &mut Activity,
+            &mut MoveTarget,
+            &mut CreatureMotion,
+            Option<&Helper>,
+            Option<&super::traits::Traits>,
+        ),
+        (
+            With<Villager>,
+            Without<Corpse>,
+            Without<Held>,
+            Without<Airborne>,
+            Without<crate::creature::Childhood>,
+        ),
+    >,
+) {
+    let dt = time.delta_secs();
+    if !is_work_hour(clock.time_of_day()) {
+        return;
+    }
+
+    // Helpers at work: walk in, steady the frame.
+    for (villager, at, mut activity, mut target, mut motion, helper, _) in &mut folk {
+        let Some(helper) = helper else {
+            continue;
+        };
+        let done = sites.get_mut(helper.0).is_err();
+        if done || *activity != Activity::Working {
+            commands.entity(villager).remove::<Helper>();
+            if *activity == Activity::Working {
+                *activity = Activity::Idle;
+                target.0 = None;
+            }
+            continue;
+        }
+        let Ok((_, site_at, mut construction)) = sites.get_mut(helper.0) else {
+            continue;
+        };
+        if at.translation.distance(site_at.translation) > 3.0 {
+            target.0 = Some(site_at.translation);
+        } else {
+            target.0 = None;
+            motion.flail = motion.flail.max(0.25);
+            construction.progress += dt / WORK_SECONDS * 0.5;
+        }
+    }
+
+    // Recruit: an idle neighbour near an active site, two helpers at most.
+    for (site, site_at, _) in &sites {
+        let already = helpers_now.iter().filter(|h| h.0 == site).count();
+        if already >= 2 {
+            continue;
+        }
+        for (villager, at, mut activity, _, _, helper, manner) in &mut folk {
+            if helper.is_some()
+                || !matches!(*activity, Activity::Idle | Activity::Wandering)
+                || manner.is_some_and(|m| m.has(super::traits::Trait::Slothful))
+                || at.translation.distance(site_at.translation) > 45.0
+                || !rng.0.chance(0.01)
+            {
+                continue;
+            }
+            *activity = Activity::Working;
+            commands.entity(villager).insert(Helper(site));
+            break;
+        }
+    }
+}
+
 /// This villager is fetching a loose log home.
 #[derive(Component)]
 pub struct SalvageHauler(pub Entity);
@@ -1243,6 +1373,16 @@ pub(super) fn salvage_timber(
         *activity = Activity::Hauling;
         commands.entity(villager).insert(SalvageHauler(log));
     }
+}
+
+/// Whether a build site is a house, for the personal-stake speedup.
+fn plan_kind_is_house(
+    build_sites: &Query<(&mut ConstructionSite, &Blueprint)>,
+    site: Entity,
+) -> bool {
+    build_sites
+        .get(site)
+        .is_ok_and(|(_, plan)| plan.kind == BuildingKind::House)
 }
 
 /// A worksite this worker gave up on reaching. Without this, the nearest tree
@@ -1809,7 +1949,11 @@ pub(super) fn do_work(
             &mut MoveTarget,
             &mut CreatureMotion,
             &Person,
-            (Option<&mut Chronicle>, Option<&super::traits::Traits>),
+            (
+                Option<&mut Chronicle>,
+                Option<&super::traits::Traits>,
+                Option<&super::home::Home>,
+            ),
         ),
         (
             With<Villager>,
@@ -1883,7 +2027,7 @@ pub(super) fn do_work(
         mut target,
         mut motion,
         person,
-        (chronicle, manner),
+        (chronicle, manner, home),
     ) in &mut workers
     {
         if *activity != Activity::Working {
@@ -1960,10 +2104,16 @@ pub(super) fn do_work(
                 continue;
             }
 
-            // At the frame, hammering.
+            // At the frame, hammering - and a carpenter with no roof of
+            // their own drives nails like it is personal, because it is.
             target.0 = None;
             motion.flail = motion.flail.max(0.3);
-            job.progress += dt;
+            let stake = if plan_kind_is_house(&build_sites, house) && home.is_none() {
+                1.4
+            } else {
+                1.0
+            };
+            job.progress += dt * stake;
             if job.progress < 3.5 {
                 continue;
             }
@@ -2897,8 +3047,8 @@ pub(crate) fn raise_stage(
 pub(super) fn village_slots(centre: Vec3, rings: std::ops::Range<u32>) -> Vec<(f32, f32, f32)> {
     let mut slots = Vec::new();
     for ring in rings {
-        let radius = 11.0 + ring as f32 * 6.5;
-        let count = ((std::f32::consts::TAU * radius) / 8.5).floor().max(4.0) as u32;
+        let radius = 14.0 + ring as f32 * 9.0;
+        let count = ((std::f32::consts::TAU * radius) / 12.0).floor().max(4.0) as u32;
         // The golden angle staggers each ring so lanes never align.
         let offset = ring as f32 * 2.399_963;
         for i in 0..count {
@@ -2932,7 +3082,21 @@ pub(super) fn plan_houses(
         ResMut<crate::terrain::LoadedChunks>,
         ResMut<crate::grass::GrassChunks>,
     ),
-    people: Query<(), (With<Villager>, Without<Corpse>)>,
+    census: (
+        Query<
+            (
+                Option<&Vocation>,
+                &super::Morale,
+                Option<&super::home::Home>,
+                Option<&super::belief::Faith>,
+                Option<&Vitality>,
+                Has<crate::creature::Childhood>,
+            ),
+            (With<Villager>, Without<Corpse>),
+        >,
+        Query<&Field>,
+        Query<(&Transform, &CreatureGenome), With<crate::creature::wildlife::Wild>>,
+    ),
     civics: Query<&Building>,
     pending: Query<&Blueprint, With<ConstructionSite>>,
     roofs: Query<&Transform, Or<(With<ConstructionSite>, With<Hut>, With<Building>)>>,
@@ -2946,37 +3110,84 @@ pub(super) fn plan_houses(
     let Some(site) = site else {
         return;
     };
-    let population = people.iter().count();
+    let (souls, fields, wild) = census;
 
-    // Civic buildings take priority on the drawing board — but only one civic
-    // site at a time, and never while another of its kind stands or rises.
-    let has_kind = |kind: BuildingKind| {
-        civics.iter().any(|b| b.kind == kind) || pending.iter().any(|b| b.kind == kind)
-    };
-    {
-        let Ok(store) = stores.get(site.settlement) else {
-            return;
-        };
-        if store.timber < 2.0 {
-            return;
+    // The census: what the village actually is, right now.
+    let mut population = 0usize;
+    let mut roofless_adults = 0usize;
+    let mut spirits_sum = 0.0f32;
+    let mut hurt = 0usize;
+    let mut believers = 0usize;
+    let mut fishers = 0usize;
+    let mut farmers = 0usize;
+    let mut foresters = 0usize;
+    for (vocation, morale, home, faith, vitality, child) in &souls {
+        population += 1;
+        spirits_sum += morale.spirits;
+        if home.is_none() && !child {
+            roofless_adults += 1;
+        }
+        if vitality.is_some_and(|v| v.harm > 0.15) {
+            hurt += 1;
+        }
+        if faith.is_some_and(|f| f.is_believer()) {
+            believers += 1;
+        }
+        match vocation {
+            Some(Vocation::Fisher) => fishers += 1,
+            Some(Vocation::Farmer) => farmers += 1,
+            Some(Vocation::Forester) => foresters += 1,
+            _ => {}
         }
     }
 
-    // Shelter comes first: no village raises a tavern while its people
-    // sleep in the dirt. Civic works get their turn once the roofs catch
-    // up with the people.
-    let houses = roofs.iter().count();
-    let kind = if houses < desired_houses(population) {
+    let has_kind = |kind: BuildingKind| {
+        civics.iter().any(|b| b.kind == kind) || pending.iter().any(|b| b.kind == kind)
+    };
+    let Ok(store_now) = stores.get(site.settlement) else {
+        return;
+    };
+    if store_now.timber < 2.0 {
+        return;
+    }
+
+    // A person needs a house, so a house gets built: ground breaks because
+    // roofless people exist, not because a formula says the town is due.
+    // Only when everyone sleeps under a roof does the village have the
+    // spare hands for what it merely wants.
+    let kind = if roofless_adults > 0 && !pending.iter().any(|b| b.kind == BuildingKind::House) {
         BuildingKind::House
+    } else if roofless_adults > 0 {
+        return;
     } else {
-        let Ok(store) = stores.get(site.settlement) else {
-            return;
+        let needs = CivicNeeds {
+            population,
+            stone: store_now.stone,
+            timber_stored: store_now.timber,
+            stone_stored: store_now.stone,
+            food_stored: store_now.food,
+            avg_spirits: spirits_sum / population.max(1) as f32,
+            homeless: roofless_adults,
+            hurt,
+            believers,
+            fishers,
+            farmers,
+            foresters,
+            fields: fields.iter().count(),
+            wolves_near: wild
+                .iter()
+                .filter(|(at, genome)| {
+                    genome.species == Species::Wolf && at.translation.distance(site.centre) < 130.0
+                })
+                .count(),
+            pending_builds: pending.iter().count(),
         };
-        match next_civic(population, store.stone, has_kind) {
+        match next_civic(&needs, has_kind) {
             Some(kind) => kind,
             None => return,
         }
     };
+    let _ = roofs;
 
     // Civic buildings claim the inner ring; houses begin one ring out. The
     // first plot the terrain permits wins, so the village fills inside-out.
@@ -3013,7 +3224,7 @@ pub(super) fn plan_houses(
         }
         let at = Vec3::new(x, centre_height, z);
         for other in &roofs {
-            if other.translation.distance(at) < 7.5 {
+            if other.translation.distance(at) < 10.0 {
                 continue 'darts;
             }
         }
@@ -3207,10 +3418,6 @@ mod tests {
 
     #[test]
     fn houses_scale_with_population_and_stages_with_timber() {
-        assert_eq!(desired_houses(4), 1);
-        assert_eq!(desired_houses(5), 2);
-        assert_eq!(desired_houses(12), 3);
-
         // Ground broken, walls at a third, roof from two-thirds on — for any
         // building, whatever its cost.
         assert_eq!(stage_for(0.0, HOUSE_TIMBER), 0);
@@ -3220,26 +3427,61 @@ mod tests {
     }
 
     #[test]
-    fn the_civic_ladder_climbs_in_order() {
+    fn civic_works_answer_needs_not_a_ladder() {
         let none = |_: BuildingKind| false;
-        assert_eq!(next_civic(5, 99.0, none), None, "hamlets build houses");
-        assert_eq!(next_civic(6, 99.0, none), Some(BuildingKind::Well));
+
+        // A tiny hamlet builds nothing civic.
+        let hamlet = CivicNeeds {
+            population: 4,
+            stone: 99.0,
+            ..Default::default()
+        };
+        assert_eq!(next_civic(&hamlet, none), None);
+
+        // Goods heaped outdoors call for the storehouse over everything.
+        let heaped = CivicNeeds {
+            population: 12,
+            stone: 99.0,
+            timber_stored: 20.0,
+            stone_stored: 15.0,
+            avg_spirits: 0.7,
+            ..Default::default()
+        };
+        assert_eq!(next_civic(&heaped, none), Some(BuildingKind::Storehouse));
+
+        // A miserable village builds itself the tavern.
+        let glum = CivicNeeds {
+            population: 12,
+            stone: 99.0,
+            avg_spirits: 0.3,
+            ..Default::default()
+        };
         assert_eq!(
-            next_civic(8, 99.0, |k| k == BuildingKind::Well),
-            Some(BuildingKind::Storehouse),
+            next_civic(&glum, |k| k == BuildingKind::Well),
+            Some(BuildingKind::Tavern)
         );
+
+        // Wolves at the door raise a tower.
+        let hunted = CivicNeeds {
+            population: 12,
+            stone: 99.0,
+            avg_spirits: 0.7,
+            wolves_near: 3,
+            ..Default::default()
+        };
         assert_eq!(
-            next_civic(20, 99.0, |k| !matches!(k, BuildingKind::Blacksmith)),
-            Some(BuildingKind::Blacksmith),
-            "the ladder fills in whatever is missing",
+            next_civic(&hunted, |k| k == BuildingKind::Well),
+            Some(BuildingKind::Watchtower)
         );
-        assert_eq!(
-            next_civic(20, 0.0, |k| !matches!(k, BuildingKind::Blacksmith)),
-            None,
-            "no stone, no forge",
-        );
-        let all = |_: BuildingKind| true;
-        assert_eq!(next_civic(40, 99.0, all), None, "a finished town rests");
+
+        // No stone, no stone buildings.
+        let broke = CivicNeeds {
+            population: 12,
+            stone: 0.0,
+            avg_spirits: 0.2,
+            ..Default::default()
+        };
+        assert_eq!(next_civic(&broke, none), None, "no stone, no works");
     }
 
     #[test]

@@ -132,6 +132,7 @@ impl Plugin for VillagerPlugin {
                         work::eat_from_store,
                         work::haul_wood,
                         work::salvage_timber,
+                        work::lend_a_hand,
                         work::update_woodpile,
                         work::update_store_piles,
                         work::stores_move_indoors,
@@ -799,7 +800,7 @@ pub(crate) fn spawn_settlement(
 
     let site = SettlementSite {
         centre,
-        radius: 24.0,
+        radius: 36.0,
         woodpile,
         settlement,
     };
