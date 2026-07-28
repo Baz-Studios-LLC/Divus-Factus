@@ -732,7 +732,7 @@ fn spawn_hand_cursor(
 /// Where the hand sits and how it is oriented while acting as the UI cursor:
 /// floating just in front of the camera on the cursor ray, back of the hand to
 /// the viewer, index finger reaching up-screen with its tip on the cursor point.
-fn ui_cursor_placement(camera: &CameraRig, ray: Ray3d) -> (Vec3, Quat) {
+fn ui_cursor_placement(camera: &CameraRig, ray: Ray3d, tap: f32) -> (Vec3, Quat) {
     let camera_rotation = Transform::from_translation(camera.eye())
         .looking_at(camera.focus, Vec3::Y)
         .rotation;
@@ -825,7 +825,9 @@ fn animate_hand(
     };
 
     // The interface placement, available whenever there is a cursor at all.
-    let ui_placement = hand.cursor_ray.map(|ray| ui_cursor_placement(camera, ray));
+    let ui_placement = hand
+        .cursor_ray
+        .map(|ray| ui_cursor_placement(camera, ray, rig.tap));
 
     // With no ground under the cursor the hand rides at UI depth regardless of
     // rig.point — over open sky it stays a cursor instead of vanishing.
@@ -870,7 +872,10 @@ fn animate_hand(
     let position = position + camera.forward() * (rig.tap * blend * 0.7 * scale);
 
     let previous = transform.translation;
+    // Over the world the hand glides; as a cursor it snaps, because a
+    // pointer that trails the mouse reads as a pointer that misses.
     let follow = 1.0 - (-14.0 * dt).exp();
+    let follow = follow + (1.0 - follow) * blend;
     transform.translation = transform.translation.lerp(position, follow);
 
     // Bank into travel, the way anything moving through air does. This, more than
