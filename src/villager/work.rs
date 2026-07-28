@@ -3242,9 +3242,10 @@ pub(super) fn plan_houses(
         }
         grass.invalidate_near(&mut commands, at.x, at.z, pad + 4.0);
 
-        // And clears it: any tree standing inside the footprint is felled
-        // into the pile, not built around. Nobody roofs over a living oak.
-        let clearing = plan.half_w.max(plan.half_d) + 1.2;
+        // And clears it properly: every tree within canopy's reach of the
+        // walls is felled into the pile. Nobody roofs over a living oak,
+        // and nobody wants branches through the bedroom either.
+        let clearing = plan.half_w.max(plan.half_d) + 4.5;
         let mut cleared = 0.0;
         for (tree, tree_at) in &standing {
             if tree_at.translation().distance(at) < clearing {

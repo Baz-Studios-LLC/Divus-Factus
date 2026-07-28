@@ -452,6 +452,11 @@ fn populate_chunks(
                     }
                 } else if forest > 0.50 && moisture > 0.38 {
                     let density = ((forest - 0.50) / 0.3).clamp(0.0, 1.0);
+                    // Trees keep a canopy's berth from worked ground, so a
+                    // rebuilt chunk never leans a tree against a wall.
+                    if terrain.is_worked_within(x, z, 4.0) {
+                        continue;
+                    }
                     if rng.chance(tree_chance * (0.55 + density)) {
                         let kind = *rng.pick(TreeKind::for_biome(biome));
                         // Near the settlement, trees live as entities so the

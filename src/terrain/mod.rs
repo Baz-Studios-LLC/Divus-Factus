@@ -210,13 +210,19 @@ impl Terrain {
     /// Whether this ground has been worked level - a field pad, one day a
     /// floor. Nothing wild grows on worked ground.
     pub fn is_worked(&self, x: f32, z: f32) -> bool {
+        self.is_worked_within(x, z, 0.0)
+    }
+
+    /// Worked ground plus a margin - trees keep a wider berth than grass.
+    pub fn is_worked_within(&self, x: f32, z: f32, margin: f32) -> bool {
         let Ok(worked) = self.worked.read() else {
             return false;
         };
         worked.iter().any(|spot| {
             let dx = x - spot.x;
             let dz = z - spot.z;
-            dx * dx + dz * dz < spot.radius * spot.radius
+            let reach = spot.radius + margin;
+            dx * dx + dz * dz < reach * reach
         })
     }
 
