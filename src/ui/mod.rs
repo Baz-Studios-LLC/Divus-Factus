@@ -61,6 +61,9 @@ pub struct Say {
 struct Bubble {
     speaker: Entity,
     until: f32,
+    /// How far above the head the box floats — a thought's circle trail
+    /// needs more room than a speech tail.
+    lift: f32,
 }
 
 /// At most this many bubbles at once: sparse is the point. If everyone
@@ -80,10 +83,10 @@ fn speak(
             continue;
         }
         // Speech wears the gold border everything divine-adjacent wears;
-        // thoughts wear a cool bone-grey one and dimmer text — readable as
-        // "inner" at a glance, with no punctuation dressing.
+        // thoughts wear a soft blue and dimmer text — readable as "inner"
+        // at a glance, with no punctuation dressing.
         let border = if say.thought {
-            theme::text_dim().with_alpha(0.4)
+            palette::shade(&palette::CLOTH_BLUE, 0.7).with_alpha(0.9)
         } else {
             theme::panel_border()
         };
@@ -92,6 +95,7 @@ fn speak(
                 Bubble {
                     speaker: say.speaker,
                     until: time.elapsed_secs() + 4.5,
+                    lift: if say.thought { 20.0 } else { 8.0 },
                 },
                 // Under all interface chrome: a window dragged over a bubble
                 // must cover it.
@@ -104,47 +108,83 @@ fn speak(
                     row_gap: px(1),
                     padding: UiRect::axes(px(8), px(4)),
                     border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(px(8)),
+                    // Thoughts are rounder before the puffs even land.
+                    border_radius: BorderRadius::all(if say.thought { px(14) } else { px(8) }),
                     max_width: px(230),
                     ..default()
                 },
-                // Opaque, so the tail below can weld to it without a seam.
+                // Opaque, so the trimmings below can weld on seamlessly.
                 BackgroundColor(theme::panel_bg()),
                 BorderColor::all(border),
             ))
             .id();
-        // The tail: a square in the bubble's own fill, turned 45 degrees
-        // and hung half out of the bottom edge. Only its two lower edges
-        // wear the border, so what shows is a bordered triangle pointing
-        // at whoever is talking — and its plain upper half quietly covers
-        // the stretch of bubble border it hangs from.
-        commands.spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: percent(50),
-                bottom: px(-4),
-                width: px(10),
-                height: px(10),
-                border: UiRect {
-                    right: px(1),
-                    bottom: px(1),
+        // A little circle in the bubble's fill with a blue rim: the cloud
+        // puff and the thought trail are both built from these.
+        let mut puff = |left_pc: f32, top: Val, bottom: Val, size: f32| {
+            commands.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: percent(left_pc),
+                    top,
+                    bottom,
+                    width: px(size),
+                    height: px(size),
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::all(percent(50)),
                     ..default()
                 },
-                ..default()
-            },
-            UiTransform {
-                translation: Val2::new(percent(-50), px(0)),
-                rotation: Rot2::degrees(45.0),
-                ..default()
-            },
-            BackgroundColor(theme::panel_bg()),
-            BorderColor {
-                right: border,
-                bottom: border,
-                ..default()
-            },
-            ChildOf(bubble),
-        ));
+                BackgroundColor(theme::panel_bg()),
+                BorderColor::all(border),
+                ChildOf(bubble),
+            ));
+        };
+        if say.thought {
+            // A thought is a cloud: puffs straddling the top edge, smaller
+            // ones at the bottom corners, and a trail of shrinking circles
+            // drifting down toward whoever is thinking it.
+            for (left_pc, size) in [(4.0, 15.0), (24.0, 19.0), (48.0, 16.0), (72.0, 18.0)] {
+                puff(left_pc, px(-size * 0.45), Val::Auto, size);
+            }
+            puff(10.0, Val::Auto, px(-5.0), 11.0);
+            puff(82.0, Val::Auto, px(-5.0), 12.0);
+            for (left_pc, drop, size) in [(46.0, 10.0, 9.0), (43.0, 19.0, 5.5)] {
+                puff(left_pc, Val::Auto, px(-drop), size);
+            }
+            drop(puff);
+        } else {
+            drop(puff);
+            // The tail: a square in the bubble's own fill, turned 45
+            // degrees and hung half out of the bottom edge. Only its two
+            // lower edges wear the border, so what shows is a bordered
+            // triangle pointing at whoever is talking.
+            commands.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: percent(50),
+                    bottom: px(-4),
+                    width: px(10),
+                    height: px(10),
+                    border: UiRect {
+                        right: px(1),
+                        bottom: px(1),
+                        ..default()
+                    },
+                    ..default()
+                },
+                UiTransform {
+                    translation: Val2::new(percent(-50), px(0)),
+                    rotation: Rot2::degrees(45.0),
+                    ..default()
+                },
+                BackgroundColor(theme::panel_bg()),
+                BorderColor {
+                    right: border,
+                    bottom: border,
+                    ..default()
+                },
+                ChildOf(bubble),
+            ));
+        }
         // The name over the words, so a crowd's chatter has owners.
         if let Ok(person) = names.get(say.speaker) {
             commands.spawn((
@@ -194,6 +234,8 @@ fn float_bubbles(
     else {
         return;
     };
+    // Bubbles already settled this frame, so later ones can stack clear.
+    let mut placed: Vec<Rect> = Vec::new();
     for (entity, bubble, mut node, computed, mut visibility) in &mut bubbles {
         if time.elapsed_secs() > bubble.until {
             commands.entity(entity).despawn();
@@ -207,10 +249,31 @@ fn float_bubbles(
         match camera.world_to_viewport(camera_at, overhead) {
             Ok(at) => {
                 let size = computed.size() * computed.inverse_scale_factor();
-                node.left = px(at.x - size.x * 0.5);
                 // Lifted enough that the tail's point, not the box, meets
                 // the top of the speaker's head.
-                node.top = px(at.y - size.y - 8.0);
+                let mut pos = Vec2::new(at.x - size.x * 0.5, at.y - size.y - bubble.lift);
+                // Two people talking shoulder to shoulder must not talk
+                // over each other's words: a bubble that would land on an
+                // earlier one climbs until it sits clear above it.
+                // The footprint counts the trimmings hanging under the box
+                // — a thought's circle trail reaches well below it, and
+                // must not drift into the bubble stacked beneath.
+                let footprint = size + Vec2::new(0.0, bubble.lift);
+                let mut guard = 0;
+                loop {
+                    let rect = Rect::from_corners(pos, pos + footprint).inflate(3.0);
+                    let Some(hit) = placed.iter().find(|p| !p.intersect(rect).is_empty()) else {
+                        break;
+                    };
+                    pos.y = hit.min.y - footprint.y - 8.0;
+                    guard += 1;
+                    if guard > 8 {
+                        break;
+                    }
+                }
+                placed.push(Rect::from_corners(pos, pos + footprint));
+                node.left = px(pos.x);
+                node.top = px(pos.y);
                 *visibility = Visibility::Visible;
             }
             Err(_) => {
