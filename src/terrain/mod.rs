@@ -178,6 +178,35 @@ impl Terrain {
         }
     }
 
+    /// Every worked pad, for the save file.
+    pub fn export_worked(&self) -> Vec<(f32, f32, f32, f32, f32)> {
+        self.worked
+            .read()
+            .map(|worked| {
+                worked
+                    .iter()
+                    .map(|s| (s.x, s.z, s.radius, s.falloff, s.height))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Restores worked pads from a save.
+    pub fn import_worked(&self, spots: &[(f32, f32, f32, f32, f32)]) {
+        if let Ok(mut worked) = self.worked.write() {
+            worked.clear();
+            for &(x, z, radius, falloff, height) in spots {
+                worked.push(FlatSpot {
+                    x,
+                    z,
+                    radius,
+                    falloff,
+                    height,
+                });
+            }
+        }
+    }
+
     /// Whether this ground has been worked level - a field pad, one day a
     /// floor. Nothing wild grows on worked ground.
     pub fn is_worked(&self, x: f32, z: f32) -> bool {
@@ -489,6 +518,11 @@ impl LoadedChunks {
     /// Whether every chunk in view has been built.
     pub fn is_complete(&self) -> bool {
         self.wanted > 0 && self.entities.len() >= self.wanted
+    }
+
+    /// Removes and returns every chunk, for a full world reload.
+    pub fn take_all(&mut self) -> Vec<Entity> {
+        self.entities.drain().map(|(_, e)| e).collect()
     }
 
     /// Removes and returns the chunks whose footprint touches a circle, so a

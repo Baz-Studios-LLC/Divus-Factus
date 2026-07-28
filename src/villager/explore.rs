@@ -25,6 +25,7 @@ use super::{Activity, Chronicle, Person, SettlementSite, Villager, work};
 const STRIDE: f32 = 70.0;
 
 /// One place the village knows beyond its home circle.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Pocket {
     pub at: Vec3,
     pub radius: f32,
@@ -32,7 +33,7 @@ pub struct Pocket {
 
 /// Everything the village knows of the world: the home circle, and the
 /// pockets its explorers have brought back.
-#[derive(Resource)]
+#[derive(Resource, serde::Serialize, serde::Deserialize)]
 pub struct KnownWorld {
     pub centre: Vec3,
     pub radius: f32,

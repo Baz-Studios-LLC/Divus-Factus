@@ -22,6 +22,9 @@ pub struct CreatureMotion {
     pub phase: f32,
     /// How hard the creature is struggling, 0 to 1. Raised while held or falling.
     pub flail: f32,
+    /// How deep in water this creature is, 0 dry to 1 swimming. Slows the
+    /// stride and floats the body at the surface.
+    pub swim: f32,
     /// Per-creature offset so idle motion does not synchronise across a crowd.
     pub idle_offset: f32,
     /// A world point this creature is watching, if any.

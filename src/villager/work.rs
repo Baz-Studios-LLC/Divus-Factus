@@ -565,6 +565,83 @@ pub struct CropRow {
     pub height: f32,
 }
 
+/// Raises a field's visible body - soil bed, furrow ridges, and stalks -
+/// and returns the field entity. Used by the plough and by the save loader.
+#[allow(clippy::too_many_arguments)]
+pub fn raise_field(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    rng: &mut Rng,
+    at: Vec3,
+    rotation: Quat,
+    growth: f32,
+    farmer: Entity,
+) -> Entity {
+    let field = commands
+        .spawn((
+            Name::new("A field"),
+            Field { growth, farmer },
+            Transform::from_translation(at).with_rotation(rotation),
+            Visibility::default(),
+            crate::hand::PickRadius(2.2),
+            crate::hand::Rooted,
+        ))
+        .id();
+    let bed = materials.add(StandardMaterial {
+        base_color: crate::palette::shade(&crate::palette::EARTH, 0.2),
+        perceptual_roughness: 1.0,
+        ..default()
+    });
+    let ridge = materials.add(StandardMaterial {
+        base_color: crate::palette::shade(&crate::palette::EARTH, 0.32),
+        perceptual_roughness: 1.0,
+        ..default()
+    });
+    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+    commands.spawn((
+        Mesh3d(cube.clone()),
+        MeshMaterial3d(bed),
+        Transform::from_xyz(0.0, 0.03, 0.0).with_scale(Vec3::new(3.8, 0.1, 3.1)),
+        ChildOf(field),
+    ));
+    for lane in 0..4 {
+        commands.spawn((
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(ridge.clone()),
+            Transform::from_xyz(0.0, 0.1, lane as f32 * 0.8 - 1.2)
+                .with_scale(Vec3::new(3.5, 0.09, 0.34)),
+            ChildOf(field),
+        ));
+    }
+    for lane in 0..4 {
+        for slot in 0..6 {
+            let shade = 0.5 + rng.range(0.0, 0.3);
+            let crop = materials.add(StandardMaterial {
+                base_color: crate::palette::shade(&crate::palette::GRASS, shade),
+                perceptual_roughness: 0.9,
+                ..default()
+            });
+            commands.spawn((
+                CropRow {
+                    height: rng.range(0.35, 0.62),
+                },
+                Mesh3d(cube.clone()),
+                MeshMaterial3d(crop),
+                Transform::from_xyz(
+                    slot as f32 * 0.56 - 1.4 + rng.range(-0.1, 0.1),
+                    0.2,
+                    lane as f32 * 0.8 - 1.2 + rng.range(-0.06, 0.06),
+                )
+                .with_rotation(Quat::from_rotation_z(rng.range(-0.09, 0.09)))
+                .with_scale(Vec3::new(0.07, 0.05, 0.07)),
+                ChildOf(field),
+            ));
+        }
+    }
+    field
+}
+
 /// Crops grow on their own; a farmer's tending hurries them greatly.
 pub(super) fn grow_crops(
     time: Res<Time>,
@@ -938,7 +1015,7 @@ pub(super) fn rehouse_stores(
 
         // A carrier on the job walks the loop; if none, recruit one.
         let mut have_carrier = false;
-        for (carrier, at, mut activity, mut target, hauler, loaded) in &mut carriers {
+        for (carrier, at, activity, mut target, hauler, loaded) in &mut carriers {
             if !hauler.is_some_and(|h| h.0 == pile) {
                 continue;
             }
@@ -2064,78 +2141,21 @@ pub(super) fn do_work(
                         commands.entity(chunk).despawn();
                     }
                     let at = Vec3::new(job.site.x, level, job.site.z);
-                    let field = commands
-                        .spawn((
-                            Name::new("A field"),
-                            Field {
-                                growth: 0.05,
-                                farmer: entity,
-                            },
-                            Transform::from_translation(at).with_rotation(Quat::from_rotation_y({
-                                let toward = (site.centre - at).with_y(0.0);
-                                let toward = toward.normalize_or_zero();
-                                (-toward.z).atan2(toward.x)
-                            })),
-                            Visibility::default(),
-                            crate::hand::PickRadius(2.2),
-                            crate::hand::Rooted,
-                        ))
-                        .id();
-                    let bed = materials.add(StandardMaterial {
-                        base_color: crate::palette::shade(&crate::palette::EARTH, 0.2),
-                        perceptual_roughness: 1.0,
-                        ..default()
+                    let rotation = Quat::from_rotation_y({
+                        let toward = (site.centre - at).with_y(0.0);
+                        let toward = toward.normalize_or_zero();
+                        (-toward.z).atan2(toward.x)
                     });
-                    let ridge = materials.add(StandardMaterial {
-                        base_color: crate::palette::shade(&crate::palette::EARTH, 0.32),
-                        perceptual_roughness: 1.0,
-                        ..default()
-                    });
-                    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
-                    // The tilled bed, sunk a little, with raised furrow
-                    // ridges running its length.
-                    commands.spawn((
-                        Mesh3d(cube.clone()),
-                        MeshMaterial3d(bed),
-                        Transform::from_xyz(0.0, 0.03, 0.0).with_scale(Vec3::new(3.8, 0.1, 3.1)),
-                        ChildOf(field),
-                    ));
-                    for lane in 0..4 {
-                        commands.spawn((
-                            Mesh3d(cube.clone()),
-                            MeshMaterial3d(ridge.clone()),
-                            Transform::from_xyz(0.0, 0.1, lane as f32 * 0.8 - 1.2)
-                                .with_scale(Vec3::new(3.5, 0.09, 0.34)),
-                            ChildOf(field),
-                        ));
-                    }
-                    // Crops as living stalks, not bars: rows of thin shoots,
-                    // each its own height and lean, rising as the field grows.
-                    for lane in 0..4 {
-                        for slot in 0..6 {
-                            let shade = 0.5 + rng.0.range(0.0, 0.3);
-                            let crop = materials.add(StandardMaterial {
-                                base_color: crate::palette::shade(&crate::palette::GRASS, shade),
-                                perceptual_roughness: 0.9,
-                                ..default()
-                            });
-                            commands.spawn((
-                                CropRow {
-                                    height: rng.0.range(0.35, 0.62),
-                                },
-                                Mesh3d(cube.clone()),
-                                MeshMaterial3d(crop),
-                                Transform::from_xyz(
-                                    slot as f32 * 0.56 - 1.4 + rng.0.range(-0.1, 0.1),
-                                    0.2,
-                                    lane as f32 * 0.8 - 1.2 + rng.0.range(-0.06, 0.06),
-                                )
-                                .with_rotation(Quat::from_rotation_z(rng.0.range(-0.09, 0.09)))
-                                .with_scale(Vec3::new(0.07, 0.05, 0.07)),
-                                ChildOf(field),
-                            ));
-                        }
-                    }
+                    raise_field(
+                        &mut commands,
+                        &mut meshes,
+                        &mut materials,
+                        &mut rng.0,
+                        at,
+                        rotation,
+                        0.05,
+                        entity,
+                    );
                     info!("{} tilled a new field", person.name);
                     notices.write(crate::ui::Notice::new(format!(
                         "{} broke ground on a new field",
@@ -2341,7 +2361,7 @@ pub(super) fn eat_from_store(
 /// Raises the visible stage of a building under construction, shaped and
 /// coloured by its blueprint. Each stage spawns geometry as children of the
 /// site, so the building accretes in place — and no two need look alike.
-fn raise_stage(
+pub(crate) fn raise_stage(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
@@ -2519,6 +2539,28 @@ fn raise_stage(
                     0.0,
                     &frame,
                 );
+                // Gable end-caps: stepped bands closing the triangle between
+                // wall top and ridge, so no house shows sky through its attic.
+                for zed in [-d, d] {
+                    part(
+                        Vec3::new(0.0, h + 0.2, zed),
+                        Vec3::new(w * 1.8, 0.44, 0.16),
+                        0.0,
+                        &wall,
+                    );
+                    part(
+                        Vec3::new(0.0, h + 0.56, zed),
+                        Vec3::new(w * 1.15, 0.38, 0.16),
+                        0.0,
+                        &wall,
+                    );
+                    part(
+                        Vec3::new(0.0, h + 0.88, zed),
+                        Vec3::new(w * 0.55, 0.34, 0.16),
+                        0.0,
+                        &wall,
+                    );
+                }
             }
             if matches!(plan.kind, BuildingKind::TownHall | BuildingKind::Shrine) {
                 part(

@@ -38,6 +38,7 @@ impl Plugin for CreaturePlugin {
                     plan_routes,
                     locomotion,
                     keep_apart,
+                    drowning,
                     apply_ballistics,
                     wildlife::wild_hunger,
                     wildlife::graze_and_flee,
@@ -313,7 +314,8 @@ fn locomotion(
                 let approach = (distance / (genome.height() * 2.0)).clamp(0.25, 1.0);
                 speed = genome.walk_speed() * approach * vigor;
 
-                let step = (speed * dt).min(distance);
+                // Swimming is slow: most of the stride is lost to the water.
+                let step = (speed * dt).min(distance) * (1.0 - motion.swim * 0.55);
                 transform.translation.x += direction.x * step;
                 transform.translation.z += direction.z * step;
 
@@ -325,14 +327,106 @@ fn locomotion(
             }
         }
 
-        // Stick to the ground. Terrain is the authority on height, so this is a
-        // lookup rather than a collision test.
-        let ground = terrain
-            .height_at(transform.translation.x, transform.translation.z)
+        // Stick to the ground. Terrain is the authority on height, so this is
+        // a lookup rather than a collision test. In deep water there is no
+        // ground to stand on: the body rides just under the surface and the
+        // stride becomes a paddle, at less than half pace.
+        let floor = terrain.height_at(transform.translation.x, transform.translation.z);
+        let surface = terrain
+            .river_surface_at(transform.translation.x, transform.translation.z)
+            .unwrap_or(WATER_LEVEL)
             .max(WATER_LEVEL);
-        transform.translation.y = ground;
+        let depth = surface - floor;
+        if depth > 1.0 {
+            motion.swim = (motion.swim + dt * 4.0).min(1.0);
+        } else {
+            motion.swim = (motion.swim - dt * 4.0).max(0.0);
+        }
+        if motion.swim > 0.5 {
+            transform.translation.y = surface - 0.45;
+        } else {
+            transform.translation.y = floor.max(WATER_LEVEL);
+        }
 
         motion.speed = speed;
+    }
+}
+
+/// People cannot swim. Deep water is a slow emergency: they thrash toward
+/// the nearest dry ground while the water takes its toll — and a god who
+/// drops someone in the sea has done exactly what it looks like. Animals
+/// paddle without drama.
+#[allow(clippy::type_complexity)]
+fn drowning(
+    time: Res<Time>,
+    terrain: Option<Res<Terrain>>,
+    mut say_timer: Local<f32>,
+    mut say: MessageWriter<crate::ui::Say>,
+    mut rng: Local<Option<crate::rng::Rng>>,
+    mut swimmers: Query<
+        (
+            Entity,
+            &Transform,
+            &CreatureMotion,
+            &mut Vitality,
+            &mut MoveTarget,
+        ),
+        (
+            With<crate::villager::Villager>,
+            Without<Corpse>,
+            Without<Held>,
+            Without<Airborne>,
+        ),
+    >,
+) {
+    let Some(terrain) = terrain else {
+        return;
+    };
+    let dt = time.delta_secs();
+    *say_timer += dt;
+    let rng = rng.get_or_insert_with(|| crate::rng::Rng::new(0x5EA));
+
+    for (entity, at, motion, mut vitality, mut target) in &mut swimmers {
+        if motion.swim < 0.5 {
+            continue;
+        }
+        // The water wins slowly enough for a god to intervene.
+        vitality.harm = (vitality.harm + dt / 14.0).min(1.0);
+
+        // Thrash toward the nearest dry ground.
+        let needs_course = target
+            .0
+            .is_none_or(|goal| !terrain.is_walkable(goal.x, goal.z));
+        if needs_course {
+            let mut best: Option<(f32, Vec3)> = None;
+            for step in 0..12 {
+                let angle = step as f32 / 12.0 * std::f32::consts::TAU;
+                let (sin, cos) = angle.sin_cos();
+                for reach in [10.0_f32, 22.0, 40.0, 70.0] {
+                    let x = at.translation.x + cos * reach;
+                    let z = at.translation.z + sin * reach;
+                    if terrain.is_walkable(x, z)
+                        && terrain.height_at(x, z) > WATER_LEVEL + 0.5
+                        && best.is_none_or(|(d, _)| reach < d)
+                    {
+                        best = Some((reach, Vec3::new(x, terrain.height_at(x, z), z)));
+                        break;
+                    }
+                }
+            }
+            if let Some((_, shore)) = best {
+                target.0 = Some(shore);
+            }
+        }
+
+        if *say_timer > 6.0 && rng.chance(0.3) {
+            *say_timer = 0.0;
+            say.write(crate::ui::Say {
+                speaker: entity,
+                text: "help! the water has me".to_string(),
+                thought: false,
+            });
+        }
     }
 }
 

@@ -516,7 +516,18 @@ fn choose_settlement_site(terrain: &Terrain, rng: &mut Rng) -> Vec3 {
         .unwrap_or(Vec3::new(0.0, WATER_LEVEL, 0.0))
 }
 
-fn spawn_settlement(
+/// Set before re-running [`spawn_settlement`] during a save load: fixtures
+/// are raised at the saved place under the saved names, and no founders or
+/// wildlife spawn - the save file supplies the living.
+#[derive(Resource)]
+pub struct RestoringSeed {
+    pub centre: Vec3,
+    pub name: String,
+    pub god: String,
+    pub founded: u32,
+}
+
+pub(crate) fn spawn_settlement(
     mut commands: Commands,
     assets: Res<CreatureAssets>,
     terrain: Res<Terrain>,
@@ -525,6 +536,7 @@ fn spawn_settlement(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut notices: MessageWriter<crate::ui::Notice>,
+    restoring: Option<Res<RestoringSeed>>,
 ) {
     let mut rng = Rng::stream(world_seed.0 as u64, "settlement");
 
@@ -532,17 +544,23 @@ fn spawn_settlement(
     // kept for life, so its children are named in it too.
     let language = names::Language::random(&mut Rng::stream(world_seed.0 as u64, "language"));
 
-    let centre = choose_settlement_site(&terrain, &mut rng);
+    let centre = restoring
+        .as_ref()
+        .map(|r| r.centre)
+        .unwrap_or_else(|| choose_settlement_site(&terrain, &mut rng));
 
     // The place is named in the same tongue as its people, because the people
     // named it.
-    let settlement_name = language.name(&mut rng);
+    let settlement_name = restoring
+        .as_ref()
+        .map(|r| r.name.clone())
+        .unwrap_or_else(|| language.name(&mut rng));
     let settlement = commands
         .spawn((
             Name::new(format!("Settlement of {settlement_name}")),
             Settlement {
                 name: settlement_name.clone(),
-                founded: clock.day(),
+                founded: restoring.as_ref().map_or(clock.day(), |r| r.founded),
             },
             // The banner is the town's face: hover it and the inspector opens
             // on the settlement. Rooted — a god who can uproot the town square
@@ -560,18 +578,25 @@ fn spawn_settlement(
             Visibility::default(),
         ))
         .id();
-    info!("the village of {settlement_name} was founded");
-    notices.write(crate::ui::Notice::fanfare(format!(
-        "The village of {settlement_name} is founded"
-    )));
+    if restoring.is_none() {
+        info!("the village of {settlement_name} was founded");
+        notices.write(crate::ui::Notice::fanfare(format!(
+            "The village of {settlement_name} is founded"
+        )));
+    }
 
     // The god is named by its people, in their own tongue. The player never
     // picks this: being named is the first thing belief does to you.
-    let divine_name = language.name(&mut rng);
-    info!("in {settlement_name} they name their god {divine_name}");
-    notices.write(crate::ui::Notice::fanfare(format!(
-        "In {settlement_name}, they name their god {divine_name}"
-    )));
+    let divine_name = restoring
+        .as_ref()
+        .map(|r| r.god.clone())
+        .unwrap_or_else(|| language.name(&mut rng));
+    if restoring.is_none() {
+        info!("in {settlement_name} they name their god {divine_name}");
+        notices.write(crate::ui::Notice::fanfare(format!(
+            "In {settlement_name}, they name their god {divine_name}"
+        )));
+    }
     commands.insert_resource(DivineName(divine_name));
 
     // The banner that marks the town's heart — a pole, a crossarm, and a drop
@@ -778,7 +803,12 @@ fn spawn_settlement(
     };
     let day = clock.day();
 
-    for i in 0..STARTING_POPULATION {
+    let founders = if restoring.is_some() {
+        0
+    } else {
+        STARTING_POPULATION
+    };
+    for i in 0..founders {
         let position =
             random_walkable_point(&terrain, &mut rng, centre, site.radius * 0.6).unwrap_or(centre);
         let genome = CreatureGenome::random(Species::Human, &mut rng);
@@ -845,7 +875,8 @@ fn spawn_settlement(
     // heavily — the first ecology build spawned one wolf for every two deer
     // and the wolves ate the entire wilderness inside a morning.
     let mut wildlife_rng = Rng::stream(world_seed.0 as u64, "wildlife");
-    for flock in 0..18 {
+    let flocks = if restoring.is_some() { 0 } else { 18 };
+    for flock in 0..flocks {
         let species = *wildlife_rng.pick(&[
             Species::Deer,
             Species::Deer,

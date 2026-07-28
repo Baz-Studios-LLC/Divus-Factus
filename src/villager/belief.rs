@@ -41,7 +41,7 @@ pub const FLOURISH_COST: f32 = 10.0;
 ///
 /// Newly made people start believing a little — the god was, after all, built
 /// from their hope. Everything after that is earned or lost.
-#[derive(Component, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Component, Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct Faith {
     pub trust: f32,
 }

@@ -16,6 +16,7 @@ mod noise;
 mod palette;
 mod render;
 mod rng;
+mod save;
 mod scatter;
 mod sky;
 mod terrain;
@@ -133,6 +134,7 @@ fn main() {
             miracles::MiraclesPlugin,
             title::TitlePlugin,
             matter::MatterPlugin,
+            save::SavePlugin,
         ))
         .add_systems(Startup, spawn_lighting)
         .run();

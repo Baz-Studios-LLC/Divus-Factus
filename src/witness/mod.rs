@@ -201,7 +201,7 @@ impl ReactionKind {
 ///
 /// Capped and counted rather than kept whole. The complete record is what `history`
 /// will be for; this is only what the person themself carries.
-#[derive(Component, Default, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Component, Default, Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct Witnessed {
     /// Most recent first.
     pub recent: Vec<DivineEventKind>,
