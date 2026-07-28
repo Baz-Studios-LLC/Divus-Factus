@@ -2645,12 +2645,39 @@ pub(crate) fn raise_stage(
         // The roof: gable, or a working shed's single tilted slab.
         _ => {
             if plan.shed_roof {
+                // A real lean-to: the slab's low edge seats on the wall top,
+                // the high side is walled to meet it, and the sloping sides
+                // are closed with stepped wedges.
+                let slope = 0.13_f32;
+                let rise = (2.0 * w) * slope.tan();
                 part(
-                    Vec3::new(0.0, h + 0.55, 0.0),
-                    Vec3::new(w * 2.5, 0.12, d * 2.5),
-                    0.24,
+                    Vec3::new(0.0, h + rise * 0.5 + 0.05, 0.0),
+                    Vec3::new(w * 2.35 / slope.cos(), 0.12, d * 2.4),
+                    slope,
                     &roof,
                 );
+                // The high wall band, over the door side.
+                part(
+                    Vec3::new(w, h + rise * 0.5, 0.0),
+                    Vec3::new(0.18, rise + 0.08, d * 2.1),
+                    0.0,
+                    &wall,
+                );
+                // Stepped wedges up the sloping sides.
+                let steps = 4;
+                for k in 0..steps {
+                    let band_h = rise / steps as f32;
+                    let left = -w + (k as f32) * (2.0 * w / steps as f32);
+                    let width = w - left;
+                    for zed in [-d, d] {
+                        part(
+                            Vec3::new(left + width * 0.5, h + (k as f32 + 0.5) * band_h, zed),
+                            Vec3::new(width, band_h + 0.03, 0.16),
+                            0.0,
+                            &wall,
+                        );
+                    }
+                }
             } else {
                 let slab = w * 1.42;
                 part(
