@@ -152,6 +152,7 @@ impl Plugin for VillagerPlugin {
                         belief::grow_legend,
                         belief::ascend,
                         belief::animate_motes,
+                        work::bake,
                     )
                         .chain(),
                     (
@@ -579,7 +580,13 @@ pub(crate) fn spawn_settlement(
             // The founders arrive with a few days' provisions, not nothing:
             // the first bad berry season should be a scare, not a wipe.
             work::Stockpile {
-                food: 6.0,
+                // A mixed satchel: berries picked on the road, a little
+                // grain from wherever they came from.
+                larder: work::Larder {
+                    berries: 4.0,
+                    grain: 2.0,
+                    ..default()
+                },
                 timber: 0.0,
                 stone: 0.0,
             },

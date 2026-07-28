@@ -149,7 +149,7 @@ pub(super) fn kneel(
     };
     let store_has_food = stores
         .get(site.settlement)
-        .is_ok_and(|store| store.food >= 1.0);
+        .is_ok_and(|store| store.food() >= 1.0);
 
     let god = name.as_ref().map_or("their god", |n| n.0.as_str());
 

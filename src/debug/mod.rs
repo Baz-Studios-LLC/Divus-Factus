@@ -834,7 +834,7 @@ fn update_village_panel(
     let houses = huts.iter().count();
     let (food, timber, stone) = site
         .and_then(|site| stores.get(site.settlement).ok())
-        .map_or((0.0, 0.0, 0.0), |s| (s.food, s.timber, s.stone));
+        .map_or((0.0, 0.0, 0.0), |s| (s.food(), s.timber, s.stone));
 
     for (card, mut text) in &mut gauges.p0() {
         let fresh = match card.0 {
@@ -2405,7 +2405,9 @@ fn update_hud(
                 |s| {
                     format!(
                         "{:.0} food / {:.0} timber / {:.0} stone",
-                        s.food, s.timber, s.stone,
+                        s.food(),
+                        s.timber,
+                        s.stone,
                     )
                 },
             ),
@@ -2546,7 +2548,7 @@ fn update_inspector(
             .and_then(|site| settlement_info.get(site.settlement).ok())
             .map(|(_, store)| store);
         let (title, amount) = match (pile.0, store) {
-            (PileKind::Food, Some(s)) => ("The food store", s.food),
+            (PileKind::Food, Some(s)) => ("The food store", s.larder.total()),
             (PileKind::Timber, Some(s)) => ("The woodpile", s.timber),
             (PileKind::Stone, Some(s)) => ("The stone pile", s.stone),
             (_, None) => ("The stores", 0.0),
@@ -2610,11 +2612,34 @@ fn update_inspector(
                     .iter()
                     .map(|(kind, word)| {
                         let amount = store.map_or(0.0, |s| match kind {
-                            PileKind::Food => s.food,
+                            PileKind::Food => s.food(),
                             PileKind::Timber => s.timber,
                             PileKind::Stone => s.stone,
                         });
-                        format!("{amount:.0} {word}")
+                        // Food opens its sacks: the kinds inside, named.
+                        if *kind == PileKind::Food
+                            && let Some(s) = store
+                        {
+                            let kinds = [
+                                crate::villager::work::FoodKind::Berries,
+                                crate::villager::work::FoodKind::Fish,
+                                crate::villager::work::FoodKind::Meat,
+                                crate::villager::work::FoodKind::Grain,
+                                crate::villager::work::FoodKind::Bread,
+                            ]
+                            .into_iter()
+                            .filter(|k| s.larder.stock(*k) >= 0.5)
+                            .map(|k| format!("{:.0} {}", s.larder.stock(k), k.name()))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                            if kinds.is_empty() {
+                                format!("{amount:.0} {word}")
+                            } else {
+                                format!("{amount:.0} {word} ({kinds})")
+                            }
+                        } else {
+                            format!("{amount:.0} {word}")
+                        }
                     })
                     .collect::<Vec<_>>()
                     .join(", ");
@@ -2856,7 +2881,10 @@ fn update_inspector(
                 "a village, founded on day {}\n\
                  {grown} grown, {children} children\n\
                  stores  {:.0} food, {:.0} timber, {:.0} stone",
-                settlement.founded, store.food, store.timber, store.stone,
+                settlement.founded,
+                store.food(),
+                store.timber,
+                store.stone,
             ),
         )
     } else if let Ok(vitality) = corpse {

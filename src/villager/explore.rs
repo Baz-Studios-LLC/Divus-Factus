@@ -124,7 +124,7 @@ pub(super) fn expeditions(
         .iter()
         .any(|(at, tree)| tree.harvestable() && known.knows(at.translation()));
     let wood_want = timber_short && !wood_known;
-    let food_short = stores.iter().next().is_none_or(|s| s.food < 10.0);
+    let food_short = stores.iter().next().is_none_or(|s| s.food() < 10.0);
     let berries_known = bushes
         .iter()
         .any(|(at, bush)| bush.amount > 0.5 && known.knows(at.translation()));

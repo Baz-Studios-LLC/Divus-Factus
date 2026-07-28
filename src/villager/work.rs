@@ -132,12 +132,122 @@ pub fn roll_vocation(boldness: f32, rng: &mut Rng) -> Vocation {
     Vocation::Gatherer
 }
 
+/// One kind of food in the larder. What the village eats is what its
+/// trades bring home, and the mix is the village's story: a fishing
+/// hamlet lives on fish, a farm town on bread, a bad year on berries.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum FoodKind {
+    Berries,
+    Fish,
+    Meat,
+    Grain,
+    Bread,
+}
+
+impl FoodKind {
+    pub fn name(self) -> &'static str {
+        match self {
+            FoodKind::Berries => "berries",
+            FoodKind::Fish => "fish",
+            FoodKind::Meat => "meat",
+            FoodKind::Grain => "grain",
+            FoodKind::Bread => "bread",
+        }
+    }
+}
+
+/// The village's food, kept by kind.
+#[derive(Debug, Default, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct Larder {
+    pub berries: f32,
+    pub fish: f32,
+    pub meat: f32,
+    pub grain: f32,
+    pub bread: f32,
+}
+
+impl Larder {
+    pub fn total(&self) -> f32 {
+        self.berries + self.fish + self.meat + self.grain + self.bread
+    }
+
+    pub fn add(&mut self, kind: FoodKind, amount: f32) {
+        *self.of(kind) += amount;
+    }
+
+    pub fn stock(&self, kind: FoodKind) -> f32 {
+        match kind {
+            FoodKind::Berries => self.berries,
+            FoodKind::Fish => self.fish,
+            FoodKind::Meat => self.meat,
+            FoodKind::Grain => self.grain,
+            FoodKind::Bread => self.bread,
+        }
+    }
+
+    fn of(&mut self, kind: FoodKind) -> &mut f32 {
+        match kind {
+            FoodKind::Berries => &mut self.berries,
+            FoodKind::Fish => &mut self.fish,
+            FoodKind::Meat => &mut self.meat,
+            FoodKind::Grain => &mut self.grain,
+            FoodKind::Bread => &mut self.bread,
+        }
+    }
+
+    /// Draws one meal. Bread first — baked to stretch, a bread meal
+    /// draws only three quarters as deep — then whatever the larder is
+    /// deepest in, spilling into the next kind if the first runs short.
+    /// Returns the kind that made most of the meal.
+    pub fn draw(&mut self, meal: f32) -> Option<FoodKind> {
+        if self.bread >= meal * 0.75 {
+            self.bread -= meal * 0.75;
+            return Some(FoodKind::Bread);
+        }
+        let mut order = [
+            FoodKind::Berries,
+            FoodKind::Fish,
+            FoodKind::Meat,
+            FoodKind::Grain,
+            FoodKind::Bread,
+        ];
+        order.sort_by(|a, b| self.stock(*b).total_cmp(&self.stock(*a)));
+        let mut owed = meal;
+        let mut first: Option<FoodKind> = None;
+        for kind in order {
+            let stock = self.of(kind);
+            if *stock <= 0.0 {
+                continue;
+            }
+            let taken = stock.min(owed);
+            *stock -= taken;
+            owed -= taken;
+            first.get_or_insert(kind);
+            if owed <= 0.0 {
+                break;
+            }
+        }
+        first
+    }
+}
+
+/// The last kind of food a villager ate: sameness dulls, variety cheers.
+#[derive(Component)]
+pub struct LastMeal(pub FoodKind);
+
 /// What the settlement has put by.
 #[derive(Component, Debug, Default)]
 pub struct Stockpile {
-    pub food: f32,
+    pub larder: Larder,
     pub timber: f32,
     pub stone: f32,
+}
+
+impl Stockpile {
+    /// Food of every kind together — the number the old ledgers kept.
+    pub fn food(&self) -> f32 {
+        self.larder.total()
+    }
 }
 
 /// Timber one ordinary house costs, delivered one unit per work cycle.
@@ -815,7 +925,7 @@ pub(super) fn track_store_trends(
     let now = clock.elapsed;
     trends
         .samples
-        .push_back((now, store.food, store.timber, store.stone));
+        .push_back((now, store.food(), store.timber, store.stone));
     while trends.samples.front().is_some_and(|(t, ..)| now - t > 90.0) {
         trends.samples.pop_front();
     }
@@ -1006,7 +1116,7 @@ pub(super) fn stores_move_indoors(
                         // Food shelters here too, until a granary stands.
                         PileKind::Food if !granary_stands => (
                             Vec3::new(0.0, 0.0, 0.9),
-                            ((store.food.min(24.0) / 2.0).ceil() as u8).max(1),
+                            ((store.food().min(24.0) / 2.0).ceil() as u8).max(1),
                         ),
                         PileKind::Food => continue,
                     };
@@ -1030,7 +1140,7 @@ pub(super) fn stores_move_indoors(
                         to: at.translation + at.rotation * Vec3::new(0.0, 0.0, 0.4),
                         to_rot: at.rotation,
                         hauled: 0,
-                        goal: ((store.food.min(24.0) / 2.0).ceil() as u8).max(1),
+                        goal: ((store.food().min(24.0) / 2.0).ceil() as u8).max(1),
                     });
                 }
                 notices.write(crate::ui::Notice::new(
@@ -1175,7 +1285,7 @@ pub(super) fn update_store_piles(
     }
     for (sack, mut visibility) in &mut sacks {
         // Two food to the sack, or the pile would dwarf the village.
-        let wanted = if (sack.0 as f32) * 2.0 < store.food.min(24.0) {
+        let wanted = if (sack.0 as f32) * 2.0 < store.food().min(24.0) {
             Visibility::Inherited
         } else {
             Visibility::Hidden
@@ -1566,7 +1676,7 @@ pub(super) fn retrain(
     // Hunger kills first, so food hands top the ladder: a thin larder
     // with too few of the trades that fill it retrains someone toward
     // the water or the bushes before anything else gets a say.
-    let food_low = stores.iter().next().is_none_or(|s| s.food < 12.0);
+    let food_low = stores.iter().next().is_none_or(|s| s.food() < 12.0);
     let food_hands: usize = [
         Vocation::Fisher,
         Vocation::Gatherer,
@@ -2524,7 +2634,7 @@ pub(super) fn do_work(
                 if ate_at_work {
                     picked = (picked - 0.4).max(0.0);
                 }
-                store.food += picked;
+                store.larder.add(FoodKind::Berries, picked);
                 if source.amount <= 0.1 {
                     *activity = Activity::Idle;
                     commands.entity(entity).remove::<Job>();
@@ -2544,7 +2654,7 @@ pub(super) fn do_work(
                 if ate_at_work {
                     catch = (catch - 0.4).max(0.2);
                 }
-                store.food += catch;
+                store.larder.add(FoodKind::Fish, catch);
             }
 
             Vocation::Miner | Vocation::Mason => match job.focus {
@@ -2656,11 +2766,14 @@ pub(super) fn do_work(
                     };
                     if field.growth >= 1.0 {
                         // The mill grinds the harvest into half again as much.
-                        store.food += if context.3.iter().any(|b| b.kind == BuildingKind::Mill) {
-                            9.0
-                        } else {
-                            6.0
-                        };
+                        store.larder.add(
+                            FoodKind::Grain,
+                            if context.3.iter().any(|b| b.kind == BuildingKind::Mill) {
+                                9.0
+                            } else {
+                                6.0
+                            },
+                        );
                         field.growth = 0.08;
                         info!("{} brought in a harvest", person.name);
                         notices.write(crate::ui::Notice::new(format!(
@@ -2725,7 +2838,7 @@ pub(super) fn do_work(
 
                 if is_corpse {
                     // The kill is made; bring it home as food.
-                    store.food += CARCASS_FOOD;
+                    store.larder.add(FoodKind::Meat, CARCASS_FOOD);
                     commands.entity(prey).despawn();
                     let quarry = match genome.species {
                         Species::Deer => "brought down a deer",
@@ -2764,21 +2877,53 @@ pub(super) fn do_work(
 ///
 /// This is what the stockpile is *for*: the difference between a bad berry
 /// season and a funeral.
+/// The bakery at work: the store's grain becomes bread, loaf by loaf.
+/// Bread stretches — a baked meal draws only three quarters as deep — so
+/// a working bakery quietly makes every harvest feed more mouths.
+pub(super) fn bake(
+    time: Res<Time>,
+    mut since_last: Local<f32>,
+    site: Option<Res<SettlementSite>>,
+    buildings: Query<&Building>,
+    mut stores: Query<&mut Stockpile>,
+) {
+    *since_last += time.delta_secs();
+    if *since_last < 25.0 {
+        return;
+    }
+    *since_last = 0.0;
+    let Some(site) = site else {
+        return;
+    };
+    if !buildings.iter().any(|b| b.kind == BuildingKind::Bakery) {
+        return;
+    }
+    let Ok(mut store) = stores.get_mut(site.settlement) else {
+        return;
+    };
+    if store.larder.grain >= 1.0 {
+        store.larder.grain -= 1.0;
+        store.larder.bread += 1.3;
+    }
+}
+
 pub(super) fn eat_from_store(
+    mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,
     kitchen: Res<KitchenWarm>,
-    bakeries: Query<&Building>,
     site: Option<Res<SettlementSite>>,
     mut stores: Query<&mut Stockpile>,
     bushes: Query<(&GlobalTransform, &FoodSource)>,
     mut hungry: Query<
         (
+            Entity,
             &Transform,
             &mut Needs,
             &mut super::Morale,
             &mut Activity,
             &mut MoveTarget,
             Option<&super::traits::Traits>,
+            Option<&LastMeal>,
         ),
         (
             With<Villager>,
@@ -2796,10 +2941,12 @@ pub(super) fn eat_from_store(
         return;
     };
 
-    for (transform, mut needs, mut morale, mut activity, mut target, manner) in &mut hungry {
+    for (who, transform, mut needs, mut morale, mut activity, mut target, manner, last) in
+        &mut hungry
+    {
         match *activity {
             Activity::VisitingStore => {
-                if store.food < 1.0 {
+                if store.food() < 1.0 {
                     *activity = Activity::Idle;
                     target.0 = None;
                     continue;
@@ -2808,18 +2955,31 @@ pub(super) fn eat_from_store(
                     target.0 = Some(site.centre);
                     continue;
                 }
-                // Bread goes further than raw stores: the bakery thins the
-                // draw on the sacks without thinning the meal.
-                store.food -= if bakeries.iter().any(|b| b.kind == BuildingKind::Bakery) {
-                    0.7
-                } else {
-                    1.0
-                } * manner.map_or(1.0, |m| m.appetite());
+                // The meal comes out of the larder by kind — bread first
+                // and cheapest, then whatever the village is deepest in.
+                let meal = manner.map_or(1.0, |m| m.appetite());
+                let Some(kind) = store.larder.draw(meal) else {
+                    *activity = Activity::Idle;
+                    target.0 = None;
+                    continue;
+                };
                 let ration = if cooked { 0.85 } else { 0.55 };
                 needs.hunger = (needs.hunger - ration).max(0.0);
                 if cooked {
                     morale.spirits = (morale.spirits + 0.08).min(1.0);
                 }
+                // The tongue keeps score: the same meal again dulls the
+                // day a little, a change of kind brightens it.
+                match last {
+                    Some(last) if last.0 == kind => {
+                        morale.spirits = (morale.spirits - 0.02).max(0.0);
+                    }
+                    Some(_) => {
+                        morale.spirits = (morale.spirits + 0.05).min(1.0);
+                    }
+                    None => {}
+                }
+                commands.entity(who).insert(LastMeal(kind));
                 target.0 = None;
                 if needs.hunger < 0.1 {
                     *activity = Activity::Idle;
@@ -2832,7 +2992,7 @@ pub(super) fn eat_from_store(
                 let bush_near = bushes.iter().any(|(at, bush)| {
                     bush.amount > 0.2 && at.translation().distance(transform.translation) < 30.0
                 });
-                if !bush_near && needs.hunger > DOWN_TOOLS_HUNGER && store.food >= 1.0 {
+                if !bush_near && needs.hunger > DOWN_TOOLS_HUNGER && store.food() >= 1.0 {
                     *activity = Activity::VisitingStore;
                     target.0 = Some(site.centre);
                 }
@@ -3395,7 +3555,8 @@ pub(super) fn plan_houses(
     // roof: an empty larder beside open water breaks ground on the dock
     // first, because hunger kills faster than rain.
     let kind =
-        if population >= 5 && store_now.food < 8.0 && shore_near && !has_kind(BuildingKind::Dock) {
+        if population >= 5 && store_now.food() < 8.0 && shore_near && !has_kind(BuildingKind::Dock)
+        {
             BuildingKind::Dock
         } else if roofless_adults > 0 && !pending.iter().any(|b| b.kind == BuildingKind::House) {
             BuildingKind::House
@@ -3407,7 +3568,7 @@ pub(super) fn plan_houses(
                 stone: store_now.stone,
                 timber_stored: store_now.timber,
                 stone_stored: store_now.stone,
-                food_stored: store_now.food,
+                food_stored: store_now.food(),
                 avg_spirits: spirits_sum / population.max(1) as f32,
                 homeless: roofless_adults,
                 hurt,
@@ -3705,7 +3866,10 @@ pub(super) fn log_stores(
             "the stores of {} hold {:.0} food, {:.0} timber, {:.0} stone \
              ({at_work} at work, {standing} trees standing, {animals} wild things, \
              nearest {nearest:.0} away)",
-            settlement.name, store.food, store.timber, store.stone,
+            settlement.name,
+            store.food(),
+            store.timber,
+            store.stone,
         );
     }
 }

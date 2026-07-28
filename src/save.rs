@@ -152,6 +152,10 @@ struct SaveGame {
     /// Worn ground: (cell x, cell z, wear).
     #[serde(default)]
     trails: Vec<(i32, i32, f32)>,
+    /// The larder by kind: berries, fish, meat, grain, bread. Older saves
+    /// carried only the total (stores.0), which returns as berries.
+    #[serde(default)]
+    larder: Option<[f32; 5]>,
 }
 
 fn slots_dir() -> std::path::PathBuf {
@@ -271,8 +275,17 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         .unwrap_or_else(|| "the god".to_string());
     let stores = world
         .get::<Stockpile>(settlement_entity)
-        .map(|s| (s.food, s.timber, s.stone))
+        .map(|s| (s.food(), s.timber, s.stone))
         .unwrap_or((0.0, 0.0, 0.0));
+    let larder = world.get::<Stockpile>(settlement_entity).map(|s| {
+        [
+            s.larder.berries,
+            s.larder.fish,
+            s.larder.meat,
+            s.larder.grain,
+            s.larder.bread,
+        ]
+    });
 
     let worked = world.resource::<Terrain>().export_worked();
     let known = {
@@ -620,6 +633,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         trails: world
             .get_resource::<crate::trails::Trails>()
             .map_or_else(Vec::new, |t| t.export()),
+        larder,
     })
 }
 
@@ -695,7 +709,20 @@ fn apply(world: &mut World, save: SaveGame) {
     // 4. Everything the fixtures own, put back the way it was.
     world.resource_mut::<SettlementSite>().woodpile = save.woodpile;
     if let Some(mut store) = world.get_mut::<Stockpile>(settlement_entity) {
-        store.food = save.stores.0;
+        // Old saves kept one food number; it comes back as berries.
+        store.larder = match save.larder {
+            Some([berries, fish, meat, grain, bread]) => crate::villager::work::Larder {
+                berries,
+                fish,
+                meat,
+                grain,
+                bread,
+            },
+            None => crate::villager::work::Larder {
+                berries: save.stores.0,
+                ..Default::default()
+            },
+        };
         store.timber = save.stores.1;
         store.stone = save.stores.2;
     }
