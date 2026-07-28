@@ -338,6 +338,18 @@ pub mod theme {
         palette::shade(&palette::STONE, 0.13).with_alpha(0.98)
     }
 
+    /// The warm card: a parchment-dark fill for detail panes, so content
+    /// areas read as two materials - dark wells beside warm boards - the
+    /// way a built interface does, without leaving the palette.
+    pub fn card_bg() -> Color {
+        Color::srgb(0.16, 0.13, 0.095)
+    }
+
+    /// The card's stronger golden edge.
+    pub fn card_border() -> Color {
+        palette::shade(&palette::CLOTH_GOLD, 0.6).with_alpha(0.55)
+    }
+
     /// Panel edge: a whisper of the gold that marks everything divine.
     pub fn panel_border() -> Color {
         palette::shade(&palette::CLOTH_GOLD, 0.55).with_alpha(0.35)
@@ -559,9 +571,8 @@ fn window_impl(
         })
         .id();
 
-    // The frame: no padding of its own, so the title bar can run edge to
-    // edge like a real window's chrome. A soft drop shadow lifts the whole
-    // thing off the world behind it.
+    // The outer rim: a near-black plate with the deep shadow. Inside it, a
+    // warm bezel frames the content - two materials, like a built thing.
     let root = commands
         .spawn((
             Panel,
@@ -569,19 +580,35 @@ fn window_impl(
             Node {
                 min_width: px(min_width),
                 flex_direction: FlexDirection::Column,
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(8)),
-                overflow: Overflow::clip(),
+                padding: px(5).into(),
+                border: UiRect::all(px(2)),
+                border_radius: BorderRadius::all(px(12)),
                 ..default()
             },
-            BackgroundColor(theme::panel_bg()),
-            BorderColor::all(theme::panel_border()),
-            BoxShadow::new(Color::BLACK.with_alpha(0.5), px(3), px(6), px(0), px(16)),
+            BackgroundColor(Color::srgb(0.05, 0.045, 0.04)),
+            BorderColor::all(Color::BLACK.with_alpha(0.8)),
+            BoxShadow::new(Color::BLACK.with_alpha(0.65), px(4), px(9), px(2), px(26)),
             Interaction::default(),
             ChildOf(strip),
         ))
         .id();
+    let frame = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                flex_direction: FlexDirection::Column,
+                border: UiRect::all(px(2)),
+                border_radius: BorderRadius::all(px(9)),
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            BackgroundColor(theme::panel_bg()),
+            BorderColor::all(theme::card_border()),
+            ChildOf(root),
+        ))
+        .id();
 
+    // The banner: a tall title plate with the name writ large.
     let title_bar = commands
         .spawn((
             DragHandle(root),
@@ -591,20 +618,18 @@ fn window_impl(
                 justify_content: JustifyContent::SpaceBetween,
                 align_items: AlignItems::Center,
                 column_gap: px(16),
-                padding: UiRect::axes(px(theme::PAD), px(7)),
-                border: UiRect::bottom(px(1)),
+                padding: UiRect::axes(px(theme::PAD + 6.0), px(12)),
                 ..default()
             },
             BackgroundColor(theme::title_bg()),
-            BorderColor::all(theme::panel_border()),
             Interaction::default(),
-            ChildOf(root),
+            ChildOf(frame),
         ))
         .id();
     commands.spawn((
         Text::new(title),
         TextFont {
-            font_size: FontSize::Px(15.0),
+            font_size: FontSize::Px(20.0),
             ..default()
         },
         TextColor(theme::accent()),
@@ -615,61 +640,61 @@ fn window_impl(
             CloseButton(root),
             UiButton,
             Node {
-                width: px(18),
-                height: px(18),
+                width: px(26),
+                height: px(26),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(4)),
+                border: UiRect::all(px(2)),
+                border_radius: BorderRadius::all(px(6)),
                 ..default()
             },
-            BorderColor::all(theme::panel_border()),
+            BorderColor::all(theme::card_border()),
             Interaction::default(),
             ChildOf(title_bar),
         ))
         .id();
-    commands.spawn((dim("x"), ChildOf(close)));
+    commands.spawn((body("x"), ChildOf(close)));
 
-    // The gold thread under the chrome: one bright line, then the body.
+    // The gold thread under the banner.
     commands.spawn((
         Node {
             width: percent(100),
-            height: px(2),
+            height: px(3),
             ..default()
         },
-        BackgroundColor(theme::accent().with_alpha(0.35)),
-        ChildOf(root),
+        BackgroundColor(theme::accent().with_alpha(0.45)),
+        ChildOf(frame),
     ));
 
-    let body = commands
+    let content = commands
         .spawn((
             Node {
                 width: percent(100),
                 flex_direction: FlexDirection::Column,
                 row_gap: px(theme::GAP),
-                padding: UiRect::all(px(theme::PAD)),
+                padding: px(theme::PAD).into(),
                 ..default()
             },
-            ChildOf(root),
+            ChildOf(frame),
         ))
         .id();
 
-    // Corner studs: four small gold squares, the craftsman's touch that says
-    // this frame was made, not printed.
+    // Corner studs on the rim.
     for (left, top) in [(false, false), (true, false), (false, true), (true, true)] {
         let auto = Val::Auto;
         commands.spawn((
             Node {
                 position_type: PositionType::Absolute,
-                left: if left { px(3) } else { auto },
-                right: if left { auto } else { px(3) },
-                top: if top { px(3) } else { auto },
-                bottom: if top { auto } else { px(3) },
-                width: px(4),
-                height: px(4),
+                left: if left { px(4) } else { auto },
+                right: if left { auto } else { px(4) },
+                top: if top { px(4) } else { auto },
+                bottom: if top { auto } else { px(4) },
+                width: px(5),
+                height: px(5),
+                border_radius: BorderRadius::all(px(2)),
                 ..default()
             },
-            BackgroundColor(theme::accent().with_alpha(0.55)),
+            BackgroundColor(theme::accent().with_alpha(0.6)),
             ChildOf(root),
         ));
     }
@@ -677,7 +702,7 @@ fn window_impl(
     WindowHandles {
         root,
         title_bar,
-        body,
+        body: content,
     }
 }
 
@@ -699,6 +724,75 @@ pub fn scroll_regions(
             scroll.0.y -= mouse_scroll.delta.y * 18.0;
         }
     }
+}
+
+/// A dark inset well: content that sits INTO the panel.
+pub fn inset_well(commands: &mut Commands, parent: Entity) -> Entity {
+    commands
+        .spawn((
+            Node {
+                width: percent(100),
+                flex_direction: FlexDirection::Column,
+                row_gap: px(3),
+                padding: px(8).into(),
+                border_radius: BorderRadius::all(px(8)),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.35)),
+            ChildOf(parent),
+        ))
+        .id()
+}
+
+/// A warm bordered card: the parchment board detail content sits ON.
+pub fn detail_card(commands: &mut Commands, parent: Entity) -> Entity {
+    commands
+        .spawn((
+            Node {
+                flex_grow: 1.0,
+                flex_direction: FlexDirection::Column,
+                row_gap: px(theme::GAP),
+                padding: px(theme::PAD).into(),
+                border: UiRect::all(px(2)),
+                border_radius: BorderRadius::all(px(8)),
+                ..default()
+            },
+            BackgroundColor(theme::card_bg()),
+            BorderColor::all(theme::card_border()),
+            ChildOf(parent),
+        ))
+        .id()
+}
+
+/// A square content tile - for miracle slots, item cells, icon grids. Lit
+/// tiles wear the gold edge; dim ones sit back.
+pub fn tile(commands: &mut Commands, parent: Entity, size: f32, lit: bool) -> Entity {
+    commands
+        .spawn((
+            Node {
+                width: px(size),
+                height: px(size),
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                row_gap: px(2),
+                border: UiRect::all(px(2)),
+                border_radius: BorderRadius::all(px(8)),
+                ..default()
+            },
+            BackgroundColor(if lit {
+                theme::title_bg()
+            } else {
+                Color::BLACK.with_alpha(0.3)
+            }),
+            BorderColor::all(if lit {
+                theme::card_border()
+            } else {
+                theme::panel_border().with_alpha(0.2)
+            }),
+            ChildOf(parent),
+        ))
+        .id()
 }
 
 /// The panes of a split view: the window chrome, the list on the left, and
@@ -754,10 +848,15 @@ pub fn split_view(commands: &mut Commands, title: &str, list_width: f32, height:
                 height: percent(100),
                 flex_direction: FlexDirection::Column,
                 row_gap: px(theme::GAP),
+                padding: px(theme::PAD).into(),
+                border: UiRect::all(px(2)),
+                border_radius: BorderRadius::all(px(8)),
                 // Content never bleeds past the window - it scrolls.
                 overflow: Overflow::scroll_y(),
                 ..default()
             },
+            BackgroundColor(theme::card_bg()),
+            BorderColor::all(theme::card_border()),
             Scrollable,
             ScrollPosition::DEFAULT,
             Interaction::default(),
@@ -946,15 +1045,20 @@ pub fn tab_bar(commands: &mut Commands, parent: Entity, labels: &[&str]) -> Vec<
                 TabButton { bar, page },
                 UiButton,
                 Node {
-                    padding: UiRect::axes(px(12), px(4)),
-                    border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::top(px(5)),
+                    padding: UiRect::axes(px(18), px(7)),
+                    border: UiRect::all(px(2)),
+                    border_radius: BorderRadius::top(px(8)),
                     ..default()
                 },
-                BorderColor::all(if index == 0 {
-                    theme::accent().with_alpha(0.6)
+                BackgroundColor(if index == 0 {
+                    theme::card_bg()
                 } else {
-                    theme::panel_border()
+                    Color::BLACK.with_alpha(0.25)
+                }),
+                BorderColor::all(if index == 0 {
+                    theme::card_border()
+                } else {
+                    theme::panel_border().with_alpha(0.4)
                 }),
                 Interaction::default(),
                 ChildOf(bar),
@@ -996,9 +1100,9 @@ pub fn switch_tabs(
             }
             if let Ok(mut border) = borders.get_mut(other) {
                 *border = BorderColor::all(if active {
-                    theme::accent().with_alpha(0.6)
+                    theme::card_border()
                 } else {
-                    theme::panel_border()
+                    theme::panel_border().with_alpha(0.4)
                 });
             }
         }
