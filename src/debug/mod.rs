@@ -60,6 +60,7 @@ impl Plugin for DebugPlugin {
                 Update,
                 (
                     toggle_saves,
+                    update_faith_roster,
                     capture_preselect,
                     style_roster_rows,
                     update_village_panel,
@@ -398,12 +399,16 @@ struct VillageGaugeValue(VillageStat);
 #[derive(Component)]
 struct VillageLand;
 
+/// The FAITH tab's roster: who believes, and the last reason why.
+#[derive(Component)]
+struct FaithRoster;
+
 /// The line under the happiness gauge saying WHY it stands where it does.
 #[derive(Component)]
 struct HappinessWhy;
 
 fn spawn_village_panel(mut commands: Commands) {
-    let window = ui::big_window(&mut commands, "THE VILLAGE", 560.0);
+    let window = ui::big_window(&mut commands, "THE VILLAGE", 720.0);
     commands.entity(window.root).insert((
         Name::new("Village Panel"),
         VillagePanel,
@@ -453,6 +458,35 @@ fn spawn_village_panel(mut commands: Commands) {
         commands.spawn((ui::dim(label), ChildOf(card)));
     }
 
+    let pages = ui::tab_bar(&mut commands, window.body, &["OVERVIEW", "FAITH"]);
+    let overview = pages[0];
+    let faith_page = pages[1];
+    commands.entity(faith_page).insert(Node {
+        width: percent(100),
+        min_height: px(320),
+        max_height: px(460),
+        flex_direction: FlexDirection::Column,
+        row_gap: px(3),
+        overflow: Overflow::scroll_y(),
+        display: Display::None,
+        ..default()
+    });
+    commands.entity(faith_page).insert((
+        ui::Scrollable,
+        ScrollPosition::DEFAULT,
+        Interaction::default(),
+    ));
+    commands.spawn((
+        FaithRoster,
+        Node {
+            width: percent(100),
+            flex_direction: FlexDirection::Column,
+            row_gap: px(5),
+            ..default()
+        },
+        ChildOf(faith_page),
+    ));
+
     let gauge = |commands: &mut Commands, parent, label: &str, stat, color| {
         let handles = ui::gauge_row(commands, parent, label, color);
         commands.entity(handles.fill).insert(VillageGaugeFill(stat));
@@ -461,10 +495,10 @@ fn spawn_village_panel(mut commands: Commands) {
             .insert(VillageGaugeValue(stat));
     };
 
-    ui::section_header(&mut commands, window.body, "WELLBEING");
+    ui::section_header(&mut commands, overview, "WELLBEING");
     gauge(
         &mut commands,
-        window.body,
+        overview,
         "happiness",
         VillageStat::Happiness,
         crate::palette::shade(&crate::palette::GRASS, 0.7),
@@ -476,64 +510,64 @@ fn spawn_village_panel(mut commands: Commands) {
             margin: UiRect::left(px(ui::theme::LABEL_WIDTH + 10.0)),
             ..default()
         },
-        ChildOf(window.body),
+        ChildOf(overview),
     ));
     gauge(
         &mut commands,
-        window.body,
+        overview,
         "fed",
         VillageStat::Fed,
         crate::palette::shade(&crate::palette::CLOTH_RED, 0.6),
     );
     gauge(
         &mut commands,
-        window.body,
+        overview,
         "housed",
         VillageStat::Housed,
         crate::palette::shade(&crate::palette::WOOD, 0.65),
     );
 
-    ui::section_header(&mut commands, window.body, "FAITH");
+    ui::section_header(&mut commands, overview, "FAITH");
     gauge(
         &mut commands,
-        window.body,
+        overview,
         "belief in you",
         VillageStat::Faith,
         ui::theme::accent(),
     );
     gauge(
         &mut commands,
-        window.body,
+        overview,
         "believers",
         VillageStat::Believers,
         ui::theme::accent().with_alpha(0.55),
     );
 
-    ui::section_header(&mut commands, window.body, "STORES");
+    ui::section_header(&mut commands, overview, "STORES");
     gauge(
         &mut commands,
-        window.body,
+        overview,
         "food",
         VillageStat::Food,
         crate::palette::shade(&crate::palette::GRASS, 0.55),
     );
     gauge(
         &mut commands,
-        window.body,
+        overview,
         "timber",
         VillageStat::Timber,
         crate::palette::shade(&crate::palette::WOOD, 0.5),
     );
     gauge(
         &mut commands,
-        window.body,
+        overview,
         "stone",
         VillageStat::Stone,
         crate::palette::shade(&crate::palette::STONE, 0.55),
     );
 
-    ui::section_header(&mut commands, window.body, "THE LAND");
-    commands.spawn((VillageLand, ui::dim(""), ChildOf(window.body)));
+    ui::section_header(&mut commands, overview, "THE LAND");
+    commands.spawn((VillageLand, ui::dim(""), ChildOf(overview)));
 }
 
 /// Fills the ledger while it is open.
@@ -1505,6 +1539,95 @@ fn update_person_detail(
         && text.0 != fresh
     {
         *text = Text::new(fresh);
+    }
+}
+
+/// Rebuilds the FAITH roster while the ledger is open: every soul, ranked
+/// by their faith, each with the last reason their heart moved - a god
+/// reads congregations the way shepherds count sheep.
+#[allow(clippy::type_complexity)]
+fn update_faith_roster(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut last_rebuild: Local<f32>,
+    panels: Query<&Visibility, With<VillagePanel>>,
+    rosters: Query<Entity, With<FaithRoster>>,
+    flock: Query<
+        (
+            &Person,
+            Option<&crate::villager::belief::Faith>,
+            Option<&Chronicle>,
+            Option<&Witnessed>,
+        ),
+        (With<Villager>, Without<crate::creature::Corpse>),
+    >,
+) {
+    if !panels.iter().any(|v| *v != Visibility::Hidden) {
+        return;
+    }
+    *last_rebuild += time.delta_secs();
+    if *last_rebuild < 2.0 {
+        return;
+    }
+    *last_rebuild = 0.0;
+    let Ok(roster) = rosters.single() else {
+        return;
+    };
+    commands.entity(roster).despawn_related::<Children>();
+
+    let mut souls: Vec<_> = flock.iter().collect();
+    souls.sort_by(|a, b| {
+        let fa = a.1.map_or(0.0, |f| f.trust);
+        let fb = b.1.map_or(0.0, |f| f.trust);
+        fb.total_cmp(&fa)
+    });
+    for (person, faith, chronicle, witnessed) in souls {
+        let trust = faith.map_or(0.0, |f| f.trust);
+        let believer = faith.is_some_and(|f| f.is_believer());
+        let name_line = commands
+            .spawn((
+                Node {
+                    width: percent(100),
+                    flex_direction: FlexDirection::Row,
+                    justify_content: JustifyContent::SpaceBetween,
+                    ..default()
+                },
+                ChildOf(roster),
+            ))
+            .id();
+        commands.spawn((
+            ui::body(format!(
+                "{}{}",
+                person.name,
+                if believer { "  *" } else { "" }
+            )),
+            ChildOf(name_line),
+        ));
+        commands.spawn((
+            ui::dim(format!(
+                "{}  ({:.0}%)",
+                faith.map_or("has never wondered", |f| f.describe()),
+                trust * 100.0,
+            )),
+            ChildOf(name_line),
+        ));
+        // The why: the last line of their life that touched the god.
+        let why = chronicle
+            .and_then(|c| {
+                c.events.iter().rev().find(|e| {
+                    e.text.contains("saw")
+                        || e.text.contains("heard")
+                        || e.text.contains("prayed")
+                        || e.text.contains("answered")
+                        || e.text.contains("believe")
+                })
+            })
+            .map(|e| format!("d{}  {}", e.day, e.text))
+            .unwrap_or_else(|| match witnessed {
+                Some(w) if w.secondhand > 0 => "knows the god only from stories".to_string(),
+                _ => "has neither seen nor heard of you".to_string(),
+            });
+        commands.spawn((ui::dim(format!("   {why}")), ChildOf(roster)));
     }
 }
 

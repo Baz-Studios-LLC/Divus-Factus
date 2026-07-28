@@ -38,6 +38,7 @@ impl Plugin for UiPlugin {
                     drag_windows,
                     close_windows,
                     scroll_regions,
+                    switch_tabs,
                     speak,
                     float_bubbles,
                 ),
@@ -753,10 +754,13 @@ pub fn split_view(commands: &mut Commands, title: &str, list_width: f32, height:
                 height: percent(100),
                 flex_direction: FlexDirection::Column,
                 row_gap: px(theme::GAP),
-                // Content never bleeds past the window; it is cut at the sill.
-                overflow: Overflow::clip(),
+                // Content never bleeds past the window - it scrolls.
+                overflow: Overflow::scroll_y(),
                 ..default()
             },
+            Scrollable,
+            ScrollPosition::DEFAULT,
+            Interaction::default(),
             ChildOf(row),
         ))
         .id();
@@ -894,6 +898,111 @@ pub fn gauge_row(commands: &mut Commands, parent: Entity, label_text: &str, colo
         ))
         .id();
     Gauge { fill, value }
+}
+
+/// One tab button in a bar; clicking it shows its page and hides its
+/// siblings' pages.
+#[derive(Component)]
+pub struct TabButton {
+    pub bar: Entity,
+    pub page: Entity,
+}
+
+/// A tabbed row plus one content page per label. The first tab starts
+/// active. Pages are plain columns the caller fills.
+pub fn tab_bar(commands: &mut Commands, parent: Entity, labels: &[&str]) -> Vec<Entity> {
+    let bar = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                flex_direction: FlexDirection::Row,
+                column_gap: px(4),
+                margin: UiRect::bottom(px(4)),
+                ..default()
+            },
+            ChildOf(parent),
+        ))
+        .id();
+    let mut pages = Vec::with_capacity(labels.len());
+    for (index, label_text) in labels.iter().enumerate() {
+        let page = commands
+            .spawn((
+                Node {
+                    width: percent(100),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: px(theme::GAP),
+                    display: if index == 0 {
+                        Display::Flex
+                    } else {
+                        Display::None
+                    },
+                    ..default()
+                },
+                ChildOf(parent),
+            ))
+            .id();
+        let button = commands
+            .spawn((
+                TabButton { bar, page },
+                UiButton,
+                Node {
+                    padding: UiRect::axes(px(12), px(4)),
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::top(px(5)),
+                    ..default()
+                },
+                BorderColor::all(if index == 0 {
+                    theme::accent().with_alpha(0.6)
+                } else {
+                    theme::panel_border()
+                }),
+                Interaction::default(),
+                ChildOf(bar),
+            ))
+            .id();
+        commands.spawn((
+            Text::new(*label_text),
+            TextFont {
+                font_size: FontSize::Px(theme::SMALL_SIZE),
+                ..default()
+            },
+            TextColor(theme::accent()),
+            ChildOf(button),
+        ));
+        pages.push(page);
+    }
+    pages
+}
+
+/// Tab clicks swap the visible page within their bar.
+#[allow(clippy::type_complexity)]
+pub fn switch_tabs(
+    clicked: Query<(Entity, &Interaction, &TabButton), Changed<Interaction>>,
+    all_tabs: Query<(Entity, &TabButton)>,
+    mut pages: Query<&mut Node, Without<TabButton>>,
+    mut borders: Query<&mut BorderColor, With<TabButton>>,
+) {
+    for (pressed, interaction, tab) in &clicked {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        for (other, sibling) in &all_tabs {
+            if sibling.bar != tab.bar {
+                continue;
+            }
+            let active = other == pressed;
+            if let Ok(mut node) = pages.get_mut(sibling.page) {
+                node.display = if active { Display::Flex } else { Display::None };
+            }
+            if let Ok(mut border) = borders.get_mut(other) {
+                *border = BorderColor::all(if active {
+                    theme::accent().with_alpha(0.6)
+                } else {
+                    theme::panel_border()
+                });
+            }
+        }
+    }
 }
 
 /// A ruled section header: a hairline, the label in gold, a hairline. The

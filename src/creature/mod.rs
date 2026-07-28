@@ -40,6 +40,7 @@ impl Plugin for CreaturePlugin {
                     keep_apart,
                     drowning,
                     carrion_fades,
+                    hurt_flashes,
                     apply_ballistics,
                     wildlife::wild_hunger,
                     wildlife::graze_and_flee,
@@ -72,6 +73,8 @@ pub struct Creature;
 pub struct Vitality {
     /// 0 healthy, 1 dead.
     pub harm: f32,
+    /// Harm as of last frame, so the flash knows a fresh wound from an old one.
+    pub last_harm: f32,
     /// Whether the killing blow, if it comes now, was violence rather than want.
     /// Doctrine will care about the difference; the dead do not.
     pub violent: bool,
@@ -345,11 +348,94 @@ fn locomotion(
         }
         if motion.swim > 0.5 {
             transform.translation.y = surface - 0.45;
+        } else if depth > 0.0 {
+            // Wading: the feet find the seabed and the water climbs the
+            // body, instead of the old film-walking on the surface.
+            transform.translation.y = floor;
         } else {
-            transform.translation.y = floor.max(WATER_LEVEL);
+            transform.translation.y = floor;
         }
 
         motion.speed = speed;
+    }
+}
+
+/// A translucent red shell flashed around a body the moment it takes harm.
+/// The body materials are shared across every creature, so the flash is its
+/// own short-lived thing rather than a tint.
+#[derive(Component)]
+pub struct HurtFlash {
+    remaining: f32,
+}
+
+/// Marks the flash shell mesh itself.
+#[derive(Component)]
+struct FlashShell;
+
+#[allow(clippy::type_complexity)]
+fn hurt_flashes(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut hurt: Query<
+        (
+            Entity,
+            &mut Vitality,
+            &CreatureGenome,
+            Option<&mut HurtFlash>,
+        ),
+        (With<Creature>, Without<Corpse>),
+    >,
+    shells: Query<(Entity, &ChildOf), With<FlashShell>>,
+) {
+    let dt = time.delta_secs();
+    for (entity, mut vitality, genome, flash) in &mut hurt {
+        let harm = vitality.harm;
+        let fresh = harm > vitality.last_harm + 0.01;
+        vitality.last_harm = harm;
+        match flash {
+            Some(mut flash) => {
+                if fresh {
+                    flash.remaining = 0.22;
+                } else {
+                    flash.remaining -= dt;
+                    if flash.remaining <= 0.0 {
+                        commands.entity(entity).remove::<HurtFlash>();
+                        for (shell, childof) in &shells {
+                            if childof.parent() == entity {
+                                commands.entity(shell).despawn();
+                            }
+                        }
+                    }
+                }
+            }
+            None if fresh => {
+                commands
+                    .entity(entity)
+                    .insert(HurtFlash { remaining: 0.22 });
+                let height = genome.height();
+                commands.spawn((
+                    FlashShell,
+                    Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        base_color:
+                            crate::palette::shade(&crate::palette::CLOTH_RED, 0.85).with_alpha(0.4),
+                        alpha_mode: AlphaMode::Blend,
+                        unlit: true,
+                        ..default()
+                    })),
+                    Transform::from_xyz(0.0, height * 0.55, 0.0).with_scale(Vec3::new(
+                        height * 0.62,
+                        height * 1.12,
+                        height * 0.52,
+                    )),
+                    bevy::light::NotShadowCaster,
+                    ChildOf(entity),
+                ));
+            }
+            None => {}
+        }
     }
 }
 
@@ -762,6 +848,7 @@ mod tests {
                 Vitality {
                     harm: 1.0,
                     violent: true,
+                    ..default()
                 },
             ))
             .id();

@@ -745,12 +745,16 @@ fn ui_cursor_placement(camera: &CameraRig, ray: Ray3d, tap: f32) -> (Vec3, Quat)
         * Quat::from_rotation_y(0.25)
         * Quat::from_rotation_x(-0.15);
 
-    // Park the *fingertip* on the cursor, not the palm. Measured from the
-    // model, not guessed: the index knuckle sits at x -0.36, z -0.42, and the
-    // two straightened segments reach 0.52 + 0.416 further — the old guess
-    // used the wrong finger's x and left the drawn tip a cursor-width off
-    // the real click point.
-    let fingertip_local = Vec3::new(-0.36, -0.02, -1.36) * UI_CURSOR_SCALE;
+    // Park the *fingertip* on the cursor, not the palm — computed from the
+    // finger's real joint chain, including however far the current tap has
+    // curled it, so the tip stays glued to the click point mid-press.
+    let proximal = 0.04 + tap * 0.42;
+    let distal = proximal + 0.03 + tap * 0.5;
+    let fingertip_local = Vec3::new(
+        -0.36,
+        -(0.52 * proximal.sin() + 0.416 * distal.sin()),
+        -(0.42 + 0.52 * proximal.cos() + 0.416 * distal.cos()),
+    ) * UI_CURSOR_SCALE;
     let position = ray.origin + *ray.direction * UI_CURSOR_DEPTH - rotation * fingertip_local;
 
     (position, rotation)

@@ -73,23 +73,30 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     color += sky.horizon.rgb * pow(toward_sun, 7.0) * 0.20 * daylight;
 
     // The night: stars prick through as the daylight drains, and the moon
-    // rides opposite the sun, so it rises as the sun sets.
+    // rides opposite the sun - it moves all night, mirroring the sun's arc.
     let night = 1.0 - smoothstep(0.05, 0.35, daylight);
-    if (night > 0.0 && elevation > 0.02) {
-        // Stars: a hash over a coarse celestial grid; only the brightest
-        // cells light, so the field is sparse and steady. Twinkle is subtle.
-        let cell = floor(dir.xz / (elevation + 0.15) * 42.0);
-        let h = fract(sin(dot(cell, vec2<f32>(127.1, 311.7))) * 43758.5453);
-        let sparkle = 0.85 + 0.15 * sin(sky.misc.x * (1.5 + h * 3.0) + h * 40.0);
-        let star = smoothstep(0.985, 0.999, h) * sparkle;
-        color += vec3<f32>(0.9, 0.93, 1.0) * star * night * 0.85;
+    if (night > 0.0 && elevation > 0.01) {
+        // Stars on the celestial sphere itself: cells in longitude/latitude,
+        // so the field is even from horizon to zenith with no smearing. The
+        // hash avoids large sin() arguments, which lose precision on GPUs
+        // and were erasing whole bands of sky.
+        let sph = vec2<f32>(atan2(dir.z, dir.x), asin(clamp(dir.y, -1.0, 1.0)));
+        let cell = floor(sph * vec2<f32>(64.0, 44.0));
+        var p3 = fract(vec3<f32>(cell.xyx) * 0.1031);
+        p3 += dot(p3, p3.yzx + 33.33);
+        let h = fract((p3.x + p3.y) * p3.z);
+        let sparkle = 0.82 + 0.18 * sin(sky.misc.x * (1.0 + h * 3.0) + h * 40.0);
+        let horizon_fade = smoothstep(0.02, 0.14, elevation);
+        let star = smoothstep(0.978, 0.997, h) * sparkle * horizon_fade;
+        color += vec3<f32>(0.9, 0.93, 1.0) * star * night * 0.9;
 
-        // The moon: a pale disc with a soft halo, anti-sunward.
-        let moon_dir = normalize(vec3<f32>(-sky.sun_dir.x, abs(sky.sun_dir.y), -sky.sun_dir.z));
+        // The moon: a pale disc with a soft halo, exactly anti-sunward, so
+        // it climbs while the sun sinks and sets as morning comes.
+        let moon_dir = normalize(-sky.sun_dir.xyz);
         let toward_moon = max(dot(dir, moon_dir), 0.0);
-        let disc = smoothstep(0.9996, 0.99985, toward_moon);
-        let halo = pow(toward_moon, 220.0) * 0.18;
-        color += (vec3<f32>(0.86, 0.88, 0.92) * disc + vec3<f32>(0.6, 0.65, 0.78) * halo)
+        let disc = smoothstep(0.99955, 0.99985, toward_moon);
+        let halo = pow(toward_moon, 260.0) * 0.16;
+        color += (vec3<f32>(0.88, 0.9, 0.94) * disc + vec3<f32>(0.6, 0.65, 0.78) * halo)
             * night;
     }
 
