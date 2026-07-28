@@ -253,6 +253,7 @@ fn plan_routes(
 fn locomotion(
     time: Res<Time>,
     terrain: Option<Res<Terrain>>,
+    trails: Option<Res<crate::trails::Trails>>,
     mut creatures: Query<
         (
             &CreatureGenome,
@@ -314,9 +315,13 @@ fn locomotion(
                 let direction = to_target / distance;
 
                 // Ease into and out of the destination rather than starting and
-                // stopping instantly.
+                // stopping instantly. Worn trails are quicker underfoot —
+                // the village's own habits pave its shortcuts.
                 let approach = (distance / (genome.height() * 2.0)).clamp(0.25, 1.0);
-                speed = genome.walk_speed() * approach * vigor;
+                let paved = trails.as_ref().map_or(1.0, |t| {
+                    t.haste(transform.translation.x, transform.translation.z)
+                });
+                speed = genome.walk_speed() * approach * vigor * paved;
 
                 // Swimming is slow: most of the stride is lost to the water.
                 let step = (speed * dt).min(distance) * (1.0 - motion.swim * 0.55);

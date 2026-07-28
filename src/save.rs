@@ -149,6 +149,9 @@ struct SaveGame {
     boulders: Vec<(Vec3, Vec3)>,
     #[serde(default)]
     weather: (f32, f32, f64),
+    /// Worn ground: (cell x, cell z, wear).
+    #[serde(default)]
+    trails: Vec<(i32, i32, f32)>,
 }
 
 fn slots_dir() -> std::path::PathBuf {
@@ -614,6 +617,9 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         weather: world
             .get_resource::<crate::weather::Weather>()
             .map_or((0.15, 0.15, 0.0), |w| (w.intensity, w.target, w.next_front)),
+        trails: world
+            .get_resource::<crate::trails::Trails>()
+            .map_or_else(Vec::new, |t| t.export()),
     })
 }
 
@@ -639,6 +645,7 @@ fn apply(world: &mut World, save: SaveGame) {
     sweep!(TerrainChunk);
     sweep!(crate::matter::Boulder);
     sweep!(crate::matter::Matter);
+    sweep!(crate::trails::TrailPatch);
     doomed.sort();
     doomed.dedup();
     for entity in doomed {
@@ -717,6 +724,9 @@ fn apply(world: &mut World, save: SaveGame) {
     world.insert_resource(crate::villager::work::KitchenWarm {
         until: save.kitchen_until,
     });
+    if let Some(mut trails) = world.get_resource_mut::<crate::trails::Trails>() {
+        trails.restore(save.trails.iter().copied());
+    }
     world.insert_resource(crate::weather::Weather {
         intensity: save.weather.0,
         target: save.weather.1,

@@ -21,6 +21,7 @@ mod scatter;
 mod sky;
 mod terrain;
 mod title;
+mod trails;
 mod ui;
 mod villager;
 mod water;
@@ -137,6 +138,7 @@ fn main() {
             matter::MatterPlugin,
             save::SavePlugin,
             weather::WeatherPlugin,
+            trails::TrailsPlugin,
         ))
         .add_systems(Startup, spawn_lighting)
         .run();
