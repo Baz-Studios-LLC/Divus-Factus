@@ -1,0 +1,202 @@
+//! Traits: the grain of a person, for better and worse.
+//!
+//! A trait earns its place only if systems read it. Every one here bends a
+//! real mechanic — how fast they work, how hard belief lands, how quickly
+//! the heart mends, how often they talk, how much they eat — so two
+//! villagers with the same job and the same day live it differently. The
+//! inspector speaks them as manner ("diligent, and a glutton"), and small
+//! talk lets them confess themselves.
+
+use bevy::prelude::*;
+
+use crate::rng::Rng;
+
+/// One inclination, virtue or flaw.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Trait {
+    // Virtues.
+    Diligent,
+    Devout,
+    Cheerful,
+    Chatty,
+    Hardy,
+    // Flaws.
+    Slothful,
+    Skeptic,
+    Gloomy,
+    Quiet,
+    Glutton,
+}
+
+impl Trait {
+    pub fn word(self) -> &'static str {
+        match self {
+            Trait::Diligent => "diligent",
+            Trait::Devout => "devout",
+            Trait::Cheerful => "cheerful",
+            Trait::Chatty => "chatty",
+            Trait::Hardy => "hardy",
+            Trait::Slothful => "slothful",
+            Trait::Skeptic => "a skeptic",
+            Trait::Gloomy => "gloomy",
+            Trait::Quiet => "quiet",
+            Trait::Glutton => "a glutton",
+        }
+    }
+}
+
+/// The traits a person carries: at most one virtue and one flaw, rolled at
+/// birth and kept for life.
+#[derive(Component, Debug, Default)]
+pub struct Traits(pub Vec<Trait>);
+
+impl Traits {
+    pub fn roll(rng: &mut Rng) -> Self {
+        const VIRTUES: [Trait; 5] = [
+            Trait::Diligent,
+            Trait::Devout,
+            Trait::Cheerful,
+            Trait::Chatty,
+            Trait::Hardy,
+        ];
+        const FLAWS: [Trait; 5] = [
+            Trait::Slothful,
+            Trait::Skeptic,
+            Trait::Gloomy,
+            Trait::Quiet,
+            Trait::Glutton,
+        ];
+        let mut traits = Vec::with_capacity(2);
+        if rng.chance(0.55) {
+            traits.push(*rng.pick(&VIRTUES));
+        }
+        if rng.chance(0.55) {
+            let flaw = *rng.pick(&FLAWS);
+            // A person is not their own opposite.
+            let clashes = matches!(
+                (traits.first(), flaw),
+                (Some(Trait::Diligent), Trait::Slothful)
+                    | (Some(Trait::Devout), Trait::Skeptic)
+                    | (Some(Trait::Cheerful), Trait::Gloomy)
+                    | (Some(Trait::Chatty), Trait::Quiet)
+            );
+            if !clashes {
+                traits.push(flaw);
+            }
+        }
+        Traits(traits)
+    }
+
+    pub fn has(&self, wanted: Trait) -> bool {
+        self.0.contains(&wanted)
+    }
+
+    /// The manner line the inspector shows: "diligent, and a glutton".
+    pub fn describe(&self) -> String {
+        match self.0.as_slice() {
+            [] => "unremarkable".to_string(),
+            [one] => one.word().to_string(),
+            [a, b] => format!("{}, and {}", a.word(), b.word()),
+            more => more.iter().map(|t| t.word()).collect::<Vec<_>>().join(", "),
+        }
+    }
+
+    /// Multiplier on a work cycle: the diligent finish sooner.
+    pub fn work_pace(&self) -> f32 {
+        if self.has(Trait::Diligent) {
+            0.8
+        } else if self.has(Trait::Slothful) {
+            1.3
+        } else {
+            1.0
+        }
+    }
+
+    /// Multiplier on every faith movement, up or down.
+    pub fn conviction(&self) -> f32 {
+        if self.has(Trait::Devout) {
+            1.5
+        } else if self.has(Trait::Skeptic) {
+            0.5
+        } else {
+            1.0
+        }
+    }
+
+    /// Multiplier on spirits recovery.
+    pub fn brightness(&self) -> f32 {
+        if self.has(Trait::Cheerful) {
+            1.5
+        } else if self.has(Trait::Gloomy) {
+            0.6
+        } else {
+            1.0
+        }
+    }
+
+    /// Chance multiplier on choosing to tell a story.
+    pub fn talkativeness(&self) -> f32 {
+        if self.has(Trait::Chatty) {
+            1.8
+        } else if self.has(Trait::Quiet) {
+            0.35
+        } else {
+            1.0
+        }
+    }
+
+    /// Multiplier on the day's wear (rest drain).
+    pub fn endurance(&self) -> f32 {
+        if self.has(Trait::Hardy) { 0.75 } else { 1.0 }
+    }
+
+    /// Multiplier on food drawn per meal.
+    pub fn appetite(&self) -> f32 {
+        if self.has(Trait::Glutton) { 1.4 } else { 1.0 }
+    }
+
+    /// Small-talk lines this manner offers.
+    pub fn lines(&self) -> Vec<&'static str> {
+        let mut lines = Vec::new();
+        for t in &self.0 {
+            lines.extend_from_slice(match t {
+                Trait::Diligent => &["idle hands itch", "the work does not do itself"][..],
+                Trait::Devout => &["I said my thanks this morning", "nothing happens unwatched"],
+                Trait::Cheerful => &[
+                    "could be worse, could be raining",
+                    "smile, it costs nothing",
+                ],
+                Trait::Chatty => &[
+                    "did you hear about the fisher",
+                    "stop me if I told you this",
+                ],
+                Trait::Hardy => &["cold never hurt anyone", "I have walked further on less"],
+                Trait::Slothful => &["it will keep until tomorrow", "why stand when you can sit"],
+                Trait::Skeptic => &["I believe what I can bite", "coincidence wears many masks"],
+                Trait::Gloomy => &["it will probably rain", "good times never last"],
+                Trait::Quiet => &["mm", "the wind says enough"],
+                Trait::Glutton => &["I think about supper all day", "one more helping, then"],
+            });
+        }
+        lines
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn no_one_is_their_own_opposite() {
+        let mut rng = Rng::new(41);
+        for _ in 0..500 {
+            let traits = Traits::roll(&mut rng);
+            assert!(traits.0.len() <= 2);
+            let clash = (traits.has(Trait::Diligent) && traits.has(Trait::Slothful))
+                || (traits.has(Trait::Devout) && traits.has(Trait::Skeptic))
+                || (traits.has(Trait::Cheerful) && traits.has(Trait::Gloomy))
+                || (traits.has(Trait::Chatty) && traits.has(Trait::Quiet));
+            assert!(!clash, "rolled a contradiction: {:?}", traits.0);
+        }
+    }
+}
