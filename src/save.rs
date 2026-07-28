@@ -194,6 +194,21 @@ fn process_requests(world: &mut World) {
         match read_slot(slot) {
             Ok(save) => {
                 apply(world, save);
+                world.resource_mut::<Time<Virtual>>().unpause();
+                let panels: Vec<Entity> = world
+                    .query_filtered::<Entity, With<SavesPanel>>()
+                    .iter(world)
+                    .collect();
+                for panel in panels {
+                    world.entity_mut(panel).insert(Visibility::Hidden);
+                }
+                let menus: Vec<Entity> = world
+                    .query_filtered::<Entity, With<crate::title::PauseMenu>>()
+                    .iter(world)
+                    .collect();
+                for menu in menus {
+                    world.entity_mut(menu).insert(Visibility::Hidden);
+                }
                 world.write_message(ui::Notice::fanfare(format!(
                     "The world returns as it was - slot {slot}"
                 )));

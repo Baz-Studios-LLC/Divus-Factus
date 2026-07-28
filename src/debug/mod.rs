@@ -59,7 +59,6 @@ impl Plugin for DebugPlugin {
             .add_systems(
                 Update,
                 (
-                    toggle_saves,
                     update_faith_roster,
                     capture_preselect,
                     style_roster_rows,
@@ -343,28 +342,6 @@ struct RowFace {
 /// The big centred village ledger.
 #[derive(Component)]
 struct VillagePanel;
-
-/// The toolbar button for the saves window.
-#[derive(Component)]
-struct SavesButton;
-
-/// The disk button toggles the saves window.
-fn toggle_saves(
-    buttons: Query<&Interaction, (Changed<Interaction>, With<SavesButton>)>,
-    mut panels: Query<&mut Visibility, With<crate::save::SavesPanel>>,
-) {
-    for interaction in &buttons {
-        if *interaction == Interaction::Pressed {
-            for mut visibility in &mut panels {
-                *visibility = if *visibility == Visibility::Hidden {
-                    Visibility::Visible
-                } else {
-                    Visibility::Hidden
-                };
-            }
-        }
-    }
-}
 
 /// Its toolbar button.
 #[derive(Component)]
@@ -812,34 +789,6 @@ fn spawn_toolbar(mut commands: Commands) {
             ))
             .id();
         commands.entity(bar_node).insert(ChildOf(village));
-    }
-
-    // The saves button: a floppy-ish disk - a square with a notched label.
-    let saves = ui::icon_button(&mut commands, bar);
-    commands.entity(saves).insert(SavesButton);
-    for (left, top, width, height, bright) in [
-        (8.0, 7.0, 17.0, 19.0, false),
-        (12.0, 7.0, 9.0, 7.0, true),
-        (11.0, 17.0, 11.0, 7.0, true),
-    ] {
-        let piece = commands
-            .spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: px(left),
-                    top: px(top),
-                    width: px(width),
-                    height: px(height),
-                    ..default()
-                },
-                BackgroundColor(if bright {
-                    ui::theme::accent()
-                } else {
-                    ui::theme::text_dim()
-                }),
-            ))
-            .id();
-        commands.entity(piece).insert(ChildOf(saves));
     }
 
     // The world button: a globe, drawn as a ringed circle with a belt.

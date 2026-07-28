@@ -45,7 +45,7 @@ struct LoadGameButton;
 
 /// The in-game pause menu and its buttons.
 #[derive(Component)]
-struct PauseMenu;
+pub struct PauseMenu;
 
 #[derive(Component)]
 struct ResumeButton;
@@ -55,6 +55,9 @@ struct PauseSettingsButton;
 
 #[derive(Component)]
 struct ExitButton;
+
+#[derive(Component)]
+struct PauseSavesButton;
 
 /// The settings overlay, above the title.
 #[derive(Component)]
@@ -197,6 +200,8 @@ fn toggle_pause_menu(
             commands.entity(resume).insert(ResumeButton);
             let settings = menu_button(&mut commands, window.body, "Settings");
             commands.entity(settings).insert(PauseSettingsButton);
+            let saves = menu_button(&mut commands, window.body, "Saves");
+            commands.entity(saves).insert(PauseSavesButton);
             let exit = menu_button(&mut commands, window.body, "Exit Game");
             commands.entity(exit).insert(ExitButton);
             time.pause();
@@ -210,6 +215,8 @@ fn handle_pause_menu(
     mut commands: Commands,
     resume: Query<&Interaction, (Changed<Interaction>, With<ResumeButton>)>,
     settings: Query<&Interaction, (Changed<Interaction>, With<PauseSettingsButton>)>,
+    saves: Query<&Interaction, (Changed<Interaction>, With<PauseSavesButton>)>,
+    mut saves_panels: Query<&mut Visibility, With<crate::save::SavesPanel>>,
     exit: Query<&Interaction, (Changed<Interaction>, With<ExitButton>)>,
     open_settings: Query<Entity, With<SettingsScreen>>,
     menus: Query<Entity, With<PauseMenu>>,
@@ -227,6 +234,13 @@ fn handle_pause_menu(
     for interaction in &settings {
         if *interaction == Interaction::Pressed && open_settings.is_empty() {
             commands.run_system_cached(spawn_settings);
+        }
+    }
+    for interaction in &saves {
+        if *interaction == Interaction::Pressed {
+            for mut visibility in &mut saves_panels {
+                *visibility = Visibility::Visible;
+            }
         }
     }
     for interaction in &exit {
