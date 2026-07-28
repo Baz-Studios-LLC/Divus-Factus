@@ -1244,6 +1244,9 @@ pub struct Conversing {
     pub spoke_at: Option<f64>,
     pub replied: bool,
     pub kind: Option<crate::witness::DivineEventKind>,
+    /// What the other party is telling — so a listener who saw the same
+    /// thing can answer as a fellow witness, not a doubter.
+    pub hearing: Option<crate::witness::DivineEventKind>,
 }
 
 /// Whoever has news finds an idle neighbour and goes TO them: both stop,
@@ -1291,8 +1294,13 @@ fn meet_to_talk(
         if !matches!(*activity, Activity::Idle | Activity::Wandering) {
             continue;
         }
+        // A story wears out in its own telling: each retelling cools the
+        // urge until only the chattiest still bother — and a fresh sight
+        // winds the whole square back up. Without this, one smite kept
+        // every witness retelling it in a loop forever.
         let tongue = manner.map_or(1.0, |m| m.talkativeness());
-        if !rng.0.chance((0.4 * tongue).min(0.95)) {
+        let fatigue = 1.0 / (1.0 + witnessed.told as f32 * 0.8);
+        if !rng.0.chance((0.4 * tongue * fatigue).min(0.95)) {
             continue;
         }
         // The nearest idle neighbour becomes the audience.
@@ -1319,6 +1327,7 @@ fn meet_to_talk(
                 spoke_at: None,
                 replied: false,
                 kind: Some(kind),
+                hearing: None,
             },
             Activity::Chatting,
         ));
@@ -1329,6 +1338,7 @@ fn meet_to_talk(
                 spoke_at: None,
                 replied: false,
                 kind: None,
+                hearing: Some(kind),
             },
             Activity::Chatting,
         ));
@@ -1400,7 +1410,8 @@ fn hold_conversations(
                 .get(entity)
                 .map(|(p, ..)| p.name.clone())
                 .unwrap_or_default();
-            let told = kind.rumor().replace("the god", god);
+            // The same story never wears the same words twice in a row.
+            let told = (*rng.0.pick(kind.rumors())).replace("the god", god);
             say.write(crate::ui::Say {
                 speaker: entity,
                 text: told.clone(),
@@ -1420,17 +1431,45 @@ fn hold_conversations(
                 }
                 let _ = listener_person;
             }
+            // The telling itself spends the teller's fire.
+            if let Ok((_, mut own_witnessed, _, _)) = minds.get_mut(entity) {
+                own_witnessed.told = own_witnessed.told.saturating_add(1);
+            }
         }
         // The reply, a beat after the meeting settles, from the listener.
         if talk.kind.is_none() && !talk.replied && clock.elapsed > talk.until - 9.0 {
             talk.replied = true;
-            let reply = *rng.0.pick(&[
-                "truly?",
-                "I half believe it",
-                "the god again...",
-                "so the stories are true",
-                "keep your voice down",
-            ]);
+            // A listener who stood there too answers as a fellow witness,
+            // not a doubter — shared awe, not scepticism.
+            let saw_it_too = talk.hearing.is_some_and(|kind| {
+                minds
+                    .get(entity)
+                    .is_ok_and(|(_, witnessed, _, _)| witnessed.recent.contains(&kind))
+            });
+            let reply = if saw_it_too {
+                *rng.0.pick(&[
+                    "I saw it too - I can still hardly breathe",
+                    "you too? I thought my eyes had broken",
+                    "I was THERE - every word of it is true",
+                    "no story. I stood right beside you",
+                    "I have thought of nothing else since",
+                    "we saw it together - who will believe us",
+                ])
+            } else {
+                *rng.0.pick(&[
+                    "truly?",
+                    "I half believe it",
+                    "the god again...",
+                    "so the stories are true",
+                    "keep your voice down",
+                    "who else knows of this?",
+                    "you swear it?",
+                    "stranger things have happened here",
+                    "tell it again, slower",
+                    "do not spread that too far",
+                    "I will believe it when I see it",
+                ])
+            };
             say.write(crate::ui::Say {
                 speaker: entity,
                 text: reply.replace("the god", god),
@@ -1952,6 +1991,7 @@ mod tests {
                 recent: vec![crate::witness::DivineEventKind::Thrown],
                 total: 1,
                 secondhand: 0,
+                told: 0,
             },
             Chronicle::default(),
         ));

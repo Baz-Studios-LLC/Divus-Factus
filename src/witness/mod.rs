@@ -125,16 +125,63 @@ impl DivineEventKind {
     /// The same act, retold. A rumour is a witness account with the witness
     /// removed — which is exactly how religions start.
     pub fn rumor(self) -> &'static str {
+        self.rumors()[0]
+    }
+
+    /// Every phrasing a story wears in the telling. A miracle retold by a
+    /// dozen mouths must not sound like one mouth a dozen times.
+    pub fn rumors(self) -> &'static [&'static str] {
         match self {
-            DivineEventKind::Lifted => "something lifted a man into the empty air",
-            DivineEventKind::Thrown => "something hurled a man across the land",
-            DivineEventKind::SetDown => "something carried a man and set him down unharmed",
-            DivineEventKind::Impact => "a man was dashed against the earth",
-            DivineEventKind::Provided => "the god set food before the starving",
-            DivineEventKind::Smote => "the sky itself struck at the god's word",
-            DivineEventKind::Uprooted => "the god pulled a tree from the ground like a weed",
-            DivineEventKind::Mended => "the god knit a broken body whole",
-            DivineEventKind::Quaked => "the ground itself buckled at the god's anger",
+            DivineEventKind::Lifted => &[
+                "something lifted a man into the empty air",
+                "he just rose, feet kicking at nothing",
+                "the air itself took hold of him, I saw it",
+                "picked up like a doll, he was",
+            ],
+            DivineEventKind::Thrown => &[
+                "something hurled a man across the land",
+                "he flew further than any man should",
+                "flung like a stone from a sling, screaming the whole way",
+                "one moment standing, the next a speck against the sky",
+            ],
+            DivineEventKind::SetDown => &[
+                "something carried a man and set him down unharmed",
+                "carried the whole way and placed like an egg in straw",
+                "set down soft as a leaf, not a scratch on him",
+            ],
+            DivineEventKind::Impact => &[
+                "a man was dashed against the earth",
+                "the ground met him harder than any fall",
+                "thrown down like washing on a stone",
+            ],
+            DivineEventKind::Provided => &[
+                "the god set food before the starving",
+                "food from nowhere, laid out like a table",
+                "the larder was empty and then it was not",
+                "we were hungry and something answered",
+            ],
+            DivineEventKind::Smote => &[
+                "the sky itself struck at the god's word",
+                "fire came down and the ground still smokes",
+                "one bolt, out of a sky with no storm in it",
+                "the flash left its shape behind my eyes",
+                "struck - like a hammer through the clouds",
+            ],
+            DivineEventKind::Uprooted => &[
+                "the god pulled a tree from the ground like a weed",
+                "a whole oak, roots and all, into the air",
+                "the tree screamed at the roots, I heard it",
+            ],
+            DivineEventKind::Mended => &[
+                "the god knit a broken body whole",
+                "wounds closed like water smoothing over",
+                "he was dying, and then he simply was not",
+            ],
+            DivineEventKind::Quaked => &[
+                "the ground itself buckled at the god's anger",
+                "the earth rolled like a shaken rug",
+                "cracks opened where the god's finger fell",
+            ],
         }
     }
 }
@@ -209,6 +256,10 @@ pub struct Witnessed {
     pub total: u32,
     /// Stories heard from others, never seen with their own eyes.
     pub secondhand: u32,
+    /// How many times they have told their story. Enthusiasm for the
+    /// retelling wears out; a fresh sight winds it back up.
+    #[serde(default)]
+    pub told: u32,
 }
 
 impl Witnessed {
@@ -219,6 +270,8 @@ impl Witnessed {
         self.recent.insert(0, kind);
         self.recent.truncate(Self::CAPACITY);
         self.total = self.total.saturating_add(1);
+        // A fresh sight rekindles the urge to tell it.
+        self.told = 0;
     }
 
     /// Whether this person has ever seen anything at all.

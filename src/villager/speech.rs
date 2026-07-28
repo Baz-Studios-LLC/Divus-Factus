@@ -2,19 +2,25 @@
 //!
 //! Small talk is the simulation showing through: every line a villager
 //! offers is grounded in something true about them right now — their belly,
-//! their bed, their marriage, their god, their trade, the hour. The picker
-//! is a weighted draw over every line their state makes available, so the
-//! pressing things come up more, but nobody is reduced to one complaint.
+//! their bed, their marriage, their god, their trade, the hour, the sky. The
+//! picker is a weighted draw over every line their state makes available, so
+//! the pressing things come up more, but nobody is reduced to one complaint.
+//! And nobody repeats themselves while they still have something fresh to
+//! say: each person remembers their own recent lines, and the village
+//! remembers what anyone said lately, so the same proverb never does two
+//! laps of the square in a morning.
 
 use bevy::prelude::*;
 
 use crate::creature::genome::{Age, CreatureGenome};
 use crate::creature::{Corpse, Held, Vitality};
 use crate::rng::Rng;
+use crate::weather::WeatherKind;
 
 use super::{Activity, EARSHOT, Morale, Needs, SimRng, Spouse, Villager, home, work};
 
 /// One candidate line with how loudly it asks to be said.
+#[derive(Clone, Copy)]
 struct Line(&'static str, f32);
 
 /// Gathers every line this person's state can truthfully offer.
@@ -32,8 +38,9 @@ fn candidates(
     vocation: Option<&work::Vocation>,
     activity: &Activity,
     hour: f32,
+    sky: Option<WeatherKind>,
 ) -> Vec<Line> {
-    let mut pool: Vec<Line> = Vec::with_capacity(24);
+    let mut pool: Vec<Line> = Vec::with_capacity(64);
     let mut add = |lines: &[&'static str], weight: f32| {
         for line in lines {
             pool.push(Line(line, weight));
@@ -48,13 +55,34 @@ fn candidates(
                 "when did I last eat",
                 "I could eat the whole harvest",
                 "hunger makes the day long",
+                "I would trade my boots for bread",
+                "my stomach growls louder than I talk",
+                "even the gulls eat better than me",
+                "thin soup and thinner hope",
             ],
             3.0,
         );
     } else if needs.hunger > 0.35 {
-        add(&["I could do with a bite", "is there bread left"], 1.5);
+        add(
+            &[
+                "I could do with a bite",
+                "is there bread left",
+                "something warm would go down well",
+                "a heel of bread would mend this morning",
+                "my thoughts keep drifting to the pot",
+            ],
+            1.5,
+        );
     } else if needs.hunger < 0.15 {
-        add(&["a full belly makes light work", "I ate well today"], 1.0);
+        add(
+            &[
+                "a full belly makes light work",
+                "I ate well today",
+                "no finer feeling than enough",
+                "I may never be hungry again",
+            ],
+            1.0,
+        );
     }
     if needs.rest > 0.75 {
         add(
@@ -62,6 +90,9 @@ fn candidates(
                 "I could sleep where I stand",
                 "my feet are done",
                 "this day has been three days long",
+                "my eyelids weigh like millstones",
+                "one more hour, then I drop",
+                "even my yawns are yawning",
             ],
             3.0,
         );
@@ -72,6 +103,9 @@ fn candidates(
                 "this wound is slow to mend",
                 "I ache where it caught me",
                 "the healer said rest, as if I could",
+                "it throbs when the weather turns",
+                "I will carry this scar a while",
+                "worse has healed, so will this",
             ],
             3.0,
         );
@@ -83,6 +117,9 @@ fn candidates(
             &[
                 "our roof held through the wind",
                 "home before dark, with luck",
+                "there is no sound like your own door",
+                "four walls turn a night into a rest",
+                "the hearth will be warm by now",
             ],
             0.8,
         );
@@ -93,6 +130,10 @@ fn candidates(
                 "a roof of my own, someday",
                 "the fire is warm, but it is not a home",
                 "I envy the housed their walls",
+                "the stars are poor company in the rain",
+                "I know every root in this ground by my back",
+                "timber and hands, that is all a house is",
+                "someday a door will close behind me",
             ],
             2.0,
         );
@@ -106,6 +147,10 @@ fn candidates(
                 "I hardly remember laughing",
                 "the days blur into one",
                 "something has to change",
+                "I carry more than I can name",
+                "even the birds sound tired",
+                "I smile so no one asks",
+                "tomorrow had better be kinder",
             ],
             2.5,
         );
@@ -116,6 +161,8 @@ fn candidates(
                 "I could sing, almost",
                 "no complaints today, none",
                 "life is good here",
+                "I woke up glad and stayed that way",
+                "we are luckier than we know",
             ],
             1.5,
         );
@@ -129,6 +176,9 @@ fn candidates(
                     "my love waits at home",
                     "we were wed under this same sky",
                     "marriage is work - good work",
+                    "I still catch myself smiling at them",
+                    "two are stronger than one and one",
+                    "I married better than I deserved",
                 ],
                 1.0,
             );
@@ -138,6 +188,8 @@ fn candidates(
                     "someone to come home to, that is all I ask",
                     "I saw them across the square again",
                     "perhaps at the fire tonight",
+                    "love finds the patient, they say",
+                    "I rehearsed a greeting all morning",
                 ],
                 1.2,
             );
@@ -152,6 +204,9 @@ fn candidates(
                 "I have seen all this before",
                 "the young walk so fast now",
                 "we built this from nothing, you know",
+                "I remember when this was all trees",
+                "my knees preach patience",
+                "half my friends live in the ground now",
             ],
             1.5,
         ),
@@ -161,6 +216,10 @@ fn candidates(
                 "I found a beetle this morning",
                 "race you to the banner",
                 "why is the sky blue and the sea not",
+                "I can hold my breath forever, watch",
+                "do fish sleep",
+                "I am not tired, I am NOT",
+                "when I am big I will build the tallest house",
             ],
             2.0,
         ),
@@ -175,6 +234,8 @@ fn candidates(
                 "I felt something near this morning",
                 "the god provides, in the end",
                 "we are not alone, I am sure of it",
+                "say what you like, the god listens",
+                "there is a hand over this village",
             ],
             1.5,
         ),
@@ -183,6 +244,9 @@ fn candidates(
                 "the sky is empty, I think",
                 "prayers cost nothing and buy the same",
                 "we are on our own out here",
+                "I have watched prayers go unanswered",
+                "luck wears a god's name here",
+                "show me, then I will kneel",
             ],
             1.5,
         ),
@@ -195,6 +259,8 @@ fn candidates(
                     "I know what I saw",
                     "I still see it when I close my eyes",
                     "no one believes me who was not there",
+                    "my hands have not stopped shaking",
+                    "I will tell my grandchildren about that",
                 ],
                 2.0,
             );
@@ -204,6 +270,8 @@ fn candidates(
                 &[
                     "everyone has a story of the god now",
                     "the tales grow with each telling",
+                    "I heard it thirdhand and still shivered",
+                    "half the square swears they saw it",
                 ],
                 1.0,
             );
@@ -221,6 +289,9 @@ fn candidates(
             &[
                 "the woods give good timber this season",
                 "a tree tells you where it wants to fall",
+                "sawdust in my beard again",
+                "you learn a forest by its silences",
+                "my axe knows the way home",
             ],
             trade_weight,
         ),
@@ -228,6 +299,9 @@ fn candidates(
             &[
                 "the water was kind today",
                 "you learn patience, or you learn hunger",
+                "the fish know my shadow by now",
+                "a red dawn keeps me ashore",
+                "nets mend faster with company",
             ],
             trade_weight,
         ),
@@ -235,32 +309,59 @@ fn candidates(
             &[
                 "the rows are coming up well",
                 "good soil forgives a bad farmer",
+                "rain does half my work",
+                "every seed is a small promise",
+                "the crows and I have an arrangement",
             ],
             trade_weight,
         ),
         Some(work::Vocation::Mason) => add(
-            &["good stone, this", "a foundation outlasts its house"],
+            &[
+                "good stone, this",
+                "a foundation outlasts its house",
+                "stone is honest, it never pretends",
+                "my hands are maps of every wall here",
+                "measure the stone twice, your fingers once",
+            ],
             trade_weight,
         ),
         Some(work::Vocation::Carpenter) => add(
-            &["that frame will outlive us all", "measure long, cut once"],
+            &[
+                "that frame will outlive us all",
+                "measure long, cut once",
+                "a true joint needs no nail",
+                "wood remembers every hurry",
+                "I dream in beams and pegs",
+            ],
             trade_weight,
         ),
         Some(work::Vocation::Hunter) => add(
             &[
                 "there are tracks by the ridge",
                 "the herd moved east in the night",
+                "the wind was wrong all morning",
+                "you eat what you outwit",
+                "still air, good hunting",
             ],
             trade_weight,
         ),
         Some(work::Vocation::Miner) => add(
-            &["the rock rings true", "stone keeps its secrets deep"],
+            &[
+                "the rock rings true",
+                "stone keeps its secrets deep",
+                "daylight looks strange after the seam",
+                "you listen to rock, or it surprises you",
+                "there is iron under this hill, I can smell it",
+            ],
             trade_weight,
         ),
         Some(work::Vocation::Gatherer) => add(
             &[
                 "the bushes are heavy this week",
                 "you take what the land offers",
+                "my basket knows the good spots",
+                "berries hide from the impatient",
+                "the sweet ones grow past the thorns",
             ],
             trade_weight,
         ),
@@ -268,21 +369,39 @@ fn candidates(
             &[
                 "the pot wants more than roots",
                 "everyone is brave until supper is late",
+                "salt would change our lives",
+                "a good broth forgives a hard day",
+                "I season by argument",
             ],
             trade_weight,
         ),
         Some(work::Vocation::Healer) => add(
-            &["rest is the best medicine", "half my work is listening"],
+            &[
+                "rest is the best medicine",
+                "half my work is listening",
+                "willow bark and patience",
+                "wash it, wrap it, leave it be",
+                "everyone heals at their own pace",
+            ],
             trade_weight,
         ),
         Some(work::Vocation::Priest) => add(
-            &["all of it means something", "the god hears more than words"],
+            &[
+                "all of it means something",
+                "the god hears more than words",
+                "doubt loudly, believe quietly",
+                "I keep the litany, the litany keeps me",
+                "every grave teaches the same sermon",
+            ],
             trade_weight,
         ),
         Some(work::Vocation::Explorer) => add(
             &[
                 "the world is wider than the fog",
                 "the cairns are not the end of anything",
+                "my feet itch past every marker",
+                "somewhere out there is the answer",
+                "maps lie, legs do not",
             ],
             trade_weight,
         ),
@@ -292,13 +411,77 @@ fn candidates(
     // The hour.
     if (0.25..0.4).contains(&hour) {
         add(
-            &["the dew is cold this morning", "a new day, same work"],
+            &[
+                "the dew is cold this morning",
+                "a new day, same work",
+                "the light comes up kind today",
+                "first one up sees the world unwrapped",
+            ],
             0.8,
         );
     } else if (0.6..0.75).contains(&hour) {
-        add(&["the light goes gold", "nearly time for the fire"], 0.8);
+        add(
+            &[
+                "the light goes gold",
+                "nearly time for the fire",
+                "the day folds itself away",
+                "supper smoke on the wind",
+            ],
+            0.8,
+        );
     } else if !(0.25..0.75).contains(&hour) {
-        add(&["the stars are out", "quiet, now"], 0.8);
+        add(
+            &[
+                "the stars are out",
+                "quiet, now",
+                "the village breathes slower at night",
+                "night makes every sound a story",
+            ],
+            0.8,
+        );
+    }
+
+    // The sky over everyone's head is everyone's business.
+    match sky {
+        Some(WeatherKind::Rain) => add(
+            &[
+                "this rain finds every seam",
+                "wet to the bone again",
+                "the fields drink well today",
+                "my boots may never dry",
+                "smell that - wet earth",
+            ],
+            1.6,
+        ),
+        Some(WeatherKind::Storm) => add(
+            &[
+                "no one should be out in this",
+                "that sky is furious",
+                "count between the flash and the roar",
+                "the wind wants my roof",
+                "storms make believers, they say",
+            ],
+            2.2,
+        ),
+        Some(WeatherKind::Overcast) => add(
+            &[
+                "grey as an old kettle up there",
+                "rain before supper, mark me",
+                "the sun owes us a debt",
+                "a lid on the sky all day",
+            ],
+            0.9,
+        ),
+        Some(WeatherKind::Clear) => add(
+            &[
+                "not a cloud anywhere",
+                "a sky like this forgives a lot",
+                "good drying weather",
+                "the sea is glass today",
+            ],
+            0.7,
+        ),
+        None => {}
     }
 
     // The grain of the person, confessing itself.
@@ -310,7 +493,15 @@ fn candidates(
 
     // Always something, so the draw never comes up empty.
     add(
-        &["a fine enough day", "so it goes", "well, back to it"],
+        &[
+            "a fine enough day",
+            "so it goes",
+            "well, back to it",
+            "the days keep coming",
+            "same village, new morning",
+            "you get used to it",
+            "no news is its own news",
+        ],
         0.4,
     );
 
@@ -333,6 +524,35 @@ fn draw(pool: &[Line], rng: &mut Rng) -> Option<&'static str> {
     pool.last().map(|line| line.0)
 }
 
+/// Draws a line nobody is tired of: first avoiding everything this person
+/// has said lately AND everything the village has heard lately, then
+/// relaxing one ring at a time. Only a pool with no fresh line left in it
+/// permits a repeat.
+fn pick_fresh(
+    pool: &[Line],
+    said_by_them: &[&'static str],
+    heard_lately: &[&'static str],
+    rng: &mut Rng,
+) -> Option<&'static str> {
+    let strict: Vec<Line> = pool
+        .iter()
+        .filter(|l| !said_by_them.contains(&l.0) && !heard_lately.contains(&l.0))
+        .copied()
+        .collect();
+    if let Some(line) = draw(&strict, rng) {
+        return Some(line);
+    }
+    let theirs: Vec<Line> = pool
+        .iter()
+        .filter(|l| !said_by_them.contains(&l.0))
+        .copied()
+        .collect();
+    if let Some(line) = draw(&theirs, rng) {
+        return Some(line);
+    }
+    draw(pool, rng)
+}
+
 /// The ordinary murmur of a village: someone, every little while, says or
 /// thinks what their day actually is. Speech when someone is near enough to
 /// hear; a private thought when alone, which only the god gets to read.
@@ -340,8 +560,11 @@ fn draw(pool: &[Line], rng: &mut Rng) -> Option<&'static str> {
 pub(super) fn small_talk(
     time: Res<Time>,
     mut since_last: Local<f32>,
+    mut said_before: Local<std::collections::HashMap<Entity, Vec<&'static str>>>,
+    mut heard_lately: Local<Vec<&'static str>>,
     name: Option<Res<super::DivineName>>,
     clock: Res<crate::calendar::WorldClock>,
+    weather: Option<Res<crate::weather::Weather>>,
     mut rng: ResMut<SimRng>,
     mut say: MessageWriter<crate::ui::Say>,
     villagers: Query<
@@ -395,10 +618,20 @@ pub(super) fn small_talk(
         vocation,
         activity,
         clock.time_of_day(),
+        weather.as_ref().map(|w| w.kind()),
     );
-    let Some(line) = draw(&pool, &mut rng.0) else {
+    let mine = said_before.entry(speaker).or_default();
+    let Some(line) = pick_fresh(&pool, mine, &heard_lately, &mut rng.0) else {
         return;
     };
+    mine.push(line);
+    if mine.len() > 10 {
+        mine.remove(0);
+    }
+    heard_lately.push(line);
+    if heard_lately.len() > 12 {
+        heard_lately.remove(0);
+    }
 
     // A thought if alone, said aloud if anyone is close enough to hear it.
     let heard = all.iter().any(|(other, other_at, ..)| {
@@ -438,9 +671,10 @@ mod tests {
             None,
             &Activity::Idle,
             0.5,
+            Some(WeatherKind::Rain),
         );
         assert!(
-            pool.len() > 12,
+            pool.len() > 25,
             "a person in a hard state has many true things to say, found {}",
             pool.len()
         );
@@ -453,9 +687,24 @@ mod tests {
             }
         }
         assert!(
-            seen.len() > 8,
+            seen.len() > 12,
             "two hundred draws should span many lines, got {}",
             seen.len()
         );
+    }
+
+    #[test]
+    fn nobody_repeats_while_fresh_lines_remain() {
+        let pool = [Line("first", 1.0), Line("second", 1.0), Line("third", 1.0)];
+        let mut rng = Rng::new(9);
+        // Two of three already said: a hundred draws must all land on the
+        // third, never a repeat.
+        for _ in 0..100 {
+            let line = pick_fresh(&pool, &["first"], &["second"], &mut rng);
+            assert_eq!(line, Some("third"));
+        }
+        // Everything already said: better a repeat than silence.
+        let line = pick_fresh(&pool, &["first", "second", "third"], &[], &mut rng);
+        assert!(line.is_some());
     }
 }
