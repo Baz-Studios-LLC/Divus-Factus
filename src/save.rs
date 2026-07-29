@@ -1112,12 +1112,14 @@ fn apply(world: &mut World, save: SaveGame) {
                 });
                 let mut commands = world.commands();
                 for (pos, scale) in &save.boulders {
+                    let roll = crate::scatter::roll_rock(&mut rng.0);
                     let boulder = crate::scatter::spawn_boulder(
                         &mut commands,
                         &mut meshes,
                         material.clone(),
                         *pos,
                         &mut rng.0,
+                        roll,
                     );
                     commands.entity(boulder).insert(SavedBoulder);
                     commands.entity(boulder).entry::<Transform>().and_modify({

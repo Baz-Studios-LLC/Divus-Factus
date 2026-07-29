@@ -430,18 +430,25 @@ fn populate_chunks(
                 };
 
                 if slope > 0.42 {
-                    if rng.chance(0.30) && !stripped.is_stripped(x, z) {
+                    if rng.chance(0.30) {
+                        let roll = roll_rock(&mut rng);
                         let near_village = settlement.as_ref().is_some_and(|site| {
                             Vec2::new(x - site.centre.x, z - site.centre.z).length()
                                 < TREE_HARVEST_RADIUS
                         });
-                        if near_village {
+                        if stripped.is_stripped(x, z) {
+                            // Bare ground still burns the rock's dice, or
+                            // carrying one rock off would reshuffle every
+                            // neighbour on the next chunk rebuild.
+                            bake_rock(&mut MeshBuilder::default(), local, &mut rng);
+                        } else if near_village {
                             let rock = spawn_boulder(
                                 &mut commands,
                                 &mut meshes,
                                 terrain_assets.ground_material.clone(),
                                 local,
                                 &mut rng,
+                                roll,
                             );
                             commands.entity(rock).insert(ChildOf(entity));
                         } else {
@@ -450,12 +457,13 @@ fn populate_chunks(
                     }
                 } else if forest > 0.50 && moisture > 0.38 {
                     let density = ((forest - 0.50) / 0.3).clamp(0.0, 1.0);
-                    // Trees keep a canopy's berth from worked ground, so a
-                    // rebuilt chunk never leans a tree against a wall — and
-                    // stripped ground stays bare: the axe is permanent.
-                    if terrain.is_worked_within(x, z, 4.0) || stripped.is_stripped(x, z) {
-                        continue;
-                    }
+                    // Trees keep a canopy's berth from worked ground, and
+                    // stripped ground stays bare: the axe is permanent. But
+                    // EVERY position burns the same dice standing or gone —
+                    // suppression discards geometry, never random draws, or
+                    // one felled tree would rearrange the whole forest on
+                    // the next chunk rebuild.
+                    let bare = terrain.is_worked_within(x, z, 4.0) || stripped.is_stripped(x, z);
                     if rng.chance(tree_chance * (0.55 + density)) {
                         let kind = *rng.pick(TreeKind::for_biome(biome));
                         // Near the settlement, trees live as entities so the
@@ -464,7 +472,9 @@ fn populate_chunks(
                             Vec2::new(x - site.centre.x, z - site.centre.z).length()
                                 < TREE_HARVEST_RADIUS
                         });
-                        if near_village {
+                        if bare {
+                            bake_tree(&mut MeshBuilder::default(), local, kind, &mut rng);
+                        } else if near_village {
                             let tree = spawn_tree(
                                 &mut commands,
                                 &mut meshes,
@@ -485,24 +495,34 @@ fn populate_chunks(
                             local,
                             &mut rng,
                         );
-                        commands.entity(bush).insert(ChildOf(entity));
+                        // A worked pad grows nothing - but the dice burned.
+                        // Cut-over ground, though, can flower into a heath.
+                        if terrain.is_worked_within(x, z, 4.0) {
+                            commands.entity(bush).despawn();
+                        } else {
+                            commands.entity(bush).insert(ChildOf(entity));
+                        }
                     }
-                } else if rng.chance(0.055) && !stripped.is_stripped(x, z) {
+                } else if rng.chance(0.055) {
                     // Loose stones on open ground: near the settlement they are
                     // real boulders — the miners' bread. (The flat-ground rocks
                     // were baked scenery at first, and the whole civic ladder
                     // starved for stone on any village founded on flat land.)
+                    let roll = roll_rock(&mut rng);
                     let near_village = settlement.as_ref().is_some_and(|site| {
                         Vec2::new(x - site.centre.x, z - site.centre.z).length()
                             < TREE_HARVEST_RADIUS
                     });
-                    if near_village {
+                    if stripped.is_stripped(x, z) {
+                        bake_rock(&mut MeshBuilder::default(), local, &mut rng);
+                    } else if near_village {
                         let rock = spawn_boulder(
                             &mut commands,
                             &mut meshes,
                             terrain_assets.ground_material.clone(),
                             local,
                             &mut rng,
+                            roll,
                         );
                         commands.entity(rock).insert(ChildOf(entity));
                     } else {
@@ -734,32 +754,50 @@ fn spawn_sacred(
         .id()
 }
 
+/// A rock's rolled identity, drawn SEPARATELY from the geometry dice so
+/// every scatter path — live boulder, baked scenery, or suppressed bare
+/// ground — consumes exactly the same random draws. Determinism is what
+/// keeps a rebuilt chunk from rearranging the world.
+pub(crate) struct RockRoll {
+    pub mass: f32,
+    pub radius: f32,
+    pub girth: f32,
+}
+
+/// One rock in six is a real outcrop: shoulder-high, many loads of stone,
+/// mined for days before it is gone.
+pub(crate) fn roll_rock(rng: &mut Rng) -> RockRoll {
+    let mass = rng.range(90.0, 170.0);
+    let radius = rng.range(0.7, 1.05);
+    let outcrop = rng.chance(0.18);
+    let girth = if outcrop { rng.range(2.2, 3.0) } else { 1.0 };
+    RockRoll {
+        mass: mass * girth,
+        radius: radius * girth,
+        girth,
+    }
+}
+
 pub(crate) fn spawn_boulder(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     material: Handle<StandardMaterial>,
     local: Vec3,
     rng: &mut Rng,
+    roll: RockRoll,
 ) -> Entity {
     let mut builder = MeshBuilder::default();
     bake_rock(&mut builder, Vec3::ZERO, rng);
-    // One rock in six is a real outcrop: shoulder-high, many loads of
-    // stone, mined for days before it is gone. The land between lone
-    // boulders and a true mine.
-    let outcrop = rng.chance(0.18);
-    let girth = if outcrop { rng.range(2.2, 3.0) } else { 1.0 };
+    let outcrop = roll.girth > 1.0;
     commands
         .spawn((
             Name::new(if outcrop { "An outcrop" } else { "A boulder" }),
             crate::matter::Boulder,
-            crate::matter::Matter::boulder(
-                rng.range(90.0, 170.0) * girth,
-                rng.range(0.7, 1.05) * girth,
-            ),
+            crate::matter::Matter::boulder(roll.mass, roll.radius),
             Mesh3d(meshes.add(builder.build())),
             MeshMaterial3d(material),
-            Transform::from_translation(local).with_scale(Vec3::splat(girth)),
-            crate::hand::PickRadius(1.3 * girth),
+            Transform::from_translation(local).with_scale(Vec3::splat(roll.girth)),
+            crate::hand::PickRadius(1.3 * roll.girth),
         ))
         .id()
 }

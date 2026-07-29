@@ -1,13 +1,23 @@
-## Built from the land it stands on
+## The land gives, the land remembers
 
-**Houses of timber, stone, or mud brick** — a village now builds from what its ground actually gives. Too few trees within a working walk? The planner raises stone masonry or mud-brick homes instead, drawn from the quarry and the clay bank by the same hands. A treeless founding builds anyway.
+**The god's sight** — press R and the land confesses what it holds: green tiles for woods (deeper is thicker), slate for stone — mountains, boulders and outcrops alike — ochre for clay, rust for iron, rose for wild food, with a legend by the speed controls. Plan your village's next century from the air.
 
-**Founding, freed** — not every people settles by the sea. Each world rolls its own coastal yearning; some villages rise far inland and live by field, herd and well — a real life now that the walls don't demand timber.
+**Nobody starves in a crowd anymore** — the grimmest bug yet: when someone died, mourners gathered on a timer hunger couldn't break, each starvation summoning the next crowd of grief. Hunger now outranks every social hold — mourning, gossip, prayer, sleep, waiting out the rain — and stomachs last twice as long besides. Two meals a day, like people.
 
-**Nobody starves marching past a full larder** — the last great starvation bug: the hungry used to trek to the nearest berries wherever they stood, dying on the road past a stocked store. They now eat from whichever is nearer, bush or banner.
+**The Mine** — when stone runs short and rock rises near, miners drive a timbered portal into a genuine mountainside — banked over with earth, a true door into the hill — and haul stone out by the cartload.
 
-**The village of singletons unsticks** — a town of twelve founders spread one-per-trade could never appoint a mason, and one unfinished foundation froze every house forever. The retraining ladder now borrows the least-critical single pair of hands when no trade has two.
+**Outcrops** — one loose rock in six is now shoulder-high and yields many loads before it's gone. Flat country has real stone in it.
 
-**One tooltip to rule them** — hover any miracle or toolbar icon and the top-corner card names it: what it is, what it costs, what it does. Same card the world uses.
+**Houses of pure timber** — no stone, no clay, no problem: houses post-frame straight into the earth and owe the masons nothing. When fire comes to this world someday, those are the homes that will fear it.
 
-**The People window behaves** — fixed generous size (no more breathing with its content), no roster flicker, no mystery gap, and every soul's full dated life story on its own tab.
+**The axe is permanent** — felled trees and mined-out rocks are gone for good, and the ground remembers across saves. A hard-worked woods thins into visible clear-cut, and a farmed-out country pushes its people outward — which is the point.
+
+**Walk the planks** — the dock is real footing now: fishers stroll out and cast from the deck's end past the shallows, and the catch is doubled for it.
+
+**Fields become a farm** — new plots square up beside the old ones, rows aligned, a path's width apart. Harvests are heavier too.
+
+**Founders read the land** — the banner now plants where timber and stone stand within a working walk, never on a summit, never on a barren postcard beach. And the coasts run rich with clay banks strung along the waterline.
+
+**Nobody climbs the cliff face** — steep ground finally refuses a stride, uphill. Downhill scrambles and dock planks excepted.
+
+**The woods hold still** — cutting one tree used to reshuffle its whole chunk's scenery on the next rebuild. The world's dice are burned identically now whether a thing stands or is long gone; forests thin in place, tree by honest tree. (Existing worlds reshuffle once on first load after updating, then never again.)
