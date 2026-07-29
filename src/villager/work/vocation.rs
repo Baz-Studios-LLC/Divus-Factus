@@ -196,7 +196,13 @@ pub(crate) fn retrain(
     // Hunger kills first, so food hands top the ladder: a thin larder
     // with too few of the trades that fill it retrains someone toward
     // the water or the bushes before anything else gets a say.
-    let food_low = stores.iter().next().is_none_or(|s| s.food() < 12.0);
+    let mouths = workers.iter().count();
+    // The larder's floor rises with the population: twelve food is a
+    // pantry for eight and a rounding error for twenty-four.
+    let food_low = stores
+        .iter()
+        .next()
+        .is_none_or(|s| s.food() < (mouths as f32 * 1.2).max(12.0));
     let food_hands: usize = [
         Vocation::Fisher,
         Vocation::Gatherer,
@@ -206,7 +212,6 @@ pub(crate) fn retrain(
     .into_iter()
     .map(|v| count_of(v))
     .sum();
-    let mouths = workers.iter().count();
     // Whether water lies within a working walk of the square — twelve
     // spokes, no dart-throwing, so no rng is needed here.
     let shore_near = terrain.as_ref().zip(site.as_ref()).is_some_and(|(t, s)| {

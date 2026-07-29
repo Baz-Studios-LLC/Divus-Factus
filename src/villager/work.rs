@@ -474,6 +474,7 @@ pub(super) fn do_work(
     >,
 ) {
     let dt = time.delta_secs();
+    let workers_alive = workers.iter().count();
     let (ref carrying, ref children, ref loads, ref _buildings) = context;
     let (carrying, children, loads) = (carrying, children, loads);
     let (
@@ -513,14 +514,17 @@ pub(super) fn do_work(
         }
 
         // Shifts end: at day's end, or when hunger calls. The food trades
-        // do not down tools for hunger — their meal is at the worksite.
+        // do not down tools for hunger — their meal is at the worksite —
+        // and while the larder is thin they keep working after dark,
+        // because the village eats all night whether anyone produces or
+        // not.
         let feeds_the_village = matches!(
             vocation,
             Vocation::Fisher | Vocation::Gatherer | Vocation::Hunter | Vocation::Farmer
         );
-        if !is_work_hour(clock.time_of_day())
-            || (needs.hunger > DOWN_TOOLS_HUNGER && !feeds_the_village)
-        {
+        let larder_thin = store.food() < workers_alive as f32;
+        let on_shift = is_work_hour(clock.time_of_day()) || (feeds_the_village && larder_thin);
+        if !on_shift || (needs.hunger > DOWN_TOOLS_HUNGER && !feeds_the_village) {
             *activity = Activity::Idle;
             target.0 = None;
             commands.entity(entity).remove::<Job>();

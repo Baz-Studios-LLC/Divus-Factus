@@ -199,13 +199,26 @@ pub(crate) fn take_up_work(
     let Some(site) = site else {
         return;
     };
-    if !is_work_hour(clock.time_of_day()) {
-        return;
-    }
     let (buildings, fields, patients, deposits, sacred) = town;
+    // A thin larder keeps the food trades working after dark - lanterns
+    // on the dock - because the village eats all night whether or not
+    // anyone is producing.
+    let mouths = workers.iter().count();
+    let larder_thin = stores
+        .get(site.settlement)
+        .is_ok_and(|s| s.food() < mouths as f32);
+    let daylight = is_work_hour(clock.time_of_day());
 
     for (entity, transform, needs, vocation, mut activity, shunned) in &mut workers {
         if !matches!(*activity, Activity::Idle | Activity::Wandering) {
+            continue;
+        }
+        let night_shift = larder_thin
+            && matches!(
+                vocation,
+                Vocation::Fisher | Vocation::Gatherer | Vocation::Hunter
+            );
+        if !daylight && !night_shift {
             continue;
         }
         // Hunger sends most trades off to find a meal — but the trades

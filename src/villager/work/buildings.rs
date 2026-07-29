@@ -973,44 +973,45 @@ pub(crate) fn plan_houses(
     // spare hands for what it merely wants. One need outranks even the
     // roof: an empty larder beside open water breaks ground on the dock
     // first, because hunger kills faster than rain.
-    let kind =
-        if population >= 5 && store_now.food() < 8.0 && shore_near && !has_kind(BuildingKind::Dock)
-        {
-            BuildingKind::Dock
-        } else if roofless_adults > 0 && !pending.iter().any(|b| b.kind == BuildingKind::House) {
-            BuildingKind::House
-        } else if roofless_adults > 0 {
-            return;
-        } else {
-            let needs = CivicNeeds {
-                population,
-                stone: store_now.stone,
-                timber_stored: store_now.timber,
-                stone_stored: store_now.stone,
-                food_stored: store_now.food(),
-                avg_spirits: spirits_sum / population.max(1) as f32,
-                homeless: roofless_adults,
-                hurt,
-                believers,
-                fishers,
-                farmers,
-                foresters,
-                fields: fields.iter().count(),
-                wolves_near: wild
-                    .iter()
-                    .filter(|(at, genome)| {
-                        genome.species == Species::Wolf
-                            && at.translation.distance(site.centre) < 130.0
-                    })
-                    .count(),
-                pending_builds: pending.iter().count(),
-                shore_near,
-            };
-            match next_civic(&needs, has_kind) {
-                Some(kind) => kind,
-                None => return,
-            }
+    let kind = if population >= 5
+        && store_now.food() < (population as f32 * 0.8).max(8.0)
+        && shore_near
+        && !has_kind(BuildingKind::Dock)
+    {
+        BuildingKind::Dock
+    } else if roofless_adults > 0 && !pending.iter().any(|b| b.kind == BuildingKind::House) {
+        BuildingKind::House
+    } else if roofless_adults > 0 {
+        return;
+    } else {
+        let needs = CivicNeeds {
+            population,
+            stone: store_now.stone,
+            timber_stored: store_now.timber,
+            stone_stored: store_now.stone,
+            food_stored: store_now.food(),
+            avg_spirits: spirits_sum / population.max(1) as f32,
+            homeless: roofless_adults,
+            hurt,
+            believers,
+            fishers,
+            farmers,
+            foresters,
+            fields: fields.iter().count(),
+            wolves_near: wild
+                .iter()
+                .filter(|(at, genome)| {
+                    genome.species == Species::Wolf && at.translation.distance(site.centre) < 130.0
+                })
+                .count(),
+            pending_builds: pending.iter().count(),
+            shore_near,
         };
+        match next_civic(&needs, has_kind) {
+            Some(kind) => kind,
+            None => return,
+        }
+    };
     let _ = roofs;
 
     // A dock is sited by the water, not by the rings: the nearest walkable

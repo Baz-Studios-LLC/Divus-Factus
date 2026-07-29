@@ -1086,8 +1086,12 @@ fn accumulate_hunger(
 /// Whether the village is doing well enough to grow.
 /// Whether the village can bear another child, against the current roof —
 /// the town hall raises it.
-fn can_grow_to(living: usize, average_hunger: f32, cap: usize) -> bool {
-    living >= 2 && living < cap && average_hunger < 0.55
+fn can_grow_to(living: usize, average_hunger: f32, food_stored: f32, cap: usize) -> bool {
+    // Births need SURPLUS, not merely absence of famine: a child arrives
+    // into a larder holding at least a meal and a half per head, or the
+    // village overshoots its food supply and starves at the cap - growth
+    // constrained by hunger before hunger ever kills.
+    living >= 2 && living < cap && average_hunger < 0.55 && food_stored >= living as f32 * 1.5
 }
 
 /// Brings children into fed villages.
@@ -1295,6 +1299,7 @@ fn births(
     mut notices: MessageWriter<crate::ui::Notice>,
     town_halls: Query<&work::Building>,
     huts: Query<(), With<work::Hut>>,
+    stores: Query<&work::Stockpile>,
     mut rng: ResMut<SimRng>,
     villagers: Query<
         (
@@ -1339,7 +1344,11 @@ fn births(
         POPULATION_CAP
     };
     let cap = hall_cap.min(home::shelter_capacity(huts.iter().count()));
-    if !can_grow_to(living, average_hunger, cap) || !rng.0.chance(0.6) {
+    let food_stored = site
+        .as_ref()
+        .and_then(|s| stores.get(s.settlement).ok())
+        .map_or(0.0, |s| s.food());
+    if !can_grow_to(living, average_hunger, food_stored, cap) || !rng.0.chance(0.6) {
         return;
     }
 
@@ -1772,20 +1781,24 @@ mod tests {
     fn villages_grow_only_when_fed_and_roofed_by_the_cap() {
         let cap = POPULATION_CAP;
         assert!(
-            can_grow_to(2, 0.3, cap),
+            can_grow_to(2, 0.3, 20.0, cap),
             "a fed pair should be able to grow"
         );
         assert!(
-            !can_grow_to(1, 0.0, cap),
+            !can_grow_to(1, 0.0, 20.0, cap),
             "one villager cannot grow a village"
         );
-        assert!(!can_grow_to(cap, 0.0, cap), "the cap must hold");
+        assert!(!can_grow_to(cap, 0.0, 999.0, cap), "the cap must hold");
         assert!(
-            !can_grow_to(10, 0.9, cap),
+            !can_grow_to(10, 0.2, 5.0, cap),
+            "a thin larder must gate births before hunger does"
+        );
+        assert!(
+            !can_grow_to(10, 0.9, 99.0, cap),
             "a starving village must not grow"
         );
         assert!(
-            can_grow_to(cap, 0.0, cap + 10),
+            can_grow_to(cap, 0.0, 99.0, cap + 10),
             "a town hall must raise the roof",
         );
     }
