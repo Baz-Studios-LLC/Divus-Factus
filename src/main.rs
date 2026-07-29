@@ -8,6 +8,7 @@ mod debug;
 mod grass;
 mod hand;
 mod loading;
+mod markers;
 mod matter;
 mod meshbuild;
 mod miracles;
@@ -143,6 +144,7 @@ fn main() {
             trails::TrailsPlugin,
             speed::SpeedPlugin,
             survey::SurveyPlugin,
+            markers::MarkersPlugin,
         ))
         .add_systems(Startup, spawn_lighting)
         .run();

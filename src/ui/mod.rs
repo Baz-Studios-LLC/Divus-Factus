@@ -937,9 +937,23 @@ pub fn focus_windows(
         ),
         With<UiWindow>,
     >,
+    just_shown: Query<(&Visibility, &ChildOf), (With<UiWindow>, Changed<Visibility>)>,
     strips: Query<Option<&GlobalZIndex>>,
     mut stack: Local<i32>,
 ) {
+    // A window that just opened comes to the front unasked - opening IS
+    // choosing it.
+    for (visibility, strip) in &just_shown {
+        if *visibility != Visibility::Hidden {
+            *stack += 1;
+            if *stack > 200 {
+                *stack = 1;
+            }
+            commands
+                .entity(strip.parent())
+                .insert(GlobalZIndex(10 + *stack));
+        }
+    }
     if !buttons.just_pressed(bevy::input::mouse::MouseButton::Left) {
         return;
     }

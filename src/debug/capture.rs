@@ -92,8 +92,19 @@ pub(crate) fn capture_preselect(
             Without<crate::creature::Corpse>,
         ),
     >,
+    mut history: Query<&mut Visibility, With<super::HistoryPanel>>,
 ) {
-    if crate::capture_path().is_none() || selected.0.is_some() {
+    if crate::capture_path().is_none() {
+        return;
+    }
+    // EGREGORE_OPEN=history photographs the chronicle instead of a person.
+    if std::env::var("EGREGORE_OPEN").is_ok_and(|w| w == "history") {
+        for mut visibility in &mut history {
+            *visibility = Visibility::Visible;
+        }
+        return;
+    }
+    if selected.0.is_some() {
         return;
     }
     if let Some(person) = people.iter().next() {

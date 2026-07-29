@@ -1229,7 +1229,19 @@ pub(crate) fn plan_houses(
         && !has_kind(BuildingKind::Dock)
     {
         BuildingKind::Dock
-    } else if roofless_adults > 0 && !pending.iter().any(|(b, _)| b.kind == BuildingKind::House) {
+    } else if (roofless_adults > 0 || {
+        // Build AHEAD of need: the village keeps at least one empty
+        // house's worth of room, so growth never waits on a construction
+        // site. A town that builds exactly what it needs is always one
+        // wedding behind.
+        let houses = civics
+            .iter()
+            .filter(|b| b.kind == BuildingKind::House)
+            .count();
+        let capacity = crate::villager::home::shelter_capacity(houses);
+        (capacity as i32 - population as i32) < crate::villager::home::HOUSE_CAPACITY as i32
+    }) && !pending.iter().any(|(b, _)| b.kind == BuildingKind::House)
+    {
         BuildingKind::House
     } else if roofless_adults > 0 {
         // A house is already rising for them - say so, with arithmetic,
