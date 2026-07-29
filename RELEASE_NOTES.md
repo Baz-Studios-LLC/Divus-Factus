@@ -1,13 +1,9 @@
-## The book of record
+## The city unbound
 
-**THE CHRONICLE, in full** — the history window now holds everything that has ever happened in this world, newest first, every entry dated — and shelved into tabs: LIVES (births, weddings, deaths), WORKS (ground broken, buildings raised), FAITH (miracles and conversions), THE WORLD (discoveries, seasons, wolves), and ALL. Old saves gain the shelves automatically.
+**No more population cap** — a village grows as far as it can build. Shelter, food surplus and land are the only limits: house rings sprawl outward as the town grows, the settlement's reach follows its furthest roof, and lifespans are finally proportioned to the calendar (a sixteen-day childhood, three seasons of prime) so generations actually roll.
 
-**A village of twenty-four eats** — starvation at full population is fixed at the root: children are only born into a larder with real surplus, the village's food alarms scale with its mouths, and when stores run thin the fishers, gatherers and hunters work through the night — lanterns on the dock.
+**Starvation became a story you can read** — every death names its cause ("starved on the road, 300 strides from a larder that held food"), and the famine watch narrates a thin larder before it kills: too few food hands, land picked bare, eating faster than it gathers. Following the cause it kept catching: far work is now provisioned with **rations** — the road eats first — and workers leave early enough that the walk home never finishes what the work began.
 
-**No more flashes and slides**
-- Breaking ground no longer flashes white: reshaped terrain swaps chunks in a single frame, so there is never a hole in the world.
-- Dusk shadows stay attached to their trees instead of sliding across the land, and true night casts no phantom shadows at all.
+**Every soul gets a book** — the character page grows THE LIFE: a person's entire dated chronicle, uncapped, newest first, beside THE SOUL. Nothing of a life is discarded anymore.
 
-**Small rights**
-- Thought clouds: bigger, fewer billows — and the second line always stays inside.
-- The divine hand becomes the pointing finger over the time controls.
+**Steady frames on old roads** — mature trail networks no longer sag the frame rate; only ground actively being worn or fading repaints.
