@@ -683,9 +683,8 @@ pub(crate) fn spawn_settlement(
         // out past the home circle — deposits are why explorers matter,
         // and the road to one is a road the village will wear itself.
         let mut placed_iron = 0;
-        let mut placed_clay = 0;
         for _ in 0..400 {
-            if placed_iron >= 4 && placed_clay >= 4 {
+            if placed_iron >= 4 {
                 break;
             }
             let angle = rng.range(0.0, std::f32::consts::TAU);
@@ -696,33 +695,59 @@ pub(crate) fn spawn_settlement(
                 continue;
             }
             let height = terrain.height_at(x, z);
-            let at = Vec3::new(x, height, z);
-            if placed_iron < 4 && height > crate::terrain::WATER_LEVEL + 20.0 {
+            if height > crate::terrain::WATER_LEVEL + 20.0 {
                 crate::matter::spawn_deposit(
                     &mut commands,
                     &mut meshes,
                     &mut materials,
-                    at,
+                    Vec3::new(x, height, z),
                     crate::matter::DepositKind::Iron,
                     rng.range(16.0, 26.0),
                 );
                 placed_iron += 1;
-            } else if placed_clay < 4
-                && (crate::terrain::WATER_LEVEL + 0.6..crate::terrain::WATER_LEVEL + 2.8)
-                    .contains(&height)
-            {
-                crate::matter::spawn_deposit(
-                    &mut commands,
-                    &mut meshes,
-                    &mut materials,
-                    at,
-                    crate::matter::DepositKind::Clay,
-                    rng.range(20.0, 32.0),
-                );
-                placed_clay += 1;
             }
         }
-        info!("the land holds {placed_iron} iron veins and {placed_clay} clay banks");
+
+        // Clay is a creature of the waterline: wherever the coast runs,
+        // the wet banks along it are rich with it — strung out with a
+        // little space between banks, so working the clay means walking
+        // the shore rather than emptying one pit.
+        let mut clay_banks: Vec<Vec3> = Vec::new();
+        for _ in 0..900 {
+            if clay_banks.len() >= 10 {
+                break;
+            }
+            let angle = rng.range(0.0, std::f32::consts::TAU);
+            let reach = rng.range(40.0, 700.0);
+            let (sin, cos) = angle.sin_cos();
+            let (x, z) = (centre.x + cos * reach, centre.z + sin * reach);
+            if !terrain.is_walkable(x, z) {
+                continue;
+            }
+            let height = terrain.height_at(x, z);
+            if !(crate::terrain::WATER_LEVEL + 0.5..crate::terrain::WATER_LEVEL + 3.5)
+                .contains(&height)
+            {
+                continue;
+            }
+            let at = Vec3::new(x, height, z);
+            if clay_banks.iter().any(|b| b.distance(at) < 25.0) {
+                continue;
+            }
+            crate::matter::spawn_deposit(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                at,
+                crate::matter::DepositKind::Clay,
+                rng.range(24.0, 40.0),
+            );
+            clay_banks.push(at);
+        }
+        info!(
+            "the land holds {placed_iron} iron veins and {} clay banks",
+            clay_banks.len()
+        );
     }
 
     // The god is named by its people, in their own tongue. The player never
