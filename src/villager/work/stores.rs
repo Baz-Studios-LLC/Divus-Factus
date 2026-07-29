@@ -721,6 +721,15 @@ pub(crate) fn eat_from_store(
                 };
                 let ration = if cooked { 0.85 } else { 0.55 };
                 needs.hunger = (needs.hunger - ration).max(0.0);
+                // A second helping at the same table: one visit feeds to
+                // satisfaction, instead of half the village trotting back
+                // to the banner twice for every mealtime.
+                if needs.hunger > 0.3 && store.food() >= 1.0 {
+                    if let Some(second) = store.larder.draw(meal) {
+                        needs.hunger = (needs.hunger - ration).max(0.0);
+                        let _ = second;
+                    }
+                }
                 if cooked {
                     morale.spirits = (morale.spirits + 0.08).min(1.0);
                 }

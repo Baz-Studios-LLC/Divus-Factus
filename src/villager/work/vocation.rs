@@ -189,6 +189,15 @@ pub(crate) fn assign_vocations(
     }
 }
 
+/// Fresh to a calling the village pressed on them: for a few days this
+/// person is off the retraining table, or two competing needs would
+/// bounce one soul between the hammer and the net every audit, forever,
+/// and the chronicle would read like a bad joke.
+#[derive(Component)]
+pub struct NewToTheTrade {
+    pub until: f64,
+}
+
 /// The village calls people into the trades it lacks.
 ///
 /// A tavern with no cook, a shrine with no keeper, a bruised village with no
@@ -228,6 +237,7 @@ pub(crate) fn retrain(
             &Person,
             Option<&mut Chronicle>,
             Option<&Skills>,
+            Option<&NewToTheTrade>,
         ),
         (With<Villager>, Without<Corpse>),
     >,
@@ -383,20 +393,27 @@ pub(crate) fn retrain(
     // From the giving trade, take the GREENEST hands, never the master:
     // a need can pull anyone, but the village does not melt down its
     // finest fisher to hold a hammer while an apprentice stands idle.
+    // And never someone still learning the last trade it pressed on them.
     let donor = workers
         .iter_mut()
         .filter(|(_, v, ..)| **v == give)
+        .filter(|(.., fresh)| fresh.is_none_or(|f| clock.elapsed > f.until))
         .min_by(|a, b| {
             let a_craft = a.4.map_or(0.0, |s| s.of(give));
             let b_craft = b.4.map_or(0.0, |s| s.of(give));
             a_craft.total_cmp(&b_craft)
         });
-    let Some((entity, old, person, chronicle, _)) = donor else {
+    let Some((entity, old, person, chronicle, _, _)) = donor else {
         return;
     };
     let old = *old;
 
-    commands.entity(entity).insert(wanted);
+    commands.entity(entity).insert((
+        wanted,
+        NewToTheTrade {
+            until: clock.elapsed + crate::calendar::DAY_SECONDS as f64 * 3.0,
+        },
+    ));
     info!(
         "{} set down their tools and {}",
         person.name,

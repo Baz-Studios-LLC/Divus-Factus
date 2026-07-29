@@ -1134,7 +1134,7 @@ pub(crate) fn plan_houses(
         Query<(&Transform, &CreatureGenome), With<crate::creature::wildlife::Wild>>,
     ),
     civics: Query<&Building>,
-    pending: Query<&Blueprint, With<ConstructionSite>>,
+    pending: Query<(&Blueprint, &ConstructionSite)>,
     roofs: Query<&Transform, Or<(With<ConstructionSite>, With<Hut>, With<Building>)>>,
 ) {
     *since_last += time.delta_secs();
@@ -1180,7 +1180,7 @@ pub(crate) fn plan_houses(
     }
 
     let has_kind = |kind: BuildingKind| {
-        civics.iter().any(|b| b.kind == kind) || pending.iter().any(|b| b.kind == kind)
+        civics.iter().any(|b| b.kind == kind) || pending.iter().any(|(b, _)| b.kind == kind)
     };
     let Ok(store_now) = stores.get(site.settlement) else {
         return;
@@ -1189,6 +1189,12 @@ pub(crate) fn plan_houses(
     // a clay bank raises mud brick. Only a village with nothing at all
     // waits.
     if store_now.timber < 2.0 && store_now.stone < 2.0 && store_now.clay < 2.0 {
+        if roofless_adults > 0 {
+            info!(
+                "housing watch: {} roofless and the piles hold nothing to build from",
+                roofless_adults
+            );
+        }
         return;
     }
 
@@ -1223,9 +1229,22 @@ pub(crate) fn plan_houses(
         && !has_kind(BuildingKind::Dock)
     {
         BuildingKind::Dock
-    } else if roofless_adults > 0 && !pending.iter().any(|b| b.kind == BuildingKind::House) {
+    } else if roofless_adults > 0 && !pending.iter().any(|(b, _)| b.kind == BuildingKind::House) {
         BuildingKind::House
     } else if roofless_adults > 0 {
+        // A house is already rising for them - say so, with arithmetic,
+        // so a stalled build is a visible fact instead of a silent
+        // population ceiling.
+        if let Some((plan, cs)) = pending.iter().find(|(b, _)| b.kind == BuildingKind::House) {
+            info!(
+                "housing watch: {} roofless; a house stands at {:.0} of {:.0} timber, {:.0} of {:.0} footing stone",
+                roofless_adults,
+                cs.progress,
+                plan.kind.timber_cost(),
+                cs.stone_laid,
+                cs.footing_stone(plan.kind),
+            );
+        }
         return;
     } else {
         let needs = CivicNeeds {

@@ -162,6 +162,7 @@ pub(super) fn lend_a_hand(
             &mut MoveTarget,
             &mut CreatureMotion,
             Option<&Helper>,
+            &Needs,
             Option<&super::traits::Traits>,
         ),
         (
@@ -178,13 +179,17 @@ pub(super) fn lend_a_hand(
         return;
     }
 
-    // Helpers at work: walk in, steady the frame.
-    for (villager, at, mut activity, mut target, mut motion, helper, _) in &mut folk {
+    // Helpers at work: walk in, steady the frame. Hunger releases them
+    // like any worker - a helper carries no Job, so the ordinary
+    // down-tools check never sees them, and before this check the
+    // good-hearted starved at stalled sites they could not finish.
+    for (villager, at, mut activity, mut target, mut motion, helper, needs, _) in &mut folk {
         let Some(helper) = helper else {
             continue;
         };
+        let hungry = needs.hunger > DOWN_TOOLS_HUNGER;
         let done = sites.get_mut(helper.0).is_err();
-        if done || *activity != Activity::Working {
+        if done || hungry || *activity != Activity::Working {
             commands.entity(villager).remove::<Helper>();
             if *activity == Activity::Working {
                 *activity = Activity::Idle;
@@ -235,7 +240,7 @@ pub(super) fn lend_a_hand(
         if already >= 2 {
             continue;
         }
-        for (villager, at, mut activity, _, _, helper, manner) in &mut folk {
+        for (villager, at, mut activity, _, _, helper, _, manner) in &mut folk {
             if helper.is_some()
                 || !matches!(*activity, Activity::Idle | Activity::Wandering)
                 || manner.is_some_and(|m| m.has(super::traits::Trait::Slothful))

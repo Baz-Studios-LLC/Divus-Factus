@@ -124,6 +124,7 @@ impl Plugin for VillagerPlugin {
                 (
                     (
                         accumulate_hunger,
+                        starvation_watch,
                         grow_up,
                         grow_old,
                         form_bonds,
@@ -1215,6 +1216,39 @@ fn accumulate_hunger(
                 vitality.violent = false;
             }
         }
+    }
+}
+
+/// The forensics that run BEFORE the funeral: anyone at the edge of
+/// starving logs who they are, what they are doing, and how far the
+/// banner stands, every few seconds. When a death notice reads like
+/// nonsense - "starved within sight of a stocked larder" - this is the
+/// tape to rewind to see exactly which state held them while they died.
+fn starvation_watch(
+    time: Res<Time>,
+    mut since: Local<f32>,
+    site: Option<Res<SettlementSite>>,
+    watchers: Query<
+        (&Person, &Needs, &Activity, &Transform),
+        (With<Villager>, Without<crate::creature::Corpse>),
+    >,
+) {
+    *since += time.delta_secs();
+    if *since < 8.0 {
+        return;
+    }
+    *since = 0.0;
+    for (person, needs, activity, at) in &watchers {
+        if needs.hunger < 0.95 {
+            continue;
+        }
+        let from_home = site
+            .as_ref()
+            .map_or(f32::NAN, |s| s.centre.distance(at.translation));
+        info!(
+            "starvation watch: {} is {:?} at hunger {:.2}, {:.0} strides from the banner",
+            person.name, activity, needs.hunger, from_home
+        );
     }
 }
 

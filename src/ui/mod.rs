@@ -38,6 +38,7 @@ impl Plugin for UiPlugin {
                     drag_windows,
                     close_windows,
                     scroll_regions,
+                    focus_windows,
                     switch_tabs,
                     speak,
                     float_bubbles,
@@ -919,6 +920,68 @@ pub struct Scrollable;
 
 /// The wheel scrolls whatever scrollable region it is over. Bevy clamps the
 /// position to the content, so this only has to push.
+/// Clicking a window brings it to the front, the way windows anywhere
+/// work. Hit-tested by geometry (clicks land on child buttons, never the
+/// window root, so Interaction cannot carry this) and applied to the
+/// window's full-screen strip, which is what actually stacks.
+pub fn focus_windows(
+    mut commands: Commands,
+    buttons: Res<ButtonInput<bevy::input::mouse::MouseButton>>,
+    primary: Query<&bevy::window::Window, With<bevy::window::PrimaryWindow>>,
+    panels: Query<
+        (
+            &ComputedNode,
+            &UiGlobalTransform,
+            &InheritedVisibility,
+            &ChildOf,
+        ),
+        With<UiWindow>,
+    >,
+    strips: Query<Option<&GlobalZIndex>>,
+    mut stack: Local<i32>,
+) {
+    if !buttons.just_pressed(bevy::input::mouse::MouseButton::Left) {
+        return;
+    }
+    let Ok(primary) = primary.single() else {
+        return;
+    };
+    let Some(cursor) = primary.cursor_position() else {
+        return;
+    };
+    // Of every visible window under the cursor, the one already highest
+    // is the one the player sees themself clicking.
+    let mut hit: Option<(i32, Entity)> = None;
+    for (computed, transform, visibility, strip) in &panels {
+        if !visibility.get() {
+            continue;
+        }
+        let scale = computed.inverse_scale_factor();
+        let centre = Vec2::new(transform.translation.x, transform.translation.y) * scale;
+        let half = computed.size() * scale * 0.5;
+        if (cursor.x - centre.x).abs() > half.x || (cursor.y - centre.y).abs() > half.y {
+            continue;
+        }
+        let z = strips.get(strip.parent()).ok().flatten().map_or(0, |z| z.0);
+        if hit.is_none_or(|(top, _)| z >= top) {
+            hit = Some((z, strip.parent()));
+        }
+    }
+    let Some((current, strip)) = hit else {
+        return;
+    };
+    // Already on top of the stack: nothing to raise.
+    if current == *stack && *stack != 0 {
+        return;
+    }
+    // Windows stack between the world (0) and the overlays (250+).
+    *stack += 1;
+    if *stack > 200 {
+        *stack = 1;
+    }
+    commands.entity(strip).insert(GlobalZIndex(10 + *stack));
+}
+
 pub fn scroll_regions(
     mouse_scroll: Res<bevy::input::mouse::AccumulatedMouseScroll>,
     primary: Query<&bevy::window::Window, With<bevy::window::PrimaryWindow>>,

@@ -18,9 +18,7 @@ use crate::creature::genome::Tone;
 use crate::meshbuild::MeshBuilder;
 use crate::palette;
 use crate::rng::Rng;
-use crate::terrain::{
-    Biome, CHUNK_SIZE, Terrain, TerrainAssets, TerrainChunk, TerrainSet, WATER_LEVEL,
-};
+use crate::terrain::{Biome, CHUNK_SIZE, Terrain, TerrainAssets, TerrainChunk, WATER_LEVEL};
 
 /// Marks foliage that sways in the wind.
 #[derive(Component)]
@@ -39,13 +37,16 @@ impl Plugin for ScatterPlugin {
             .init_resource::<DirtyGroves>()
             .add_systems(
                 Update,
-                (
-                    populate_chunks.after(TerrainSet),
-                    sway_foliage,
-                    topple_trees,
-                    sink_spent,
-                    rebake_groves,
-                ),
+                (sway_foliage, topple_trees, sink_spent, rebake_groves),
+            )
+            // PostUpdate, deliberately: chunks spawned during Update - by
+            // streaming or by a building levelling the ground - get their
+            // scenery THIS frame, before anything renders. In Update the
+            // scenery lagged the chunk by a frame and every construction
+            // made the nearby forest blink.
+            .add_systems(
+                PostUpdate,
+                populate_chunks.before(bevy::transform::TransformSystems::Propagate),
             );
     }
 }
