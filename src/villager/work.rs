@@ -423,6 +423,7 @@ pub(super) fn do_work(
                 Option<&super::traits::Traits>,
                 Option<&super::home::Home>,
                 Option<&mut Rations>,
+                Option<&mut Skills>,
             ),
         ),
         (
@@ -519,7 +520,7 @@ pub(super) fn do_work(
         mut target,
         mut motion,
         person,
-        (mut chronicle, manner, home, rations),
+        (mut chronicle, manner, home, rations, mut skills),
     ) in &mut workers
     {
         if *activity != Activity::Working {
@@ -972,18 +973,40 @@ pub(super) fn do_work(
         // Iron tools bite better - but only while there IS iron: the
         // blacksmith's speed is now something the village mines, smelts
         // and wears out, not a property of the building's silhouette.
+        // A practiced hand is a quicker one - mastery shaves a fifth off
+        // the cycle - and a better-rewarded one below: most trades yield
+        // more per cycle as the craft grows.
+        let skill = skills.as_ref().map_or(0.0, |s| s.of(*vocation));
         let cycle =
             if context.3.iter().any(|b| b.kind == BuildingKind::Blacksmith) && store.iron > 0.0 {
                 WORK_SECONDS * 0.75
             } else {
                 WORK_SECONDS
             } * manner.map_or(1.0, |m| m.work_pace())
-                * weather.as_ref().map_or(1.0, |w| w.toil());
+                * weather.as_ref().map_or(1.0, |w| w.toil())
+                * (1.0 - skill * 0.2);
         job.progress += dt;
         if job.progress < cycle {
             continue;
         }
         job.progress = 0.0;
+
+        // The cycle itself is the teacher. A real day at the post is
+        // twenty-odd cycles once walking and meals take their share, so
+        // this rate makes 'getting the knack' a day and a half's work
+        // and mastery the better part of a season. The chronicle marks
+        // each threshold crossed.
+        if let Some(skills) = skills.as_mut()
+            && let Some(tier) = skills.practice(*vocation, 0.005)
+        {
+            info!("{} is now {} at their craft", person.name, tier);
+            if let Some(chronicle) = chronicle.as_mut() {
+                chronicle.record(
+                    clock.day(),
+                    format!("became {tier} as one who {}", vocation.describe()),
+                );
+            }
+        }
 
         // The food trades eat where they work — the fisher at the water's
         // edge, the gatherer over the basket. Without this, the hunger
@@ -1020,7 +1043,7 @@ pub(super) fn do_work(
                     commands.entity(entity).remove::<Job>();
                     continue;
                 };
-                let mut picked = source.amount.min(1.0);
+                let mut picked = source.amount.min(1.0 + skill * 0.5);
                 source.amount -= picked;
                 // What went into the gatherer does not also reach the sacks.
                 if ate_at_work {
@@ -1036,7 +1059,7 @@ pub(super) fn do_work(
             // A dock casts past the shallows, and a smokehouse cures the
             // catch: one day's fishing can feed three days of village.
             Vocation::Fisher => {
-                let mut catch = 1.0_f32;
+                let mut catch = 1.0_f32 + skill * 0.8;
                 if context.3.iter().any(|b| b.kind == BuildingKind::Dock) {
                     // Past the shallows the fish run twice as thick: a dock
                     // doubles the line, and is meant to carry a village.
@@ -1053,7 +1076,7 @@ pub(super) fn do_work(
 
             Vocation::Miner | Vocation::Mason => match job.focus {
                 // Bare high ground still yields loose stone.
-                None => store.stone += 1.0,
+                None => store.stone += 1.0 + skill * 0.5,
                 // The mine: a drift into standing rock gives up stone by
                 // the cartload, and never runs out the way a boulder does.
                 Some(works)
@@ -1062,7 +1085,7 @@ pub(super) fn do_work(
                         .get(works)
                         .is_ok_and(|b| b.kind == BuildingKind::Mine) =>
                 {
-                    store.stone += 3.0;
+                    store.stone += 3.0 + skill * 1.5;
                 }
                 // A deposit gives up its kind, load by load, until the
                 // ground is empty and the diggings are abandoned.
@@ -1092,7 +1115,7 @@ pub(super) fn do_work(
                         commands.entity(entity).remove::<Job>();
                         continue;
                     };
-                    store.stone += 1.0;
+                    store.stone += 1.0 + skill * 0.5;
                     // An outcrop gives up its stone slowly - the pick takes
                     // the same bite from a much bigger body - then chips
                     // away like any boulder once it is down to one.
@@ -1172,7 +1195,7 @@ pub(super) fn do_work(
                         3.0
                     } else {
                         2.0
-                    };
+                    } + skill;
                     commands
                         .entity(entity)
                         .insert(CarryingWood { amount: yield_ });
@@ -1270,7 +1293,7 @@ pub(super) fn do_work(
                         *activity = Activity::Idle;
                         commands.entity(entity).remove::<Job>();
                     } else {
-                        field.growth = (field.growth + 0.10).min(1.0);
+                        field.growth = (field.growth + 0.10 * (1.0 + skill * 0.5)).min(1.0);
                     }
                 }
             },
@@ -1293,7 +1316,7 @@ pub(super) fn do_work(
                     0.5
                 } else {
                     0.3
-                };
+                } * (1.0 + skill * 0.8);
                 vitality.harm = (vitality.harm - mending).max(0.0);
                 if vitality.harm <= 0.0 {
                     info!("{} nursed someone back to health", person.name);
@@ -1322,7 +1345,7 @@ pub(super) fn do_work(
 
                 if is_corpse {
                     // The kill is made; bring it home as food.
-                    store.larder.add(FoodKind::Meat, CARCASS_FOOD);
+                    store.larder.add(FoodKind::Meat, CARCASS_FOOD + skill * 1.5);
                     commands.entity(prey).despawn();
                     let quarry = match genome.species {
                         Species::Deer => "brought down a deer",

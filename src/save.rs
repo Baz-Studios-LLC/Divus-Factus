@@ -75,6 +75,8 @@ struct PersonSave {
     traits: Option<Traits>,
     chronicle: Option<Chronicle>,
     vocation: Option<crate::villager::work::Vocation>,
+    #[serde(default)]
+    skills: Option<crate::villager::work::Skills>,
     harm: f32,
     prime: Option<f32>,
     childhood: Option<f32>,
@@ -421,6 +423,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         Option<Traits>,
         Option<Chronicle>,
         Option<crate::villager::work::Vocation>,
+        Option<crate::villager::work::Skills>,
         f32,
         Option<f32>,
         Option<f32>,
@@ -442,6 +445,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                     Option<&Traits>,
                     Option<&Chronicle>,
                     Option<&crate::villager::work::Vocation>,
+                    Option<&crate::villager::work::Skills>,
                     Option<&Vitality>,
                     Option<&Prime>,
                     Option<&Childhood>,
@@ -454,7 +458,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
             ), (With<Villager>, Without<Corpse>)>()
             .iter(world)
     {
-        let (faith, traits, chronicle, vocation, vitality, prime, childhood) = extras;
+        let (faith, traits, chronicle, vocation, skills, vitality, prime, childhood) = extras;
         let (spouse, parentage, home) = ties;
         people_ids.push(entity);
         raw.push((
@@ -475,6 +479,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
             traits.map(|t| Traits(t.0.clone())),
             chronicle.cloned(),
             vocation.copied(),
+            skills.cloned(),
             vitality.map_or(0.0, |v| v.harm),
             prime.map(|p| p.remaining),
             childhood.map(|c| c.remaining),
@@ -502,6 +507,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                 traits,
                 chronicle,
                 vocation,
+                skills,
                 harm,
                 prime,
                 childhood,
@@ -519,6 +525,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                     traits,
                     chronicle,
                     vocation,
+                    skills,
                     harm,
                     prime,
                     childhood,
@@ -974,6 +981,9 @@ fn apply(world: &mut World, save: SaveGame) {
             }
             if let Some(vocation) = p.vocation {
                 e.insert(vocation);
+            }
+            if let Some(skills) = &p.skills {
+                e.insert(skills.clone());
             }
             if let Some(remaining) = p.prime {
                 e.insert(Prime { remaining });

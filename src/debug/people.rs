@@ -515,6 +515,7 @@ pub(crate) fn update_person_detail(
                 Option<&Parentage>,
                 Option<&crate::villager::home::Home>,
                 Option<&crate::villager::work::Vocation>,
+                Option<&crate::villager::work::Skills>,
                 Option<&crate::villager::traits::Traits>,
                 Has<crate::creature::Childhood>,
             ),
@@ -550,7 +551,7 @@ pub(crate) fn update_person_detail(
         (person, genome, member_of),
         (needs, activity, vitality, morale),
         (temperament, witnessed, faith, chronicle),
-        (spouse, parentage, home, vocation, manner, child),
+        (spouse, parentage, home, vocation, skills, manner, child),
     )) = selected.0.and_then(|entity| people.get(entity).ok())
     else {
         // Hidden means GONE: Visibility alone leaves the node's empty
@@ -606,7 +607,9 @@ pub(crate) fn update_person_detail(
             InspectorValue::FaithIn => faith
                 .map_or("has never wondered", |f| f.describe())
                 .to_string(),
-            InspectorValue::Work => vocation.map_or("none yet", |v| v.describe()).to_string(),
+            InspectorValue::Work => vocation.map_or("none yet".to_string(), |v| {
+                skills.map_or_else(|| v.describe().to_string(), |s| s.describe(*v))
+            }),
             InspectorValue::Family => family_phrase(spouse, parentage, &kin_names, &corpse_check),
             InspectorValue::Seen => match witnessed {
                 Some(w) if w.is_innocent() && w.secondhand > 0 => "only in stories".to_string(),

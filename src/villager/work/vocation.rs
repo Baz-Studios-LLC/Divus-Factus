@@ -32,6 +32,60 @@ pub enum Vocation {
     Guard,
 }
 
+/// A working life's accumulated craft, one score per calling ever
+/// practised. Grown by doing the work, cycle by cycle; never lost —
+/// a retrained mason still remembers the sea. 0 is first-day hands,
+/// 1 is mastery.
+#[derive(Component, Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Skills(pub Vec<(Vocation, f32)>);
+
+impl Skills {
+    pub fn of(&self, vocation: Vocation) -> f32 {
+        self.0
+            .iter()
+            .find(|(v, _)| *v == vocation)
+            .map_or(0.0, |(_, s)| *s)
+    }
+
+    /// One work cycle's worth of learning. Returns the mastery tier
+    /// crossed, if this cycle crossed one — the chronicle wants to know.
+    pub fn practice(&mut self, vocation: Vocation, amount: f32) -> Option<&'static str> {
+        let entry = match self.0.iter_mut().find(|(v, _)| *v == vocation) {
+            Some(entry) => entry,
+            None => {
+                self.0.push((vocation, 0.0));
+                self.0.last_mut().expect("just pushed")
+            }
+        };
+        let before = Self::tier(entry.1);
+        entry.1 = (entry.1 + amount).min(1.0);
+        let after = Self::tier(entry.1);
+        (after != before).then_some(after)
+    }
+
+    /// The words for a level of craft, in the order a life earns them.
+    fn tier(skill: f32) -> &'static str {
+        if skill < 0.15 {
+            "new to it"
+        } else if skill < 0.45 {
+            "getting the knack"
+        } else if skill < 0.8 {
+            "a practiced hand"
+        } else {
+            "a master"
+        }
+    }
+
+    /// How this person's current calling reads, craft and all.
+    pub fn describe(&self, vocation: Vocation) -> String {
+        format!(
+            "{} - {}",
+            vocation.describe(),
+            Self::tier(self.of(vocation))
+        )
+    }
+}
+
 impl Vocation {
     /// The vocation as the inspector names it.
     pub fn describe(self) -> &'static str {
@@ -125,7 +179,9 @@ pub(crate) fn assign_vocations(
             continue;
         }
         let vocation = roll_vocation(temperament.boldness, &mut rng.0);
-        commands.entity(entity).insert(vocation);
+        commands
+            .entity(entity)
+            .insert((vocation, Skills::default()));
         info!("{} {}", person.name, vocation.taking_up());
         if let Some(mut chronicle) = chronicle {
             chronicle.record(clock.day(), vocation.taking_up());
@@ -166,7 +222,13 @@ pub(crate) fn retrain(
         (With<crate::creature::wildlife::Wild>, Without<Corpse>),
     >,
     mut workers: Query<
-        (Entity, &Vocation, &Person, Option<&mut Chronicle>),
+        (
+            Entity,
+            &Vocation,
+            &Person,
+            Option<&mut Chronicle>,
+            Option<&Skills>,
+        ),
         (With<Villager>, Without<Corpse>),
     >,
 ) {
@@ -179,7 +241,7 @@ pub(crate) fn retrain(
     *since_last = 0.0;
 
     let has_building = |kind: BuildingKind| buildings.iter().any(|b| b.kind == kind);
-    let count_of = |v: Vocation| workers.iter().filter(|(_, w, _, _)| **w == v).count();
+    let count_of = |v: Vocation| workers.iter().filter(|(_, w, ..)| **w == v).count();
     let has_vocation = |v: Vocation| count_of(v) > 0;
     let timber_low = stores.iter().next().is_none_or(|s| s.timber < 6.0);
     // Whether any fellable tree stands on ground the village knows. When
@@ -318,8 +380,18 @@ pub(crate) fn retrain(
     else {
         return;
     };
-    let donor = workers.iter_mut().find(|(_, v, _, _)| **v == give);
-    let Some((entity, old, person, chronicle)) = donor else {
+    // From the giving trade, take the GREENEST hands, never the master:
+    // a need can pull anyone, but the village does not melt down its
+    // finest fisher to hold a hammer while an apprentice stands idle.
+    let donor = workers
+        .iter_mut()
+        .filter(|(_, v, ..)| **v == give)
+        .min_by(|a, b| {
+            let a_craft = a.4.map_or(0.0, |s| s.of(give));
+            let b_craft = b.4.map_or(0.0, |s| s.of(give));
+            a_craft.total_cmp(&b_craft)
+        });
+    let Some((entity, old, person, chronicle, _)) = donor else {
         return;
     };
     let old = *old;
