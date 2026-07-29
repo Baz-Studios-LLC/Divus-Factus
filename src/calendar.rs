@@ -207,6 +207,23 @@ impl WorldClock {
     }
 }
 
+/// The calendar date a bare day-number falls on: "spring 14, year 2".
+/// For records that stored the day and want to speak like the HUD does.
+pub fn date_of_day(day: u32) -> String {
+    let season = match ((day - 1) / DAYS_PER_SEASON) % SEASONS_PER_YEAR {
+        0 => Season::Spring,
+        1 => Season::Summer,
+        2 => Season::Autumn,
+        _ => Season::Winter,
+    };
+    format!(
+        "{} {}, year {}",
+        season.name(),
+        (day - 1) % DAYS_PER_SEASON + 1,
+        (day - 1) / (DAYS_PER_SEASON * SEASONS_PER_YEAR) + 1
+    )
+}
+
 fn tick(time: Res<Time>, mut clock: ResMut<WorldClock>) {
     clock.elapsed += time.delta_secs() as f64;
 }

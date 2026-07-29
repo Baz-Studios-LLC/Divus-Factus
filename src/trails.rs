@@ -44,6 +44,11 @@ impl Plugin for TrailsPlugin {
 /// One cell's memory of feet.
 pub struct TrailCell {
     pub wear: f32,
+    /// The tint band last painted (blend quantized), so the painter only
+    /// touches chunks where something actually changed - a mature road
+    /// network otherwise re-cost thousands of noise lookups every pass,
+    /// and the frame rate sagged with the miles walked.
+    painted_band: u8,
 }
 
 /// Everywhere the ground has been walked, and how hard.
@@ -91,7 +96,13 @@ impl Trails {
     pub fn restore(&mut self, worn: impl Iterator<Item = (i32, i32, f32)>) {
         self.cells.clear();
         for (x, z, wear) in worn {
-            self.cells.insert(IVec2::new(x, z), TrailCell { wear });
+            self.cells.insert(
+                IVec2::new(x, z),
+                TrailCell {
+                    wear,
+                    painted_band: u8::MAX,
+                },
+            );
         }
     }
 
@@ -123,7 +134,10 @@ fn tread(
                 transform.translation.x,
                 transform.translation.z,
             ))
-            .or_insert(TrailCell { wear: 0.0 });
+            .or_insert(TrailCell {
+                wear: 0.0,
+                painted_band: 0,
+            });
         cell.wear = (cell.wear + dt * 0.9).min(WEAR_CAP);
     }
 }
@@ -155,13 +169,17 @@ fn paint(
         return;
     };
 
-    // Age the map, remembering where paint needs to change (including
-    // ground that has just faded back to nothing).
+    // Age the map, remembering only the cells whose PAINT actually needs
+    // to change: the band their blend falls in moved since last pass.
     let mut stale: Vec<IVec2> = Vec::new();
     let mut gone: Vec<IVec2> = Vec::new();
     for (at, cell) in trails.cells.iter_mut() {
         cell.wear -= FADE * elapsed;
-        stale.push(*at);
+        let band = (((cell.wear - 0.8).max(0.0) / VISIBLE).min(1.0) * 24.0) as u8;
+        if band != cell.painted_band {
+            cell.painted_band = band;
+            stale.push(*at);
+        }
         if cell.wear <= 0.05 {
             gone.push(*at);
         }

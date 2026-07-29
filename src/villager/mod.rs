@@ -52,18 +52,22 @@ const SECONDS_STARVING_TO_DIE: f32 = 120.0;
 /// Seconds of decent feeding to heal from the brink back to whole.
 const SECONDS_TO_MEND: f32 = 160.0;
 
-/// The village will not grow past this. A cap, not a target — reached only if the
-/// player keeps everyone fed.
-const POPULATION_CAP: usize = 24;
+// There is no numeric population cap: a village grows as far as its
+// shelter, its larder and its land allow. Cities are meant to get huge -
+// the limits are the ones the villagers build their way past.
 
 /// Seconds between chances of a birth.
 const BIRTH_INTERVAL: f32 = 18.0;
 
-/// Seconds a newborn takes to come of age.
-const SECONDS_TO_COME_OF_AGE: f32 = 300.0;
+/// Seconds a newborn takes to come of age: sixteen days - a childhood
+/// spanning most of a season, proportioned to the 28-day calendar.
+const SECONDS_TO_COME_OF_AGE: f32 = crate::calendar::DAY_SECONDS * 16.0;
 
-/// Seconds of adulthood before age begins to show.
-const SECONDS_OF_PRIME: f32 = 950.0;
+/// Seconds of adulthood before age begins to show: three seasons of
+/// prime. Under the old 950 seconds every founding mother was an elder
+/// by the first week and no village could ever grow - lifespans must be
+/// proportioned to the calendar they live inside.
+const SECONDS_OF_PRIME: f32 = crate::calendar::DAY_SECONDS * 84.0;
 
 /// Seconds between rounds of courtship.
 const BOND_INTERVAL: f32 = 12.0;
@@ -103,6 +107,7 @@ impl Plugin for VillagerPlugin {
                     rites::burials,
                     seek_company,
                     speech::small_talk,
+                    stretch_settlement,
                     explore::expeditions,
                     explore::escort_duty,
                     explore::raise_cairns,
@@ -292,18 +297,13 @@ pub struct Chronicle {
 }
 
 impl Chronicle {
-    /// How much of a life is kept. The first entry (birth or founding) is
-    /// never dropped; the middle goes before the beginning does.
-    pub const KEPT: usize = 24;
-
     pub fn record(&mut self, day: u32, text: impl Into<String>) {
+        // A whole life is kept: the chronicle page shows everything, and
+        // doctrine will one day be spun from the full record.
         self.events.push(LifeEvent {
             day,
             text: text.into(),
         });
-        if self.events.len() > Self::KEPT {
-            self.events.remove(1);
-        }
     }
 
     /// Records a rumor heard, stacking retellings of the same story into one
@@ -998,6 +998,33 @@ pub(crate) fn spawn_settlement(
 /// The settlement site is chosen from the terrain, so it is not known until after
 /// generation. Starting the camera at the world origin instead leaves the player
 /// staring at an empty hillside with the entire population off-screen.
+/// The settlement's official radius follows its furthest roof: wandering,
+/// sheltering and the social range all read this, so a sprawling town
+/// LIVES sprawling instead of crowding its old centre.
+fn stretch_settlement(
+    time: Res<Time>,
+    mut since_last: Local<f32>,
+    mut site: Option<ResMut<SettlementSite>>,
+    buildings: Query<&GlobalTransform, With<work::Building>>,
+) {
+    *since_last += time.delta_secs();
+    if *since_last < 12.0 {
+        return;
+    }
+    *since_last = 0.0;
+    let Some(site) = site.as_mut() else {
+        return;
+    };
+    let furthest = buildings
+        .iter()
+        .map(|at| at.translation().distance(site.centre))
+        .fold(0.0f32, f32::max);
+    let stretched = (furthest + 14.0).max(36.0);
+    if (stretched - site.radius).abs() > 1.0 {
+        site.radius = stretched;
+    }
+}
+
 fn point_camera_at_settlement(
     site: Option<Res<SettlementSite>>,
     terrain_probe: Option<Res<Terrain>>,
@@ -1378,17 +1405,10 @@ fn births(
             .sum::<f32>()
             / living as f32
     };
-    // A town hall makes room for a town — but nobody is born into a village
-    // that cannot shelter them. Houses are the real roof on growth.
-    let hall_cap = if town_halls
-        .iter()
-        .any(|b| b.kind == work::BuildingKind::TownHall)
-    {
-        POPULATION_CAP + 10
-    } else {
-        POPULATION_CAP
-    };
-    let cap = hall_cap.min(home::shelter_capacity(huts.iter().count()));
+    // Nobody is born into a village that cannot shelter them: houses are
+    // the roof on growth, and the only one - build more, grow more.
+    let _ = town_halls;
+    let cap = home::shelter_capacity(huts.iter().count());
     let food_stored = site
         .as_ref()
         .and_then(|s| stores.get(s.settlement).ok())
@@ -1824,7 +1844,7 @@ mod tests {
 
     #[test]
     fn villages_grow_only_when_fed_and_roofed_by_the_cap() {
-        let cap = POPULATION_CAP;
+        let cap = 24;
         assert!(
             can_grow_to(2, 0.3, 20.0, cap),
             "a fed pair should be able to grow"

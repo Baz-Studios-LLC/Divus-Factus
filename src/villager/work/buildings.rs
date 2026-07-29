@@ -1077,12 +1077,15 @@ pub(crate) fn plan_houses(
         return;
     }
 
-    // Civic buildings claim the inner ring; houses begin one ring out. The
-    // first plot the terrain permits wins, so the village fills inside-out.
+    // Civic buildings claim the inner ring; houses begin one ring out and
+    // the town SPRAWLS: the ring search widens with the population, so a
+    // growing city pushes its streets outward instead of hitting a wall
+    // of full plots.
+    let ring_reach = 5 + (population / 6) as u32;
     let rings = if kind == BuildingKind::House {
-        1..5
+        1..ring_reach
     } else {
-        0..5
+        0..ring_reach.min(7)
     };
     'darts: for (x, z, yaw) in village_slots(site.centre, rings) {
         if !terrain.is_walkable(x, z) {

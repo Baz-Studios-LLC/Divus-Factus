@@ -68,6 +68,10 @@ pub(crate) struct DetailSeen;
 #[derive(Component)]
 pub(crate) struct DetailLife;
 
+/// The full life story on its own tab, every entry dated.
+#[derive(Component)]
+pub(crate) struct DetailChronicle;
+
 /// The dossier content, shown only while someone is selected.
 #[derive(Component)]
 pub(crate) struct DetailPage;
@@ -213,6 +217,11 @@ pub(crate) fn spawn_people_panel(mut commands: Commands, mut images: ResMut<Asse
     commands.spawn((DetailName, ui::heading(""), ChildOf(masthead_text)));
     commands.spawn((DetailSubtitle, ui::dim(""), ChildOf(masthead_text)));
 
+    // Two faces of a person: the soul as it stands, and the life as it
+    // was lived. The chronicle deserves its own page, not a footnote.
+    let tabs = ui::tab_bar(&mut commands, page, &["THE SOUL", "THE LIFE"]);
+    let (soul, life_tab) = (tabs[0], tabs[1]);
+
     // Every readout the hover card has, permanent and orderly.
     for (value, label) in [
         (InspectorValue::State, "state"),
@@ -227,15 +236,44 @@ pub(crate) fn spawn_people_panel(mut commands: Commands, mut images: ResMut<Asse
         (InspectorValue::Family, "family"),
         (InspectorValue::Seen, "seen you"),
     ] {
-        let row = ui::stat_row(&mut commands, page, label, None);
+        let row = ui::stat_row(&mut commands, soul, label, None);
         commands.entity(row.value).insert(DetailStat(value));
     }
-    ui::section_header(&mut commands, page, "WANTS");
-    commands.spawn((PersonDetailText, ui::body(""), ChildOf(page)));
-    ui::section_header(&mut commands, page, "HAS SEEN");
-    commands.spawn((DetailSeen, ui::body(""), ChildOf(page)));
-    ui::section_header(&mut commands, page, "LIFE");
-    commands.spawn((DetailLife, ui::dim(""), ChildOf(page)));
+    ui::section_header(&mut commands, soul, "WANTS");
+    commands.spawn((PersonDetailText, ui::body(""), ChildOf(soul)));
+    ui::section_header(&mut commands, soul, "HAS SEEN");
+    commands.spawn((DetailSeen, ui::body(""), ChildOf(soul)));
+    ui::section_header(&mut commands, soul, "LATELY");
+    commands.spawn((DetailLife, ui::dim(""), ChildOf(soul)));
+
+    // THE LIFE: the whole story, newest first, in its own scrolling well.
+    let well = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                max_height: px(300),
+                flex_direction: FlexDirection::Column,
+                overflow: Overflow::scroll_y(),
+                padding: UiRect::all(px(8)),
+                border_radius: BorderRadius::all(px(6)),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.35)),
+            ui::Scrollable,
+            ChildOf(life_tab),
+        ))
+        .id();
+    let story = commands
+        .spawn((
+            DetailChronicle,
+            ui::dim(""),
+            Node {
+                max_width: px(250),
+                ..default()
+            },
+        ))
+        .id();
+    commands.entity(story).insert(ChildOf(well));
     commands.insert_resource(PaperdollTarget(target));
 }
 
@@ -471,6 +509,7 @@ pub(crate) fn update_person_detail(
         Query<&mut Text, With<PersonDetailText>>,
         Query<&mut Text, With<DetailSeen>>,
         Query<&mut Text, With<DetailLife>>,
+        Query<&mut Text, With<DetailChronicle>>,
     )>,
 ) {
     if !panels.iter().any(|v| *v != Visibility::Hidden) {
@@ -596,18 +635,49 @@ pub(crate) fn update_person_detail(
         *text = Text::new(fresh);
     }
 
-    let fresh = chronicle.map_or_else(
+    let fresh = chronicle.as_ref().map_or_else(
         || "unwritten".to_string(),
         |chronicle| {
             let tail = chronicle.events.len().saturating_sub(4);
             chronicle.events[tail..]
                 .iter()
-                .map(|event| format!("d{}  {}", event.day, event.text))
+                .map(|event| {
+                    format!(
+                        "{}  {}",
+                        crate::calendar::date_of_day(event.day),
+                        event.text
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join("\n")
         },
     );
     if let Ok(mut text) = texts.p5().single_mut()
+        && text.0 != fresh
+    {
+        *text = Text::new(fresh);
+    }
+
+    // THE LIFE tab: everything, newest first, each entry dated.
+    let fresh = chronicle.map_or_else(
+        || "unwritten".to_string(),
+        |chronicle| {
+            chronicle
+                .events
+                .iter()
+                .rev()
+                .map(|event| {
+                    format!(
+                        "{}  {}",
+                        crate::calendar::date_of_day(event.day),
+                        event.text
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        },
+    );
+    if let Ok(mut text) = texts.p6().single_mut()
         && text.0 != fresh
     {
         *text = Text::new(fresh);

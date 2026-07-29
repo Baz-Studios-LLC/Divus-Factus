@@ -212,7 +212,10 @@ fn plan_routes(
     let Some(terrain) = terrain else {
         return;
     };
-    let mut budget = ROUTES_PER_FRAME;
+    // The budget grows with the crowd: four routes a frame was sized for
+    // a hamlet, and a city of eighty would starve for paths and stand
+    // still in the street.
+    let mut budget = ROUTES_PER_FRAME.max(creatures.iter().count() / 8);
 
     for (transform, target, mut route) in &mut creatures {
         let Some(goal) = target.0 else {

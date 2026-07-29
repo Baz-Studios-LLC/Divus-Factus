@@ -428,3 +428,36 @@ until the loop above is fun.
   the settlement and would happily walk off into unloaded terrain.
 - One settlement of twelve in an endless world is very sparse. Population and
   multiple settlements matter more now than more terrain does.
+
+---
+
+## The long game (recorded 2026-07-29, direction agreed with Baz)
+
+The population cap is gone: growth is governed by shelter, food surplus and
+land, and the town physically sprawls (house rings widen with population,
+the settlement radius follows the furthest roof). From here, three arcs in
+order:
+
+**1. Doctrine — the egregore itself.** What the village believes the god IS,
+grown from what they witnessed; epithets, prayers as a queue, doctrine
+shaping villager behaviour. The game's soul; comes first so every later
+crisis (raids, famines, schisms) lands as a theological event.
+
+**2. Defense — walls and a standing watch.** Palisades first, stone later:
+wall segments as civic works tracing the settlement's (now stretching)
+perimeter, gates where the worn trails cross it. The Guard grows into a
+small army: barracks, patrol circuits along the walls, iron arms from the
+smelter (the iron economy's endgame sink). The castle crowns this arc — a
+keep at the heart of a mature city, suburbs clustering outside the walls
+(near-fission: satellite house clusters with their own wells, the same
+machinery as distant colonies pointed inward).
+
+**3. Goblins — the enemy worth walling against.** Encampments seeded far
+out like deposits, growing over time, raid parties marching the trails at
+night: loot, fire, fear. Explicitly AFTER defense exists — the village
+needs survivability (done: rations, famine watch, scaled thresholds) and
+walls before an enemy that tests them. A raid witnessed is a faith event:
+the god who saved us, or the god who let it happen.
+
+Multi-settlement fission runs through all three: a crowded, well-fed city
+with known far ground sends founders past the cairns.
