@@ -146,20 +146,20 @@ fn speak(
                 ));
             };
             let auto = Val::Auto;
-            // The rim, top and bottom: packed tightly enough that the
-            // circles overlap at the widest bubble, so the silhouette is
-            // curve meeting curve the whole way round.
-            for i in 0..24 {
-                let pc = i as f32 * 4.25;
-                let size = 9.0 + ((i * 7) % 4) as f32 * 1.3;
+            // The rim, top and bottom: a handful of generous lobes, still
+            // spaced tightly enough to overlap at the widest bubble - big
+            // soft bumps touching each other the whole way round.
+            for i in 0..16 {
+                let pc = i as f32 * 6.15 - 1.0;
+                let size = 14.0 + ((i * 7) % 4) as f32 * 1.8;
                 lobe(percent(pc), px(-size * 0.42), auto, auto, size);
-                let size = 8.5 + ((i * 5 + 2) % 4) as f32 * 1.3;
-                lobe(percent(pc + 2.0), auto, auto, px(-size * 0.42), size);
+                let size = 13.5 + ((i * 5 + 2) % 4) as f32 * 1.8;
+                lobe(percent(pc + 3.0), auto, auto, px(-size * 0.42), size);
             }
             // The sides.
-            for (pc, size) in [(2.0, 11.0), (28.0, 12.0), (54.0, 11.5), (80.0, 10.5)] {
+            for (pc, size) in [(4.0, 15.0), (38.0, 16.5), (70.0, 14.5)] {
                 lobe(px(-size * 0.42), percent(pc), auto, auto, size);
-                lobe(auto, percent(pc + 5.0), px(-size * 0.42), auto, size);
+                lobe(auto, percent(pc + 7.0), px(-size * 0.42), auto, size);
             }
             drop(lobe);
             // The cover: the box's own fill, laid over every lobe's
