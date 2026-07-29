@@ -115,8 +115,14 @@ fn speak(
                     max_width: px(230),
                     ..default()
                 },
-                // Opaque, so the trimmings below can weld on seamlessly.
-                BackgroundColor(theme::panel_bg()),
+                // Opaque, so the trimmings below can weld on seamlessly -
+                // and for thoughts, FULLY opaque: the cloud is layered
+                // discs, and any alpha darkens every overlap.
+                BackgroundColor(if say.thought {
+                    theme::panel_bg().with_alpha(1.0)
+                } else {
+                    theme::panel_bg()
+                }),
                 BorderColor::all(border),
             ))
             .id();
@@ -129,20 +135,21 @@ fn speak(
             // survives only on the OUTSIDE silhouette and never breaks
             // into the cloud.
             let auto = Val::Auto;
-            // A modest count of lobes in genuinely varied sizes - small
-            // bumps shouldering big billows, the way a cloud actually
-            // looks - spaced to keep touching at the widest bubble.
+            // A modest count of lobes, sizes JITTERED neighbour to
+            // neighbour - a billow beside a bump beside a billow, the way
+            // a cloud actually piles up. A smooth size ramp reads as
+            // uniform; only real jumps read as cloud.
+            const TOP: [f32; 10] = [24.0, 15.0, 27.0, 17.0, 21.0, 14.5, 25.5, 16.0, 20.0, 26.0];
+            const UNDER: [f32; 10] = [17.0, 25.0, 15.5, 22.0, 14.5, 26.5, 16.5, 23.0, 15.0, 21.0];
             let mut rim: Vec<(Val, Val, Val, Val, f32)> = Vec::new();
-            for i in 0..10 {
+            for (i, (&size, &under)) in TOP.iter().zip(UNDER.iter()).enumerate() {
                 let pc = i as f32 * 9.8 - 1.5;
-                let size = 16.0 + ((i * 13) % 7) as f32 * 1.7;
                 rim.push((percent(pc), px(-size * 0.40), auto, auto, size));
-                let size = 15.0 + ((i * 11 + 3) % 7) as f32 * 1.7;
-                rim.push((percent(pc + 4.5), auto, auto, px(-size * 0.40), size));
+                rim.push((percent(pc + 4.5), auto, auto, px(-under * 0.40), under));
             }
-            for (pc, size) in [(8.0, 19.0), (55.0, 23.0)] {
+            for (pc, size) in [(8.0, 19.0), (55.0, 24.0)] {
                 rim.push((px(-size * 0.40), percent(pc), auto, auto, size));
-                rim.push((auto, percent(pc + 12.0), px(-size * 0.40), auto, size - 3.0));
+                rim.push((auto, percent(pc + 12.0), px(-size * 0.40), auto, size - 4.0));
             }
             for pass in 0..2 {
                 for (left, top, right, bottom, size) in &rim {
@@ -175,7 +182,13 @@ fn speak(
                             translation: Val2::new(px(dx), px(dy)),
                             ..default()
                         },
-                        BackgroundColor(if pass == 0 { border } else { theme::panel_bg() }),
+                        // Fully opaque, both layers: any alpha at all and
+                        // every overlap darkens like a Venn diagram.
+                        BackgroundColor(if pass == 0 {
+                            border.with_alpha(1.0)
+                        } else {
+                            theme::panel_bg().with_alpha(1.0)
+                        }),
                         ChildOf(bubble),
                     ));
                 }
@@ -192,7 +205,7 @@ fn speak(
                     border_radius: BorderRadius::all(px(13)),
                     ..default()
                 },
-                BackgroundColor(theme::panel_bg()),
+                BackgroundColor(theme::panel_bg().with_alpha(1.0)),
                 ChildOf(bubble),
             ));
             // The trail: detached circles shrinking down toward whoever
