@@ -57,6 +57,10 @@ fn spawn_speed_strip(mut commands: Commands) {
     let strip = commands
         .spawn((
             Name::new("Time Controls"),
+            // A Panel with an Interaction, so the divine hand knows it is
+            // over interface here and becomes the pointing finger.
+            ui::Panel,
+            Interaction::default(),
             Node {
                 position_type: PositionType::Absolute,
                 left: px(12),
