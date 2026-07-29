@@ -478,3 +478,13 @@ speed and carrying capacity. Wild horses tamed and raised, carts built
 from timber and iron, caravans that move goods (and later, founding
 parties) along the worn trails far faster than feet. Sits naturally
 before multi-settlement fission — the same carts provision colonies.
+
+**All scenery real (deferred on measurement).** The dream: every tree
+and rock in the world an entity the simulation can touch, unlocking
+far-woods logging expeditions. First attempt (all-entities, shared
+meshes) read as halving release fps, but the benchmark was confounded
+by thermal throttling. Before retrying: build an averaged-fps harness
+(mean over all PERF lines, interleaved A/B runs, cool machine), then
+either eat the measured cost or do the split-representation refactor -
+lightweight logic entities everywhere, per-chunk merged visuals that
+rebake on change. The mesh library (ScatterMeshes) is already in.
