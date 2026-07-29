@@ -45,6 +45,7 @@ impl Plugin for CreaturePlugin {
                     wildlife::wild_hunger,
                     wildlife::graze_and_flee,
                     wildlife::wolves_hunt,
+                    wildlife::wolves_stalk,
                     wildlife::wild_breeding,
                     wildlife::wild_growth,
                     succumb,

@@ -405,6 +405,16 @@ fn candidates(
             ],
             trade_weight,
         ),
+        Some(work::Vocation::Guard) => add(
+            &[
+                "quiet watch is good watch",
+                "I saw shapes at the treeline",
+                "the spear is mostly for leaning on",
+                "wolves test the roads at dusk",
+                "sleep well - that is the whole job",
+            ],
+            trade_weight,
+        ),
         None => {}
     }
 

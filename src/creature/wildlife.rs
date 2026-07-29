@@ -403,6 +403,104 @@ pub(super) fn wild_growth(
     }
 }
 
+/// Wolves test the roads. A villager alone and far from the square —
+/// a miner on the ore road, an explorer past the cairns — is prey the
+/// pack understands. Company is armour: anyone within a dozen strides
+/// makes a walker no longer alone, which is the whole argument for
+/// guards walking with expeditions. Towers hold their old dread.
+#[allow(clippy::type_complexity)]
+pub(super) fn wolves_stalk(
+    time: Res<Time>,
+    site: Option<Res<crate::villager::SettlementSite>>,
+    towers: Query<(&GlobalTransform, &crate::villager::work::Building)>,
+    mut say: MessageWriter<crate::ui::Say>,
+    mut rng: ResMut<crate::villager::SimRng>,
+    mut wolves: Query<
+        (&Transform, &CreatureGenome, &mut Wild, &mut MoveTarget),
+        (Without<Corpse>, Without<Held>, Without<Villager>),
+    >,
+    mut walkers: Query<
+        (
+            Entity,
+            &Transform,
+            Option<&crate::villager::work::Vocation>,
+            &mut crate::creature::Vitality,
+            &mut CreatureMotion,
+        ),
+        (
+            With<Villager>,
+            Without<Corpse>,
+            Without<Held>,
+            Without<Wild>,
+        ),
+    >,
+) {
+    let Some(site) = site else {
+        return;
+    };
+    let dt = time.delta_secs();
+    let posts: Vec<Vec3> = towers
+        .iter()
+        .filter(|(_, b)| b.kind == crate::villager::work::BuildingKind::Watchtower)
+        .map(|(t, _)| t.translation())
+        .collect();
+    // Where everyone stands, for the loneliness test.
+    let folk: Vec<(Entity, Vec3, bool)> = walkers
+        .iter()
+        .map(|(entity, at, vocation, _, _)| {
+            (
+                entity,
+                at.translation,
+                matches!(vocation, Some(crate::villager::work::Vocation::Guard)),
+            )
+        })
+        .collect();
+
+    for (wolf_at, genome, mut wild, mut target) in &mut wolves {
+        if genome.species != Species::Wolf || wild.hunger < 0.35 {
+            continue;
+        }
+        let at = wolf_at.translation;
+        // The mark: nearest villager who is far from the square, past the
+        // towers' dread, not a guard, and truly alone.
+        let mark = folk
+            .iter()
+            .filter(|(who, spot, is_guard)| {
+                !is_guard
+                    && spot.distance(at) < 42.0
+                    && spot.distance(site.centre) > 60.0
+                    && posts.iter().all(|post| post.distance(*spot) > 55.0)
+                    && !folk
+                        .iter()
+                        .any(|(other, other_at, _)| other != who && other_at.distance(*spot) < 12.0)
+            })
+            .min_by(|a, b| a.1.distance(at).total_cmp(&b.1.distance(at)));
+        let Some((quarry, quarry_at, _)) = mark else {
+            continue;
+        };
+        if quarry_at.distance(at) > 1.7 {
+            target.0 = Some(*quarry_at);
+            continue;
+        }
+        // Teeth. A mauling is slow enough to run from, fast enough to
+        // kill the one who cannot.
+        target.0 = None;
+        if let Ok((_, _, _, mut vitality, mut motion)) = walkers.get_mut(*quarry) {
+            vitality.harm += dt * 0.3;
+            vitality.violent = true;
+            motion.flail = 1.0;
+            if rng.0.chance(dt * 0.4) {
+                say.write(crate::ui::Say {
+                    speaker: *quarry,
+                    text: "wolves! WOLVES!".to_string(),
+                    thought: false,
+                });
+            }
+        }
+        wild.hunger = (wild.hunger - dt * 0.1).max(0.0);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

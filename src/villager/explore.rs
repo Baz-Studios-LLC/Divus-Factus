@@ -74,6 +74,13 @@ pub struct Expedition {
     homeward: bool,
 }
 
+/// A guard walking with someone whose road runs past the cairns.
+/// Company is armour: the wolves do not test a pair.
+#[derive(Component)]
+pub struct Escorting {
+    pub ward: Entity,
+}
+
 /// Idle explorers walk out past the cairns, read the land, and come home
 /// with what they found.
 #[allow(clippy::type_complexity)]
@@ -133,6 +140,16 @@ pub(super) fn expeditions(
     // Hungry villages muster expeditions in earnest; content ones only
     // when wanderlust strikes.
     let urgency = if wood_want || food_want { 0.02 } else { 0.002 };
+
+    // Idle guards, ready to fall in beside whoever sets out.
+    let mut guard_pool: Vec<(Entity, Vec3)> = explorers
+        .iter()
+        .filter(|(_, _, vocation, _, activity, ..)| {
+            **vocation == work::Vocation::Guard
+                && matches!(**activity, Activity::Idle | Activity::Wandering)
+        })
+        .map(|(guard, at, ..)| (guard, at.translation))
+        .collect();
 
     for (entity, at, vocation, person, mut activity, mut target, expedition, chronicle) in
         &mut explorers
@@ -297,6 +314,53 @@ pub(super) fn expeditions(
             homeward: false,
         });
         target.0 = Some(frontier);
+        // A guard falls in if one is free: nobody should walk past the
+        // cairns alone while the village can spare a spear.
+        if let Some(index) = guard_pool
+            .iter()
+            .enumerate()
+            .filter(|(_, (_, spot))| spot.distance(at.translation) < 60.0)
+            .min_by(|a, b| {
+                a.1.1
+                    .distance(at.translation)
+                    .total_cmp(&b.1.1.distance(at.translation))
+            })
+            .map(|(index, _)| index)
+        {
+            let (guard, _) = guard_pool.swap_remove(index);
+            commands
+                .entity(guard)
+                .insert((Escorting { ward: entity }, Activity::Working));
+            info!("{} walks out with an escort", person.name);
+        }
+    }
+}
+
+/// The escort's whole job: stay at the ward's shoulder until the road
+/// brings them both home, then stand down.
+#[allow(clippy::type_complexity)]
+pub(super) fn escort_duty(
+    mut commands: Commands,
+    wards: Query<(&Transform, Has<Expedition>), With<Villager>>,
+    mut escorts: Query<
+        (Entity, &Escorting, &mut MoveTarget, &mut Activity),
+        (With<Villager>, Without<Corpse>, Without<Held>),
+    >,
+) {
+    for (guard, escorting, mut target, mut activity) in &mut escorts {
+        let stand_down = match wards.get(escorting.ward) {
+            Ok((_, on_expedition)) => !on_expedition,
+            Err(_) => true,
+        };
+        if stand_down {
+            commands.entity(guard).remove::<Escorting>();
+            *activity = Activity::Idle;
+            target.0 = None;
+            continue;
+        }
+        if let Ok((ward_at, _)) = wards.get(escorting.ward) {
+            target.0 = Some(ward_at.translation - Vec3::new(1.4, 0.0, 1.1));
+        }
     }
 }
 

@@ -64,6 +64,8 @@ pub enum Vocation {
     Priest,
     /// Walks past the cairns and brings back the world.
     Explorer,
+    /// Spear and post: walks the edge, walks the roads, meets the wolves.
+    Guard,
 }
 
 impl Vocation {
@@ -82,6 +84,7 @@ impl Vocation {
             Vocation::Healer => "tends the hurt",
             Vocation::Priest => "keeps the shrine",
             Vocation::Explorer => "walks past the cairns",
+            Vocation::Guard => "stands guard",
         }
     }
 
@@ -100,6 +103,7 @@ impl Vocation {
             Vocation::Healer => "took up the salves",
             Vocation::Priest => "took up the litany",
             Vocation::Explorer => "took up the wayfarer's staff",
+            Vocation::Guard => "took up the guard's spear",
         }
     }
 }
@@ -1659,6 +1663,10 @@ pub(super) fn retrain(
     trees: Query<(&GlobalTransform, &crate::scatter::FellableTree)>,
     terrain: Option<Res<Terrain>>,
     site: Option<Res<SettlementSite>>,
+    wild: Query<
+        (&Transform, &crate::creature::genome::CreatureGenome),
+        (With<crate::creature::wildlife::Wild>, Without<Corpse>),
+    >,
     mut workers: Query<
         (Entity, &Vocation, &Person, Option<&mut Chronicle>),
         (With<Villager>, Without<Corpse>),
@@ -1713,6 +1721,16 @@ pub(super) fn retrain(
             })
         })
     });
+    // Wolves pressing the village, or a manned post waiting for its
+    // man: danger calls a guard the way hunger calls a fisher.
+    let wolves_near = site.as_ref().map_or(0, |s| {
+        wild.iter()
+            .filter(|(at, genome)| {
+                genome.species == crate::creature::genome::Species::Wolf
+                    && at.translation.distance(s.centre) < 130.0
+            })
+            .count()
+    });
     let mut wanted: Option<Vocation> = None;
     if food_low && food_hands * 5 < mouths.max(4) {
         wanted = Some(if shore_near {
@@ -1720,6 +1738,10 @@ pub(super) fn retrain(
         } else {
             Vocation::Gatherer
         });
+    } else if !has_vocation(Vocation::Guard)
+        && (wolves_near >= 2 || has_building(BuildingKind::Watchtower))
+    {
+        wanted = Some(Vocation::Guard);
     } else if timber_low && !wood_known && !has_vocation(Vocation::Explorer) {
         wanted = Some(Vocation::Explorer);
     } else if !has_vocation(Vocation::Forester) && timber_low && wood_known {
@@ -2251,6 +2273,22 @@ pub(super) fn take_up_work(
                     let at = at.translation();
                     Job::at(at, Some(shrine), at.distance(transform.translation))
                 }),
+
+            // A guard's post is the tower if one stands, the village edge
+            // otherwise; the walking of it is the work.
+            Vocation::Guard => {
+                let post = buildings
+                    .iter()
+                    .find(|(_, _, b)| b.kind == BuildingKind::Watchtower)
+                    .map(|(_, at, _)| at.translation())
+                    .unwrap_or_else(|| {
+                        let angle = rng.0.range(0.0, std::f32::consts::TAU);
+                        let (sin, cos) = angle.sin_cos();
+                        let (x, z) = (site.centre.x + cos * 22.0, site.centre.z + sin * 22.0);
+                        Vec3::new(x, terrain.height_at(x, z), z)
+                    });
+                Some(Job::at(post, None, post.distance(transform.translation)))
+            }
         };
 
         if let Some(job) = job {
@@ -2366,7 +2404,7 @@ pub(super) fn do_work(
         mut target,
         mut motion,
         person,
-        (chronicle, manner, home),
+        (mut chronicle, manner, home),
     ) in &mut workers
     {
         if *activity != Activity::Working {
@@ -2386,6 +2424,74 @@ pub(super) fn do_work(
             *activity = Activity::Idle;
             target.0 = None;
             commands.entity(entity).remove::<Job>();
+            continue;
+        }
+
+        // Guards are their own trade: no pile, no yield — the work is the
+        // walking, and the wolves are the deadline.
+        if *vocation == Vocation::Guard {
+            let at = transform.translation;
+            let nearest_wolf = prey_query
+                .iter()
+                .filter(|(_, _, _, is_corpse, genome)| {
+                    !is_corpse && genome.species == Species::Wolf
+                })
+                .map(|(t, ..)| t.translation)
+                .filter(|w| w.distance(at) < 26.0)
+                .min_by(|a, b| a.distance(at).total_cmp(&b.distance(at)));
+            if let Some(wolf_at) = nearest_wolf {
+                if wolf_at.distance(at) > 1.8 {
+                    target.0 = Some(wolf_at);
+                } else {
+                    // Close enough to strike: a blow a beat, until the
+                    // beast dies or breaks off.
+                    target.0 = None;
+                    motion.flail = 1.0;
+                    job.progress += dt;
+                    if job.progress >= 1.1 {
+                        job.progress = 0.0;
+                        for (wolf_t, mut vitality, mut wolf_motion, is_corpse, genome) in
+                            prey_query.iter_mut()
+                        {
+                            if is_corpse
+                                || genome.species != Species::Wolf
+                                || wolf_t.translation.distance(at) > 2.2
+                            {
+                                continue;
+                            }
+                            vitality.harm += 0.7;
+                            vitality.violent = true;
+                            wolf_motion.flail = 1.0;
+                            if vitality.harm >= 1.0 {
+                                info!("{} slew a wolf", person.name);
+                                if let Some(chronicle) = chronicle.as_mut() {
+                                    chronicle.record(
+                                        clock.day(),
+                                        "stood between the village and a wolf, and won".to_string(),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
+            // No wolves in sight: walk the round. A new leg of the patrol
+            // whenever the last one is done.
+            if at.distance(job.site) > 2.0 {
+                target.0 = Some(job.site);
+            } else {
+                target.0 = None;
+                job.progress += dt;
+                if job.progress >= 6.0 {
+                    job.progress = 0.0;
+                    let angle = rng.0.range(0.0, std::f32::consts::TAU);
+                    let (sin, cos) = angle.sin_cos();
+                    let reach = rng.0.range(14.0, 30.0);
+                    let (x, z) = (site.centre.x + cos * reach, site.centre.z + sin * reach);
+                    job.site = Vec3::new(x, 0.0, z);
+                }
+            }
             continue;
         }
 
@@ -2741,6 +2847,9 @@ pub(super) fn do_work(
         }
 
         match vocation {
+            // Guards never reach this match: their patrol-and-fight block
+            // runs earlier and always continues.
+            Vocation::Guard => {}
             Vocation::Gatherer => {
                 // A sacred stand yields its kind and is spent.
                 if let Some(mut flora) = job.focus.and_then(|f| sacred_mut.get_mut(f).ok()) {

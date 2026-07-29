@@ -101,6 +101,7 @@ impl Plugin for VillagerPlugin {
                     seek_company,
                     speech::small_talk,
                     explore::expeditions,
+                    explore::escort_duty,
                     explore::raise_cairns,
                 )
                     .chain(),
