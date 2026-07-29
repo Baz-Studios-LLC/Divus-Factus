@@ -1120,6 +1120,7 @@ fn apply(world: &mut World, save: SaveGame) {
                         *pos,
                         &mut rng.0,
                         roll,
+                        None,
                     );
                     commands.entity(boulder).insert(SavedBoulder);
                     commands.entity(boulder).entry::<Transform>().and_modify({

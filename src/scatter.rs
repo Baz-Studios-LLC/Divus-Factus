@@ -41,6 +41,7 @@ impl Plugin for ScatterPlugin {
                 populate_chunks.after(TerrainSet),
                 sway_foliage,
                 topple_trees,
+                sink_spent,
             ),
         );
     }
@@ -371,8 +372,13 @@ fn populate_chunks(
     world_seed: Res<crate::WorldSeed>,
     stripped: Res<StrippedGround>,
     settlement: Option<Res<crate::villager::SettlementSite>>,
+    mut library: Local<Option<ScatterMeshes>>,
     chunks: Query<(Entity, &TerrainChunk), Added<TerrainChunk>>,
 ) {
+    if chunks.is_empty() {
+        return;
+    }
+    let library = library.get_or_insert_with(|| ScatterMeshes::build(&mut meshes, world_seed.0));
     // EGREGORE_SCARCE starves the land of berry bushes — the famine dial, for
     // exercising the prayer loop without waiting for a bad year.
     let scarcity = if std::env::var("EGREGORE_SCARCE").is_ok() {
@@ -455,6 +461,7 @@ fn populate_chunks(
                                 local,
                                 &mut rng,
                                 roll,
+                                Some(library),
                             );
                             commands.entity(rock).insert(ChildOf(entity));
                         } else {
@@ -483,7 +490,7 @@ fn populate_chunks(
                         } else if near_village {
                             let tree = spawn_tree(
                                 &mut commands,
-                                &mut meshes,
+                                library,
                                 terrain_assets.ground_material.clone(),
                                 local,
                                 kind,
@@ -529,6 +536,7 @@ fn populate_chunks(
                             local,
                             &mut rng,
                             roll,
+                            Some(library),
                         );
                         commands.entity(rock).insert(ChildOf(entity));
                     } else {
@@ -584,10 +592,14 @@ fn populate_chunks(
 /// World units between scatter sample points.
 const SCATTER_SPACING: f32 = 4.5;
 
-/// Within this range of the settlement, trees are entities rather than baked
-/// scenery — the simulation touches them, so they must be touchable. An axe
-/// cannot fell a vertex buffer.
-pub const TREE_HARVEST_RADIUS: f32 = 150.0;
+/// Within this range of the settlement, trees and rocks are entities rather
+/// than baked scenery — the simulation touches them, so they must be
+/// touchable. An axe cannot fell a vertex buffer. Deliberately wider than
+/// the villagers' working reach (170), so every rock and tree a worker can
+/// walk to is real: nothing in arm's reach is set dressing. (Going fully
+/// real everywhere was measured and rejected: 13.6k scenery entities
+/// halved the release frame rate, 59fps to 31.)
+pub const TREE_HARVEST_RADIUS: f32 = 190.0;
 
 /// Ground the village has already stripped: felled trees and mined-out
 /// boulders, by rounded world position. The scatterer consults it before
@@ -632,6 +644,29 @@ pub struct Toppling {
     pub elapsed: f32,
 }
 
+/// Anything worked down to nothing sinks out of the world instead of
+/// blinking: the last load leaves the pile, and the ground takes back
+/// what is left.
+#[derive(Component, Default)]
+pub struct Sinking {
+    pub elapsed: f32,
+}
+
+pub(crate) fn sink_spent(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut spent: Query<(Entity, &mut Sinking, &mut Transform)>,
+) {
+    let dt = time.delta_secs();
+    for (thing, mut sinking, mut transform) in &mut spent {
+        sinking.elapsed += dt;
+        transform.translation.y -= dt * 2.6;
+        if sinking.elapsed > 1.1 {
+            commands.entity(thing).despawn();
+        }
+    }
+}
+
 pub(crate) fn topple_trees(
     time: Res<Time>,
     mut commands: Commands,
@@ -667,24 +702,97 @@ impl FellableTree {
     }
 }
 
+/// The shared wardrobe of scenery meshes: a dozen rolled variants per tree
+/// kind and a rack of rocks, built once. Entity trees and rocks near the
+/// village wear these shared handles so they batch on the GPU — giving
+/// every entity its own mesh measurably taxed the frame for each one
+/// standing. Which variant a given spot wears comes from a position hash,
+/// never from the chunk's dice, so the scatter stream stays untouched.
+pub struct ScatterMeshes {
+    trees: Vec<(TreeKind, Vec<Handle<Mesh>>)>,
+    rocks: Vec<Handle<Mesh>>,
+}
+
+impl ScatterMeshes {
+    const VARIANTS: i32 = 12;
+
+    pub fn build(meshes: &mut Assets<Mesh>, seed: u32) -> Self {
+        let mut rng = Rng::new((seed as u64) ^ 0x7ee5_11b);
+        let kinds = [
+            TreeKind::Conifer,
+            TreeKind::Broadleaf,
+            TreeKind::Birch,
+            TreeKind::Palm,
+            TreeKind::Snag,
+        ];
+        let trees = kinds
+            .into_iter()
+            .map(|kind| {
+                let variants = (0..Self::VARIANTS)
+                    .map(|_| {
+                        let mut builder = MeshBuilder::default();
+                        bake_tree(&mut builder, Vec3::ZERO, kind, &mut rng);
+                        meshes.add(builder.build())
+                    })
+                    .collect();
+                (kind, variants)
+            })
+            .collect();
+        let rocks = (0..Self::VARIANTS)
+            .map(|_| {
+                let mut builder = MeshBuilder::default();
+                bake_rock(&mut builder, Vec3::ZERO, &mut rng);
+                meshes.add(builder.build())
+            })
+            .collect();
+        ScatterMeshes { trees, rocks }
+    }
+
+    /// A stable per-position pick, independent of any rng stream.
+    fn spot(local: Vec3) -> Rng {
+        Rng::new(((local.x.to_bits() as u64) << 32) ^ (local.z.to_bits() as u64) ^ 0x5107)
+    }
+
+    fn tree(&self, kind: TreeKind, local: Vec3) -> (Handle<Mesh>, f32) {
+        let mut spot = Self::spot(local);
+        let rack = &self
+            .trees
+            .iter()
+            .find(|(k, _)| *k == kind)
+            .expect("every kind has variants")
+            .1;
+        let handle = rack[spot.range_i(0, Self::VARIANTS - 1) as usize].clone();
+        (handle, spot.range(0.0, std::f32::consts::TAU))
+    }
+
+    fn rock(&self, local: Vec3) -> (Handle<Mesh>, f32) {
+        let mut spot = Self::spot(local);
+        let handle = self.rocks[spot.range_i(0, Self::VARIANTS - 1) as usize].clone();
+        (handle, spot.range(0.0, std::f32::consts::TAU))
+    }
+}
+
 /// Spawns one real tree entity, built from the same generator as the baked ones.
 fn spawn_tree(
     commands: &mut Commands,
-    meshes: &mut Assets<Mesh>,
+    library: &ScatterMeshes,
     material: Handle<StandardMaterial>,
     local: Vec3,
     kind: TreeKind,
     rng: &mut Rng,
 ) -> Entity {
-    let mut builder = MeshBuilder::default();
-    bake_tree(&mut builder, Vec3::ZERO, kind, rng);
+    // The old unique-mesh dice still burn — determinism over thrift —
+    // but the body worn is a shared library variant, so a hundred trees
+    // cost the renderer a handful of batches instead of a hundred.
+    bake_tree(&mut MeshBuilder::default(), Vec3::ZERO, kind, rng);
+    let (mesh, yaw) = library.tree(kind, local);
     commands
         .spawn((
             Name::new("A tree"),
             FellableTree { maturity: 1.0 },
-            Mesh3d(meshes.add(builder.build())),
+            Mesh3d(mesh),
             MeshMaterial3d(material),
-            Transform::from_translation(local),
+            Transform::from_translation(local).with_rotation(Quat::from_rotation_y(yaw)),
             // Grabbable: a god who can uproot a tree should. The uprooting
             // itself is handled — and witnessed — by the hand.
             crate::hand::PickRadius(1.6),
@@ -832,18 +940,27 @@ pub(crate) fn spawn_boulder(
     local: Vec3,
     rng: &mut Rng,
     roll: RockRoll,
+    library: Option<&ScatterMeshes>,
 ) -> Entity {
+    // The dice burn identically either way; the library, when offered,
+    // just decides which shared body the rock wears.
     let mut builder = MeshBuilder::default();
     bake_rock(&mut builder, Vec3::ZERO, rng);
+    let (mesh, yaw) = match library {
+        Some(library) => library.rock(local),
+        None => (meshes.add(builder.build()), 0.0),
+    };
     let outcrop = roll.girth > 1.0;
     commands
         .spawn((
             Name::new(if outcrop { "An outcrop" } else { "A boulder" }),
             crate::matter::Boulder,
             crate::matter::Matter::boulder(roll.mass, roll.radius),
-            Mesh3d(meshes.add(builder.build())),
+            Mesh3d(mesh),
             MeshMaterial3d(material),
-            Transform::from_translation(local).with_scale(Vec3::splat(roll.girth)),
+            Transform::from_translation(local)
+                .with_rotation(Quat::from_rotation_y(yaw))
+                .with_scale(Vec3::splat(roll.girth)),
             crate::hand::PickRadius(1.3 * roll.girth),
         ))
         .id()

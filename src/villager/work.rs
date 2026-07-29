@@ -1068,7 +1068,11 @@ pub(super) fn do_work(
                         crate::matter::DepositKind::Clay => store.clay += 1.0,
                     }
                     if deposit.amount <= 0.5 {
-                        commands.entity(worked).despawn();
+                        // A worked-out vein settles back into the earth.
+                        commands
+                            .entity(worked)
+                            .remove::<crate::hand::PickRadius>()
+                            .insert(crate::scatter::Sinking::default());
                         *activity = Activity::Idle;
                         commands.entity(entity).remove::<Job>();
                     }
@@ -1091,9 +1095,14 @@ pub(super) fn do_work(
                     };
                     rock_transform.scale *= wear;
                     if rock_transform.scale.x < 0.4 {
-                        // Chipped to nothing — and the ground remembers, so
-                        // no chunk rebuild quietly restocks the quarry.
-                        commands.entity(rock).despawn();
+                        // Chipped to nothing: the remnant sinks away, and
+                        // the ground remembers, so no chunk rebuild quietly
+                        // restocks the quarry.
+                        commands
+                            .entity(rock)
+                            .remove::<crate::matter::Boulder>()
+                            .remove::<crate::hand::PickRadius>()
+                            .insert(crate::scatter::Sinking::default());
                         stripped.strip(job.site.x, job.site.z);
                         *activity = Activity::Idle;
                         commands.entity(entity).remove::<Job>();
