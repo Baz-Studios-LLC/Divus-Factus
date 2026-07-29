@@ -433,7 +433,10 @@ pub(super) fn do_work(
         ),
     >,
     mut bushes: Query<&mut FoodSource, Without<Villager>>,
-    mut trees: Query<&mut crate::scatter::FellableTree>,
+    mut trees: Query<
+        (&mut crate::scatter::FellableTree, &Transform),
+        (Without<Villager>, Without<crate::matter::Boulder>),
+    >,
     mut boulders_mut: Query<
         (&mut Transform, &crate::matter::Boulder),
         (Without<Villager>, Without<Creature>),
@@ -1108,7 +1111,7 @@ pub(super) fn do_work(
                 }
                 // A standing tree comes down and a sapling starts over.
                 Some(tree) => {
-                    let Ok(felled) = trees.get_mut(tree) else {
+                    let Ok((felled, tree_transform)) = trees.get_mut(tree) else {
                         *activity = Activity::Idle;
                         commands.entity(entity).remove::<Job>();
                         continue;
@@ -1118,12 +1121,25 @@ pub(super) fn do_work(
                         commands.entity(entity).remove::<Job>();
                         continue;
                     }
-                    // The tree comes down and STAYS down: the stump is
-                    // struck from the world and the ground remembers, so a
-                    // worked woods thins for good and clear-cut country
+                    // The tree comes down and STAYS down: it topples away
+                    // from the axe, and the ground remembers the felling, so
+                    // a worked woods thins for good and clear-cut country
                     // reads from the air. Scarcity is the door to elsewhere.
+                    let away = (job.site - transform.translation).with_y(0.0);
+                    let away = away.normalize_or(Vec3::X);
+                    let base_rot = tree_transform.rotation;
+                    let base_y = tree_transform.translation.y;
                     drop(felled);
-                    commands.entity(tree).despawn();
+                    commands
+                        .entity(tree)
+                        .remove::<crate::scatter::FellableTree>()
+                        .remove::<crate::hand::PickRadius>()
+                        .insert(crate::scatter::Toppling {
+                            axis: Vec3::Y.cross(away).normalize_or(Vec3::Z),
+                            base_rot,
+                            base_y,
+                            elapsed: 0.0,
+                        });
                     stripped.strip(job.site.x, job.site.z);
                     // Shoulder the logs and turn for home. The timber only
                     // becomes the village's when it reaches the pile — and a

@@ -35,8 +35,14 @@ pub struct ScatterPlugin;
 
 impl Plugin for ScatterPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<StrippedGround>()
-            .add_systems(Update, (populate_chunks.after(TerrainSet), sway_foliage));
+        app.init_resource::<StrippedGround>().add_systems(
+            Update,
+            (
+                populate_chunks.after(TerrainSet),
+                sway_foliage,
+                topple_trees,
+            ),
+        );
     }
 }
 
@@ -611,6 +617,47 @@ impl StrippedGround {
 #[derive(Component)]
 pub struct FellableTree {
     pub maturity: f32,
+}
+
+/// A felled tree mid-fall: it leans, crashes, lies a beat, and sinks
+/// away. Pure theatre — the timber went home on the forester's shoulder —
+/// but a tree that blinks out of the world breaks the fiction the whole
+/// game is built on.
+#[derive(Component)]
+pub struct Toppling {
+    /// Horizontal axis to rotate about; the crown falls away from the axe.
+    pub axis: Vec3,
+    pub base_rot: Quat,
+    pub base_y: f32,
+    pub elapsed: f32,
+}
+
+pub(crate) fn topple_trees(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut falling: Query<(Entity, &mut Toppling, &mut Transform)>,
+) {
+    /// Seconds from the last axe blow to the crash.
+    const FALL: f32 = 1.15;
+    /// Seconds the felled trunk lies where it landed.
+    const REST: f32 = 1.6;
+    /// Seconds to sink out of the world.
+    const SINK: f32 = 1.0;
+    for (tree, mut topple, mut transform) in &mut falling {
+        topple.elapsed += time.delta_secs();
+        let t = topple.elapsed;
+        if t < FALL {
+            // Gravity's ease: a slow lean that becomes a crash.
+            let lean = (t / FALL) * (t / FALL);
+            let angle = std::f32::consts::FRAC_PI_2 * 0.97 * lean;
+            transform.rotation = Quat::from_axis_angle(topple.axis, angle) * topple.base_rot;
+        } else if t < FALL + REST + SINK {
+            let sunk = ((t - FALL - REST) / SINK).clamp(0.0, 1.0);
+            transform.translation.y = topple.base_y - sunk * 2.4;
+        } else {
+            commands.entity(tree).despawn();
+        }
+    }
 }
 
 impl FellableTree {
