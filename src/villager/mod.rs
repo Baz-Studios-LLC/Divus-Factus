@@ -1184,12 +1184,24 @@ fn point_camera_at_settlement(
 
 fn accumulate_hunger(
     time: Res<Time>,
-    mut villagers: Query<(&mut Needs, &mut crate::creature::Vitality)>,
+    mut villagers: Query<(
+        &mut Needs,
+        &mut crate::creature::Vitality,
+        Option<&Activity>,
+    )>,
 ) {
     let dt = time.delta_secs();
     let rate = dt / SECONDS_TO_STARVE;
 
-    for (mut needs, mut vitality) in &mut villagers {
+    for (mut needs, mut vitality, activity) in &mut villagers {
+        // A sleeping body burns slow: the night costs a quarter of what
+        // the waking day does, so bedding down part-fed is a sound plan
+        // rather than a gamble.
+        let rate = if matches!(activity, Some(Activity::Sleeping)) {
+            rate * 0.25
+        } else {
+            rate
+        };
         needs.hunger = (needs.hunger + rate).min(1.0);
 
         // An empty stomach is survivable; an empty stomach that stays empty is not.

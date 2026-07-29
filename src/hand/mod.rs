@@ -422,7 +422,16 @@ fn handle_grab_and_release(
     transforms: Query<&GlobalTransform>,
     parents: Query<(), With<ChildOf>>,
     rooted: Query<(), With<Rooted>>,
-    trees: Query<&crate::scatter::FellableTree>,
+    trees: Query<(
+        &crate::scatter::FellableTree,
+        &crate::scatter::TreeBody,
+        &crate::scatter::InGrove,
+    )>,
+    mut grove_kit: (
+        ResMut<Assets<Mesh>>,
+        Res<crate::terrain::TerrainAssets>,
+        ResMut<crate::scatter::DirtyGroves>,
+    ),
     matters: Query<&crate::matter::Matter>,
     pointer: Res<PointerContext>,
     armed: Res<crate::miracles::SelectedMiracle>,
@@ -473,7 +482,19 @@ fn handle_grab_and_release(
         // Grabbing a living tree is an uprooting: it leaves the ground's
         // ownership (and its chunk's coordinate space), becomes loose wood in
         // the world, and everyone nearby sees it happen.
-        if let Ok(tree) = trees.get(entity) {
+        if let Ok((tree, body, home)) = trees.get(entity) {
+            // Torn from the ground AND from its grove: the tree takes its
+            // own body with it, and the grove closes over the gap.
+            let (meshes, terrain_assets, dirty_groves) = &mut grove_kit;
+            crate::scatter::stand_alone(
+                &mut commands,
+                meshes,
+                terrain_assets.ground_material.clone(),
+                entity,
+                body,
+                home,
+                dirty_groves,
+            );
             commands
                 .entity(entity)
                 .remove::<ChildOf>()

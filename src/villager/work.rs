@@ -434,7 +434,12 @@ pub(super) fn do_work(
     >,
     mut bushes: Query<&mut FoodSource, Without<Villager>>,
     mut trees: Query<
-        (&mut crate::scatter::FellableTree, &Transform),
+        (
+            &mut crate::scatter::FellableTree,
+            &Transform,
+            &crate::scatter::TreeBody,
+            &crate::scatter::InGrove,
+        ),
         (Without<Villager>, Without<crate::matter::Boulder>),
     >,
     mut boulders_mut: Query<
@@ -466,6 +471,8 @@ pub(super) fn do_work(
         ResMut<crate::grass::GrassChunks>,
         Option<Res<crate::weather::Weather>>,
         ResMut<crate::scatter::StrippedGround>,
+        Res<crate::terrain::TerrainAssets>,
+        ResMut<crate::scatter::DirtyGroves>,
     ),
     assets: (ResMut<Assets<Mesh>>, ResMut<Assets<StandardMaterial>>),
     mut prey_query: Query<
@@ -492,7 +499,8 @@ pub(super) fn do_work(
         mut sacred_mut,
     ) = trades;
     let (mut build_sites, settlements, mut notices) = civic;
-    let (terrain, mut chunks, mut grass, weather, mut stripped) = ground;
+    let (terrain, mut chunks, mut grass, weather, mut stripped, terrain_assets, mut dirty_groves) =
+        ground;
     let (mut meshes, mut materials) = assets;
     let Some(site) = site else {
         return;
@@ -1120,7 +1128,7 @@ pub(super) fn do_work(
                 }
                 // A standing tree comes down and a sapling starts over.
                 Some(tree) => {
-                    let Ok((felled, tree_transform)) = trees.get_mut(tree) else {
+                    let Ok((felled, _, body, home)) = trees.get_mut(tree) else {
                         *activity = Activity::Idle;
                         commands.entity(entity).remove::<Job>();
                         continue;
@@ -1136,19 +1144,26 @@ pub(super) fn do_work(
                     // reads from the air. Scarcity is the door to elsewhere.
                     let away = (job.site - transform.translation).with_y(0.0);
                     let away = away.normalize_or(Vec3::X);
-                    let base_rot = tree_transform.rotation;
-                    let base_y = tree_transform.translation.y;
+                    // The standing tree is meshless bookkeeping inside its
+                    // grove; the FALL is played by a one-off actor baked
+                    // from the same body, while the grove rebakes without
+                    // the felled tree the same frame.
+                    let actor_mesh = body.bake(&mut meshes);
+                    dirty_groves.0.push(home.0);
                     drop(felled);
-                    commands
-                        .entity(tree)
-                        .remove::<crate::scatter::FellableTree>()
-                        .remove::<crate::hand::PickRadius>()
-                        .insert(crate::scatter::Toppling {
+                    commands.spawn((
+                        Name::new("A felled tree"),
+                        Mesh3d(actor_mesh),
+                        MeshMaterial3d(terrain_assets.ground_material.clone()),
+                        Transform::from_translation(job.site),
+                        crate::scatter::Toppling {
                             axis: Vec3::Y.cross(away).normalize_or(Vec3::Z),
-                            base_rot,
-                            base_y,
+                            base_rot: Quat::IDENTITY,
+                            base_y: job.site.y,
                             elapsed: 0.0,
-                        });
+                        },
+                    ));
+                    commands.entity(tree).despawn();
                     stripped.strip(job.site.x, job.site.z);
                     // Shoulder the logs and turn for home. The timber only
                     // becomes the village's when it reaches the pile — and a

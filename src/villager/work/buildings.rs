@@ -1107,12 +1107,16 @@ pub(crate) fn plan_houses(
     mut notices: MessageWriter<crate::ui::Notice>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    standing: Query<(Entity, &GlobalTransform), With<crate::scatter::FellableTree>>,
+    standing: Query<
+        (Entity, &GlobalTransform, &crate::scatter::InGrove),
+        With<crate::scatter::FellableTree>,
+    >,
     mut ground: (
         ResMut<crate::terrain::LoadedChunks>,
         ResMut<crate::grass::GrassChunks>,
         Res<crate::terrain::TerrainAssets>,
         ResMut<crate::scatter::StrippedGround>,
+        ResMut<crate::scatter::DirtyGroves>,
     ),
     census: (
         Query<
@@ -1291,7 +1295,7 @@ pub(crate) fn plan_houses(
             3.2,
             face.y + plan.wall_h + 1.4,
         );
-        let (chunks, grass, chunk_assets, stripped) = &mut ground;
+        let (chunks, grass, chunk_assets, stripped, dirty_groves) = &mut ground;
         crate::terrain::rebuild_chunks_near(
             &mut commands,
             &mut meshes,
@@ -1304,9 +1308,10 @@ pub(crate) fn plan_houses(
         );
         grass.invalidate_near(&mut commands, face.x, face.z, plan.half_w + 9.0);
         let mut cleared = 0.0;
-        for (tree, tree_at) in &standing {
+        for (tree, tree_at, home) in &standing {
             if tree_at.translation().distance(face) < plan.half_w + 4.0 {
                 stripped.strip(tree_at.translation().x, tree_at.translation().z);
+                dirty_groves.0.push(home.0);
                 commands.entity(tree).despawn();
                 cleared += 1.0;
             }
@@ -1355,7 +1360,7 @@ pub(crate) fn plan_houses(
 
         // A small worked pad on the dry end; the rest stands on pilings.
         terrain.flatten(shore.x, shore.z, plan.half_w + 1.2, 2.0, shore.y);
-        let (chunks, grass, chunk_assets, stripped) = &mut ground;
+        let (chunks, grass, chunk_assets, stripped, dirty_groves) = &mut ground;
         crate::terrain::rebuild_chunks_near(
             &mut commands,
             &mut meshes,
@@ -1368,9 +1373,10 @@ pub(crate) fn plan_houses(
         );
         grass.invalidate_near(&mut commands, shore.x, shore.z, plan.half_w + 5.0);
         let mut cleared = 0.0;
-        for (tree, tree_at) in &standing {
+        for (tree, tree_at, home) in &standing {
             if tree_at.translation().distance(shore) < plan.half_w + 4.0 {
                 stripped.strip(tree_at.translation().x, tree_at.translation().z);
+                dirty_groves.0.push(home.0);
                 commands.entity(tree).despawn();
                 cleared += 1.0;
             }
@@ -1464,7 +1470,7 @@ pub(crate) fn plan_houses(
             // the ground actually gives.
             let trees_near = standing
                 .iter()
-                .filter(|(_, t)| t.translation().distance(site.centre) < 140.0)
+                .filter(|(_, t, _)| t.translation().distance(site.centre) < 140.0)
                 .count();
             if trees_near < 6 && store_now.timber < 8.0 {
                 use crate::palette as pal;
@@ -1485,7 +1491,7 @@ pub(crate) fn plan_houses(
         // into a slope. This is what a foundation is *for*.
         let pad = plan.half_w.max(plan.half_d) + 1.6;
         terrain.flatten(at.x, at.z, pad, 2.4, at.y);
-        let (chunks, grass, chunk_assets, stripped) = &mut ground;
+        let (chunks, grass, chunk_assets, stripped, dirty_groves) = &mut ground;
         crate::terrain::rebuild_chunks_near(
             &mut commands,
             &mut meshes,
@@ -1503,9 +1509,10 @@ pub(crate) fn plan_houses(
         // and nobody wants branches through the bedroom either.
         let clearing = plan.half_w.max(plan.half_d) + 4.5;
         let mut cleared = 0.0;
-        for (tree, tree_at) in &standing {
+        for (tree, tree_at, home) in &standing {
             if tree_at.translation().distance(at) < clearing {
                 stripped.strip(tree_at.translation().x, tree_at.translation().z);
+                dirty_groves.0.push(home.0);
                 commands.entity(tree).despawn();
                 cleared += 1.0;
             }

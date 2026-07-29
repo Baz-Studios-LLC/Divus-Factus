@@ -257,7 +257,17 @@ fn storm_strikes(
         (&Transform, &mut Vitality, &mut CreatureMotion),
         (With<Creature>, Without<Corpse>),
     >,
-    trees: Query<(Entity, &GlobalTransform), With<crate::scatter::FellableTree>>,
+    trees: Query<
+        (
+            Entity,
+            &GlobalTransform,
+            &crate::scatter::TreeBody,
+            &crate::scatter::InGrove,
+        ),
+        With<crate::scatter::FellableTree>,
+    >,
+    terrain_assets: Res<crate::terrain::TerrainAssets>,
+    mut dirty_groves: ResMut<crate::scatter::DirtyGroves>,
 ) {
     if weather.kind() != WeatherKind::Storm {
         return;
@@ -291,9 +301,19 @@ fn storm_strikes(
     }
     let _ = struck;
 
-    // Anything wooden at the strike point catches.
-    for (tree, tree_at) in &trees {
+    // Anything wooden at the strike point catches — and steps out of its
+    // grove to burn where everyone can see it.
+    for (tree, tree_at, body, home) in &trees {
         if tree_at.translation().distance(at) < 5.0 {
+            crate::scatter::stand_alone(
+                &mut commands,
+                &mut meshes,
+                terrain_assets.ground_material.clone(),
+                tree,
+                body,
+                home,
+                &mut dirty_groves,
+            );
             commands.entity(tree).insert(Burning {
                 remaining: rng.range(14.0, 22.0),
             });
@@ -338,10 +358,21 @@ fn fire_spreads(
     >,
     flames: Query<(), With<TreeFlame>>,
     unburnt: Query<
-        (Entity, &GlobalTransform),
+        (
+            Entity,
+            &GlobalTransform,
+            &crate::scatter::TreeBody,
+            &crate::scatter::InGrove,
+        ),
         (With<crate::scatter::FellableTree>, Without<Burning>),
     >,
+    grove_kit: (
+        Res<crate::terrain::TerrainAssets>,
+        ResMut<crate::scatter::DirtyGroves>,
+        ResMut<crate::scatter::StrippedGround>,
+    ),
 ) {
+    let (terrain_assets, mut dirty_groves, mut stripped) = grove_kit;
     let rng = rng.get_or_insert_with(|| Rng::new(0xF12E));
     let dt = time.delta_secs();
     // Rain fights the fire; a downpour wins quickly.
@@ -380,19 +411,31 @@ fn fire_spreads(
         }
         fire.remaining -= dt * quench;
         if fire.remaining <= 0.0 {
-            // Burned through: the tree is gone for good.
+            // Burned through: the tree is gone for good, and the ground
+            // remembers - a burn scar does not regrow on a chunk rebuild.
+            stripped.strip(at.translation().x, at.translation().z);
             commands.entity(tree).despawn();
             continue;
         }
         // Sparks leap while it rages - farther and more often in wind.
         if rng.chance((dt * (0.06 + weather.wind * 0.1)).min(1.0)) {
             let reach = 4.0 + weather.wind * 5.0;
-            if let Some((next, _)) = unburnt
+            if let Some((next, _, body, home)) = unburnt
                 .iter()
-                .map(|(e, t)| (e, t.translation().distance(at.translation())))
-                .filter(|(_, d)| *d < reach)
+                .map(|(e, t, b, h)| (e, t.translation().distance(at.translation()), b, h))
+                .filter(|(_, d, ..)| *d < reach)
                 .min_by(|a, b| a.1.total_cmp(&b.1))
+                .map(|(e, d, b, h)| (e, d, b, h))
             {
+                crate::scatter::stand_alone(
+                    &mut commands,
+                    &mut meshes,
+                    terrain_assets.ground_material.clone(),
+                    next,
+                    body,
+                    home,
+                    &mut dirty_groves,
+                );
                 commands.entity(next).insert(Burning {
                     remaining: rng.range(14.0, 22.0),
                 });

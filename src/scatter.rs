@@ -35,15 +35,18 @@ pub struct ScatterPlugin;
 
 impl Plugin for ScatterPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<StrippedGround>().add_systems(
-            Update,
-            (
-                populate_chunks.after(TerrainSet),
-                sway_foliage,
-                topple_trees,
-                sink_spent,
-            ),
-        );
+        app.init_resource::<StrippedGround>()
+            .init_resource::<DirtyGroves>()
+            .add_systems(
+                Update,
+                (
+                    populate_chunks.after(TerrainSet),
+                    sway_foliage,
+                    topple_trees,
+                    sink_spent,
+                    rebake_groves,
+                ),
+            );
     }
 }
 
@@ -396,6 +399,10 @@ fn populate_chunks(
         );
 
         let mut builder = MeshBuilder::default();
+        // Standing trees gather here and are spawned after the sweep:
+        // real entities every one, bucketed into grove visuals so the
+        // renderer sees a handful of meshes where the sim sees a forest.
+        let mut stands: Vec<(Vec3, TreeKind)> = Vec::new();
         let steps = (CHUNK_SIZE / SCATTER_SPACING) as i32;
 
         for iz in 0..steps {
@@ -479,26 +486,8 @@ fn populate_chunks(
                     let bare = terrain.is_worked_within(x, z, 4.0) || stripped.is_stripped(x, z);
                     if rng.chance(tree_chance * (0.55 + density)) {
                         let kind = *rng.pick(TreeKind::for_biome(biome));
-                        // Near the settlement, trees live as entities so the
-                        // foresters' axes can actually reach them.
-                        let near_village = settlement.as_ref().is_some_and(|site| {
-                            Vec2::new(x - site.centre.x, z - site.centre.z).length()
-                                < TREE_HARVEST_RADIUS
-                        });
-                        if bare {
-                            bake_tree(&mut MeshBuilder::default(), local, kind, &mut rng);
-                        } else if near_village {
-                            let tree = spawn_tree(
-                                &mut commands,
-                                library,
-                                terrain_assets.ground_material.clone(),
-                                local,
-                                kind,
-                                &mut rng,
-                            );
-                            commands.entity(tree).insert(ChildOf(entity));
-                        } else {
-                            bake_tree(&mut builder, local, kind, &mut rng);
+                        if !bare {
+                            stands.push((local, kind));
                         }
                     } else if rng.chance(0.16 * scarcity) {
                         let bush = spawn_bush(
@@ -577,6 +566,59 @@ fn populate_chunks(
             }
         }
 
+        // The groves: bucket the stands by a coarse grid — pure
+        // bookkeeping, invisible on the ground since every tree keeps the
+        // exact spot the noise gave it — and raise one merged mesh per
+        // bucket with the member trees as meshless entities beside it.
+        let mut buckets: Vec<(IVec2, Vec<(Vec3, TreeKind)>)> = Vec::new();
+        for (local, kind) in stands {
+            let cell = IVec2::new(
+                (local.x / GROVE_SPAN).floor() as i32,
+                (local.z / GROVE_SPAN).floor() as i32,
+            );
+            match buckets.iter_mut().find(|(c, _)| *c == cell) {
+                Some((_, members)) => members.push((local, kind)),
+                None => buckets.push((cell, vec![(local, kind)])),
+            }
+        }
+        for (_, members) in buckets {
+            let anchor = members.iter().map(|(at, _)| *at).sum::<Vec3>() / members.len() as f32;
+            let mut grove_mesh = MeshBuilder::default();
+            let mut bodies: Vec<(Vec3, TreeBody)> = Vec::new();
+            for (local, kind) in &members {
+                let body = TreeBody::at(*kind, origin.x + local.x, origin.y + local.z);
+                bake_tree(
+                    &mut grove_mesh,
+                    *local - anchor,
+                    body.kind,
+                    &mut Rng::new(body.seed),
+                );
+                bodies.push((*local, body));
+            }
+            let grove = commands
+                .spawn((
+                    Name::new("A grove"),
+                    GroveMesh,
+                    Mesh3d(meshes.add(grove_mesh.build())),
+                    MeshMaterial3d(terrain_assets.ground_material.clone()),
+                    Transform::from_translation(anchor),
+                    ChildOf(entity),
+                ))
+                .id();
+            for (local, body) in bodies {
+                commands.spawn((
+                    Name::new("A tree"),
+                    FellableTree { maturity: 1.0 },
+                    body,
+                    InGrove(grove),
+                    Transform::from_translation(local),
+                    Visibility::default(),
+                    crate::hand::PickRadius(1.6),
+                    ChildOf(entity),
+                ));
+            }
+        }
+
         if !builder.is_empty() {
             commands.spawn((
                 Name::new("Chunk Scenery"),
@@ -591,6 +633,9 @@ fn populate_chunks(
 
 /// World units between scatter sample points.
 const SCATTER_SPACING: f32 = 4.5;
+
+/// Side of the grove bucket: trees within one cell share a rendered mesh.
+const GROVE_SPAN: f32 = 14.0;
 
 /// Within this range of the settlement, trees and rocks are entities rather
 /// than baked scenery — the simulation touches them, so they must be
@@ -629,6 +674,123 @@ impl StrippedGround {
 #[derive(Component)]
 pub struct FellableTree {
     pub maturity: f32,
+}
+
+/// The rolled identity of one standing tree: everything needed to bake its
+/// body on demand — merged into its grove's shared mesh while it stands,
+/// or alone the moment it topples, burns, or is carried off in the hand.
+#[derive(Component, Clone, Copy)]
+pub struct TreeBody {
+    pub kind: TreeKind,
+    pub seed: u64,
+}
+
+impl TreeBody {
+    /// Seeded purely by world position, so the same spot always grows the
+    /// same tree no matter which rng stream asked.
+    pub fn at(kind: TreeKind, x: f32, z: f32) -> TreeBody {
+        TreeBody {
+            kind,
+            seed: ((x.to_bits() as u64) << 32) ^ (z.to_bits() as u64) ^ 0x7233,
+        }
+    }
+
+    /// Bakes this tree's body, alone, origin at its base.
+    pub fn bake(&self, meshes: &mut Assets<Mesh>) -> Handle<Mesh> {
+        let mut builder = MeshBuilder::default();
+        bake_tree(
+            &mut builder,
+            Vec3::ZERO,
+            self.kind,
+            &mut Rng::new(self.seed),
+        );
+        meshes.add(builder.build())
+    }
+}
+
+/// Which grove-visual this standing tree is merged into. Groves are pure
+/// rendering: a handful of neighbouring trees drawn as one mesh, because
+/// a mesh per trunk taxed the frame for every tree standing. The trees
+/// themselves are full entities — meshless while merged — and every one
+/// of them can be felled, burned, or uprooted individually.
+#[derive(Component)]
+pub struct InGrove(pub Entity);
+
+/// A grove's merged visual.
+#[derive(Component)]
+pub struct GroveMesh;
+
+/// Groves whose membership changed this frame and need their mesh rebaked.
+/// Every site that detaches a tree (the axe, the hand, the fire, the
+/// building clearings) pushes the grove here BEFORE removing the tree.
+#[derive(Resource, Default)]
+pub struct DirtyGroves(pub Vec<Entity>);
+
+/// Rebakes dirty groves from their surviving members, and buries groves
+/// with none left.
+pub(crate) fn rebake_groves(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut dirty: ResMut<DirtyGroves>,
+    trees: Query<(&Transform, &TreeBody, &InGrove)>,
+    mut groves: Query<&Transform, With<GroveMesh>>,
+) {
+    if dirty.0.is_empty() {
+        return;
+    }
+    let mut done: Vec<Entity> = Vec::new();
+    for grove in dirty.0.drain(..) {
+        if done.contains(&grove) {
+            continue;
+        }
+        done.push(grove);
+        // The grove may have unloaded with its chunk mid-frame.
+        let Ok(grove_at) = groves.get_mut(grove) else {
+            continue;
+        };
+        let mut builder = MeshBuilder::default();
+        let mut standing = 0;
+        for (tree_at, body, home) in &trees {
+            if home.0 != grove {
+                continue;
+            }
+            standing += 1;
+            bake_tree(
+                &mut builder,
+                tree_at.translation - grove_at.translation,
+                body.kind,
+                &mut Rng::new(body.seed),
+            );
+        }
+        if standing == 0 {
+            commands.entity(grove).despawn();
+        } else {
+            commands
+                .entity(grove)
+                .insert(Mesh3d(meshes.add(builder.build())));
+        }
+    }
+}
+
+/// Pulls a standing tree out of its grove to be seen alone: it gets its
+/// own baked body, and the grove rebakes without it this same frame. The
+/// caller decides what happens next — fire, the hand; the axe has its
+/// own path (a one-off topple actor).
+pub fn stand_alone(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    material: Handle<StandardMaterial>,
+    tree: Entity,
+    body: &TreeBody,
+    home: &InGrove,
+    dirty: &mut DirtyGroves,
+) {
+    dirty.0.push(home.0);
+    let mesh = body.bake(meshes);
+    commands
+        .entity(tree)
+        .remove::<InGrove>()
+        .insert((Mesh3d(mesh), MeshMaterial3d(material)));
 }
 
 /// A felled tree mid-fall: it leans, crashes, lies a beat, and sinks
@@ -709,7 +871,6 @@ impl FellableTree {
 /// standing. Which variant a given spot wears comes from a position hash,
 /// never from the chunk's dice, so the scatter stream stays untouched.
 pub struct ScatterMeshes {
-    trees: Vec<(TreeKind, Vec<Handle<Mesh>>)>,
     rocks: Vec<Handle<Mesh>>,
 }
 
@@ -718,26 +879,6 @@ impl ScatterMeshes {
 
     pub fn build(meshes: &mut Assets<Mesh>, seed: u32) -> Self {
         let mut rng = Rng::new((seed as u64) ^ 0x7ee5_11b);
-        let kinds = [
-            TreeKind::Conifer,
-            TreeKind::Broadleaf,
-            TreeKind::Birch,
-            TreeKind::Palm,
-            TreeKind::Snag,
-        ];
-        let trees = kinds
-            .into_iter()
-            .map(|kind| {
-                let variants = (0..Self::VARIANTS)
-                    .map(|_| {
-                        let mut builder = MeshBuilder::default();
-                        bake_tree(&mut builder, Vec3::ZERO, kind, &mut rng);
-                        meshes.add(builder.build())
-                    })
-                    .collect();
-                (kind, variants)
-            })
-            .collect();
         let rocks = (0..Self::VARIANTS)
             .map(|_| {
                 let mut builder = MeshBuilder::default();
@@ -745,7 +886,7 @@ impl ScatterMeshes {
                 meshes.add(builder.build())
             })
             .collect();
-        ScatterMeshes { trees, rocks }
+        ScatterMeshes { rocks }
     }
 
     /// A stable per-position pick, independent of any rng stream.
@@ -753,51 +894,11 @@ impl ScatterMeshes {
         Rng::new(((local.x.to_bits() as u64) << 32) ^ (local.z.to_bits() as u64) ^ 0x5107)
     }
 
-    fn tree(&self, kind: TreeKind, local: Vec3) -> (Handle<Mesh>, f32) {
-        let mut spot = Self::spot(local);
-        let rack = &self
-            .trees
-            .iter()
-            .find(|(k, _)| *k == kind)
-            .expect("every kind has variants")
-            .1;
-        let handle = rack[spot.range_i(0, Self::VARIANTS - 1) as usize].clone();
-        (handle, spot.range(0.0, std::f32::consts::TAU))
-    }
-
     fn rock(&self, local: Vec3) -> (Handle<Mesh>, f32) {
         let mut spot = Self::spot(local);
         let handle = self.rocks[spot.range_i(0, Self::VARIANTS - 1) as usize].clone();
         (handle, spot.range(0.0, std::f32::consts::TAU))
     }
-}
-
-/// Spawns one real tree entity, built from the same generator as the baked ones.
-fn spawn_tree(
-    commands: &mut Commands,
-    library: &ScatterMeshes,
-    material: Handle<StandardMaterial>,
-    local: Vec3,
-    kind: TreeKind,
-    rng: &mut Rng,
-) -> Entity {
-    // The old unique-mesh dice still burn — determinism over thrift —
-    // but the body worn is a shared library variant, so a hundred trees
-    // cost the renderer a handful of batches instead of a hundred.
-    bake_tree(&mut MeshBuilder::default(), Vec3::ZERO, kind, rng);
-    let (mesh, yaw) = library.tree(kind, local);
-    commands
-        .spawn((
-            Name::new("A tree"),
-            FellableTree { maturity: 1.0 },
-            Mesh3d(mesh),
-            MeshMaterial3d(material),
-            Transform::from_translation(local).with_rotation(Quat::from_rotation_y(yaw)),
-            // Grabbable: a god who can uproot a tree should. The uprooting
-            // itself is handled — and witnessed — by the hand.
-            crate::hand::PickRadius(1.6),
-        ))
-        .id()
 }
 
 /// Spawns one loose boulder entity, near the settlement where the simulation
