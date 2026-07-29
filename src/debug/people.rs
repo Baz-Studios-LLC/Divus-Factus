@@ -22,6 +22,10 @@ pub(crate) struct PeopleRows;
 #[derive(Component)]
 pub(crate) struct PersonRow(Entity);
 
+/// The text of a roster row, updated in place between rebuilds.
+#[derive(Component)]
+pub(crate) struct RowLabel(Entity);
+
 /// Where the paperdoll stands: a stage far below the world, on its own
 /// render layer, seen by no one but its own camera.
 pub(crate) const DOLL_STAGE: Vec3 = Vec3::new(0.0, -600.0, 0.0);
@@ -283,8 +287,10 @@ pub(crate) fn update_people_panel(
     time: Res<Time>,
     mut last_rebuild: Local<f32>,
     mut was_open: Local<bool>,
+    mut roster: Local<Vec<Entity>>,
     panels: Query<&Visibility, With<PeoplePanel>>,
     containers: Query<Entity, With<PeopleRows>>,
+    mut labels: Query<(&RowLabel, &mut Text)>,
     people: Query<
         (
             Entity,
@@ -311,6 +317,29 @@ pub(crate) fn update_people_panel(
     let Ok(container) = containers.single() else {
         return;
     };
+
+    // The same people as last pass: refresh each row's words IN PLACE.
+    // Tearing the rows down and rebuilding them was a once-a-heartbeat
+    // flicker across the whole roster.
+    let mut current: Vec<Entity> = people.iter().map(|(e, ..)| e).collect();
+    current.sort();
+    if current == *roster && !just_opened {
+        for (label, mut text) in &mut labels {
+            let Ok((_, person, vocation, activity)) = people.get(label.0) else {
+                continue;
+            };
+            let doing = match activity {
+                Activity::Working => vocation.map_or("at work", |v| v.describe()),
+                other => state_phrase(Some(other), None),
+            };
+            let fresh = format!("{} - {}", person.name, doing);
+            if text.0 != fresh {
+                *text = Text::new(fresh);
+            }
+        }
+        return;
+    }
+    *roster = current;
     commands.entity(container).despawn_related::<Children>();
 
     let mut names: Vec<_> = people.iter().collect();
@@ -356,6 +385,7 @@ pub(crate) fn update_people_panel(
             ))
             .id();
         commands.spawn((
+            RowLabel(entity),
             ui::body(format!("{} - {}", person.name, doing)),
             ChildOf(name_button),
         ));
@@ -495,11 +525,11 @@ pub(crate) fn update_person_detail(
     corpse_check: Query<Option<&crate::creature::Vitality>, With<crate::creature::Corpse>>,
     settlements: Query<&Settlement>,
     mut page: Query<
-        &mut Visibility,
+        (&mut Visibility, &mut Node),
         (With<DetailPage>, Without<DetailEmpty>, Without<PeoplePanel>),
     >,
     mut empty: Query<
-        &mut Visibility,
+        (&mut Visibility, &mut Node),
         (With<DetailEmpty>, Without<DetailPage>, Without<PeoplePanel>),
     >,
     mut texts: ParamSet<(
@@ -523,19 +553,25 @@ pub(crate) fn update_person_detail(
         (spouse, parentage, home, vocation, manner, child),
     )) = selected.0.and_then(|entity| people.get(entity).ok())
     else {
-        for mut visibility in &mut page {
+        // Hidden means GONE: Visibility alone leaves the node's empty
+        // height in the layout - the mystery gap above the dossier.
+        for (mut visibility, mut node) in &mut page {
             *visibility = Visibility::Hidden;
+            node.display = Display::None;
         }
-        for mut visibility in &mut empty {
+        for (mut visibility, mut node) in &mut empty {
             *visibility = Visibility::Inherited;
+            node.display = Display::Flex;
         }
         return;
     };
-    for mut visibility in &mut page {
+    for (mut visibility, mut node) in &mut page {
         *visibility = Visibility::Inherited;
+        node.display = Display::Flex;
     }
-    for mut visibility in &mut empty {
+    for (mut visibility, mut node) in &mut empty {
         *visibility = Visibility::Hidden;
+        node.display = Display::None;
     }
 
     if let Ok(mut name) = texts.p0().single_mut()
