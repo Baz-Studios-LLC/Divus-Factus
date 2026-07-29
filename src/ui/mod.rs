@@ -119,12 +119,11 @@ fn speak(
             ))
             .id();
         if say.thought {
-            // A thought is a cloud. The lobes are ringed circles sunk
-            // halfway into the box all around its edge; the interior
-            // cover spawned just after them paints the box's fill back
-            // over their inner halves. What survives is a scalloped blue
-            // edge — soft bulges outside, clean fill within — instead of
-            // beads threaded on a border.
+            // A thought is a cloud. Many small lobes, sunk deep and packed
+            // close along the whole rim, so the outline reads as one
+            // continuous scalloped edge — not beads on a wire. The
+            // interior cover spawned just after them paints the box's
+            // fill back over their inner halves.
             let mut lobe = |left: Val, top: Val, right: Val, bottom: Val, size: f32| {
                 commands.spawn((
                     Node {
@@ -145,19 +144,19 @@ fn speak(
                 ));
             };
             let auto = Val::Auto;
-            for (pc, size) in [
-                (3.0, 15.0),
-                (17.0, 20.0),
-                (37.0, 17.0),
-                (56.0, 21.0),
-                (77.0, 16.0),
-            ] {
-                lobe(percent(pc), px(-size * 0.5), auto, auto, size);
+            // The rim, top and bottom: close-set so no straight border
+            // survives between bumps at any bubble width.
+            for i in 0..11 {
+                let pc = 1.0 + i as f32 * 9.3;
+                let size = 10.0 + ((i * 7) % 3) as f32 * 1.6;
+                lobe(percent(pc), px(-size * 0.38), auto, auto, size);
+                let size = 9.5 + ((i * 5 + 1) % 3) as f32 * 1.6;
+                lobe(percent(pc + 4.0), auto, auto, px(-size * 0.38), size);
             }
-            lobe(px(-7.0), percent(30.0), auto, auto, 14.0);
-            lobe(auto, percent(40.0), px(-7.0), auto, 13.0);
-            for (pc, size) in [(6.0, 13.0), (26.0, 16.0), (60.0, 15.0), (80.0, 13.0)] {
-                lobe(percent(pc), auto, auto, px(-size * 0.5), size);
+            // The sides.
+            for (pc, size) in [(8.0, 11.0), (42.0, 12.5), (76.0, 10.5)] {
+                lobe(px(-size * 0.38), percent(pc), auto, auto, size);
+                lobe(auto, percent(pc + 6.0), px(-size * 0.38), auto, size);
             }
             drop(lobe);
             // The cover: the box's own fill, laid over every lobe's
