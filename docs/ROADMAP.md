@@ -496,3 +496,14 @@ repeats, zebra rows - is the template. Next: the person panel grown
 into a full dossier (genealogy tree, skills ledger, personal
 chronicle, relationships), then the village ledger in the same
 language. Active window always on top (done).
+
+**Queued from the 2026-07-29 session (Baz's asks, in order):**
+1. The overlays panel: a toolbar-opened window of toggles - thought
+   bubbles, chat bubbles, overhead markers (done as P key; fold in),
+   job labels over heads, current-activity labels.
+2. Housing in two tiers: row houses for singles, family houses built
+   for each wed couple - nobody waits homeless, and a mature town is
+   houses-for-families. (Build-ahead spare-house rule already in.)
+3. The person dossier: the People window grown into the chronicle's
+   design language - genealogy tree, skills ledger, personal
+   chronicle, relationships. The voyeur's heart.
