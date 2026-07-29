@@ -2403,12 +2403,19 @@ fn update_hud(
             HudValue::Store => stores.iter().next().map_or_else(
                 || "-".to_string(),
                 |s| {
-                    format!(
+                    let mut line = format!(
                         "{:.0} food / {:.0} timber / {:.0} stone",
                         s.food(),
                         s.timber,
                         s.stone,
-                    )
+                    );
+                    if s.ore + s.iron > 0.05 {
+                        line += &format!(" / {:.0} ore / {:.1} iron", s.ore, s.iron);
+                    }
+                    if s.clay > 0.05 {
+                        line += &format!(" / {:.0} clay", s.clay);
+                    }
+                    line
                 },
             ),
             HudValue::Chunks => chunk_count.to_string(),
@@ -2479,10 +2486,13 @@ fn update_inspector(
     kin_names: Query<&Person>,
     settlements: Query<&Settlement>,
     huts: Query<(), With<crate::villager::work::Hut>>,
-    rising: Query<(
-        &crate::villager::work::ConstructionSite,
-        &crate::villager::work::Blueprint,
-    )>,
+    rising: (
+        Query<(
+            &crate::villager::work::ConstructionSite,
+            &crate::villager::work::Blueprint,
+        )>,
+        Query<&crate::matter::Deposit>,
+    ),
     households: Query<
         (&Person, &crate::villager::home::Home, &Activity),
         Without<crate::creature::Corpse>,
@@ -2845,7 +2855,7 @@ fn update_inspector(
                 residents.join("\n")
             },
         )
-    } else if let Ok((construction, plan)) = rising.get(entity) {
+    } else if let Ok((construction, plan)) = rising.0.get(entity) {
         // Say what the site is actually waiting on: a foundation short of
         // stone blocks the carpenters, and that must be legible, or an
         // honest wait reads as a broken village.
@@ -2898,6 +2908,13 @@ fn update_inspector(
             None => "still",
         };
         (name, cause.to_string())
+    } else if let Ok(deposit) = rising.1.get(entity) {
+        // The god reads the ground itself: what it is, and how much the
+        // village could still carry out of it.
+        (
+            deposit.kind.title().to_string(),
+            format!("{:.0} loads left in the ground", deposit.amount),
+        )
     } else {
         let what = names
             .get(entity)

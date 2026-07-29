@@ -265,6 +265,103 @@ fn float(time: Res<Time>, mut floating: Query<(&mut Transform, &Matter), With<Fl
     }
 }
 
+/// What a placed deposit holds. Deposits are the map making demands:
+/// iron wants the far hills, clay wants the wet banks, and wanting either
+/// means walking there and carrying it home.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum DepositKind {
+    Iron,
+    Clay,
+}
+
+impl DepositKind {
+    pub fn title(self) -> &'static str {
+        match self {
+            DepositKind::Iron => "A hillside veined with iron",
+            DepositKind::Clay => "A bank of good red clay",
+        }
+    }
+}
+
+/// A worked deposit: what it is and how much is left in the ground.
+#[derive(Component, Debug)]
+pub struct Deposit {
+    pub kind: DepositKind,
+    pub amount: f32,
+}
+
+/// Raises a deposit in the world: a rust-streaked outcrop for iron, a low
+/// red mound for clay. Same procedural cloth as everything else.
+pub(crate) fn spawn_deposit(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    at: Vec3,
+    kind: DepositKind,
+    amount: f32,
+) -> Entity {
+    use crate::palette as pal;
+    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+    let root = commands
+        .spawn((
+            Name::new(kind.title()),
+            Deposit { kind, amount },
+            Transform::from_translation(at),
+            Visibility::default(),
+            crate::hand::PickRadius(2.2),
+            crate::hand::Rooted,
+        ))
+        .id();
+    match kind {
+        DepositKind::Iron => {
+            let dark = materials.add(StandardMaterial {
+                base_color: pal::shade(&pal::STONE, 0.28),
+                perceptual_roughness: 1.0,
+                ..default()
+            });
+            let rust = materials.add(StandardMaterial {
+                base_color: Color::srgb(0.48, 0.26, 0.14),
+                perceptual_roughness: 1.0,
+                ..default()
+            });
+            for (x, z, s, h, rusty) in [
+                (0.0, 0.0, 1.6, 1.4, false),
+                (1.1, 0.5, 1.0, 0.9, false),
+                (-0.9, 0.6, 1.1, 1.0, true),
+                (0.4, -0.9, 0.9, 0.7, true),
+                (-0.5, -0.7, 0.7, 0.5, false),
+            ] {
+                commands.spawn((
+                    Mesh3d(cube.clone()),
+                    MeshMaterial3d(if rusty { rust.clone() } else { dark.clone() }),
+                    Transform::from_xyz(x, h * 0.4, z)
+                        .with_rotation(Quat::from_rotation_y(x + z))
+                        .with_scale(Vec3::new(s, h, s * 0.85)),
+                    ChildOf(root),
+                ));
+            }
+        }
+        DepositKind::Clay => {
+            let clay = materials.add(StandardMaterial {
+                base_color: Color::srgb(0.62, 0.36, 0.24),
+                perceptual_roughness: 1.0,
+                ..default()
+            });
+            for (x, z, s) in [(0.0, 0.0, 2.4), (1.3, 0.8, 1.5), (-1.2, -0.6, 1.7)] {
+                commands.spawn((
+                    Mesh3d(cube.clone()),
+                    MeshMaterial3d(clay.clone()),
+                    Transform::from_xyz(x, 0.14, z)
+                        .with_rotation(Quat::from_rotation_y(x - z))
+                        .with_scale(Vec3::new(s, 0.3, s * 0.8)),
+                    ChildOf(root),
+                ));
+            }
+        }
+    }
+    root
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

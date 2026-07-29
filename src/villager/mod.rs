@@ -153,6 +153,7 @@ impl Plugin for VillagerPlugin {
                         belief::ascend,
                         belief::animate_motes,
                         work::bake,
+                        work::smelt,
                     )
                         .chain(),
                     (
@@ -589,6 +590,7 @@ pub(crate) fn spawn_settlement(
                 },
                 timber: 0.0,
                 stone: 0.0,
+                ..default()
             },
             Transform::from_translation(centre),
             Visibility::default(),
@@ -599,6 +601,52 @@ pub(crate) fn spawn_settlement(
         notices.write(crate::ui::Notice::fanfare(format!(
             "The village of {settlement_name} is founded"
         )));
+
+        // The land is salted with what the village will one day want:
+        // iron in the far hills, clay along the wet banks. Deliberately
+        // out past the home circle — deposits are why explorers matter,
+        // and the road to one is a road the village will wear itself.
+        let mut placed_iron = 0;
+        let mut placed_clay = 0;
+        for _ in 0..400 {
+            if placed_iron >= 4 && placed_clay >= 4 {
+                break;
+            }
+            let angle = rng.range(0.0, std::f32::consts::TAU);
+            let reach = rng.range(140.0, 460.0);
+            let (sin, cos) = angle.sin_cos();
+            let (x, z) = (centre.x + cos * reach, centre.z + sin * reach);
+            if !terrain.is_walkable(x, z) {
+                continue;
+            }
+            let height = terrain.height_at(x, z);
+            let at = Vec3::new(x, height, z);
+            if placed_iron < 4 && height > crate::terrain::WATER_LEVEL + 20.0 {
+                crate::matter::spawn_deposit(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    at,
+                    crate::matter::DepositKind::Iron,
+                    rng.range(16.0, 26.0),
+                );
+                placed_iron += 1;
+            } else if placed_clay < 4
+                && (crate::terrain::WATER_LEVEL + 0.6..crate::terrain::WATER_LEVEL + 2.8)
+                    .contains(&height)
+            {
+                crate::matter::spawn_deposit(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    at,
+                    crate::matter::DepositKind::Clay,
+                    rng.range(20.0, 32.0),
+                );
+                placed_clay += 1;
+            }
+        }
+        info!("the land holds {placed_iron} iron veins and {placed_clay} clay banks");
     }
 
     // The god is named by its people, in their own tongue. The player never

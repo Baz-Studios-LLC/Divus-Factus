@@ -156,6 +156,12 @@ struct SaveGame {
     /// carried only the total (stores.0), which returns as berries.
     #[serde(default)]
     larder: Option<[f32; 5]>,
+    /// Ore, iron, clay in the store.
+    #[serde(default)]
+    metals: (f32, f32, f32),
+    /// Placed deposits still in the ground: (kind, position, amount).
+    #[serde(default)]
+    deposits: Vec<(u8, Vec3, f32)>,
 }
 
 fn slots_dir() -> std::path::PathBuf {
@@ -286,6 +292,23 @@ fn gather(world: &mut World) -> Option<SaveGame> {
             s.larder.bread,
         ]
     });
+    let metals = world
+        .get::<Stockpile>(settlement_entity)
+        .map_or((0.0, 0.0, 0.0), |s| (s.ore, s.iron, s.clay));
+    let deposits: Vec<(u8, Vec3, f32)> = world
+        .query::<(&GlobalTransform, &crate::matter::Deposit)>()
+        .iter(world)
+        .map(|(at, deposit)| {
+            (
+                match deposit.kind {
+                    crate::matter::DepositKind::Iron => 0,
+                    crate::matter::DepositKind::Clay => 1,
+                },
+                at.translation(),
+                deposit.amount,
+            )
+        })
+        .collect();
 
     let worked = world.resource::<Terrain>().export_worked();
     let known = {
@@ -634,6 +657,8 @@ fn gather(world: &mut World) -> Option<SaveGame> {
             .get_resource::<crate::trails::Trails>()
             .map_or_else(Vec::new, |t| t.export()),
         larder,
+        metals,
+        deposits,
     })
 }
 
@@ -660,6 +685,7 @@ fn apply(world: &mut World, save: SaveGame) {
     sweep!(crate::matter::Boulder);
     sweep!(crate::matter::Matter);
     sweep!(crate::trails::TrailPatch);
+    sweep!(crate::matter::Deposit);
     doomed.sort();
     doomed.dedup();
     for entity in doomed {
@@ -725,6 +751,9 @@ fn apply(world: &mut World, save: SaveGame) {
         };
         store.timber = save.stores.1;
         store.stone = save.stores.2;
+        store.ore = save.metals.0;
+        store.iron = save.metals.1;
+        store.clay = save.metals.2;
     }
     for (pile, mut transform) in world
         .query::<(&StorePile, &mut Transform)>()
@@ -1062,6 +1091,22 @@ fn apply(world: &mut World, save: SaveGame) {
                         let scale = *scale;
                         move |mut t| t.scale = scale
                     });
+                }
+                // The deposits come back with exactly what was left in
+                // the ground; a worked-out vein stays worked out.
+                for (kind, pos, amount) in &save.deposits {
+                    crate::matter::spawn_deposit(
+                        &mut commands,
+                        &mut meshes,
+                        &mut materials,
+                        *pos,
+                        if *kind == 0 {
+                            crate::matter::DepositKind::Iron
+                        } else {
+                            crate::matter::DepositKind::Clay
+                        },
+                        *amount,
+                    );
                 }
             });
         });

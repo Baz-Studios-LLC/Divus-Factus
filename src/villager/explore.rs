@@ -91,6 +91,7 @@ pub(super) fn expeditions(
     stores: Query<&crate::villager::work::Stockpile>,
     trees: Query<(&GlobalTransform, &FellableTree)>,
     bushes: Query<(&GlobalTransform, &crate::scatter::FoodSource)>,
+    deposits: Query<(&GlobalTransform, &crate::matter::Deposit)>,
     mut explorers: Query<
         (
             Entity,
@@ -179,7 +180,21 @@ pub(super) fn expeditions(
                 .filter(|(b, _)| b.translation().distance(spot) < 45.0)
                 .count();
             let high_ground = terrain.height_at(spot.x, spot.z) > WATER_LEVEL + 12.0;
-            let (what, radius) = if near_trees >= 6 {
+            // A deposit within sight of the survey is the find of a
+            // lifetime: rarer than any wood, and named accordingly.
+            let near_deposit = deposits
+                .iter()
+                .filter(|(at, deposit)| {
+                    deposit.amount > 0.5 && at.translation().distance(spot) < 45.0
+                })
+                .map(|(_, deposit)| deposit.kind)
+                .next();
+            let (what, radius) = if let Some(kind) = near_deposit {
+                match kind {
+                    crate::matter::DepositKind::Iron => ("a hillside veined with iron", 45.0),
+                    crate::matter::DepositKind::Clay => ("a bank of good red clay", 40.0),
+                }
+            } else if near_trees >= 6 {
                 ("a green wood past the cairns", 55.0)
             } else if near_bushes >= 3 {
                 ("a heath heavy with berries", 45.0)

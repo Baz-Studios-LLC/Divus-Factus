@@ -241,6 +241,12 @@ pub struct Stockpile {
     pub larder: Larder,
     pub timber: f32,
     pub stone: f32,
+    /// Raw ore out of a vein, waiting on the blacksmith's fire.
+    pub ore: f32,
+    /// Smelted iron: while any is held, every trade's tools bite better.
+    pub iron: f32,
+    /// Dug clay: a brick where stone runs short.
+    pub clay: f32,
 }
 
 impl Stockpile {
@@ -711,7 +717,11 @@ pub struct WoodLoad;
 
 /// Stone in someone's arms, on its way to a foundation.
 #[derive(Component, Debug)]
-pub struct CarryingStone;
+pub struct CarryingStone {
+    /// Clay brick rather than stone: the refund must go back to the
+    /// right pile if the errand is abandoned.
+    pub clay: bool,
+}
 
 /// Puts a stone block in someone's arms.
 pub(super) fn shoulder_stone(
@@ -1870,6 +1880,7 @@ pub(super) fn take_up_work(
         Query<(Entity, &GlobalTransform, &Building)>,
         Query<(Entity, &Transform, &Field)>,
         Query<(Entity, &Transform, &Vitality), (With<Villager>, Without<Corpse>)>,
+        Query<(Entity, &GlobalTransform, &crate::matter::Deposit)>,
     ),
     stores: Query<&Stockpile>,
     game: Query<
@@ -1897,7 +1908,7 @@ pub(super) fn take_up_work(
     if !is_work_hour(clock.time_of_day()) {
         return;
     }
-    let (buildings, fields, patients) = town;
+    let (buildings, fields, patients, deposits) = town;
 
     for (entity, transform, needs, vocation, mut activity, shunned) in &mut workers {
         if !matches!(*activity, Activity::Idle | Activity::Wandering) {
@@ -1990,28 +2001,52 @@ pub(super) fn take_up_work(
                         .map(|at| Job::at(at, None, at.distance(transform.translation)))
                 }),
 
-            // Miners work real stone where any lies loose; failing that, the
-            // high bare ground.
-            Vocation::Miner => boulders
-                .iter()
-                .map(|(rock, rock_transform)| {
-                    (
-                        rock,
-                        rock_transform.translation(),
-                        rock_transform.translation().distance(transform.translation),
-                    )
-                })
-                .filter(|(_, at, d)| (*d < WORK_REACH || known_far(*at, *d)) && permitted(*at))
-                .min_by(|a, b| a.2.total_cmp(&b.2))
-                .map(|(rock, at, d)| Job::at(at, Some(rock), d))
-                .or_else(|| {
-                    find_ground(&terrain, site.centre, &mut rng.0, |t, x, z| {
-                        matches!(t.biome_at(x, z), Biome::Alpine)
-                            || t.height_at(x, z) > WATER_LEVEL + 40.0
+            // Miners feed two hungers: the stone every foundation wants,
+            // and the ore the blacksmith's fire waits on. Stone while the
+            // pile runs thin; the far vein once the village can spare the
+            // walk.
+            Vocation::Miner => {
+                let stone_job = boulders
+                    .iter()
+                    .map(|(rock, rock_transform)| {
+                        (
+                            rock,
+                            rock_transform.translation(),
+                            rock_transform.translation().distance(transform.translation),
+                        )
                     })
-                    .filter(|at| permitted(*at))
-                    .map(|at| Job::at(at, None, at.distance(transform.translation)))
-                }),
+                    .filter(|(_, at, d)| (*d < WORK_REACH || known_far(*at, *d)) && permitted(*at))
+                    .min_by(|a, b| a.2.total_cmp(&b.2))
+                    .map(|(rock, at, d)| Job::at(at, Some(rock), d))
+                    .or_else(|| {
+                        find_ground(&terrain, site.centre, &mut rng.0, |t, x, z| {
+                            matches!(t.biome_at(x, z), Biome::Alpine)
+                                || t.height_at(x, z) > WATER_LEVEL + 40.0
+                        })
+                        .filter(|at| permitted(*at))
+                        .map(|at| Job::at(at, None, at.distance(transform.translation)))
+                    });
+                let ore_job = deposits
+                    .iter()
+                    .filter(|(_, _, deposit)| {
+                        deposit.kind == crate::matter::DepositKind::Iron && deposit.amount > 0.5
+                    })
+                    .map(|(vein, vein_transform, _)| {
+                        (
+                            vein,
+                            vein_transform.translation(),
+                            vein_transform.translation().distance(transform.translation),
+                        )
+                    })
+                    .filter(|(_, at, d)| (*d < WORK_REACH || known_far(*at, *d)) && permitted(*at))
+                    .min_by(|a, b| a.2.total_cmp(&b.2))
+                    .map(|(vein, at, d)| Job::at(at, Some(vein), d));
+                if stores.get(site.settlement).is_ok_and(|s| s.stone >= 12.0) {
+                    ore_job.or(stone_job)
+                } else {
+                    stone_job.or(ore_job)
+                }
+            }
 
             // Foresters fell real trees, and only real trees — where none
             // stand on known ground, the want goes unmet until an explorer
@@ -2053,7 +2088,10 @@ pub(super) fn take_up_work(
 
             // Masons serve any site whose foundation still wants stone.
             Vocation::Mason => {
-                let laying = if stores.get(site.settlement).is_ok_and(|s| s.stone >= 1.0) {
+                let laying = if stores
+                    .get(site.settlement)
+                    .is_ok_and(|s| s.stone >= 1.0 || s.clay >= 1.0)
+                {
                     build_sites
                         .iter()
                         .filter(|(_, _, cs, plan)| cs.stone_laid < plan.kind.stone_cost())
@@ -2069,23 +2107,48 @@ pub(super) fn take_up_work(
                 } else {
                     None
                 };
-                // No foundations to lay: cut stone like a miner.
-                laying.or_else(|| {
-                    boulders
-                        .iter()
-                        .map(|(rock, rock_transform)| {
-                            (
-                                rock,
-                                rock_transform.translation(),
-                                rock_transform.translation().distance(transform.translation),
-                            )
-                        })
-                        .filter(|(_, at, d)| {
-                            (*d < WORK_REACH || known_far(*at, *d)) && permitted(*at)
-                        })
-                        .min_by(|a, b| a.2.total_cmp(&b.2))
-                        .map(|(rock, at, d)| Job::at(at, Some(rock), d))
-                })
+                // No foundations to lay: cut stone like a miner — or, when
+                // the clay store is thin, dig the red bank instead.
+                laying
+                    .or_else(|| {
+                        boulders
+                            .iter()
+                            .map(|(rock, rock_transform)| {
+                                (
+                                    rock,
+                                    rock_transform.translation(),
+                                    rock_transform.translation().distance(transform.translation),
+                                )
+                            })
+                            .filter(|(_, at, d)| {
+                                (*d < WORK_REACH || known_far(*at, *d)) && permitted(*at)
+                            })
+                            .min_by(|a, b| a.2.total_cmp(&b.2))
+                            .map(|(rock, at, d)| Job::at(at, Some(rock), d))
+                    })
+                    .or_else(|| {
+                        if stores.get(site.settlement).is_ok_and(|s| s.clay >= 14.0) {
+                            return None;
+                        }
+                        deposits
+                            .iter()
+                            .filter(|(_, _, deposit)| {
+                                deposit.kind == crate::matter::DepositKind::Clay
+                                    && deposit.amount > 0.5
+                            })
+                            .map(|(bank, bank_transform, _)| {
+                                (
+                                    bank,
+                                    bank_transform.translation(),
+                                    bank_transform.translation().distance(transform.translation),
+                                )
+                            })
+                            .filter(|(_, at, d)| {
+                                (*d < WORK_REACH || known_far(*at, *d)) && permitted(*at)
+                            })
+                            .min_by(|a, b| a.2.total_cmp(&b.2))
+                            .map(|(bank, at, d)| Job::at(at, Some(bank), d))
+                    })
             }
 
             // Farmers work their own field, tilling a new one if they lack it.
@@ -2213,6 +2276,7 @@ pub(super) fn do_work(
         Query<(&Transform, &mut Vitality), (With<Villager>, Without<Corpse>)>,
         Query<&mut Field>,
         ResMut<KitchenWarm>,
+        Query<&mut crate::matter::Deposit>,
     ),
     civic: (
         Query<(&mut ConstructionSite, &Blueprint)>,
@@ -2240,7 +2304,7 @@ pub(super) fn do_work(
     let dt = time.delta_secs();
     let (ref carrying, ref children, ref loads, ref _buildings) = context;
     let (carrying, children, loads) = (carrying, children, loads);
-    let (carrying_stone, mut patients, mut fields_mut, mut kitchen) = trades;
+    let (carrying_stone, mut patients, mut fields_mut, mut kitchen, mut deposits_mut) = trades;
     let (mut build_sites, settlements, mut notices) = civic;
     let (terrain, mut chunks, mut grass, weather) = ground;
     let (mut meshes, mut materials) = assets;
@@ -2430,7 +2494,7 @@ pub(super) fn do_work(
                 continue;
             }
             if carrying_stone.get(entity).is_err() {
-                if store.stone < 1.0 {
+                if store.stone < 1.0 && store.clay < 1.0 {
                     *activity = Activity::Idle;
                     commands.entity(entity).remove::<Job>();
                     continue;
@@ -2445,8 +2509,15 @@ pub(super) fn do_work(
                     }
                     continue;
                 }
-                store.stone -= 1.0;
-                commands.entity(entity).insert(CarryingStone);
+                // Stone first; clay brick where stone runs short, so a
+                // flat-land village is not walled out of foundations.
+                let clay = store.stone < 1.0;
+                if clay {
+                    store.clay -= 1.0;
+                } else {
+                    store.stone -= 1.0;
+                }
+                commands.entity(entity).insert(CarryingStone { clay });
                 shoulder_stone(&mut commands, &mut meshes, &mut materials, entity);
                 job.patience = 20.0 + job.site.distance(transform.translation) * 0.8;
                 continue;
@@ -2455,7 +2526,10 @@ pub(super) fn do_work(
                 target.0 = Some(job.site);
                 job.patience -= dt;
                 if job.patience <= 0.0 {
-                    store.stone += 1.0;
+                    match carrying_stone.get(entity) {
+                        Ok(c) if c.clay => store.clay += 1.0,
+                        _ => store.stone += 1.0,
+                    }
                     commands.entity(entity).remove::<CarryingStone>();
                     shed_wood(&mut commands, entity, &children, &loads);
                     *activity = Activity::Idle;
@@ -2601,12 +2675,16 @@ pub(super) fn do_work(
         // Blacksmith's tools quicken every trade's hands - and the diligent
         // need less quickening than the slothful. Foul weather slows all of
         // them alike: nobody hammers well in a downpour.
-        let cycle = if context.3.iter().any(|b| b.kind == BuildingKind::Blacksmith) {
-            WORK_SECONDS * 0.75
-        } else {
-            WORK_SECONDS
-        } * manner.map_or(1.0, |m| m.work_pace())
-            * weather.as_ref().map_or(1.0, |w| w.toil());
+        // Iron tools bite better - but only while there IS iron: the
+        // blacksmith's speed is now something the village mines, smelts
+        // and wears out, not a property of the building's silhouette.
+        let cycle =
+            if context.3.iter().any(|b| b.kind == BuildingKind::Blacksmith) && store.iron > 0.0 {
+                WORK_SECONDS * 0.75
+            } else {
+                WORK_SECONDS
+            } * manner.map_or(1.0, |m| m.work_pace())
+                * weather.as_ref().map_or(1.0, |w| w.toil());
         job.progress += dt;
         if job.progress < cycle {
             continue;
@@ -2660,6 +2738,23 @@ pub(super) fn do_work(
             Vocation::Miner | Vocation::Mason => match job.focus {
                 // Bare high ground still yields loose stone.
                 None => store.stone += 1.0,
+                // A deposit gives up its kind, load by load, until the
+                // ground is empty and the diggings are abandoned.
+                Some(worked) if deposits_mut.get(worked).is_ok() => {
+                    let Ok(mut deposit) = deposits_mut.get_mut(worked) else {
+                        continue;
+                    };
+                    deposit.amount -= 1.0;
+                    match deposit.kind {
+                        crate::matter::DepositKind::Iron => store.ore += 1.0,
+                        crate::matter::DepositKind::Clay => store.clay += 1.0,
+                    }
+                    if deposit.amount <= 0.5 {
+                        commands.entity(worked).despawn();
+                        *activity = Activity::Idle;
+                        commands.entity(entity).remove::<Job>();
+                    }
+                }
                 // A boulder is chipped down blow by blow until it is gone.
                 Some(rock) => {
                     let Ok((mut rock_transform, _)) = boulders_mut.get_mut(rock) else {
@@ -2877,6 +2972,42 @@ pub(super) fn do_work(
 ///
 /// This is what the stockpile is *for*: the difference between a bad berry
 /// season and a funeral.
+/// The blacksmith at work: ore out of the far hills becomes iron, and
+/// iron in the store means every trade's tools bite better - until the
+/// edges dull. Mine, smelt, wear out, mine again: the first strategic
+/// resource loop.
+pub(super) fn smelt(
+    time: Res<Time>,
+    mut since_last: Local<f32>,
+    site: Option<Res<SettlementSite>>,
+    buildings: Query<&Building>,
+    mut stores: Query<&mut Stockpile>,
+) {
+    *since_last += time.delta_secs();
+    if *since_last < 22.0 {
+        return;
+    }
+    let interval = *since_last;
+    *since_last = 0.0;
+    let Some(site) = site else {
+        return;
+    };
+    if !buildings.iter().any(|b| b.kind == BuildingKind::Blacksmith) {
+        return;
+    }
+    let Ok(mut store) = stores.get_mut(site.settlement) else {
+        return;
+    };
+    if store.ore >= 1.0 {
+        store.ore -= 1.0;
+        store.iron += 1.0;
+    }
+    // Tools wear: the edge is spent slowly whenever iron is in use.
+    if store.iron > 0.0 {
+        store.iron = (store.iron - 0.004 * interval).max(0.0);
+    }
+}
+
 /// The bakery at work: the store's grain becomes bread, loaf by loaf.
 /// Bread stretches — a baked meal draws only three quarters as deep — so
 /// a working bakery quietly makes every harvest feed more mouths.
