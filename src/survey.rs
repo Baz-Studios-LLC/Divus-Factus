@@ -53,7 +53,7 @@ fn spawn_legend(mut commands: Commands) {
                 border_radius: BorderRadius::all(px(6)),
                 ..default()
             },
-            BackgroundColor(Color::BLACK.with_alpha(0.55)),
+            BackgroundColor(crate::ui::theme::panel_bg()),
             Visibility::Hidden,
             // Above the windows: while the sight is open, its legend reads
             // over whatever else is on screen, the way a mode should.
