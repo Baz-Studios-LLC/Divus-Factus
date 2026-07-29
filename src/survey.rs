@@ -152,6 +152,7 @@ fn refresh_survey(
     mut survey: ResMut<Survey>,
     rigs: Query<&CameraRig>,
     deposits: Query<(&GlobalTransform, &crate::matter::Deposit)>,
+    rocks: Query<&GlobalTransform, With<crate::matter::Boulder>>,
     bushes: Query<(&GlobalTransform, &crate::scatter::FoodSource)>,
     sheets: Query<Entity, With<SurveySheet>>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -200,6 +201,13 @@ fn refresh_survey(
             )
         })
         .collect();
+    // Loose stone the picks can actually reach: boulders and outcrops
+    // sit on flat ground too, and the sight must show them there or the
+    // map claims the only stone in the world is mountainside.
+    let stones: Vec<Vec2> = rocks
+        .iter()
+        .map(|at| Vec2::new(at.translation().x, at.translation().z))
+        .collect();
     let heaths: Vec<Vec2> = bushes
         .iter()
         .filter(|(_, food)| food.amount > 0.3)
@@ -228,7 +236,9 @@ fn refresh_survey(
                 *k == crate::matter::DepositKind::Clay && v.distance(Vec2::new(x, z)) < 9.0
             }) {
                 Some([0.82, 0.45, 0.12, 0.70])
-            } else if terrain.slope_at(x, z) > 0.42 {
+            } else if terrain.slope_at(x, z) > 0.42
+                || stones.iter().any(|s| s.distance(Vec2::new(x, z)) < 5.0)
+            {
                 Some([0.50, 0.56, 0.70, 0.60])
             } else if terrain.forest_at(x, z) > 0.50 && terrain.moisture_at(x, z) > 0.38 {
                 // Promise what the biome will deliver, as the founding
