@@ -121,47 +121,65 @@ fn speak(
             ))
             .id();
         if say.thought {
-            // A thought is a cloud. Many small lobes, sunk deep and packed
-            // close along the whole rim, so the outline reads as one
-            // continuous scalloped edge — not beads on a wire. The
-            // interior cover spawned just after them paints the box's
-            // fill back over their inner halves.
-            let mut lobe = |left: Val, top: Val, right: Val, bottom: Val, size: f32| {
-                commands.spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        left,
-                        top,
-                        right,
-                        bottom,
-                        width: px(size),
-                        height: px(size),
-                        border: UiRect::all(px(1)),
-                        border_radius: BorderRadius::all(percent(50)),
-                        ..default()
-                    },
-                    BackgroundColor(theme::panel_bg()),
-                    BorderColor::all(border),
-                    ChildOf(bubble),
-                ));
-            };
+            // A thought is a cloud: big soft lobes touching the whole way
+            // round. The outline is built in two layers - first every lobe
+            // as a solid border-colour disc a ring wider, all beneath,
+            // then every lobe again in the bubble's own fill. Where bumps
+            // overlap, the fill covers the neighbour's ring, so the line
+            // survives only on the OUTSIDE silhouette and never breaks
+            // into the cloud.
             let auto = Val::Auto;
-            // The rim, top and bottom: a handful of generous lobes, still
-            // spaced tightly enough to overlap at the widest bubble - big
-            // soft bumps touching each other the whole way round.
-            for i in 0..16 {
-                let pc = i as f32 * 6.15 - 1.0;
-                let size = 14.0 + ((i * 7) % 4) as f32 * 1.8;
-                lobe(percent(pc), px(-size * 0.42), auto, auto, size);
-                let size = 13.5 + ((i * 5 + 2) % 4) as f32 * 1.8;
-                lobe(percent(pc + 3.0), auto, auto, px(-size * 0.42), size);
+            // A modest count of lobes in genuinely varied sizes - small
+            // bumps shouldering big billows, the way a cloud actually
+            // looks - spaced to keep touching at the widest bubble.
+            let mut rim: Vec<(Val, Val, Val, Val, f32)> = Vec::new();
+            for i in 0..10 {
+                let pc = i as f32 * 9.8 - 1.5;
+                let size = 16.0 + ((i * 13) % 7) as f32 * 1.7;
+                rim.push((percent(pc), px(-size * 0.40), auto, auto, size));
+                let size = 15.0 + ((i * 11 + 3) % 7) as f32 * 1.7;
+                rim.push((percent(pc + 4.5), auto, auto, px(-size * 0.40), size));
             }
-            // The sides.
-            for (pc, size) in [(4.0, 15.0), (38.0, 16.5), (70.0, 14.5)] {
-                lobe(px(-size * 0.42), percent(pc), auto, auto, size);
-                lobe(auto, percent(pc + 7.0), px(-size * 0.42), auto, size);
+            for (pc, size) in [(8.0, 19.0), (55.0, 23.0)] {
+                rim.push((px(-size * 0.40), percent(pc), auto, auto, size));
+                rim.push((auto, percent(pc + 12.0), px(-size * 0.40), auto, size - 3.0));
             }
-            drop(lobe);
+            for pass in 0..2 {
+                for (left, top, right, bottom, size) in &rim {
+                    let grow = if pass == 0 { 2.6 } else { 0.0 };
+                    // The bigger under-disc stays concentric with its
+                    // fill: nudged back toward whichever edges anchor it.
+                    let dx = if *left != Val::Auto {
+                        -grow * 0.5
+                    } else {
+                        grow * 0.5
+                    };
+                    let dy = if *top != Val::Auto {
+                        -grow * 0.5
+                    } else {
+                        grow * 0.5
+                    };
+                    commands.spawn((
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: *left,
+                            top: *top,
+                            right: *right,
+                            bottom: *bottom,
+                            width: px(size + grow),
+                            height: px(size + grow),
+                            border_radius: BorderRadius::all(percent(50)),
+                            ..default()
+                        },
+                        UiTransform {
+                            translation: Val2::new(px(dx), px(dy)),
+                            ..default()
+                        },
+                        BackgroundColor(if pass == 0 { border } else { theme::panel_bg() }),
+                        ChildOf(bubble),
+                    ));
+                }
+            }
             // The cover: the box's own fill, laid over every lobe's
             // inner half. Spawned after the lobes, before the words.
             commands.spawn((
