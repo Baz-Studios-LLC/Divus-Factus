@@ -108,7 +108,14 @@ fn speak(
                     top: px(-1000),
                     flex_direction: FlexDirection::Column,
                     row_gap: px(1),
-                    padding: UiRect::axes(px(8), px(4)),
+                    // Thoughts breathe: the billowed rim eats into the box,
+                    // so the words stand further from the edge than in a
+                    // straight-walled speech bubble.
+                    padding: if say.thought {
+                        UiRect::axes(px(15), px(9))
+                    } else {
+                        UiRect::axes(px(8), px(4))
+                    },
                     // A thought's rim is drawn entirely by its lobes: the
                     // box itself has no border, so no straight line can
                     // ever show between the round parts.
