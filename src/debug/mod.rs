@@ -101,7 +101,9 @@ struct AutoCapture {
 
 fn auto_capture(
     mut commands: Commands,
-    time: Res<Time>,
+    // Real time: the capture delay is a wall-clock promise, and must not
+    // stretch on the title screen's pause or shrink under EGREGORE_SPEED.
+    time: Res<Time<Real>>,
     mut capture: ResMut<AutoCapture>,
     target: Option<Res<crate::render::CaptureTarget>>,
     chunk_probe: Option<Res<LoadedChunks>>,

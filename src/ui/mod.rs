@@ -73,7 +73,9 @@ const BUBBLE_CAP: usize = 7;
 /// Spawns a bubble per Say, skipping speakers who already have one.
 fn speak(
     mut commands: Commands,
-    time: Res<Time>,
+    // Real time: a bubble is for the player's eyes, and must stay
+    // readable however hard the world is hasted.
+    time: Res<Time<Real>>,
     mut messages: MessageReader<Say>,
     names: Query<&crate::villager::Person>,
     live: Query<&Bubble>,
@@ -298,7 +300,7 @@ fn speak(
 /// Bubbles ride above their speakers' heads and fade off with them.
 fn float_bubbles(
     mut commands: Commands,
-    time: Res<Time>,
+    time: Res<Time<Real>>,
     cameras: Query<(&bevy::camera::Camera, &GlobalTransform)>,
     speakers: Query<&GlobalTransform, Without<Bubble>>,
     mut bubbles: Query<(Entity, &Bubble, &mut Node, &ComputedNode, &mut Visibility)>,
@@ -475,7 +477,8 @@ fn show_notices(
 /// Toasts count down and fade out over their last moments rather than popping.
 fn age_toasts(
     mut commands: Commands,
-    time: Res<Time>,
+    // Real time: notices are for the player, not the world.
+    time: Res<Time<Real>>,
     mut toasts: Query<(
         Entity,
         &mut Toast,

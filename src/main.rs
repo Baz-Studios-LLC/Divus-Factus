@@ -19,6 +19,7 @@ mod rng;
 mod save;
 mod scatter;
 mod sky;
+mod speed;
 mod terrain;
 mod title;
 mod trails;
@@ -139,6 +140,7 @@ fn main() {
             save::SavePlugin,
             weather::WeatherPlugin,
             trails::TrailsPlugin,
+            speed::SpeedPlugin,
         ))
         .add_systems(Startup, spawn_lighting)
         .run();
