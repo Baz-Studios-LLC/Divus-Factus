@@ -1517,12 +1517,18 @@ fn births(
 
 /// Scores each option and switches activity when something outscores the current one.
 fn choose_activity(
+    site: Option<Res<SettlementSite>>,
+    stores: Query<&work::Stockpile>,
     mut villagers: Query<
         (&mut Activity, &Needs, &Transform, &MoveTarget),
         (With<Villager>, Without<Held>, Without<Airborne>),
     >,
     food: Query<(Entity, &GlobalTransform, &FoodSource), Without<Villager>>,
 ) {
+    let larder = site
+        .as_ref()
+        .and_then(|s| stores.get(s.settlement).ok())
+        .map_or(0.0, |s| s.food());
     for (mut activity, needs, transform, target) in &mut villagers {
         let hunger_score = food_utility(needs);
         let wander_score = wander_utility();
@@ -1567,10 +1573,29 @@ fn choose_activity(
                 })
                 .min_by(|a, b| a.1.total_cmp(&b.1));
 
-            if let Some((entity, _)) = nearest {
-                if *activity != Activity::SeekingFood(entity) {
+            // THE FIX for 'starved within sight of a stocked larder': a
+            // hungry villager used to march to the nearest fruiting bush
+            // WHEREVER it was - four hundred strides past a full store -
+            // and the march itself killed them. The rule now: eat from
+            // whichever is nearer, the bush or the banner, and never walk
+            // past food toward food.
+            let banner = site
+                .as_ref()
+                .map(|s| s.centre.distance(transform.translation));
+            if let Some((entity, bush_distance_sq)) = nearest {
+                let bush_distance = bush_distance_sq.sqrt();
+                let store_wins = larder >= 1.0
+                    && banner.is_some_and(|b| b < bush_distance || bush_distance > 80.0);
+                if store_wins {
+                    *activity = Activity::VisitingStore;
+                } else if *activity != Activity::SeekingFood(entity) {
                     *activity = Activity::SeekingFood(entity);
                 }
+                continue;
+            }
+            // No fruiting bush anywhere: the store is the only table.
+            if larder >= 1.0 {
+                *activity = Activity::VisitingStore;
                 continue;
             }
         }

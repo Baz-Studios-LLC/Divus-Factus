@@ -128,7 +128,10 @@ struct RecenterButton;
 fn spawn_toolbar(mut commands: Commands) {
     let bar = ui::toolbar(&mut commands);
     let recenter = ui::icon_button(&mut commands, bar);
-    commands.entity(recenter).insert(RecenterButton);
+    commands.entity(recenter).insert((
+        RecenterButton,
+        ui::HoverHint::new("Fly home", "the camera returns to the village banner"),
+    ));
 
     // The icon is the town banner, drawn in nodes: a pole with a flag.
     let pole = commands
@@ -162,7 +165,10 @@ fn spawn_toolbar(mut commands: Commands) {
 
     // The village ledger: three rising bars.
     let village = ui::icon_button(&mut commands, bar);
-    commands.entity(village).insert(VillageButton);
+    commands.entity(village).insert((
+        VillageButton,
+        ui::HoverHint::new("The Village", "ledger, gauges and the faith roster"),
+    ));
     for (i, height) in [(0, 8.0), (1, 13.0), (2, 18.0)] {
         let bar_node = commands
             .spawn((
@@ -186,7 +192,13 @@ fn spawn_toolbar(mut commands: Commands) {
 
     // The god's own panel: a gold diamond mark.
     let god = ui::icon_button(&mut commands, bar);
-    commands.entity(god).insert(GodButton);
+    commands.entity(god).insert((
+        GodButton,
+        ui::HoverHint::new(
+            "The God",
+            "your name, your miracles, how they feel about you",
+        ),
+    ));
     for (size, top, left, bright) in [(12.0, 10.0, 10.0, true), (6.0, 13.0, 13.0, false)] {
         let mark = commands
             .spawn((
@@ -211,7 +223,10 @@ fn spawn_toolbar(mut commands: Commands) {
 
     // The world button: a globe, drawn as a ringed circle with a belt.
     let world = ui::icon_button(&mut commands, bar);
-    commands.entity(world).insert(WorldButton);
+    commands.entity(world).insert((
+        WorldButton,
+        ui::HoverHint::new("The Land", "the world's own numbers"),
+    ));
     let globe = commands
         .spawn((
             Node {
@@ -245,7 +260,10 @@ fn spawn_toolbar(mut commands: Commands) {
 
     // The people button: a head above shoulders.
     let people = ui::icon_button(&mut commands, bar);
-    commands.entity(people).insert(PeopleButton);
+    commands.entity(people).insert((
+        PeopleButton,
+        ui::HoverHint::new("The People", "roster, portraits and every life's story"),
+    ));
     let head = commands
         .spawn((
             Node {
@@ -279,7 +297,10 @@ fn spawn_toolbar(mut commands: Commands) {
 
     // The history button: a page with written lines.
     let history = ui::icon_button(&mut commands, bar);
-    commands.entity(history).insert(HistoryButton);
+    commands.entity(history).insert((
+        HistoryButton,
+        ui::HoverHint::new("The Chronicle", "everything that has ever happened here"),
+    ));
     let page = commands
         .spawn((
             Node {

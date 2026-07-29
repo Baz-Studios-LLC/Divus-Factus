@@ -97,6 +97,7 @@ pub(crate) fn update_inspector(
             &crate::villager::work::Blueprint,
         )>,
         Query<&crate::matter::Deposit>,
+        Query<(&Interaction, &ui::HoverHint)>,
     ),
     households: Query<
         (&Person, &crate::villager::home::Home, &Activity),
@@ -132,6 +133,39 @@ pub(crate) fn update_inspector(
     let Ok(mut visibility) = panels.single_mut() else {
         return;
     };
+
+    // ONE tooltip system: a hinted button under the cursor speaks through
+    // the same top-corner card the world does. Interface wins over world
+    // - if you are over a button, the button is what you are asking about.
+    if let Some(hint) = rising
+        .2
+        .iter()
+        .find(|(interaction, _)| !matches!(interaction, Interaction::None))
+        .map(|(_, hint)| hint)
+    {
+        *visibility = Visibility::Visible;
+        for (mut block, mut node) in &mut person_block {
+            *block = Visibility::Hidden;
+            node.display = Display::None;
+        }
+        if let Ok(mut name) = texts.p0().single_mut()
+            && name.0 != hint.title
+        {
+            *name = Text::new(hint.title.clone());
+        }
+        if let Ok(mut subtitle) = texts.p1().single_mut()
+            && subtitle.0 != hint.line
+        {
+            *subtitle = Text::new(hint.line.clone());
+        }
+        if let Ok((mut detail, mut detail_visibility)) = texts.p2().single_mut() {
+            if !detail.0.is_empty() {
+                *detail = Text::new("");
+            }
+            *detail_visibility = Visibility::Hidden;
+        }
+        return;
+    }
 
     // Whoever the hand holds or hovers — and failing that, whoever the camera
     // is following. The card of a follow stays up for the whole ride.

@@ -306,6 +306,17 @@ impl Miracle {
         }
     }
 
+    /// What the miracle does, for the hint card.
+    pub fn blurb(self) -> &'static str {
+        match self {
+            Miracle::Flourish => "every bush around the settlement bears fruit",
+            Miracle::Smite => "lightning, called down on a point",
+            Miracle::Bounty => "the bushes at the touch erupt with fruit",
+            Miracle::Mend => "knits the hurt whole around the touch",
+            Miracle::Quake => "throws the ground and everyone on it",
+        }
+    }
+
     pub fn key(self) -> KeyCode {
         match self {
             Miracle::Flourish => KeyCode::Digit1,
@@ -452,6 +463,12 @@ fn spawn_hotbar(mut commands: Commands) {
                 ChildOf(bar),
             ))
             .id();
+        if let Some(miracle) = miracle {
+            commands.entity(slot).insert(ui::HoverHint::new(
+                miracle.name(),
+                format!("{} - {:.0} belief", miracle.blurb(), miracle.cost()),
+            ));
+        }
 
         // The number in the corner, hotkey-style.
         let number = commands
@@ -577,6 +594,10 @@ fn reveal_earned_miracle(
         return;
     };
     slot.0 = Some(earned);
+    commands.entity(slot_entity).insert(ui::HoverHint::new(
+        earned.name(),
+        format!("{} - {:.0} belief", earned.blurb(), earned.cost()),
+    ));
 
     match earned {
         // A cross of green — mending.

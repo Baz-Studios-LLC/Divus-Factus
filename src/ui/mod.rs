@@ -958,6 +958,23 @@ pub fn scroll_regions(
     }
 }
 
+/// A hint the cursor summons: hover anything carrying one and the card
+/// in the corner names it - what it is, what it costs, what it does.
+#[derive(Component)]
+pub struct HoverHint {
+    pub title: String,
+    pub line: String,
+}
+
+impl HoverHint {
+    pub fn new(title: impl Into<String>, line: impl Into<String>) -> Self {
+        HoverHint {
+            title: title.into(),
+            line: line.into(),
+        }
+    }
+}
+
 /// A dark inset well: content that sits INTO the panel.
 pub fn inset_well(commands: &mut Commands, parent: Entity) -> Entity {
     commands
