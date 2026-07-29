@@ -2415,6 +2415,9 @@ fn update_hud(
                     if s.clay > 0.05 {
                         line += &format!(" / {:.0} clay", s.clay);
                     }
+                    if s.incense + s.dye > 0.05 {
+                        line += &format!(" / {:.1} incense / {:.1} dye", s.incense, s.dye);
+                    }
                     line
                 },
             ),

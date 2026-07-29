@@ -154,6 +154,7 @@ impl Plugin for VillagerPlugin {
                         belief::animate_motes,
                         work::bake,
                         work::smelt,
+                        work::dye_cloth,
                     )
                         .chain(),
                     (

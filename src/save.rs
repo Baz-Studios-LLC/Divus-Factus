@@ -162,6 +162,9 @@ struct SaveGame {
     /// Placed deposits still in the ground: (kind, position, amount).
     #[serde(default)]
     deposits: Vec<(u8, Vec3, f32)>,
+    /// Incense and dye in the store.
+    #[serde(default)]
+    sacred: (f32, f32),
 }
 
 fn slots_dir() -> std::path::PathBuf {
@@ -295,6 +298,9 @@ fn gather(world: &mut World) -> Option<SaveGame> {
     let metals = world
         .get::<Stockpile>(settlement_entity)
         .map_or((0.0, 0.0, 0.0), |s| (s.ore, s.iron, s.clay));
+    let sacred = world
+        .get::<Stockpile>(settlement_entity)
+        .map_or((0.0, 0.0), |s| (s.incense, s.dye));
     let deposits: Vec<(u8, Vec3, f32)> = world
         .query::<(&GlobalTransform, &crate::matter::Deposit)>()
         .iter(world)
@@ -659,6 +665,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         larder,
         metals,
         deposits,
+        sacred,
     })
 }
 
@@ -754,6 +761,8 @@ fn apply(world: &mut World, save: SaveGame) {
         store.ore = save.metals.0;
         store.iron = save.metals.1;
         store.clay = save.metals.2;
+        store.incense = save.sacred.0;
+        store.dye = save.sacred.1;
     }
     for (pile, mut transform) in world
         .query::<(&StorePile, &mut Transform)>()

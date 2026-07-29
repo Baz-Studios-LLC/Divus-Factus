@@ -518,6 +518,26 @@ fn populate_chunks(
                         &mut rng,
                     );
                     commands.entity(bush).insert(ChildOf(entity));
+                } else if moisture > 0.45 && rng.chance(0.012) {
+                    let herb = spawn_sacred(
+                        &mut commands,
+                        &mut meshes,
+                        terrain_assets.ground_material.clone(),
+                        local,
+                        SacredKind::Incense,
+                        &mut rng,
+                    );
+                    commands.entity(herb).insert(ChildOf(entity));
+                } else if rng.chance(0.010) {
+                    let flowers = spawn_sacred(
+                        &mut commands,
+                        &mut meshes,
+                        terrain_assets.ground_material.clone(),
+                        local,
+                        SacredKind::Dye,
+                        &mut rng,
+                    );
+                    commands.entity(flowers).insert(ChildOf(entity));
                 } else if rng.chance(0.05) {
                     bake_rock(&mut builder, local, &mut rng);
                 }
@@ -588,6 +608,113 @@ fn spawn_tree(
 
 /// Spawns one loose boulder entity, near the settlement where the simulation
 /// (and the hand, and the miners) can touch it.
+/// The rarer gifts of the land: not food, but what faith and finery are
+/// made from. Incense herbs for the shrine's coals, dyeflowers for the
+/// weaver's vats — scarce enough that finding a stand of either is news.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SacredKind {
+    Incense,
+    Dye,
+}
+
+#[derive(Component)]
+pub struct SacredFlora {
+    pub kind: SacredKind,
+    pub amount: f32,
+}
+
+/// A stand of sacred flora, baked like a bush: smoke-grey herb stalks
+/// with pale tips, or a low green clump crowned in vivid blossom.
+fn spawn_sacred(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    material: Handle<StandardMaterial>,
+    position: Vec3,
+    kind: SacredKind,
+    rng: &mut Rng,
+) -> Entity {
+    let mut builder = MeshBuilder::default();
+    match kind {
+        SacredKind::Incense => {
+            for _ in 0..rng.range_i(4, 6) {
+                let h = rng.range(0.5, 0.9);
+                builder.push_box(
+                    Transform::from_xyz(rng.range(-0.35, 0.35), h * 0.5, rng.range(-0.35, 0.35))
+                        .with_scale(Vec3::new(0.08, h, 0.08)),
+                    palette::color_at(
+                        Tone {
+                            ramp: palette::RAMP_FOLIAGE,
+                            step: 1,
+                        }
+                        .palette_index(),
+                    ),
+                );
+                builder.push_box(
+                    Transform::from_xyz(rng.range(-0.35, 0.35), h + 0.05, rng.range(-0.35, 0.35))
+                        .with_scale(Vec3::splat(0.13)),
+                    palette::color_at(
+                        Tone {
+                            ramp: palette::RAMP_BONE,
+                            step: 3,
+                        }
+                        .palette_index(),
+                    ),
+                );
+            }
+        }
+        SacredKind::Dye => {
+            builder.push_box(
+                Transform::from_xyz(0.0, 0.2, 0.0).with_scale(Vec3::new(0.8, 0.4, 0.8)),
+                palette::color_at(
+                    Tone {
+                        ramp: palette::RAMP_FOLIAGE,
+                        step: 2,
+                    }
+                    .palette_index(),
+                ),
+            );
+            for _ in 0..rng.range_i(4, 7) {
+                builder.push_box(
+                    Transform::from_xyz(
+                        rng.range(-0.4, 0.4),
+                        rng.range(0.4, 0.65),
+                        rng.range(-0.4, 0.4),
+                    )
+                    .with_scale(Vec3::splat(0.15)),
+                    palette::color_at(
+                        Tone {
+                            ramp: if rng.chance(0.5) {
+                                palette::RAMP_CLOTH_BLUE
+                            } else {
+                                palette::RAMP_CLOTH_RED
+                            },
+                            step: 4,
+                        }
+                        .palette_index(),
+                    ),
+                );
+            }
+        }
+    }
+    commands
+        .spawn((
+            Name::new(match kind {
+                SacredKind::Incense => "A stand of incense herb",
+                SacredKind::Dye => "A clump of dyeflowers",
+            }),
+            Mesh3d(meshes.add(builder.build())),
+            MeshMaterial3d(material),
+            Transform::from_translation(position)
+                .with_rotation(Quat::from_rotation_y(rng.range(0.0, std::f32::consts::TAU))),
+            SacredFlora {
+                kind,
+                amount: rng.range(2.0, 4.0),
+            },
+            crate::hand::PickRadius(1.0),
+        ))
+        .id()
+}
+
 pub(crate) fn spawn_boulder(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,

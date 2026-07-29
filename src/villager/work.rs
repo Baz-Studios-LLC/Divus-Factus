@@ -247,6 +247,10 @@ pub struct Stockpile {
     pub iron: f32,
     /// Dug clay: a brick where stone runs short.
     pub clay: f32,
+    /// Herb for the shrine's coals: a censed sermon carries further.
+    pub incense: f32,
+    /// Dye for the weaver's vats: bright cloth, brighter spirits.
+    pub dye: f32,
 }
 
 impl Stockpile {
@@ -1881,6 +1885,7 @@ pub(super) fn take_up_work(
         Query<(Entity, &Transform, &Field)>,
         Query<(Entity, &Transform, &Vitality), (With<Villager>, Without<Corpse>)>,
         Query<(Entity, &GlobalTransform, &crate::matter::Deposit)>,
+        Query<(Entity, &GlobalTransform, &crate::scatter::SacredFlora)>,
     ),
     stores: Query<&Stockpile>,
     game: Query<
@@ -1908,7 +1913,7 @@ pub(super) fn take_up_work(
     if !is_work_hour(clock.time_of_day()) {
         return;
     }
-    let (buildings, fields, patients, deposits) = town;
+    let (buildings, fields, patients, deposits, sacred) = town;
 
     for (entity, transform, needs, vocation, mut activity, shunned) in &mut workers {
         if !matches!(*activity, Activity::Idle | Activity::Wandering) {
@@ -1938,19 +1943,47 @@ pub(super) fn take_up_work(
         let known_far = |at: Vec3, d: f32| d < 700.0 && known.as_ref().is_some_and(|k| k.knows(at));
 
         let job = match vocation {
-            Vocation::Gatherer => bushes
-                .iter()
-                .filter(|(_, _, source)| source.amount > 0.5)
-                .map(|(bush, bush_transform, _)| {
-                    (
-                        bush,
-                        bush_transform.translation(),
-                        bush_transform.translation().distance(transform.translation),
-                    )
-                })
-                .filter(|(_, at, d)| (*d < WORK_REACH || known_far(*at, *d)) && permitted(*at))
-                .min_by(|a, b| a.2.total_cmp(&b.2))
-                .map(|(bush, at, d)| Job::at(at, Some(bush), d)),
+            // Gatherers fill the larder first; with food put by, they go
+            // after the rarer gifts — incense herb and dyeflowers.
+            Vocation::Gatherer => {
+                let food_job = bushes
+                    .iter()
+                    .filter(|(_, _, source)| source.amount > 0.5)
+                    .map(|(bush, bush_transform, _)| {
+                        (
+                            bush,
+                            bush_transform.translation(),
+                            bush_transform.translation().distance(transform.translation),
+                        )
+                    })
+                    .filter(|(_, at, d)| (*d < WORK_REACH || known_far(*at, *d)) && permitted(*at))
+                    .min_by(|a, b| a.2.total_cmp(&b.2))
+                    .map(|(bush, at, d)| Job::at(at, Some(bush), d));
+                let sacred_job = || {
+                    sacred
+                        .iter()
+                        .filter(|(_, _, flora)| flora.amount > 0.5)
+                        .map(|(stand, stand_transform, _)| {
+                            (
+                                stand,
+                                stand_transform.translation(),
+                                stand_transform
+                                    .translation()
+                                    .distance(transform.translation),
+                            )
+                        })
+                        .filter(|(_, at, d)| {
+                            (*d < WORK_REACH || known_far(*at, *d)) && permitted(*at)
+                        })
+                        .min_by(|a, b| a.2.total_cmp(&b.2))
+                        .map(|(stand, at, d)| Job::at(at, Some(stand), d))
+                };
+                if stores.get(site.settlement).is_ok_and(|s| s.food() >= 25.0) {
+                    sacred_job().or(food_job)
+                } else {
+                    food_job.or_else(sacred_job)
+                }
+            }
 
             // A carcass already down is free meat: harvest before hunting,
             // and the village stops drowning in carrion.
@@ -2277,6 +2310,7 @@ pub(super) fn do_work(
         Query<&mut Field>,
         ResMut<KitchenWarm>,
         Query<&mut crate::matter::Deposit>,
+        Query<&mut crate::scatter::SacredFlora>,
     ),
     civic: (
         Query<(&mut ConstructionSite, &Blueprint)>,
@@ -2304,7 +2338,14 @@ pub(super) fn do_work(
     let dt = time.delta_secs();
     let (ref carrying, ref children, ref loads, ref _buildings) = context;
     let (carrying, children, loads) = (carrying, children, loads);
-    let (carrying_stone, mut patients, mut fields_mut, mut kitchen, mut deposits_mut) = trades;
+    let (
+        carrying_stone,
+        mut patients,
+        mut fields_mut,
+        mut kitchen,
+        mut deposits_mut,
+        mut sacred_mut,
+    ) = trades;
     let (mut build_sites, settlements, mut notices) = civic;
     let (terrain, mut chunks, mut grass, weather) = ground;
     let (mut meshes, mut materials) = assets;
@@ -2701,6 +2742,23 @@ pub(super) fn do_work(
 
         match vocation {
             Vocation::Gatherer => {
+                // A sacred stand yields its kind and is spent.
+                if let Some(mut flora) = job.focus.and_then(|f| sacred_mut.get_mut(f).ok()) {
+                    let taken = flora.amount.min(1.0);
+                    flora.amount -= taken;
+                    match flora.kind {
+                        crate::scatter::SacredKind::Incense => store.incense += taken,
+                        crate::scatter::SacredKind::Dye => store.dye += taken,
+                    }
+                    if flora.amount <= 0.1 {
+                        if let Some(stand) = job.focus {
+                            commands.entity(stand).despawn();
+                        }
+                        *activity = Activity::Idle;
+                        commands.entity(entity).remove::<Job>();
+                    }
+                    continue;
+                }
                 let Some(mut source) = job.focus.and_then(|b| bushes.get_mut(b).ok()) else {
                     *activity = Activity::Idle;
                     commands.entity(entity).remove::<Job>();
@@ -3005,6 +3063,40 @@ pub(super) fn smelt(
     // Tools wear: the edge is spent slowly whenever iron is in use.
     if store.iron > 0.0 {
         store.iron = (store.iron - 0.004 * interval).max(0.0);
+    }
+}
+
+/// The weaver at work: dye out of the flowers becomes bright cloth on
+/// the village's backs, and bright cloth is a quiet lift to every day
+/// it is worn. Vanity, but vanity that keeps spirits above the line.
+pub(super) fn dye_cloth(
+    time: Res<Time>,
+    mut since_last: Local<f32>,
+    site: Option<Res<SettlementSite>>,
+    buildings: Query<&Building>,
+    mut stores: Query<&mut Stockpile>,
+    mut wearers: Query<&mut super::Morale, With<Villager>>,
+) {
+    *since_last += time.delta_secs();
+    if *since_last < 45.0 {
+        return;
+    }
+    *since_last = 0.0;
+    let Some(site) = site else {
+        return;
+    };
+    if !buildings.iter().any(|b| b.kind == BuildingKind::Weaver) {
+        return;
+    }
+    let Ok(mut store) = stores.get_mut(site.settlement) else {
+        return;
+    };
+    if store.dye < 0.3 {
+        return;
+    }
+    store.dye -= 0.3;
+    for mut morale in &mut wearers {
+        morale.spirits = (morale.spirits + 0.03).min(1.0);
     }
 }
 
@@ -3890,6 +3982,8 @@ pub(super) fn sermons(
     mut say: MessageWriter<crate::ui::Say>,
     name: Option<Res<super::DivineName>>,
     clock: Res<crate::calendar::WorldClock>,
+    site: Option<Res<SettlementSite>>,
+    mut stores: Query<&mut Stockpile>,
     shrines: Query<(&GlobalTransform, &Building)>,
     mut congregation: Query<
         (
@@ -3938,16 +4032,32 @@ pub(super) fn sermons(
         thought: false,
     });
 
+    // Incense on the coals: the telling carries further and sinks
+    // deeper. Sacred goods spend themselves feeding belief - that is
+    // what makes them sacred.
+    let censed = site
+        .as_ref()
+        .and_then(|s| stores.get_mut(s.settlement).ok())
+        .is_some_and(|mut store| {
+            if store.incense >= 0.5 {
+                store.incense -= 0.5;
+                true
+            } else {
+                false
+            }
+        });
+    let (reach, sway) = if censed { (34.0, 0.05) } else { (22.0, 0.03) };
+
     let day = clock.day();
     for (_, at, mut witnessed, mut faith, chronicle, vocation, _) in &mut congregation {
         if *vocation == Vocation::Priest {
             continue;
         }
-        if at.translation.distance(shrine) > 22.0 {
+        if at.translation.distance(shrine) > reach {
             continue;
         }
         witnessed.secondhand = witnessed.secondhand.saturating_add(1);
-        faith.trust = (faith.trust + 0.03).min(0.8);
+        faith.trust = (faith.trust + sway).min(0.8);
         if let Some(mut chronicle) = chronicle {
             chronicle.record(
                 day,
