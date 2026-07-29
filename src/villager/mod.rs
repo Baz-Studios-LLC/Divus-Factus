@@ -451,9 +451,15 @@ fn wander_utility() -> f32 {
 /// search radius keeps the founding village near where the player starts looking.
 const SETTLEMENT_SEARCH_RADIUS: f32 = 900.0;
 
-/// Finds a walkable, dry, reasonably flat site near water for the settlement.
+/// Finds a walkable, dry, reasonably flat site for the settlement — near
+/// water on some worlds, well inland on others.
 fn choose_settlement_site(terrain: &Terrain, rng: &mut Rng) -> Vec3 {
     let mut best: Option<(f32, Vec3)> = None;
+    // How much this founding people care for the sea. Rolled per world:
+    // some folk are fishers to the bone, some would rather farm a valley
+    // three days from the sound of surf - and with mud brick and masonry
+    // in the building repertoire, inland is a real life, not a death.
+    let coastal_yearning = rng.range(0.0, 1.5);
 
     for _ in 0..6_000 {
         let x = rng.range(-SETTLEMENT_SEARCH_RADIUS, SETTLEMENT_SEARCH_RADIUS);
@@ -523,7 +529,7 @@ fn choose_settlement_site(terrain: &Terrain, rng: &mut Rng) -> Vec3 {
         // the reward around a quarter of the outer band being water.
         let shoreline = 1.0 - ((water_fraction - 0.25) / 0.25).abs().min(1.0);
 
-        let score = buildable_fraction * 4.0 + flatness * 2.0 + shoreline * 1.5;
+        let score = buildable_fraction * 4.0 + flatness * 2.0 + shoreline * coastal_yearning;
         if best.is_none_or(|(b, _)| score > b) {
             best = Some((score, Vec3::new(x, height, z)));
         }

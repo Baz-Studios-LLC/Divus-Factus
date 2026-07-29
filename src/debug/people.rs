@@ -93,7 +93,7 @@ pub(crate) struct RowFace {
 }
 
 pub(crate) fn spawn_people_panel(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
-    let split = ui::split_view(&mut commands, "THE PEOPLE", 285.0, 470.0);
+    let split = ui::split_view(&mut commands, "THE PEOPLE", 300.0, 640.0);
     // Capture mode opens the window and picks somebody, so an unattended
     // screenshot can prove the pane works.
     let starts = if crate::capture_path().is_some() {

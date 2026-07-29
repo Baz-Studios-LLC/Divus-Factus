@@ -289,7 +289,33 @@ pub(crate) fn retrain(
     .map(|v| (v, count_of(v)))
     .collect();
     counts.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
-    let Some((give, _)) = counts.into_iter().find(|(v, n)| *v != wanted && *n >= 2) else {
+    let Some((give, _)) = counts
+        .iter()
+        .copied()
+        .find(|(v, n)| *v != wanted && *n >= 2)
+        .or_else(|| {
+            // A village of singletons must still answer its needs: when no
+            // trade can spare a second pair of hands, borrow the least
+            // critical single instead - never a food trade while food is
+            // the worry, never the last forester while timber is. Without
+            // this, twelve founders spread one-per-trade could never
+            // appoint a mason; one unfinished foundation then blocked
+            // every house, and the village froze at its founding dozen.
+            counts.iter().copied().find(|(v, n)| {
+                *n >= 1
+                    && *v != wanted
+                    && !(food_low
+                        && matches!(
+                            v,
+                            Vocation::Fisher
+                                | Vocation::Gatherer
+                                | Vocation::Hunter
+                                | Vocation::Farmer
+                        ))
+                    && !(timber_low && *v == Vocation::Forester)
+            })
+        })
+    else {
         return;
     };
     let donor = workers.iter_mut().find(|(_, v, _, _)| **v == give);

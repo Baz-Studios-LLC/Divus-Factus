@@ -1039,7 +1039,9 @@ pub struct SplitView {
 /// A two-pane window: a fixed-width list column beside a detail pane, split
 /// by a hairline. The caller fills both sides; the chrome is shared.
 pub fn split_view(commands: &mut Commands, title: &str, list_width: f32, height: f32) -> SplitView {
-    let window = self::window(commands, title, list_width + 320.0);
+    // A generous FIXED frame: content must never resize the window - a
+    // panel that breathes with every text change is seasickness, not UI.
+    let window = self::window(commands, title, list_width + 500.0);
     let row = commands
         .spawn((
             Node {
@@ -1077,6 +1079,9 @@ pub fn split_view(commands: &mut Commands, title: &str, list_width: f32, height:
         .spawn((
             Node {
                 flex_grow: 1.0,
+                // Flexbox lets long text push its container wide unless the
+                // minimum is pinned; zero it so words wrap instead.
+                min_width: px(0),
                 height: percent(100),
                 flex_direction: FlexDirection::Column,
                 row_gap: px(theme::GAP),

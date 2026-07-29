@@ -628,16 +628,22 @@ pub(super) fn do_work(
                 commands.entity(entity).remove::<Job>();
                 continue;
             };
-            if build_sites.get(house).is_err() {
+            let Ok((_, site_plan)) = build_sites.get(house) else {
                 // Finished under someone else's hammer.
                 *activity = Activity::Idle;
                 commands.entity(entity).remove::<Job>();
                 continue;
-            }
+            };
+            let stuff = site_plan.stuff;
 
             if carrying.get(entity).is_err() {
-                // Empty-handed: fetch from the pile.
-                if store.timber < 1.0 {
+                // Empty-handed: fetch whatever this house is BUILT from.
+                let short = match stuff {
+                    BuildStuff::Timber => store.timber < 1.0,
+                    BuildStuff::Stone => store.stone < 1.0,
+                    BuildStuff::MudBrick => store.clay < 1.0,
+                };
+                if short {
                     *activity = Activity::Idle;
                     commands.entity(entity).remove::<Job>();
                     continue;
@@ -655,7 +661,11 @@ pub(super) fn do_work(
                     }
                     continue;
                 }
-                store.timber -= 1.0;
+                match stuff {
+                    BuildStuff::Timber => store.timber -= 1.0,
+                    BuildStuff::Stone => store.stone -= 1.0,
+                    BuildStuff::MudBrick => store.clay -= 1.0,
+                }
                 commands.entity(entity).insert(CarryingWood { amount: 1.0 });
                 shoulder_wood(&mut commands, &mut meshes, &mut materials, entity);
                 job.patience = 20.0 + job.site.distance(transform.translation) * 0.8;

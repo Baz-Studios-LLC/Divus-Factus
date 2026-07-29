@@ -472,9 +472,10 @@ pub(crate) fn update_inspector(
             )
         } else {
             format!(
-                "{:.0} of {:.0} timber worked into it",
+                "{:.0} of {:.0} {} worked into it",
                 construction.progress.min(plan.kind.timber_cost()),
                 plan.kind.timber_cost(),
+                plan.stuff.word(),
             )
         };
         (format!("{}, rising", plan.kind.name()), line)

@@ -378,7 +378,10 @@ pub(crate) fn take_up_work(
 
             // Carpenters go where ground is broken — if there is timber to work.
             Vocation::Carpenter => {
-                if stores.get(site.settlement).is_ok_and(|s| s.timber >= 1.0) {
+                if stores
+                    .get(site.settlement)
+                    .is_ok_and(|s| s.timber >= 1.0 || s.stone >= 1.0 || s.clay >= 1.0)
+                {
                     build_sites
                         .iter()
                         .filter(|(_, _, cs, plan)| cs.stone_laid >= plan.kind.stone_cost())

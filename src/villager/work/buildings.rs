@@ -205,6 +205,28 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
     best.filter(|(score, _)| *score >= 0.45).map(|(_, k)| k)
 }
 
+/// What a building's body is raised FROM. The land decides: timber where
+/// woods stand near, mud brick where clay is the gift, bare masonry where
+/// stone is all there is - a village never freezes for want of the one
+/// material its ground never offered.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub enum BuildStuff {
+    #[default]
+    Timber,
+    Stone,
+    MudBrick,
+}
+
+impl BuildStuff {
+    pub fn word(self) -> &'static str {
+        match self {
+            BuildStuff::Timber => "timber",
+            BuildStuff::Stone => "stone",
+            BuildStuff::MudBrick => "mud brick",
+        }
+    }
+}
+
 /// One building's rolled shape and colours. No two houses need look alike:
 /// footprint, height, roof style and paint all vary within the kind.
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -217,6 +239,10 @@ pub struct Blueprint {
     pub roof: Color,
     /// A single tilted slab instead of a gable — the working-shed look.
     pub shed_roof: bool,
+    /// The material the walls rise from; the planner picks it from what
+    /// the land around this settlement actually offers.
+    #[serde(default)]
+    pub stuff: BuildStuff,
 }
 
 impl Blueprint {
@@ -243,6 +269,7 @@ impl Blueprint {
                     pal::shade(&pal::SAND, rng.range(0.45, 0.6))
                 },
                 shed_roof: rng.chance(0.12),
+                stuff: BuildStuff::Timber,
             },
             BuildingKind::Sawmill => Blueprint {
                 kind,
@@ -252,6 +279,7 @@ impl Blueprint {
                 walls: pal::shade(&pal::WOOD, 0.5),
                 roof: pal::shade(&pal::WOOD, 0.35),
                 shed_roof: true,
+                stuff: BuildStuff::Timber,
             },
             BuildingKind::Blacksmith => Blueprint {
                 kind,
@@ -261,6 +289,7 @@ impl Blueprint {
                 walls: pal::shade(&pal::STONE, 0.45),
                 roof: pal::shade(&pal::EARTH, 0.25),
                 shed_roof: false,
+                stuff: BuildStuff::Timber,
             },
             BuildingKind::Tavern => Blueprint {
                 kind,
@@ -270,6 +299,7 @@ impl Blueprint {
                 walls: pal::shade(&pal::WOOD, 0.7),
                 roof: pal::shade(&pal::CLOTH_RED, 0.35),
                 shed_roof: false,
+                stuff: BuildStuff::Timber,
             },
             BuildingKind::TownHall => Blueprint {
                 kind,
@@ -279,6 +309,7 @@ impl Blueprint {
                 walls: pal::shade(&pal::BONE, 0.88),
                 roof: pal::shade(&pal::CLOTH_BLUE, 0.35),
                 shed_roof: false,
+                stuff: BuildStuff::Timber,
             },
             BuildingKind::Shrine => Blueprint {
                 kind,
@@ -288,6 +319,7 @@ impl Blueprint {
                 walls: pal::shade(&pal::STONE, 0.55),
                 roof: pal::shade(&pal::CLOTH_GOLD, 0.6),
                 shed_roof: false,
+                stuff: BuildStuff::Timber,
             },
             // Long, low and windowless: a roof over the piles.
             BuildingKind::Storehouse => Blueprint {
@@ -298,6 +330,7 @@ impl Blueprint {
                 walls: pal::shade(&pal::WOOD, 0.5),
                 roof: pal::shade(&pal::EARTH, 0.35),
                 shed_roof: true,
+                stuff: BuildStuff::Timber,
             },
             // Squat and tall-roofed; its stilts show in the frame stage.
             BuildingKind::Granary => Blueprint {
@@ -308,6 +341,7 @@ impl Blueprint {
                 walls: pal::shade(&pal::BONE, 0.7),
                 roof: pal::shade(&pal::GRASS, 0.3),
                 shed_roof: false,
+                stuff: BuildStuff::Timber,
             },
             // A stone ring with a little peaked cap.
             BuildingKind::Well => Blueprint {
@@ -318,6 +352,7 @@ impl Blueprint {
                 walls: pal::shade(&pal::STONE, 0.5),
                 roof: pal::shade(&pal::WOOD, 0.45),
                 shed_roof: false,
+                stuff: BuildStuff::Timber,
             },
             // Dark-walled and low, stained by its own trade.
             BuildingKind::Smokehouse => Blueprint {
@@ -328,6 +363,7 @@ impl Blueprint {
                 walls: pal::shade(&pal::WOOD, 0.25),
                 roof: pal::shade(&pal::STONE, 0.3),
                 shed_roof: true,
+                stuff: BuildStuff::Timber,
             },
             // Tall for its footprint; the sails are the tell.
             BuildingKind::Mill => Blueprint {
@@ -338,6 +374,7 @@ impl Blueprint {
                 walls: pal::shade(&pal::BONE, 0.8),
                 roof: pal::shade(&pal::CLOTH_RED, 0.3),
                 shed_roof: false,
+                stuff: BuildStuff::Timber,
             },
             // Warm-walled, wide-doored, always faintly floured.
             BuildingKind::Bakery => Blueprint {
@@ -348,6 +385,7 @@ impl Blueprint {
                 walls: pal::shade(&pal::EARTH, 0.55),
                 roof: pal::shade(&pal::CLOTH_GOLD, 0.35),
                 shed_roof: false,
+                stuff: BuildStuff::Timber,
             },
             // A cottage hung with dyed cloth.
             BuildingKind::Weaver => Blueprint {
@@ -358,6 +396,7 @@ impl Blueprint {
                 walls: pal::shade(&pal::CLOTH_BLUE, 0.5),
                 roof: pal::shade(&pal::BONE, 0.6),
                 shed_roof: false,
+                stuff: BuildStuff::Timber,
             },
             // Small, green-roofed, half garden already.
             BuildingKind::Herbalist => Blueprint {
@@ -368,6 +407,7 @@ impl Blueprint {
                 walls: pal::shade(&pal::WOOD, 0.6),
                 roof: pal::shade(&pal::GRASS, 0.5),
                 shed_roof: true,
+                stuff: BuildStuff::Timber,
             },
             // A narrow stone finger with a platform at the top.
             BuildingKind::Watchtower => Blueprint {
@@ -378,6 +418,7 @@ impl Blueprint {
                 walls: pal::shade(&pal::STONE, 0.4),
                 roof: pal::shade(&pal::WOOD, 0.4),
                 shed_roof: false,
+                stuff: BuildStuff::Timber,
             },
             // No walls at all: a narrow deck run out over the water on
             // pilings. half_d is the long axis, pointing seaward.
@@ -389,6 +430,7 @@ impl Blueprint {
                 walls: pal::shade(&pal::WOOD, 0.5),
                 roof: pal::shade(&pal::WOOD, 0.35),
                 shed_roof: false,
+                stuff: BuildStuff::Timber,
             },
         }
     }
@@ -961,7 +1003,10 @@ pub(crate) fn plan_houses(
     let Ok(store_now) = stores.get(site.settlement) else {
         return;
     };
-    if store_now.timber < 2.0 {
+    // Build from ANY material on hand - a treeless coast raises stone,
+    // a clay bank raises mud brick. Only a village with nothing at all
+    // waits.
+    if store_now.timber < 2.0 && store_now.stone < 2.0 && store_now.clay < 2.0 {
         return;
     }
 
@@ -1120,7 +1165,28 @@ pub(crate) fn plan_houses(
             }
         }
 
-        let plan = Blueprint::roll(kind, &mut rng.0);
+        let mut plan = Blueprint::roll(kind, &mut rng.0);
+        if kind == BuildingKind::House {
+            // The land dictates the walls: too few standing trees within a
+            // working walk makes timber homes a fantasy - build from what
+            // the ground actually gives.
+            let trees_near = standing
+                .iter()
+                .filter(|(_, t)| t.translation().distance(site.centre) < 140.0)
+                .count();
+            if trees_near < 6 && store_now.timber < 8.0 {
+                use crate::palette as pal;
+                if store_now.clay >= 4.0 {
+                    plan.stuff = BuildStuff::MudBrick;
+                    plan.walls = pal::shade(&pal::EARTH, rng.0.range(0.5, 0.65));
+                    plan.roof = pal::shade(&pal::SAND, rng.0.range(0.4, 0.55));
+                } else {
+                    plan.stuff = BuildStuff::Stone;
+                    plan.walls = pal::shade(&pal::STONE, rng.0.range(0.45, 0.6));
+                    plan.roof = pal::shade(&pal::EARTH, rng.0.range(0.3, 0.45));
+                }
+            }
+        }
 
         // Breaking ground levels the plot: the pad is worked flat and rolls
         // back into the hillside, so no floor, sill, or stake ever clips
