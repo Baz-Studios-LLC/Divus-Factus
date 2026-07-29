@@ -488,3 +488,11 @@ by thermal throttling. Before retrying: build an averaged-fps harness
 either eat the measured cost or do the split-representation refactor -
 lightweight logic entities everywhere, per-chunk merged visuals that
 rebake on change. The mesh library (ScatterMeshes) is already in.
+
+**The voyeur's panels (direction set by Baz).** Large, beautiful,
+information-dense windows are the heart of watching this game. The
+chronicle's table design - day bands, category icons, coalesced
+repeats, zebra rows - is the template. Next: the person panel grown
+into a full dossier (genealogy tree, skills ledger, personal
+chronicle, relationships), then the village ledger in the same
+language. Active window always on top (done).
