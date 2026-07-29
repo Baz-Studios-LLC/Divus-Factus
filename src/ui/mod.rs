@@ -876,13 +876,38 @@ pub struct Scrollable;
 /// position to the content, so this only has to push.
 pub fn scroll_regions(
     mouse_scroll: Res<bevy::input::mouse::AccumulatedMouseScroll>,
-    mut regions: Query<(&Interaction, &mut ScrollPosition), With<Scrollable>>,
+    primary: Query<&bevy::window::Window, With<bevy::window::PrimaryWindow>>,
+    mut regions: Query<
+        (
+            &ComputedNode,
+            &UiGlobalTransform,
+            &InheritedVisibility,
+            &mut ScrollPosition,
+        ),
+        With<Scrollable>,
+    >,
 ) {
     if mouse_scroll.delta.y == 0.0 {
         return;
     }
-    for (interaction, mut scroll) in &mut regions {
-        if *interaction != Interaction::None {
+    let Ok(primary) = primary.single() else {
+        return;
+    };
+    let Some(cursor) = primary.cursor_position() else {
+        return;
+    };
+    // Hit-test by geometry, not by Interaction: hovering a button INSIDE
+    // a scrollable pane captures the hover and starved the pane of wheel
+    // events — scroll that worked or not depending on which pixel the
+    // cursor happened to rest on.
+    for (computed, transform, visibility, mut scroll) in &mut regions {
+        if !visibility.get() {
+            continue;
+        }
+        let scale = computed.inverse_scale_factor();
+        let centre = Vec2::new(transform.translation.x, transform.translation.y) * scale;
+        let half = computed.size() * scale * 0.5;
+        if (cursor.x - centre.x).abs() <= half.x && (cursor.y - centre.y).abs() <= half.y {
             scroll.0.y -= mouse_scroll.delta.y * 18.0;
         }
     }
