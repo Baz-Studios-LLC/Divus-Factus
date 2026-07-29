@@ -776,6 +776,36 @@ fn blend(a: Color, b: Color, t: f32) -> Color {
 /// Heights are sampled once into a local grid with a one-cell skirt, and normals are
 /// taken from that grid rather than by re-evaluating the terrain function four more
 /// times per vertex — the difference between one noise evaluation per vertex and five.
+/// The ground's own colour at a point, exactly as [`build_chunk_mesh`]
+/// would paint the vertex there. Kept in step with the loop below so the
+/// trail painter can restore a faded path to the true ground colour.
+pub fn ground_color_at(terrain: &Terrain, world_x: f32, world_z: f32) -> [f32; 4] {
+    let cell = CHUNK_SIZE / CHUNK_CELLS as f32;
+    let y = terrain.height_at(world_x, world_z);
+    let normal = Vec3::new(
+        terrain.height_at(world_x - cell, world_z) - terrain.height_at(world_x + cell, world_z),
+        2.0 * cell,
+        terrain.height_at(world_x, world_z - cell) - terrain.height_at(world_x, world_z + cell),
+    )
+    .normalize();
+    let slope = 1.0 - normal.y.clamp(0.0, 1.0);
+    let moisture = terrain.moisture_at(world_x, world_z);
+    let shade_t =
+        (0.42 + ((y - WATER_LEVEL) / 200.0) * 0.45 + (moisture - 0.5) * 0.12).clamp(0.0, 1.0);
+    let color = surface_color(
+        y,
+        slope,
+        moisture,
+        shade_t,
+        terrain.biome_at(world_x, world_z),
+        terrain.line_variation_at(world_x, world_z),
+        terrain.ground_patch_at(world_x, world_z),
+        terrain.river_influence_at(world_x, world_z),
+    )
+    .to_linear();
+    [color.red, color.green, color.blue, 1.0]
+}
+
 pub fn build_chunk_mesh(terrain: &Terrain, coord: IVec2) -> Mesh {
     let cell = CHUNK_SIZE / CHUNK_CELLS as f32;
     let origin = Vec2::new(coord.x as f32 * CHUNK_SIZE, coord.y as f32 * CHUNK_SIZE);

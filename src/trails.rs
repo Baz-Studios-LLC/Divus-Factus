@@ -3,22 +3,23 @@
 //! Nobody plans a road. Every walking villager leaves a little wear in the
 //! cell under their feet; wear accumulates where routes repeat — fire to
 //! shore, door to field, square to quarry — and fades where they don't.
-//! Past a threshold the grass gives up and a dirt path shows, and worn
-//! ground is faster underfoot, so the village's habits literally pave its
-//! own shortcuts. The map of trails IS the map of the village's life, and
-//! when work moves far afield, the road there draws itself.
+//! The path is painted straight into the terrain's vertex colours: grass
+//! blends toward bare earth as wear builds and blends back as it fades,
+//! so a trail looks like ground that has been walked, not like tiles laid
+//! on top of it. Worn ground is faster underfoot, so the village's habits
+//! pave its own shortcuts.
 
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
 use crate::creature::anim::CreatureMotion;
-use crate::terrain::Terrain;
+use crate::terrain::{CHUNK_SIZE, Terrain, TerrainChunk, ground_color_at};
 use crate::villager::Villager;
 
 /// The side of one wear cell, in world units.
 const CELL: f32 = 1.7;
 
-/// Wear at which the dirt shows through the grass.
+/// Wear at which the dirt fully shows through the grass.
 const VISIBLE: f32 = 6.0;
 
 /// Wear stops accumulating here: a road, not a trench.
@@ -28,26 +29,21 @@ const WEAR_CAP: f32 = 30.0;
 /// a morning survives an idle afternoon.
 const FADE: f32 = 0.008;
 
-/// How much faster feet move on visibly worn ground.
+/// How much faster feet move on well-worn ground.
 const HASTE: f32 = 1.25;
-
-/// At most this many dirt patches at once — a cap, not a plan.
-const PATCH_CAP: usize = 1600;
 
 pub struct TrailsPlugin;
 
 impl Plugin for TrailsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Trails>()
-            .add_systems(Startup, init_trail_assets)
-            .add_systems(Update, (tread, maintain));
+            .add_systems(Update, (tread, paint));
     }
 }
 
 /// One cell's memory of feet.
 pub struct TrailCell {
     pub wear: f32,
-    patch: Option<Entity>,
 }
 
 /// Everywhere the ground has been walked, and how hard.
@@ -70,12 +66,32 @@ impl Trails {
         }
     }
 
-    /// Restores the bare wear map (from a save); patches respawn lazily.
+    /// How worn the ground looks at a point: the strongest nearby cell,
+    /// eased off with distance, so a painted path has soft shoulders
+    /// instead of cell-shaped stamps.
+    fn wear_near(&self, x: f32, z: f32) -> f32 {
+        let home = Self::cell_of(x, z);
+        let mut strongest: f32 = 0.0;
+        for dz in -1..=1 {
+            for dx in -1..=1 {
+                let at = home + IVec2::new(dx, dz);
+                let Some(cell) = self.cells.get(&at) else {
+                    continue;
+                };
+                let centre = Vec2::new((at.x as f32 + 0.5) * CELL, (at.y as f32 + 0.5) * CELL);
+                let reach = 1.0 - (centre.distance(Vec2::new(x, z)) / (CELL * 1.35)).min(1.0);
+                strongest = strongest.max(cell.wear * reach);
+            }
+        }
+        strongest
+    }
+
+    /// Restores the bare wear map (from a save); freshly built chunks
+    /// repaint themselves as they appear.
     pub fn restore(&mut self, worn: impl Iterator<Item = (i32, i32, f32)>) {
         self.cells.clear();
         for (x, z, wear) in worn {
-            self.cells
-                .insert(IVec2::new(x, z), TrailCell { wear, patch: None });
+            self.cells.insert(IVec2::new(x, z), TrailCell { wear });
         }
     }
 
@@ -87,32 +103,6 @@ impl Trails {
             .map(|(at, cell)| (at.x, at.y, cell.wear))
             .collect()
     }
-}
-
-/// A visible stretch of bare earth where the grass gave up.
-#[derive(Component)]
-pub struct TrailPatch;
-
-/// The one mesh and material every patch shares.
-#[derive(Resource)]
-struct TrailAssets {
-    mesh: Handle<Mesh>,
-    dirt: Handle<StandardMaterial>,
-}
-
-fn init_trail_assets(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    commands.insert_resource(TrailAssets {
-        mesh: meshes.add(Cuboid::new(CELL * 1.08, 0.05, CELL * 1.08)),
-        dirt: materials.add(StandardMaterial {
-            base_color: crate::palette::shade(&crate::palette::EARTH, 0.42),
-            perceptual_roughness: 1.0,
-            ..default()
-        }),
-    });
 }
 
 /// Walking wears the ground. Only villagers going somewhere leave wear —
@@ -133,74 +123,118 @@ fn tread(
                 transform.translation.x,
                 transform.translation.z,
             ))
-            .or_insert(TrailCell {
-                wear: 0.0,
-                patch: None,
-            });
+            .or_insert(TrailCell { wear: 0.0 });
         cell.wear = (cell.wear + dt * 0.9).min(WEAR_CAP);
     }
 }
 
-/// The slow keeping of the ground: wear fades, dirt shows where it has
-/// earned it and grasses over where it hasn't.
-fn maintain(
-    mut commands: Commands,
+/// The slow keeping of the ground: wear fades, and the terrain's own
+/// vertex colours are repainted — toward bare earth where feet insist,
+/// back toward the true ground colour where they have stopped.
+fn paint(
     time: Res<Time>,
     mut since_last: Local<f32>,
     terrain: Option<Res<Terrain>>,
-    assets: Option<Res<TrailAssets>>,
     mut trails: ResMut<Trails>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    chunks: Query<(&TerrainChunk, &Mesh3d)>,
+    fresh: Query<&TerrainChunk, Added<TerrainChunk>>,
 ) {
+    // Newly streamed-in chunks always need their trails painted on, even
+    // on a pass where no wear changed — a loaded save's roads come back
+    // this way too.
+    let fresh_coords: Vec<IVec2> = fresh.iter().map(|chunk| chunk.coord).collect();
+
     *since_last += time.delta_secs();
-    if *since_last < 2.0 {
+    if *since_last < 2.0 && fresh_coords.is_empty() {
         return;
     }
     let elapsed = *since_last;
     *since_last = 0.0;
-    let (Some(terrain), Some(assets)) = (terrain, assets) else {
+    let Some(terrain) = terrain else {
         return;
     };
 
-    let mut patches = trails
-        .cells
-        .values()
-        .filter(|cell| cell.patch.is_some())
-        .count();
+    // Age the map, remembering where paint needs to change (including
+    // ground that has just faded back to nothing).
+    let mut stale: Vec<IVec2> = Vec::new();
     let mut gone: Vec<IVec2> = Vec::new();
     for (at, cell) in trails.cells.iter_mut() {
         cell.wear -= FADE * elapsed;
+        stale.push(*at);
         if cell.wear <= 0.05 {
-            if let Some(patch) = cell.patch.take() {
-                commands.entity(patch).despawn();
-                patches -= 1;
-            }
             gone.push(*at);
-            continue;
         }
-        if cell.wear >= VISIBLE && cell.patch.is_none() && patches < PATCH_CAP {
-            let x = (at.x as f32 + 0.5) * CELL;
-            let z = (at.y as f32 + 0.5) * CELL;
-            let patch = commands
-                .spawn((
-                    TrailPatch,
-                    Mesh3d(assets.mesh.clone()),
-                    MeshMaterial3d(assets.dirt.clone()),
-                    Transform::from_xyz(x, terrain.height_at(x, z) + 0.03, z),
-                    bevy::light::NotShadowCaster,
-                ))
-                .id();
-            cell.patch = Some(patch);
-            patches += 1;
-        } else if cell.wear < VISIBLE - 1.0
-            && let Some(patch) = cell.patch.take()
-        {
-            // Hysteresis: a whole point of wear between showing and
-            // grassing over, so a border cell does not flicker.
-            commands.entity(patch).despawn();
-            patches -= 1;
+    }
+
+    // Which chunks those cells touch (with a margin: a cell near a chunk
+    // seam tints vertices in the neighbour too).
+    let mut dirty: Vec<IVec2> = fresh_coords;
+    for at in &stale {
+        let centre = Vec2::new((at.x as f32 + 0.5) * CELL, (at.y as f32 + 0.5) * CELL);
+        for (dx, dz) in [(0.0, 0.0), (-2.5, 0.0), (2.5, 0.0), (0.0, -2.5), (0.0, 2.5)] {
+            let coord = IVec2::new(
+                ((centre.x + dx) / CHUNK_SIZE).floor() as i32,
+                ((centre.y + dz) / CHUNK_SIZE).floor() as i32,
+            );
+            if !dirty.contains(&coord) {
+                dirty.push(coord);
+            }
         }
     }
     for at in gone {
         trails.cells.remove(&at);
+    }
+    if dirty.is_empty() {
+        return;
+    }
+
+    let dirt = crate::palette::shade(&crate::palette::EARTH, 0.42).to_linear();
+    for (chunk, mesh_handle) in &chunks {
+        if !dirty.contains(&chunk.coord) {
+            continue;
+        }
+        let Some(mut mesh) = meshes.get_mut(&mesh_handle.0) else {
+            continue;
+        };
+        let origin = Vec2::new(
+            chunk.coord.x as f32 * CHUNK_SIZE,
+            chunk.coord.y as f32 * CHUNK_SIZE,
+        );
+        let Some(positions) = mesh
+            .attribute(Mesh::ATTRIBUTE_POSITION)
+            .and_then(|a| a.as_float3())
+            .map(|p| p.to_vec())
+        else {
+            continue;
+        };
+        let Some(bevy::mesh::VertexAttributeValues::Float32x4(colors)) =
+            mesh.attribute_mut(Mesh::ATTRIBUTE_COLOR)
+        else {
+            continue;
+        };
+        for (position, color) in positions.iter().zip(colors.iter_mut()) {
+            let (x, z) = (origin.x + position[0], origin.y + position[2]);
+            let wear = trails.wear_near(x, z);
+            // The alpha channel is a private ledger: 1.0 means untouched
+            // ground, anything less means we painted it. Opaque terrain
+            // never reads alpha, so it is free bookkeeping - and it lets
+            // the pass skip the thousands of vertices it never touched.
+            let tinted = color[3] < 0.9995;
+            if wear <= 0.0 && !tinted {
+                continue;
+            }
+            // Passing through once is not a path: tint only begins after
+            // the same ground has been walked again and again, and even a
+            // hard road never fully loses the ground tone underneath.
+            let blend = ((wear - 3.0) / (VISIBLE * 1.8)).clamp(0.0, 1.0) * 0.75;
+            let base = ground_color_at(&terrain, x, z);
+            *color = [
+                base[0] + (dirt.red - base[0]) * blend,
+                base[1] + (dirt.green - base[1]) * blend,
+                base[2] + (dirt.blue - base[2]) * blend,
+                if blend > 0.0 { 0.999 } else { 1.0 },
+            ];
+        }
     }
 }

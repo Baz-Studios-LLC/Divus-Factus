@@ -691,7 +691,6 @@ fn apply(world: &mut World, save: SaveGame) {
     sweep!(TerrainChunk);
     sweep!(crate::matter::Boulder);
     sweep!(crate::matter::Matter);
-    sweep!(crate::trails::TrailPatch);
     sweep!(crate::matter::Deposit);
     doomed.sort();
     doomed.dedup();
