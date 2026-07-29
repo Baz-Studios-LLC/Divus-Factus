@@ -148,17 +148,17 @@ fn speak(
             // neighbour - a billow beside a bump beside a billow, the way
             // a cloud actually piles up. A smooth size ramp reads as
             // uniform; only real jumps read as cloud.
-            const TOP: [f32; 10] = [24.0, 15.0, 27.0, 17.0, 21.0, 14.5, 25.5, 16.0, 20.0, 26.0];
-            const UNDER: [f32; 10] = [17.0, 25.0, 15.5, 22.0, 14.5, 26.5, 16.5, 23.0, 15.0, 21.0];
+            const TOP: [f32; 7] = [30.0, 22.0, 34.0, 24.0, 28.0, 21.0, 32.0];
+            const UNDER: [f32; 7] = [24.0, 32.0, 22.0, 30.0, 21.0, 33.0, 26.0];
             let mut rim: Vec<(Val, Val, Val, Val, f32)> = Vec::new();
             for (i, (&size, &under)) in TOP.iter().zip(UNDER.iter()).enumerate() {
-                let pc = i as f32 * 9.8 - 1.5;
+                let pc = i as f32 * 14.4 - 2.0;
                 rim.push((percent(pc), px(-size * 0.40), auto, auto, size));
-                rim.push((percent(pc + 4.5), auto, auto, px(-under * 0.40), under));
+                rim.push((percent(pc + 7.0), auto, auto, px(-under * 0.40), under));
             }
-            for (pc, size) in [(8.0, 19.0), (55.0, 24.0)] {
+            for (pc, size) in [(12.0, 24.0), (52.0, 27.0)] {
                 rim.push((px(-size * 0.40), percent(pc), auto, auto, size));
-                rim.push((auto, percent(pc + 12.0), px(-size * 0.40), auto, size - 4.0));
+                rim.push((auto, percent(pc + 14.0), px(-size * 0.40), auto, size - 4.0));
             }
             for pass in 0..2 {
                 for (left, top, right, bottom, size) in &rim {
@@ -285,9 +285,11 @@ fn speak(
             Text::new(say.text.clone()),
             // The text itself must know the wrap width: a shrink-wrapped
             // bubble measures its text at full one-line width, and the
-            // late wrap spills lines out the bottom of the border.
+            // late wrap spills lines out the bottom of the border. The
+            // width is the box minus ITS OWN padding - a thought pads
+            // wider, so its text wraps sooner.
             Node {
-                max_width: px(212),
+                max_width: px(if say.thought { 200.0 } else { 212.0 }),
                 ..default()
             },
             TextFont {
