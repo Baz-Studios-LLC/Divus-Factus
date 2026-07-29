@@ -1131,36 +1131,89 @@ fn stream_chunks(
             continue;
         }
 
-        let river = build_river_mesh(&terrain, coord).map(|mesh| meshes.add(mesh));
-
-        let entity = commands
-            .spawn((
-                Name::new(format!("Chunk {},{}", coord.x, coord.y)),
-                TerrainChunk { coord },
-                Mesh3d(meshes.add(build_chunk_mesh(&terrain, coord))),
-                MeshMaterial3d(assets.ground_material.clone()),
-                Transform::from_xyz(
-                    coord.x as f32 * CHUNK_SIZE,
-                    0.0,
-                    coord.y as f32 * CHUNK_SIZE,
-                ),
-                Visibility::default(),
-            ))
-            .id();
-
-        if let Some(river) = river {
-            commands.spawn((
-                Name::new("River"),
-                Mesh3d(river),
-                MeshMaterial3d(assets.water_material.clone()),
-                Transform::default(),
-                NotShadowCaster,
-                ChildOf(entity),
-            ));
-        }
-
-        loaded.entities.insert(coord, entity);
+        spawn_chunk(
+            &mut commands,
+            &mut meshes,
+            &assets,
+            &terrain,
+            &mut loaded,
+            coord,
+        );
         built += 1;
+    }
+}
+
+/// Builds one chunk entity - terrain mesh, river ribbon - and registers it.
+/// Shared by streaming and by anyone reshaping ground in place.
+pub(crate) fn spawn_chunk(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    assets: &TerrainAssets,
+    terrain: &Terrain,
+    loaded: &mut LoadedChunks,
+    coord: IVec2,
+) -> Entity {
+    let river = build_river_mesh(terrain, coord).map(|mesh| meshes.add(mesh));
+    let entity = commands
+        .spawn((
+            Name::new(format!("Chunk {},{}", coord.x, coord.y)),
+            TerrainChunk { coord },
+            Mesh3d(meshes.add(build_chunk_mesh(terrain, coord))),
+            MeshMaterial3d(assets.ground_material.clone()),
+            Transform::from_xyz(
+                coord.x as f32 * CHUNK_SIZE,
+                0.0,
+                coord.y as f32 * CHUNK_SIZE,
+            ),
+            Visibility::default(),
+        ))
+        .id();
+    if let Some(river) = river {
+        commands.spawn((
+            Name::new("River"),
+            Mesh3d(river),
+            MeshMaterial3d(assets.water_material.clone()),
+            Transform::default(),
+            NotShadowCaster,
+            ChildOf(entity),
+        ));
+    }
+    loaded.entities.insert(coord, entity);
+    entity
+}
+
+/// Reshaped ground swaps its chunks in a single frame: the old entity dies
+/// and its replacement - built from the terrain's CURRENT heights - is
+/// spawned in the same command batch, so there is never a frame where the
+/// world has a hole in it. (Despawning and letting streaming refill was a
+/// white flash of sky, once per ground-breaking, most visible at 8x.)
+pub(crate) fn rebuild_chunks_near(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    assets: &TerrainAssets,
+    terrain: &Terrain,
+    loaded: &mut LoadedChunks,
+    x: f32,
+    z: f32,
+    radius: f32,
+) {
+    let min = IVec2::new(
+        ((x - radius) / CHUNK_SIZE).floor() as i32,
+        ((z - radius) / CHUNK_SIZE).floor() as i32,
+    );
+    let max = IVec2::new(
+        ((x + radius) / CHUNK_SIZE).floor() as i32,
+        ((z + radius) / CHUNK_SIZE).floor() as i32,
+    );
+    for cx in min.x..=max.x {
+        for cz in min.y..=max.y {
+            let coord = IVec2::new(cx, cz);
+            let Some(old) = loaded.entities.remove(&coord) else {
+                continue;
+            };
+            commands.entity(old).despawn();
+            spawn_chunk(commands, meshes, assets, terrain, loaded, coord);
+        }
     }
 }
 

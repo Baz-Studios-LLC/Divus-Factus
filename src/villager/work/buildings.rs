@@ -894,6 +894,7 @@ pub(crate) fn plan_houses(
     mut ground: (
         ResMut<crate::terrain::LoadedChunks>,
         ResMut<crate::grass::GrassChunks>,
+        Res<crate::terrain::TerrainAssets>,
     ),
     census: (
         Query<
@@ -1024,10 +1025,17 @@ pub(crate) fn plan_houses(
 
         // A small worked pad on the dry end; the rest stands on pilings.
         terrain.flatten(shore.x, shore.z, plan.half_w + 1.2, 2.0, shore.y);
-        let (chunks, grass) = &mut ground;
-        for chunk in chunks.take_near(shore.x, shore.z, plan.half_w + 5.0) {
-            commands.entity(chunk).despawn();
-        }
+        let (chunks, grass, chunk_assets) = &mut ground;
+        crate::terrain::rebuild_chunks_near(
+            &mut commands,
+            &mut meshes,
+            chunk_assets,
+            &terrain,
+            chunks,
+            shore.x,
+            shore.z,
+            plan.half_w + 5.0,
+        );
         grass.invalidate_near(&mut commands, shore.x, shore.z, plan.half_w + 5.0);
         let mut cleared = 0.0;
         for (tree, tree_at) in &standing {
@@ -1115,10 +1123,17 @@ pub(crate) fn plan_houses(
         // into a slope. This is what a foundation is *for*.
         let pad = plan.half_w.max(plan.half_d) + 1.6;
         terrain.flatten(at.x, at.z, pad, 2.4, at.y);
-        let (chunks, grass) = &mut ground;
-        for chunk in chunks.take_near(at.x, at.z, pad + 4.0) {
-            commands.entity(chunk).despawn();
-        }
+        let (chunks, grass, chunk_assets) = &mut ground;
+        crate::terrain::rebuild_chunks_near(
+            &mut commands,
+            &mut meshes,
+            chunk_assets,
+            &terrain,
+            chunks,
+            at.x,
+            at.z,
+            pad + 4.0,
+        );
         grass.invalidate_near(&mut commands, at.x, at.z, pad + 4.0);
 
         // And clears it properly: every tree within canopy's reach of the
