@@ -107,8 +107,10 @@ fn speak(
                     flex_direction: FlexDirection::Column,
                     row_gap: px(1),
                     padding: UiRect::axes(px(8), px(4)),
-                    border: UiRect::all(px(1)),
-                    // Thoughts are rounder before the puffs even land.
+                    // A thought's rim is drawn entirely by its lobes: the
+                    // box itself has no border, so no straight line can
+                    // ever show between the round parts.
+                    border: UiRect::all(if say.thought { px(0) } else { px(1) }),
                     border_radius: BorderRadius::all(if say.thought { px(14) } else { px(8) }),
                     max_width: px(230),
                     ..default()
@@ -144,19 +146,20 @@ fn speak(
                 ));
             };
             let auto = Val::Auto;
-            // The rim, top and bottom: close-set so no straight border
-            // survives between bumps at any bubble width.
-            for i in 0..11 {
-                let pc = 1.0 + i as f32 * 9.3;
-                let size = 10.0 + ((i * 7) % 3) as f32 * 1.6;
-                lobe(percent(pc), px(-size * 0.38), auto, auto, size);
-                let size = 9.5 + ((i * 5 + 1) % 3) as f32 * 1.6;
-                lobe(percent(pc + 4.0), auto, auto, px(-size * 0.38), size);
+            // The rim, top and bottom: packed tightly enough that the
+            // circles overlap at the widest bubble, so the silhouette is
+            // curve meeting curve the whole way round.
+            for i in 0..24 {
+                let pc = i as f32 * 4.25;
+                let size = 9.0 + ((i * 7) % 4) as f32 * 1.3;
+                lobe(percent(pc), px(-size * 0.42), auto, auto, size);
+                let size = 8.5 + ((i * 5 + 2) % 4) as f32 * 1.3;
+                lobe(percent(pc + 2.0), auto, auto, px(-size * 0.42), size);
             }
             // The sides.
-            for (pc, size) in [(8.0, 11.0), (42.0, 12.5), (76.0, 10.5)] {
-                lobe(px(-size * 0.38), percent(pc), auto, auto, size);
-                lobe(auto, percent(pc + 6.0), px(-size * 0.38), auto, size);
+            for (pc, size) in [(2.0, 11.0), (28.0, 12.0), (54.0, 11.5), (80.0, 10.5)] {
+                lobe(px(-size * 0.42), percent(pc), auto, auto, size);
+                lobe(auto, percent(pc + 5.0), px(-size * 0.42), auto, size);
             }
             drop(lobe);
             // The cover: the box's own fill, laid over every lobe's
