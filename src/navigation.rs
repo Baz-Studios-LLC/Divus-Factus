@@ -37,7 +37,9 @@ fn to_cell(p: Vec3) -> Cell {
 fn to_world(c: Cell, terrain: &Terrain) -> Vec3 {
     let x = c.x as f32 * CELL;
     let z = c.y as f32 * CELL;
-    Vec3::new(x, terrain.height_at(x, z), z)
+    // Stand height, not ground height: a waypoint on a dock's deck is at
+    // plank level, so the climb charge prices the ramp and not the seabed.
+    Vec3::new(x, terrain.stand_height_at(x, z), z)
 }
 
 /// Priority-queue entry. `Ord` is reversed so `BinaryHeap` pops the lowest score.

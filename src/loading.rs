@@ -51,7 +51,10 @@ const MINIMUM_SECONDS: f32 = 0.6;
 #[derive(Resource)]
 struct LoadingStarted(f32);
 
-fn spawn_loading_screen(mut commands: Commands, time: Res<Time>) {
+fn spawn_loading_screen(mut commands: Commands, time: Res<Time<Real>>) {
+    // Real time, deliberately: the virtual clock can arrive here paused
+    // (the title holds it), and a minimum measured on a stopped clock
+    // never passes - the game once deadlocked on this exact stillness.
     commands.insert_resource(LoadingStarted(time.elapsed_secs()));
 
     commands
@@ -143,7 +146,7 @@ fn update_progress(
 }
 
 fn finish_when_world_is_built(
-    time: Res<Time>,
+    time: Res<Time<Real>>,
     started: Option<Res<LoadingStarted>>,
     chunks: Option<Res<LoadedChunks>>,
     mut next: ResMut<NextState<GameState>>,

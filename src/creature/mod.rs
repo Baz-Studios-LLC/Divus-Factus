@@ -329,8 +329,22 @@ fn locomotion(
 
                 // Swimming is slow: most of the stride is lost to the water.
                 let step = (speed * dt).min(distance) * (1.0 - motion.swim * 0.55);
-                transform.translation.x += direction.x * step;
-                transform.translation.z += direction.z * step;
+                let ahead_x = transform.translation.x + direction.x * step;
+                let ahead_z = transform.translation.z + direction.z * step;
+                // Legs are not climbing gear: a stride onto genuinely
+                // steep ground is refused when it climbs. Routes avoid
+                // such cells, but straight-line steering before a route
+                // lands — and corners cut between waypoints — used to
+                // walk people up cliff faces. Downhill is always allowed,
+                // so nobody strands on a crag they somehow reached.
+                let here_y = terrain.height_at(transform.translation.x, transform.translation.z);
+                let blocked = terrain.slope_at(ahead_x, ahead_z) >= 0.55
+                    && terrain.height_at(ahead_x, ahead_z) > here_y + 0.1
+                    && terrain.boardwalk_at(ahead_x, ahead_z).is_none();
+                if !blocked {
+                    transform.translation.x += direction.x * step;
+                    transform.translation.z += direction.z * step;
+                }
 
                 // Turn toward travel rather than snapping, so direction changes read
                 // as the creature deciding rather than teleporting.
@@ -344,7 +358,9 @@ fn locomotion(
         // a lookup rather than a collision test. In deep water there is no
         // ground to stand on: the body rides just under the surface and the
         // stride becomes a paddle, at less than half pace.
-        let floor = terrain.height_at(transform.translation.x, transform.translation.z);
+        // Stand height includes built decks: on a dock the planks are the
+        // floor, and the water check below sees no depth to swim in.
+        let floor = terrain.stand_height_at(transform.translation.x, transform.translation.z);
         let surface = terrain
             .river_surface_at(transform.translation.x, transform.translation.z)
             .unwrap_or(WATER_LEVEL)
@@ -658,7 +674,7 @@ fn apply_ballistics(
         }
 
         let ground = terrain
-            .height_at(transform.translation.x, transform.translation.z)
+            .stand_height_at(transform.translation.x, transform.translation.z)
             .max(WATER_LEVEL);
 
         if transform.translation.y <= ground {

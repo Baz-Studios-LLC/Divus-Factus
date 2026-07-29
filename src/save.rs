@@ -93,6 +93,8 @@ struct BuildingSave {
     progress: f32,
     stage: u8,
     stone_laid: f32,
+    #[serde(default)]
+    timber_footing: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -152,6 +154,9 @@ struct SaveGame {
     /// Worn ground: (cell x, cell z, wear).
     #[serde(default)]
     trails: Vec<(i32, i32, f32)>,
+    /// Ground stripped of its tree or boulder for good.
+    #[serde(default)]
+    stripped: Vec<(i32, i32)>,
     /// The larder by kind: berries, fish, meat, grain, bread. Older saves
     /// carried only the total (stores.0), which returns as berries.
     #[serde(default)]
@@ -377,9 +382,15 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         )>()
         .iter(world)
     {
-        let (done, progress, stage, stone_laid) = match (building, site_state) {
-            (Some(_), _) => (true, 0.0, 2, 0.0),
-            (None, Some(cs)) => (false, cs.progress, cs.stage, cs.stone_laid),
+        let (done, progress, stage, stone_laid, timber_footing) = match (building, site_state) {
+            (Some(_), _) => (true, 0.0, 2, 0.0, false),
+            (None, Some(cs)) => (
+                false,
+                cs.progress,
+                cs.stage,
+                cs.stone_laid,
+                cs.timber_footing,
+            ),
             _ => continue,
         };
         building_ids.push(entity);
@@ -391,6 +402,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
             progress,
             stage,
             stone_laid,
+            timber_footing,
         });
     }
 
@@ -662,6 +674,9 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         trails: world
             .get_resource::<crate::trails::Trails>()
             .map_or_else(Vec::new, |t| t.export()),
+        stripped: world
+            .get_resource::<crate::scatter::StrippedGround>()
+            .map_or_else(Vec::new, |s| s.0.iter().map(|c| (c.x, c.y)).collect()),
         larder,
         metals,
         deposits,
@@ -791,6 +806,13 @@ fn apply(world: &mut World, save: SaveGame) {
     if let Some(mut trails) = world.get_resource_mut::<crate::trails::Trails>() {
         trails.restore(save.trails.iter().copied());
     }
+    if let Some(mut stripped) = world.get_resource_mut::<crate::scatter::StrippedGround>() {
+        stripped.0 = save
+            .stripped
+            .iter()
+            .map(|&(x, z)| IVec2::new(x, z))
+            .collect();
+    }
     world.insert_resource(crate::weather::Weather {
         intensity: save.weather.0,
         target: save.weather.1,
@@ -851,6 +873,7 @@ fn apply(world: &mut World, save: SaveGame) {
                         progress: b.progress,
                         stage: b.stage,
                         stone_laid: b.stone_laid,
+                        timber_footing: b.timber_footing,
                     },
                 ));
             }

@@ -150,7 +150,10 @@ fn apply_speed(
     sim: Res<SimSpeed>,
     mut time: ResMut<Time<Virtual>>,
 ) {
-    if *state.get() != GameState::Playing {
+    // Only the title keeps authority over the clock. During Loading the
+    // speed strip's will is enforced too: if anything leaves the virtual
+    // clock paused on the way in, this is what starts it beating again.
+    if *state.get() == GameState::Title {
         return;
     }
     if menus.iter().any(|v| *v == Visibility::Visible) {

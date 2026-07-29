@@ -15,7 +15,7 @@
 use bevy::prelude::*;
 
 use super::work::{Hut, Stockpile};
-use super::{Activity, Chronicle, Person, SettlementSite, SimRng, Villager};
+use super::{Activity, Chronicle, Needs, Person, SettlementSite, SimRng, Villager};
 use crate::creature::anim::CreatureMotion;
 use crate::creature::genome::{Age, CreatureGenome};
 use crate::creature::{Airborne, Corpse, Held, MoveTarget};
@@ -68,6 +68,7 @@ pub(super) fn take_shelter(
         (
             &Transform,
             Option<&Home>,
+            &Needs,
             &mut Activity,
             &mut MoveTarget,
             &mut Visibility,
@@ -90,7 +91,17 @@ pub(super) fn take_shelter(
     let pouring = weather.intensity > 0.6;
     let fire_pos = fires.iter().next().map(|f| f.translation());
 
-    for (transform, home, mut activity, mut target, mut visibility) in &mut villagers {
+    for (transform, home, needs, mut activity, mut target, mut visibility) in &mut villagers {
+        // The starving do not wait out the rain: wet and fed beats dry
+        // and dead, and the food systems own them until they have eaten.
+        if needs.hunger > 0.7 {
+            if *activity == Activity::Sheltering {
+                *visibility = Visibility::Inherited;
+                *activity = Activity::Idle;
+                target.0 = None;
+            }
+            continue;
+        }
         if !pouring {
             if *activity == Activity::Sheltering {
                 *visibility = Visibility::Inherited;
@@ -474,6 +485,7 @@ pub(super) fn night_routine(
         (
             &Transform,
             Option<&Home>,
+            &Needs,
             &mut Activity,
             &mut MoveTarget,
             &mut Visibility,
@@ -490,7 +502,9 @@ pub(super) fn night_routine(
     let night = clock.is_night();
     let fire_pos = fires.iter().next().map(|f| f.translation());
 
-    for (transform, home, mut activity, mut target, mut visibility, mut motion) in &mut villagers {
+    for (transform, home, needs, mut activity, mut target, mut visibility, mut motion) in
+        &mut villagers
+    {
         if !night {
             if *activity == Activity::Sleeping {
                 *visibility = Visibility::Inherited;
@@ -502,6 +516,20 @@ pub(super) fn night_routine(
 
         // The fire-tender finishes the errand first; sleep can wait a minute.
         if *activity == Activity::TendingFire {
+            continue;
+        }
+
+        // Nobody sleeps through starving. A night is longer than an empty
+        // stomach can bear, so the truly hungry are left to the food systems
+        // — roused from bed if need be — until they have eaten enough to
+        // survive until dawn. Without this, a roof was a death sentence the
+        // firelit homeless escaped: sleep held the housed while hunger ran.
+        if needs.hunger > 0.7 {
+            if *activity == Activity::Sleeping {
+                *visibility = Visibility::Inherited;
+                *activity = Activity::Idle;
+                target.0 = None;
+            }
             continue;
         }
 

@@ -258,7 +258,7 @@ pub(crate) fn retrain(
     } else if !has_vocation(Vocation::Mason)
         && sites
             .iter()
-            .any(|(cs, plan)| cs.stone_laid < plan.kind.stone_cost())
+            .any(|(cs, plan)| cs.stone_laid < cs.footing_stone(plan.kind))
     {
         wanted = Some(Vocation::Mason);
     } else if has_building(BuildingKind::Tavern) && !has_vocation(Vocation::Cook) {

@@ -313,7 +313,10 @@ pub(crate) fn take_up_work(
                 .iter()
                 .find(|(_, _, b)| b.kind == BuildingKind::Dock)
                 .map(|(dock, dock_at, _)| {
-                    let at = dock_at.translation();
+                    // The post is out at the deck's end, past the shallows —
+                    // the planks are ground now, and the fish run under the
+                    // far rail.
+                    let at = dock_at.translation() + dock_at.rotation() * Vec3::new(0.0, 0.0, 4.6);
                     Job::at(at, Some(dock), at.distance(transform.translation))
                 })
                 .or_else(|| {
@@ -327,21 +330,33 @@ pub(crate) fn take_up_work(
             // pile runs thin; the far vein once the village can spare the
             // walk.
             Vocation::Miner => {
-                let stone_job = nearest_job(
-                    boulders.iter().map(|(rock, t)| (rock, t.translation())),
-                    transform.translation,
-                    WORK_REACH,
-                    &known_far,
-                    &permitted,
-                )
-                .or_else(|| {
-                    find_ground(&terrain, site.centre, &mut rng.0, |t, x, z| {
-                        matches!(t.biome_at(x, z), Biome::Alpine)
-                            || t.height_at(x, z) > WATER_LEVEL + 40.0
+                // A built mine outranks loose boulders: the drift is dug,
+                // the stone is waiting, and the yard is the miner's post.
+                let mine_job = buildings
+                    .iter()
+                    .find(|(_, _, b)| b.kind == BuildingKind::Mine)
+                    .map(|(works, works_at, _)| {
+                        let at = works_at.translation();
+                        Job::at(at, Some(works), at.distance(transform.translation))
+                    });
+                let stone_job = mine_job
+                    .or_else(|| {
+                        nearest_job(
+                            boulders.iter().map(|(rock, t)| (rock, t.translation())),
+                            transform.translation,
+                            WORK_REACH,
+                            &known_far,
+                            &permitted,
+                        )
                     })
-                    .filter(|at| permitted(*at))
-                    .map(|at| Job::at(at, None, at.distance(transform.translation)))
-                });
+                    .or_else(|| {
+                        find_ground(&terrain, site.centre, &mut rng.0, |t, x, z| {
+                            matches!(t.biome_at(x, z), Biome::Alpine)
+                                || t.height_at(x, z) > WATER_LEVEL + 40.0
+                        })
+                        .filter(|at| permitted(*at))
+                        .map(|at| Job::at(at, None, at.distance(transform.translation)))
+                    });
                 let ore_job = nearest_job(
                     deposits
                         .iter()
@@ -384,7 +399,7 @@ pub(crate) fn take_up_work(
                 {
                     build_sites
                         .iter()
-                        .filter(|(_, _, cs, plan)| cs.stone_laid >= plan.kind.stone_cost())
+                        .filter(|(_, _, cs, plan)| cs.stone_laid >= cs.footing_stone(plan.kind))
                         .map(|(house, house_transform, ..)| {
                             (
                                 house,
@@ -407,7 +422,7 @@ pub(crate) fn take_up_work(
                 {
                     build_sites
                         .iter()
-                        .filter(|(_, _, cs, plan)| cs.stone_laid < plan.kind.stone_cost())
+                        .filter(|(_, _, cs, plan)| cs.stone_laid < cs.footing_stone(plan.kind))
                         .map(|(b, t, ..)| {
                             (
                                 b,
@@ -462,12 +477,11 @@ pub(crate) fn take_up_work(
                     Some((field, at)) => {
                         Some(Job::at(at, Some(field), at.distance(transform.translation)))
                     }
-                    // A new plot: flat, dry, out of everyone's way. The Job
-                    // carries no focus; arriving farmers till on the spot.
-                    None => village_slots(site.centre, 5..7)
-                        .into_iter()
-                        .map(|(x, z, _)| Vec3::new(x, terrain.height_at(x, z), z))
-                        .find(|at| {
+                    None => {
+                        // Farmland grows as one farm, not scattered allotments:
+                        // each new plot takes the next open cell of the grid the
+                        // first field started, rows shared, a path's width apart.
+                        let good_ground = |at: Vec3| {
                             terrain.is_walkable(at.x, at.z)
                                 && at.y > WATER_LEVEL + 2.0
                                 && !matches!(
@@ -476,13 +490,54 @@ pub(crate) fn take_up_work(
                                 )
                                 && fields
                                     .iter()
-                                    .all(|(_, t, _)| t.translation.distance(*at) > 7.0)
+                                    .all(|(_, t, _)| t.translation.distance(at) > 3.6)
                                 && trees
                                     .iter()
-                                    .all(|(_, t, _)| t.translation().distance(*at) > 3.5)
-                                && permitted(*at)
-                        })
-                        .map(|at| Job::at(at, None, at.distance(transform.translation))),
+                                    .all(|(_, t, _)| t.translation().distance(at) > 3.5)
+                                && permitted(at)
+                        };
+                        let anchor = fields
+                            .iter()
+                            .min_by(|a, b| {
+                                a.1.translation
+                                    .distance(site.centre)
+                                    .total_cmp(&b.1.translation.distance(site.centre))
+                            })
+                            .map(|(_, t, _)| (t.translation, t.rotation));
+                        let gridded = anchor.and_then(|(origin, rotation)| {
+                            let across = rotation * Vec3::new(4.9, 0.0, 0.0);
+                            let down = rotation * Vec3::new(0.0, 0.0, 4.1);
+                            // Ring by ring outward, so the farm stays compact.
+                            (1..=4i32)
+                                .flat_map(|ring| {
+                                    (-ring..=ring).flat_map(move |i| {
+                                        (-ring..=ring).filter_map(move |j| {
+                                            (i.abs().max(j.abs()) == ring).then_some((i, j))
+                                        })
+                                    })
+                                })
+                                .map(|(i, j)| {
+                                    let spot = origin + across * i as f32 + down * j as f32;
+                                    Vec3::new(spot.x, terrain.height_at(spot.x, spot.z), spot.z)
+                                })
+                                .find(|at| good_ground(*at))
+                        });
+                        // The first plot — or a farm hemmed in on every side —
+                        // falls back to the open ring slots.
+                        gridded
+                            .or_else(|| {
+                                village_slots(site.centre, 5..7)
+                                    .into_iter()
+                                    .map(|(x, z, _)| Vec3::new(x, terrain.height_at(x, z), z))
+                                    .find(|at| {
+                                        good_ground(*at)
+                                            && fields
+                                                .iter()
+                                                .all(|(_, t, _)| t.translation.distance(*at) > 7.0)
+                                    })
+                            })
+                            .map(|at| Job::at(at, None, at.distance(transform.translation)))
+                    }
                 }
             }
 

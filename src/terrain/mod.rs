@@ -152,6 +152,27 @@ pub struct Terrain {
     rivers: Arc<rivers::RiverIndex>,
     /// Ground worked level by hands. Shared like the rivers; grows rarely.
     worked: Arc<RwLock<Vec<FlatSpot>>>,
+    /// Built decks over water — walkable planks the ground itself answers
+    /// for, so navigation needs no special cases. Registered when docks rise.
+    boardwalks: Arc<RwLock<Vec<Boardwalk>>>,
+}
+
+/// One deck of planks run out over the water.
+#[derive(Clone, Copy)]
+struct Boardwalk {
+    /// Dry-end origin.
+    x: f32,
+    z: f32,
+    /// Unit direction the deck runs, seaward.
+    dx: f32,
+    dz: f32,
+    /// The walkable span along that direction, in world units from the origin.
+    from: f32,
+    to: f32,
+    /// Walkable half-width either side of the centreline.
+    half_w: f32,
+    /// World height of the deck top.
+    deck: f32,
 }
 
 impl Terrain {
@@ -160,6 +181,60 @@ impl Terrain {
             seed,
             rivers: Arc::new(rivers::RiverIndex::default()),
             worked: Arc::default(),
+            boardwalks: Arc::default(),
+        }
+    }
+
+    /// Opens a built deck to foot traffic: a strip from `from` to `to` along
+    /// `dir` out of `origin`, `half_w` wide, standing at `deck` height. The
+    /// half-width should be a little generous — the navigation grid samples
+    /// every 2.5 units and a strip narrower than that can slip between cells.
+    pub fn register_boardwalk(
+        &self,
+        origin: Vec3,
+        dir: Vec2,
+        from: f32,
+        to: f32,
+        half_w: f32,
+        deck: f32,
+    ) {
+        let dir = dir.normalize_or_zero();
+        if let Ok(mut walks) = self.boardwalks.write() {
+            walks.push(Boardwalk {
+                x: origin.x,
+                z: origin.z,
+                dx: dir.x,
+                dz: dir.y,
+                from,
+                to,
+                half_w,
+                deck,
+            });
+        }
+    }
+
+    /// The deck underfoot, if any: the world height of the planks there.
+    pub fn boardwalk_at(&self, x: f32, z: f32) -> Option<f32> {
+        let walks = self.boardwalks.read().ok()?;
+        walks
+            .iter()
+            .find(|walk| {
+                let rx = x - walk.x;
+                let rz = z - walk.z;
+                let along = rx * walk.dx + rz * walk.dz;
+                let across = (rx * walk.dz - rz * walk.dx).abs();
+                (walk.from..=walk.to).contains(&along) && across <= walk.half_w
+            })
+            .map(|walk| walk.deck)
+    }
+
+    /// Where feet actually stand: the deck when planks span this spot and
+    /// clear the ground, the ground itself otherwise.
+    pub fn stand_height_at(&self, x: f32, z: f32) -> f32 {
+        let ground = self.height_at(x, z);
+        match self.boardwalk_at(x, z) {
+            Some(deck) => deck.max(ground),
+            None => ground,
         }
     }
 
@@ -383,6 +458,13 @@ impl Terrain {
         )
     }
 
+    /// Forest density in `[0, 1]` — the same field the scatterer seeds trees
+    /// from, so ground can be judged for timber before any chunk exists.
+    /// Trees stand where this exceeds 0.50 on moist, gentle ground.
+    pub fn forest_at(&self, x: f32, z: f32) -> f32 {
+        fbm_2d(x * 0.004, z * 0.004, self.seed ^ 0xf00d, 3, 2.0, 0.5)
+    }
+
     /// Ground mottling in `[0, 1]`, at a scale of tens of metres.
     ///
     /// Ground colour otherwise varies only with moisture and altitude, which change
@@ -480,6 +562,11 @@ impl Terrain {
     /// Somewhere a walking creature can stand: dry, not a cliff face, and not in
     /// deep flowing water. The shallow edge of a river is fordable.
     pub fn is_walkable(&self, x: f32, z: f32) -> bool {
+        // Planks beat water: a deck built over the shallows is a floor,
+        // whatever the seabed under it is doing.
+        if self.boardwalk_at(x, z).is_some() {
+            return true;
+        }
         if self.is_submerged(x, z) || self.slope_at(x, z) >= 0.55 {
             return false;
         }

@@ -228,7 +228,7 @@ pub(super) fn lend_a_hand(
     // Only where the work can actually advance — a site still waiting on
     // its foundation stone needs a mason, not a crowd.
     for (site, site_at, construction, plan) in &sites {
-        if construction.stone_laid < plan.kind.stone_cost() {
+        if construction.stone_laid < construction.footing_stone(plan.kind) {
             continue;
         }
         let already = helpers_now.iter().filter(|h| h.0 == site).count();
@@ -447,7 +447,7 @@ pub(super) fn do_work(
     trades: (
         Query<&CarryingStone>,
         Query<(&Transform, &mut Vitality), (With<Villager>, Without<Corpse>)>,
-        Query<&mut Field>,
+        Query<(&mut Field, &Transform), Without<crate::matter::Boulder>>,
         ResMut<KitchenWarm>,
         Query<&mut crate::matter::Deposit>,
         Query<&mut crate::scatter::SacredFlora>,
@@ -462,6 +462,7 @@ pub(super) fn do_work(
         ResMut<crate::terrain::LoadedChunks>,
         ResMut<crate::grass::GrassChunks>,
         Option<Res<crate::weather::Weather>>,
+        ResMut<crate::scatter::StrippedGround>,
     ),
     assets: (ResMut<Assets<Mesh>>, ResMut<Assets<StandardMaterial>>),
     mut prey_query: Query<
@@ -488,7 +489,7 @@ pub(super) fn do_work(
         mut sacred_mut,
     ) = trades;
     let (mut build_sites, settlements, mut notices) = civic;
-    let (terrain, mut chunks, mut grass, weather) = ground;
+    let (terrain, mut chunks, mut grass, weather, mut stripped) = ground;
     let (mut meshes, mut materials) = assets;
     let Some(site) = site else {
         return;
@@ -770,7 +771,7 @@ pub(super) fn do_work(
             let Ok((mut construction, plan)) = build_sites.get_mut(site_entity) else {
                 continue;
             };
-            if construction.stone_laid >= plan.kind.stone_cost() {
+            if construction.stone_laid >= construction.footing_stone(plan.kind) {
                 *activity = Activity::Idle;
                 commands.entity(entity).remove::<Job>();
                 continue;
@@ -859,7 +860,7 @@ pub(super) fn do_work(
                     ChildOf(site_entity),
                 ));
             }
-            if construction.stone_laid >= plan.kind.stone_cost() {
+            if construction.stone_laid >= construction.footing_stone(plan.kind) {
                 // The foundation shows itself the moment the last block lands.
                 let slab = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
                 let stone_material = materials.add(StandardMaterial {
@@ -1026,7 +1027,9 @@ pub(super) fn do_work(
             Vocation::Fisher => {
                 let mut catch = 1.0_f32;
                 if context.3.iter().any(|b| b.kind == BuildingKind::Dock) {
-                    catch += 0.5;
+                    // Past the shallows the fish run twice as thick: a dock
+                    // doubles the line, and is meant to carry a village.
+                    catch += 1.0;
                 }
                 if context.3.iter().any(|b| b.kind == BuildingKind::Smokehouse) {
                     catch *= 2.0;
@@ -1040,6 +1043,16 @@ pub(super) fn do_work(
             Vocation::Miner | Vocation::Mason => match job.focus {
                 // Bare high ground still yields loose stone.
                 None => store.stone += 1.0,
+                // The mine: a drift into standing rock gives up stone by
+                // the cartload, and never runs out the way a boulder does.
+                Some(works)
+                    if context
+                        .3
+                        .get(works)
+                        .is_ok_and(|b| b.kind == BuildingKind::Mine) =>
+                {
+                    store.stone += 3.0;
+                }
                 // A deposit gives up its kind, load by load, until the
                 // ground is empty and the diggings are abandoned.
                 Some(worked) if deposits_mut.get(worked).is_ok() => {
@@ -1065,9 +1078,20 @@ pub(super) fn do_work(
                         continue;
                     };
                     store.stone += 1.0;
-                    rock_transform.scale *= 0.72;
+                    // An outcrop gives up its stone slowly - the pick takes
+                    // the same bite from a much bigger body - then chips
+                    // away like any boulder once it is down to one.
+                    let wear = if rock_transform.scale.x > 1.6 {
+                        0.93
+                    } else {
+                        0.72
+                    };
+                    rock_transform.scale *= wear;
                     if rock_transform.scale.x < 0.4 {
+                        // Chipped to nothing — and the ground remembers, so
+                        // no chunk rebuild quietly restocks the quarry.
                         commands.entity(rock).despawn();
+                        stripped.strip(job.site.x, job.site.z);
                         *activity = Activity::Idle;
                         commands.entity(entity).remove::<Job>();
                     }
@@ -1084,7 +1108,7 @@ pub(super) fn do_work(
                 }
                 // A standing tree comes down and a sapling starts over.
                 Some(tree) => {
-                    let Ok(mut felled) = trees.get_mut(tree) else {
+                    let Ok(felled) = trees.get_mut(tree) else {
                         *activity = Activity::Idle;
                         commands.entity(entity).remove::<Job>();
                         continue;
@@ -1094,7 +1118,13 @@ pub(super) fn do_work(
                         commands.entity(entity).remove::<Job>();
                         continue;
                     }
-                    felled.maturity = 0.05;
+                    // The tree comes down and STAYS down: the stump is
+                    // struck from the world and the ground remembers, so a
+                    // worked woods thins for good and clear-cut country
+                    // reads from the air. Scarcity is the door to elsewhere.
+                    drop(felled);
+                    commands.entity(tree).despawn();
+                    stripped.strip(job.site.x, job.site.z);
                     // Shoulder the logs and turn for home. The timber only
                     // becomes the village's when it reaches the pile — and a
                     // sawmill wrings a third log from every tree.
@@ -1129,11 +1159,26 @@ pub(super) fn do_work(
                     }
                     grass.invalidate_near(&mut commands, job.site.x, job.site.z, 7.0);
                     let at = Vec3::new(job.site.x, level, job.site.z);
-                    let rotation = Quat::from_rotation_y({
-                        let toward = (site.centre - at).with_y(0.0);
-                        let toward = toward.normalize_or_zero();
-                        (-toward.z).atan2(toward.x)
-                    });
+                    // A field beside other fields shares their rows — the
+                    // grid the siting chose only reads as one farm if the
+                    // furrows agree. The first field of a farm faces home.
+                    let rotation = fields_mut
+                        .iter()
+                        .map(|(_, t)| t)
+                        .filter(|t| t.translation.distance(at) < 16.0)
+                        .min_by(|a, b| {
+                            a.translation
+                                .distance(at)
+                                .total_cmp(&b.translation.distance(at))
+                        })
+                        .map(|t| t.rotation)
+                        .unwrap_or_else(|| {
+                            Quat::from_rotation_y({
+                                let toward = (site.centre - at).with_y(0.0);
+                                let toward = toward.normalize_or_zero();
+                                (-toward.z).atan2(toward.x)
+                            })
+                        });
                     raise_field(
                         &mut commands,
                         &mut meshes,
@@ -1156,19 +1201,21 @@ pub(super) fn do_work(
                     commands.entity(entity).remove::<Job>();
                 }
                 Some(field_entity) => {
-                    let Ok(mut field) = fields_mut.get_mut(field_entity) else {
+                    let Ok((mut field, _)) = fields_mut.get_mut(field_entity) else {
                         *activity = Activity::Idle;
                         commands.entity(entity).remove::<Job>();
                         continue;
                     };
                     if field.growth >= 1.0 {
                         // The mill grinds the harvest into half again as much.
+                        // A field is the steadiest table the village has:
+                        // one brought-in harvest feeds a family for days.
                         store.larder.add(
                             FoodKind::Grain,
                             if context.3.iter().any(|b| b.kind == BuildingKind::Mill) {
-                                9.0
+                                12.0
                             } else {
-                                6.0
+                                8.0
                             },
                         );
                         field.growth = 0.08;

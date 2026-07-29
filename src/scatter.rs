@@ -16,7 +16,6 @@ use bevy::prelude::*;
 
 use crate::creature::genome::Tone;
 use crate::meshbuild::MeshBuilder;
-use crate::noise::fbm_2d;
 use crate::palette;
 use crate::rng::Rng;
 use crate::terrain::{
@@ -36,10 +35,8 @@ pub struct ScatterPlugin;
 
 impl Plugin for ScatterPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (populate_chunks.after(TerrainSet), sway_foliage, grow_trees),
-        );
+        app.init_resource::<StrippedGround>()
+            .add_systems(Update, (populate_chunks.after(TerrainSet), sway_foliage));
     }
 }
 
@@ -366,6 +363,7 @@ fn populate_chunks(
     terrain_assets: Res<TerrainAssets>,
     terrain: Res<Terrain>,
     world_seed: Res<crate::WorldSeed>,
+    stripped: Res<StrippedGround>,
     settlement: Option<Res<crate::villager::SettlementSite>>,
     chunks: Query<(Entity, &TerrainChunk), Added<TerrainChunk>>,
 ) {
@@ -414,7 +412,7 @@ fn populate_chunks(
 
                 let slope = terrain.slope_at(x, z);
                 let moisture = terrain.moisture_at(x, z);
-                let forest = fbm_2d(x * 0.004, z * 0.004, world_seed.0 ^ 0xf00d, 3, 2.0, 0.5);
+                let forest = terrain.forest_at(x, z);
 
                 // Positions are chunk-local; the chunk's transform places them.
                 let local = Vec3::new(x - origin.x, height, z - origin.y);
@@ -432,7 +430,7 @@ fn populate_chunks(
                 };
 
                 if slope > 0.42 {
-                    if rng.chance(0.30) {
+                    if rng.chance(0.30) && !stripped.is_stripped(x, z) {
                         let near_village = settlement.as_ref().is_some_and(|site| {
                             Vec2::new(x - site.centre.x, z - site.centre.z).length()
                                 < TREE_HARVEST_RADIUS
@@ -453,8 +451,9 @@ fn populate_chunks(
                 } else if forest > 0.50 && moisture > 0.38 {
                     let density = ((forest - 0.50) / 0.3).clamp(0.0, 1.0);
                     // Trees keep a canopy's berth from worked ground, so a
-                    // rebuilt chunk never leans a tree against a wall.
-                    if terrain.is_worked_within(x, z, 4.0) {
+                    // rebuilt chunk never leans a tree against a wall — and
+                    // stripped ground stays bare: the axe is permanent.
+                    if terrain.is_worked_within(x, z, 4.0) || stripped.is_stripped(x, z) {
                         continue;
                     }
                     if rng.chance(tree_chance * (0.55 + density)) {
@@ -488,7 +487,7 @@ fn populate_chunks(
                         );
                         commands.entity(bush).insert(ChildOf(entity));
                     }
-                } else if rng.chance(0.04) {
+                } else if rng.chance(0.055) && !stripped.is_stripped(x, z) {
                     // Loose stones on open ground: near the settlement they are
                     // real boulders — the miners' bread. (The flat-ground rocks
                     // were baked scenery at first, and the whole civic ladder
@@ -564,11 +563,31 @@ const SCATTER_SPACING: f32 = 4.5;
 /// cannot fell a vertex buffer.
 pub const TREE_HARVEST_RADIUS: f32 = 150.0;
 
-/// Seconds for a felled tree to grow back to full height.
-const TREE_REGROW_SECONDS: f32 = 480.0;
+/// Ground the village has already stripped: felled trees and mined-out
+/// boulders, by rounded world position. The scatterer consults it before
+/// seeding, so a chunk rebuild never resurrects what hands took away —
+/// a woods worked hard stays visibly cut, and a farmed-out country reads
+/// as exactly that from the air.
+#[derive(Resource, Default)]
+pub struct StrippedGround(pub bevy::platform::collections::HashSet<IVec2>);
 
-/// A tree the axe can reach. Maturity 1 is full-grown; felling drops it to a
-/// sapling that regrows in real time — a woods worked too hard visibly thins.
+impl StrippedGround {
+    fn key(x: f32, z: f32) -> IVec2 {
+        IVec2::new(x.round() as i32, z.round() as i32)
+    }
+
+    /// Marks this spot as taken: nothing wild of the felled kind returns.
+    pub fn strip(&mut self, x: f32, z: f32) {
+        self.0.insert(Self::key(x, z));
+    }
+
+    pub fn is_stripped(&self, x: f32, z: f32) -> bool {
+        self.0.contains(&Self::key(x, z))
+    }
+}
+
+/// A tree the axe can reach. Maturity 1 is full-grown; a felled tree is
+/// gone for good — the land does not quietly undo the woodcutter.
 #[derive(Component)]
 pub struct FellableTree {
     pub maturity: f32,
@@ -724,34 +743,25 @@ pub(crate) fn spawn_boulder(
 ) -> Entity {
     let mut builder = MeshBuilder::default();
     bake_rock(&mut builder, Vec3::ZERO, rng);
+    // One rock in six is a real outcrop: shoulder-high, many loads of
+    // stone, mined for days before it is gone. The land between lone
+    // boulders and a true mine.
+    let outcrop = rng.chance(0.18);
+    let girth = if outcrop { rng.range(2.2, 3.0) } else { 1.0 };
     commands
         .spawn((
-            Name::new("A boulder"),
+            Name::new(if outcrop { "An outcrop" } else { "A boulder" }),
             crate::matter::Boulder,
-            crate::matter::Matter::boulder(rng.range(90.0, 170.0), rng.range(0.7, 1.05)),
+            crate::matter::Matter::boulder(
+                rng.range(90.0, 170.0) * girth,
+                rng.range(0.7, 1.05) * girth,
+            ),
             Mesh3d(meshes.add(builder.build())),
             MeshMaterial3d(material),
-            Transform::from_translation(local),
-            crate::hand::PickRadius(1.3),
+            Transform::from_translation(local).with_scale(Vec3::splat(girth)),
+            crate::hand::PickRadius(1.3 * girth),
         ))
         .id()
-}
-
-/// Felled trees grow back, sapling to crown.
-fn grow_trees(
-    time: Res<Time>,
-    clock: Res<crate::calendar::WorldClock>,
-    mut trees: Query<(&mut FellableTree, &mut Transform)>,
-) {
-    let dt = time.delta_secs();
-    // Wood is patient: winter slows a sapling but never quite stops it.
-    let seasonal = clock.season().growth().max(0.3);
-    for (mut tree, mut transform) in &mut trees {
-        if tree.maturity < 1.0 {
-            tree.maturity = (tree.maturity + dt * seasonal / TREE_REGROW_SECONDS).min(1.0);
-            transform.scale = Vec3::splat(0.12 + 0.88 * tree.maturity);
-        }
-    }
 }
 
 /// Seed for a chunk's scatter.

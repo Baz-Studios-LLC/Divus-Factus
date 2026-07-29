@@ -45,6 +45,9 @@ pub enum BuildingKind {
     /// Planks run out over the water: fishers cast past the shallows,
     /// and the catch comes home heavier.
     Dock,
+    /// A timbered adit driven into rising ground: miners bring out stone
+    /// by the cartload instead of chipping boulders where they lie.
+    Mine,
 }
 
 impl BuildingKind {
@@ -66,6 +69,7 @@ impl BuildingKind {
             BuildingKind::Herbalist => 6.0,
             BuildingKind::Watchtower => 10.0,
             BuildingKind::Dock => 5.0,
+            BuildingKind::Mine => 6.0,
         }
     }
 
@@ -89,6 +93,8 @@ impl BuildingKind {
             BuildingKind::Watchtower => 6.0,
             // Pilings, not foundations: a dock is all carpentry.
             BuildingKind::Dock => 0.0,
+            // The mountain provides its own stone; the timber shores it up.
+            BuildingKind::Mine => 0.0,
         }
     }
 
@@ -110,6 +116,7 @@ impl BuildingKind {
             BuildingKind::Watchtower => "The watchtower",
             BuildingKind::Shrine => "The shrine",
             BuildingKind::Dock => "The dock",
+            BuildingKind::Mine => "The mine",
         }
     }
 }
@@ -138,6 +145,11 @@ pub struct CivicNeeds {
     pub pending_builds: usize,
     /// Whether walkable shore lies within working reach — no water, no dock.
     pub shore_near: bool,
+    /// Hands at the stone trade, arguing for a proper works.
+    pub miners: usize,
+    /// Whether rising rocky ground stands within working reach — no
+    /// mountainside, no mine.
+    pub rock_near: bool,
 }
 
 /// Chooses the next civic building by NEED, not by a fixed ladder: each
@@ -147,11 +159,12 @@ pub struct CivicNeeds {
 pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Option<BuildingKind> {
     use BuildingKind::*;
     let candidates = [
-        Well, Dock, Storehouse, Sawmill, Blacksmith, Smokehouse, Granary, Tavern, Mill, Bakery,
-        Weaver, Herbalist, Shrine, Watchtower, TownHall,
+        Well, Dock, Mine, Storehouse, Sawmill, Blacksmith, Smokehouse, Granary, Tavern, Mill,
+        Bakery, Weaver, Herbalist, Shrine, Watchtower, TownHall,
     ];
     let min_pop = |kind: BuildingKind| match kind {
         Well | Dock => 5,
+        Mine => 7,
         Storehouse => 7,
         Sawmill => 8,
         Smokehouse => 9,
@@ -175,6 +188,18 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
             Dock => {
                 if needs.shore_near {
                     needs.fishers as f32 * 0.3 + (35.0 - needs.food_stored).max(0.0) / 45.0 + 0.2
+                } else {
+                    0.0
+                }
+            }
+            // Foundations wait on stone more than anything else waits on
+            // anything: half-raised walls argue for a real works in the
+            // mountainside, and idle miners second them. No rock, no mine.
+            Mine => {
+                if needs.rock_near {
+                    needs.miners as f32 * 0.3
+                        + needs.pending_builds as f32 * 0.2
+                        + (10.0 - needs.stone_stored).max(0.0) / 25.0
                 } else {
                     0.0
                 }
@@ -420,6 +445,18 @@ impl Blueprint {
                 shed_roof: false,
                 stuff: BuildStuff::Timber,
             },
+            // A portal driven into the hillside: the frame is all that
+            // shows, the works are in the dark. half_d points into the rise.
+            BuildingKind::Mine => Blueprint {
+                kind,
+                half_w: rng.range(1.4, 1.7),
+                half_d: 1.6,
+                wall_h: 1.4,
+                walls: pal::shade(&pal::STONE, 0.35),
+                roof: pal::shade(&pal::WOOD, 0.4),
+                shed_roof: false,
+                stuff: BuildStuff::Timber,
+            },
             // No walls at all: a narrow deck run out over the water on
             // pilings. half_d is the long axis, pointing seaward.
             BuildingKind::Dock => Blueprint {
@@ -444,6 +481,22 @@ pub struct ConstructionSite {
     pub stage: u8,
     /// Foundation stone laid so far, by masons, one carried block at a time.
     pub stone_laid: f32,
+    /// Post-framed straight into the earth: no stone footing wanted. The
+    /// path to shelter for a land that is all woods — and one day, when
+    /// fire comes to the world, the homes that will fear it most.
+    #[serde(default)]
+    pub timber_footing: bool,
+}
+
+impl ConstructionSite {
+    /// Stone this build's foundation expects before walls may rise.
+    pub fn footing_stone(&self, kind: BuildingKind) -> f32 {
+        if self.timber_footing {
+            0.0
+        } else {
+            kind.stone_cost()
+        }
+    }
 }
 
 /// A finished building of any kind.
@@ -455,6 +508,36 @@ pub struct Building {
 /// A finished house.
 #[derive(Component)]
 pub struct Hut;
+
+/// The moment a dock finishes — fresh-built or restored from a save — its
+/// deck is opened to foot traffic: the terrain learns the planks as a
+/// boardwalk, and from then on navigation, footing and the fisher's post
+/// all treat the deck as ground.
+pub(crate) fn open_boardwalks(
+    terrain: Res<crate::terrain::Terrain>,
+    docks: Query<(&Transform, &Building, Option<&Blueprint>), Added<Building>>,
+) {
+    for (transform, building, plan) in &docks {
+        if building.kind != BuildingKind::Dock {
+            continue;
+        }
+        let half_w = plan.map_or(1.15, |p| p.half_w);
+        let half_d = plan.map_or(3.1, |p| p.half_d);
+        let seaward = transform.rotation * Vec3::Z;
+        terrain.register_boardwalk(
+            transform.translation,
+            Vec2::new(seaward.x, seaward.z),
+            // The ramp starts a little shy of the origin; the deck ends at
+            // twice the long half-axis out over the water.
+            -half_d * 0.6,
+            half_d * 2.0,
+            // Wider than the planks look: the nav grid samples every 2.5
+            // units, and a strip narrower than a cell slips between them.
+            (half_w * 0.9).max(1.8),
+            transform.translation.y + 0.68,
+        );
+    }
+}
 
 /// Which visual stage a build should show, at `progress` timber toward a
 /// total `cost`: frame, walls, roof, at thirds of the way.
@@ -518,6 +601,98 @@ pub(crate) fn raise_stage(
             ChildOf(site),
         ));
     };
+
+    // A mine is a doorway into the hill, not a house: a heavy timber
+    // portal, a stone surround, and the dark past the lintel. The long
+    // local +Z axis points into the rise, so the works read as driven
+    // underground rather than perched on top of it.
+    if plan.kind == BuildingKind::Mine {
+        let dark = materials.add(StandardMaterial {
+            base_color: Color::srgb(0.03, 0.03, 0.04),
+            perceptual_roughness: 1.0,
+            ..default()
+        });
+        match stage {
+            // The portal frame: two squared posts and a lintel proud of
+            // them both, braced like the first metre of a drift.
+            0 => {
+                for x in [-w * 0.55, w * 0.55] {
+                    part(
+                        Vec3::new(x, h * 0.5, d * 0.3),
+                        Vec3::new(0.3, h, 0.3),
+                        0.0,
+                        &frame,
+                    );
+                }
+                part(
+                    Vec3::new(0.0, h + 0.12, d * 0.3),
+                    Vec3::new(w * 1.5, 0.28, 0.4),
+                    0.0,
+                    &frame,
+                );
+            }
+            // The stone surround and the mouth itself: a dark plane set
+            // behind the frame, flanked by dressed-stone cheeks banked
+            // into the slope.
+            1 => {
+                part(
+                    Vec3::new(0.0, h * 0.5, d * 0.5),
+                    Vec3::new(w * 1.1, h, 0.2),
+                    0.0,
+                    &dark,
+                );
+                for side in [-1.0, 1.0] {
+                    part(
+                        Vec3::new(side * w * 0.95, h * 0.45, d * 0.35),
+                        Vec3::new(w * 0.55, h * 0.9, 0.9),
+                        0.0,
+                        &stonework,
+                    );
+                }
+                part(
+                    Vec3::new(0.0, h + 0.45, d * 0.45),
+                    Vec3::new(w * 1.9, 0.7, 1.1),
+                    0.0,
+                    &stonework,
+                );
+            }
+            // The working yard: a spoil heap grown to one side, crates,
+            // and a lantern post for the shift that comes out after dark.
+            _ => {
+                part(
+                    Vec3::new(w * 1.5, 0.35, -d * 0.4),
+                    Vec3::new(1.7, 0.7, 1.4),
+                    0.12,
+                    &stonework,
+                );
+                part(
+                    Vec3::new(-w * 1.1, 0.25, -d * 0.6),
+                    Vec3::new(0.5, 0.5, 0.5),
+                    0.0,
+                    &wall,
+                );
+                part(
+                    Vec3::new(-w * 1.0, 0.2, -d * 0.1),
+                    Vec3::new(0.4, 0.4, 0.4),
+                    0.3,
+                    &wall,
+                );
+                part(
+                    Vec3::new(w * 0.9, 0.9, -d * 0.9),
+                    Vec3::new(0.12, 1.8, 0.12),
+                    0.0,
+                    &frame,
+                );
+                part(
+                    Vec3::new(w * 0.9, 1.85, -d * 0.9),
+                    Vec3::new(0.3, 0.3, 0.3),
+                    0.0,
+                    &gold,
+                );
+            }
+        }
+        return;
+    }
 
     // A dock is planks, not walls: pilings driven toward the water, a deck
     // run out over it, and the trimmings of a working waterfront. The long
@@ -937,6 +1112,7 @@ pub(crate) fn plan_houses(
         ResMut<crate::terrain::LoadedChunks>,
         ResMut<crate::grass::GrassChunks>,
         Res<crate::terrain::TerrainAssets>,
+        ResMut<crate::scatter::StrippedGround>,
     ),
     census: (
         Query<
@@ -977,6 +1153,7 @@ pub(crate) fn plan_houses(
     let mut fishers = 0usize;
     let mut farmers = 0usize;
     let mut foresters = 0usize;
+    let mut miners = 0usize;
     for (vocation, morale, home, faith, vitality, child) in &souls {
         population += 1;
         spirits_sum += morale.spirits;
@@ -993,6 +1170,7 @@ pub(crate) fn plan_houses(
             Some(Vocation::Fisher) => fishers += 1,
             Some(Vocation::Farmer) => farmers += 1,
             Some(Vocation::Forester) => foresters += 1,
+            Some(Vocation::Miner) => miners += 1,
             _ => {}
         }
     }
@@ -1011,6 +1189,23 @@ pub(crate) fn plan_houses(
     }
 
     let shore_near = find_shore(&terrain, site.centre, &mut rng.0).is_some();
+
+    // Ground fit for a mine mouth: walkable footing against a genuine
+    // face — the ground a short walk uphill must stand well above the
+    // mouth, so the drift is driven INTO something rather than standing
+    // exposed on a rise. High flat country does not qualify, however
+    // stony: a portal needs a wall of rock behind it.
+    let minable = |t: &Terrain, x: f32, z: f32| {
+        let step = 3.5;
+        let rise_x = t.height_at(x + step, z) - t.height_at(x - step, z);
+        let rise_z = t.height_at(x, z + step) - t.height_at(x, z - step);
+        let uphill = Vec3::new(rise_x, 0.0, rise_z).normalize_or_zero();
+        if uphill == Vec3::ZERO {
+            return false;
+        }
+        t.height_at(x + uphill.x * 7.0, z + uphill.z * 7.0) - t.height_at(x, z) > 3.0
+    };
+    let rock_near = find_ground(&terrain, site.centre, &mut rng.0, minable).is_some();
 
     // A person needs a house, so a house gets built: ground breaks because
     // roofless people exist, not because a formula says the town is due.
@@ -1051,6 +1246,8 @@ pub(crate) fn plan_houses(
                 .count(),
             pending_builds: pending.iter().count(),
             shore_near,
+            miners,
+            rock_near,
         };
         match next_civic(&needs, has_kind) {
             Some(kind) => kind,
@@ -1058,6 +1255,93 @@ pub(crate) fn plan_houses(
         }
     };
     let _ = roofs;
+
+    // A mine is sited by the rock, not by the rings: the nearest walkable
+    // ground beside rising stone takes the portal, driven uphill so the
+    // works read as underground.
+    if kind == BuildingKind::Mine {
+        let Some(face) = find_ground(&terrain, site.centre, &mut rng.0, minable) else {
+            return;
+        };
+        // The portal faces uphill: sample the gradient and point local +Z
+        // at the climb.
+        let step = 4.0;
+        let rise_x =
+            terrain.height_at(face.x + step, face.z) - terrain.height_at(face.x - step, face.z);
+        let rise_z =
+            terrain.height_at(face.x, face.z + step) - terrain.height_at(face.x, face.z - step);
+        let uphill = Vec3::new(rise_x, 0.0, rise_z).normalize_or(Vec3::Z);
+        let yaw = uphill.x.atan2(uphill.z);
+        let plan = Blueprint::roll(kind, &mut rng.0);
+        // Set the portal INTO the cut: the mouth steps a stride up the
+        // slope, and the flattened yard below carves a notch out of the
+        // hillside for it to stand against.
+        let face = face + uphill * 1.4;
+
+        // A worked yard at the mouth; the hill keeps its shape past it.
+        terrain.flatten(face.x, face.z, plan.half_w + 1.6, 2.4, face.y);
+        // And the hill is banked OVER the portal's back: whatever the
+        // face's true shape, the door reads as a door into the earth —
+        // nobody walks behind the mine and finds the back of the set.
+        let crown = face + uphill * (plan.half_d * 1.2);
+        terrain.flatten(
+            crown.x,
+            crown.z,
+            plan.half_w * 1.4,
+            3.2,
+            face.y + plan.wall_h + 1.4,
+        );
+        let (chunks, grass, chunk_assets, stripped) = &mut ground;
+        crate::terrain::rebuild_chunks_near(
+            &mut commands,
+            &mut meshes,
+            chunk_assets,
+            &terrain,
+            chunks,
+            face.x,
+            face.z,
+            plan.half_w + 9.0,
+        );
+        grass.invalidate_near(&mut commands, face.x, face.z, plan.half_w + 9.0);
+        let mut cleared = 0.0;
+        for (tree, tree_at) in &standing {
+            if tree_at.translation().distance(face) < plan.half_w + 4.0 {
+                stripped.strip(tree_at.translation().x, tree_at.translation().z);
+                commands.entity(tree).despawn();
+                cleared += 1.0;
+            }
+        }
+        if cleared > 0.0
+            && let Ok(mut store) = stores.get_mut(site.settlement)
+        {
+            store.timber += cleared;
+        }
+
+        let building = commands
+            .spawn((
+                Name::new(format!("{}, rising", plan.kind.name())),
+                ConstructionSite::default(),
+                plan.clone(),
+                Transform::from_translation(face).with_rotation(Quat::from_rotation_y(yaw)),
+                Visibility::default(),
+                crate::hand::PickRadius(plan.half_d + 0.9),
+                crate::hand::Rooted,
+            ))
+            .id();
+        raise_stage(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            building,
+            0,
+            &plan,
+        );
+        info!("ground was broken: {}", plan.kind.name());
+        notices.write(crate::ui::Notice::new(
+            "Ground was broken for the mine".to_string(),
+        ));
+        return;
+    }
 
     // A dock is sited by the water, not by the rings: the nearest walkable
     // shore takes the pilings, and the deck points out over the water.
@@ -1071,7 +1355,7 @@ pub(crate) fn plan_houses(
 
         // A small worked pad on the dry end; the rest stands on pilings.
         terrain.flatten(shore.x, shore.z, plan.half_w + 1.2, 2.0, shore.y);
-        let (chunks, grass, chunk_assets) = &mut ground;
+        let (chunks, grass, chunk_assets, stripped) = &mut ground;
         crate::terrain::rebuild_chunks_near(
             &mut commands,
             &mut meshes,
@@ -1086,6 +1370,7 @@ pub(crate) fn plan_houses(
         let mut cleared = 0.0;
         for (tree, tree_at) in &standing {
             if tree_at.translation().distance(shore) < plan.half_w + 4.0 {
+                stripped.strip(tree_at.translation().x, tree_at.translation().z);
                 commands.entity(tree).despawn();
                 cleared += 1.0;
             }
@@ -1166,6 +1451,13 @@ pub(crate) fn plan_houses(
         }
 
         let mut plan = Blueprint::roll(kind, &mut rng.0);
+        // A land of woods and nothing else still shelters its people: with
+        // no stone in the pile and no clay to brick, a timber house is
+        // post-framed straight into the earth and owes the masons nothing.
+        // Another path to a roof — until fire comes to the world, when
+        // these will be the homes that fear it.
+        let timber_footing =
+            kind == BuildingKind::House && store_now.stone < 1.0 && store_now.clay < 1.0;
         if kind == BuildingKind::House {
             // The land dictates the walls: too few standing trees within a
             // working walk makes timber homes a fantasy - build from what
@@ -1193,7 +1485,7 @@ pub(crate) fn plan_houses(
         // into a slope. This is what a foundation is *for*.
         let pad = plan.half_w.max(plan.half_d) + 1.6;
         terrain.flatten(at.x, at.z, pad, 2.4, at.y);
-        let (chunks, grass, chunk_assets) = &mut ground;
+        let (chunks, grass, chunk_assets, stripped) = &mut ground;
         crate::terrain::rebuild_chunks_near(
             &mut commands,
             &mut meshes,
@@ -1213,6 +1505,7 @@ pub(crate) fn plan_houses(
         let mut cleared = 0.0;
         for (tree, tree_at) in &standing {
             if tree_at.translation().distance(at) < clearing {
+                stripped.strip(tree_at.translation().x, tree_at.translation().z);
                 commands.entity(tree).despawn();
                 cleared += 1.0;
             }
@@ -1226,7 +1519,10 @@ pub(crate) fn plan_houses(
         let building = commands
             .spawn((
                 Name::new(format!("{}, rising", plan.kind.name())),
-                ConstructionSite::default(),
+                ConstructionSite {
+                    timber_footing,
+                    ..default()
+                },
                 plan.clone(),
                 Transform::from_translation(at).with_rotation(Quat::from_rotation_y(yaw)),
                 Visibility::default(),

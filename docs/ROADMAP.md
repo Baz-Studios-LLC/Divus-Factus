@@ -461,3 +461,20 @@ the god who saved us, or the god who let it happen.
 
 Multi-settlement fission runs through all three: a crowded, well-fed city
 with known far ground sends founders past the cairns.
+
+## Next up (recorded 2026-07-29, direction agreed with Baz)
+
+**Skills and the shape of a working life.** Every villager keeps a skill
+per vocation, grown by doing the work. Skill raises YIELD (a master fisher
+lands more per cast), not just pace; assignment prefers what a person is
+good at, so trades become identities the inspector and People window can
+tell stories about. Extreme need still overrides — a famine puts the
+master mason on a fishing line. Assignment also balances: need-weight
+times skill-preference with a crowding penalty, so trades fill evenly
+under equal need instead of clustering.
+
+**Caravans and horses.** The resource choke is distance; the answer is
+speed and carrying capacity. Wild horses tamed and raised, carts built
+from timber and iron, caravans that move goods (and later, founding
+parties) along the worn trails far faster than feet. Sits naturally
+before multi-settlement fission — the same carts provision colonies.

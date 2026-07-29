@@ -20,6 +20,7 @@ mod save;
 mod scatter;
 mod sky;
 mod speed;
+mod survey;
 mod terrain;
 mod title;
 mod trails;
@@ -141,6 +142,7 @@ fn main() {
             weather::WeatherPlugin,
             trails::TrailsPlugin,
             speed::SpeedPlugin,
+            survey::SurveyPlugin,
         ))
         .add_systems(Startup, spawn_lighting)
         .run();

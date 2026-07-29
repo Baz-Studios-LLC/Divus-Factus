@@ -29,13 +29,18 @@ use crate::creature::{
 use crate::palette;
 use crate::rng::Rng;
 use crate::scatter::FoodSource;
-use crate::terrain::{Terrain, WATER_LEVEL};
+use crate::terrain::{Biome, Terrain, WATER_LEVEL};
 
 /// How many villagers the settlement starts with.
 pub const STARTING_POPULATION: usize = 12;
 
 /// Seconds of not eating it takes to go from fed to starving.
-pub(crate) const SECONDS_TO_STARVE: f32 = 150.0;
+///
+/// Half a day (day = 600s): two meals a day, and a night slept through on
+/// a part-full stomach is survivable. At the old 150 a stomach lasted a
+/// quarter-day, everyone ate four times daily, and food logistics smothered
+/// every other ambition the village might have had.
+pub(crate) const SECONDS_TO_STARVE: f32 = 300.0;
 
 /// Hunger above this makes finding food the villager's priority.
 const HUNGRY_THRESHOLD: f32 = 0.35;
@@ -136,6 +141,7 @@ impl Plugin for VillagerPlugin {
                         work::forget_shunned,
                         work::plan_houses,
                         work::take_up_work,
+                        work::open_boardwalks,
                         work::do_work,
                         work::grow_crops,
                         work::sermons,
@@ -454,7 +460,7 @@ const SETTLEMENT_SEARCH_RADIUS: f32 = 900.0;
 /// Finds a walkable, dry, reasonably flat site for the settlement — near
 /// water on some worlds, well inland on others.
 fn choose_settlement_site(terrain: &Terrain, rng: &mut Rng) -> Vec3 {
-    let mut best: Option<(f32, Vec3)> = None;
+    let mut best: Option<(f32, Vec3, f32, f32)> = None;
     // How much this founding people care for the sea. Rolled per world:
     // some folk are fishers to the bone, some would rather farm a valley
     // three days from the sound of surf - and with mud brick and masonry
@@ -472,6 +478,12 @@ fn choose_settlement_site(terrain: &Terrain, rng: &mut Rng) -> Vec3 {
         let height = terrain.height_at(x, z);
         if height < WATER_LEVEL + 3.0 {
             // The banner itself stands well above the tide, always.
+            continue;
+        }
+        // And never on the mountain: summits are for mines, not banners.
+        // The founding fire belongs on low country, with the rock a walk
+        // away — not under the bedrolls.
+        if height > WATER_LEVEL + 30.0 {
             continue;
         }
 
@@ -529,14 +541,66 @@ fn choose_settlement_site(terrain: &Terrain, rng: &mut Rng) -> Vec3 {
         // the reward around a quarter of the outer band being water.
         let shoreline = 1.0 - ((water_fraction - 0.25) / 0.25).abs().min(1.0);
 
-        let score = buildable_fraction * 4.0 + flatness * 2.0 + shoreline * coastal_yearning;
-        if best.is_none_or(|(b, _)| score > b) {
-            best = Some((score, Vec3::new(x, height, z)));
+        // The materials band: what the founders could actually build from.
+        // Sample the working-walk ring for ground that will bear trees (the
+        // same forest field the scatterer seeds from) and for the steep rocky
+        // ground that sheds boulders. A pretty shore with nothing to cut or
+        // quarry is a slow death; timber in reach outweighs any view.
+        let mut timber = 0.0;
+        let mut stony = 0;
+        let mut material_samples = 0;
+        for angle_step in 0..12 {
+            let angle = angle_step as f32 / 12.0 * std::f32::consts::TAU;
+            for distance in [45.0, 70.0, 95.0, 120.0] {
+                let sx = x + angle.cos() * distance;
+                let sz = z + angle.sin() * distance;
+                material_samples += 1;
+                if terrain.is_submerged(sx, sz) {
+                    continue;
+                }
+                if terrain.slope_at(sx, sz) > 0.42 {
+                    // Rock scores only at a respectful distance: a mountain
+                    // IN walking reach is wealth, a mountain OVER the
+                    // bedrolls is a hard place to raise a street.
+                    if distance >= 70.0 {
+                        stony += 1;
+                    }
+                } else if terrain.forest_at(sx, sz) > 0.50 && terrain.moisture_at(sx, sz) > 0.38 {
+                    // Weight by how thickly this biome actually grows trees,
+                    // so an arid "forest" cell promises what it delivers.
+                    timber += match terrain.biome_at(sx, sz) {
+                        Biome::Arid => 0.2,
+                        Biome::Alpine => 0.35,
+                        _ => 1.0,
+                    };
+                }
+            }
+        }
+        // Saturate at about a third of the ring bearing wood: enough to found
+        // on, and it keeps whole-forest sites from drowning every other need.
+        let timberland = (timber / material_samples as f32 / 0.33).min(1.0);
+        let stoneland = (stony as f32 / material_samples as f32 / 0.20).min(1.0);
+
+        let score = buildable_fraction * 4.0
+            + flatness * 2.0
+            + timberland * 3.0
+            + stoneland * 1.0
+            + shoreline * coastal_yearning;
+        if best.is_none_or(|(b, ..)| score > b) {
+            best = Some((score, Vec3::new(x, height, z), timberland, stoneland));
         }
     }
 
-    best.map(|(_, p)| p)
-        .unwrap_or(Vec3::new(0.0, WATER_LEVEL, 0.0))
+    if let Some((_, site, timberland, stoneland)) = best {
+        info!(
+            "the founders chose their ground: woods {:.0}%, stony rises {:.0}% within a working walk",
+            timberland * 100.0,
+            stoneland * 100.0
+        );
+        site
+    } else {
+        Vec3::new(0.0, WATER_LEVEL, 0.0)
+    }
 }
 
 /// Set before re-running [`spawn_settlement`] during a save load: fixtures
@@ -1532,6 +1596,24 @@ fn choose_activity(
     for (mut activity, needs, transform, target) in &mut villagers {
         let hunger_score = food_utility(needs);
         let wander_score = wander_utility();
+
+        // Hunger outranks every social hold. Grief, gossip, prayer and the
+        // fire's tending can all wait; an empty stomach cannot. Without
+        // this, one death gathered mourners whose own hunger ran out where
+        // they stood, and the chronicle filled with a weeping crowd
+        // starving beside a stocked larder, each death calling the next.
+        if needs.hunger > 0.75
+            && matches!(
+                *activity,
+                Activity::Mourning
+                    | Activity::Chatting
+                    | Activity::Praying
+                    | Activity::TendingFire
+                    | Activity::Sheltering
+            )
+        {
+            *activity = Activity::Idle;
+        }
 
         // Work, store visits, the fire and sleep are owned by the systems that
         // start them, and end on their own terms — hunger, nightfall, dawn.
