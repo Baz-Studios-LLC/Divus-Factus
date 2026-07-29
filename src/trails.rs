@@ -27,7 +27,7 @@ const WEAR_CAP: f32 = 30.0;
 
 /// Worn ground fades at this rate, per second. Slow: a trail earned over
 /// a morning survives an idle afternoon.
-const FADE: f32 = 0.008;
+const FADE: f32 = 0.0035;
 
 /// How much faster feet move on well-worn ground.
 const HASTE: f32 = 1.25;
@@ -138,7 +138,7 @@ fn tread(
                 wear: 0.0,
                 painted_band: 0,
             });
-        cell.wear = (cell.wear + dt * 0.9).min(WEAR_CAP);
+        cell.wear = (cell.wear + dt * 1.5).min(WEAR_CAP);
     }
 }
 
@@ -175,7 +175,7 @@ fn paint(
     let mut gone: Vec<IVec2> = Vec::new();
     for (at, cell) in trails.cells.iter_mut() {
         cell.wear -= FADE * elapsed;
-        let band = (((cell.wear - 0.8).max(0.0) / VISIBLE).min(1.0) * 24.0) as u8;
+        let band = (((cell.wear - 1.2).max(0.0) / 5.0).min(1.0) * 24.0) as u8;
         if band != cell.painted_band {
             cell.painted_band = band;
             stale.push(*at);
@@ -242,10 +242,11 @@ fn paint(
             if wear <= 0.0 && !tinted {
                 continue;
             }
-            // Passing through once is not a path: tint only begins after
-            // the same ground has been walked again and again, and even a
-            // hard road never fully loses the ground tone underneath.
-            let blend = ((wear - 3.0) / (VISIBLE * 1.8)).clamp(0.0, 1.0) * 0.75;
+            // Passing through once is not a path - but a commute is: the
+            // first hint shows after a couple of crossings, a walked route
+            // darkens into a true road within a working morning, and even
+            // a hard road never fully loses the ground tone underneath.
+            let blend = ((wear - 1.2) / 5.0).clamp(0.0, 1.0) * 0.8;
             let base = ground_color_at(&terrain, x, z);
             *color = [
                 base[0] + (dirt.red - base[0]) * blend,
