@@ -67,6 +67,10 @@ jobs:
           tag_name: ${{ env.TAG }}
           files: dist/*
           fail_on_unmatched_files: true
-          # The launcher shows the release body as patch notes: never ship
-          # an empty one. Commit subjects here are written to read as notes.
+          # The launcher shows the release body as patch notes, and it may
+          # fetch the release the second it exists - so the notes must be
+          # IN the release from birth. RELEASE_NOTES.md is updated as part
+          # of every version-bump commit; the generated section (a compare
+          # link) is appended after it.
+          body_path: RELEASE_NOTES.md
           generate_release_notes: true
