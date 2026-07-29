@@ -260,10 +260,13 @@ fn sky_at(elevation: f32) -> Sky {
     // How close to the horizon the sun is while up — the golden-hour weight.
     let low_sun = (1.0 - smoothstep(0.12, 0.45, elevation)) * smoothstep(-0.10, 0.05, elevation);
 
-    // The sun keeps its azimuth and swings in elevation, clamped just above
-    // the horizon so the directional light always has a valid bearing.
+    // The sun keeps its azimuth and swings in elevation, clamped well above
+    // the horizon: below ~0.15 the light grazes the ground and the shadow
+    // map's depth bias slides every shadow off its caster - trees casting
+    // shadows that detach and sweep the land through dusk. The sky's own
+    // disc fades into the horizon glow before the clamp is visible.
     let azimuth = Vec2::new(crate::SUN_DIRECTION.x, crate::SUN_DIRECTION.z).normalize();
-    let y = elevation.clamp(0.06, 1.0);
+    let y = elevation.clamp(0.15, 1.0);
     let flat = (1.0 - y * y).max(0.0).sqrt();
     let sun_direction = Vec3::new(azimuth.x * flat, y, azimuth.y * flat).normalize();
 
@@ -385,6 +388,9 @@ fn apply_sky_to_lights(
     for (mut light, mut transform) in &mut suns {
         light.color = sky.sun_color;
         light.illuminance = sky.sun_illuminance.max(1.0);
+        // No shadows in the dark: with the sun's light at nothing, any
+        // shadow it casts is pure artifact - and the artifacts move.
+        light.shadow_maps_enabled = sky.daylight > 0.02;
         *transform =
             Transform::from_translation(sky.sun_direction * 140.0).looking_at(Vec3::ZERO, Vec3::Y);
     }
