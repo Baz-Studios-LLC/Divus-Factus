@@ -51,6 +51,9 @@ pub struct Weather {
     pub next_front: f64,
     /// Wind strength, 0..1, following the intensity with its own lag.
     pub wind: f32,
+    /// The season's cold, laid over whatever the sky is doing. Set each
+    /// frame from the calendar; not saved - it re-derives from the date.
+    pub chill: f32,
 }
 
 impl Default for Weather {
@@ -60,6 +63,7 @@ impl Default for Weather {
             target: 0.15,
             next_front: 0.0,
             wind: 0.2,
+            chill: 0.0,
         }
     }
 }
@@ -81,7 +85,7 @@ impl Weather {
     /// Air temperature 0 bitter to 1 balmy, from the hour and the sky:
     /// midday clear is warm, a stormy night is cold to the bone.
     pub fn temperature(&self, daylight: f32) -> f32 {
-        (0.25 + daylight * 0.6 - self.intensity * 0.3).clamp(0.0, 1.0)
+        (0.25 + daylight * 0.6 - self.intensity * 0.3 - self.chill).clamp(0.0, 1.0)
     }
 
     pub fn temperature_word(&self, daylight: f32) -> &'static str {
@@ -119,6 +123,8 @@ fn progress_fronts(
     mut weather: ResMut<Weather>,
 ) {
     let rng = rng.get_or_insert_with(|| Rng::new(0x5EA50));
+    // The calendar's cold rides along even between fronts.
+    weather.chill = clock.season().chill();
     if clock.elapsed >= weather.next_front {
         // Clear-ish weather is the ordinary day; storms are events. An
         // override for photographing and testing particular skies.
@@ -128,7 +134,7 @@ fn progress_fronts(
             Ok("storm") => 1.0,
             _ => {
                 let roll = rng.f32();
-                if roll < 0.45 {
+                let base = if roll < 0.45 {
                     rng.range(0.05, 0.3)
                 } else if roll < 0.75 {
                     rng.range(0.3, 0.55)
@@ -136,7 +142,10 @@ fn progress_fronts(
                     rng.range(0.55, 0.8)
                 } else {
                     rng.range(0.8, 1.0)
-                }
+                };
+                // The season's thumb on the dice: winters run grey and
+                // stormy, summers clear.
+                (base + clock.season().gloom()).clamp(0.02, 1.0)
             }
         };
         weather.next_front = clock.elapsed + rng.range(120.0, 320.0) as f64;

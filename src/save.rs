@@ -796,6 +796,8 @@ fn apply(world: &mut World, save: SaveGame) {
         target: save.weather.1,
         next_front: save.weather.2,
         wind: 0.15 + save.weather.0 * 0.85,
+        // Re-derived from the calendar on the next frame.
+        chill: 0.0,
     });
     world.insert_resource(Belief {
         total: save.belief.0,

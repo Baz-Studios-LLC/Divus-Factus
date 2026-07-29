@@ -845,15 +845,19 @@ pub fn raise_field(
 /// Crops grow on their own; a farmer's tending hurries them greatly.
 pub(super) fn grow_crops(
     time: Res<Time>,
+    clock: Res<crate::calendar::WorldClock>,
     weather: Option<Res<crate::weather::Weather>>,
     mut fields: Query<(&mut Field, &Children)>,
     mut rows: Query<(&mut Transform, &CropRow)>,
 ) {
     let dt = time.delta_secs();
-    // Rain is the farmer's other pair of hands.
+    // Rain is the farmer's other pair of hands - and the season is the
+    // hand over both: winter fields sleep, and the village lives on what
+    // the granary holds.
     let watered = weather.map_or(1.0, |w| 1.0 + w.intensity * 1.5);
+    let seasonal = clock.season().growth();
     for (mut field, children) in &mut fields {
-        field.growth = (field.growth + dt * watered / 600.0).min(1.0);
+        field.growth = (field.growth + dt * watered * seasonal / 600.0).min(1.0);
         for &child in children {
             if let Ok((mut stalk, crop)) = rows.get_mut(child) {
                 let height = crop.height * (0.1 + field.growth * 0.9);

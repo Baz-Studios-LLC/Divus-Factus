@@ -23,13 +23,86 @@ pub const DAY_SECONDS: f32 = 600.0;
 /// Fraction of the day the sun is up.
 const DAYLIGHT_FRACTION: f32 = 0.72;
 
+/// Days in one season, Stardew-fashion: long enough to live a stretch of
+/// life in, short enough that the turn is always coming.
+pub const DAYS_PER_SEASON: u32 = 28;
+
+/// Seasons in a year.
+pub const SEASONS_PER_YEAR: u32 = 4;
+
+/// The quarter of the year, and everything that leans on it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Season {
+    Spring,
+    Summer,
+    Autumn,
+    Winter,
+}
+
+impl Season {
+    pub fn name(self) -> &'static str {
+        match self {
+            Season::Spring => "spring",
+            Season::Summer => "summer",
+            Season::Autumn => "autumn",
+            Season::Winter => "winter",
+        }
+    }
+
+    /// How readily living things grow: crops, berry bushes, saplings.
+    /// Winter all but stops the fields - the larder carries the village
+    /// through, or it does not.
+    pub fn growth(self) -> f32 {
+        match self {
+            Season::Spring => 1.2,
+            Season::Summer => 1.0,
+            Season::Autumn => 0.7,
+            Season::Winter => 0.08,
+        }
+    }
+
+    /// Cold laid over whatever the weather is doing. Winter nights bite.
+    pub fn chill(self) -> f32 {
+        match self {
+            Season::Spring => 0.05,
+            Season::Summer => 0.0,
+            Season::Autumn => 0.12,
+            Season::Winter => 0.35,
+        }
+    }
+
+    /// The season's thumb on the weather dice: shifted toward grey and
+    /// storm in the dark half of the year, toward clear skies in summer.
+    pub fn gloom(self) -> f32 {
+        match self {
+            Season::Spring => 0.05,
+            Season::Summer => -0.08,
+            Season::Autumn => 0.08,
+            Season::Winter => 0.18,
+        }
+    }
+
+    /// The cast of the light: winter pales and cools, autumn gilds.
+    fn light_tint(self) -> Option<(Color, f32)> {
+        match self {
+            Season::Spring => None,
+            Season::Summer => Some((Color::srgb(1.0, 0.96, 0.86), 0.08)),
+            Season::Autumn => Some((Color::srgb(1.0, 0.82, 0.55), 0.16)),
+            Season::Winter => Some((Color::srgb(0.82, 0.88, 1.0), 0.22)),
+        }
+    }
+}
+
 pub struct CalendarPlugin;
 
 impl Plugin for CalendarPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<WorldClock>()
             .init_resource::<Sky>()
-            .add_systems(Update, (tick, drive_sky, apply_sky_to_lights).chain());
+            .add_systems(
+                Update,
+                (tick, drive_sky, apply_sky_to_lights, herald_seasons).chain(),
+            );
     }
 }
 
@@ -48,8 +121,14 @@ impl Default for WorldClock {
             .ok()
             .and_then(|v| v.parse::<f32>().ok())
             .unwrap_or(0.22);
+        // EGREGORE_DAY jumps the calendar for testing a season without
+        // living to it: 29 is the first day of summer, 85 of winter.
+        let day = std::env::var("EGREGORE_DAY")
+            .ok()
+            .and_then(|v| v.parse::<u32>().ok())
+            .map_or(0, |d| d.saturating_sub(1));
         WorldClock {
-            elapsed: (DAY_SECONDS * start) as f64,
+            elapsed: (DAY_SECONDS * start) as f64 + (DAY_SECONDS as f64) * day as f64,
         }
     }
 }
@@ -96,9 +175,35 @@ impl WorldClock {
         }
     }
 
-    /// The date, as the HUD shows it.
+    /// The season this day falls in.
+    pub fn season(&self) -> Season {
+        match ((self.day() - 1) / DAYS_PER_SEASON) % SEASONS_PER_YEAR {
+            0 => Season::Spring,
+            1 => Season::Summer,
+            2 => Season::Autumn,
+            _ => Season::Winter,
+        }
+    }
+
+    /// The day within the season, 1 to 28.
+    pub fn day_of_season(&self) -> u32 {
+        (self.day() - 1) % DAYS_PER_SEASON + 1
+    }
+
+    /// The year, counted from 1.
+    pub fn year(&self) -> u32 {
+        (self.day() - 1) / (DAYS_PER_SEASON * SEASONS_PER_YEAR) + 1
+    }
+
+    /// The date, as the HUD shows it: "spring 14, year 1 - morning".
     pub fn date_phrase(&self) -> String {
-        format!("day {}, {}", self.day(), self.phase_name())
+        format!(
+            "{} {}, year {} - {}",
+            self.season().name(),
+            self.day_of_season(),
+            self.year(),
+            self.phase_name()
+        )
     }
 }
 
@@ -211,6 +316,15 @@ fn drive_sky(
     mut sky: ResMut<Sky>,
 ) {
     *sky = sky_at(clock.sun_elevation());
+    // The season casts the light before the weather does: winter pale and
+    // cool, autumn gilded, summer faintly honeyed.
+    if let Some((tint, strength)) = clock.season().light_tint() {
+        sky.sun_color = mix_colors(sky.sun_color, tint, strength * sky.daylight);
+        sky.horizon = mix_colors(sky.horizon, tint, strength * 0.5 * sky.daylight);
+        if clock.season() == Season::Winter {
+            sky.sun_illuminance *= 0.88;
+        }
+    }
     // Weather sits on top of the hour: the sun dims behind the deck and the
     // horizon greys - and because fog reads the horizon, rain greys the
     // whole distance with it.
@@ -222,6 +336,32 @@ fn drive_sky(
         let grey = Color::srgb(0.52, 0.55, 0.58);
         sky.horizon = mix_colors(sky.horizon, grey, i * 0.45 * sky.daylight);
         sky.sun_color = mix_colors(sky.sun_color, grey, i * 0.4);
+    }
+}
+
+/// Announces the turn of each season - the calendar's one fanfare.
+fn herald_seasons(
+    clock: Res<WorldClock>,
+    mut last: Local<Option<Season>>,
+    mut notices: MessageWriter<crate::ui::Notice>,
+) {
+    let season = clock.season();
+    match *last {
+        None => *last = Some(season),
+        Some(previous) if previous != season => {
+            *last = Some(season);
+            info!("the season turns: {}", season.name());
+            notices.write(crate::ui::Notice::fanfare(format!(
+                "{} settles over the land",
+                match season {
+                    Season::Spring => "Spring",
+                    Season::Summer => "Summer",
+                    Season::Autumn => "Autumn",
+                    Season::Winter => "Winter",
+                }
+            )));
+        }
+        _ => {}
     }
 }
 
@@ -256,6 +396,24 @@ fn apply_sky_to_lights(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_calendar_keeps_stardew_time() {
+        let at_day = |day: u32| WorldClock {
+            elapsed: (day - 1) as f64 * DAY_SECONDS as f64 + 1.0,
+        };
+        assert_eq!(at_day(1).season(), Season::Spring);
+        assert_eq!(at_day(1).day_of_season(), 1);
+        assert_eq!(at_day(28).season(), Season::Spring);
+        assert_eq!(at_day(29).season(), Season::Summer);
+        assert_eq!(at_day(29).day_of_season(), 1);
+        assert_eq!(at_day(57).season(), Season::Autumn);
+        assert_eq!(at_day(85).season(), Season::Winter);
+        assert_eq!(at_day(112).year(), 1);
+        assert_eq!(at_day(113).season(), Season::Spring);
+        assert_eq!(at_day(113).year(), 2);
+        assert!(at_day(90).date_phrase().starts_with("winter 6, year 1"));
+    }
 
     #[test]
     fn the_sun_rises_sets_and_returns() {

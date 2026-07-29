@@ -738,11 +738,17 @@ pub(crate) fn spawn_boulder(
 }
 
 /// Felled trees grow back, sapling to crown.
-fn grow_trees(time: Res<Time>, mut trees: Query<(&mut FellableTree, &mut Transform)>) {
+fn grow_trees(
+    time: Res<Time>,
+    clock: Res<crate::calendar::WorldClock>,
+    mut trees: Query<(&mut FellableTree, &mut Transform)>,
+) {
     let dt = time.delta_secs();
+    // Wood is patient: winter slows a sapling but never quite stops it.
+    let seasonal = clock.season().growth().max(0.3);
     for (mut tree, mut transform) in &mut trees {
         if tree.maturity < 1.0 {
-            tree.maturity = (tree.maturity + dt / TREE_REGROW_SECONDS).min(1.0);
+            tree.maturity = (tree.maturity + dt * seasonal / TREE_REGROW_SECONDS).min(1.0);
             transform.scale = Vec3::splat(0.12 + 0.88 * tree.maturity);
         }
     }
@@ -777,10 +783,16 @@ fn sway_foliage(time: Res<Time>, mut foliage: Query<(&Foliage, &mut Transform)>)
 }
 
 /// Regrows food over time, so a settlement that strips the map can recover.
-pub fn regrow_food(time: Res<Time>, mut sources: Query<&mut FoodSource>) {
+pub fn regrow_food(
+    time: Res<Time>,
+    clock: Res<crate::calendar::WorldClock>,
+    mut sources: Query<&mut FoodSource>,
+) {
     let dt = time.delta_secs();
     for mut source in &mut sources {
-        source.amount = (source.amount + source.regrowth * dt).min(FoodSource::CAPACITY);
+        // Bushes follow the season; winter berries are a memory.
+        source.amount = (source.amount + source.regrowth * dt * clock.season().growth())
+            .min(FoodSource::CAPACITY);
     }
 }
 
