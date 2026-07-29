@@ -35,7 +35,7 @@ use crate::terrain::{Terrain, WATER_LEVEL};
 pub const STARTING_POPULATION: usize = 12;
 
 /// Seconds of not eating it takes to go from fed to starving.
-const SECONDS_TO_STARVE: f32 = 150.0;
+pub(crate) const SECONDS_TO_STARVE: f32 = 150.0;
 
 /// Hunger above this makes finding food the villager's priority.
 const HUNGRY_THRESHOLD: f32 = 0.35;
@@ -159,6 +159,7 @@ impl Plugin for VillagerPlugin {
                         work::bake,
                         work::smelt,
                         work::dye_cloth,
+                        work::famine_watch,
                     )
                         .chain(),
                     (
@@ -1218,11 +1219,15 @@ fn grow_old(
 /// spouse's story gains its worst line.
 fn bereave(
     clock: Res<crate::calendar::WorldClock>,
+    site: Option<Res<SettlementSite>>,
+    stores: Query<&work::Stockpile>,
+    bushes: Query<(&GlobalTransform, &crate::scatter::FoodSource)>,
     mut notices: MessageWriter<crate::ui::Notice>,
     mut the_dead: Query<
         (
             Entity,
             &Person,
+            &Transform,
             Option<&crate::creature::Vitality>,
             Option<&mut Chronicle>,
         ),
@@ -1231,17 +1236,57 @@ fn bereave(
     mut survivors: Query<(&Spouse, &mut Chronicle), Without<crate::creature::Corpse>>,
 ) {
     let day = clock.day();
-    for (dead, person, vitality, chronicle) in &mut the_dead {
+    for (dead, person, at, vitality, chronicle) in &mut the_dead {
+        // A starvation is a story with a cause, and the cause is written
+        // into the record: an empty larder, a picked-bare land, or a road
+        // home that was simply too long. The Dwarf Fortress rule - you
+        // should always be able to read WHY.
+        let starved_because = || {
+            let larder = site
+                .as_ref()
+                .and_then(|s| stores.get(s.settlement).ok())
+                .map_or(0.0, |s| s.food());
+            let from_home = site
+                .as_ref()
+                .map_or(0.0, |s| at.translation.distance(s.centre));
+            let nearest_berries = bushes
+                .iter()
+                .filter(|(_, bush)| bush.amount > 0.2)
+                .map(|(t, _)| t.translation().distance(at.translation) as u32)
+                .min();
+            if larder >= 1.0 && from_home > 80.0 {
+                format!(
+                    "{} starved on the road, {:.0} strides from a larder that held food",
+                    person.name, from_home
+                )
+            } else if larder >= 1.0 {
+                format!("{} starved within sight of a stocked larder", person.name)
+            } else {
+                match nearest_berries {
+                    Some(d) if d > 60 => format!(
+                        "{} starved - the larder was empty and the nearest berries stood {d} strides away",
+                        person.name
+                    ),
+                    Some(_) => format!("{} starved beside an empty larder", person.name),
+                    None => format!(
+                        "{} starved - the larder was empty and the land picked bare",
+                        person.name
+                    ),
+                }
+            }
+        };
         notices.write(crate::ui::Notice::new(match vitality {
             Some(v) if v.violent => format!("{} was broken against the earth", person.name),
-            _ => format!("{} has starved", person.name),
+            _ => starved_because(),
         }));
         if let Some(mut chronicle) = chronicle {
             chronicle.record(
                 day,
                 match vitality {
-                    Some(v) if v.violent => "was broken against the earth",
-                    _ => "starved",
+                    Some(v) if v.violent => "was broken against the earth".to_string(),
+                    _ => starved_because()
+                        .replace(&format!("{} ", person.name), "")
+                        .replacen("starved", "starved:", 1),
                 },
             );
         }

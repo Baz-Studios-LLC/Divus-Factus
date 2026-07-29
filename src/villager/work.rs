@@ -14,7 +14,8 @@
 use bevy::prelude::*;
 
 use super::{
-    Activity, Chronicle, HUNGRY_THRESHOLD, Needs, Person, SettlementSite, SimRng, Villager,
+    Activity, Chronicle, HUNGRY_THRESHOLD, Needs, Person, SECONDS_TO_STARVE, SettlementSite,
+    SimRng, Villager,
 };
 use crate::creature::anim::CreatureMotion;
 use crate::creature::genome::{CreatureGenome, Species};
@@ -421,6 +422,7 @@ pub(super) fn do_work(
                 Option<&mut Chronicle>,
                 Option<&super::traits::Traits>,
                 Option<&super::home::Home>,
+                Option<&mut Rations>,
             ),
         ),
         (
@@ -505,7 +507,7 @@ pub(super) fn do_work(
         mut target,
         mut motion,
         person,
-        (mut chronicle, manner, home),
+        (mut chronicle, manner, home, rations),
     ) in &mut workers
     {
         if *activity != Activity::Working {
@@ -522,9 +524,28 @@ pub(super) fn do_work(
             vocation,
             Vocation::Fisher | Vocation::Gatherer | Vocation::Hunter | Vocation::Farmer
         );
+        // Rations on the road: the provisioned eat from the satchel the
+        // moment hunger bites, wherever they happen to be standing.
+        let mut rations_left = 0.0;
+        if let Some(mut rations) = rations {
+            if needs.hunger > 0.5 && rations.0 > 0.0 {
+                rations.0 -= 1.0;
+                needs.hunger = (needs.hunger - 0.6).max(0.0);
+                if rations.0 <= 0.0 {
+                    commands.entity(entity).remove::<Rations>();
+                }
+            }
+            rations_left = rations.0.max(0.0);
+        }
         let larder_thin = store.food() < workers_alive as f32;
         let on_shift = is_work_hour(clock.time_of_day()) || (feeds_the_village && larder_thin);
-        if !on_shift || (needs.hunger > DOWN_TOOLS_HUNGER && !feeds_the_village) {
+        // The wise walk home before hunger walks them: what decides the
+        // shift's end is hunger ON ARRIVAL, not hunger here - a worker
+        // two hundred strides out must leave two hundred strides early.
+        // Meals still in the satchel buy the road back.
+        let walk_home = transform.translation.distance(site.centre) / 2.4;
+        let projected = needs.hunger + walk_home / SECONDS_TO_STARVE - rations_left * 0.6;
+        if !on_shift || (projected > DOWN_TOOLS_HUNGER && !feeds_the_village) {
             *activity = Activity::Idle;
             target.0 = None;
             commands.entity(entity).remove::<Job>();

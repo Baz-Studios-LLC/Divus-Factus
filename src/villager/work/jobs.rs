@@ -123,6 +123,12 @@ pub(crate) fn find_ground(
     best.map(|(_, at)| at)
 }
 
+/// Meals in the satchel: taken from the larder when a worksite lies past
+/// a safe walk, eaten on the road the moment hunger bites. Travel time
+/// made into a food cost, which is what it always was.
+#[derive(Component)]
+pub struct Rations(pub f32);
+
 /// The one shape every scouting trade shares: from candidate worksites,
 /// the nearest that lies inside working reach — or on ground an explorer
 /// has brought home — and is not recently shunned. Nine trades used to
@@ -176,7 +182,7 @@ pub(crate) fn take_up_work(
         Query<(Entity, &GlobalTransform, &crate::matter::Deposit)>,
         Query<(Entity, &GlobalTransform, &crate::scatter::SacredFlora)>,
     ),
-    stores: Query<&Stockpile>,
+    mut stores: Query<&mut Stockpile>,
     game: Query<
         (Entity, &Transform, &CreatureGenome),
         (
@@ -529,6 +535,30 @@ pub(crate) fn take_up_work(
         };
 
         if let Some(job) = job {
+            // The road eats first. A worksite past a safe walk is taken
+            // only with rations out of the larder - about one meal per
+            // half-starvation of travel, capped at three - and a village
+            // too poor to provision the road keeps its people near home,
+            // where the famine watch will say so out loud.
+            let round_trip =
+                job.site.distance(transform.translation) + job.site.distance(site.centre);
+            let meals = ((round_trip / 2.4) / (super::super::SECONDS_TO_STARVE * 0.5))
+                .floor()
+                .min(3.0);
+            if meals >= 1.0 && !feeds_the_village {
+                let Ok(mut store) = stores.get_mut(site.settlement) else {
+                    continue;
+                };
+                if store.food() < meals + 2.0 {
+                    continue;
+                }
+                let mut owed = meals;
+                while owed > 0.0 {
+                    store.larder.draw(1.0);
+                    owed -= 1.0;
+                }
+                commands.entity(entity).insert(Rations(meals));
+            }
             *activity = Activity::Working;
             commands.entity(entity).insert(job);
         }

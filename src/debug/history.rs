@@ -64,6 +64,9 @@ impl Ledger {
             "died",
             "mauled",
             "slew",
+            "famine",
+            "picked bare",
+            "larder",
         ]) {
             Ledger::Lives
         } else if hit(&[

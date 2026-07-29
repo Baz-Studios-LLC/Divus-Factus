@@ -468,6 +468,101 @@ pub(crate) fn update_store_piles(
 ///
 /// This is what the stockpile is *for*: the difference between a bad berry
 /// season and a funeral.
+/// The famine watch: when the larder runs thin, the village says WHY out
+/// loud - too few food hands, land picked bare, the store draining
+/// faster than it fills - so a starvation is never a mystery, only a
+/// story the god read too late.
+#[allow(clippy::type_complexity)]
+pub(crate) fn famine_watch(
+    time: Res<Time>,
+    mut since_last: Local<f32>,
+    mut last_said: Local<String>,
+    site: Option<Res<SettlementSite>>,
+    stores: Query<&Stockpile>,
+    settlements: Query<&crate::villager::Settlement>,
+    trends: Res<StoreTrends>,
+    folk: Query<
+        (&Transform, Option<&Vocation>),
+        (
+            With<Villager>,
+            Without<Corpse>,
+            Without<crate::creature::Held>,
+        ),
+    >,
+    bushes: Query<(&GlobalTransform, &FoodSource)>,
+    mut notices: MessageWriter<crate::ui::Notice>,
+) {
+    *since_last += time.delta_secs();
+    if *since_last < 40.0 {
+        return;
+    }
+    *since_last = 0.0;
+    let Some(site) = site else {
+        return;
+    };
+    let Ok(store) = stores.get(site.settlement) else {
+        return;
+    };
+    let mouths = folk.iter().count();
+    if store.food() >= mouths as f32 * 1.5 {
+        last_said.clear();
+        return;
+    }
+    let village = settlements
+        .get(site.settlement)
+        .map_or("the village", |s| s.name.as_str());
+    let hands = folk
+        .iter()
+        .filter(|(_, vocation)| {
+            matches!(
+                vocation,
+                Some(Vocation::Fisher)
+                    | Some(Vocation::Gatherer)
+                    | Some(Vocation::Hunter)
+                    | Some(Vocation::Farmer)
+            )
+        })
+        .count();
+    let fruiting_near = bushes
+        .iter()
+        .filter(|(at, bush)| bush.amount > 0.3 && at.translation().distance(site.centre) < 170.0)
+        .count();
+    let nearest_berries = bushes
+        .iter()
+        .filter(|(_, bush)| bush.amount > 0.3)
+        .map(|(at, _)| at.translation().distance(site.centre) as u32)
+        .min();
+    let rate = trends.rate_per_minute(PileKind::Food);
+
+    let line = if hands == 0 {
+        format!("famine watch: nobody in {village} works a food trade")
+    } else if fruiting_near == 0 {
+        match nearest_berries {
+            Some(d) => format!(
+                "famine watch: the near land is picked bare - the closest berries stand {d} strides from {village}"
+            ),
+            None => format!("famine watch: not a fruiting bush remains anywhere near {village}"),
+        }
+    } else if rate < -0.5 {
+        format!(
+            "famine watch: {village} eats {:.0} more than it gathers each minute, {hands} hands feeding {mouths} mouths",
+            -rate
+        )
+    } else {
+        // Rounded to fives so the ledger records the squeeze, not every
+        // twitch of the count.
+        format!(
+            "famine watch: {village} holds about {:.0} food for {mouths} mouths, {hands} hands at the food trades",
+            (store.food() / 5.0).round() * 5.0
+        )
+    };
+    if *last_said != line {
+        *last_said = line.clone();
+        info!("{line}");
+        notices.write(crate::ui::Notice::new(line));
+    }
+}
+
 /// The blacksmith at work: ore out of the far hills becomes iron, and
 /// iron in the store means every trade's tools bite better - until the
 /// edges dull. Mine, smelt, wear out, mine again: the first strategic
