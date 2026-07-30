@@ -19,6 +19,7 @@ mod render;
 mod rng;
 mod save;
 mod scatter;
+mod sigil;
 mod sky;
 mod speed;
 mod survey;

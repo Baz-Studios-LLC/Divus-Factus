@@ -112,6 +112,11 @@ pub(crate) struct Codex {
 #[derive(Component)]
 pub(crate) struct CodexTab(pub CodexPage);
 
+/// The ledger banner's cloth: dressed with the town's true arms by
+/// [`dress_ledger_banner`] once (and whenever) a settlement stands.
+#[derive(Component)]
+pub(crate) struct LedgerBannerCloth;
+
 /// The DETAILS page wells, rebuilt on a slow clock while the window is open.
 #[derive(Component)]
 pub(crate) struct BuildingRows;
@@ -238,54 +243,124 @@ pub(crate) fn people_glyph(commands: &mut Commands, parent: Entity, tint: Color)
     bar(commands, c, (8.5, 7.5, 9.0, 7.5), 0.0, tint, true);
 }
 
+/// Draws a town's sigil - the same rectangles the world raises in gold
+/// blocks on the cloth, here as nodes.
+pub(crate) fn sigil_glyph(
+    commands: &mut Commands,
+    parent: Entity,
+    sigil: usize,
+    tint: Color,
+    size: f32,
+) {
+    let c = glyph_canvas(commands, parent, size);
+    let k = size / 16.0;
+    for &(x, y, w, h, turn, round) in crate::sigil::rects(sigil) {
+        bar(commands, c, (x * k, y * k, w * k, h * k), turn, tint, round);
+    }
+}
+
 /// The village banner: a hung cloth with the tree upon it, flying at the
 /// detail pane's shoulder the way the mockup flies it.
 pub(crate) fn banner_glyph(commands: &mut Commands, parent: Entity) {
-    let cloth = commands
+    // A banner with a banner's anatomy: a finialled crossbar, the cloth
+    // hanging from it, a swallowtail notch at the foot, the tree writ
+    // larger on the drop. All in the book's gold - the codex is monochrome
+    // on purpose.
+    let stage = commands
         .spawn((
             Node {
-                width: px(56),
-                height: px(72),
+                width: px(72),
+                height: px(88),
                 flex_shrink: 0.0,
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(0)),
                 ..default()
             },
-            BackgroundColor(ui::theme::title_bg()),
-            BorderColor::all(ui::theme::accent().with_alpha(0.5)),
             ChildOf(parent),
         ))
         .id();
-    // The crossbar it hangs from.
+    let gold = ui::theme::accent();
+    // The crossbar, and its finials.
     commands.spawn((
         Node {
             position_type: PositionType::Absolute,
-            left: px(-5),
-            top: px(-4),
-            width: px(62),
+            left: px(2),
+            top: px(4),
+            width: px(68),
             height: px(3),
             ..default()
         },
-        BackgroundColor(ui::theme::accent().with_alpha(0.8)),
-        ChildOf(cloth),
+        BackgroundColor(gold.with_alpha(0.85)),
+        ChildOf(stage),
     ));
-    // A thread of fringe at its foot.
+    for left in [0.0, 66.0] {
+        commands.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(left),
+                top: px(2.5),
+                width: px(6),
+                height: px(6),
+                ..default()
+            },
+            UiTransform::from_rotation(Rot2::degrees(45.0)),
+            BackgroundColor(gold.with_alpha(0.9)),
+            ChildOf(stage),
+        ));
+    }
+    // The cloth, hanging from the bar.
+    let cloth = commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(9),
+                top: px(7),
+                width: px(54),
+                height: px(70),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                padding: UiRect::top(px(16)),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(0)),
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            BackgroundColor(ui::theme::title_bg()),
+            BorderColor::all(gold.with_alpha(0.5)),
+            ChildOf(stage),
+        ))
+        .id();
+    // The arms arrive by system once the settlement exists: the cloth's
+    // true colour, and the sign the town rolled at its founding.
+    commands.entity(cloth).insert(LedgerBannerCloth);
+    // The swallowtail: a turned square of the pane's own ground, cutting
+    // the notch out of the cloth's foot - with two gold threads to hem it.
     commands.spawn((
         Node {
             position_type: PositionType::Absolute,
-            left: px(4),
-            right: px(4),
-            bottom: px(4),
-            height: px(2),
+            left: px(26),
+            top: px(66),
+            width: px(20),
+            height: px(20),
             ..default()
         },
-        BackgroundColor(ui::theme::accent().with_alpha(0.35)),
-        ChildOf(cloth),
+        UiTransform::from_rotation(Rot2::degrees(45.0)),
+        BackgroundColor(ui::theme::card_bg()),
+        ChildOf(stage),
     ));
-    tree_glyph(commands, cloth, ui::theme::accent().with_alpha(0.9));
+    for turn in [45.0, -45.0] {
+        commands.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(if turn > 0.0 { 24.0 } else { 34.0 }),
+                top: px(73),
+                width: px(15),
+                height: px(1.5),
+                ..default()
+            },
+            UiTransform::from_rotation(Rot2::degrees(turn)),
+            BackgroundColor(gold.with_alpha(0.5)),
+            ChildOf(stage),
+        ));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -841,6 +916,48 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         .id();
     tree_glyph(&mut commands, land, ui::theme::accent().with_alpha(0.7));
     commands.spawn((VillageLand, ui::dim(""), ChildOf(land)));
+}
+
+/// Dresses the ledger's banner in the town's true arms: the cloth takes
+/// the founding roll's colour, and the sigil - the same rectangles the
+/// world raises in gold on the real banner - is drawn upon it. Re-dresses
+/// itself when a different settlement stands (a new world, a loaded save).
+pub(crate) fn dress_ledger_banner(
+    mut commands: Commands,
+    site: Option<Res<crate::villager::SettlementSite>>,
+    settlements: Query<&crate::villager::Settlement>,
+    cloths: Query<Entity, With<LedgerBannerCloth>>,
+    mut fills: Query<&mut BackgroundColor>,
+    mut seen: Local<Option<(usize, usize)>>,
+) {
+    let Some(arms) = site
+        .as_ref()
+        .and_then(|site| settlements.get(site.settlement).ok())
+        .map(|s| (s.banner_ramp, s.sigil))
+    else {
+        return;
+    };
+    if *seen == Some(arms) {
+        return;
+    }
+    *seen = Some(arms);
+    let field = crate::palette::shade(&crate::palette::ALL_RAMPS[arms.0], 0.8);
+    // The heraldic rule of tincture: dark ink on a light field, gold on a
+    // dark one, so the sign always reads.
+    let luminance =
+        field.to_srgba().red * 0.3 + field.to_srgba().green * 0.55 + field.to_srgba().blue * 0.15;
+    let ink = if luminance > 0.5 {
+        Color::srgb(0.12, 0.10, 0.06)
+    } else {
+        ui::theme::accent()
+    };
+    for cloth in &cloths {
+        commands.entity(cloth).despawn_related::<Children>();
+        if let Ok(mut fill) = fills.get_mut(cloth) {
+            fill.0 = field;
+        }
+        sigil_glyph(&mut commands, cloth, arms.1, ink, 30.0);
+    }
 }
 
 /// Pressing a live tab turns the codex to that page.

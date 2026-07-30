@@ -247,6 +247,10 @@ pub struct Settlement {
     pub name: String,
     /// The day it was raised.
     pub founded: u32,
+    /// The cloth the banner flies, as a palette ramp index.
+    pub banner_ramp: usize,
+    /// The sign upon it, into [`crate::sigil::SIGILS`].
+    pub sigil: usize,
 }
 
 /// Which settlement this person belongs to.
@@ -637,6 +641,9 @@ pub struct RestoringSeed {
     pub name: String,
     pub god: String,
     pub founded: u32,
+    /// The banner as it flew: (cloth ramp, sigil). None re-rolls once, for
+    /// saves older than heraldry.
+    pub banner: Option<(usize, usize)>,
 }
 
 pub(crate) fn spawn_settlement(
@@ -667,12 +674,25 @@ pub(crate) fn spawn_settlement(
         .as_ref()
         .map(|r| r.name.clone())
         .unwrap_or_else(|| language.name(&mut rng));
+    // The town's arms: the cloth's colour and the sign upon it, rolled at
+    // the founding and kept for the rest of its history.
+    let (banner_ramp, sigil) = restoring
+        .as_ref()
+        .and_then(|r| r.banner)
+        .unwrap_or_else(|| {
+            (
+                *rng.pick(palette::CLOTH_RAMPS),
+                (rng.next_u32() as usize) % crate::sigil::SIGILS.len(),
+            )
+        });
     let settlement = commands
         .spawn((
             Name::new(format!("Settlement of {settlement_name}")),
             Settlement {
                 name: settlement_name.clone(),
                 founded: restoring.as_ref().map_or(clock.day(), |r| r.founded),
+                banner_ramp,
+                sigil,
             },
             // The banner is the town's face: hover it and the inspector opens
             // on the settlement. Rooted — a god who can uproot the town square
@@ -698,9 +718,10 @@ pub(crate) fn spawn_settlement(
         ))
         .id();
     if restoring.is_none() {
-        info!("the village of {settlement_name} was founded");
+        let sign = crate::sigil::name(sigil);
+        info!("the village of {settlement_name} was founded under the sign of {sign}");
         notices.write(crate::ui::Notice::fanfare(format!(
-            "The village of {settlement_name} is founded"
+            "The village of {settlement_name} is founded, under the sign of {sign}"
         )));
 
         // The land is salted with what the village will one day want:
@@ -799,9 +820,8 @@ pub(crate) fn spawn_settlement(
             perceptual_roughness: 0.9,
             ..default()
         });
-        let cloth_ramp = *rng.pick(palette::CLOTH_RAMPS);
         let cloth = materials.add(StandardMaterial {
-            base_color: palette::shade(&palette::ALL_RAMPS[cloth_ramp], 0.8),
+            base_color: palette::shade(&palette::ALL_RAMPS[banner_ramp], 0.8),
             perceptual_roughness: 0.85,
             double_sided: false,
             cull_mode: None,
@@ -813,6 +833,24 @@ pub(crate) fn spawn_settlement(
             ..default()
         });
 
+        fn part_rotated(
+            commands: &mut Commands,
+            cube: &Handle<Mesh>,
+            material: &Handle<StandardMaterial>,
+            settlement: Entity,
+            offset: Vec3,
+            rotation: Quat,
+            size: Vec3,
+        ) {
+            commands.spawn((
+                Mesh3d(cube.clone()),
+                MeshMaterial3d(material.clone()),
+                Transform::from_translation(offset)
+                    .with_rotation(rotation)
+                    .with_scale(size),
+                ChildOf(settlement),
+            ));
+        }
         let mut part = |offset: Vec3, size: Vec3, material: &Handle<StandardMaterial>| {
             commands.spawn((
                 Mesh3d(cube.clone()),
@@ -838,6 +876,24 @@ pub(crate) fn spawn_settlement(
             Vec3::new(1.3, 0.14, 0.08),
             &trim,
         );
+        // The sign, in gold blocks proud of the cloth, on both faces - the
+        // very rectangles the codex draws, made voxel.
+        for &(x, y, w, h, turn, _round) in crate::sigil::rects(sigil) {
+            let unit = 1.05 / 16.0;
+            let cx = (x + w * 0.5) / 16.0 - 0.5;
+            let cy = (y + h * 0.5) / 16.0 - 0.5;
+            for face in [-1.0f32, 1.0] {
+                part_rotated(
+                    &mut commands,
+                    &cube,
+                    &trim,
+                    settlement,
+                    Vec3::new(0.75 + cx * 1.05, 3.62 - cy * 1.05, face * 0.05),
+                    Quat::from_rotation_z(-turn.to_radians()),
+                    Vec3::new(w * unit, h * unit, 0.035),
+                );
+            }
+        }
     }
 
     // The village fire, a few steps from the banner — on the driest ground

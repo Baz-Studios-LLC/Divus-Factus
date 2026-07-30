@@ -101,7 +101,11 @@ pub(crate) fn capture_preselect(
     // Every window lives in the codex now: captures open it on the People
     // page with somebody selected (a screenshot always has a subject),
     // EGREGORE_OPEN=village stays on the ledger, =history turns to the
-    // chronicle.
+    // chronicle - and =none keeps the book closed, for photographing the
+    // world itself.
+    if std::env::var("EGREGORE_OPEN").is_ok_and(|w| w == "none") {
+        return;
+    }
     for mut visibility in &mut codex_windows {
         if *visibility == Visibility::Hidden {
             *visibility = Visibility::Visible;

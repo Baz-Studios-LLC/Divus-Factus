@@ -113,6 +113,9 @@ struct SaveGame {
     label_souls: usize,
     god: String,
     founded: u32,
+    /// The banner as it flew: (cloth ramp, sigil index).
+    #[serde(default)]
+    banner: Option<(u32, u32)>,
     centre: Vec3,
     woodpile: Vec3,
     worked: Vec<(f32, f32, f32, f32, f32)>,
@@ -300,6 +303,9 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         .unwrap_or_default();
     let site = world.get_resource::<SettlementSite>()?;
     let settlement_entity = site.settlement;
+    let banner = world
+        .get::<Settlement>(settlement_entity)
+        .map(|s| (s.banner_ramp as u32, s.sigil as u32));
     let centre = site.centre;
     let woodpile = site.woodpile;
 
@@ -667,6 +673,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
     Some(SaveGame {
         version: 1,
         faith_history,
+        banner,
         seed,
         elapsed,
         label_settlement: name.clone(),
@@ -823,6 +830,9 @@ fn apply(world: &mut World, save: SaveGame) {
         name: save.label_settlement.clone(),
         god: save.god.clone(),
         founded: save.founded,
+        banner: save
+            .banner
+            .map(|(ramp, sigil)| (ramp as usize, sigil as usize)),
     });
     let _ = world.run_system_once(crate::villager::spawn_settlement);
     world.remove_resource::<RestoringSeed>();

@@ -88,6 +88,7 @@ impl Plugin for DebugPlugin {
                     update_ledger_details,
                     handle_codex_tabs,
                     apply_codex_page,
+                    dress_ledger_banner,
                     update_dossier,
                     update_god_panel,
                     update_faith_chart,
