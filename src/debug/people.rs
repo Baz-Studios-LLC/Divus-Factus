@@ -501,6 +501,8 @@ pub(crate) fn spawn_people_panel(
         .spawn((
             Node {
                 width: percent(100),
+                height: px(210),
+                flex_shrink: 0.0,
                 flex_direction: FlexDirection::Row,
                 column_gap: px(10),
                 align_items: AlignItems::Stretch,
@@ -516,11 +518,13 @@ pub(crate) fn spawn_people_panel(
                 Node {
                     flex_grow: 1.0,
                     flex_basis: px(0),
+                    min_height: px(0),
                     flex_direction: FlexDirection::Column,
                     row_gap: px(6),
                     padding: UiRect::all(px(10)),
                     border: UiRect::all(px(1)),
                     border_radius: BorderRadius::all(px(0)),
+                    overflow: Overflow::clip(),
                     ..default()
                 },
                 BackgroundColor(Color::BLACK.with_alpha(0.22)),
@@ -1565,13 +1569,23 @@ pub(crate) fn update_dossier(
                 .id();
             stripe = !stripe;
             super::history::spawn_glyph(&mut commands, row, ledger);
+            let words = commands
+                .spawn((
+                    Node {
+                        flex_grow: 1.0,
+                        min_width: px(0),
+                        ..default()
+                    },
+                    ChildOf(row),
+                ))
+                .id();
             commands.spawn((
                 ui::body(event.text.clone()),
                 Node {
-                    flex_grow: 1.0,
+                    width: percent(100),
                     ..default()
                 },
-                ChildOf(row),
+                ChildOf(words),
             ));
         }
         if chronicle.events.len() > 120 {
@@ -1618,13 +1632,27 @@ pub(crate) fn update_dossier(
                 },
                 ChildOf(row),
             ));
+            let words = commands
+                .spawn((
+                    Node {
+                        flex_grow: 1.0,
+                        min_width: px(0),
+                        ..default()
+                    },
+                    ChildOf(row),
+                ))
+                .id();
+            // The wrapper's width is definite once laid out, so the text
+            // measures against it - a bare flex-grown Text measures its
+            // height fully wrapped at minimum width and keeps that tall
+            // ghost height, which spread these rows down the card.
             commands.spawn((
                 ui::body(event.text.clone()),
                 Node {
-                    flex_grow: 1.0,
+                    width: percent(100),
                     ..default()
                 },
-                ChildOf(row),
+                ChildOf(words),
             ));
         }
         if tail == chronicle.events.len() {

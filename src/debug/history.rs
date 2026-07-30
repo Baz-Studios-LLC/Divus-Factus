@@ -504,13 +504,23 @@ pub(crate) fn update_history_panel(
                 },
                 ChildOf(row),
             ));
+            let words = commands
+                .spawn((
+                    Node {
+                        flex_grow: 1.0,
+                        min_width: px(0),
+                        ..default()
+                    },
+                    ChildOf(row),
+                ))
+                .id();
             commands.spawn((
                 ui::body(entry.text.clone_words()),
                 Node {
-                    flex_grow: 1.0,
+                    width: percent(100),
                     ..default()
                 },
-                ChildOf(row),
+                ChildOf(words),
             ));
             if entry.count > 1 {
                 let pill = commands
