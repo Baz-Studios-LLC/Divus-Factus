@@ -121,7 +121,7 @@ pub(crate) fn spawn_people_panel(
         "PEOPLE",
         Some("The mortals of your world."),
         320.0,
-        700.0,
+        620.0,
     );
     // Capture mode opens the window and picks somebody, so an unattended
     // screenshot can prove the pane works.
@@ -396,19 +396,30 @@ pub(crate) fn spawn_people_panel(
     // Pages stretch to the plate's foot, so the reading column and the
     // portrait close on one shared bottom edge - the puzzle contract.
     for (index, tab_page) in [soul, kin_tab, life_tab].into_iter().enumerate() {
-        commands.entity(tab_page).insert(Node {
-            width: percent(100),
-            flex_grow: 1.0,
-            min_height: px(0),
-            flex_direction: FlexDirection::Column,
-            row_gap: px(ui::theme::GAP),
-            display: if index == 0 {
-                Display::Flex
-            } else {
-                Display::None
+        commands.entity(tab_page).insert((
+            Node {
+                width: percent(100),
+                flex_grow: 1.0,
+                min_height: px(0),
+                flex_direction: FlexDirection::Column,
+                row_gap: px(ui::theme::GAP),
+                // A life can outgrow its band - Gabae of Tuhi had
+                // twenty-three children spill over the footer - so every
+                // page scrolls inside the puzzle contract's fixed row.
+                overflow: Overflow::scroll_y(),
+                ..default()
             },
-            ..default()
-        });
+            ui::Scrollable,
+            bevy::ui::ScrollPosition::default(),
+        ));
+        if index != 0 {
+            commands
+                .entity(tab_page)
+                .entry::<Node>()
+                .and_modify(|mut node| {
+                    node.display = Display::None;
+                });
+        }
     }
 
     // Every readout the hover card has, as a two-column grid of chipped

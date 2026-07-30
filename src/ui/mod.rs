@@ -811,6 +811,9 @@ fn window_impl_titled(
             BorderColor::all(Color::BLACK.with_alpha(0.8)),
             BoxShadow::new(Color::BLACK.with_alpha(0.65), px(4), px(9), px(2), px(26)),
             Interaction::default(),
+            // A window is solid: clicks on its body must never fall
+            // through to the toolbar or the world behind it.
+            bevy::ui::FocusPolicy::Block,
             ChildOf(strip),
         ))
         .id();

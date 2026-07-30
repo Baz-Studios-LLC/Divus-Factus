@@ -306,11 +306,28 @@ pub struct Chronicle {
 impl Chronicle {
     pub fn record(&mut self, day: u32, text: impl Into<String>) {
         // A whole life is kept: the chronicle page shows everything, and
-        // doctrine will one day be spun from the full record.
-        self.events.push(LifeEvent {
-            day,
-            text: text.into(),
-        });
+        // doctrine will one day be spun from the full record. But hearing
+        // the same sermon four nights running is one fact, not four - an
+        // exact repeat of the latest entry only deepens it.
+        let text = text.into();
+        if let Some(last) = self.events.last_mut()
+            && last
+                .text
+                .trim_end_matches(|c: char| c == ')' || c.is_ascii_digit() || c == ' ')
+                .trim_end_matches("(x")
+                .trim_end()
+                == text
+        {
+            let seen = last
+                .text
+                .rsplit_once("(x")
+                .and_then(|(_, n)| n.trim_end_matches(')').parse::<u32>().ok())
+                .unwrap_or(1);
+            last.text = format!("{text} (x{})", seen + 1);
+            last.day = day;
+            return;
+        }
+        self.events.push(LifeEvent { day, text });
     }
 
     /// Records a rumor heard, stacking retellings of the same story into one
@@ -1499,6 +1516,14 @@ fn chronicle_divine_touch(
     }
 }
 
+/// The season of recovery and nursing after a birth: while it runs, this
+/// mother bears no second child. Without it, one prolific couple filled a
+/// year with twenty-three children off an even dice pick.
+#[derive(Component)]
+pub struct NewMother {
+    pub until: f64,
+}
+
 fn births(
     mut commands: Commands,
     time: Res<Time>,
@@ -1522,6 +1547,7 @@ fn births(
             &Needs,
             &Person,
             Option<&Spouse>,
+            Option<&NewMother>,
         ),
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
@@ -1542,7 +1568,7 @@ fn births(
     } else {
         villagers
             .iter()
-            .map(|(_, _, _, n, _, _)| n.hunger)
+            .map(|(_, _, _, n, ..)| n.hunger)
             .sum::<f32>()
             / living as f32
     };
@@ -1563,15 +1589,18 @@ fn births(
     // the pick among eligible mothers is even.
     let mothers: Vec<_> = villagers
         .iter()
-        .filter(|(_, _, genome, _, _, spouse)| {
-            genome.age == Age::Adult && genome.sex == Sex::Female && spouse.is_some()
+        .filter(|(_, _, genome, _, _, spouse, recovery)| {
+            genome.age == Age::Adult
+                && genome.sex == Sex::Female
+                && spouse.is_some()
+                && recovery.is_none_or(|r| clock.elapsed > r.until)
         })
-        .filter(|(_, _, _, _, _, spouse)| {
+        .filter(|(_, _, _, _, _, spouse, _)| {
             // The husband must himself still be living — a widow bears no child.
             spouse.is_some_and(|s| {
                 villagers
                     .get(s.0)
-                    .is_ok_and(|(_, _, g, _, _, _)| g.age == Age::Adult && g.sex == Sex::Male)
+                    .is_ok_and(|(_, _, g, ..)| g.age == Age::Adult && g.sex == Sex::Male)
             })
         })
         .collect();
@@ -1581,11 +1610,15 @@ fn births(
     }
 
     let pick = rng.0.range_i(0, mothers.len() as i32 - 1) as usize;
-    let (mother, mother_t, mother_g, _, mother_p, spouse) = &mothers[pick];
+    let (mother, mother_t, mother_g, _, mother_p, spouse, _) = &mothers[pick];
     let father = spouse.expect("filtered above").0;
-    let Ok((_, _, father_g, _, father_p, _)) = villagers.get(father) else {
+    let Ok((_, _, father_g, _, father_p, ..)) = villagers.get(father) else {
         return;
     };
+    // A birth is followed by a season of nursing before the next.
+    commands.entity(*mother).insert(NewMother {
+        until: clock.elapsed + crate::calendar::DAY_SECONDS as f64 * 24.0,
+    });
 
     let child_genome = CreatureGenome::child_of(mother_g, father_g, &mut rng.0);
     let name = culture.language.name_for(child_genome.sex, &mut rng.0);
