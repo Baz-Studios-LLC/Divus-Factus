@@ -38,7 +38,13 @@ impl Plugin for TitlePlugin {
                     auto_title.run_if(in_state(GameState::Playing)),
                     handle_settings,
                     style_menu_buttons,
-                    toggle_pause_menu.run_if(in_state(GameState::Playing)),
+                    // Before the codex's own Escape handling, so the frame
+                    // that shuts the book sees it still open and yields -
+                    // one press must never both close the codex and raise
+                    // the pause menu.
+                    toggle_pause_menu
+                        .run_if(in_state(GameState::Playing))
+                        .before(crate::debug::handle_tuning_input),
                     handle_pause_menu,
                 ),
             );
@@ -518,15 +524,20 @@ fn drift_smoke(
 
 /// Escape raises the pause menu - the world holds its breath while it is
 /// up, the same stillness the title uses. When a miracle is armed, Escape
-/// belongs to disarming it instead.
+/// belongs to disarming it instead; when the codex is open, Escape
+/// belongs to closing the book.
 fn toggle_pause_menu(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
     armed: Res<crate::miracles::SelectedMiracle>,
+    codex: Query<&Visibility, With<crate::debug::VillagePanel>>,
     mut time: ResMut<Time<Virtual>>,
     menus: Query<(Entity, &Visibility), With<PauseMenu>>,
 ) {
-    if !keys.just_pressed(KeyCode::Escape) || armed.0.is_some() {
+    if !keys.just_pressed(KeyCode::Escape)
+        || armed.0.is_some()
+        || codex.iter().any(|v| *v != Visibility::Hidden)
+    {
         return;
     }
     match menus.single() {
@@ -568,6 +579,14 @@ fn handle_pause_menu(
     settings: Query<&Interaction, (Changed<Interaction>, With<PauseSettingsButton>)>,
     saves: Query<&Interaction, (Changed<Interaction>, With<PauseSavesButton>)>,
     mut saves_panels: Query<&mut Visibility, With<crate::save::SavesPanel>>,
+    mut codex: ResMut<crate::debug::Codex>,
+    mut codex_panels: Query<
+        &mut Visibility,
+        (
+            With<crate::debug::VillagePanel>,
+            Without<crate::save::SavesPanel>,
+        ),
+    >,
     exit: Query<&Interaction, (Changed<Interaction>, With<ExitButton>)>,
     to_title: Query<&Interaction, (Changed<Interaction>, With<TitleReturnButton>)>,
     open_settings: Query<Entity, With<SettingsScreen>>,
@@ -592,6 +611,12 @@ fn handle_pause_menu(
             // Nothing of the abandoned game follows the god upstairs: no
             // follow, no open sight, no marks, no armed miracle - and the
             // clock runs on, because the title overlooks a living world.
+            // The codex shuts and turns back to its first page, so the
+            // next game opens the book fresh.
+            for mut visibility in &mut codex_panels {
+                *visibility = Visibility::Hidden;
+            }
+            codex.page = crate::debug::CodexPage::Ledger;
             time.unpause();
             survey.on = false;
             markers.0 = false;

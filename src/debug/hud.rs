@@ -180,6 +180,15 @@ pub(crate) fn handle_tuning_input(
             };
         }
     }
+    // Escape closes an open codex - the book shuts before the pause menu
+    // would rise, and the pause menu stands aside while the book is up.
+    if keys.just_pressed(KeyCode::Escape) {
+        for mut visibility in &mut codex {
+            if *visibility != Visibility::Hidden {
+                *visibility = Visibility::Hidden;
+            }
+        }
+    }
     if keys.just_pressed(KeyCode::F1) {
         state.hud_visible = !state.hud_visible;
     }
