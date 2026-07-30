@@ -962,14 +962,14 @@ pub(crate) fn dress_ledger_banner(
     }
     *seen = Some(arms);
     let field = crate::palette::shade(&crate::palette::ALL_RAMPS[arms.0], 0.8);
-    // The heraldic rule of tincture: dark ink on a light field, gold on a
-    // dark one, so the sign always reads.
-    let luminance =
-        field.to_srgba().red * 0.3 + field.to_srgba().green * 0.55 + field.to_srgba().blue * 0.15;
-    let ink = if luminance > 0.5 {
-        Color::srgb(0.12, 0.10, 0.06)
-    } else {
+    // The shared rule of tincture, so the ledger's banner and the banner in
+    // the square always agree on which metal the sign is struck in.
+    let srgb = field.to_srgba();
+    let ink = if crate::sigil::gold_reads_on([srgb.red, srgb.green, srgb.blue]) {
         ui::theme::accent()
+    } else {
+        let dark = crate::sigil::dark_ink();
+        Color::srgb(dark[0], dark[1], dark[2])
     };
     for cloth in &cloths {
         commands.entity(cloth).despawn_related::<Children>();
