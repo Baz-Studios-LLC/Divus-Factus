@@ -66,6 +66,12 @@ pub(crate) struct FaithText {
     field: u8,
 }
 
+/// One soul's standing row on the FAITH roster. When the ranking shifts,
+/// these are reordered in place rather than torn down - despawning cost a
+/// layout frame and jolted the scroll.
+#[derive(Component)]
+pub(crate) struct FaithRow(Entity);
+
 /// The line under the happiness gauge saying WHY it stands where it does.
 #[derive(Component)]
 pub(crate) struct HappinessWhy;
@@ -1412,19 +1418,21 @@ pub(crate) fn update_ledger_details(
     }
 }
 
-/// The FAITH roster: rows rebuild only when the ranking itself changes -
-/// who is on the roll, in what order - while the drifting numbers and the
-/// why-lines update in place. Tearing rows down on a timer made the page
-/// flinch and fought the scroll.
+/// The FAITH roster: rows are torn down only when someone joins or leaves
+/// the roll. When souls merely trade places in the ranking, the standing
+/// rows are reordered in place - despawning them cost a layout frame and
+/// jolted the scroll every time trust drifted past a neighbour. The
+/// drifting numbers and why-lines always update in place.
 #[allow(clippy::type_complexity)]
 pub(crate) fn update_faith_roster(
     mut commands: Commands,
     codex: Res<Codex>,
     time: Res<Time>,
     mut last_rebuild: Local<f32>,
-    mut fingerprint: Local<u64>,
+    mut fingerprints: Local<(u64, u64)>,
     panels: Query<&Visibility, With<VillagePanel>>,
     rosters: Query<Entity, With<FaithRoster>>,
+    rows: Query<(Entity, &FaithRow)>,
     mut lines: Query<(&FaithText, &mut Text)>,
     flock: Query<
         (
@@ -1490,19 +1498,36 @@ pub(crate) fn update_faith_roster(
         fb.total_cmp(&fa)
     });
 
-    // Structural fingerprint: the roll and its order, nothing finer.
-    let fresh = {
+    // Two fingerprints: who is on the roll at all, and in what order.
+    let (membership, order) = {
         use std::hash::{Hash, Hasher};
-        let mut hasher = std::hash::DefaultHasher::new();
+        let mut order_hasher = std::hash::DefaultHasher::new();
         for (entity, ..) in &souls {
-            entity.hash(&mut hasher);
+            entity.hash(&mut order_hasher);
         }
-        hasher.finish()
+        let mut names: Vec<Entity> = souls.iter().map(|(entity, ..)| *entity).collect();
+        names.sort();
+        let mut membership_hasher = std::hash::DefaultHasher::new();
+        names.hash(&mut membership_hasher);
+        (membership_hasher.finish(), order_hasher.finish())
     };
-    if fresh != *fingerprint {
-        *fingerprint = fresh;
+
+    if membership != fingerprints.0 {
+        *fingerprints = (membership, order);
         commands.entity(roster).despawn_related::<Children>();
         for (entity, person, faith, chronicle, witnessed) in &souls {
+            let row = commands
+                .spawn((
+                    FaithRow(*entity),
+                    Node {
+                        width: percent(100),
+                        flex_direction: FlexDirection::Column,
+                        row_gap: px(5),
+                        ..default()
+                    },
+                    ChildOf(roster),
+                ))
+                .id();
             let name_line = commands
                 .spawn((
                     Node {
@@ -1511,7 +1536,7 @@ pub(crate) fn update_faith_roster(
                         justify_content: JustifyContent::SpaceBetween,
                         ..default()
                     },
-                    ChildOf(roster),
+                    ChildOf(row),
                 ))
                 .id();
             commands.spawn((
@@ -1536,10 +1561,21 @@ pub(crate) fn update_faith_roster(
                     field: 2,
                 },
                 ui::dim(compose(2, person, *faith, *chronicle, *witnessed)),
-                ChildOf(roster),
+                ChildOf(row),
             ));
         }
         return;
+    }
+
+    if order != fingerprints.1 {
+        fingerprints.1 = order;
+        let standing: std::collections::HashMap<Entity, Entity> =
+            rows.iter().map(|(row, mark)| (mark.0, row)).collect();
+        let ordered: Vec<Entity> = souls
+            .iter()
+            .filter_map(|(entity, ..)| standing.get(entity).copied())
+            .collect();
+        commands.entity(roster).replace_children(&ordered);
     }
 
     // The quiet path: the rows stand; only the words that drift are set.
