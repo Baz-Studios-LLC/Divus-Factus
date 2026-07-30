@@ -367,11 +367,16 @@ pub(crate) fn banner_glyph(commands: &mut Commands, parent: Entity) {
 // The window.
 // ---------------------------------------------------------------------------
 
-/// The main split band's height. The plates (96), gaps and the land strip
-/// (40) ride above and below it; the sum is pinned to the People window's
-/// measured footprint (761 logical tall), so the codex never changes shape
-/// between pages.
-const MAIN_BAND: f32 = 501.0;
+/// The page's one spacing rhythm: this many pixels around the content and
+/// between every band and column. The codex body's padding is overridden
+/// to match, and the maths stays integral: the inner well is 1120 wide,
+/// and 1120 = 3 x 366 + 2 x 11.
+const RHYTHM: f32 = 11.0;
+
+/// The main split band's height. The plates (96) and the land strip (40)
+/// ride above and below it with the rhythm between; the sum is the page
+/// band.
+const MAIN_BAND: f32 = 494.0;
 
 /// Every page's full height: the ledger's bands sum to it (96 + 5 + 501 +
 /// 5 + 45), and the people page is pinned to it directly.
@@ -401,6 +406,14 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
             ..default()
         },
     ));
+    // The body breathes in the page's own rhythm on every side.
+    commands.entity(window.body).insert(Node {
+        width: percent(100),
+        flex_direction: FlexDirection::Column,
+        row_gap: px(RHYTHM),
+        padding: px(RHYTHM).into(),
+        ..default()
+    });
 
     // The pages, as siblings in the body: exactly one shows at a time, and
     // every page's bands sum to the same height, so the book never changes
@@ -410,7 +423,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
             Node {
                 width: percent(100),
                 flex_direction: FlexDirection::Column,
-                row_gap: px(ui::theme::GAP),
+                row_gap: px(RHYTHM),
                 ..default()
             },
             Visibility::Inherited,
@@ -550,11 +563,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
                 height: px(96),
                 flex_shrink: 0.0,
                 flex_direction: FlexDirection::Row,
-                // Ten, deliberately: the content well is 1118 wide and
-                // 1118 = 3 x 366 + 2 x 10 - integral shares, so the flex
-                // maths lands on whole pixels and the two rows' seams
-                // cannot round apart.
-                column_gap: px(10),
+                column_gap: px(RHYTHM),
                 ..default()
             },
             ChildOf(ledger_page),
@@ -586,10 +595,9 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
             ChildOf(ledger_page),
         ))
         .id();
-    // One integral geometry, shared with the plates row: the content well
-    // is 1118 wide and 1118 = 3 x 366 + 2 x 10, so the rail IS a plate's
-    // width and every seam lands on the same whole pixel.
-    let (rail, detail) = ui::split_row(&mut commands, main, 366.0, 10.0);
+    // One integral geometry, shared with the plates row: the rail IS a
+    // plate's width, and every seam lands on the same whole pixel.
+    let (rail, detail) = ui::split_row(&mut commands, main, 366.0, RHYTHM);
 
     // The rail: OVERVIEW lists the villages of this world (one banner so
     // far, honestly); FAITH ranks every soul by their trust.
@@ -906,7 +914,6 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
                 padding: UiRect::axes(px(12), px(4)),
                 border: UiRect::all(px(1)),
                 border_radius: BorderRadius::all(px(0)),
-                margin: UiRect::top(px(5)),
                 ..default()
             },
             BackgroundColor(ui::theme::title_bg().with_alpha(0.55)),
