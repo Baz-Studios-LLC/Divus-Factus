@@ -10,6 +10,8 @@
 	<string>com.bazstudios.egregore</string>
 	<key>CFBundleExecutable</key>
 	<string>egregore</string>
+	<key>CFBundleIconFile</key>
+	<string>Egregore</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleInfoDictionaryVersion</key>

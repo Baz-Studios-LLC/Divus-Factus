@@ -20,6 +20,7 @@ chmod +x "$APP/Contents/MacOS/egregore"
 strip "$APP/Contents/MacOS/egregore" 2>/dev/null || true
 
 cp -R "$ROOT/assets" "$APP/Contents/MacOS/assets"
+cp "$HERE/Egregore.icns" "$APP/Contents/Resources/Egregore.icns"
 sed "s/__VERSION__/$VERSION/g" "$HERE/Info.plist" > "$APP/Contents/Info.plist"
 
 # Ad-hoc sign so macOS runs it without a "damaged" error; the launcher also
