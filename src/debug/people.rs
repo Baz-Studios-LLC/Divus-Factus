@@ -152,7 +152,7 @@ pub(crate) fn spawn_people_panel(
         Node {
             width: px(320),
             flex_shrink: 0.0,
-            height: percent(100),
+            max_height: px(640),
             flex_direction: FlexDirection::Column,
             row_gap: px(5),
             overflow: Overflow::scroll_y(),

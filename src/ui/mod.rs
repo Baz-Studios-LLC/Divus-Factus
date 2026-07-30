@@ -1176,21 +1176,24 @@ pub fn split_view_titled(
     list_width: f32,
     height: f32,
 ) -> SplitView {
-    // A generous FIXED frame: content must never resize the window - a
-    // panel that breathes with every text change is seasickness, not UI.
+    // The frame hugs its content: every block inside is fixed-height by
+    // design (the puzzle contract), so the window's margins fall out even
+    // on all four sides by construction instead of by tuned arithmetic.
+    // The height parameter caps the LIST side only.
     let window = window_impl_titled(commands, title, subtitle, list_width + 500.0, false);
     let row = commands
         .spawn((
             Node {
                 width: percent(100),
-                height: px(height),
                 flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Stretch,
                 column_gap: px(theme::PAD),
                 ..default()
             },
             ChildOf(window.body),
         ))
         .id();
+    let _ = height;
     let list = commands
         .spawn((
             Node {
