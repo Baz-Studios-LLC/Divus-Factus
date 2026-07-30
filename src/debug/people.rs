@@ -200,8 +200,10 @@ pub(crate) fn spawn_people_panel(
     commands.spawn((
         Name::new("Paperdoll Fill"),
         DirectionalLight {
-            color: crate::palette::shade(&crate::palette::SKY, 0.85),
-            illuminance: 4_500.0,
+            // Near-neutral, and quiet: a blue fill painted the charcoal
+            // alcove's edges sky-coloured.
+            color: Color::srgb(0.75, 0.78, 0.85),
+            illuminance: 2_800.0,
             ..default()
         },
         Transform::from_xyz(-2.6, 1.4, -1.2).looking_at(Vec3::ZERO, Vec3::Y),
@@ -213,24 +215,26 @@ pub(crate) fn spawn_people_panel(
     // vignette, and a two-tier plinth with a thread of gold. Actual
     // geometry under the portrait lights, not painted rectangles.
     let layer = bevy::camera::visibility::RenderLayers::layer(DOLL_LAYER);
+    // Charcoal throughout, matched to the panel's own ground: the niche
+    // is a stage, not a subject - nothing behind the sitter competes.
     let stone = materials.add(StandardMaterial {
-        base_color: crate::palette::shade(&crate::palette::STONE, 0.22),
+        base_color: Color::srgb(0.098, 0.104, 0.122),
         perceptual_roughness: 1.0,
         ..default()
     });
     let stone_dark = materials.add(StandardMaterial {
-        base_color: crate::palette::shade(&crate::palette::STONE, 0.12),
+        base_color: Color::srgb(0.066, 0.07, 0.084),
         perceptual_roughness: 1.0,
         ..default()
     });
     let velvet = materials.add(StandardMaterial {
-        base_color: crate::palette::shade(&crate::palette::STONE, 0.05),
+        base_color: Color::srgb(0.032, 0.035, 0.045),
         perceptual_roughness: 1.0,
         ..default()
     });
     let gold = materials.add(StandardMaterial {
-        base_color: crate::palette::shade(&crate::palette::CLOTH_GOLD, 0.8),
-        perceptual_roughness: 0.5,
+        base_color: Color::srgb(0.13, 0.135, 0.155),
+        perceptual_roughness: 0.8,
         ..default()
     });
     let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
