@@ -508,6 +508,34 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         ))
         .id();
     let (rail, detail) = ui::split_row(&mut commands, main, 368.0, 9.0);
+    // The rail is a plate's exact flex share and the detail is two shares
+    // plus the middle gutter, so both rows derive from one width and the
+    // seams coincide to the sub-pixel - no hand-solved constants to drift.
+    commands.entity(rail).insert(Node {
+        flex_grow: 1.0,
+        flex_basis: px(0),
+        flex_shrink: 0.0,
+        height: percent(100),
+        flex_direction: FlexDirection::Column,
+        row_gap: px(4),
+        overflow: Overflow::scroll_y(),
+        padding: UiRect::all(px(6)),
+        border_radius: BorderRadius::all(px(0)),
+        ..default()
+    });
+    commands.entity(detail).insert(Node {
+        flex_grow: 2.0,
+        flex_basis: px(9),
+        min_width: px(0),
+        height: percent(100),
+        flex_direction: FlexDirection::Column,
+        row_gap: px(ui::theme::GAP),
+        padding: px(ui::theme::PAD).into(),
+        border: UiRect::all(px(2)),
+        border_radius: BorderRadius::all(px(0)),
+        overflow: Overflow::clip(),
+        ..default()
+    });
 
     // The rail: OVERVIEW lists the villages of this world (one banner so
     // far, honestly); FAITH ranks every soul by their trust.
