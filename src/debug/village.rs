@@ -475,7 +475,11 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
                 height: px(96),
                 flex_shrink: 0.0,
                 flex_direction: FlexDirection::Row,
-                column_gap: px(9),
+                // Ten, deliberately: the content well is 1118 wide and
+                // 1118 = 3 x 366 + 2 x 10 - integral shares, so the flex
+                // maths lands on whole pixels and the two rows' seams
+                // cannot round apart.
+                column_gap: px(10),
                 ..default()
             },
             ChildOf(ledger_page),
@@ -507,35 +511,10 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
             ChildOf(ledger_page),
         ))
         .id();
-    let (rail, detail) = ui::split_row(&mut commands, main, 368.0, 9.0);
-    // The rail is a plate's exact flex share and the detail is two shares
-    // plus the middle gutter, so both rows derive from one width and the
-    // seams coincide to the sub-pixel - no hand-solved constants to drift.
-    commands.entity(rail).insert(Node {
-        flex_grow: 1.0,
-        flex_basis: px(0),
-        flex_shrink: 0.0,
-        height: percent(100),
-        flex_direction: FlexDirection::Column,
-        row_gap: px(4),
-        overflow: Overflow::scroll_y(),
-        padding: UiRect::all(px(6)),
-        border_radius: BorderRadius::all(px(0)),
-        ..default()
-    });
-    commands.entity(detail).insert(Node {
-        flex_grow: 2.0,
-        flex_basis: px(9),
-        min_width: px(0),
-        height: percent(100),
-        flex_direction: FlexDirection::Column,
-        row_gap: px(ui::theme::GAP),
-        padding: px(ui::theme::PAD).into(),
-        border: UiRect::all(px(2)),
-        border_radius: BorderRadius::all(px(0)),
-        overflow: Overflow::clip(),
-        ..default()
-    });
+    // One integral geometry, shared with the plates row: the content well
+    // is 1118 wide and 1118 = 3 x 366 + 2 x 10, so the rail IS a plate's
+    // width and every seam lands on the same whole pixel.
+    let (rail, detail) = ui::split_row(&mut commands, main, 366.0, 10.0);
 
     // The rail: OVERVIEW lists the villages of this world (one banner so
     // far, honestly); FAITH ranks every soul by their trust.
