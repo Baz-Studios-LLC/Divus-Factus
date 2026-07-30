@@ -1685,6 +1685,7 @@ pub(crate) fn handle_people_rows(
     followers: Query<(&Interaction, &FollowButton), Changed<Interaction>>,
     mut follow: ResMut<crate::camera::FollowTarget>,
     mut selected: ResMut<SelectedPerson>,
+    mut panels: Query<&mut Visibility, With<PeoplePanel>>,
 ) {
     for (interaction, row) in &rows {
         if *interaction == Interaction::Pressed {
@@ -1696,6 +1697,11 @@ pub(crate) fn handle_people_rows(
             follow.entity = Some(button.0);
             follow.style = crate::camera::FollowStyle::Overhead;
             selected.0 = Some(button.0);
+            // Following is about WATCHING: the panel steps aside so the
+            // eye lands on the person, not their paperwork.
+            for mut visibility in &mut panels {
+                *visibility = Visibility::Hidden;
+            }
         }
     }
 }

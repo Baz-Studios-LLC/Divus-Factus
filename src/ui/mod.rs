@@ -1847,7 +1847,12 @@ pub struct PointerContext {
 }
 
 /// Reads hover state off the panels after the UI focus pass has run.
-fn track_pointer(panels: Query<&Interaction, With<Panel>>, mut pointer: ResMut<PointerContext>) {
+fn track_pointer(panels: Query<&Interaction>, mut pointer: ResMut<PointerContext>) {
+    // ANY hovered interactive node counts - not just Panel-marked ones.
+    // Buttons win the pick over their window, so checking panels alone
+    // read "not over UI" the instant a cursor touched a button, and the
+    // hand jittered between its interface pose and its world pose along
+    // every button edge.
     pointer.over_ui = panels
         .iter()
         .any(|interaction| !matches!(interaction, Interaction::None));
