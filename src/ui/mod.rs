@@ -1124,15 +1124,16 @@ impl HoverHint {
 // kit so every new page is assembled, not re-invented.
 // ---------------------------------------------------------------------------
 
-/// A titled, subtitled window shell with nothing inside — the same chrome the
-/// People window wears, for callers building their own bands.
+/// A titled, subtitled window shell with nothing inside, for callers
+/// building their own bands. `centred` opens it dead centre of the screen.
 pub fn titled_window(
     commands: &mut Commands,
     title: &str,
     subtitle: Option<&str>,
     min_width: f32,
+    centred: bool,
 ) -> WindowHandles {
-    window_impl_titled(commands, title, subtitle, min_width, false)
+    window_impl_titled(commands, title, subtitle, min_width, centred)
 }
 
 /// A row splitting into an inset list rail and a framed detail pane — the

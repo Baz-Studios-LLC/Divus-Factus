@@ -309,7 +309,11 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         "THE LEDGER",
         Some("The heart of a living world."),
         1160.0,
+        // Dead centre, both axes, and it stays there: the codex is the one
+        // grand window, not a floating panel to be shuffled about.
+        true,
     );
+    commands.entity(window.title_bar).remove::<ui::DragHandle>();
     commands.entity(window.root).insert((
         Name::new("Codex Panel"),
         VillagePanel,
