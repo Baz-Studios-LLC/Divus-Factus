@@ -530,7 +530,9 @@ pub(crate) fn spin_doll(time: Res<Time>, mut dolls: Query<&mut Transform, With<D
     // A portrait, not a rotisserie: the doll sways through a gentle
     // three-quarter arc, face toward the reader - nobody's head should
     // spend half its life being the back of a microwave.
-    let sway = (time.elapsed_secs() * 0.45).sin() * 0.55 - 0.25;
+    // The camera stands on +Z and a body's face points -Z: without the
+    // half-turn every portrait was a study of the sitter's back.
+    let sway = std::f32::consts::PI + (time.elapsed_secs() * 0.45).sin() * 0.55 - 0.25;
     for mut doll in &mut dolls {
         doll.rotation = Quat::from_rotation_y(sway);
     }
