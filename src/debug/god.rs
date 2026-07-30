@@ -1226,30 +1226,37 @@ pub(crate) fn update_god_panel(
     }
 }
 
-/// Redraws the faith curve when the record grows (or the page opens): the
-/// whole biography bucketed into bars, oldest left, gold throughout.
+/// Redraws the faith curve when the record grows (or the page opens, or
+/// the well is first laid out): the whole biography bucketed and drawn as
+/// one gold line, oldest left, a bright point marking today.
 pub(crate) fn update_faith_chart(
     mut commands: Commands,
     codex: Res<super::village::Codex>,
     panels: Query<&Visibility, With<GodPanel>>,
     history: Res<crate::villager::belief::FaithHistory>,
-    charts: Query<Entity, With<FaithChart>>,
+    charts: Query<(Entity, &ComputedNode), With<FaithChart>>,
     mut spans: Query<&mut Text, With<FaithChartSpan>>,
-    mut drawn: Local<(usize, bool)>,
+    mut drawn: Local<Option<(usize, Vec2)>>,
 ) {
     if codex.page != super::village::CodexPage::Deity
         || !panels.iter().any(|v| *v != Visibility::Hidden)
     {
-        drawn.1 = false;
+        *drawn = None;
         return;
     }
-    if drawn.1 && drawn.0 == history.samples.len() {
-        return;
-    }
-    *drawn = (history.samples.len(), true);
-    let Ok(chart) = charts.single() else {
+    let Ok((chart, computed)) = charts.single() else {
         return;
     };
+    // The line is plotted in the well's own pixels, so the well must have
+    // been laid out; a zero-sized first frame just waits its turn.
+    let size = computed.size() * computed.inverse_scale_factor();
+    if size.x < 12.0 || size.y < 12.0 {
+        return;
+    }
+    if *drawn == Some((history.samples.len(), size)) {
+        return;
+    }
+    *drawn = Some((history.samples.len(), size));
     commands.entity(chart).despawn_related::<Children>();
 
     const BUCKETS: usize = 48;
@@ -1264,7 +1271,9 @@ pub(crate) fn update_faith_chart(
             ChildOf(chart),
         ));
     } else {
-        // Bucket-average the whole record into the chart's width.
+        // Bucket-average the whole record into the chart's width, then
+        // join the points with thin rotated strokes - the same trick the
+        // sigils use for their turned bars.
         let buckets = BUCKETS.min(samples.len());
         let mut heights = Vec::with_capacity(buckets);
         for bucket in 0..buckets {
@@ -1274,18 +1283,49 @@ pub(crate) fn update_faith_chart(
             heights.push(slice.iter().sum::<f32>() / slice.len() as f32);
         }
         let top = heights.iter().cloned().fold(1.0f32, f32::max);
-        for value in heights {
+        let inner = Vec2::new(size.x - 12.0, size.y - 14.0);
+        let point = |i: usize, value: f32| {
+            Vec2::new(
+                6.0 + i as f32 / (buckets - 1) as f32 * inner.x,
+                7.0 + (1.0 - value / top) * inner.y,
+            )
+        };
+        for (i, pair) in heights.windows(2).enumerate() {
+            let a = point(i, pair[0]);
+            let b = point(i + 1, pair[1]);
+            let mid = (a + b) * 0.5;
+            let length = a.distance(b).max(1.0);
+            let angle = (b.y - a.y).atan2(b.x - a.x);
             commands.spawn((
                 Node {
-                    flex_grow: 1.0,
-                    flex_basis: px(0),
-                    height: percent((value / top * 100.0).clamp(3.0, 100.0)),
+                    position_type: PositionType::Absolute,
+                    left: px(mid.x - length * 0.5),
+                    top: px(mid.y - 1.0),
+                    width: px(length),
+                    height: px(2),
+                    border_radius: BorderRadius::all(px(2)),
                     ..default()
                 },
-                BackgroundColor(ui::theme::accent().with_alpha(0.8)),
+                UiTransform::from_rotation(Rot2::radians(angle)),
+                BackgroundColor(ui::theme::accent().with_alpha(0.9)),
                 ChildOf(chart),
             ));
         }
+        // Today, marked: the line's living end.
+        let now = point(buckets - 1, *heights.last().unwrap());
+        commands.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(now.x - 2.5),
+                top: px(now.y - 2.5),
+                width: px(5),
+                height: px(5),
+                border_radius: BorderRadius::all(px(5)),
+                ..default()
+            },
+            BackgroundColor(ui::theme::accent()),
+            ChildOf(chart),
+        ));
     }
     if let Ok(mut text) = spans.single_mut() {
         let days = history.samples.len().max(1) as u32;
