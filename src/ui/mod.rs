@@ -538,20 +538,23 @@ pub mod theme {
     /// opaque — a bright landscape bleeding through the panel is what makes
     /// long dim text unreadable over grass.
     pub fn panel_bg() -> Color {
-        palette::shade(&palette::STONE, 0.05).with_alpha(0.94)
+        // Deep charcoal with a whisper of night blue, near opaque: the
+        // world must not bleed through and mud the reading surface -
+        // gold belongs to the line-work, not the air.
+        Color::srgb(0.045, 0.05, 0.062).with_alpha(0.985)
     }
 
     /// Title-bar fill: a shade lighter than the panel, so the chrome reads
     /// as a distinct part the way real windows do.
     pub fn title_bg() -> Color {
-        palette::shade(&palette::STONE, 0.13).with_alpha(0.98)
+        Color::srgb(0.075, 0.082, 0.102).with_alpha(0.99)
     }
 
     /// The warm card: a parchment-dark fill for detail panes, so content
     /// areas read as two materials - dark wells beside warm boards - the
     /// way a built interface does, without leaving the palette.
     pub fn card_bg() -> Color {
-        Color::srgb(0.16, 0.13, 0.095)
+        Color::srgb(0.058, 0.062, 0.078)
     }
 
     /// The card's stronger golden edge.
@@ -801,7 +804,7 @@ fn window_impl_titled(
                 flex_direction: FlexDirection::Column,
                 padding: px(5).into(),
                 border: UiRect::all(px(2)),
-                border_radius: BorderRadius::all(px(12)),
+                border_radius: BorderRadius::all(px(3)),
                 ..default()
             },
             BackgroundColor(Color::srgb(0.05, 0.045, 0.04)),
@@ -817,7 +820,7 @@ fn window_impl_titled(
                 width: percent(100),
                 flex_direction: FlexDirection::Column,
                 border: UiRect::all(px(2)),
-                border_radius: BorderRadius::all(px(9)),
+                border_radius: BorderRadius::all(px(2)),
                 overflow: Overflow::clip(),
                 ..default()
             },
@@ -1193,7 +1196,7 @@ pub fn split_view_titled(
                 row_gap: px(2),
                 overflow: Overflow::scroll_y(),
                 padding: UiRect::all(px(6)),
-                border_radius: BorderRadius::all(px(6)),
+                border_radius: BorderRadius::all(px(2)),
                 ..default()
             },
             // An inset well, a step darker than the panel: the roster reads
@@ -1412,15 +1415,15 @@ pub fn tab_bar(commands: &mut Commands, parent: Entity, labels: &[&str]) -> Vec<
                 TabButton { bar, page },
                 UiButton,
                 Node {
-                    padding: UiRect::axes(px(18), px(7)),
-                    border: UiRect::all(px(2)),
-                    border_radius: BorderRadius::top(px(8)),
+                    padding: UiRect::axes(px(22), px(8)),
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::all(px(2)),
                     ..default()
                 },
                 BackgroundColor(if index == 0 {
-                    theme::card_bg()
+                    theme::title_bg()
                 } else {
-                    Color::BLACK.with_alpha(0.25)
+                    Color::BLACK.with_alpha(0.18)
                 }),
                 BorderColor::all(if index == 0 {
                     theme::card_border()
@@ -1433,6 +1436,7 @@ pub fn tab_bar(commands: &mut Commands, parent: Entity, labels: &[&str]) -> Vec<
             .id();
         commands.spawn((
             Text::new(*label_text),
+            DisplayFace,
             TextFont {
                 font_size: FontSize::Px(theme::SMALL_SIZE),
                 ..default()
@@ -1452,6 +1456,7 @@ pub fn switch_tabs(
     all_tabs: Query<(Entity, &TabButton)>,
     mut pages: Query<&mut Node, Without<TabButton>>,
     mut borders: Query<&mut BorderColor, With<TabButton>>,
+    mut fills: Query<&mut BackgroundColor, With<TabButton>>,
 ) {
     for (pressed, interaction, tab) in &clicked {
         if *interaction != Interaction::Pressed {
@@ -1467,10 +1472,17 @@ pub fn switch_tabs(
             }
             if let Ok(mut border) = borders.get_mut(other) {
                 *border = BorderColor::all(if active {
-                    theme::card_border()
+                    theme::accent().with_alpha(0.85)
                 } else {
-                    theme::panel_border().with_alpha(0.4)
+                    theme::panel_border().with_alpha(0.35)
                 });
+            }
+            if let Ok(mut fill) = fills.get_mut(other) {
+                fill.0 = if active {
+                    theme::title_bg().into()
+                } else {
+                    Color::BLACK.with_alpha(0.18)
+                };
             }
         }
     }
@@ -1597,20 +1609,40 @@ pub fn heading(text: impl Into<String>) -> impl Bundle {
     )
 }
 
+/// A display-face headline at a chosen size - the big names.
+pub fn title_sized(text: impl Into<String>, size: f32) -> impl Bundle {
+    (
+        Text::new(text),
+        DisplayFace,
+        TextFont {
+            font_size: FontSize::Px(size),
+            ..default()
+        },
+        TextColor(theme::accent()),
+    )
+}
+
 /// Marks text that speaks in the display face - Cinzel, the engraved
 /// capitals - rather than the working mono. Titles and names, never data.
 #[derive(Component)]
 pub struct DisplayFace;
 
+/// Marks text that speaks in the reading face - EB Garamond, the warm
+/// serif - for labels, values and running words on the panels.
+#[derive(Component)]
+pub struct SerifFace;
+
 /// The game's loaded typefaces.
 #[derive(Resource)]
 pub struct Fonts {
     pub display: Handle<Font>,
+    pub text: Handle<Font>,
 }
 
 pub(crate) fn load_fonts(mut commands: Commands, assets: Res<AssetServer>) {
     commands.insert_resource(Fonts {
         display: assets.load("fonts/Cinzel.ttf"),
+        text: assets.load("fonts/EBGaramond.ttf"),
     });
 }
 
@@ -1620,6 +1652,7 @@ pub(crate) fn load_fonts(mut commands: Commands, assets: Res<AssetServer>) {
 pub(crate) fn dress_display_text(
     fonts: Option<Res<Fonts>>,
     mut fresh: Query<&mut TextFont, Added<DisplayFace>>,
+    mut prose: Query<&mut TextFont, (Added<SerifFace>, Without<DisplayFace>)>,
 ) {
     let Some(fonts) = fonts else {
         return;
@@ -1627,12 +1660,22 @@ pub(crate) fn dress_display_text(
     for mut font in &mut fresh {
         font.font = fonts.display.clone().into();
     }
+    for mut font in &mut prose {
+        font.font = fonts.text.clone().into();
+        // Garamond runs small on the body: a step up keeps the panels
+        // as readable as the mono they replace.
+        font.font_size = FontSize::Px(match font.font_size {
+            FontSize::Px(size) => size + 2.0,
+            _ => 17.0,
+        });
+    }
 }
 
 /// Ordinary readable text.
 pub fn body(text: impl Into<String>) -> impl Bundle {
     (
         Text::new(text),
+        SerifFace,
         TextFont {
             font_size: FontSize::Px(theme::BODY_SIZE),
             ..default()
@@ -1646,6 +1689,7 @@ pub fn body(text: impl Into<String>) -> impl Bundle {
 pub fn label(text: impl Into<String>) -> impl Bundle {
     (
         Text::new(text),
+        SerifFace,
         TextFont {
             font_size: FontSize::Px(theme::BODY_SIZE),
             ..default()
@@ -1658,6 +1702,7 @@ pub fn label(text: impl Into<String>) -> impl Bundle {
 pub fn section(text: impl Into<String>) -> impl Bundle {
     (
         Text::new(text),
+        SerifFace,
         TextFont {
             font_size: FontSize::Px(theme::SMALL_SIZE),
             ..default()
@@ -1674,6 +1719,7 @@ pub fn section(text: impl Into<String>) -> impl Bundle {
 pub fn dim(text: impl Into<String>) -> impl Bundle {
     (
         Text::new(text),
+        SerifFace,
         TextFont {
             font_size: FontSize::Px(theme::SMALL_SIZE),
             ..default()
