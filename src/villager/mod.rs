@@ -265,6 +265,10 @@ pub struct WorldChronicle {
 pub struct HistoryEvent {
     pub stamp: String,
     pub text: String,
+    /// Whole days since founding, for the chronicle's time filters. Old
+    /// saves default to day zero and land in the first spring.
+    #[serde(default)]
+    pub day: u32,
 }
 
 /// Copies every notice into the permanent record.
@@ -277,6 +281,7 @@ fn record_history(
         history.events.push(HistoryEvent {
             stamp: clock.date_phrase(),
             text: notice.text.clone(),
+            day: clock.day(),
         });
     }
 }

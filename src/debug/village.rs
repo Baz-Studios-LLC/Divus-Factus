@@ -87,6 +87,7 @@ pub(crate) struct ActivityRow(u8);
 pub(crate) enum CodexPage {
     Ledger,
     People,
+    Chronicle,
 }
 
 /// The codex's spine: which page is open, and the handles the page-turn
@@ -97,8 +98,10 @@ pub(crate) struct Codex {
     pub root: Entity,
     pub ledger_page: Entity,
     pub people_page: Entity,
+    pub chronicle_page: Entity,
     pub ledger_tab: Entity,
     pub people_tab: Entity,
+    pub chronicle_tab: Entity,
     pub title_text: Entity,
     pub subtitle_text: Option<Entity>,
 }
@@ -180,21 +183,27 @@ fn tree_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     bar(commands, c, (7.0, 1.0, 4.5, 3.0), 0.0, tint, false);
 }
 
-/// A temple: lintel, columns, footing.
-fn temple_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
-    let c = glyph_canvas(commands, parent, 18.0);
-    bar(commands, c, (2.0, 3.0, 14.0, 2.5), 0.0, tint, false);
-    for left in [3.5, 8.0, 12.5] {
-        bar(commands, c, (left, 6.5, 2.0, 6.5), 0.0, tint, false);
-    }
-    bar(commands, c, (2.0, 13.5, 14.0, 2.5), 0.0, tint, false);
-}
-
 /// Faith: two bars leant together in prayer.
 fn hands_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     let c = glyph_canvas(commands, parent, 18.0);
     bar(commands, c, (4.0, 4.0, 3.0, 11.0), 22.0, tint, false);
     bar(commands, c, (11.0, 4.0, 3.0, 11.0), -22.0, tint, false);
+}
+
+/// A scroll: a page bearing written lines.
+fn scroll_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+    let c = glyph_canvas(commands, parent, 18.0);
+    bar(
+        commands,
+        c,
+        (3.5, 2.0, 11.0, 14.0),
+        0.0,
+        tint.with_alpha(0.22),
+        false,
+    );
+    for top in [5.0, 8.0, 11.0] {
+        bar(commands, c, (5.5, top, 7.0, 1.5), 0.0, tint, false);
+    }
 }
 
 /// A person: head over shoulders.
@@ -327,20 +336,25 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
             ChildOf(window.body),
         ))
         .id();
-    let people_page = commands
-        .spawn((
-            Node {
-                width: percent(100),
-                height: px(PAGE_BAND),
-                flex_shrink: 0.0,
-                flex_direction: FlexDirection::Column,
-                display: Display::None,
-                ..default()
-            },
-            Visibility::Hidden,
-            ChildOf(window.body),
-        ))
-        .id();
+    let mut bound_page = || {
+        commands
+            .spawn((
+                Node {
+                    width: percent(100),
+                    height: px(PAGE_BAND),
+                    flex_shrink: 0.0,
+                    flex_direction: FlexDirection::Column,
+                    row_gap: px(ui::theme::GAP),
+                    display: Display::None,
+                    ..default()
+                },
+                Visibility::Hidden,
+                ChildOf(window.body),
+            ))
+            .id()
+    };
+    let people_page = bound_page();
+    let chronicle_page = bound_page();
 
     // The codex strip: five pages, two residents. Dark tabs are pages still
     // being written.
@@ -398,24 +412,17 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         ui::HoverHint::new("The Ledger", "the heart of a living world"),
     ));
 
-    let wood_tab = tab(&mut commands, false, true);
-    tree_glyph(&mut commands, wood_tab, faint);
-    commands.entity(wood_tab).insert(ui::HoverHint::new(
-        "The Wilds",
+    let god_tab = tab(&mut commands, false, true);
+    hands_glyph(&mut commands, god_tab, faint);
+    commands.entity(god_tab).insert(ui::HoverHint::new(
+        "The God",
         "this page of the codex is still being written",
     ));
 
-    let civic_tab = tab(&mut commands, false, true);
-    temple_glyph(&mut commands, civic_tab, faint);
-    commands.entity(civic_tab).insert(ui::HoverHint::new(
-        "The Works",
-        "this page of the codex is still being written",
-    ));
-
-    let faith_tab = tab(&mut commands, false, true);
-    hands_glyph(&mut commands, faith_tab, faint);
-    commands.entity(faith_tab).insert(ui::HoverHint::new(
-        "The Faith",
+    let world_tab = tab(&mut commands, false, true);
+    tree_glyph(&mut commands, world_tab, faint);
+    commands.entity(world_tab).insert(ui::HoverHint::new(
+        "The World",
         "this page of the codex is still being written",
     ));
 
@@ -426,13 +433,25 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         ui::HoverHint::new("The People", "the mortals of your world"),
     ));
 
+    let chronicle_tab = tab(&mut commands, false, true);
+    scroll_glyph(&mut commands, chronicle_tab, ink.with_alpha(0.8));
+    commands.entity(chronicle_tab).insert((
+        CodexTab(CodexPage::Chronicle),
+        ui::HoverHint::new(
+            "The Chronicle",
+            "the tale of your people, written moment by moment",
+        ),
+    ));
+
     commands.insert_resource(Codex {
         page: CodexPage::Ledger,
         root: window.root,
         ledger_page,
         people_page,
+        chronicle_page,
         ledger_tab,
         people_tab,
+        chronicle_tab,
         title_text: window.title_text,
         subtitle_text: window.subtitle_text,
     });
@@ -522,6 +541,40 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         .id();
     commands.spawn((LedgerRailName, ui::body(""), ChildOf(entry_words)));
     commands.spawn((ui::dim("the first banner raised"), ChildOf(entry_words)));
+    // The eye: fly home to this banner, the way the People rows follow a
+    // soul - and the codex steps aside so the village fills the view.
+    let eye = commands
+        .spawn((
+            super::RecenterButton,
+            ui::UiButton,
+            ui::KeepFace,
+            ui::HoverHint::new("Fly home", "the camera returns to the village banner"),
+            Node {
+                width: px(26),
+                height: px(26),
+                flex_shrink: 0.0,
+                margin: UiRect::left(Val::Auto),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(26)),
+                ..default()
+            },
+            BorderColor::all(ui::theme::accent().with_alpha(0.6)),
+            Interaction::default(),
+            ChildOf(entry),
+        ))
+        .id();
+    commands.spawn((
+        Node {
+            width: px(8),
+            height: px(8),
+            border_radius: BorderRadius::all(px(8)),
+            ..default()
+        },
+        BackgroundColor(ui::theme::accent().with_alpha(0.85)),
+        ChildOf(eye),
+    ));
 
     commands.entity(faith_page).insert((
         Node {
@@ -805,6 +858,7 @@ pub(crate) fn apply_codex_page(
     let pages = [
         (codex.ledger_page, codex.page == CodexPage::Ledger),
         (codex.people_page, codex.page == CodexPage::People),
+        (codex.chronicle_page, codex.page == CodexPage::Chronicle),
     ];
     for (page, open) in pages {
         if let Ok(mut node) = nodes.get_mut(page) {
@@ -830,6 +884,7 @@ pub(crate) fn apply_codex_page(
     let tabs = [
         (codex.ledger_tab, codex.page == CodexPage::Ledger),
         (codex.people_tab, codex.page == CodexPage::People),
+        (codex.chronicle_tab, codex.page == CodexPage::Chronicle),
     ];
     for (tab, open) in tabs {
         if let Ok(mut fill) = fills.get_mut(tab) {
@@ -850,6 +905,10 @@ pub(crate) fn apply_codex_page(
     let (title, subtitle) = match codex.page {
         CodexPage::Ledger => ("THE LEDGER", "The heart of a living world."),
         CodexPage::People => ("THE PEOPLE", "The mortals of your world."),
+        CodexPage::Chronicle => (
+            "THE CHRONICLE",
+            "The tale of your people, written moment by moment.",
+        ),
     };
     if let Ok(mut text) = texts.get_mut(codex.title_text)
         && text.0 != title

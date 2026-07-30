@@ -45,6 +45,8 @@ impl Plugin for DebugPlugin {
             .init_resource::<DebugState>()
             .init_resource::<SelectedPerson>()
             .init_resource::<RosterSort>()
+            .init_resource::<ChronicleView>()
+            .init_resource::<ChronicleStars>()
             .add_systems(
                 Startup,
                 (
@@ -52,7 +54,7 @@ impl Plugin for DebugPlugin {
                     spawn_toolbar,
                     spawn_world_panel,
                     spawn_people_panel.after(spawn_village_panel),
-                    spawn_history_panel,
+                    spawn_chronicle_page.after(spawn_village_panel),
                     spawn_village_panel,
                     spawn_god_panel,
                 ),
@@ -65,7 +67,8 @@ impl Plugin for DebugPlugin {
                     update_hud,
                     update_world_panel,
                     update_people_panel,
-                    update_history_panel,
+                    handle_chronicle_filters,
+                    update_chronicle,
                     handle_people_rows,
                     handle_roster_sort,
                     // Playing only: the hover card naming what is beneath the
@@ -129,47 +132,12 @@ impl Default for DebugState {
     }
 }
 
-/// The toolbar button that flies the camera home to the settlement.
+/// Flies the camera home to the settlement - the eye on the ledger page.
 #[derive(Component)]
-struct RecenterButton;
+pub(crate) struct RecenterButton;
 
 fn spawn_toolbar(mut commands: Commands) {
     let bar = ui::toolbar(&mut commands);
-    let recenter = ui::icon_button(&mut commands, bar);
-    commands.entity(recenter).insert((
-        RecenterButton,
-        ui::HoverHint::new("Fly home", "the camera returns to the village banner"),
-    ));
-
-    // The icon is the town banner, drawn in nodes: a pole with a flag.
-    let pole = commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: px(12),
-                top: px(6),
-                width: px(3),
-                height: px(21),
-                ..default()
-            },
-            BackgroundColor(ui::theme::text_dim()),
-        ))
-        .id();
-    commands.entity(pole).insert(ChildOf(recenter));
-    let flag = commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: px(15),
-                top: px(7),
-                width: px(11),
-                height: px(8),
-                ..default()
-            },
-            BackgroundColor(ui::theme::accent()),
-        ))
-        .id();
-    commands.entity(flag).insert(ChildOf(recenter));
 
     // The village ledger: three rising bars.
     let village = ui::icon_button(&mut commands, bar);
@@ -384,15 +352,6 @@ fn handle_toolbar(
         ),
     >,
     mut codex: Option<ResMut<Codex>>,
-    mut history_panels: Query<
-        &mut Visibility,
-        (
-            With<HistoryPanel>,
-            Without<WorldPanel>,
-            Without<PeoplePanel>,
-            Without<VillagePanel>,
-        ),
-    >,
 ) {
     // Windows are toggles now: each button opens or closes its own, and any
     // mix may stay open. They are real windows — drag them, close them.
@@ -426,8 +385,15 @@ fn handle_toolbar(
     }
     for interaction in &history_buttons {
         if *interaction == Interaction::Pressed {
-            for mut visibility in &mut history_panels {
-                toggle(&mut visibility);
+            if let Some(codex) = codex.as_mut() {
+                for mut visibility in &mut village_panels {
+                    if *visibility != Visibility::Hidden && codex.page == CodexPage::Chronicle {
+                        *visibility = Visibility::Hidden;
+                    } else {
+                        *visibility = Visibility::Visible;
+                        codex.page = CodexPage::Chronicle;
+                    }
+                }
             }
         }
     }
@@ -461,6 +427,11 @@ fn handle_toolbar(
             follow.entity = None;
             rig.target_focus = site.centre;
             rig.target_distance = 70.0;
+            // The eye lives on the ledger's village entry now: flying home
+            // closes the codex so the village itself fills the view.
+            for mut visibility in &mut village_panels {
+                *visibility = Visibility::Hidden;
+            }
         }
     }
 }
