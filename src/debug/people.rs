@@ -458,6 +458,9 @@ pub(crate) fn spawn_people_panel(
 
     // WANTS and HAS SEEN, side by side; LATELY beneath with its dates in
     // the margin - the mockup's lower third.
+    // The dossier's footer: WANTS, HAS SEEN and LATELY span the full
+    // width beneath the portrait and the reading, whatever tab is open -
+    // the mockup's composition, and the soul's want is never out of view.
     let cards = commands
         .spawn((
             Node {
@@ -465,9 +468,10 @@ pub(crate) fn spawn_people_panel(
                 flex_direction: FlexDirection::Row,
                 column_gap: px(10),
                 align_items: AlignItems::Stretch,
+                margin: UiRect::top(px(10)),
                 ..default()
             },
-            ChildOf(soul),
+            ChildOf(page),
         ))
         .id();
     let card = |commands: &mut Commands, parent: Entity, title: &str| -> Entity {
@@ -639,7 +643,7 @@ pub(crate) fn update_people_panel(
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 column_gap: px(8),
-                padding: UiRect::axes(px(8), px(6)),
+                padding: UiRect::new(px(13), px(10), px(7), px(7)),
                 border: UiRect::bottom(px(1)),
                 ..default()
             },
@@ -695,7 +699,7 @@ pub(crate) fn update_people_panel(
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
                     column_gap: px(6),
-                    padding: UiRect::new(px(0), px(8), px(3), px(3)),
+                    padding: UiRect::new(px(12), px(10), px(6), px(6)),
                     border: UiRect::all(px(1)),
                     border_radius: BorderRadius::all(px(2)),
                     ..default()
@@ -713,8 +717,7 @@ pub(crate) fn update_people_panel(
                     flex_grow: 1.0,
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
-                    column_gap: px(8),
-                    padding: UiRect::axes(px(6), px(4)),
+                    column_gap: px(10),
                     border_radius: BorderRadius::all(px(2)),
                     ..default()
                 },
