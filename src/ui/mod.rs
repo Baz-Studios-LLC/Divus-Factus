@@ -1204,20 +1204,19 @@ pub fn split_row(
     (list, detail)
 }
 
-/// A big-number stat plate: the glyph seated in a ring medallion, the label
-/// in engraved capitals above the figure beside it. Returns (seat, number) —
-/// the caller puts its glyph in the seat and marks the number for updates.
+/// A big-number stat plate: the label as a centred header across the top,
+/// the glyph's ring medallion and the figure side by side beneath it.
+/// Returns (seat, number) — the caller puts its glyph in the seat and marks
+/// the number for live updates.
 pub fn stat_plate(commands: &mut Commands, parent: Entity, label_text: &str) -> (Entity, Entity) {
     let plate = commands
         .spawn((
             Node {
                 flex_grow: 1.0,
                 flex_basis: px(0),
-                flex_direction: FlexDirection::Row,
+                flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                column_gap: px(14),
-                padding: UiRect::axes(px(10), px(8)),
+                padding: UiRect::axes(px(10), px(9)),
                 border: UiRect::all(px(1)),
                 border_radius: BorderRadius::all(px(0)),
                 ..default()
@@ -1225,33 +1224,6 @@ pub fn stat_plate(commands: &mut Commands, parent: Entity, label_text: &str) -> 
             BackgroundColor(theme::title_bg()),
             BorderColor::all(theme::panel_border()),
             ChildOf(parent),
-        ))
-        .id();
-    let seat = commands
-        .spawn((
-            Node {
-                width: px(40),
-                height: px(40),
-                flex_shrink: 0.0,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(40)),
-                ..default()
-            },
-            BackgroundColor(Color::BLACK.with_alpha(0.25)),
-            BorderColor::all(theme::accent().with_alpha(0.4)),
-            ChildOf(plate),
-        ))
-        .id();
-    let words = commands
-        .spawn((
-            Node {
-                flex_direction: FlexDirection::Column,
-                row_gap: px(1),
-                ..default()
-            },
-            ChildOf(plate),
         ))
         .id();
     commands.spawn((
@@ -1262,8 +1234,37 @@ pub fn stat_plate(commands: &mut Commands, parent: Entity, label_text: &str) -> 
             ..default()
         },
         TextColor(theme::text_dim()),
-        ChildOf(words),
+        ChildOf(plate),
     ));
+    let row = commands
+        .spawn((
+            Node {
+                flex_grow: 1.0,
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: px(12),
+                ..default()
+            },
+            ChildOf(plate),
+        ))
+        .id();
+    let seat = commands
+        .spawn((
+            Node {
+                width: px(38),
+                height: px(38),
+                flex_shrink: 0.0,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(38)),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.25)),
+            BorderColor::all(theme::accent().with_alpha(0.4)),
+            ChildOf(row),
+        ))
+        .id();
     let number = commands
         .spawn((
             Text::new("0"),
@@ -1273,7 +1274,13 @@ pub fn stat_plate(commands: &mut Commands, parent: Entity, label_text: &str) -> 
                 ..default()
             },
             TextColor(theme::accent()),
-            ChildOf(words),
+            // Cinzel's line box carries phantom depth below the capitals;
+            // uncorrected, the figure sits visibly low against the seat.
+            Node {
+                margin: UiRect::top(px(-7)),
+                ..default()
+            },
+            ChildOf(row),
         ))
         .id();
     (seat, number)
