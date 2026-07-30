@@ -470,6 +470,33 @@ camp in a lean season, chronicled with its why. What they feed:
 Noted deliberately: this is the one-way door from naturalistic folk-world
 to fantasy world. Crossed on purpose.
 
+**Fire that spreads (Baz, 2026-07-30) — Milestone 3.75's first citizen,
+specified.** Today lightning-struck trees effectively vanish; fire must
+become a STATE things pass through, not a deletion with drama:
+- *Properties, not scripts:* matter grows the fire triplet — flammability
+  (does it catch), fuel (an oak burns all night, a bush is a flash), and
+  dryness (the gate, written daily by weather and season). ONE transfer
+  rule: a burning thing radiates ignition at neighbours, wind-biased,
+  dryness-gated. The forest fire is emergent — no forest-fire code, just
+  trees near trees.
+- *Burning is a life stage:* struck → real minutes of flame and smoke,
+  its own light at night → a charred snag standing in ash. Memory, not
+  disappearance.
+- *The axe is permanent; fire renews:* burn scars heal — saplings return
+  green after seasons, unlike stripped ground which never does. Fire is
+  the world redecorating; the axe is the village consuming.
+- *Consequences:* the pure-timber houses were built to fear this day
+  (v0.2.5 notes foreshadowed it); bucket chains from the shore (hauling,
+  which villagers already know); firebreaks; dry late summer becomes fire
+  season the way deep winter is wolf season — the calendar's second
+  antagonist. A Smite that starts a forest fire gives wrath consequences
+  that outrun the caster — the ultimate false-attribution engine.
+- *Engineering:* the grove system is ready — stand_alone() already
+  detaches single trees; burning = that + a fire state; spread is a
+  neighbour query groves can answer. Care: concurrency caps (a forest
+  alight is a spectacle, not a slideshow) and a burnt-registry like
+  StrippedGround but with a regrowth clock.
+
 **The legibility track runs in parallel (it's UI, not sim):**
 - **Job outfits (Baz's idea, agreed):** taking a trade dresses the body for
   it — LAYERED over the personal genome-coloured tunic, never replacing it,
