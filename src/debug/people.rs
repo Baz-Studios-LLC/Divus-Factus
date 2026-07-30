@@ -141,7 +141,7 @@ pub(crate) fn spawn_people_panel(
             flex_direction: FlexDirection::Column,
             padding: px(5).into(),
             border: UiRect::all(px(2)),
-            border_radius: BorderRadius::all(px(3)),
+            border_radius: BorderRadius::all(px(0)),
             ..default()
         },
     ));
@@ -157,7 +157,7 @@ pub(crate) fn spawn_people_panel(
             row_gap: px(5),
             overflow: Overflow::scroll_y(),
             padding: UiRect::all(px(6)),
-            border_radius: BorderRadius::all(px(2)),
+            border_radius: BorderRadius::all(px(0)),
             ..default()
         },
     ));
@@ -167,7 +167,7 @@ pub(crate) fn spawn_people_panel(
     // real body, rebuilt, turning slowly.
     let target = images.add(bevy::image::Image::new_target_texture(
         440,
-        520,
+        672,
         bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
         None,
     ));
@@ -337,9 +337,10 @@ pub(crate) fn spawn_people_panel(
         .spawn((
             Node {
                 width: percent(100),
+                height: px(400),
                 flex_direction: FlexDirection::Row,
                 column_gap: px(14),
-                align_items: AlignItems::FlexStart,
+                align_items: AlignItems::Stretch,
                 ..default()
             },
             ChildOf(page),
@@ -350,7 +351,7 @@ pub(crate) fn spawn_people_panel(
             Node {
                 padding: UiRect::all(px(4)),
                 border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(2)),
+                border_radius: BorderRadius::all(px(0)),
                 flex_shrink: 0.0,
                 ..default()
             },
@@ -363,7 +364,7 @@ pub(crate) fn spawn_people_panel(
         bevy::ui::widget::ImageNode::new(target.clone()),
         Node {
             width: px(256),
-            height: px(304),
+            height: px(390),
             ..default()
         },
         ChildOf(plaque),
@@ -373,6 +374,7 @@ pub(crate) fn spawn_people_panel(
             Node {
                 flex_grow: 1.0,
                 min_width: px(0),
+                height: percent(100),
                 flex_direction: FlexDirection::Column,
                 row_gap: px(8),
                 ..default()
@@ -391,6 +393,23 @@ pub(crate) fn spawn_people_panel(
         &["THE SOUL", "KIN & CRAFT", "THE LIFE"],
     );
     let (soul, kin_tab, life_tab) = (tabs[0], tabs[1], tabs[2]);
+    // Pages stretch to the plate's foot, so the reading column and the
+    // portrait close on one shared bottom edge - the puzzle contract.
+    for (index, tab_page) in [soul, kin_tab, life_tab].into_iter().enumerate() {
+        commands.entity(tab_page).insert(Node {
+            width: percent(100),
+            flex_grow: 1.0,
+            min_height: px(0),
+            flex_direction: FlexDirection::Column,
+            row_gap: px(ui::theme::GAP),
+            display: if index == 0 {
+                Display::Flex
+            } else {
+                Display::None
+            },
+            ..default()
+        });
+    }
 
     // Every readout the hover card has, as a two-column grid of chipped
     // rows - each stat wearing its little engraved glyph.
@@ -398,11 +417,13 @@ pub(crate) fn spawn_people_panel(
         .spawn((
             Node {
                 width: percent(100),
+                flex_grow: 1.0,
                 flex_direction: FlexDirection::Row,
                 flex_wrap: FlexWrap::Wrap,
+                align_content: AlignContent::SpaceEvenly,
                 row_gap: px(3),
-                padding: UiRect::all(px(6)),
-                border_radius: BorderRadius::all(px(2)),
+                padding: UiRect::axes(px(10), px(6)),
+                border_radius: BorderRadius::all(px(0)),
                 ..default()
             },
             BackgroundColor(Color::BLACK.with_alpha(0.22)),
@@ -484,7 +505,7 @@ pub(crate) fn spawn_people_panel(
                     row_gap: px(6),
                     padding: UiRect::all(px(10)),
                     border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(px(2)),
+                    border_radius: BorderRadius::all(px(0)),
                     ..default()
                 },
                 BackgroundColor(Color::BLACK.with_alpha(0.22)),
@@ -541,7 +562,7 @@ pub(crate) fn spawn_people_panel(
             flex_direction: FlexDirection::Column,
             row_gap: px(6),
             padding: UiRect::all(px(8)),
-            border_radius: BorderRadius::all(px(2)),
+            border_radius: BorderRadius::all(px(0)),
             ..default()
         },
         BackgroundColor(Color::BLACK.with_alpha(0.25)),
@@ -555,7 +576,7 @@ pub(crate) fn spawn_people_panel(
             flex_direction: FlexDirection::Column,
             row_gap: px(7),
             padding: UiRect::all(px(8)),
-            border_radius: BorderRadius::all(px(2)),
+            border_radius: BorderRadius::all(px(0)),
             ..default()
         },
         BackgroundColor(Color::BLACK.with_alpha(0.25)),
@@ -573,7 +594,7 @@ pub(crate) fn spawn_people_panel(
             overflow: Overflow::scroll_y(),
             padding: UiRect::all(px(8)),
             row_gap: px(2),
-            border_radius: BorderRadius::all(px(2)),
+            border_radius: BorderRadius::all(px(0)),
             ..default()
         },
         BackgroundColor(Color::BLACK.with_alpha(0.35)),
@@ -666,7 +687,7 @@ pub(crate) fn update_people_panel(
             Node {
                 padding: UiRect::axes(px(7), px(1)),
                 border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(2)),
+                border_radius: BorderRadius::all(px(0)),
                 ..default()
             },
             BorderColor::all(ui::theme::panel_border()),
@@ -701,7 +722,7 @@ pub(crate) fn update_people_panel(
                     column_gap: px(6),
                     padding: UiRect::new(px(12), px(10), px(6), px(6)),
                     border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(px(2)),
+                    border_radius: BorderRadius::all(px(0)),
                     ..default()
                 },
                 BackgroundColor(ui::theme::title_bg().with_alpha(0.55)),
@@ -718,7 +739,7 @@ pub(crate) fn update_people_panel(
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
                     column_gap: px(10),
-                    border_radius: BorderRadius::all(px(2)),
+                    border_radius: BorderRadius::all(px(0)),
                     ..default()
                 },
                 BackgroundColor(ui::theme::panel_bg().with_alpha(0.0)),
@@ -1377,7 +1398,7 @@ pub(crate) fn update_dossier(
                     Node {
                         width: px(170),
                         height: px(9),
-                        border_radius: BorderRadius::all(px(2)),
+                        border_radius: BorderRadius::all(px(0)),
                         flex_shrink: 0.0,
                         overflow: Overflow::clip(),
                         ..default()
@@ -1390,7 +1411,7 @@ pub(crate) fn update_dossier(
                 Node {
                     width: percent((skill * 100.0).max(2.0)),
                     height: percent(100),
-                    border_radius: BorderRadius::all(px(2)),
+                    border_radius: BorderRadius::all(px(0)),
                     ..default()
                 },
                 BackgroundColor(crate::palette::shade(
@@ -1489,7 +1510,7 @@ pub(crate) fn update_dossier(
                             padding: UiRect::axes(px(10), px(4)),
                             margin: UiRect::top(px(6)),
                             border: UiRect::left(px(3)),
-                            border_radius: BorderRadius::all(px(2)),
+                            border_radius: BorderRadius::all(px(0)),
                             ..default()
                         },
                         BorderColor::all(ui::theme::accent().with_alpha(0.8)),
@@ -1516,7 +1537,7 @@ pub(crate) fn update_dossier(
                         align_items: AlignItems::Center,
                         column_gap: px(8),
                         padding: UiRect::axes(px(6), px(4)),
-                        border_radius: BorderRadius::all(px(2)),
+                        border_radius: BorderRadius::all(px(0)),
                         ..default()
                     },
                     BackgroundColor(if stripe {

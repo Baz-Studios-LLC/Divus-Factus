@@ -804,7 +804,7 @@ fn window_impl_titled(
                 flex_direction: FlexDirection::Column,
                 padding: px(5).into(),
                 border: UiRect::all(px(2)),
-                border_radius: BorderRadius::all(px(3)),
+                border_radius: BorderRadius::all(px(0)),
                 ..default()
             },
             BackgroundColor(Color::srgb(0.05, 0.045, 0.04)),
@@ -820,7 +820,7 @@ fn window_impl_titled(
                 width: percent(100),
                 flex_direction: FlexDirection::Column,
                 border: UiRect::all(px(2)),
-                border_radius: BorderRadius::all(px(2)),
+                border_radius: BorderRadius::all(px(0)),
                 overflow: Overflow::clip(),
                 ..default()
             },
@@ -881,7 +881,7 @@ fn window_impl_titled(
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 border: UiRect::all(px(2)),
-                border_radius: BorderRadius::all(px(6)),
+                border_radius: BorderRadius::all(px(0)),
                 ..default()
             },
             BorderColor::all(theme::card_border()),
@@ -1197,7 +1197,7 @@ pub fn split_view_titled(
                 row_gap: px(2),
                 overflow: Overflow::scroll_y(),
                 padding: UiRect::all(px(6)),
-                border_radius: BorderRadius::all(px(2)),
+                border_radius: BorderRadius::all(px(0)),
                 ..default()
             },
             // An inset well, a step darker than the panel: the roster reads
@@ -1418,7 +1418,7 @@ pub fn tab_bar(commands: &mut Commands, parent: Entity, labels: &[&str]) -> Vec<
                 Node {
                     padding: UiRect::axes(px(22), px(8)),
                     border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(px(2)),
+                    border_radius: BorderRadius::all(px(0)),
                     ..default()
                 },
                 BackgroundColor(if index == 0 {
