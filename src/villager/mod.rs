@@ -876,8 +876,20 @@ pub(crate) fn spawn_settlement(
             Vec3::new(1.3, 0.14, 0.08),
             &trim,
         );
-        // The sign, in gold blocks proud of the cloth, on both faces - the
-        // very rectangles the codex draws, made voxel.
+        // The sign, in blocks proud of the cloth, on both faces - the very
+        // rectangles the codex draws, made voxel, inked by the rule of
+        // tincture so it reads on any cloth.
+        let field = palette::shade(&palette::ALL_RAMPS[banner_ramp], 0.8).to_srgba();
+        let sign_material = if crate::sigil::gold_reads_on([field.red, field.green, field.blue]) {
+            trim.clone()
+        } else {
+            let dark = crate::sigil::dark_ink();
+            materials.add(StandardMaterial {
+                base_color: Color::srgb(dark[0], dark[1], dark[2]),
+                perceptual_roughness: 0.7,
+                ..default()
+            })
+        };
         for &(x, y, w, h, turn, _round) in crate::sigil::rects(sigil) {
             let unit = 1.05 / 16.0;
             let cx = (x + w * 0.5) / 16.0 - 0.5;
@@ -886,7 +898,7 @@ pub(crate) fn spawn_settlement(
                 part_rotated(
                     &mut commands,
                     &cube,
-                    &trim,
+                    &sign_material,
                     settlement,
                     Vec3::new(0.75 + cx * 1.05, 3.62 - cy * 1.05, face * 0.05),
                     Quat::from_rotation_z(-turn.to_radians()),

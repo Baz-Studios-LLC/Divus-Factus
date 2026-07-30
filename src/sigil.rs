@@ -218,6 +218,22 @@ pub fn rects(index: usize) -> &'static [SigilRect] {
     SIGILS[index % SIGILS.len()].1
 }
 
+/// The rule of tincture, shared by every renderer of the arms: the sign is
+/// inked in whichever metal - bright gold or near-black - stands further
+/// from the field's own brightness, so the sign reads on any cloth the
+/// founding happens to roll.
+pub fn gold_reads_on(field_srgb: [f32; 3]) -> bool {
+    let luminance = field_srgb[0] * 0.3 + field_srgb[1] * 0.55 + field_srgb[2] * 0.15;
+    const GOLD_LUMINANCE: f32 = 0.62;
+    const DARK_LUMINANCE: f32 = 0.10;
+    (luminance - GOLD_LUMINANCE).abs() >= (luminance - DARK_LUMINANCE).abs()
+}
+
+/// The dark metal, when gold would drown.
+pub fn dark_ink() -> [f32; 3] {
+    [0.12, 0.10, 0.06]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
