@@ -418,6 +418,33 @@ mortality/winter work first so restlessness reflects a working world,
 not its bugs. Schism is the CAPSTONE of the simulation arc — the reward
 for finishing it.
 
+**Defenses (discussed 2026-07-30): walls, archers, knights — scaled to a
+threat that must be real.** A wall with nothing outside it is decoration,
+so the defense ladder grows in lockstep with the threat ladder:
+
+- *Wolves first, winter makes them serious:* a starving pack grows bold
+  enough to enter the village for the stores — or the children. Justifies
+  the small start Baz asked for: one or two part-time watchmen at low pop
+  (a fisher who drops the net when the horn sounds), a palisade of home
+  timber. Rides the winter-antagonist work and the already-queued combat
+  verbs (shared foundation with expedition guards).
+- *The archer gives the watchtower a person:* the tower wards passively
+  today; manned, it lets a small militia matter against a pack.
+- *Knights are late-game and an IRON SINK:* ore → blacksmith → arms and
+  mail finally gives surveyed iron a purpose; a knight is something a
+  town achieves (population, blacksmith, iron country, and a reason).
+- *Human threats arrive with schism:* the first raid is never a spawned
+  bandit camp — it is the splinter town that failed, coming back armed in
+  a hungry winter. Every threat has a chronicle behind it.
+- *The Egregore twist — walls are a confession:* a congregation that
+  truly trusts its god under-builds (the god is the wall); a doubting or
+  dread-ruled town builds high and mans the tower. Faith becomes readable
+  in the skyline, and defense investment is doctrine made visible.
+
+Ladder: part-time militia (~pop 10) → palisade → gate → guard as a real
+trade → archer + tower → stone wall → knights. Threats first, then the
+defenses they justify.
+
 **The legibility track runs in parallel (it's UI, not sim):**
 - **Job outfits (Baz's idea, agreed):** taking a trade dresses the body for
   it — LAYERED over the personal genome-coloured tunic, never replacing it,
