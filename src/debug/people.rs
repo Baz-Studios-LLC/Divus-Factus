@@ -6,10 +6,6 @@ use crate::villager::{
 };
 use crate::witness::{Temperament, Witnessed};
 
-/// The toolbar button that opens the people roster.
-#[derive(Component)]
-pub(crate) struct PeopleButton;
-
 /// The roster panel: everyone alive, click to follow.
 #[derive(Component)]
 pub(crate) struct PeoplePanel;

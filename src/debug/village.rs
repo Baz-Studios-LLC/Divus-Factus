@@ -24,10 +24,6 @@ use bevy::prelude::*;
 #[derive(Component)]
 pub(crate) struct VillagePanel;
 
-/// Its toolbar button.
-#[derive(Component)]
-pub(crate) struct VillageButton;
-
 /// One of the three big numbers at the top: souls, houses, believers.
 #[derive(Component)]
 pub(crate) struct VillageCard(u8);

@@ -1822,69 +1822,6 @@ pub fn centered_strip(commands: &mut Commands, top: Val, bottom: Val) -> Entity 
         .id()
 }
 
-/// The top-centre toolbar: a short row of icon buttons. Centred by its strip,
-/// however many buttons it grows.
-pub fn toolbar(commands: &mut Commands) -> Entity {
-    // Flush with the screen's top; the margin lives as padding on an
-    // invisible apron, so the approach to the bar is already interface.
-    let strip = centered_strip(commands, px(0), Val::Auto);
-    let apron = commands
-        .spawn((
-            Panel,
-            Interaction::default(),
-            Node {
-                padding: UiRect::axes(px(14), px(0))
-                    .with_top(px(theme::MARGIN))
-                    .with_bottom(px(12)),
-                ..default()
-            },
-            ChildOf(strip),
-        ))
-        .id();
-    let bar = commands
-        .spawn((
-            Name::new("Toolbar"),
-            Panel,
-            Node {
-                flex_direction: FlexDirection::Row,
-                column_gap: px(6),
-                padding: UiRect::all(px(5)),
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(6)),
-                ..default()
-            },
-            BackgroundColor(theme::panel_bg()),
-            BorderColor::all(theme::panel_border()),
-            Interaction::default(),
-            ChildOf(apron),
-        ))
-        .id();
-    bar
-}
-
-/// An icon button in the toolbar. Its icon is built from child nodes by the
-/// caller — no icon fonts, no images, same as everything else in this game.
-/// Returns the button entity; watch its `Interaction` for presses.
-pub fn icon_button(commands: &mut Commands, toolbar: Entity) -> Entity {
-    let button = commands
-        .spawn((
-            UiButton,
-            Node {
-                width: px(34),
-                height: px(34),
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(5)),
-                ..default()
-            },
-            BackgroundColor(theme::panel_bg().with_alpha(0.4)),
-            BorderColor::all(theme::panel_border()),
-            Interaction::default(),
-            ChildOf(toolbar),
-        ))
-        .id();
-    button
-}
-
 /// Marks a kit button, for the shared hover/press styling.
 #[derive(Component)]
 pub struct UiButton;

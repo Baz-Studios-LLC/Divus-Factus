@@ -51,7 +51,6 @@ impl Plugin for DebugPlugin {
                 Startup,
                 (
                     spawn_hud,
-                    spawn_toolbar,
                     spawn_world_panel.after(spawn_village_panel),
                     spawn_people_panel.after(spawn_village_panel),
                     spawn_chronicle_page.after(spawn_village_panel),
@@ -141,277 +140,17 @@ impl Default for DebugState {
 #[derive(Component)]
 pub(crate) struct RecenterButton;
 
-fn spawn_toolbar(mut commands: Commands) {
-    let bar = ui::toolbar(&mut commands);
-
-    // The village ledger: three rising bars.
-    let village = ui::icon_button(&mut commands, bar);
-    commands.entity(village).insert((
-        VillageButton,
-        ui::HoverHint::new("The Village", "ledger, gauges and the faith roster"),
-    ));
-    for (i, height) in [(0, 8.0), (1, 13.0), (2, 18.0)] {
-        let bar_node = commands
-            .spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: px(8.0 + i as f32 * 6.0),
-                    bottom: px(6),
-                    width: px(4),
-                    height: px(height),
-                    ..default()
-                },
-                BackgroundColor(if i == 2 {
-                    ui::theme::accent()
-                } else {
-                    ui::theme::text_dim()
-                }),
-            ))
-            .id();
-        commands.entity(bar_node).insert(ChildOf(village));
-    }
-
-    // The god's own panel: a gold diamond mark.
-    let god = ui::icon_button(&mut commands, bar);
-    commands.entity(god).insert((
-        GodButton,
-        ui::HoverHint::new(
-            "The God",
-            "your name, your miracles, how they feel about you",
-        ),
-    ));
-    for (size, top, left, bright) in [(12.0, 10.0, 10.0, true), (6.0, 13.0, 13.0, false)] {
-        let mark = commands
-            .spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: px(left),
-                    top: px(top),
-                    width: px(size),
-                    height: px(size),
-                    border_radius: BorderRadius::all(px(3)),
-                    ..default()
-                },
-                BackgroundColor(if bright {
-                    ui::theme::accent()
-                } else {
-                    ui::theme::title_bg()
-                }),
-            ))
-            .id();
-        commands.entity(mark).insert(ChildOf(god));
-    }
-
-    // The world button: a globe, drawn as a ringed circle with a belt.
-    let world = ui::icon_button(&mut commands, bar);
-    commands.entity(world).insert((
-        WorldButton,
-        ui::HoverHint::new("The Land", "the world's own numbers"),
-    ));
-    let globe = commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: px(7),
-                top: px(7),
-                width: px(20),
-                height: px(20),
-                border: UiRect::all(px(2)),
-                border_radius: BorderRadius::all(px(10)),
-                ..default()
-            },
-            BorderColor::all(ui::theme::text_dim()),
-        ))
-        .id();
-    commands.entity(globe).insert(ChildOf(world));
-    let belt = commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: px(8),
-                top: px(15),
-                width: px(18),
-                height: px(3),
-                ..default()
-            },
-            BackgroundColor(ui::theme::accent().with_alpha(0.8)),
-        ))
-        .id();
-    commands.entity(belt).insert(ChildOf(world));
-
-    // The people button: a head above shoulders.
-    let people = ui::icon_button(&mut commands, bar);
-    commands.entity(people).insert((
-        PeopleButton,
-        ui::HoverHint::new("The People", "roster, portraits and every life's story"),
-    ));
-    let head = commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: px(13),
-                top: px(6),
-                width: px(8),
-                height: px(8),
-                border_radius: BorderRadius::all(px(4)),
-                ..default()
-            },
-            BackgroundColor(ui::theme::text_dim()),
-        ))
-        .id();
-    commands.entity(head).insert(ChildOf(people));
-    let shoulders = commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: px(9),
-                top: px(16),
-                width: px(16),
-                height: px(11),
-                border_radius: BorderRadius::top(px(7)),
-                ..default()
-            },
-            BackgroundColor(ui::theme::accent().with_alpha(0.8)),
-        ))
-        .id();
-    commands.entity(shoulders).insert(ChildOf(people));
-
-    // The history button: a page with written lines.
-    let history = ui::icon_button(&mut commands, bar);
-    commands.entity(history).insert((
-        HistoryButton,
-        ui::HoverHint::new("The Chronicle", "everything that has ever happened here"),
-    ));
-    let page = commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: px(9),
-                top: px(5),
-                width: px(16),
-                height: px(23),
-                border: UiRect::all(px(2)),
-                border_radius: BorderRadius::all(px(2)),
-                ..default()
-            },
-            BorderColor::all(ui::theme::text_dim()),
-        ))
-        .id();
-    commands.entity(page).insert(ChildOf(history));
-    for (i, width) in [(0u8, 8.0f32), (1, 8.0), (2, 5.0)] {
-        let line = commands
-            .spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: px(13),
-                    top: px(10.0 + i as f32 * 5.0),
-                    width: px(width),
-                    height: px(2),
-                    ..default()
-                },
-                BackgroundColor(ui::theme::accent().with_alpha(0.8)),
-            ))
-            .id();
-        commands.entity(line).insert(ChildOf(history));
-    }
-}
-
-/// The recenter button flies the view back to the village banner.
+/// The eye on the ledger's village entry: flying home clears any follow,
+/// aims the camera at the banner, and the codex steps aside so the village
+/// itself fills the view. (The toolbar this once served is gone - the codex
+/// is whole, and Tab and the strip are its doors.)
 fn handle_toolbar(
     buttons: Query<&Interaction, (Changed<Interaction>, With<RecenterButton>)>,
-    world_buttons: Query<&Interaction, (Changed<Interaction>, With<WorldButton>)>,
-    people_buttons: Query<&Interaction, (Changed<Interaction>, With<PeopleButton>)>,
-    village_buttons: Query<&Interaction, (Changed<Interaction>, With<VillageButton>)>,
-    god_buttons: Query<&Interaction, (Changed<Interaction>, With<GodButton>)>,
-    mut village_panels: Query<
-        &mut Visibility,
-        (
-            With<VillagePanel>,
-            Without<WorldPanel>,
-            Without<PeoplePanel>,
-            Without<HistoryPanel>,
-            Without<GodPanel>,
-        ),
-    >,
+    mut village_panels: Query<&mut Visibility, With<VillagePanel>>,
     site: Option<Res<crate::villager::SettlementSite>>,
     mut follow: ResMut<crate::camera::FollowTarget>,
     mut rigs: Query<&mut crate::camera::CameraRig>,
-    history_buttons: Query<&Interaction, (Changed<Interaction>, With<HistoryButton>)>,
-    mut codex: Option<ResMut<Codex>>,
 ) {
-    // Every button turns the codex: open it on the page, or close it if it
-    // is already open there.
-    for interaction in &world_buttons {
-        if *interaction == Interaction::Pressed {
-            if let Some(codex) = codex.as_mut() {
-                for mut visibility in &mut village_panels {
-                    if *visibility != Visibility::Hidden && codex.page == CodexPage::World {
-                        *visibility = Visibility::Hidden;
-                    } else {
-                        *visibility = Visibility::Visible;
-                        codex.page = CodexPage::World;
-                    }
-                }
-            }
-        }
-    }
-    for interaction in &people_buttons {
-        if *interaction == Interaction::Pressed {
-            if let Some(codex) = codex.as_mut() {
-                for mut visibility in &mut village_panels {
-                    if *visibility != Visibility::Hidden && codex.page == CodexPage::People {
-                        *visibility = Visibility::Hidden;
-                    } else {
-                        *visibility = Visibility::Visible;
-                        codex.page = CodexPage::People;
-                    }
-                }
-            }
-        }
-    }
-    for interaction in &history_buttons {
-        if *interaction == Interaction::Pressed {
-            if let Some(codex) = codex.as_mut() {
-                for mut visibility in &mut village_panels {
-                    if *visibility != Visibility::Hidden && codex.page == CodexPage::Chronicle {
-                        *visibility = Visibility::Hidden;
-                    } else {
-                        *visibility = Visibility::Visible;
-                        codex.page = CodexPage::Chronicle;
-                    }
-                }
-            }
-        }
-    }
-    for interaction in &village_buttons {
-        if *interaction == Interaction::Pressed {
-            if let Some(codex) = codex.as_mut() {
-                for mut visibility in &mut village_panels {
-                    if *visibility != Visibility::Hidden && codex.page == CodexPage::Ledger {
-                        *visibility = Visibility::Hidden;
-                    } else {
-                        *visibility = Visibility::Visible;
-                        codex.page = CodexPage::Ledger;
-                    }
-                }
-            }
-        }
-    }
-    for interaction in &god_buttons {
-        if *interaction == Interaction::Pressed {
-            if let Some(codex) = codex.as_mut() {
-                for mut visibility in &mut village_panels {
-                    if *visibility != Visibility::Hidden && codex.page == CodexPage::Deity {
-                        *visibility = Visibility::Hidden;
-                    } else {
-                        *visibility = Visibility::Visible;
-                        codex.page = CodexPage::Deity;
-                    }
-                }
-            }
-        }
-    }
-
     let (Some(site), Ok(mut rig)) = (site, rigs.single_mut()) else {
         return;
     };
@@ -420,8 +159,6 @@ fn handle_toolbar(
             follow.entity = None;
             rig.target_focus = site.centre;
             rig.target_distance = 70.0;
-            // The eye lives on the ledger's village entry now: flying home
-            // closes the codex so the village itself fills the view.
             for mut visibility in &mut village_panels {
                 *visibility = Visibility::Hidden;
             }

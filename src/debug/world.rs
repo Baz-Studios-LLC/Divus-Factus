@@ -13,10 +13,6 @@ use bevy::prelude::*;
 
 use super::village::{glyph_canvas, house_glyph};
 
-/// The toolbar button that turns the codex to this page.
-#[derive(Component)]
-pub(crate) struct WorldButton;
-
 /// The world page node; every is-it-open gate reads its visibility.
 #[derive(Component)]
 pub(crate) struct WorldPanel;
@@ -27,9 +23,8 @@ pub(crate) struct WorldMap {
     pub image: Handle<Image>,
     pub centre: Vec2,
     pub radius: f32,
-    /// Rows painted so far; the painter rests at `size`.
+    /// Rows painted so far; the painter rests at the map's full height.
     pub painted: u32,
-    pub size: u32,
 }
 
 /// The zoom radii the +/- buttons walk.
@@ -163,10 +158,11 @@ fn season_name(season: u8) -> &'static str {
 // The page.
 // ---------------------------------------------------------------------------
 
-/// The map texture's side, in pixels.
-const MAP_SIZE: u32 = 288;
+/// The map texture's face, in pixels: the pane's own widescreen shape.
+const MAP_W: u32 = 512;
+const MAP_H: u32 = 288;
 /// Rows the cartographer paints per frame.
-const ROWS_PER_FRAME: u32 = 8;
+const ROWS_PER_FRAME: u32 = 6;
 
 pub(crate) fn spawn_world_panel(
     mut commands: Commands,
@@ -179,11 +175,11 @@ pub(crate) fn spawn_world_panel(
         .insert((Name::new("World Page"), WorldPanel));
 
     // The unpainted parchment: near-black until the cartographer works.
-    let blank = vec![0u8; (MAP_SIZE * MAP_SIZE * 4) as usize];
+    let blank = vec![0u8; (MAP_W * MAP_H * 4) as usize];
     let image = images.add(Image::new(
         bevy::render::render_resource::Extent3d {
-            width: MAP_SIZE,
-            height: MAP_SIZE,
+            width: MAP_W,
+            height: MAP_H,
             depth_or_array_layers: 1,
         },
         bevy::render::render_resource::TextureDimension::D2,
@@ -196,7 +192,6 @@ pub(crate) fn spawn_world_panel(
         centre: Vec2::ZERO,
         radius: ZOOM_STEPS[1],
         painted: 0,
-        size: MAP_SIZE,
     });
     commands.init_resource::<MapZoom>();
 
@@ -384,9 +379,8 @@ pub(crate) fn spawn_world_panel(
     let map_frame = commands
         .spawn((
             Node {
+                width: percent(100),
                 height: percent(100),
-                aspect_ratio: Some(1.0),
-                flex_shrink: 0.0,
                 border: UiRect::all(px(1)),
                 border_radius: BorderRadius::all(px(0)),
                 overflow: Overflow::clip(),
@@ -467,19 +461,23 @@ pub(crate) fn spawn_world_panel(
             ChildOf(button),
         ));
     }
-    // The legend.
+    // The legend: a floating card upon the map, the mockup's way.
     let legend = commands
         .spawn((
             Node {
-                flex_grow: 1.0,
-                min_width: px(0),
+                position_type: PositionType::Absolute,
+                right: px(10),
+                top: px(10),
                 flex_direction: FlexDirection::Column,
                 row_gap: px(6),
-                padding: UiRect::all(px(8)),
+                padding: UiRect::all(px(10)),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(0)),
                 ..default()
             },
-            BackgroundColor(Color::BLACK.with_alpha(0.2)),
-            ChildOf(map_row),
+            BackgroundColor(ui::theme::title_bg().with_alpha(0.88)),
+            BorderColor::all(ui::theme::panel_border()),
+            ChildOf(map_frame),
         ))
         .id();
     commands.spawn((
@@ -732,7 +730,7 @@ pub(crate) fn paint_world_map(
     {
         map.centre = Vec2::new(site.centre.x, site.centre.z);
     }
-    if map.painted >= map.size {
+    if map.painted >= MAP_H {
         return;
     }
     let Some(mut image) = images.get_mut(&map.image) else {
@@ -742,8 +740,8 @@ pub(crate) fn paint_world_map(
         return;
     };
 
-    let size = map.size;
     let radius = map.radius;
+    let radius_z = radius * MAP_H as f32 / MAP_W as f32;
     let centre = map.centre;
     let known_centre = known.as_ref().map(|k| Vec2::new(k.centre.x, k.centre.z));
     let known_radius = known.as_ref().map_or(0.0, |k| k.radius);
@@ -754,13 +752,13 @@ pub(crate) fn paint_world_map(
             .collect()
     });
 
-    let rows_to_paint = ROWS_PER_FRAME.min(size - map.painted);
+    let rows_to_paint = ROWS_PER_FRAME.min(MAP_H - map.painted);
     for row in map.painted..map.painted + rows_to_paint {
-        for col in 0..size {
-            let u = col as f32 / (size - 1) as f32;
-            let v = row as f32 / (size - 1) as f32;
+        for col in 0..MAP_W {
+            let u = col as f32 / (MAP_W - 1) as f32;
+            let v = row as f32 / (MAP_H - 1) as f32;
             let x = centre.x + (u - 0.5) * 2.0 * radius;
-            let z = centre.y + (v - 0.5) * 2.0 * radius;
+            let z = centre.y + (v - 0.5) * 2.0 * radius_z;
             let height = terrain.height_at(x, z);
 
             let mut colour: [f32; 3];
@@ -794,7 +792,7 @@ pub(crate) fn paint_world_map(
                     ];
                 }
                 // Hillshade from the northwest, so relief reads as relief.
-                let step = radius / size as f32 * 2.0;
+                let step = radius / MAP_W as f32 * 2.0;
                 let lit = terrain.height_at(x - step, z - step);
                 let slope = ((height - lit) / step).clamp(-1.2, 1.2);
                 let shade = 1.0 + slope * 0.35;
@@ -816,7 +814,7 @@ pub(crate) fn paint_world_map(
                 ];
             }
 
-            let offset = ((row * size + col) * 4) as usize;
+            let offset = ((row * MAP_W + col) * 4) as usize;
             data[offset] = (colour[0].clamp(0.0, 1.0) * 255.0) as u8;
             data[offset + 1] = (colour[1].clamp(0.0, 1.0) * 255.0) as u8;
             data[offset + 2] = (colour[2].clamp(0.0, 1.0) * 255.0) as u8;
@@ -888,9 +886,10 @@ pub(crate) fn update_world_markers(
     };
     commands.entity(well).despawn_related::<Children>();
 
+    let radius_z = map.radius * MAP_H as f32 / MAP_W as f32;
     let place = |world: Vec2| -> Option<(f32, f32)> {
         let u = (world.x - map.centre.x) / (2.0 * map.radius) + 0.5;
-        let v = (world.y - map.centre.y) / (2.0 * map.radius) + 0.5;
+        let v = (world.y - map.centre.y) / (2.0 * radius_z) + 0.5;
         ((0.02..0.98).contains(&u) && (0.02..0.98).contains(&v)).then_some((u * 100.0, v * 100.0))
     };
 

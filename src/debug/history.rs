@@ -13,10 +13,6 @@ use crate::palette;
 use crate::ui;
 use bevy::prelude::*;
 
-/// The toolbar button that opens the history.
-#[derive(Component)]
-pub(crate) struct HistoryButton;
-
 /// The history panel: everything that has ever happened, stamped.
 #[derive(Component)]
 pub(crate) struct HistoryPanel;

@@ -12,10 +12,6 @@ use bevy::prelude::*;
 
 use super::village::{glyph_canvas, hands_glyph, house_glyph, people_glyph};
 
-/// The toolbar button that turns the codex to this page.
-#[derive(Component)]
-pub(crate) struct GodButton;
-
 /// The deity page node; every is-it-open gate reads its visibility.
 #[derive(Component)]
 pub(crate) struct GodPanel;
