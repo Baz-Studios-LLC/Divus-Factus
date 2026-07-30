@@ -1206,6 +1206,13 @@ pub(crate) fn plan_houses(
     // exposed on a rise. High flat country does not qualify, however
     // stony: a portal needs a wall of rock behind it.
     let minable = |t: &Terrain, x: f32, z: f32| {
+        // Well above the tide, always: a steep coastal bank passes the
+        // rise test on pure geometry, and a village once drove its mine
+        // into the beach bluff beside the dock. Mines belong in rising
+        // country, not the shore.
+        if t.height_at(x, z) < WATER_LEVEL + 10.0 {
+            return false;
+        }
         let step = 3.5;
         let rise_x = t.height_at(x + step, z) - t.height_at(x - step, z);
         let rise_z = t.height_at(x, z + step) - t.height_at(x, z - step);
