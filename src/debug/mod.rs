@@ -52,7 +52,7 @@ impl Plugin for DebugPlugin {
                 (
                     spawn_hud,
                     spawn_toolbar,
-                    spawn_world_panel,
+                    spawn_world_panel.after(spawn_village_panel),
                     spawn_people_panel.after(spawn_village_panel),
                     spawn_chronicle_page.after(spawn_village_panel),
                     spawn_village_panel,
@@ -77,6 +77,10 @@ impl Plugin for DebugPlugin {
                     screenshot_on_request,
                 )
                     .chain(),
+            )
+            .add_systems(
+                Update,
+                (paint_world_map, handle_map_zoom, update_world_markers).chain(),
             )
             .add_systems(
                 Update,
@@ -333,30 +337,21 @@ fn handle_toolbar(
     mut follow: ResMut<crate::camera::FollowTarget>,
     mut rigs: Query<&mut crate::camera::CameraRig>,
     history_buttons: Query<&Interaction, (Changed<Interaction>, With<HistoryButton>)>,
-    mut world_panels: Query<
-        &mut Visibility,
-        (
-            With<WorldPanel>,
-            Without<PeoplePanel>,
-            Without<HistoryPanel>,
-            Without<VillagePanel>,
-        ),
-    >,
     mut codex: Option<ResMut<Codex>>,
 ) {
-    // Windows are toggles now: each button opens or closes its own, and any
-    // mix may stay open. They are real windows — drag them, close them.
-    let toggle = |visibility: &mut Visibility| {
-        *visibility = if *visibility == Visibility::Hidden {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
-    };
+    // Every button turns the codex: open it on the page, or close it if it
+    // is already open there.
     for interaction in &world_buttons {
         if *interaction == Interaction::Pressed {
-            for mut visibility in &mut world_panels {
-                toggle(&mut visibility);
+            if let Some(codex) = codex.as_mut() {
+                for mut visibility in &mut village_panels {
+                    if *visibility != Visibility::Hidden && codex.page == CodexPage::World {
+                        *visibility = Visibility::Hidden;
+                    } else {
+                        *visibility = Visibility::Visible;
+                        codex.page = CodexPage::World;
+                    }
+                }
             }
         }
     }

@@ -62,6 +62,7 @@ impl Ledger {
             "died",
             "mauled",
             "slew",
+            "broken against",
             "famine",
             "picked bare",
             "larder",
@@ -266,6 +267,7 @@ impl Importance {
             "perish",
             "mauled",
             "slew",
+            "broken against",
             "widow",
             "famine",
         ]) {

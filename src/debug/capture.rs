@@ -111,6 +111,7 @@ pub(crate) fn capture_preselect(
         Ok("village") => super::village::CodexPage::Ledger,
         Ok("history") => super::village::CodexPage::Chronicle,
         Ok("god") => super::village::CodexPage::Deity,
+        Ok("world") => super::village::CodexPage::World,
         _ => super::village::CodexPage::People,
     };
     if let Some(mut codex) = codex

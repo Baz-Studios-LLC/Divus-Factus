@@ -89,6 +89,7 @@ pub(crate) enum CodexPage {
     People,
     Chronicle,
     Deity,
+    World,
 }
 
 /// The codex's spine: which page is open, and the handles the page-turn
@@ -101,10 +102,12 @@ pub(crate) struct Codex {
     pub people_page: Entity,
     pub chronicle_page: Entity,
     pub deity_page: Entity,
+    pub world_page: Entity,
     pub ledger_tab: Entity,
     pub people_tab: Entity,
     pub chronicle_tab: Entity,
     pub deity_tab: Entity,
+    pub world_tab: Entity,
     pub title_text: Entity,
     pub subtitle_text: Option<Entity>,
 }
@@ -363,6 +366,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
     let people_page = bound_page();
     let chronicle_page = bound_page();
     let deity_page = bound_page();
+    let world_page = bound_page();
 
     // The codex strip: five pages, two residents. Dark tabs are pages still
     // being written.
@@ -411,7 +415,6 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         button.id()
     };
     let ink = ui::theme::accent();
-    let faint = ui::theme::accent().with_alpha(0.35);
 
     let ledger_tab = tab(&mut commands, true, true);
     house_glyph(&mut commands, ledger_tab, ink);
@@ -428,10 +431,10 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
     ));
 
     let world_tab = tab(&mut commands, false, true);
-    tree_glyph(&mut commands, world_tab, faint);
-    commands.entity(world_tab).insert(ui::HoverHint::new(
-        "The World",
-        "this page of the codex is still being written",
+    tree_glyph(&mut commands, world_tab, ink.with_alpha(0.8));
+    commands.entity(world_tab).insert((
+        CodexTab(CodexPage::World),
+        ui::HoverHint::new("The World", "the lands your people walk; the seasons turn"),
     ));
 
     let people_tab = tab(&mut commands, false, true);
@@ -458,10 +461,12 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         people_page,
         chronicle_page,
         deity_page,
+        world_page,
         ledger_tab,
         people_tab,
         chronicle_tab,
         deity_tab,
+        world_tab,
         title_text: window.title_text,
         subtitle_text: window.subtitle_text,
     });
@@ -870,6 +875,7 @@ pub(crate) fn apply_codex_page(
         (codex.people_page, codex.page == CodexPage::People),
         (codex.chronicle_page, codex.page == CodexPage::Chronicle),
         (codex.deity_page, codex.page == CodexPage::Deity),
+        (codex.world_page, codex.page == CodexPage::World),
     ];
     for (page, open) in pages {
         if let Ok(mut node) = nodes.get_mut(page) {
@@ -897,6 +903,7 @@ pub(crate) fn apply_codex_page(
         (codex.people_tab, codex.page == CodexPage::People),
         (codex.chronicle_tab, codex.page == CodexPage::Chronicle),
         (codex.deity_tab, codex.page == CodexPage::Deity),
+        (codex.world_tab, codex.page == CodexPage::World),
     ];
     for (tab, open) in tabs {
         if let Ok(mut fill) = fills.get_mut(tab) {
@@ -922,6 +929,10 @@ pub(crate) fn apply_codex_page(
             "The tale of your people, written moment by moment.",
         ),
         CodexPage::Deity => ("THE DEITY", "You are the unseen. They are the faithful."),
+        CodexPage::World => (
+            "THE WORLD",
+            "The lands your people walk. The seasons turn. The world endures.",
+        ),
     };
     if let Ok(mut text) = texts.get_mut(codex.title_text)
         && text.0 != title
