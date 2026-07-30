@@ -57,6 +57,15 @@ pub(crate) struct VillageLand;
 #[derive(Component)]
 pub(crate) struct FaithRoster;
 
+/// A faith roster line's live text, keyed to its soul so drifting numbers
+/// update in place instead of rebuilding the rows: 0 name, 1 standing,
+/// 2 the why.
+#[derive(Component)]
+pub(crate) struct FaithText {
+    person: Entity,
+    field: u8,
+}
+
 /// The line under the happiness gauge saying WHY it stands where it does.
 #[derive(Component)]
 pub(crate) struct HappinessWhy;
@@ -1403,9 +1412,10 @@ pub(crate) fn update_ledger_details(
     }
 }
 
-/// Rebuilds the FAITH roster while the codex is open: every soul, ranked
-/// by their faith, each with the last reason their heart moved - a god
-/// reads congregations the way shepherds count sheep.
+/// The FAITH roster: rows rebuild only when the ranking itself changes -
+/// who is on the roll, in what order - while the drifting numbers and the
+/// why-lines update in place. Tearing rows down on a timer made the page
+/// flinch and fought the scroll.
 #[allow(clippy::type_complexity)]
 pub(crate) fn update_faith_roster(
     mut commands: Commands,
@@ -1415,8 +1425,10 @@ pub(crate) fn update_faith_roster(
     mut fingerprint: Local<u64>,
     panels: Query<&Visibility, With<VillagePanel>>,
     rosters: Query<Entity, With<FaithRoster>>,
+    mut lines: Query<(&FaithText, &mut Text)>,
     flock: Query<
         (
+            Entity,
             &Person,
             Option<&crate::villager::belief::Faith>,
             Option<&Chronicle>,
@@ -1436,74 +1448,108 @@ pub(crate) fn update_faith_roster(
     let Ok(roster) = rosters.single() else {
         return;
     };
-    // Rebuild only when a soul's line would actually read differently.
-    let fresh = {
-        use std::hash::{Hash, Hasher};
-        let mut hasher = std::hash::DefaultHasher::new();
-        for (person, faith, _, _) in &flock {
-            person.name.hash(&mut hasher);
-            ((faith.map_or(0.0, |f| f.trust) * 100.0) as i32).hash(&mut hasher);
+
+    let compose = |field: u8,
+                   person: &Person,
+                   faith: Option<&crate::villager::belief::Faith>,
+                   chronicle: Option<&Chronicle>,
+                   witnessed: Option<&Witnessed>|
+     -> String {
+        match field {
+            0 => {
+                let believer = faith.is_some_and(|f| f.is_believer());
+                format!("{}{}", person.name, if believer { "  *" } else { "" })
+            }
+            1 => format!(
+                "{}  ({:.0}%)",
+                faith.map_or("has never wondered", |f| f.describe()),
+                faith.map_or(0.0, |f| f.trust) * 100.0,
+            ),
+            _ => chronicle
+                .and_then(|c| {
+                    c.events.iter().rev().find(|e| {
+                        e.text.contains("saw")
+                            || e.text.contains("heard")
+                            || e.text.contains("prayed")
+                            || e.text.contains("answered")
+                            || e.text.contains("believe")
+                    })
+                })
+                .map(|e| format!("   d{}  {}", e.day, e.text))
+                .unwrap_or_else(|| match witnessed {
+                    Some(w) if w.secondhand > 0 => "   knows the god only from stories".to_string(),
+                    _ => "   has neither seen nor heard of you".to_string(),
+                }),
         }
-        hasher.finish()
     };
-    if fresh == *fingerprint {
-        return;
-    }
-    *fingerprint = fresh;
-    commands.entity(roster).despawn_related::<Children>();
 
     let mut souls: Vec<_> = flock.iter().collect();
     souls.sort_by(|a, b| {
-        let fa = a.1.map_or(0.0, |f| f.trust);
-        let fb = b.1.map_or(0.0, |f| f.trust);
+        let fa = a.2.map_or(0.0, |f| f.trust);
+        let fb = b.2.map_or(0.0, |f| f.trust);
         fb.total_cmp(&fa)
     });
-    for (person, faith, chronicle, witnessed) in souls {
-        let trust = faith.map_or(0.0, |f| f.trust);
-        let believer = faith.is_some_and(|f| f.is_believer());
-        let name_line = commands
-            .spawn((
-                Node {
-                    width: percent(100),
-                    flex_direction: FlexDirection::Row,
-                    justify_content: JustifyContent::SpaceBetween,
-                    ..default()
+
+    // Structural fingerprint: the roll and its order, nothing finer.
+    let fresh = {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::hash::DefaultHasher::new();
+        for (entity, ..) in &souls {
+            entity.hash(&mut hasher);
+        }
+        hasher.finish()
+    };
+    if fresh != *fingerprint {
+        *fingerprint = fresh;
+        commands.entity(roster).despawn_related::<Children>();
+        for (entity, person, faith, chronicle, witnessed) in &souls {
+            let name_line = commands
+                .spawn((
+                    Node {
+                        width: percent(100),
+                        flex_direction: FlexDirection::Row,
+                        justify_content: JustifyContent::SpaceBetween,
+                        ..default()
+                    },
+                    ChildOf(roster),
+                ))
+                .id();
+            commands.spawn((
+                FaithText {
+                    person: *entity,
+                    field: 0,
                 },
+                ui::body(compose(0, person, *faith, *chronicle, *witnessed)),
+                ChildOf(name_line),
+            ));
+            commands.spawn((
+                FaithText {
+                    person: *entity,
+                    field: 1,
+                },
+                ui::dim(compose(1, person, *faith, *chronicle, *witnessed)),
+                ChildOf(name_line),
+            ));
+            commands.spawn((
+                FaithText {
+                    person: *entity,
+                    field: 2,
+                },
+                ui::dim(compose(2, person, *faith, *chronicle, *witnessed)),
                 ChildOf(roster),
-            ))
-            .id();
-        commands.spawn((
-            ui::body(format!(
-                "{}{}",
-                person.name,
-                if believer { "  *" } else { "" }
-            )),
-            ChildOf(name_line),
-        ));
-        commands.spawn((
-            ui::dim(format!(
-                "{}  ({:.0}%)",
-                faith.map_or("has never wondered", |f| f.describe()),
-                trust * 100.0,
-            )),
-            ChildOf(name_line),
-        ));
-        // The why: the last line of their life that touched the god.
-        let why = chronicle
-            .and_then(|c| {
-                c.events.iter().rev().find(|e| {
-                    e.text.contains("saw")
-                        || e.text.contains("heard")
-                        || e.text.contains("prayed")
-                        || e.text.contains("answered")
-                        || e.text.contains("believe")
-                })
-            })
-            .map(|e| format!("d{}  {}", e.day, e.text))
-            .unwrap_or_else(|| match witnessed {
-                Some(w) if w.secondhand > 0 => "knows the god only from stories".to_string(),
-                _ => "has neither seen nor heard of you".to_string(),
-            });
-        commands.spawn((ui::dim(format!("   {why}")), ChildOf(roster)));
+            ));
+        }
+        return;
+    }
+
+    // The quiet path: the rows stand; only the words that drift are set.
+    for (line, mut text) in &mut lines {
+        let Ok((_, person, faith, chronicle, witnessed)) = flock.get(line.person) else {
+            continue;
+        };
+        let fresh = compose(line.field, person, faith, chronicle, witnessed);
+        if text.0 != fresh {
+            *text = Text::new(fresh);
+        }
     }
 }
