@@ -1204,20 +1204,19 @@ pub fn split_row(
     (list, detail)
 }
 
-/// A big-number stat plate: the number writ large over a small label, on the
-/// title-bar charcoal. Returns (row, number) — the caller marks the number
-/// for live updates, and may seat a glyph at the row's head so the mark and
-/// the figure read as one group.
+/// A big-number stat plate: the glyph seated in a ring medallion, the label
+/// in engraved capitals above the figure beside it. Returns (seat, number) —
+/// the caller puts its glyph in the seat and marks the number for updates.
 pub fn stat_plate(commands: &mut Commands, parent: Entity, label_text: &str) -> (Entity, Entity) {
     let plate = commands
         .spawn((
             Node {
                 flex_grow: 1.0,
                 flex_basis: px(0),
-                flex_direction: FlexDirection::Column,
+                flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
-                row_gap: px(2),
+                column_gap: px(14),
                 padding: UiRect::axes(px(10), px(8)),
                 border: UiRect::all(px(1)),
                 border_radius: BorderRadius::all(px(0)),
@@ -1228,31 +1227,56 @@ pub fn stat_plate(commands: &mut Commands, parent: Entity, label_text: &str) -> 
             ChildOf(parent),
         ))
         .id();
-    let row = commands
+    let seat = commands
         .spawn((
             Node {
-                flex_direction: FlexDirection::Row,
+                width: px(40),
+                height: px(40),
+                flex_shrink: 0.0,
+                justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                column_gap: px(12),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(40)),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.25)),
+            BorderColor::all(theme::accent().with_alpha(0.4)),
+            ChildOf(plate),
+        ))
+        .id();
+    let words = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: px(1),
                 ..default()
             },
             ChildOf(plate),
         ))
         .id();
+    commands.spawn((
+        Text::new(label_text.to_uppercase()),
+        DisplayFace,
+        TextFont {
+            font_size: FontSize::Px(11.0),
+            ..default()
+        },
+        TextColor(theme::text_dim()),
+        ChildOf(words),
+    ));
     let number = commands
         .spawn((
             Text::new("0"),
             DisplayFace,
             TextFont {
-                font_size: FontSize::Px(30.0),
+                font_size: FontSize::Px(32.0),
                 ..default()
             },
             TextColor(theme::accent()),
-            ChildOf(row),
+            ChildOf(words),
         ))
         .id();
-    commands.spawn((dim(label_text), ChildOf(plate)));
-    (row, number)
+    (seat, number)
 }
 
 /// A titled card well — the People footer's card face as a kit piece: a

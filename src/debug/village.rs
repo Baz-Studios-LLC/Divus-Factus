@@ -570,15 +570,13 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         ))
         .id();
     for (index, label) in [(0u8, "souls"), (1, "houses"), (2, "believers")] {
-        let (row, number) = ui::stat_plate(&mut commands, plates, label);
+        let (seat, number) = ui::stat_plate(&mut commands, plates, label);
         commands.entity(number).insert(VillageCard(index));
-        let badge = commands.spawn((Node::default(), ChildOf(row))).id();
-        commands.entity(row).insert_children(0, &[badge]);
-        let tint = ui::theme::accent().with_alpha(0.55);
+        let tint = ui::theme::accent().with_alpha(0.8);
         match index {
-            0 => person_glyph(&mut commands, badge, tint),
-            1 => house_glyph(&mut commands, badge, tint),
-            _ => hands_glyph(&mut commands, badge, tint),
+            0 => person_glyph(&mut commands, seat, tint),
+            1 => house_glyph(&mut commands, seat, tint),
+            _ => hands_glyph(&mut commands, seat, tint),
         }
     }
 
