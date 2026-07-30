@@ -381,6 +381,43 @@ because they never need to, and when they do, they die. Two halves:
   readable deaths when the road wins anyway ("starved on the road home
   from the far wood"), so a lost expedition is a story, not a mystery.
 
+**Schism — what makes people found a NEW town (discussed 2026-07-30):**
+not one trigger but one mechanic with many readable causes: per-adult
+*restlessness*, accumulated with receipts exactly like faith, from any of:
+
+1. *Nothing here is mine* — want-starvation: no roof of one's own, no
+   calling (trades full), nobody to wed who isn't kin (a founding pool of
+   twelve runs out of strangers fast)
+2. *The land is spent* — stripped ground and long commutes while an
+   explorer's tale names a green wood two ridges east; economic emigration,
+   the worksite camp maturing into a hamlet
+3. *The god failed me* — doubt's ledger read further down: unanswered
+   prayers, an idle god at a deathbed, a Skeptic with an audience
+4. *The god terrifies me* — the dread-legend mirror: Smite witnesses and
+   falsely-attributed storms; the timid believe AND flee, so a god of
+   wrath watches the congregation thin at its edges
+5. *I cannot live with these people* — grudges (needs a small grudge
+   system; witness/gossip already carry who-did-what-to-whom)
+6. *Doctrine splits* — the thesis: when Event → Interpretation → Doctrine
+   divides the village, the losing half walks and founds a town that
+   worships the same god DIFFERENTLY; the god becomes what several
+   congregations believe, and they no longer agree
+
+Restlessness crossing threshold in a leader-tempered soul (the Bold, a
+wronged elder) turns to SPEECH — "there is nothing for me here" — which
+spreads it, kin first, until a party crystallizes: leader, followers,
+provisions, a destination the explorers found. They walk past the cairns
+and raise a new banner, and the chronicle writes why: "Gabae led eleven
+souls east, done with hunger and the god's silence." A town's founding
+must never need explaining — the town remembers.
+
+Prerequisites, honestly: provisioning + parties (or the schism dies on
+the road), multi-settlement architecture (SettlementSite is a singleton
+resource today — making the village plural is real engineering), and the
+mortality/winter work first so restlessness reflects a working world,
+not its bugs. Schism is the CAPSTONE of the simulation arc — the reward
+for finishing it.
+
 **The legibility track runs in parallel (it's UI, not sim):**
 - **Job outfits (Baz's idea, agreed):** taking a trade dresses the body for
   it — LAYERED over the personal genome-coloured tunic, never replacing it,
