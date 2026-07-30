@@ -37,12 +37,15 @@ fn vertex(vertex: Vertex) -> VertexOutput {
 
     let gust = sin(dot(world_position.xz, vec2(0.045, 0.038)) + t) * 0.7
         + sin(dot(world_position.xz, vec2(-0.021, 0.052)) + t * 0.63 + 1.7) * 0.4;
-    let flutter = sin(t * 2.6 + phase) * 0.22;
-    let bend = (gust + flutter) * grass.wind.w * weight;
+    let flutter = sin(t * 2.6 + phase) * 0.14;
 
-    world_position.x += grass.wind.x * bend;
-    world_position.z += grass.wind.y * bend;
-    world_position.y -= abs(bend) * 0.35 * weight;
+    let angle = clamp((gust + flutter) * grass.wind.w, -1.1, 1.1);
+    let reach = weight * 0.3;
+    let lean = sin(angle) * reach;
+
+    world_position.x += grass.wind.x * lean;
+    world_position.z += grass.wind.y * lean;
+    world_position.y -= (1.0 - cos(angle)) * reach;
 
     out.world_position = world_position;
     out.position = position_world_to_clip(world_position.xyz);

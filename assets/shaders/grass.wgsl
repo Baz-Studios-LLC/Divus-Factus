@@ -41,13 +41,20 @@ fn vertex(vertex: Vertex) -> VertexOutput {
 
     let gust = sin(dot(world_position.xz, vec2(0.045, 0.038)) + t) * 0.7
         + sin(dot(world_position.xz, vec2(-0.021, 0.052)) + t * 0.63 + 1.7) * 0.4;
-    let flutter = sin(t * 2.6 + phase) * 0.22;
-    let bend = (gust + flutter) * grass.wind.w * weight;
+    let flutter = sin(t * 2.6 + phase) * 0.14;
 
-    world_position.x += grass.wind.x * bend;
-    world_position.z += grass.wind.y * bend;
-    // A bending blade's tip drops; without this, hard gusts stretch the grass.
-    world_position.y -= abs(bend) * 0.35 * weight;
+    // The blade leans rather than shears: the sum is an angle about the root,
+    // and each vertex swings on its own height up the blade (weight against a
+    // nominal stature). sin carries it sideways while 1 - cos settles it, so
+    // no gust can lengthen a blade — hard wind lays grass over instead of
+    // stretching it, and the tips stop pogoing on the old abs() drop.
+    let angle = clamp((gust + flutter) * grass.wind.w, -1.1, 1.1);
+    let reach = weight * 0.3;
+    let lean = sin(angle) * reach;
+
+    world_position.x += grass.wind.x * lean;
+    world_position.z += grass.wind.y * lean;
+    world_position.y -= (1.0 - cos(angle)) * reach;
 
     out.world_position = world_position;
     out.position = view.clip_from_world * world_position;

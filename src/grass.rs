@@ -89,8 +89,11 @@ fn drive_wind(
     for (_, material) in materials.iter_mut() {
         material.extension.params.clock.x = time.elapsed_secs();
         // z: speed, w: strength - a storm's gusts run fast and bend hard.
+        // Strength is the lean's angle scale now (the shader rotates blades
+        // about their roots): a calm sways ~15 degrees, a storm lays blades
+        // over toward the shader's 1.1-radian clamp at the crests.
         material.extension.params.wind.z = 0.7 + wind * 1.6;
-        material.extension.params.wind.w = 0.5 + wind * 1.3;
+        material.extension.params.wind.w = 0.4 + wind * 0.7;
     }
 }
 
