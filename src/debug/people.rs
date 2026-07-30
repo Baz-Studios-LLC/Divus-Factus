@@ -121,7 +121,7 @@ pub(crate) fn spawn_people_panel(
         "PEOPLE",
         Some("The mortals of your world."),
         320.0,
-        662.0,
+        650.0,
     );
     // Capture mode opens the window and picks somebody, so an unattended
     // screenshot can prove the pane works.
