@@ -307,13 +307,92 @@ The design's central claim, built at the smallest scale that can prove it.
 - [x] The village window is tabbed (OVERVIEW / FAITH: who believes and the
       chronicle line that made them); tab bar is a kit piece
 
-**Agreed, next:** Guards and expedition parties (explorer + one or two
-guards; wolves as expedition danger; combat verbs for villagers). The
-life-cycle/calendar decision (recommendation: a day is a season) and
-seasons riding the weather system. Then Milestone 3.75, "the world is made
-of stuff" - substance states with one transfer rule (burning trees are the
-first citizen), containers as objects, village animals, one ingestion
-pipeline.
+---
+
+## The simulation-first doctrine (agreed 2026-07-30)
+
+**Baz's directive: the simulation must be down right before any new god
+powers are added.** The four existing miracles stay; nothing new joins the
+hotbar until the bar below is passed. The belief system's *world* side —
+prayers, sermons, false attribution, doctrine — is simulation, not power,
+and keeps deepening.
+
+**Definition of done — the unattended-village test:** a village left
+completely alone (god idle, no hand, no miracles) runs for several in-game
+years at 8x and produces: survival through winters, growth to a stable
+population in the low hundreds, generational turnover, and a chronicle
+where every death and every crisis has a readable cause. Proven by long
+soaks with census time-series, not spot checks.
+
+**The calendar stands; the rates were wrong.** The Stardew-shaped year
+stays: 4 seasons x 28 days, a day = 10 minutes at 1x (a year = 2h20m at
+8x). The observed failure — 12 founders becoming 100+ souls in 30 minutes
+of 8x, i.e. ONE SEASON; one couple bearing 23 children in a year — is
+demographic rates ignoring the calendar, not a calendar problem.
+
+**DECIDED: a villager's natural life is about five years.** (~12 hours of
+8x play; founders die across several sessions; a player watches children
+they saw born grow old.) Lifespan is the master constant everything else
+derives from:
+
+- **A life in seasons:** child for year 1 (112 days) → comes of age at 1 →
+  prime through ~3.5 → elder rebuild ~4 → dies of old age in a weighted
+  window of 4.5-6 years (Hardy stretches it, hard living shortens it).
+  Old age is the fourth death: quiet, at night, in bed when they have one —
+  its own chronicle line, rites, and a grave reading back a complete life.
+- **Demography respecting the year:** courtship accumulates over ~a
+  fortnight of evenings (no more instant proximity weddings); fertility
+  runs from coming-of-age to ~year 3; births space 1.5-2 seasons; a
+  lifetime yields 2-4 children. One season should turn 12 founders into
+  ~15-18; year one ends ~30; a hundred souls is a year-2-to-3 achievement.
+- **Skills on the same clock:** mastery takes ~3 working years, so a master
+  is what an elder becomes, and losing one to old age hurts the village.
+- **Re-soak everything:** labor audit, build-ahead housing, and the food
+  balance all retune against a village growing ~5x slower.
+
+**Order of work (agreed):**
+1. Life-cycle constants + old-age death (mortality and generations)
+2. Birth pacing / courtship retune, then the multi-year soak campaign
+3. Winter as the antagonist: harvest-then-store rhythm, food that keeps vs
+   food that doesn't, firewood vs building timber, spring relief
+4. Sickness: seasonal, crowding-driven, occasionally lethal — the healer's
+   real trade, and death's third readable face after hunger and violence
+5. Then the previously-agreed breadth: guards and expedition parties;
+   Milestone 3.75 "the world is made of stuff" (substance states,
+   containers, village animals, one ingestion pipeline)
+
+**The range problem (observed, 2026-07-30):** nobody goes far from town —
+because they never need to, and when they do, they die. Two halves:
+
+- *No pull outward.* Near ground suffices until depletion, and even then
+  workers hug home. The design intent was always that a farmed-out country
+  pushes its people outward; the push needs a matching pull: virgin
+  distance should be RICHER (untouched groves, fat outcrops, big game),
+  discovered pockets already count as workable ground, and roads should
+  make distance cheaper — trails exist visually but grant no speed yet.
+  Caravans/horses (queued) ride the same thread. The far horizon of this
+  thread is worksite camps at distant grounds — a forester's camp at the
+  far wood — which is the natural seed of satellite hamlets someday.
+- *Distance kills.* Travellers carry nothing: hunger climbs on the walk
+  and the walk home is longer than a stomach. Expeditions need
+  provisioning — a satchel of rations eaten on the road (a natural first
+  citizen for Milestone 3.75's containers) — plus the already-agreed
+  guards/parties against wolves, weather sense about setting out, and
+  readable deaths when the road wins anyway ("starved on the road home
+  from the far wood"), so a lost expedition is a story, not a mystery.
+
+**The legibility track runs in parallel (it's UI, not sim):**
+- **Job outfits (Baz's idea, agreed):** taking a trade dresses the body for
+  it — LAYERED over the personal genome-coloured tunic, never replacing it,
+  so a person reads as *themselves, dressed for work*. Farmer straw hat;
+  fisher rush hat + waders; hunter hide half-cloak; forester strap + cap;
+  miner hood + dusted apron; mason slate split apron; carpenter tool belt;
+  cook the village's only white apron; healer herb-green sash; priest the
+  full robe in the god's colour; gatherer basket sling. Children plain;
+  the retired plain — plain is itself information. Rides the existing
+  rebuild-on-retrain/age machinery; roster busts and the paperdoll inherit
+  it. Likely replaces the planned "job labels" overlay toggle.
+- The overlays panel, the codex shell, and panel migrations continue.
 
 - Witness system: who saw what, from how far, in what context
 - `Event` → `Interpretation` → `Doctrine`, with motivated (not random) misreading
