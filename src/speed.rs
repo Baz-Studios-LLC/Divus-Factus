@@ -118,9 +118,10 @@ fn spawn_speed_strip(mut commands: Commands) {
     }
 }
 
-/// Space pauses; comma and period walk the speed steps; the buttons do
-/// both. Picking a speed while paused also resumes — reaching for haste
-/// means wanting the world to move.
+/// Space pauses; minus and plus (and comma and period) walk the speed
+/// steps, on the main row and the numpad alike; the buttons do both.
+/// Picking a speed while paused also resumes — reaching for haste means
+/// wanting the world to move.
 fn command_time(
     keys: Res<ButtonInput<KeyCode>>,
     buttons: Query<(&Interaction, &SpeedButton), Changed<Interaction>>,
@@ -133,10 +134,17 @@ fn command_time(
         .iter()
         .position(|s| (*s - sim.speed).abs() < 0.01)
         .unwrap_or(0);
-    if keys.just_pressed(KeyCode::Comma) && step > 0 {
+    let slower = keys.just_pressed(KeyCode::Comma)
+        || keys.just_pressed(KeyCode::Minus)
+        || keys.just_pressed(KeyCode::NumpadSubtract);
+    // The plus lives on the Equal key without its shift; both read as +.
+    let faster = keys.just_pressed(KeyCode::Period)
+        || keys.just_pressed(KeyCode::Equal)
+        || keys.just_pressed(KeyCode::NumpadAdd);
+    if slower && step > 0 {
         sim.speed = STEPS[step - 1];
     }
-    if keys.just_pressed(KeyCode::Period) && step + 1 < STEPS.len() {
+    if faster && step + 1 < STEPS.len() {
         sim.speed = STEPS[step + 1];
     }
     for (interaction, button) in &buttons {
