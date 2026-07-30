@@ -69,10 +69,16 @@ pub(crate) struct FaithChart;
 #[derive(Component)]
 pub(crate) struct FaithChartSpan;
 
-/// Where the god's empty room stands: a stage of its own, far from the
-/// world and the paperdoll alike.
-const DEITY_STAGE: Vec3 = Vec3::new(0.0, -700.0, 0.0);
-const DEITY_LAYER: usize = 3;
+/// Where the god's room stands: a stage of its own, far from the world and
+/// the paperdoll alike. The manifestation module builds the apparition on
+/// the same stage.
+pub(crate) const DEITY_STAGE: Vec3 = Vec3::new(0.0, -700.0, 0.0);
+pub(crate) const DEITY_LAYER: usize = 3;
+
+/// The room's own camera, so the manifestation can switch it off while
+/// nobody is looking.
+#[derive(Component)]
+pub(crate) struct DeityCamera;
 
 // ---------------------------------------------------------------------------
 // Small marks this page alone needs.
@@ -278,6 +284,7 @@ pub(crate) fn spawn_god_panel(
     ));
     commands.spawn((
         Name::new("Deity Camera"),
+        DeityCamera,
         Camera3d::default(),
         Camera {
             order: -21,

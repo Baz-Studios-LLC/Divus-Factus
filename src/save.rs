@@ -805,6 +805,11 @@ fn found_anew(world: &mut World) {
     world.insert_resource(Belief::default());
     world.insert_resource(Legend::default());
     world.insert_resource(crate::villager::belief::FaithHistory::default());
+    // The god's portrait snaps to the new world's blank slate rather than
+    // easing out of the abandoned world's temperament.
+    if let Some(mut manifest) = world.get_resource_mut::<crate::debug::Manifestation>() {
+        manifest.arrive();
+    }
 
     // Found the new settlement the same way a fresh launch does — new site,
     // new founders, new names, a new first page of the chronicle.
@@ -928,6 +933,11 @@ fn apply(world: &mut World, save: SaveGame) {
         unlocked: save.legend_unlocked,
         epithet,
     });
+    // The god's portrait snaps to the restored legend rather than easing
+    // out of whatever the previous world had made of it.
+    if let Some(mut manifest) = world.get_resource_mut::<crate::debug::Manifestation>() {
+        manifest.arrive();
+    }
 
     // 5. Buildings, replayed stage by stage.
     let mut building_ids: Vec<Entity> = Vec::new();

@@ -24,6 +24,7 @@ mod god;
 mod history;
 mod hud;
 mod inspector;
+mod manifest;
 mod people;
 mod village;
 mod world;
@@ -33,6 +34,7 @@ pub(crate) use god::*;
 pub(crate) use history::*;
 pub(crate) use hud::*;
 pub(crate) use inspector::*;
+pub(crate) use manifest::*;
 pub(crate) use people::*;
 pub(crate) use village::*;
 pub(crate) use world::*;
@@ -47,6 +49,7 @@ impl Plugin for DebugPlugin {
             .init_resource::<RosterSort>()
             .init_resource::<ChronicleView>()
             .init_resource::<ChronicleStars>()
+            .init_resource::<Manifestation>()
             .add_systems(
                 Startup,
                 (
@@ -80,6 +83,16 @@ impl Plugin for DebugPlugin {
             .add_systems(
                 Update,
                 (paint_world_map, handle_map_zoom, update_world_markers).chain(),
+            )
+            .add_systems(
+                Update,
+                (
+                    rebuild_manifestation,
+                    ease_manifestation,
+                    gate_deity_camera,
+                    animate_manifestation,
+                )
+                    .chain(),
             )
             .add_systems(
                 Update,
