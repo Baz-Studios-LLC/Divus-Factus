@@ -161,6 +161,51 @@ pub const SNOW: Ramp = [
 
 /// Every ramp, in a stable order. The post-process quantiser walks this list, so
 /// changing it changes the look of the whole game.
+/// Royal purple: the dye of processions.
+pub const CLOTH_PURPLE: Ramp = [
+    [0x1f, 0x12, 0x28],
+    [0x33, 0x1d, 0x42],
+    [0x4d, 0x2c, 0x60],
+    [0x6b, 0x41, 0x82],
+    [0x8f, 0x63, 0xa4],
+];
+
+/// Wine: burgundy, darker and bluer than the crimson.
+pub const CLOTH_WINE: Ramp = [
+    [0x26, 0x0e, 0x1c],
+    [0x3e, 0x15, 0x2d],
+    [0x5c, 0x20, 0x42],
+    [0x7d, 0x30, 0x58],
+    [0xa1, 0x4d, 0x74],
+];
+
+/// Teal: the sea taken up as cloth.
+pub const CLOTH_TEAL: Ramp = [
+    [0x0d, 0x20, 0x20],
+    [0x14, 0x33, 0x33],
+    [0x1f, 0x4c, 0x4a],
+    [0x2e, 0x6a, 0x65],
+    [0x49, 0x8f, 0x86],
+];
+
+/// Rust: burnt orange, warmer and redder than the earth.
+pub const CLOTH_RUST: Ramp = [
+    [0x2e, 0x14, 0x0a],
+    [0x4c, 0x20, 0x0e],
+    [0x70, 0x31, 0x14],
+    [0x96, 0x47, 0x1e],
+    [0xbd, 0x66, 0x33],
+];
+
+/// Sable: the black cloth, for banners that mean it.
+pub const CLOTH_SABLE: Ramp = [
+    [0x0c, 0x0c, 0x10],
+    [0x15, 0x15, 0x1a],
+    [0x20, 0x21, 0x27],
+    [0x2d, 0x2f, 0x36],
+    [0x3e, 0x41, 0x49],
+];
+
 pub const ALL_RAMPS: &[Ramp] = &[
     STONE,
     EARTH,
@@ -180,6 +225,11 @@ pub const ALL_RAMPS: &[Ramp] = &[
     SKIN_DEEP,
     SNOW,
     SCRUB,
+    CLOTH_PURPLE,
+    CLOTH_WINE,
+    CLOTH_TEAL,
+    CLOTH_RUST,
+    CLOTH_SABLE,
 ];
 
 /// Indices into [`ALL_RAMPS`]. Meshes refer to colours by ramp index and step
@@ -210,6 +260,11 @@ pub const RAMP_SKIN_DEEP: usize = 15;
 pub const RAMP_SNOW: usize = 16;
 #[allow(dead_code)]
 pub const RAMP_SCRUB: usize = 17;
+pub const RAMP_CLOTH_PURPLE: usize = 18;
+pub const RAMP_CLOTH_WINE: usize = 19;
+pub const RAMP_CLOTH_TEAL: usize = 20;
+pub const RAMP_CLOTH_RUST: usize = 21;
+pub const RAMP_CLOTH_SABLE: usize = 22;
 
 /// Ramp indices a villager's skin may be drawn from.
 pub const SKIN_RAMPS: &[usize] = &[RAMP_SKIN_PALE, RAMP_SKIN_MID, RAMP_SKIN_DEEP];
@@ -222,6 +277,12 @@ pub const CLOTH_RAMPS: &[usize] = &[
     RAMP_CLOTH_GREEN,
     RAMP_EARTH,
     RAMP_BONE,
+    RAMP_CLOTH_PURPLE,
+    RAMP_CLOTH_WINE,
+    RAMP_CLOTH_TEAL,
+    RAMP_CLOTH_RUST,
+    RAMP_CLOTH_SABLE,
+    RAMP_SKY,
 ];
 
 /// Ramp indices hair may be drawn from.
