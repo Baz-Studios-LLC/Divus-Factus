@@ -878,21 +878,34 @@ fn window_impl_titled(
         .spawn((
             CloseButton(root),
             UiButton,
+            // A bare saltire, as mocked: no box, no border - the mark
+            // alone is the button.
             Node {
                 width: px(26),
                 height: px(26),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                border: UiRect::all(px(2)),
-                border_radius: BorderRadius::all(px(0)),
                 ..default()
             },
-            BorderColor::all(theme::card_border()),
             Interaction::default(),
             ChildOf(title_bar),
         ))
         .id();
-    commands.spawn((body("x"), ChildOf(close)));
+    // A drawn saltire, not a typeset letter: two crossed bars in the
+    // same hand-set vocabulary as every other glyph in the interface.
+    for turn in [45.0, -45.0] {
+        commands.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(5),
+                top: px(12),
+                width: px(16),
+                height: px(2),
+                ..default()
+            },
+            UiTransform::from_rotation(Rot2::degrees(turn)),
+            BackgroundColor(theme::accent().with_alpha(0.9)),
+            ChildOf(close),
+        ));
+    }
 
     // The gold thread under the banner.
     commands.spawn((

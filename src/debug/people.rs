@@ -387,7 +387,18 @@ pub(crate) fn spawn_people_panel(
         ))
         .id();
     commands.spawn((DetailName, ui::title_sized("", 34.0), ChildOf(reading)));
-    commands.spawn((DetailSubtitle, ui::dim(""), ChildOf(reading)));
+    commands.spawn((
+        DetailSubtitle,
+        ui::dim(""),
+        // Subtext, not a separate paragraph: Cinzel's line box carries
+        // phantom depth below the capitals, so the standing is pulled up
+        // to sit against the name it belongs to.
+        Node {
+            margin: UiRect::top(px(-14)),
+            ..default()
+        },
+        ChildOf(reading),
+    ));
 
     // Two faces of a person: the soul as it stands, and the life as it
     // was lived. The chronicle deserves its own page, not a footnote.
