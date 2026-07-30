@@ -121,7 +121,7 @@ pub(crate) fn spawn_people_panel(
         "PEOPLE",
         Some("The mortals of your world."),
         320.0,
-        648.0,
+        662.0,
     );
     // Capture mode opens the window and picks somebody, so an unattended
     // screenshot can prove the pane works.
@@ -1625,8 +1625,15 @@ pub(crate) fn update_dossier(
                 .id();
             commands.spawn((
                 ui::dim(crate::calendar::date_of_day(event.day)),
+                // Dates never wrap - and saying so kills the ghost height
+                // their measurement otherwise reserves for the wrapping
+                // they would never do.
+                TextLayout {
+                    linebreak: bevy::text::LineBreak::NoWrap,
+                    ..default()
+                },
                 Node {
-                    width: px(128),
+                    width: px(150),
                     flex_shrink: 0.0,
                     ..default()
                 },
