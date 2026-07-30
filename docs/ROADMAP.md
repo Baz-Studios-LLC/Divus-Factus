@@ -445,6 +445,31 @@ Ladder: part-time militia (~pop 10) → palisade → gate → guard as a real
 trade → archer + tower → stone wall → knights. Threats first, then the
 defenses they justify.
 
+**Goblins (Baz, 2026-07-30): an encampment in the deep woods** — the
+threat ladder's missing middle rung between wolves (early) and the failed
+splinter town (late, blocked behind multi-settlement). Built under the
+founding law — the world runs for its own sake — so NOT a spawner: a
+camp. Goblin genomes on the existing creature system (small, crooked
+humanoids, their own palette ramp), their own foraging and hunting, their
+own fire at night. They raid when THEIR food runs short, so winter
+presses on them too and a raid is almost forecastable weather — a hungry
+camp in a lean season, chronicled with its why. What they feed:
+- the unknown world gets teeth: explorers can bring home the other kind
+  of discovery, a fanfare of dread beyond the cairns
+- the defense ladder gets its reason: watchmen and palisades against
+  something that carries spears back
+- expedition warfare gets a target: an unchecked camp grows and raids
+  harder; a mustered party can raze it
+- schism practice: a camp is settlement-lite — sited, growing, raiding,
+  discoverable, destroyable — exercising multi-settlement muscles before
+  human splinter towns need them
+- the Egregore question: who do the villagers SAY sent the raid? False
+  attribution feeds on fear; and one wild future door — a dread-heavy
+  god's legend reaching the deep woods and finding its second
+  congregation there
+Noted deliberately: this is the one-way door from naturalistic folk-world
+to fantasy world. Crossed on purpose.
+
 **The legibility track runs in parallel (it's UI, not sim):**
 - **Job outfits (Baz's idea, agreed):** taking a trade dresses the body for
   it — LAYERED over the personal genome-coloured tunic, never replacing it,
