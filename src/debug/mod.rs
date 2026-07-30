@@ -51,7 +51,7 @@ impl Plugin for DebugPlugin {
                     spawn_hud,
                     spawn_toolbar,
                     spawn_world_panel,
-                    spawn_people_panel,
+                    spawn_people_panel.after(spawn_village_panel),
                     spawn_history_panel,
                     spawn_village_panel,
                     spawn_god_panel,
@@ -81,6 +81,7 @@ impl Plugin for DebugPlugin {
                     update_faith_roster,
                     update_ledger_details,
                     handle_codex_tabs,
+                    apply_codex_page,
                     update_dossier,
                     update_god_panel,
                     capture_preselect,
@@ -382,15 +383,7 @@ fn handle_toolbar(
             Without<VillagePanel>,
         ),
     >,
-    mut people_panels: Query<
-        &mut Visibility,
-        (
-            With<PeoplePanel>,
-            Without<WorldPanel>,
-            Without<HistoryPanel>,
-            Without<VillagePanel>,
-        ),
-    >,
+    mut codex: Option<ResMut<Codex>>,
     mut history_panels: Query<
         &mut Visibility,
         (
@@ -419,8 +412,15 @@ fn handle_toolbar(
     }
     for interaction in &people_buttons {
         if *interaction == Interaction::Pressed {
-            for mut visibility in &mut people_panels {
-                toggle(&mut visibility);
+            if let Some(codex) = codex.as_mut() {
+                for mut visibility in &mut village_panels {
+                    if *visibility != Visibility::Hidden && codex.page == CodexPage::People {
+                        *visibility = Visibility::Hidden;
+                    } else {
+                        *visibility = Visibility::Visible;
+                        codex.page = CodexPage::People;
+                    }
+                }
             }
         }
     }
@@ -433,8 +433,15 @@ fn handle_toolbar(
     }
     for interaction in &village_buttons {
         if *interaction == Interaction::Pressed {
-            for mut visibility in &mut village_panels {
-                toggle(&mut visibility);
+            if let Some(codex) = codex.as_mut() {
+                for mut visibility in &mut village_panels {
+                    if *visibility != Visibility::Hidden && codex.page == CodexPage::Ledger {
+                        *visibility = Visibility::Hidden;
+                    } else {
+                        *visibility = Visibility::Visible;
+                        codex.page = CodexPage::Ledger;
+                    }
+                }
             }
         }
     }

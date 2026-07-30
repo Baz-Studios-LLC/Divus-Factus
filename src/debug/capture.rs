@@ -93,24 +93,36 @@ pub(crate) fn capture_preselect(
         ),
     >,
     mut history: Query<&mut Visibility, With<super::HistoryPanel>>,
-    mut codex: Query<&mut Visibility, (With<super::VillagePanel>, Without<super::HistoryPanel>)>,
+    mut codex_windows: Query<
+        &mut Visibility,
+        (With<super::VillagePanel>, Without<super::HistoryPanel>),
+    >,
+    codex: Option<ResMut<super::village::Codex>>,
 ) {
-    if crate::capture_path().is_none() {
+    if crate::capture_path().is_none() || crate::title::title_capture() {
         return;
     }
-    // EGREGORE_OPEN=history photographs the chronicle instead of a person;
-    // EGREGORE_OPEN=village, the codex.
+    // EGREGORE_OPEN=history photographs the chronicle; =village, the codex on
+    // its ledger page; anything else opens the codex on the People page with
+    // somebody selected, so a screenshot always has a subject.
     if std::env::var("EGREGORE_OPEN").is_ok_and(|w| w == "history") {
         for mut visibility in &mut history {
             *visibility = Visibility::Visible;
         }
         return;
     }
-    if std::env::var("EGREGORE_OPEN").is_ok_and(|w| w == "village") {
-        for mut visibility in &mut codex {
+    for mut visibility in &mut codex_windows {
+        if *visibility == Visibility::Hidden {
             *visibility = Visibility::Visible;
         }
+    }
+    if std::env::var("EGREGORE_OPEN").is_ok_and(|w| w == "village") {
         return;
+    }
+    if let Some(mut codex) = codex
+        && codex.page != super::village::CodexPage::People
+    {
+        codex.page = super::village::CodexPage::People;
     }
     if selected.0.is_some() {
         return;

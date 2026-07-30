@@ -82,10 +82,30 @@ pub(crate) struct LedgerEpithet;
 #[derive(Component)]
 pub(crate) struct ActivityRow(u8);
 
-/// The codex strip's people icon: opens the People window where it still
-/// stands, until that page migrates into the codex proper.
+/// Which page of the codex is open.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CodexPage {
+    Ledger,
+    People,
+}
+
+/// The codex's spine: which page is open, and the handles the page-turn
+/// needs — page roots, the two live tabs, and the title texts to rewrite.
+#[derive(Resource)]
+pub(crate) struct Codex {
+    pub page: CodexPage,
+    pub root: Entity,
+    pub ledger_page: Entity,
+    pub people_page: Entity,
+    pub ledger_tab: Entity,
+    pub people_tab: Entity,
+    pub title_text: Entity,
+    pub subtitle_text: Option<Entity>,
+}
+
+/// A live tab on the codex strip: pressing it turns to its page.
 #[derive(Component)]
-pub(crate) struct CodexPeopleTab;
+pub(crate) struct CodexTab(pub CodexPage);
 
 /// The DETAILS page wells, rebuilt on a slow clock while the window is open.
 #[derive(Component)]
@@ -267,6 +287,10 @@ fn banner_glyph(commands: &mut Commands, parent: Entity) {
 /// between pages.
 const MAIN_BAND: f32 = 501.0;
 
+/// Every page's full height: the ledger's bands sum to it (96 + 5 + 501 +
+/// 5 + 45), and the people page is pinned to it directly.
+const PAGE_BAND: f32 = 652.0;
+
 pub(crate) fn spawn_village_panel(mut commands: Commands) {
     let window = ui::titled_window(
         &mut commands,
@@ -288,8 +312,38 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         },
     ));
 
-    // The codex strip: five pages, one resident. Dark tabs are pages still
-    // being written; the people tab opens the People window where it stands.
+    // The pages, as siblings in the body: exactly one shows at a time, and
+    // every page's bands sum to the same height, so the book never changes
+    // shape when a page turns.
+    let ledger_page = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                flex_direction: FlexDirection::Column,
+                row_gap: px(ui::theme::GAP),
+                ..default()
+            },
+            Visibility::Inherited,
+            ChildOf(window.body),
+        ))
+        .id();
+    let people_page = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                height: px(PAGE_BAND),
+                flex_shrink: 0.0,
+                flex_direction: FlexDirection::Column,
+                display: Display::None,
+                ..default()
+            },
+            Visibility::Hidden,
+            ChildOf(window.body),
+        ))
+        .id();
+
+    // The codex strip: five pages, two residents. Dark tabs are pages still
+    // being written.
     let strip = commands
         .spawn(Node {
             position_type: PositionType::Absolute,
@@ -337,8 +391,12 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
     let ink = ui::theme::accent();
     let faint = ui::theme::accent().with_alpha(0.35);
 
-    let ledger_tab = tab(&mut commands, true, false);
+    let ledger_tab = tab(&mut commands, true, true);
     house_glyph(&mut commands, ledger_tab, ink);
+    commands.entity(ledger_tab).insert((
+        CodexTab(CodexPage::Ledger),
+        ui::HoverHint::new("The Ledger", "the heart of a living world"),
+    ));
 
     let wood_tab = tab(&mut commands, false, true);
     tree_glyph(&mut commands, wood_tab, faint);
@@ -364,9 +422,20 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
     let people_tab = tab(&mut commands, false, true);
     people_glyph(&mut commands, people_tab, ink.with_alpha(0.8));
     commands.entity(people_tab).insert((
-        CodexPeopleTab,
+        CodexTab(CodexPage::People),
         ui::HoverHint::new("The People", "the mortals of your world"),
     ));
+
+    commands.insert_resource(Codex {
+        page: CodexPage::Ledger,
+        root: window.root,
+        ledger_page,
+        people_page,
+        ledger_tab,
+        people_tab,
+        title_text: window.title_text,
+        subtitle_text: window.subtitle_text,
+    });
 
     // ---- Band one: the three great numbers. -------------------------------
     let plates = commands
@@ -379,7 +448,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
                 column_gap: px(8),
                 ..default()
             },
-            ChildOf(window.body),
+            ChildOf(ledger_page),
         ))
         .id();
     for (index, label) in [(0u8, "souls"), (1, "houses"), (2, "believers")] {
@@ -405,7 +474,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
                 flex_direction: FlexDirection::Column,
                 ..default()
             },
-            ChildOf(window.body),
+            ChildOf(ledger_page),
         ))
         .id();
     let (rail, detail) = ui::split_row(&mut commands, main, 320.0);
@@ -696,28 +765,102 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
             },
             BackgroundColor(ui::theme::title_bg().with_alpha(0.55)),
             BorderColor::all(ui::theme::panel_border()),
-            ChildOf(window.body),
+            ChildOf(ledger_page),
         ))
         .id();
     tree_glyph(&mut commands, land, ui::theme::accent().with_alpha(0.7));
     commands.spawn((VillageLand, ui::dim(""), ChildOf(land)));
 }
 
-/// The strip's people icon opens the People window where it still stands.
+/// Pressing a live tab turns the codex to that page.
 pub(crate) fn handle_codex_tabs(
-    tabs: Query<&Interaction, (Changed<Interaction>, With<CodexPeopleTab>)>,
-    mut people: Query<&mut Visibility, With<super::people::PeoplePanel>>,
+    tabs: Query<(&Interaction, &CodexTab), Changed<Interaction>>,
+    codex: Option<ResMut<Codex>>,
 ) {
-    for interaction in &tabs {
-        if *interaction == Interaction::Pressed {
-            for mut visibility in &mut people {
-                *visibility = if *visibility == Visibility::Hidden {
-                    Visibility::Visible
-                } else {
-                    Visibility::Hidden
-                };
+    let Some(mut codex) = codex else {
+        return;
+    };
+    for (interaction, tab) in &tabs {
+        if *interaction == Interaction::Pressed && codex.page != tab.0 {
+            codex.page = tab.0;
+        }
+    }
+}
+
+/// Applies the open page: the page roots' layout and visibility mirror the
+/// window and the open page every frame (the gates every update system reads
+/// live on the page nodes), while the strip's tab dress and the title bar
+/// rename only on an actual page-turn.
+pub(crate) fn apply_codex_page(
+    codex: Res<Codex>,
+    mut nodes: Query<&mut Node>,
+    mut visibilities: Query<&mut Visibility>,
+    mut fills: Query<&mut BackgroundColor>,
+    mut borders: Query<&mut BorderColor>,
+    mut texts: Query<&mut Text>,
+) {
+    let window_open = visibilities
+        .get(codex.root)
+        .is_ok_and(|v| *v != Visibility::Hidden);
+    let pages = [
+        (codex.ledger_page, codex.page == CodexPage::Ledger),
+        (codex.people_page, codex.page == CodexPage::People),
+    ];
+    for (page, open) in pages {
+        if let Ok(mut node) = nodes.get_mut(page) {
+            let display = if open { Display::Flex } else { Display::None };
+            if node.display != display {
+                node.display = display;
             }
         }
+        if let Ok(mut visibility) = visibilities.get_mut(page) {
+            let fresh = if open && window_open {
+                Visibility::Inherited
+            } else {
+                Visibility::Hidden
+            };
+            if *visibility != fresh {
+                *visibility = fresh;
+            }
+        }
+    }
+    if !codex.is_changed() {
+        return;
+    }
+    let tabs = [
+        (codex.ledger_tab, codex.page == CodexPage::Ledger),
+        (codex.people_tab, codex.page == CodexPage::People),
+    ];
+    for (tab, open) in tabs {
+        if let Ok(mut fill) = fills.get_mut(tab) {
+            fill.0 = if open {
+                ui::theme::panel_bg()
+            } else {
+                Color::BLACK.with_alpha(0.18)
+            };
+        }
+        if let Ok(mut border) = borders.get_mut(tab) {
+            *border = BorderColor::all(if open {
+                ui::theme::accent().with_alpha(0.85)
+            } else {
+                ui::theme::panel_border().with_alpha(0.4)
+            });
+        }
+    }
+    let (title, subtitle) = match codex.page {
+        CodexPage::Ledger => ("THE LEDGER", "The heart of a living world."),
+        CodexPage::People => ("THE PEOPLE", "The mortals of your world."),
+    };
+    if let Ok(mut text) = texts.get_mut(codex.title_text)
+        && text.0 != title
+    {
+        *text = Text::new(title);
+    }
+    if let Some(subtitle_text) = codex.subtitle_text
+        && let Ok(mut text) = texts.get_mut(subtitle_text)
+        && text.0 != subtitle
+    {
+        *text = Text::new(subtitle);
     }
 }
 
@@ -745,6 +888,7 @@ fn epithet(souls: usize, believer_fraction: f32) -> String {
 /// Fills the ledger while it is open.
 #[allow(clippy::type_complexity)]
 pub(crate) fn update_village_panel(
+    codex: Res<Codex>,
     panels: Query<&Visibility, With<VillagePanel>>,
     site: Option<Res<crate::villager::SettlementSite>>,
     settlements: Query<&crate::villager::Settlement>,
@@ -794,7 +938,7 @@ pub(crate) fn update_village_panel(
         Query<(&ActivityRow, &mut Text)>,
     )>,
 ) {
-    if !panels.iter().any(|v| *v != Visibility::Hidden) {
+    if codex.page != CodexPage::Ledger || !panels.iter().any(|v| *v != Visibility::Hidden) {
         return;
     }
 
@@ -970,6 +1114,7 @@ pub(crate) fn update_village_panel(
 #[allow(clippy::type_complexity)]
 pub(crate) fn update_ledger_details(
     mut commands: Commands,
+    codex: Res<Codex>,
     time: Res<Time>,
     mut last_rebuild: Local<f32>,
     panels: Query<&Visibility, With<VillagePanel>>,
@@ -982,7 +1127,7 @@ pub(crate) fn update_ledger_details(
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
 ) {
-    if !panels.iter().any(|v| *v != Visibility::Hidden) {
+    if codex.page != CodexPage::Ledger || !panels.iter().any(|v| *v != Visibility::Hidden) {
         return;
     }
     *last_rebuild += time.delta_secs();
@@ -1037,6 +1182,7 @@ pub(crate) fn update_ledger_details(
 #[allow(clippy::type_complexity)]
 pub(crate) fn update_faith_roster(
     mut commands: Commands,
+    codex: Res<Codex>,
     time: Res<Time>,
     mut last_rebuild: Local<f32>,
     panels: Query<&Visibility, With<VillagePanel>>,
@@ -1051,7 +1197,7 @@ pub(crate) fn update_faith_roster(
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
 ) {
-    if !panels.iter().any(|v| *v != Visibility::Hidden) {
+    if codex.page != CodexPage::Ledger || !panels.iter().any(|v| *v != Visibility::Hidden) {
         return;
     }
     *last_rebuild += time.delta_secs();

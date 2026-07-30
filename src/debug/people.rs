@@ -112,45 +112,21 @@ pub(crate) struct RowFace {
 
 pub(crate) fn spawn_people_panel(
     mut commands: Commands,
+    codex: Res<super::village::Codex>,
     mut images: ResMut<Assets<Image>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let split = ui::split_view_titled(
-        &mut commands,
-        "PEOPLE",
-        Some("The mortals of your world."),
-        320.0,
-        650.0,
-    );
-    // Capture mode opens the window and picks somebody, so an unattended
-    // screenshot can prove the pane works. Title portraits are the exception
-    // (they photograph the front door, not the furniture), and so is any
-    // capture that asked for a different window by EGREGORE_OPEN.
-    let starts = if crate::capture_path().is_some()
-        && !crate::title::title_capture()
-        && std::env::var("EGREGORE_OPEN").map_or(true, |w| w == "people")
-    {
-        Visibility::Visible
-    } else {
-        Visibility::Hidden
-    };
-    commands.entity(split.window.root).insert((
-        Name::new("People Panel"),
-        PeoplePanel,
-        starts,
-        // An explicit width, or percent-sized children resolve against
-        // the screen instead of the window - the chronicle's lesson.
-        Node {
-            width: px(1160),
-            flex_direction: FlexDirection::Column,
-            padding: px(5).into(),
-            border: UiRect::all(px(2)),
-            border_radius: BorderRadius::all(px(0)),
-            ..default()
-        },
-    ));
-    commands.entity(split.list).insert((
+    // The People page lives inside the codex now: its content builds into
+    // the codex's people page, and the codex owns the window chrome, the
+    // title and the page-turning. PeoplePanel rides the page node so every
+    // is-the-panel-open gate keeps working unchanged.
+    let page = codex.people_page;
+    commands
+        .entity(page)
+        .insert((Name::new("People Page"), PeoplePanel));
+    let (list, detail) = ui::split_row(&mut commands, page, 320.0);
+    commands.entity(list).insert((
         PeopleRows,
         // The roster holds its ground: without flex_shrink 0 the stat
         // grid's minimum widths crushed the list to a ribbon.
@@ -320,7 +296,7 @@ pub(crate) fn spawn_people_panel(
                 row_gap: px(4),
                 ..default()
             },
-            ChildOf(split.detail),
+            ChildOf(detail),
         ))
         .id();
     commands.spawn((ui::heading("NO ONE CHOSEN"), ChildOf(empty)));
@@ -336,7 +312,7 @@ pub(crate) fn spawn_people_panel(
                 ..default()
             },
             Visibility::Hidden,
-            ChildOf(split.detail),
+            ChildOf(detail),
         ))
         .id();
 
@@ -1690,7 +1666,7 @@ pub(crate) fn handle_people_rows(
     followers: Query<(&Interaction, &FollowButton), Changed<Interaction>>,
     mut follow: ResMut<crate::camera::FollowTarget>,
     mut selected: ResMut<SelectedPerson>,
-    mut panels: Query<&mut Visibility, With<PeoplePanel>>,
+    mut panels: Query<&mut Visibility, With<super::village::VillagePanel>>,
 ) {
     for (interaction, row) in &rows {
         if *interaction == Interaction::Pressed {
@@ -1702,8 +1678,8 @@ pub(crate) fn handle_people_rows(
             follow.entity = Some(button.0);
             follow.style = crate::camera::FollowStyle::Overhead;
             selected.0 = Some(button.0);
-            // Following is about WATCHING: the panel steps aside so the
-            // eye lands on the person, not their paperwork.
+            // Following is about WATCHING: the whole codex steps aside so
+            // the eye lands on the person, not their paperwork.
             for mut visibility in &mut panels {
                 *visibility = Visibility::Hidden;
             }

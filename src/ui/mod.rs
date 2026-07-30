@@ -745,6 +745,12 @@ pub struct WindowHandles {
     pub root: Entity,
     #[allow(dead_code)]
     pub title_bar: Entity,
+    /// The title's text, so a many-paged window can retitle itself.
+    #[allow(dead_code)]
+    pub title_text: Entity,
+    /// The subtitle's text, when the window was given one.
+    #[allow(dead_code)]
+    pub subtitle_text: Option<Entity>,
     pub body: Entity,
 }
 
@@ -873,19 +879,20 @@ fn window_impl_titled(
             ChildOf(title_bar),
         ))
         .id();
-    commands.spawn((
-        Text::new(title),
-        DisplayFace,
-        TextFont {
-            font_size: FontSize::Px(20.0),
-            ..default()
-        },
-        TextColor(theme::accent()),
-        ChildOf(title_words),
-    ));
-    if let Some(subtitle) = subtitle {
-        commands.spawn((dim(subtitle), ChildOf(title_words)));
-    }
+    let title_text = commands
+        .spawn((
+            Text::new(title),
+            DisplayFace,
+            TextFont {
+                font_size: FontSize::Px(20.0),
+                ..default()
+            },
+            TextColor(theme::accent()),
+            ChildOf(title_words),
+        ))
+        .id();
+    let subtitle_text =
+        subtitle.map(|subtitle| commands.spawn((dim(subtitle), ChildOf(title_words))).id());
     let close = commands
         .spawn((
             CloseButton(root),
@@ -966,6 +973,8 @@ fn window_impl_titled(
     WindowHandles {
         root,
         title_bar,
+        title_text,
+        subtitle_text,
         body: content,
     }
 }
@@ -1179,99 +1188,6 @@ pub fn tile(commands: &mut Commands, parent: Entity, size: f32, lit: bool) -> En
 
 /// The panes of a split view: the window chrome, the list on the left, and
 /// the detail pane on the right. Any window that pairs a roster with a
-/// close-up builds on this.
-pub struct SplitView {
-    pub window: WindowHandles,
-    pub list: Entity,
-    pub detail: Entity,
-}
-
-/// A two-pane window: a fixed-width list column beside a detail pane, split
-/// by a hairline. The caller fills both sides; the chrome is shared.
-#[allow(dead_code)]
-pub fn split_view(commands: &mut Commands, title: &str, list_width: f32, height: f32) -> SplitView {
-    split_view_titled(commands, title, None, list_width, height)
-}
-
-/// A split view whose banner carries a quiet second line.
-pub fn split_view_titled(
-    commands: &mut Commands,
-    title: &str,
-    subtitle: Option<&str>,
-    list_width: f32,
-    height: f32,
-) -> SplitView {
-    // The frame hugs its content: every block inside is fixed-height by
-    // design (the puzzle contract), so the window's margins fall out even
-    // on all four sides by construction instead of by tuned arithmetic.
-    // The height parameter caps the LIST side only.
-    let window = window_impl_titled(commands, title, subtitle, list_width + 500.0, false);
-    let row = commands
-        .spawn((
-            Node {
-                width: percent(100),
-                flex_direction: FlexDirection::Row,
-                align_items: AlignItems::Stretch,
-                column_gap: px(theme::PAD),
-                ..default()
-            },
-            ChildOf(window.body),
-        ))
-        .id();
-    let _ = height;
-    let list = commands
-        .spawn((
-            Node {
-                width: px(list_width),
-                height: percent(100),
-                flex_direction: FlexDirection::Column,
-                row_gap: px(2),
-                overflow: Overflow::scroll_y(),
-                padding: UiRect::all(px(6)),
-                border_radius: BorderRadius::all(px(0)),
-                ..default()
-            },
-            // An inset well, a step darker than the panel: the roster reads
-            // as content *inside* the window, not text floating on it.
-            BackgroundColor(Color::BLACK.with_alpha(0.35)),
-            Scrollable,
-            ScrollPosition::DEFAULT,
-            Interaction::default(),
-            ChildOf(row),
-        ))
-        .id();
-    let detail = commands
-        .spawn((
-            Node {
-                flex_grow: 1.0,
-                // Flexbox lets long text push its container wide unless the
-                // minimum is pinned; zero it so words wrap instead.
-                min_width: px(0),
-                height: percent(100),
-                flex_direction: FlexDirection::Column,
-                row_gap: px(theme::GAP),
-                padding: px(theme::PAD).into(),
-                border: UiRect::all(px(2)),
-                border_radius: BorderRadius::all(px(0)),
-                // The frame is architecture: it never scrolls as a whole
-                // (a wheel nudge used to push the sitter's name under the
-                // banner). Inner wells and pages scroll for themselves.
-                overflow: Overflow::clip(),
-                ..default()
-            },
-            BackgroundColor(theme::card_bg()),
-            BorderColor::all(theme::card_border()),
-            Interaction::default(),
-            ChildOf(row),
-        ))
-        .id();
-    SplitView {
-        window,
-        list,
-        detail,
-    }
-}
-
 // ---------------------------------------------------------------------------
 // The codex vocabulary: the pieces the People window proved, lifted into the
 // kit so every new page is assembled, not re-invented.
@@ -1314,12 +1230,16 @@ pub fn split_row(commands: &mut Commands, parent: Entity, list_width: f32) -> (E
                 height: percent(100),
                 flex_direction: FlexDirection::Column,
                 row_gap: px(4),
+                overflow: Overflow::scroll_y(),
                 padding: UiRect::all(px(6)),
                 border_radius: BorderRadius::all(px(0)),
                 ..default()
             },
             // The inset well, a step darker than the panel.
             BackgroundColor(Color::BLACK.with_alpha(0.35)),
+            Scrollable,
+            ScrollPosition::DEFAULT,
+            Interaction::default(),
             ChildOf(row),
         ))
         .id();
