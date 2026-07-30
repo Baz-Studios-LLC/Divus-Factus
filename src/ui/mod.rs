@@ -1224,15 +1224,15 @@ pub fn split_view_titled(
                 row_gap: px(theme::GAP),
                 padding: px(theme::PAD).into(),
                 border: UiRect::all(px(2)),
-                border_radius: BorderRadius::all(px(8)),
-                // Content never bleeds past the window - it scrolls.
-                overflow: Overflow::scroll_y(),
+                border_radius: BorderRadius::all(px(0)),
+                // The frame is architecture: it never scrolls as a whole
+                // (a wheel nudge used to push the sitter's name under the
+                // banner). Inner wells and pages scroll for themselves.
+                overflow: Overflow::clip(),
                 ..default()
             },
             BackgroundColor(theme::card_bg()),
             BorderColor::all(theme::card_border()),
-            Scrollable,
-            ScrollPosition::DEFAULT,
             Interaction::default(),
             ChildOf(row),
         ))
