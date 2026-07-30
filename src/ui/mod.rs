@@ -1230,7 +1230,7 @@ pub fn stat_plate(commands: &mut Commands, parent: Entity, label_text: &str) -> 
         Text::new(label_text.to_uppercase()),
         DisplayFace,
         TextFont {
-            font_size: FontSize::Px(11.0),
+            font_size: FontSize::Px(14.0),
             ..default()
         },
         TextColor(theme::text_dim()),
