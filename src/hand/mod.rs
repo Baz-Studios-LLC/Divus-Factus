@@ -302,15 +302,24 @@ fn pick_object(
 
 fn update_hand_ray(
     windows: Query<&Window, With<PrimaryWindow>>,
-    cameras: Query<(&Camera, &GlobalTransform), With<GodCamera>>,
+    cameras: Query<(&Camera, &CameraRig), With<GodCamera>>,
     terrain: Option<Res<Terrain>>,
     mut hand: ResMut<DivineHand>,
 ) {
-    let (Ok(window), Ok((camera, camera_transform)), Some(terrain)) =
+    let (Ok(window), Ok((camera, rig)), Some(terrain)) =
         (windows.single(), cameras.single(), terrain)
     else {
         return;
     };
+
+    // The ray is cast from the rig's pose THIS frame, not from the camera's
+    // GlobalTransform — that syncs in PostUpdate and is a frame stale. A
+    // static camera hides the difference; a moving one (the title drift, the
+    // opening descent, a follow) turns it into a per-frame sawtooth that made
+    // the pointing hand visibly jitter.
+    let camera_transform = GlobalTransform::from(
+        Transform::from_translation(rig.eye()).looking_at(rig.focus, Vec3::Y),
+    );
 
     let cursor = match window.cursor_position() {
         Some(cursor) => cursor,
@@ -324,7 +333,7 @@ fn update_hand_ray(
         None => return,
     };
 
-    let Ok(ray) = camera.viewport_to_world(camera_transform, cursor) else {
+    let Ok(ray) = camera.viewport_to_world(&camera_transform, cursor) else {
         return;
     };
 

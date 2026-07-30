@@ -60,8 +60,8 @@ struct TitleArt;
 #[derive(Component)]
 struct TitleTagline;
 
-/// The title's menu buttons — despawned the instant the descent begins, so a
-/// half-faded button can never take a click.
+/// The title's menu buttons — hidden and disarmed the instant the descent
+/// begins, so a half-faded button can never take a click.
 #[derive(Component)]
 struct TitleMenu;
 
@@ -660,7 +660,14 @@ fn begin_farewell(
         commands.entity(screen).despawn();
     }
     for button in &buttons {
-        commands.entity(button).despawn();
+        // Hidden, not despawned: yanking four buttons out of the centred
+        // column would reflow it, and the lettering above them visibly
+        // jumped. The slots stay; the buttons just stop being there to see
+        // or to press.
+        commands
+            .entity(button)
+            .remove::<Interaction>()
+            .insert(Visibility::Hidden);
     }
     let mut leaving = false;
     for screen in &screens {
