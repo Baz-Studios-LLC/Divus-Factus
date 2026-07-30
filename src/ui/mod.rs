@@ -27,7 +27,7 @@ impl Plugin for UiPlugin {
             .init_resource::<WindowDrag>()
             .add_message::<Notice>()
             .add_message::<Say>()
-            .add_systems(Startup, spawn_toast_shelf)
+            .add_systems(Startup, (spawn_toast_shelf, load_fonts))
             .add_systems(PreUpdate, track_pointer.after(bevy::ui::UiSystems::Focus))
             .add_systems(
                 Update,
@@ -39,6 +39,7 @@ impl Plugin for UiPlugin {
                     close_windows,
                     scroll_regions,
                     focus_windows,
+                    dress_display_text,
                     switch_tabs,
                     speak,
                     float_bubbles,
@@ -836,6 +837,7 @@ fn window_impl(
         .id();
     commands.spawn((
         Text::new(title),
+        DisplayFace,
         TextFont {
             font_size: FontSize::Px(20.0),
             ..default()
@@ -1552,12 +1554,45 @@ pub fn stat_row(
 pub fn heading(text: impl Into<String>) -> impl Bundle {
     (
         Text::new(text),
+        DisplayFace,
         TextFont {
             font_size: FontSize::Px(theme::TITLE_SIZE),
             ..default()
         },
         TextColor(theme::accent()),
     )
+}
+
+/// Marks text that speaks in the display face - Cinzel, the engraved
+/// capitals - rather than the working mono. Titles and names, never data.
+#[derive(Component)]
+pub struct DisplayFace;
+
+/// The game's loaded typefaces.
+#[derive(Resource)]
+pub struct Fonts {
+    pub display: Handle<Font>,
+}
+
+pub(crate) fn load_fonts(mut commands: Commands, assets: Res<AssetServer>) {
+    commands.insert_resource(Fonts {
+        display: assets.load("fonts/Cinzel.ttf"),
+    });
+}
+
+/// Dresses every newly spawned display-face text in the display font.
+/// Spawn helpers build bundles through Commands and cannot reach assets;
+/// this system is the tailor that fits them afterwards.
+pub(crate) fn dress_display_text(
+    fonts: Option<Res<Fonts>>,
+    mut fresh: Query<&mut TextFont, Added<DisplayFace>>,
+) {
+    let Some(fonts) = fonts else {
+        return;
+    };
+    for mut font in &mut fresh {
+        font.font = fonts.display.clone().into();
+    }
 }
 
 /// Ordinary readable text.
