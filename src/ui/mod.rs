@@ -1160,6 +1160,7 @@ pub struct SplitView {
 
 /// A two-pane window: a fixed-width list column beside a detail pane, split
 /// by a hairline. The caller fills both sides; the chrome is shared.
+#[allow(dead_code)]
 pub fn split_view(commands: &mut Commands, title: &str, list_width: f32, height: f32) -> SplitView {
     split_view_titled(commands, title, None, list_width, height)
 }

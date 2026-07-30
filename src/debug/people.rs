@@ -24,7 +24,7 @@ pub(crate) struct PersonRow(Entity);
 
 /// The text of a roster row, updated in place between rebuilds.
 #[derive(Component)]
-pub(crate) struct RowLabel(Entity);
+pub(crate) struct RowLabel(#[allow(dead_code)] Entity);
 
 /// Where the paperdoll stands: a stage far below the world, on its own
 /// render layer, seen by no one but its own camera.
@@ -106,6 +106,7 @@ pub(crate) struct SortButton;
 #[derive(Component)]
 pub(crate) struct RowFace {
     person: Entity,
+    #[allow(dead_code)]
     base: f32,
 }
 
@@ -999,7 +1000,7 @@ pub(crate) fn update_person_detail(
     let Some((
         (person, genome, member_of),
         (needs, activity, vitality, morale),
-        (temperament, witnessed, faith, chronicle),
+        (temperament, witnessed, faith, _chronicle),
         (spouse, parentage, home, vocation, skills, manner, child),
     )) = selected.0.and_then(|entity| people.get(entity).ok())
     else {
