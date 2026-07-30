@@ -1825,7 +1825,22 @@ pub fn centered_strip(commands: &mut Commands, top: Val, bottom: Val) -> Entity 
 /// The top-centre toolbar: a short row of icon buttons. Centred by its strip,
 /// however many buttons it grows.
 pub fn toolbar(commands: &mut Commands) -> Entity {
-    let strip = centered_strip(commands, px(theme::MARGIN), Val::Auto);
+    // Flush with the screen's top; the margin lives as padding on an
+    // invisible apron, so the approach to the bar is already interface.
+    let strip = centered_strip(commands, px(0), Val::Auto);
+    let apron = commands
+        .spawn((
+            Panel,
+            Interaction::default(),
+            Node {
+                padding: UiRect::axes(px(14), px(0))
+                    .with_top(px(theme::MARGIN))
+                    .with_bottom(px(12)),
+                ..default()
+            },
+            ChildOf(strip),
+        ))
+        .id();
     let bar = commands
         .spawn((
             Name::new("Toolbar"),
@@ -1841,7 +1856,7 @@ pub fn toolbar(commands: &mut Commands) -> Entity {
             BackgroundColor(theme::panel_bg()),
             BorderColor::all(theme::panel_border()),
             Interaction::default(),
-            ChildOf(strip),
+            ChildOf(apron),
         ))
         .id();
     bar

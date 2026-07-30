@@ -352,13 +352,22 @@ struct BeliefReadout;
 struct BeliefFill;
 
 fn spawn_hotbar(mut commands: Commands) {
-    let strip = ui::centered_strip(&mut commands, Val::Auto, px(ui::theme::MARGIN));
+    // The strip sits flush with the screen's foot; the column carries the
+    // visual margin as PADDING instead, so the whole apron around the bar -
+    // sides, top, and the gap beneath - still reads as interface and the
+    // hand never flickers back to its world pose while crossing it.
+    let strip = ui::centered_strip(&mut commands, Val::Auto, px(0));
     let column = commands
         .spawn((
+            ui::Panel,
+            Interaction::default(),
             Node {
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 row_gap: px(3),
+                padding: UiRect::axes(px(16), px(0))
+                    .with_top(px(12))
+                    .with_bottom(px(ui::theme::MARGIN)),
                 ..default()
             },
             ChildOf(strip),

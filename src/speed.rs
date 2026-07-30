@@ -53,18 +53,29 @@ impl Default for SimSpeed {
 struct SpeedButton(Option<f32>);
 
 fn spawn_speed_strip(mut commands: Commands) {
-    let strip = commands
+    // The corner margin lives as padding on an invisible apron, so the
+    // approach to the strip - sides, top, and the gap to the screen's very
+    // corner - is already interface and the hand holds its pointing pose.
+    let apron = commands
         .spawn((
             Name::new("Time Controls"),
-            // A Panel with an Interaction, so the divine hand knows it is
-            // over interface here and becomes the pointing finger.
             ui::Panel,
             ui::GameHud,
             Interaction::default(),
             Node {
                 position_type: PositionType::Absolute,
-                left: px(12),
-                bottom: px(12),
+                left: px(0),
+                bottom: px(0),
+                padding: UiRect::new(px(12), px(14), px(12), px(12)),
+                ..default()
+            },
+        ))
+        .id();
+    let strip = commands
+        .spawn((
+            ui::Panel,
+            Interaction::default(),
+            Node {
                 flex_direction: FlexDirection::Row,
                 column_gap: px(4),
                 padding: px(4).into(),
@@ -74,6 +85,7 @@ fn spawn_speed_strip(mut commands: Commands) {
             },
             BackgroundColor(ui::theme::panel_bg()),
             BorderColor::all(ui::theme::panel_border()),
+            ChildOf(apron),
         ))
         .id();
     for (speed, label) in [
