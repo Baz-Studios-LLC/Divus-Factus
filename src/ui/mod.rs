@@ -1274,10 +1274,11 @@ pub fn stat_plate(commands: &mut Commands, parent: Entity, label_text: &str) -> 
                 ..default()
             },
             TextColor(theme::accent()),
-            // Cinzel's line box carries phantom depth below the capitals;
-            // uncorrected, the figure sits visibly low against the seat.
+            // One pixel of settlement, measured against the seat's own
+            // centre: Cinzel's line box and the flex centring land the
+            // digits a hair high without it.
             Node {
-                margin: UiRect::top(px(-7)),
+                margin: UiRect::top(px(3)).with_bottom(px(-3)),
                 ..default()
             },
             ChildOf(row),
