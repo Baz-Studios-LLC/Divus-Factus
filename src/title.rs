@@ -36,6 +36,7 @@ impl Plugin for TitlePlugin {
                     handle_choice.run_if(in_state(GameState::Title)),
                     auto_begin.run_if(in_state(GameState::Title)),
                     handle_settings,
+                    style_menu_buttons,
                     toggle_pause_menu.run_if(in_state(GameState::Playing)),
                     handle_pause_menu,
                 ),
@@ -55,10 +56,6 @@ struct TitleScreen;
 /// The logotype image, so the farewell can fade it.
 #[derive(Component)]
 struct TitleArt;
-
-/// The tagline under the logotype, likewise.
-#[derive(Component)]
-struct TitleTagline;
 
 /// The title's menu buttons — hidden and disarmed the instant the descent
 /// begins, so a half-faded button can never take a click.
@@ -225,27 +222,76 @@ fn despawn_splash(mut commands: Commands, screens: Query<Entity, With<SplashScre
     commands.remove_resource::<SplashClock>();
 }
 
+/// A menu button dressed in the kit's language — the same square-cornered,
+/// charcoal-and-gold face the People window's tabs wear. Solid, not glassy:
+/// these sit over the living world now, and a translucent button reads as
+/// unfinished rather than elegant.
 fn menu_button(commands: &mut Commands, parent: Entity, label: &str) -> Entity {
     let button = commands
         .spawn((
             ui::UiButton,
+            // KeepFace: the kit's generic hover restyle would repaint the
+            // resting fill back to translucent glass; these buttons keep
+            // their own dress, tended by `style_menu_buttons`.
+            ui::KeepFace,
+            MenuFace,
             Node {
-                width: px(220),
-                padding: UiRect::axes(px(18), px(10)),
+                width: px(240),
+                padding: UiRect::axes(px(22), px(11)),
                 justify_content: JustifyContent::Center,
                 border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(5)),
+                border_radius: BorderRadius::all(px(0)),
                 ..default()
             },
-            BackgroundColor(theme::panel_bg().with_alpha(0.4)),
-            BorderColor::all(theme::panel_border()),
+            BackgroundColor(theme::title_bg()),
+            BorderColor::all(theme::panel_border().with_alpha(0.4)),
             Interaction::default(),
             ChildOf(parent),
         ))
         .id();
-    let text = commands.spawn(ui::body(label)).id();
+    let text = commands
+        .spawn((
+            Text::new(label.to_uppercase()),
+            ui::DisplayFace,
+            TextFont {
+                font_size: FontSize::Px(15.0),
+                ..default()
+            },
+            TextColor(theme::accent()),
+        ))
+        .id();
     commands.entity(text).insert(ChildOf(button));
     button
+}
+
+/// Marks buttons wearing the menu dress, so their hover styling stays theirs.
+#[derive(Component)]
+struct MenuFace;
+
+/// Hover and press on the menu dress: the border takes the gold, the way the
+/// People window's active tab does; a press warms the fill.
+fn style_menu_buttons(
+    mut buttons: Query<
+        (&Interaction, &mut BackgroundColor, &mut BorderColor),
+        (With<MenuFace>, Changed<Interaction>),
+    >,
+) {
+    for (interaction, mut fill, mut border) in &mut buttons {
+        match interaction {
+            Interaction::None => {
+                fill.0 = theme::title_bg();
+                *border = BorderColor::all(theme::panel_border().with_alpha(0.4));
+            }
+            Interaction::Hovered => {
+                fill.0 = theme::title_bg();
+                *border = BorderColor::all(theme::accent().with_alpha(0.85));
+            }
+            Interaction::Pressed => {
+                fill.0 = theme::accent().with_alpha(0.25);
+                *border = BorderColor::all(theme::accent());
+            }
+        }
+    }
 }
 
 /// How dark the title lays its veil over the living world behind it.
@@ -272,6 +318,10 @@ fn spawn_title(
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 row_gap: px(14),
+                // The block sits a touch above true centre — the classic
+                // title composition — instead of the menu grazing the
+                // bottom of the screen.
+                padding: UiRect::bottom(px(70)),
                 ..default()
             },
             // A veil, not a wall: the world drifts by underneath, blurred by
@@ -286,36 +336,21 @@ fn spawn_title(
     // lettering rather than across it.
     spawn_smoke(&mut commands, &mut images, screen);
 
-    // The logotype — the game's one blessed piece of non-procedural art.
+    // The logotype — the game's one blessed piece of non-procedural art,
+    // cropped to its lettering so the layout box is the art, not the
+    // transparent padding it once shipped inside.
     let title = commands
         .spawn((
             TitleArt,
             ImageNode::new(assets.load("EgregoreLogo.png")),
             Node {
                 width: px(860),
-                margin: UiRect::bottom(px(-54.0)).with_top(px(-80.0)),
+                margin: UiRect::bottom(px(40.0)),
                 ..default()
             },
         ))
         .id();
     commands.entity(title).insert(ChildOf(screen));
-
-    let tagline = commands
-        .spawn((
-            TitleTagline,
-            Text::new("a god of their making"),
-            TextFont {
-                font_size: FontSize::Px(16.0),
-                ..default()
-            },
-            TextColor(theme::text_dim()),
-            Node {
-                margin: UiRect::bottom(px(26)),
-                ..default()
-            },
-        ))
-        .id();
-    commands.entity(tagline).insert(ChildOf(screen));
 
     let begin = menu_button(&mut commands, screen, "Begin");
     commands.entity(begin).insert((BeginButton, TitleMenu));
@@ -687,7 +722,6 @@ fn play_farewell(
     farewell: Option<ResMut<TitleFarewell>>,
     mut screens: Query<(Entity, &mut BackgroundColor), With<TitleScreen>>,
     mut arts: Query<&mut ImageNode, With<TitleArt>>,
-    mut taglines: Query<&mut TextColor, With<TitleTagline>>,
 ) {
     let Some(mut farewell) = farewell else {
         return;
@@ -701,10 +735,6 @@ fn play_farewell(
     }
     for mut art in &mut arts {
         art.color = Color::srgba(1.0, 1.0, 1.0, fade);
-    }
-    for mut tagline in &mut taglines {
-        let dim = theme::text_dim();
-        *tagline = TextColor(dim.with_alpha(dim.alpha() * fade));
     }
 
     if farewell.t >= 1.0 {
