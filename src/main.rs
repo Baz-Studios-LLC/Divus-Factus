@@ -61,8 +61,11 @@ pub const SUN_DIRECTION: Vec3 = Vec3::new(0.520266, 0.780399, 0.346844);
 /// chunks popping into existence around them.
 #[derive(States, Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GameState {
-    /// The front door.
+    /// The studio mark, fading in and out over black while the world
+    /// generates behind it.
     #[default]
+    Splash,
+    /// The front door.
     Title,
     Loading,
     Playing,

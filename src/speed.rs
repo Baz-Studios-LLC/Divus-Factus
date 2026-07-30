@@ -4,13 +4,12 @@
 //! leave the machine running overnight to see spring again. The whole
 //! simulation already runs on virtual time, so speed is one dial —
 //! `Time<Virtual>`'s relative speed — and pausing is the same door the
-//! pause menu and title screen already use. This module only commands
-//! the dial while the world is actually being played: the title and the
-//! pause menu keep their own authority over time.
+//! pause menu already uses. The dial rules everywhere but under the pause
+//! menu: the world lives behind the splash and the title, drifting past
+//! under the lettering, so even the pre-game keeps the clock beating.
 
 use bevy::prelude::*;
 
-use crate::GameState;
 use crate::ui;
 
 /// The speeds the buttons offer, in order.
@@ -60,6 +59,7 @@ fn spawn_speed_strip(mut commands: Commands) {
             // A Panel with an Interaction, so the divine hand knows it is
             // over interface here and becomes the pointing finger.
             ui::Panel,
+            ui::GameHud,
             Interaction::default(),
             Node {
                 position_type: PositionType::Absolute,
@@ -145,17 +145,14 @@ fn command_time(
 /// world is being played. The title screen and the pause menu hold time
 /// by their own authority, and this system stays out of their way.
 fn apply_speed(
-    state: Res<State<GameState>>,
     menus: Query<&Visibility, With<crate::title::PauseMenu>>,
     sim: Res<SimSpeed>,
     mut time: ResMut<Time<Virtual>>,
 ) {
-    // Only the title keeps authority over the clock. During Loading the
-    // speed strip's will is enforced too: if anything leaves the virtual
+    // The world lives behind the splash and the title now, so the dial is
+    // enforced across the whole pre-game: if anything leaves the virtual
     // clock paused on the way in, this is what starts it beating again.
-    if *state.get() == GameState::Title {
-        return;
-    }
+    // Only the pause menu retains authority over the clock.
     if menus.iter().any(|v| *v == Visibility::Visible) {
         return;
     }

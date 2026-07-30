@@ -28,6 +28,7 @@ use bevy::render::render_resource::TextureFormat;
 use bevy::render::view::{ColorGrading, ColorGradingGlobal};
 use bevy::window::PrimaryWindow;
 
+use crate::GameState;
 use crate::camera::{CameraRig, CameraStartupSet, GodCamera};
 use crate::palette;
 use crate::terrain::LoadedChunks;
@@ -36,7 +37,8 @@ pub struct RenderPlugin;
 
 impl Plugin for RenderPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<LookSettings>()
+        app.init_resource::<TitleLens>()
+            .init_resource::<LookSettings>()
             .add_systems(Startup, setup_pipeline.after(CameraStartupSet))
             .add_systems(
                 Update,
@@ -44,8 +46,59 @@ impl Plugin for RenderPlugin {
                     focus_depth_of_field,
                     track_fog_to_zoom,
                     apply_look_settings.run_if(resource_changed::<LookSettings>),
-                ),
+                    // Last word on the lens: the dream blend overwrites what
+                    // the two systems above decided, so it must follow them.
+                    dream_lens,
+                )
+                    .chain(),
             );
+    }
+}
+
+/// How far the lens is dreaming, 0 to 1.
+///
+/// At 1 — the splash and title screens — the aperture opens wide and the
+/// focal plane pulls well short of the village, so the world behind the
+/// lettering is a soft, living blur. The blend eases back to 0 across the
+/// opening descent, the world sharpening as the god comes down to it.
+#[derive(Resource)]
+pub struct TitleLens(f32);
+
+impl Default for TitleLens {
+    fn default() -> Self {
+        // Unattended captures frame their own shot and skip the front door,
+        // so they start sharp rather than easing out of a blur nobody sees.
+        // Title portraits (EGREGORE_TITLE) keep the dream.
+        let capturing = crate::capture_path().is_some() && !crate::title::title_capture();
+        TitleLens(if capturing { 0.0 } else { 1.0 })
+    }
+}
+
+/// Aperture, in f-stops, of the fully dreaming lens.
+const DREAM_APERTURE: f32 = 2.6;
+/// Where the dreaming lens focuses, as a fraction of the camera distance —
+/// deliberately short of the village it is looking at.
+const DREAM_FOCUS: f32 = 0.4;
+
+fn dream_lens(
+    time: Res<Time<Real>>,
+    state: Res<State<GameState>>,
+    look: Res<LookSettings>,
+    mut lens: ResMut<TitleLens>,
+    mut cameras: Query<(&CameraRig, &mut DepthOfField), With<GodCamera>>,
+) {
+    let dreaming = matches!(state.get(), GameState::Splash | GameState::Title);
+    let target = if dreaming { 1.0 } else { 0.0 };
+    let step = time.delta_secs() / 2.4;
+    lens.0 += (target - lens.0).clamp(-step, step);
+    if lens.0 <= 0.001 {
+        return;
+    }
+    for (rig, mut dof) in &mut cameras {
+        dof.aperture_f_stops = look.aperture + (DREAM_APERTURE - look.aperture) * lens.0;
+        let sharp = rig.distance * look.focus_bias;
+        let dreamy = rig.distance * DREAM_FOCUS;
+        dof.focal_distance = (sharp + (dreamy - sharp) * lens.0).max(0.1);
     }
 }
 

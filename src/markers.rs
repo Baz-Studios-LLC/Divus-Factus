@@ -12,8 +12,18 @@ pub struct MarkersPlugin;
 
 impl Plugin for MarkersPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<MarkerMode>()
-            .add_systems(Update, (toggle_markers, tend_markers, spin_markers).chain());
+        app.init_resource::<MarkerMode>().add_systems(
+            Update,
+            (
+                // Only the played game listens for the key: the title's veil
+                // is translucent now, and a stray keystroke on the menu must
+                // not redecorate the world behind it.
+                toggle_markers.run_if(in_state(crate::GameState::Playing)),
+                tend_markers,
+                spin_markers,
+            )
+                .chain(),
+        );
     }
 }
 

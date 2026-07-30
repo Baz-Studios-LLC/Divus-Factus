@@ -1,10 +1,17 @@
-//! The title screen: the front door.
+//! The pre-game: the studio mark and the title screen.
 //!
-//! Kit-styled and quiet — the game's name, one line of what it is, and two
-//! choices. The world generates behind it while the player reads, so "Begin"
-//! usually opens onto a finished landscape with no waiting at all.
+//! The splash fades the studio's mark in and out over black — skippable with
+//! any key — while the world generates behind it. The title that follows is
+//! not a screen so much as a vantage: the living, blurred world drifts under
+//! the lettering, smoke curls behind the logotype, and Begin sends the camera
+//! diving from that god's-height view down to the village itself. No loading
+//! screen, no cut — the loading screen survives only as a fallback for
+//! machines still building the world when Begin is pressed.
 
+use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use bevy::window::PrimaryWindow;
 
 use crate::GameState;
 use crate::ui::{self, theme};
@@ -13,12 +20,21 @@ pub struct TitlePlugin;
 
 impl Plugin for TitlePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::Title), (spawn_title, hold_the_world))
-            .add_systems(OnExit(GameState::Title), (despawn_title, release_the_world))
+        app.add_systems(OnEnter(GameState::Splash), spawn_splash)
+            .add_systems(OnExit(GameState::Splash), despawn_splash)
+            .add_systems(OnEnter(GameState::Title), spawn_title)
+            .add_systems(OnExit(GameState::Title), begin_farewell)
             .add_systems(
                 Update,
                 (
+                    play_splash.run_if(in_state(GameState::Splash)),
+                    drift_title_camera
+                        .run_if(in_state(GameState::Splash).or_else(in_state(GameState::Title))),
+                    drift_smoke,
+                    play_farewell,
+                    sync_hud.run_if(state_changed::<GameState>),
                     handle_choice.run_if(in_state(GameState::Title)),
+                    auto_begin.run_if(in_state(GameState::Title)),
                     handle_settings,
                     toggle_pause_menu.run_if(in_state(GameState::Playing)),
                     handle_pause_menu,
@@ -27,8 +43,27 @@ impl Plugin for TitlePlugin {
     }
 }
 
+/// True when an unattended capture wants to photograph the title screen
+/// itself instead of skipping past it into the world.
+pub fn title_capture() -> bool {
+    std::env::var("EGREGORE_TITLE").is_ok()
+}
+
 #[derive(Component)]
 struct TitleScreen;
+
+/// The logotype image, so the farewell can fade it.
+#[derive(Component)]
+struct TitleArt;
+
+/// The tagline under the logotype, likewise.
+#[derive(Component)]
+struct TitleTagline;
+
+/// The title's menu buttons — despawned the instant the descent begins, so a
+/// half-faded button can never take a click.
+#[derive(Component)]
+struct TitleMenu;
 
 #[derive(Component)]
 struct BeginButton;
@@ -70,6 +105,126 @@ struct BackButton;
 #[derive(Component)]
 struct HandSwatch(usize);
 
+// ---------------------------------------------------------------------------
+// The splash: the studio's mark over black, while the world builds behind it.
+// ---------------------------------------------------------------------------
+
+#[derive(Component)]
+struct SplashScreen;
+
+#[derive(Component)]
+struct SplashArt;
+
+/// Seconds each fade takes, and seconds the mark holds at full strength.
+const SPLASH_FADE: f32 = 1.3;
+const SPLASH_HOLD: f32 = 1.8;
+
+/// Real seconds since the splash appeared.
+#[derive(Resource)]
+struct SplashClock(f32);
+
+fn spawn_splash(
+    mut commands: Commands,
+    assets: Res<AssetServer>,
+    mut next: ResMut<NextState<GameState>>,
+) {
+    // Unattended captures skip the pre-game entirely — except title
+    // portraits, which stop at the title itself.
+    if crate::capture_path().is_some() {
+        next.set(if title_capture() {
+            GameState::Title
+        } else {
+            GameState::Loading
+        });
+        return;
+    }
+
+    commands.insert_resource(SplashClock(0.0));
+    let screen = commands
+        .spawn((
+            Name::new("Splash Screen"),
+            SplashScreen,
+            ui::Panel,
+            Interaction::default(),
+            Node {
+                width: percent(100),
+                height: percent(100),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            // True black, not panel charcoal: a studio mark opens the way a
+            // theatre goes dark, and the title's own colour reads warmer for
+            // following it.
+            BackgroundColor(Color::BLACK),
+            GlobalZIndex(320),
+        ))
+        .id();
+
+    commands.spawn((
+        SplashArt,
+        ImageNode {
+            image: assets.load("NewCityEntertainment.png"),
+            color: Color::srgba(1.0, 1.0, 1.0, 0.0),
+            ..default()
+        },
+        Node {
+            width: px(620),
+            ..default()
+        },
+        ChildOf(screen),
+    ));
+}
+
+/// Runs the fade-in, hold, fade-out — and lets any key or click skip ahead.
+fn play_splash(
+    time: Res<Time<Real>>,
+    keys: Res<ButtonInput<KeyCode>>,
+    buttons: Res<ButtonInput<MouseButton>>,
+    clock: Option<ResMut<SplashClock>>,
+    mut arts: Query<&mut ImageNode, With<SplashArt>>,
+    mut next: ResMut<NextState<GameState>>,
+) {
+    let Some(mut clock) = clock else {
+        return;
+    };
+    clock.0 += time.delta_secs();
+
+    let fade_out_at = SPLASH_FADE + SPLASH_HOLD;
+    let alpha = if clock.0 < SPLASH_FADE {
+        clock.0 / SPLASH_FADE
+    } else if clock.0 < fade_out_at {
+        1.0
+    } else {
+        1.0 - (clock.0 - fade_out_at) / SPLASH_FADE
+    }
+    .clamp(0.0, 1.0);
+
+    // A key press skips ahead to the fade-out rather than cutting: the mark
+    // still leaves the way it always leaves, just now. Jumping to the point
+    // on the out-fade with the current alpha keeps the brightness continuous.
+    let skipped =
+        keys.get_just_pressed().next().is_some() || buttons.get_just_pressed().next().is_some();
+    if skipped && clock.0 < fade_out_at {
+        clock.0 = fade_out_at + (1.0 - alpha) * SPLASH_FADE;
+    }
+
+    for mut art in &mut arts {
+        art.color = Color::srgba(1.0, 1.0, 1.0, alpha);
+    }
+
+    if clock.0 >= fade_out_at + SPLASH_FADE {
+        next.set(GameState::Title);
+    }
+}
+
+fn despawn_splash(mut commands: Commands, screens: Query<Entity, With<SplashScreen>>) {
+    for screen in &screens {
+        commands.entity(screen).despawn();
+    }
+    commands.remove_resource::<SplashClock>();
+}
+
 fn menu_button(commands: &mut Commands, parent: Entity, label: &str) -> Entity {
     let button = commands
         .spawn((
@@ -93,17 +248,14 @@ fn menu_button(commands: &mut Commands, parent: Entity, label: &str) -> Entity {
     button
 }
 
+/// How dark the title lays its veil over the living world behind it.
+const SCRIM_ALPHA: f32 = 0.62;
+
 fn spawn_title(
     mut commands: Commands,
     assets: Res<AssetServer>,
-    mut next: ResMut<NextState<GameState>>,
+    mut images: ResMut<Assets<Image>>,
 ) {
-    // Unattended captures have nobody to click Begin.
-    if crate::capture_path().is_some() {
-        next.set(GameState::Loading);
-        return;
-    }
-
     let screen = commands
         .spawn((
             Name::new("Title Screen"),
@@ -122,19 +274,26 @@ fn spawn_title(
                 row_gap: px(14),
                 ..default()
             },
-            BackgroundColor(theme::panel_bg().with_alpha(1.0)),
+            // A veil, not a wall: the world drifts by underneath, blurred by
+            // the dreaming lens, alive before anyone has chosen to descend.
+            BackgroundColor(theme::panel_bg().with_alpha(SCRIM_ALPHA)),
             // Above the world, the HUD and the loading screen alike.
             GlobalZIndex(300),
         ))
         .id();
 
+    // The smoke, spawned before the logotype so it drifts behind the
+    // lettering rather than across it.
+    spawn_smoke(&mut commands, &mut images, screen);
+
     // The logotype — the game's one blessed piece of non-procedural art.
     let title = commands
         .spawn((
+            TitleArt,
             ImageNode::new(assets.load("EgregoreLogo.png")),
             Node {
-                width: px(640),
-                margin: UiRect::bottom(px(-40.0)).with_top(px(-60.0)),
+                width: px(860),
+                margin: UiRect::bottom(px(-54.0)).with_top(px(-80.0)),
                 ..default()
             },
         ))
@@ -143,6 +302,7 @@ fn spawn_title(
 
     let tagline = commands
         .spawn((
+            TitleTagline,
             Text::new("a god of their making"),
             TextFont {
                 font_size: FontSize::Px(16.0),
@@ -158,13 +318,160 @@ fn spawn_title(
     commands.entity(tagline).insert(ChildOf(screen));
 
     let begin = menu_button(&mut commands, screen, "Begin");
-    commands.entity(begin).insert(BeginButton);
+    commands.entity(begin).insert((BeginButton, TitleMenu));
     let load = menu_button(&mut commands, screen, "Load Game");
-    commands.entity(load).insert(LoadGameButton);
+    commands.entity(load).insert((LoadGameButton, TitleMenu));
     let settings = menu_button(&mut commands, screen, "Settings");
-    commands.entity(settings).insert(SettingsButton);
+    commands
+        .entity(settings)
+        .insert((SettingsButton, TitleMenu));
     let quit = menu_button(&mut commands, screen, "Quit");
-    commands.entity(quit).insert(QuitButton);
+    commands.entity(quit).insert((QuitButton, TitleMenu));
+}
+
+// ---------------------------------------------------------------------------
+// The smoke: hand-rolled wisps drifting behind the lettering.
+// ---------------------------------------------------------------------------
+
+/// One drifting wisp. Position is derived every frame from real time, so the
+/// smoke never stops moving whatever the virtual clock is doing.
+#[derive(Component)]
+struct SmokePuff {
+    /// Starting point along the drift lane, as a fraction of the lane.
+    lane: f32,
+    /// Resting height, as a fraction of the screen.
+    home_y: f32,
+    /// Lane traversal speed, in lane-fractions per second. Slow: a full
+    /// crossing takes minutes.
+    drift: f32,
+    /// Phase offset, so no two puffs breathe in step.
+    phase: f32,
+    /// Rendered size in logical pixels.
+    size: f32,
+    /// Resting opacity, before breathing and the farewell thin it.
+    alpha: f32,
+}
+
+/// The pale slate the wisps are tinted.
+const SMOKE_TINT: Color = Color::srgb(0.72, 0.76, 0.86);
+
+/// Where on screen the blow-away radiates from: the heart of the lettering.
+const SMOKE_HEART: Vec2 = Vec2::new(0.5, 0.3);
+
+/// A soft, wispy blob: radial falloff carved by value noise. One texture
+/// serves every puff — flips, scale and overlap hide the reuse.
+fn smoke_texture(images: &mut Assets<Image>) -> Handle<Image> {
+    const SIZE: u32 = 160;
+    let mut data = Vec::with_capacity((SIZE * SIZE * 4) as usize);
+    for y in 0..SIZE {
+        for x in 0..SIZE {
+            let u = x as f32 / (SIZE - 1) as f32 * 2.0 - 1.0;
+            let v = y as f32 / (SIZE - 1) as f32 * 2.0 - 1.0;
+            let r = (u * u + v * v).sqrt();
+            let body = (1.0 - r).clamp(0.0, 1.0).powf(1.8);
+            let wisp = crate::noise::fbm_2d(u * 2.6 + 5.3, v * 2.6 + 9.1, 0x50F7, 4, 2.1, 0.55);
+            let a = (body * (0.35 + 0.65 * wisp) * 255.0)
+                .round()
+                .clamp(0.0, 255.0) as u8;
+            data.extend_from_slice(&[255, 255, 255, a]);
+        }
+    }
+    images.add(Image::new(
+        Extent3d {
+            width: SIZE,
+            height: SIZE,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::RENDER_WORLD,
+    ))
+}
+
+fn spawn_smoke(commands: &mut Commands, images: &mut Assets<Image>, screen: Entity) {
+    let texture = smoke_texture(images);
+    for i in 0..12usize {
+        let f = i as f32;
+        // Golden-ratio spacing: even coverage of the lane with no visible
+        // rhythm, and no random draws to burn.
+        let puff = SmokePuff {
+            lane: (f * 0.618034).fract(),
+            home_y: 0.17 + 0.26 * (f * 0.377).fract(),
+            drift: 0.0045 + 0.006 * (f * 0.529).fract(),
+            phase: f * 1.947,
+            size: 260.0 + 360.0 * (f * 0.732).fract(),
+            alpha: 0.09 + 0.08 * (f * 0.851).fract(),
+        };
+        commands.spawn((
+            puff,
+            ImageNode {
+                image: texture.clone(),
+                color: SMOKE_TINT.with_alpha(0.0),
+                flip_x: i & 1 == 1,
+                flip_y: i & 2 == 2,
+                ..default()
+            },
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(-1000),
+                top: px(-1000),
+                ..default()
+            },
+            ChildOf(screen),
+        ));
+    }
+}
+
+/// Drifts the wisps — and, once the farewell begins, blows them away from the
+/// lettering as the descent starts.
+fn drift_smoke(
+    time: Res<Time<Real>>,
+    farewell: Option<Res<TitleFarewell>>,
+    windows: Query<&Window, With<PrimaryWindow>>,
+    mut puffs: Query<(&SmokePuff, &mut Node, &mut ImageNode)>,
+) {
+    if puffs.is_empty() {
+        return;
+    }
+    let Ok(window) = windows.single() else {
+        return;
+    };
+    let (width, height) = (window.width(), window.height());
+    let t = time.elapsed_secs();
+    let blow = farewell.map_or(0.0, |f| f.t);
+
+    for (puff, mut node, mut image) in &mut puffs {
+        // The crawl along the lane, plus a slow private wander around it.
+        let along = (puff.lane + t * puff.drift).fract();
+        let mut x = 0.14 + 0.72 * along + 0.02 * (t * 0.043 + puff.phase).sin();
+        let mut y = puff.home_y
+            + 0.016 * (t * 0.053 + puff.phase * 1.7).sin()
+            + 0.010 * (t * 0.031 + puff.phase * 2.3).cos();
+
+        // Born thin at one end of the lane, dying thin at the other, so the
+        // wrap-around never pops.
+        let mut alpha = puff.alpha
+            * (along * std::f32::consts::PI).sin().clamp(0.0, 1.0)
+            * (0.72 + 0.28 * (t * 0.11 + puff.phase * 3.1).sin());
+
+        if blow > 0.0 {
+            // Begin blows the smoke off the title: every wisp streams outward
+            // from the lettering, with the wind's own slant, thinning to
+            // nothing as the descent gets under way.
+            let s = blow * blow;
+            let away = (Vec2::new(x, y) - SMOKE_HEART) * 2.6 + Vec2::new(0.35, -0.18);
+            x += away.x * s * 0.55;
+            y += away.y * s * 0.55;
+            alpha *= (1.0 - blow).max(0.0);
+        }
+
+        node.left = px(x * width - puff.size * 0.5);
+        node.top = px(y * height - puff.size * 0.5);
+        node.width = px(puff.size);
+        node.height = px(puff.size);
+        image.color = SMOKE_TINT.with_alpha(alpha);
+    }
 }
 
 /// Escape raises the pause menu - the world holds its breath while it is
@@ -250,14 +557,168 @@ fn handle_pause_menu(
     }
 }
 
-/// The world stands still behind the title: generated and visible, but not
-/// living. Nobody builds a village while the player reads the menu.
-fn hold_the_world(mut time: ResMut<Time<Virtual>>) {
-    time.pause();
+// ---------------------------------------------------------------------------
+// The drift, the farewell, and the descent.
+// ---------------------------------------------------------------------------
+
+/// The god's-height vantage the title looks down from.
+const DRIFT_DISTANCE: f32 = 175.0;
+const DRIFT_PITCH: f32 = 0.47;
+/// Radians per second the vantage circles the village. A full lap takes five
+/// minutes; nobody should catch it moving, only notice that it has.
+const DRIFT_TURN: f32 = 0.021;
+
+/// Slowly circles the camera over the village while the pre-game screens are
+/// up. The world lives underneath — fires burning, villagers about their
+/// day — which is the whole point of looking at it.
+fn drift_title_camera(
+    time: Res<Time<Real>>,
+    site: Option<Res<crate::villager::SettlementSite>>,
+    mut rigs: Query<&mut crate::camera::CameraRig>,
+) {
+    // Unattended captures frame their own shot; only title portraits drift.
+    if crate::capture_path().is_some() && !title_capture() {
+        return;
+    }
+    let Ok(mut rig) = rigs.single_mut() else {
+        return;
+    };
+    if let Some(site) = site {
+        rig.target_focus.x = site.centre.x;
+        rig.target_focus.z = site.centre.z;
+    }
+    rig.target_distance = DRIFT_DISTANCE;
+    rig.target_pitch = DRIFT_PITCH;
+    rig.target_yaw += DRIFT_TURN * time.delta_secs();
+    rig.zoom_anchor = None;
 }
 
-fn release_the_world(mut time: ResMut<Time<Virtual>>) {
-    time.unpause();
+/// The descent. When the world finished building behind the title — which on
+/// most machines it long since has — there is no loading screen and no cut:
+/// the camera simply dives from the title vantage down to the village. The
+/// loading screen survives as the fallback for a world still under
+/// construction.
+fn begin_descent(
+    commands: &mut Commands,
+    chunks: Option<&crate::terrain::LoadedChunks>,
+    site: Option<&crate::villager::SettlementSite>,
+    next: &mut NextState<GameState>,
+) {
+    if chunks.is_some_and(|c| c.is_complete()) {
+        next.set(GameState::Playing);
+    } else {
+        next.set(GameState::Loading);
+    }
+    if let Some(site) = site {
+        commands.insert_resource(crate::camera::CameraDive::descend_to(site.centre));
+    }
+}
+
+/// Capture tooling: EGREGORE_AUTOBEGIN=seconds presses Begin unattended, so
+/// the descent itself can be photographed.
+fn auto_begin(
+    mut commands: Commands,
+    time: Res<Time<Real>>,
+    mut waited: Local<f32>,
+    chunks: Option<Res<crate::terrain::LoadedChunks>>,
+    site: Option<Res<crate::villager::SettlementSite>>,
+    mut next: ResMut<NextState<GameState>>,
+) {
+    let Some(after) = std::env::var("EGREGORE_AUTOBEGIN")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+    else {
+        return;
+    };
+    *waited += time.delta_secs();
+    if *waited >= after {
+        begin_descent(&mut commands, chunks.as_deref(), site.as_deref(), &mut next);
+    }
+}
+
+/// The title's exit, in progress from 0 to 1: the scrim thins, the lettering
+/// fades, the smoke blows away — all while the camera dives.
+#[derive(Resource)]
+struct TitleFarewell {
+    t: f32,
+}
+
+/// Seconds the farewell takes — inside the camera's dive, so the veil is gone
+/// before the descent lands.
+const FAREWELL_SECONDS: f32 = 1.7;
+
+/// Leaving the title does not cut to black; it lets go. The buttons vanish at
+/// once — a half-faded button must never take a click — and everything else
+/// hands itself to [`play_farewell`] to fade out over the descent.
+fn begin_farewell(
+    mut commands: Commands,
+    screens: Query<Entity, With<TitleScreen>>,
+    buttons: Query<Entity, With<TitleMenu>>,
+    settings: Query<Entity, With<SettingsScreen>>,
+) {
+    for screen in &settings {
+        commands.entity(screen).despawn();
+    }
+    for button in &buttons {
+        commands.entity(button).despawn();
+    }
+    let mut leaving = false;
+    for screen in &screens {
+        leaving = true;
+        // The scrim stops being a wall the moment the descent starts: no
+        // more picking, no more hand-over-interface pose.
+        commands.entity(screen).remove::<(Interaction, ui::Panel)>();
+    }
+    if leaving {
+        commands.insert_resource(TitleFarewell { t: 0.0 });
+    }
+}
+
+fn play_farewell(
+    mut commands: Commands,
+    time: Res<Time<Real>>,
+    farewell: Option<ResMut<TitleFarewell>>,
+    mut screens: Query<(Entity, &mut BackgroundColor), With<TitleScreen>>,
+    mut arts: Query<&mut ImageNode, With<TitleArt>>,
+    mut taglines: Query<&mut TextColor, With<TitleTagline>>,
+) {
+    let Some(mut farewell) = farewell else {
+        return;
+    };
+    farewell.t = (farewell.t + time.delta_secs() / FAREWELL_SECONDS).min(1.0);
+    let eased = farewell.t * farewell.t * (3.0 - 2.0 * farewell.t);
+    let fade = 1.0 - eased;
+
+    for (_, mut scrim) in &mut screens {
+        *scrim = BackgroundColor(theme::panel_bg().with_alpha(SCRIM_ALPHA * fade));
+    }
+    for mut art in &mut arts {
+        art.color = Color::srgba(1.0, 1.0, 1.0, fade);
+    }
+    for mut tagline in &mut taglines {
+        let dim = theme::text_dim();
+        *tagline = TextColor(dim.with_alpha(dim.alpha() * fade));
+    }
+
+    if farewell.t >= 1.0 {
+        for (screen, _) in &screens {
+            commands.entity(screen).despawn();
+        }
+        commands.remove_resource::<TitleFarewell>();
+    }
+}
+
+/// The game's own furniture — toolbar, time controls, belief meter, toasts —
+/// belongs to play. Over the pre-game's translucent veil it reads as a bug.
+fn sync_hud(state: Res<State<GameState>>, mut huds: Query<&mut Visibility, With<ui::GameHud>>) {
+    let playing = matches!(state.get(), GameState::Playing);
+    for mut visibility in &mut huds {
+        *visibility = if playing {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+    }
 }
 
 /// The settings overlay: for now, one setting — the colour of the hand.
@@ -379,16 +840,7 @@ fn handle_settings(
     }
 }
 
-fn despawn_title(
-    mut commands: Commands,
-    screens: Query<Entity, With<TitleScreen>>,
-    settings: Query<Entity, With<SettingsScreen>>,
-) {
-    for screen in screens.iter().chain(settings.iter()) {
-        commands.entity(screen).despawn();
-    }
-}
-
+#[allow(clippy::too_many_arguments)]
 fn handle_choice(
     mut commands: Commands,
     begin: Query<&Interaction, (Changed<Interaction>, With<BeginButton>)>,
@@ -397,12 +849,14 @@ fn handle_choice(
     settings: Query<&Interaction, (Changed<Interaction>, With<SettingsButton>)>,
     quit: Query<&Interaction, (Changed<Interaction>, With<QuitButton>)>,
     open_settings: Query<Entity, With<SettingsScreen>>,
+    chunks: Option<Res<crate::terrain::LoadedChunks>>,
+    site: Option<Res<crate::villager::SettlementSite>>,
     mut next: ResMut<NextState<GameState>>,
     mut exit: MessageWriter<AppExit>,
 ) {
     for interaction in &begin {
         if *interaction == Interaction::Pressed {
-            next.set(GameState::Loading);
+            begin_descent(&mut commands, chunks.as_deref(), site.as_deref(), &mut next);
         }
     }
     // Load Game opens the saves window over the title; picking a slot there

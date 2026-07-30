@@ -10,6 +10,7 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use std::f32::consts::{FRAC_PI_2, TAU};
 
+use crate::GameState;
 use crate::terrain::{Terrain, WATER_LEVEL};
 
 pub struct CameraPlugin;
@@ -21,8 +22,15 @@ impl Plugin for CameraPlugin {
             .add_systems(
                 Update,
                 (
-                    read_camera_input,
+                    // The player's hands stay off the wheel until the game is
+                    // actually theirs: the title drift and the opening descent
+                    // both own the rig outright.
+                    read_camera_input.run_if(
+                        in_state(GameState::Playing)
+                            .and_then(|dive: Option<Res<CameraDive>>| dive.is_none()),
+                    ),
                     apply_follow,
+                    fly_the_dive.run_if(in_state(GameState::Playing)),
                     follow_ground,
                     apply_camera_smoothing,
                     write_camera_transform,
@@ -30,6 +38,68 @@ impl Plugin for CameraPlugin {
                     .chain()
                     .in_set(CameraSet),
             );
+    }
+}
+
+/// A scripted descent: the camera flies itself from the title vantage down to
+/// the village while the player's input is held. Inserted by the title
+/// screen's Begin button; removes itself on arrival.
+#[derive(Resource)]
+pub struct CameraDive {
+    /// Progress through the flight, 0 to 1.
+    t: f32,
+    /// Departure pose — focus, pitch, distance — captured on the first frame
+    /// of flight, so the descent leaves from wherever the title drift
+    /// happened to be looking.
+    from: Option<(Vec3, f32, f32)>,
+    to_focus: Vec3,
+}
+
+impl CameraDive {
+    pub fn descend_to(focus: Vec3) -> Self {
+        CameraDive {
+            t: 0.0,
+            from: None,
+            to_focus: focus,
+        }
+    }
+}
+
+/// Seconds the descent takes: long enough to read as flight, short enough
+/// that nobody reaches for the mouse wondering whether they have control yet.
+const DIVE_SECONDS: f32 = 3.4;
+/// Where the descent lands, matching the framing the game has always opened
+/// with — see `point_camera_at_settlement`.
+const DIVE_PITCH: f32 = 0.85;
+const DIVE_DISTANCE: f32 = 80.0;
+
+/// Flies the [`CameraDive`], writing both current and target values so the
+/// smoothing pass has nothing left to argue about.
+fn fly_the_dive(
+    mut commands: Commands,
+    time: Res<Time<Real>>,
+    dive: Option<ResMut<CameraDive>>,
+    mut rigs: Query<&mut CameraRig>,
+) {
+    let (Some(mut dive), Ok(mut rig)) = (dive, rigs.single_mut()) else {
+        return;
+    };
+    let from = *dive
+        .from
+        .get_or_insert((rig.focus, rig.pitch, rig.distance));
+    dive.t = (dive.t + time.delta_secs() / DIVE_SECONDS).min(1.0);
+    // Smoothstep: the flight leaves the drift gently and settles onto the
+    // village without a felt seam at either end.
+    let s = dive.t * dive.t * (3.0 - 2.0 * dive.t);
+    rig.focus = from.0.lerp(dive.to_focus, s);
+    rig.pitch = from.1 + (DIVE_PITCH - from.1) * s;
+    rig.distance = from.2 + (DIVE_DISTANCE - from.2) * s;
+    rig.target_focus = rig.focus;
+    rig.target_pitch = rig.pitch;
+    rig.target_distance = rig.distance;
+    rig.zoom_anchor = None;
+    if dive.t >= 1.0 {
+        commands.remove_resource::<CameraDive>();
     }
 }
 

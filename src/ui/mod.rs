@@ -32,7 +32,11 @@ impl Plugin for UiPlugin {
             .add_systems(
                 Update,
                 (
-                    show_notices,
+                    // Toasts and bubbles belong to play. The pre-game's veil is
+                    // translucent now, and the world lives behind it — but its
+                    // chatter, thoughts and notices stay backstage until the
+                    // player has actually come down to the village.
+                    show_notices.run_if(in_state(crate::GameState::Playing)),
                     age_toasts,
                     style_buttons,
                     drag_windows,
@@ -41,7 +45,7 @@ impl Plugin for UiPlugin {
                     focus_windows,
                     dress_display_text,
                     switch_tabs,
-                    speak,
+                    speak.run_if(in_state(crate::GameState::Playing)),
                     float_bubbles,
                 ),
             );
@@ -416,6 +420,7 @@ fn spawn_toast_shelf(mut commands: Commands) {
     commands.spawn((
         Name::new("Notices"),
         ToastShelf,
+        GameHud,
         Node {
             position_type: PositionType::Absolute,
             right: px(theme::MARGIN),
@@ -645,6 +650,13 @@ impl Anchor {
 /// cursor has left the world for the interface.
 #[derive(Component)]
 pub struct Panel;
+
+/// Marks a root of the in-game HUD — the toolbar, the time controls, the
+/// belief meter, the toast shelf. The title screen hides these: its scrim is
+/// translucent now, and the game's furniture showing through the front door
+/// reads as a bug, not a view.
+#[derive(Component)]
+pub struct GameHud;
 
 /// The pieces of a spawned panel a caller may want to reach.
 pub struct PanelHandles {
@@ -1752,15 +1764,18 @@ pub fn dim(text: impl Into<String>) -> impl Bundle {
 /// strip itself never catches the pointer; only its contents do.
 pub fn centered_strip(commands: &mut Commands, top: Val, bottom: Val) -> Entity {
     commands
-        .spawn(Node {
-            position_type: PositionType::Absolute,
-            top,
-            bottom,
-            left: px(0),
-            width: percent(100),
-            justify_content: JustifyContent::Center,
-            ..default()
-        })
+        .spawn((
+            GameHud,
+            Node {
+                position_type: PositionType::Absolute,
+                top,
+                bottom,
+                left: px(0),
+                width: percent(100),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+        ))
         .id()
 }
 

@@ -21,7 +21,18 @@ impl Plugin for SurveyPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Survey>()
             .add_systems(Startup, spawn_legend)
-            .add_systems(Update, (toggle_survey, refresh_survey, show_legend).chain());
+            .add_systems(
+                Update,
+                (
+                    // Playing only: the title's veil is translucent now, and a
+                    // stray R typed over the menu must not open the sight on
+                    // the world drifting behind it.
+                    toggle_survey.run_if(in_state(crate::GameState::Playing)),
+                    refresh_survey,
+                    show_legend,
+                )
+                    .chain(),
+            );
     }
 }
 

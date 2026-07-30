@@ -68,7 +68,9 @@ impl Plugin for DebugPlugin {
                     update_history_panel,
                     handle_people_rows,
                     handle_roster_sort,
-                    update_inspector,
+                    // Playing only: the hover card naming what is beneath the
+                    // hand belongs to play, not to the title's translucent veil.
+                    update_inspector.run_if(in_state(crate::GameState::Playing)),
                     screenshot_on_request,
                 )
                     .chain(),
