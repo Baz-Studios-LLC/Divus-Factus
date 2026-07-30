@@ -1139,7 +1139,12 @@ pub fn titled_window(
 /// A row splitting into an inset list rail and a framed detail pane — the
 /// People window's anatomy as a kit piece, for pages that carry their own
 /// bands above and below the split. Returns (list, detail).
-pub fn split_row(commands: &mut Commands, parent: Entity, list_width: f32) -> (Entity, Entity) {
+pub fn split_row(
+    commands: &mut Commands,
+    parent: Entity,
+    list_width: f32,
+    gap: f32,
+) -> (Entity, Entity) {
     let row = commands
         .spawn((
             Node {
@@ -1148,7 +1153,7 @@ pub fn split_row(commands: &mut Commands, parent: Entity, list_width: f32) -> (E
                 min_height: px(0),
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Stretch,
-                column_gap: px(theme::PAD),
+                column_gap: px(gap),
                 ..default()
             },
             ChildOf(parent),

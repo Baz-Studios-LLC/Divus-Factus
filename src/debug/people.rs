@@ -121,7 +121,7 @@ pub(crate) fn spawn_people_panel(
     commands
         .entity(page)
         .insert((Name::new("People Page"), PeoplePanel));
-    let (list, detail) = ui::split_row(&mut commands, page, 320.0);
+    let (list, detail) = ui::split_row(&mut commands, page, 320.0, ui::theme::PAD);
     commands.entity(list).insert((
         PeopleRows,
         // The roster holds its ground: without flex_shrink 0 the stat

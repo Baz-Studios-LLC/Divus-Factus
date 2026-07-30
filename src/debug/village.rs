@@ -475,7 +475,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
                 height: px(96),
                 flex_shrink: 0.0,
                 flex_direction: FlexDirection::Row,
-                column_gap: px(8),
+                column_gap: px(9),
                 ..default()
             },
             ChildOf(ledger_page),
@@ -507,7 +507,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
             ChildOf(ledger_page),
         ))
         .id();
-    let (rail, detail) = ui::split_row(&mut commands, main, 320.0);
+    let (rail, detail) = ui::split_row(&mut commands, main, 368.0, 9.0);
 
     // The rail: OVERVIEW lists the villages of this world (one banner so
     // far, honestly); FAITH ranks every soul by their trust.

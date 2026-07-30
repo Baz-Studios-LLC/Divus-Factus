@@ -447,7 +447,7 @@ pub(crate) fn spawn_chronicle_page(mut commands: Commands, codex: Res<super::vil
     shelf_tab("THE WORLD", Some(Ledger::World));
 
     // The body: the filter rail and the book itself.
-    let (rail, main) = ui::split_row(&mut commands, page, 240.0);
+    let (rail, main) = ui::split_row(&mut commands, page, 240.0, ui::theme::PAD);
     commands.spawn((
         ChronicleRail,
         Node {
