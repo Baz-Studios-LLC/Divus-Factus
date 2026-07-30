@@ -270,15 +270,40 @@ fn spawn_head_features(
             genome.accent,
             "Cap",
         ),
-        Headwear::Hood => spawn_block(
-            commands,
-            assets,
-            head,
-            Vec3::new(0.0, head_size * 0.6, head_size * 0.1),
-            Vec3::new(head_size * 1.26, head_size * 1.1, head_size * 1.26),
-            genome.accent,
-            "Hood",
-        ),
+        Headwear::Hood => {
+            // A hood is a hollow, not a helmet: crown, back and cheeks,
+            // face open to the weather. The old single block swallowed
+            // the whole head - hooded folk went through life as a box.
+            spawn_block(
+                commands,
+                assets,
+                head,
+                Vec3::new(0.0, head_size * 1.04, head_size * 0.07),
+                Vec3::new(head_size * 1.26, head_size * 0.24, head_size * 1.18),
+                genome.accent,
+                "Hood",
+            );
+            spawn_block(
+                commands,
+                assets,
+                head,
+                Vec3::new(0.0, head_size * 0.54, head_size * 0.58),
+                Vec3::new(head_size * 1.26, head_size * 1.06, head_size * 0.22),
+                genome.accent,
+                "Hood",
+            );
+            for side in [-1.0f32, 1.0] {
+                spawn_block(
+                    commands,
+                    assets,
+                    head,
+                    Vec3::new(side * head_size * 0.59, head_size * 0.5, head_size * 0.1),
+                    Vec3::new(head_size * 0.2, head_size * 0.98, head_size * 1.08),
+                    genome.accent,
+                    "Hood",
+                );
+            }
+        }
         Headwear::Band => spawn_block(
             commands,
             assets,
