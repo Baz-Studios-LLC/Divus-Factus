@@ -101,7 +101,12 @@ pub(crate) struct RowFace {
     base: f32,
 }
 
-pub(crate) fn spawn_people_panel(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+pub(crate) fn spawn_people_panel(
+    mut commands: Commands,
+    mut images: ResMut<Assets<Image>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
     let split = ui::split_view(&mut commands, "THE PEOPLE", 300.0, 640.0);
     // Capture mode opens the window and picks somebody, so an unattended
     // screenshot can prove the pane works.
@@ -160,6 +165,96 @@ pub(crate) fn spawn_people_panel(mut commands: Commands, mut images: ResMut<Asse
         Transform::from_xyz(-2.6, 1.4, -1.2).looking_at(Vec3::ZERO, Vec3::Y),
         bevy::camera::visibility::RenderLayers::layer(DOLL_LAYER),
     ));
+
+    // The niche: real architecture behind the sitter - a stone alcove
+    // with pillars, a shouldered arch, a recessed dark panel for the
+    // vignette, and a two-tier plinth with a thread of gold. Actual
+    // geometry under the portrait lights, not painted rectangles.
+    let layer = bevy::camera::visibility::RenderLayers::layer(DOLL_LAYER);
+    let stone = materials.add(StandardMaterial {
+        base_color: crate::palette::shade(&crate::palette::STONE, 0.22),
+        perceptual_roughness: 1.0,
+        ..default()
+    });
+    let stone_dark = materials.add(StandardMaterial {
+        base_color: crate::palette::shade(&crate::palette::STONE, 0.12),
+        perceptual_roughness: 1.0,
+        ..default()
+    });
+    let velvet = materials.add(StandardMaterial {
+        base_color: crate::palette::shade(&crate::palette::STONE, 0.05),
+        perceptual_roughness: 1.0,
+        ..default()
+    });
+    let gold = materials.add(StandardMaterial {
+        base_color: crate::palette::shade(&crate::palette::CLOTH_GOLD, 0.8),
+        perceptual_roughness: 0.5,
+        ..default()
+    });
+    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+    let mut set_piece =
+        |mesh: Handle<Mesh>, material: Handle<StandardMaterial>, offset: Vec3, scale: Vec3| {
+            commands.spawn((
+                Name::new("Niche"),
+                Mesh3d(mesh),
+                MeshMaterial3d(material),
+                Transform::from_translation(DOLL_STAGE + offset).with_scale(scale),
+                layer.clone(),
+            ));
+        };
+    // The dark heart of the alcove, and the wall it is cut into.
+    set_piece(
+        cube.clone(),
+        velvet.clone(),
+        Vec3::new(0.0, 1.15, -0.95),
+        Vec3::new(1.7, 2.5, 0.2),
+    );
+    set_piece(
+        cube.clone(),
+        stone.clone(),
+        Vec3::new(0.0, 1.3, -1.15),
+        Vec3::new(3.4, 3.4, 0.18),
+    );
+    // Pillars and the shouldered arch.
+    for side in [-1.0f32, 1.0] {
+        set_piece(
+            cube.clone(),
+            stone.clone(),
+            Vec3::new(side * 1.06, 1.1, -0.85),
+            Vec3::new(0.42, 2.5, 0.42),
+        );
+        set_piece(
+            cube.clone(),
+            stone_dark.clone(),
+            Vec3::new(side * 0.72, 2.28, -0.85),
+            Vec3::new(0.5, 0.34, 0.4),
+        );
+    }
+    set_piece(
+        cube.clone(),
+        stone.clone(),
+        Vec3::new(0.0, 2.52, -0.85),
+        Vec3::new(2.6, 0.4, 0.46),
+    );
+    // The plinth: two tiers and the thread of gold.
+    set_piece(
+        meshes.add(Cylinder::new(1.05, 0.16)),
+        stone.clone(),
+        Vec3::new(0.0, -0.1, -0.15),
+        Vec3::ONE,
+    );
+    set_piece(
+        meshes.add(Cylinder::new(0.82, 0.18)),
+        stone_dark.clone(),
+        Vec3::new(0.0, 0.05, -0.15),
+        Vec3::ONE,
+    );
+    set_piece(
+        meshes.add(Cylinder::new(0.86, 0.03)),
+        gold,
+        Vec3::new(0.0, 0.13, -0.15),
+        Vec3::ONE,
+    );
 
     // The page and its empty state: one shows, the other doesn't.
     let empty = commands
