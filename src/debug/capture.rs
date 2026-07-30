@@ -110,6 +110,7 @@ pub(crate) fn capture_preselect(
     let wanted = match std::env::var("EGREGORE_OPEN").as_deref() {
         Ok("village") => super::village::CodexPage::Ledger,
         Ok("history") => super::village::CodexPage::Chronicle,
+        Ok("god") => super::village::CodexPage::Deity,
         _ => super::village::CodexPage::People,
     };
     if let Some(mut codex) = codex

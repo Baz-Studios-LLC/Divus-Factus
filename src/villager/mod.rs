@@ -98,6 +98,7 @@ impl Plugin for VillagerPlugin {
             .init_resource::<work::KitchenWarm>()
             .init_resource::<work::StoreTrends>()
             .init_resource::<belief::Belief>()
+            .init_resource::<belief::FaithHistory>()
             .init_resource::<belief::Legend>()
             .add_systems(
                 Startup,
@@ -167,6 +168,7 @@ impl Plugin for VillagerPlugin {
                         belief::tally_belief,
                         belief::grow_legend,
                         belief::ascend,
+                        belief::record_faith,
                         belief::animate_motes,
                         work::bake,
                         work::smelt,

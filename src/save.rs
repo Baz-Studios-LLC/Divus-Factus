@@ -104,6 +104,9 @@ struct SaveGame {
     version: u32,
     seed: u32,
     elapsed: f64,
+    /// The god's faith curve, sampled daily. Old saves start theirs afresh.
+    #[serde(default)]
+    faith_history: crate::villager::belief::FaithHistory,
     // The slot card's face.
     label_settlement: String,
     label_day: u32,
@@ -291,6 +294,10 @@ fn read_slot(slot: u8) -> Result<SaveGame, String> {
 fn gather(world: &mut World) -> Option<SaveGame> {
     let seed = world.resource::<crate::WorldSeed>().0;
     let elapsed = world.resource::<crate::calendar::WorldClock>().elapsed;
+    let faith_history = world
+        .get_resource::<crate::villager::belief::FaithHistory>()
+        .cloned()
+        .unwrap_or_default();
     let site = world.get_resource::<SettlementSite>()?;
     let settlement_entity = site.settlement;
     let centre = site.centre;
@@ -659,6 +666,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
     let label_day = world.resource::<crate::calendar::WorldClock>().day();
     Some(SaveGame {
         version: 1,
+        faith_history,
         seed,
         elapsed,
         label_settlement: name.clone(),
@@ -789,6 +797,7 @@ fn found_anew(world: &mut World) {
     world.insert_resource(crate::weather::Weather::default());
     world.insert_resource(Belief::default());
     world.insert_resource(Legend::default());
+    world.insert_resource(crate::villager::belief::FaithHistory::default());
 
     // Found the new settlement the same way a fresh launch does — new site,
     // new founders, new names, a new first page of the chronicle.
@@ -883,6 +892,7 @@ fn apply(world: &mut World, save: SaveGame) {
             .map(|&(x, z)| IVec2::new(x, z))
             .collect();
     }
+    world.insert_resource(save.faith_history.clone());
     world.insert_resource(crate::weather::Weather {
         intensity: save.weather.0,
         target: save.weather.1,

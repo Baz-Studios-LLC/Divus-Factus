@@ -88,6 +88,7 @@ pub(crate) enum CodexPage {
     Ledger,
     People,
     Chronicle,
+    Deity,
 }
 
 /// The codex's spine: which page is open, and the handles the page-turn
@@ -99,9 +100,11 @@ pub(crate) struct Codex {
     pub ledger_page: Entity,
     pub people_page: Entity,
     pub chronicle_page: Entity,
+    pub deity_page: Entity,
     pub ledger_tab: Entity,
     pub people_tab: Entity,
     pub chronicle_tab: Entity,
+    pub deity_tab: Entity,
     pub title_text: Entity,
     pub subtitle_text: Option<Entity>,
 }
@@ -122,7 +125,7 @@ pub(crate) struct TradeRows;
 // ---------------------------------------------------------------------------
 
 /// A fixed canvas the glyph bars are placed on, absolutely.
-fn glyph_canvas(commands: &mut Commands, parent: Entity, size: f32) -> Entity {
+pub(crate) fn glyph_canvas(commands: &mut Commands, parent: Entity, size: f32) -> Entity {
     commands
         .spawn((
             Node {
@@ -136,7 +139,7 @@ fn glyph_canvas(commands: &mut Commands, parent: Entity, size: f32) -> Entity {
         .id()
 }
 
-fn bar(
+pub(crate) fn bar(
     commands: &mut Commands,
     canvas: Entity,
     (left, top, width, height): (f32, f32, f32, f32),
@@ -167,7 +170,7 @@ fn bar(
 }
 
 /// A house: walls under a peaked roof.
-fn house_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+pub(crate) fn house_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     let c = glyph_canvas(commands, parent, 18.0);
     bar(commands, c, (4.0, 9.0, 10.0, 7.0), 0.0, tint, false);
     bar(commands, c, (1.0, 5.0, 9.0, 2.5), -33.0, tint, false);
@@ -175,7 +178,7 @@ fn house_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
 }
 
 /// A tree: the chronicle's mark, at button scale.
-fn tree_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+pub(crate) fn tree_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     let c = glyph_canvas(commands, parent, 18.0);
     bar(commands, c, (8.0, 11.0, 2.5, 6.0), 0.0, tint, false);
     bar(commands, c, (4.0, 7.5, 10.5, 3.5), 0.0, tint, false);
@@ -184,14 +187,14 @@ fn tree_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
 }
 
 /// Faith: two bars leant together in prayer.
-fn hands_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+pub(crate) fn hands_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     let c = glyph_canvas(commands, parent, 18.0);
     bar(commands, c, (4.0, 4.0, 3.0, 11.0), 22.0, tint, false);
     bar(commands, c, (11.0, 4.0, 3.0, 11.0), -22.0, tint, false);
 }
 
 /// A scroll: a page bearing written lines.
-fn scroll_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+pub(crate) fn scroll_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     let c = glyph_canvas(commands, parent, 18.0);
     bar(
         commands,
@@ -207,14 +210,14 @@ fn scroll_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
 }
 
 /// A person: head over shoulders.
-fn person_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+pub(crate) fn person_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     let c = glyph_canvas(commands, parent, 18.0);
     bar(commands, c, (6.5, 2.0, 5.0, 5.0), 0.0, tint, true);
     bar(commands, c, (4.0, 8.5, 10.0, 7.0), 0.0, tint, true);
 }
 
 /// A gathering: two souls shoulder to shoulder.
-fn people_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+pub(crate) fn people_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     let c = glyph_canvas(commands, parent, 18.0);
     bar(
         commands,
@@ -238,7 +241,7 @@ fn people_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
 
 /// The village banner: a hung cloth with the tree upon it, flying at the
 /// detail pane's shoulder the way the mockup flies it.
-fn banner_glyph(commands: &mut Commands, parent: Entity) {
+pub(crate) fn banner_glyph(commands: &mut Commands, parent: Entity) {
     let cloth = commands
         .spawn((
             Node {
@@ -355,6 +358,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
     };
     let people_page = bound_page();
     let chronicle_page = bound_page();
+    let deity_page = bound_page();
 
     // The codex strip: five pages, two residents. Dark tabs are pages still
     // being written.
@@ -412,11 +416,11 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         ui::HoverHint::new("The Ledger", "the heart of a living world"),
     ));
 
-    let god_tab = tab(&mut commands, false, true);
-    hands_glyph(&mut commands, god_tab, faint);
-    commands.entity(god_tab).insert(ui::HoverHint::new(
-        "The God",
-        "this page of the codex is still being written",
+    let deity_tab = tab(&mut commands, false, true);
+    hands_glyph(&mut commands, deity_tab, ink.with_alpha(0.8));
+    commands.entity(deity_tab).insert((
+        CodexTab(CodexPage::Deity),
+        ui::HoverHint::new("The Deity", "you are the unseen; they are the faithful"),
     ));
 
     let world_tab = tab(&mut commands, false, true);
@@ -449,9 +453,11 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         ledger_page,
         people_page,
         chronicle_page,
+        deity_page,
         ledger_tab,
         people_tab,
         chronicle_tab,
+        deity_tab,
         title_text: window.title_text,
         subtitle_text: window.subtitle_text,
     });
@@ -859,6 +865,7 @@ pub(crate) fn apply_codex_page(
         (codex.ledger_page, codex.page == CodexPage::Ledger),
         (codex.people_page, codex.page == CodexPage::People),
         (codex.chronicle_page, codex.page == CodexPage::Chronicle),
+        (codex.deity_page, codex.page == CodexPage::Deity),
     ];
     for (page, open) in pages {
         if let Ok(mut node) = nodes.get_mut(page) {
@@ -885,6 +892,7 @@ pub(crate) fn apply_codex_page(
         (codex.ledger_tab, codex.page == CodexPage::Ledger),
         (codex.people_tab, codex.page == CodexPage::People),
         (codex.chronicle_tab, codex.page == CodexPage::Chronicle),
+        (codex.deity_tab, codex.page == CodexPage::Deity),
     ];
     for (tab, open) in tabs {
         if let Ok(mut fill) = fills.get_mut(tab) {
@@ -909,6 +917,7 @@ pub(crate) fn apply_codex_page(
             "THE CHRONICLE",
             "The tale of your people, written moment by moment.",
         ),
+        CodexPage::Deity => ("THE DEITY", "You are the unseen. They are the faithful."),
     };
     if let Ok(mut text) = texts.get_mut(codex.title_text)
         && text.0 != title

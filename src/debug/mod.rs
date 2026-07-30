@@ -56,7 +56,7 @@ impl Plugin for DebugPlugin {
                     spawn_people_panel.after(spawn_village_panel),
                     spawn_chronicle_page.after(spawn_village_panel),
                     spawn_village_panel,
-                    spawn_god_panel,
+                    spawn_god_panel.after(spawn_village_panel),
                 ),
             )
             .add_systems(
@@ -87,6 +87,7 @@ impl Plugin for DebugPlugin {
                     apply_codex_page,
                     update_dossier,
                     update_god_panel,
+                    update_faith_chart,
                     capture_preselect,
                     style_roster_rows,
                     update_village_panel,
@@ -318,16 +319,6 @@ fn handle_toolbar(
     people_buttons: Query<&Interaction, (Changed<Interaction>, With<PeopleButton>)>,
     village_buttons: Query<&Interaction, (Changed<Interaction>, With<VillageButton>)>,
     god_buttons: Query<&Interaction, (Changed<Interaction>, With<GodButton>)>,
-    mut god_panels: Query<
-        &mut Visibility,
-        (
-            With<GodPanel>,
-            Without<WorldPanel>,
-            Without<PeoplePanel>,
-            Without<HistoryPanel>,
-            Without<VillagePanel>,
-        ),
-    >,
     mut village_panels: Query<
         &mut Visibility,
         (
@@ -413,8 +404,15 @@ fn handle_toolbar(
     }
     for interaction in &god_buttons {
         if *interaction == Interaction::Pressed {
-            for mut visibility in &mut god_panels {
-                toggle(&mut visibility);
+            if let Some(codex) = codex.as_mut() {
+                for mut visibility in &mut village_panels {
+                    if *visibility != Visibility::Hidden && codex.page == CodexPage::Deity {
+                        *visibility = Visibility::Hidden;
+                    } else {
+                        *visibility = Visibility::Visible;
+                        codex.page = CodexPage::Deity;
+                    }
+                }
             }
         }
     }

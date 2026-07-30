@@ -522,6 +522,27 @@ pub(super) fn ascend(
     }
 }
 
+/// The god's biography in one line: the sum of living faith, sampled once
+/// a day since the founding. The deity page draws it; saves carry it.
+#[derive(Resource, Default, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FaithHistory {
+    pub samples: Vec<f32>,
+    pub last_day: u32,
+}
+
+/// Writes the day's sample when the day turns (and the founding's first).
+pub(super) fn record_faith(
+    clock: Res<crate::calendar::WorldClock>,
+    belief: Res<Belief>,
+    mut history: ResMut<FaithHistory>,
+) {
+    let day = clock.day();
+    if history.samples.is_empty() || history.last_day != day {
+        history.samples.push(belief.total);
+        history.last_day = day;
+    }
+}
+
 /// Members of the settlement carry Faith from the moment they exist.
 pub(super) fn endow_faith(
     mut commands: Commands,
