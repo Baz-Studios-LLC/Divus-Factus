@@ -137,13 +137,27 @@ pub(crate) fn spawn_people_panel(mut commands: Commands, mut images: ResMut<Asse
             .looking_at(DOLL_STAGE + Vec3::Y * 0.85, Vec3::Y),
         bevy::camera::visibility::RenderLayers::layer(DOLL_LAYER),
     ));
+    // Portrait light: a warm key from the front quarter and a cool fill
+    // from the far side, so the face has form instead of appliance-flat
+    // panels.
     commands.spawn((
-        Name::new("Paperdoll Light"),
+        Name::new("Paperdoll Key"),
         DirectionalLight {
-            illuminance: 14_000.0,
+            color: crate::palette::shade(&crate::palette::BONE, 1.0),
+            illuminance: 13_000.0,
             ..default()
         },
-        Transform::from_xyz(2.0, 3.0, 2.5).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(1.6, 2.6, 3.0).looking_at(Vec3::ZERO, Vec3::Y),
+        bevy::camera::visibility::RenderLayers::layer(DOLL_LAYER),
+    ));
+    commands.spawn((
+        Name::new("Paperdoll Fill"),
+        DirectionalLight {
+            color: crate::palette::shade(&crate::palette::SKY, 0.85),
+            illuminance: 4_500.0,
+            ..default()
+        },
+        Transform::from_xyz(-2.6, 1.4, -1.2).looking_at(Vec3::ZERO, Vec3::Y),
         bevy::camera::visibility::RenderLayers::layer(DOLL_LAYER),
     ));
 
@@ -513,8 +527,12 @@ pub(crate) fn stamp_doll_layers(
 
 /// The doll turns slowly, so the whole person can be seen.
 pub(crate) fn spin_doll(time: Res<Time>, mut dolls: Query<&mut Transform, With<DollBody>>) {
+    // A portrait, not a rotisserie: the doll sways through a gentle
+    // three-quarter arc, face toward the reader - nobody's head should
+    // spend half its life being the back of a microwave.
+    let sway = (time.elapsed_secs() * 0.45).sin() * 0.55 - 0.25;
     for mut doll in &mut dolls {
-        doll.rotate_y(time.delta_secs() * 0.6);
+        doll.rotation = Quat::from_rotation_y(sway);
     }
 }
 
