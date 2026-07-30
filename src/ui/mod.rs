@@ -1272,6 +1272,191 @@ pub fn split_view_titled(
     }
 }
 
+// ---------------------------------------------------------------------------
+// The codex vocabulary: the pieces the People window proved, lifted into the
+// kit so every new page is assembled, not re-invented.
+// ---------------------------------------------------------------------------
+
+/// A titled, subtitled window shell with nothing inside — the same chrome the
+/// People window wears, for callers building their own bands.
+pub fn titled_window(
+    commands: &mut Commands,
+    title: &str,
+    subtitle: Option<&str>,
+    min_width: f32,
+) -> WindowHandles {
+    window_impl_titled(commands, title, subtitle, min_width, false)
+}
+
+/// A row splitting into an inset list rail and a framed detail pane — the
+/// People window's anatomy as a kit piece, for pages that carry their own
+/// bands above and below the split. Returns (list, detail).
+pub fn split_row(commands: &mut Commands, parent: Entity, list_width: f32) -> (Entity, Entity) {
+    let row = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                flex_grow: 1.0,
+                min_height: px(0),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Stretch,
+                column_gap: px(theme::PAD),
+                ..default()
+            },
+            ChildOf(parent),
+        ))
+        .id();
+    let list = commands
+        .spawn((
+            Node {
+                width: px(list_width),
+                flex_shrink: 0.0,
+                height: percent(100),
+                flex_direction: FlexDirection::Column,
+                row_gap: px(4),
+                padding: UiRect::all(px(6)),
+                border_radius: BorderRadius::all(px(0)),
+                ..default()
+            },
+            // The inset well, a step darker than the panel.
+            BackgroundColor(Color::BLACK.with_alpha(0.35)),
+            ChildOf(row),
+        ))
+        .id();
+    let detail = commands
+        .spawn((
+            Node {
+                flex_grow: 1.0,
+                min_width: px(0),
+                height: percent(100),
+                flex_direction: FlexDirection::Column,
+                row_gap: px(theme::GAP),
+                padding: px(theme::PAD).into(),
+                border: UiRect::all(px(2)),
+                border_radius: BorderRadius::all(px(0)),
+                // The frame never scrolls as a whole; inner wells scroll.
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            BackgroundColor(theme::card_bg()),
+            BorderColor::all(theme::card_border()),
+            Interaction::default(),
+            ChildOf(row),
+        ))
+        .id();
+    (list, detail)
+}
+
+/// A big-number stat plate: the number writ large over a small label, on the
+/// title-bar charcoal. Returns (row, number) — the caller marks the number
+/// for live updates, and may seat a glyph at the row's head so the mark and
+/// the figure read as one group.
+pub fn stat_plate(commands: &mut Commands, parent: Entity, label_text: &str) -> (Entity, Entity) {
+    let plate = commands
+        .spawn((
+            Node {
+                flex_grow: 1.0,
+                flex_basis: px(0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                row_gap: px(2),
+                padding: UiRect::axes(px(10), px(8)),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(0)),
+                ..default()
+            },
+            BackgroundColor(theme::title_bg()),
+            BorderColor::all(theme::panel_border()),
+            ChildOf(parent),
+        ))
+        .id();
+    let row = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: px(12),
+                ..default()
+            },
+            ChildOf(plate),
+        ))
+        .id();
+    let number = commands
+        .spawn((
+            Text::new("0"),
+            DisplayFace,
+            TextFont {
+                font_size: FontSize::Px(30.0),
+                ..default()
+            },
+            TextColor(theme::accent()),
+            ChildOf(row),
+        ))
+        .id();
+    commands.spawn((dim(label_text), ChildOf(plate)));
+    (row, number)
+}
+
+/// A titled card well — the People footer's card face as a kit piece: a
+/// quiet dark plate with a small engraved title and content below. Returns
+/// the card; children go straight in under the title.
+pub fn card_well(commands: &mut Commands, parent: Entity, title: &str) -> Entity {
+    let card = commands
+        .spawn((
+            Node {
+                flex_grow: 1.0,
+                flex_basis: px(0),
+                min_height: px(0),
+                min_width: px(0),
+                flex_direction: FlexDirection::Column,
+                row_gap: px(6),
+                padding: UiRect::all(px(10)),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(0)),
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.22)),
+            BorderColor::all(theme::text_dim().with_alpha(0.18)),
+            ChildOf(parent),
+        ))
+        .id();
+    commands.spawn((
+        Text::new(title),
+        DisplayFace,
+        TextFont {
+            font_size: FontSize::Px(theme::SMALL_SIZE),
+            ..default()
+        },
+        TextColor(theme::accent().with_alpha(0.9)),
+        ChildOf(card),
+    ));
+    card
+}
+
+/// A ruled label/value line — the ledger's activity rows. Returns the value
+/// text entity for live updates.
+pub fn ruled_row(commands: &mut Commands, parent: Entity, label_text: &str) -> Entity {
+    let row = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::SpaceBetween,
+                align_items: AlignItems::Center,
+                padding: UiRect::bottom(px(4)),
+                border: UiRect::bottom(px(1)),
+                ..default()
+            },
+            BorderColor::all(theme::text_dim().with_alpha(0.12)),
+            ChildOf(parent),
+        ))
+        .id();
+    commands.spawn((label(label_text), ChildOf(row)));
+    commands.spawn((body(""), ChildOf(row))).id()
+}
+
 /// Windows move by their title bars, like windows anywhere.
 pub fn drag_windows(
     primary: Query<&bevy::window::Window, With<bevy::window::PrimaryWindow>>,
@@ -1352,6 +1537,12 @@ pub fn gauge_row(commands: &mut Commands, parent: Entity, label_text: &str, colo
         .id();
     commands.spawn((
         label(label_text),
+        // Declared unwrappable: the serif face's +2px dressing once pushed
+        // "belief in you" past the label column and the whole row folded.
+        TextLayout {
+            linebreak: LineBreak::NoWrap,
+            ..default()
+        },
         Node {
             width: px(theme::LABEL_WIDTH),
             flex_shrink: 0.0,

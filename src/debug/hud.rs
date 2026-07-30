@@ -91,7 +91,7 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
     let hints = commands
         .spawn(ui::dim(
             "WASD or MMB-drag pan / QE or RMB orbit / wheel zoom\n\
-             hold LMB to grab, flick to throw / Tab hides this panel",
+             hold LMB to grab, flick to throw / Tab opens the codex / F1 hides this panel",
         ))
         .id();
     commands.entity(hints).insert((
@@ -164,12 +164,23 @@ pub(crate) fn nudge(value: &mut f32, delta: f32, lo: f32, hi: f32) -> bool {
 
 pub(crate) fn handle_tuning_input(
     keys: Res<ButtonInput<KeyCode>>,
+    playing: Res<State<crate::GameState>>,
     mut look: ResMut<LookSettings>,
     mut state: ResMut<DebugState>,
+    mut codex: Query<&mut Visibility, With<super::VillagePanel>>,
 ) {
-    // Tab, because function keys on a laptop keyboard are behind a modifier
-    // and a prayer. F1 still works out of habit.
-    if keys.just_pressed(KeyCode::Tab) || keys.just_pressed(KeyCode::F1) {
+    // Tab belongs to the player now: it opens the codex, the game's own
+    // book. The developer's instrument panel retreats to F1.
+    if keys.just_pressed(KeyCode::Tab) && matches!(playing.get(), crate::GameState::Playing) {
+        for mut visibility in &mut codex {
+            *visibility = if *visibility == Visibility::Hidden {
+                Visibility::Visible
+            } else {
+                Visibility::Hidden
+            };
+        }
+    }
+    if keys.just_pressed(KeyCode::F1) {
         state.hud_visible = !state.hud_visible;
     }
 

@@ -93,13 +93,21 @@ pub(crate) fn capture_preselect(
         ),
     >,
     mut history: Query<&mut Visibility, With<super::HistoryPanel>>,
+    mut codex: Query<&mut Visibility, (With<super::VillagePanel>, Without<super::HistoryPanel>)>,
 ) {
     if crate::capture_path().is_none() {
         return;
     }
-    // EGREGORE_OPEN=history photographs the chronicle instead of a person.
+    // EGREGORE_OPEN=history photographs the chronicle instead of a person;
+    // EGREGORE_OPEN=village, the codex.
     if std::env::var("EGREGORE_OPEN").is_ok_and(|w| w == "history") {
         for mut visibility in &mut history {
+            *visibility = Visibility::Visible;
+        }
+        return;
+    }
+    if std::env::var("EGREGORE_OPEN").is_ok_and(|w| w == "village") {
+        for mut visibility in &mut codex {
             *visibility = Visibility::Visible;
         }
         return;

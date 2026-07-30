@@ -79,6 +79,8 @@ impl Plugin for DebugPlugin {
                 Update,
                 (
                     update_faith_roster,
+                    update_ledger_details,
+                    handle_codex_tabs,
                     update_dossier,
                     update_god_panel,
                     capture_preselect,

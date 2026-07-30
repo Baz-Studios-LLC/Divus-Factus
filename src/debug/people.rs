@@ -124,9 +124,13 @@ pub(crate) fn spawn_people_panel(
         650.0,
     );
     // Capture mode opens the window and picks somebody, so an unattended
-    // screenshot can prove the pane works. Title portraits are the exception:
-    // they photograph the front door, not the furniture.
-    let starts = if crate::capture_path().is_some() && !crate::title::title_capture() {
+    // screenshot can prove the pane works. Title portraits are the exception
+    // (they photograph the front door, not the furniture), and so is any
+    // capture that asked for a different window by EGREGORE_OPEN.
+    let starts = if crate::capture_path().is_some()
+        && !crate::title::title_capture()
+        && std::env::var("EGREGORE_OPEN").map_or(true, |w| w == "people")
+    {
         Visibility::Visible
     } else {
         Visibility::Hidden

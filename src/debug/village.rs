@@ -1,6 +1,16 @@
-//! THE VILLAGE window: ledger, gauges, and the faith roster.
+//! THE CODEX — the one grand window — and its first resident page: THE
+//! LEDGER, the village's whole account at a glance.
+//!
+//! The codex is the People window's footprint (1160 wide, the same band
+//! heights) wearing an icon-tab strip in its title bar: house, wood, temple,
+//! faith, people. Today only the house page lives here and the people icon
+//! opens the People window where it still stands; each remaining panel
+//! migrates in as it is brought up to the People standard, one by one.
+
+use std::collections::BTreeMap;
 
 use crate::ui;
+use crate::villager::Activity;
 use crate::villager::Chronicle;
 use crate::villager::Morale;
 use crate::villager::Needs;
@@ -8,7 +18,9 @@ use crate::villager::Person;
 use crate::villager::Villager;
 use crate::witness::Witnessed;
 use bevy::prelude::*;
-/// The big centred village ledger.
+
+/// The codex window. Keeps the historical component name so the toolbar
+/// wiring and capture tooling stay untouched.
 #[derive(Component)]
 pub(crate) struct VillagePanel;
 
@@ -33,11 +45,11 @@ pub(crate) enum VillageStat {
     Stone,
 }
 
-/// The fill of a village gauge.
+/// The fill of a ledger gauge.
 #[derive(Component)]
 pub(crate) struct VillageGaugeFill(VillageStat);
 
-/// The small value text beside a village gauge.
+/// The small value text beside a ledger gauge.
 #[derive(Component)]
 pub(crate) struct VillageGaugeValue(VillageStat);
 
@@ -53,19 +65,316 @@ pub(crate) struct FaithRoster;
 #[derive(Component)]
 pub(crate) struct HappinessWhy;
 
+/// The village's name, writ large at the head of the detail pane.
+#[derive(Component)]
+pub(crate) struct LedgerName;
+
+/// The name's echo on the rail's single (for now) village entry, in the
+/// reading face rather than engraved capitals.
+#[derive(Component)]
+pub(crate) struct LedgerRailName;
+
+/// The line under the name: what kind of place this is, in the game's voice.
+#[derive(Component)]
+pub(crate) struct LedgerEpithet;
+
+/// One ACTIVITY row's value: 0 working, 1 resting, 2 praying, 3 about.
+#[derive(Component)]
+pub(crate) struct ActivityRow(u8);
+
+/// The codex strip's people icon: opens the People window where it still
+/// stands, until that page migrates into the codex proper.
+#[derive(Component)]
+pub(crate) struct CodexPeopleTab;
+
+/// The DETAILS page wells, rebuilt on a slow clock while the window is open.
+#[derive(Component)]
+pub(crate) struct BuildingRows;
+
+#[derive(Component)]
+pub(crate) struct TradeRows;
+
+// ---------------------------------------------------------------------------
+// Glyphs: little engraved marks drawn from nodes, same hand as everything.
+// ---------------------------------------------------------------------------
+
+/// A fixed canvas the glyph bars are placed on, absolutely.
+fn glyph_canvas(commands: &mut Commands, parent: Entity, size: f32) -> Entity {
+    commands
+        .spawn((
+            Node {
+                width: px(size),
+                height: px(size),
+                flex_shrink: 0.0,
+                ..default()
+            },
+            ChildOf(parent),
+        ))
+        .id()
+}
+
+fn bar(
+    commands: &mut Commands,
+    canvas: Entity,
+    (left, top, width, height): (f32, f32, f32, f32),
+    turn: f32,
+    tint: Color,
+    round: bool,
+) {
+    let mut piece = commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            left: px(left),
+            top: px(top),
+            width: px(width),
+            height: px(height),
+            border_radius: if round {
+                BorderRadius::all(px(width.max(height)))
+            } else {
+                BorderRadius::all(px(0))
+            },
+            ..default()
+        },
+        BackgroundColor(tint),
+        ChildOf(canvas),
+    ));
+    if turn != 0.0 {
+        piece.insert(UiTransform::from_rotation(Rot2::degrees(turn)));
+    }
+}
+
+/// A house: walls under a peaked roof.
+fn house_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+    let c = glyph_canvas(commands, parent, 18.0);
+    bar(commands, c, (4.0, 9.0, 10.0, 7.0), 0.0, tint, false);
+    bar(commands, c, (1.0, 5.0, 9.0, 2.5), -33.0, tint, false);
+    bar(commands, c, (8.0, 5.0, 9.0, 2.5), 33.0, tint, false);
+}
+
+/// A tree: the chronicle's mark, at button scale.
+fn tree_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+    let c = glyph_canvas(commands, parent, 18.0);
+    bar(commands, c, (8.0, 11.0, 2.5, 6.0), 0.0, tint, false);
+    bar(commands, c, (4.0, 7.5, 10.5, 3.5), 0.0, tint, false);
+    bar(commands, c, (5.5, 4.0, 7.5, 3.5), 0.0, tint, false);
+    bar(commands, c, (7.0, 1.0, 4.5, 3.0), 0.0, tint, false);
+}
+
+/// A temple: lintel, columns, footing.
+fn temple_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+    let c = glyph_canvas(commands, parent, 18.0);
+    bar(commands, c, (2.0, 3.0, 14.0, 2.5), 0.0, tint, false);
+    for left in [3.5, 8.0, 12.5] {
+        bar(commands, c, (left, 6.5, 2.0, 6.5), 0.0, tint, false);
+    }
+    bar(commands, c, (2.0, 13.5, 14.0, 2.5), 0.0, tint, false);
+}
+
+/// Faith: two bars leant together in prayer.
+fn hands_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+    let c = glyph_canvas(commands, parent, 18.0);
+    bar(commands, c, (4.0, 4.0, 3.0, 11.0), 22.0, tint, false);
+    bar(commands, c, (11.0, 4.0, 3.0, 11.0), -22.0, tint, false);
+}
+
+/// A person: head over shoulders.
+fn person_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+    let c = glyph_canvas(commands, parent, 18.0);
+    bar(commands, c, (6.5, 2.0, 5.0, 5.0), 0.0, tint, true);
+    bar(commands, c, (4.0, 8.5, 10.0, 7.0), 0.0, tint, true);
+}
+
+/// A gathering: two souls shoulder to shoulder.
+fn people_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+    let c = glyph_canvas(commands, parent, 18.0);
+    bar(
+        commands,
+        c,
+        (3.0, 3.5, 4.0, 4.0),
+        0.0,
+        tint.with_alpha(0.7),
+        true,
+    );
+    bar(
+        commands,
+        c,
+        (1.0, 8.5, 8.0, 6.5),
+        0.0,
+        tint.with_alpha(0.7),
+        true,
+    );
+    bar(commands, c, (10.5, 2.0, 4.5, 4.5), 0.0, tint, true);
+    bar(commands, c, (8.5, 7.5, 9.0, 7.5), 0.0, tint, true);
+}
+
+/// The village banner: a hung cloth with the tree upon it, flying at the
+/// detail pane's shoulder the way the mockup flies it.
+fn banner_glyph(commands: &mut Commands, parent: Entity) {
+    let cloth = commands
+        .spawn((
+            Node {
+                width: px(56),
+                height: px(72),
+                flex_shrink: 0.0,
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(0)),
+                ..default()
+            },
+            BackgroundColor(ui::theme::title_bg()),
+            BorderColor::all(ui::theme::accent().with_alpha(0.5)),
+            ChildOf(parent),
+        ))
+        .id();
+    // The crossbar it hangs from.
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            left: px(-5),
+            top: px(-4),
+            width: px(62),
+            height: px(3),
+            ..default()
+        },
+        BackgroundColor(ui::theme::accent().with_alpha(0.8)),
+        ChildOf(cloth),
+    ));
+    // A thread of fringe at its foot.
+    commands.spawn((
+        Node {
+            position_type: PositionType::Absolute,
+            left: px(4),
+            right: px(4),
+            bottom: px(4),
+            height: px(2),
+            ..default()
+        },
+        BackgroundColor(ui::theme::accent().with_alpha(0.35)),
+        ChildOf(cloth),
+    ));
+    tree_glyph(commands, cloth, ui::theme::accent().with_alpha(0.9));
+}
+
+// ---------------------------------------------------------------------------
+// The window.
+// ---------------------------------------------------------------------------
+
+/// The main split band's height. The plates (96), gaps and the land strip
+/// (40) ride above and below it; the sum is pinned to the People window's
+/// measured footprint (761 logical tall), so the codex never changes shape
+/// between pages.
+const MAIN_BAND: f32 = 501.0;
+
 pub(crate) fn spawn_village_panel(mut commands: Commands) {
-    let window = ui::big_window(&mut commands, "THE VILLAGE", 720.0);
+    let window = ui::titled_window(
+        &mut commands,
+        "THE LEDGER",
+        Some("The heart of a living world."),
+        1160.0,
+    );
     commands.entity(window.root).insert((
-        Name::new("Village Panel"),
+        Name::new("Codex Panel"),
         VillagePanel,
         Visibility::Hidden,
+        Node {
+            width: px(1160),
+            flex_direction: FlexDirection::Column,
+            padding: px(5).into(),
+            border: UiRect::all(px(2)),
+            border_radius: BorderRadius::all(px(0)),
+            ..default()
+        },
     ));
 
-    // Three big numbers first: the shape of the place at a glance.
-    let cards = commands
+    // The codex strip: five pages, one resident. Dark tabs are pages still
+    // being written; the people tab opens the People window where it stands.
+    let strip = commands
+        .spawn(Node {
+            position_type: PositionType::Absolute,
+            left: px(0),
+            right: px(0),
+            top: px(0),
+            bottom: px(0),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            column_gap: px(6),
+            ..default()
+        })
+        .id();
+    commands
+        .entity(window.title_bar)
+        .insert_children(1, &[strip]);
+    let tab = |commands: &mut Commands, active: bool, interactive: bool| -> Entity {
+        let mut button = commands.spawn((
+            Node {
+                width: px(54),
+                height: px(40),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(0)),
+                ..default()
+            },
+            BackgroundColor(if active {
+                ui::theme::panel_bg()
+            } else {
+                Color::BLACK.with_alpha(0.18)
+            }),
+            BorderColor::all(if active {
+                ui::theme::accent().with_alpha(0.85)
+            } else {
+                ui::theme::panel_border().with_alpha(0.4)
+            }),
+            ChildOf(strip),
+        ));
+        if interactive {
+            button.insert(Interaction::default());
+        }
+        button.id()
+    };
+    let ink = ui::theme::accent();
+    let faint = ui::theme::accent().with_alpha(0.35);
+
+    let ledger_tab = tab(&mut commands, true, false);
+    house_glyph(&mut commands, ledger_tab, ink);
+
+    let wood_tab = tab(&mut commands, false, true);
+    tree_glyph(&mut commands, wood_tab, faint);
+    commands.entity(wood_tab).insert(ui::HoverHint::new(
+        "The Wilds",
+        "this page of the codex is still being written",
+    ));
+
+    let civic_tab = tab(&mut commands, false, true);
+    temple_glyph(&mut commands, civic_tab, faint);
+    commands.entity(civic_tab).insert(ui::HoverHint::new(
+        "The Works",
+        "this page of the codex is still being written",
+    ));
+
+    let faith_tab = tab(&mut commands, false, true);
+    hands_glyph(&mut commands, faith_tab, faint);
+    commands.entity(faith_tab).insert(ui::HoverHint::new(
+        "The Faith",
+        "this page of the codex is still being written",
+    ));
+
+    let people_tab = tab(&mut commands, false, true);
+    people_glyph(&mut commands, people_tab, ink.with_alpha(0.8));
+    commands.entity(people_tab).insert((
+        CodexPeopleTab,
+        ui::HoverHint::new("The People", "the mortals of your world"),
+    ));
+
+    // ---- Band one: the three great numbers. -------------------------------
+    let plates = commands
         .spawn((
             Node {
                 width: percent(100),
+                height: px(96),
+                flex_shrink: 0.0,
                 flex_direction: FlexDirection::Row,
                 column_gap: px(8),
                 ..default()
@@ -74,50 +383,88 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         ))
         .id();
     for (index, label) in [(0u8, "souls"), (1, "houses"), (2, "believers")] {
-        let card = commands
-            .spawn((
-                Node {
-                    flex_grow: 1.0,
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    row_gap: px(2),
-                    padding: UiRect::axes(px(10), px(8)),
-                    border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(px(6)),
-                    ..default()
-                },
-                BackgroundColor(ui::theme::title_bg()),
-                BorderColor::all(ui::theme::panel_border()),
-                ChildOf(cards),
-            ))
-            .id();
-        commands.spawn((
-            VillageCard(index),
-            Text::new("0"),
-            TextFont {
-                font_size: FontSize::Px(24.0),
-                ..default()
-            },
-            TextColor(ui::theme::accent()),
-            ChildOf(card),
-        ));
-        commands.spawn((ui::dim(label), ChildOf(card)));
+        let (row, number) = ui::stat_plate(&mut commands, plates, label);
+        commands.entity(number).insert(VillageCard(index));
+        let badge = commands.spawn((Node::default(), ChildOf(row))).id();
+        commands.entity(row).insert_children(0, &[badge]);
+        let tint = ui::theme::accent().with_alpha(0.55);
+        match index {
+            0 => person_glyph(&mut commands, badge, tint),
+            1 => house_glyph(&mut commands, badge, tint),
+            _ => hands_glyph(&mut commands, badge, tint),
+        }
     }
 
-    let pages = ui::tab_bar(&mut commands, window.body, &["OVERVIEW", "FAITH"]);
-    let overview = pages[0];
-    let faith_page = pages[1];
-    commands.entity(faith_page).insert(Node {
+    // ---- Band two: the rail and the reading. ------------------------------
+    let main = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                height: px(MAIN_BAND),
+                flex_shrink: 0.0,
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            ChildOf(window.body),
+        ))
+        .id();
+    let (rail, detail) = ui::split_row(&mut commands, main, 320.0);
+
+    // The rail: OVERVIEW lists the villages of this world (one banner so
+    // far, honestly); FAITH ranks every soul by their trust.
+    let rail_pages = ui::tab_bar(&mut commands, rail, &["OVERVIEW", "FAITH"]);
+    let villages_page = rail_pages[0];
+    let faith_page = rail_pages[1];
+    commands.entity(villages_page).insert(Node {
         width: percent(100),
-        min_height: px(320),
-        max_height: px(460),
+        flex_grow: 1.0,
+        min_height: px(0),
         flex_direction: FlexDirection::Column,
-        row_gap: px(3),
-        overflow: Overflow::scroll_y(),
-        display: Display::None,
+        row_gap: px(5),
         ..default()
     });
+    let entry = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: px(10),
+                padding: UiRect::axes(px(12), px(10)),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(0)),
+                ..default()
+            },
+            BackgroundColor(ui::theme::title_bg().with_alpha(0.55)),
+            BorderColor::all(ui::theme::accent().with_alpha(0.85)),
+            ChildOf(villages_page),
+        ))
+        .id();
+    house_glyph(&mut commands, entry, ui::theme::accent().with_alpha(0.8));
+    let entry_words = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: px(1),
+                ..default()
+            },
+            ChildOf(entry),
+        ))
+        .id();
+    commands.spawn((LedgerRailName, ui::body(""), ChildOf(entry_words)));
+    commands.spawn((ui::dim("the first banner raised"), ChildOf(entry_words)));
+
     commands.entity(faith_page).insert((
+        Node {
+            width: percent(100),
+            flex_grow: 1.0,
+            min_height: px(0),
+            flex_direction: FlexDirection::Column,
+            row_gap: px(3),
+            overflow: Overflow::scroll_y(),
+            display: Display::None,
+            ..default()
+        },
         ui::Scrollable,
         ScrollPosition::DEFAULT,
         Interaction::default(),
@@ -133,6 +480,76 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         ChildOf(faith_page),
     ));
 
+    // The reading: name and standing under the banner, then the pages.
+    let header = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                flex_shrink: 0.0,
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::SpaceBetween,
+                align_items: AlignItems::FlexStart,
+                ..default()
+            },
+            ChildOf(detail),
+        ))
+        .id();
+    let words = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: px(2),
+                ..default()
+            },
+            ChildOf(header),
+        ))
+        .id();
+    commands.spawn((
+        LedgerName,
+        Text::new(""),
+        ui::DisplayFace,
+        TextFont {
+            font_size: FontSize::Px(30.0),
+            ..default()
+        },
+        TextColor(ui::theme::accent()),
+        ChildOf(words),
+    ));
+    commands.spawn((LedgerEpithet, ui::dim(""), ChildOf(words)));
+    banner_glyph(&mut commands, header);
+
+    let detail_pages = ui::tab_bar(&mut commands, detail, &["OVERVIEW", "DETAILS"]);
+    let overview = detail_pages[0];
+    let details = detail_pages[1];
+
+    // OVERVIEW: four card wells in a two-by-two, the mockup's grid.
+    commands.entity(overview).insert(Node {
+        width: percent(100),
+        flex_grow: 1.0,
+        min_height: px(0),
+        flex_direction: FlexDirection::Column,
+        row_gap: px(10),
+        ..default()
+    });
+    let grid_row = |commands: &mut Commands| -> Entity {
+        commands
+            .spawn((
+                Node {
+                    width: percent(100),
+                    flex_grow: 1.0,
+                    min_height: px(0),
+                    flex_direction: FlexDirection::Row,
+                    column_gap: px(10),
+                    align_items: AlignItems::Stretch,
+                    ..default()
+                },
+                ChildOf(overview),
+            ))
+            .id()
+    };
+    let top_row = grid_row(&mut commands);
+    let bottom_row = grid_row(&mut commands);
+
     let gauge = |commands: &mut Commands, parent, label: &str, stat, color| {
         let handles = ui::gauge_row(commands, parent, label, color);
         commands.entity(handles.fill).insert(VillageGaugeFill(stat));
@@ -141,79 +558,188 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
             .insert(VillageGaugeValue(stat));
     };
 
-    ui::section_header(&mut commands, overview, "WELLBEING");
+    let wellbeing = ui::card_well(&mut commands, top_row, "WELLBEING");
     gauge(
         &mut commands,
-        overview,
+        wellbeing,
         "happiness",
         VillageStat::Happiness,
         crate::palette::shade(&crate::palette::GRASS, 0.7),
     );
-    commands.spawn((
-        HappinessWhy,
-        ui::dim(""),
-        Node {
-            margin: UiRect::left(px(ui::theme::LABEL_WIDTH + 10.0)),
-            ..default()
-        },
-        ChildOf(overview),
-    ));
     gauge(
         &mut commands,
-        overview,
+        wellbeing,
         "fed",
         VillageStat::Fed,
         crate::palette::shade(&crate::palette::CLOTH_RED, 0.6),
     );
     gauge(
         &mut commands,
-        overview,
+        wellbeing,
         "housed",
         VillageStat::Housed,
         crate::palette::shade(&crate::palette::WOOD, 0.65),
     );
+    commands.spawn((HappinessWhy, ui::dim(""), ChildOf(wellbeing)));
 
-    ui::section_header(&mut commands, overview, "FAITH");
+    let faith_card = ui::card_well(&mut commands, top_row, "FAITH");
     gauge(
         &mut commands,
-        overview,
+        faith_card,
         "belief in you",
         VillageStat::Faith,
         ui::theme::accent(),
     );
     gauge(
         &mut commands,
-        overview,
+        faith_card,
         "believers",
         VillageStat::Believers,
         ui::theme::accent().with_alpha(0.55),
     );
 
-    ui::section_header(&mut commands, overview, "STORES");
+    let stores = ui::card_well(&mut commands, bottom_row, "STORES");
     gauge(
         &mut commands,
-        overview,
+        stores,
         "food",
         VillageStat::Food,
         crate::palette::shade(&crate::palette::GRASS, 0.55),
     );
     gauge(
         &mut commands,
-        overview,
+        stores,
         "timber",
         VillageStat::Timber,
         crate::palette::shade(&crate::palette::WOOD, 0.5),
     );
     gauge(
         &mut commands,
-        overview,
+        stores,
         "stone",
         VillageStat::Stone,
         crate::palette::shade(&crate::palette::STONE, 0.55),
     );
 
-    ui::section_header(&mut commands, overview, "THE LAND");
-    commands.spawn((VillageLand, ui::dim(""), ChildOf(overview)));
+    let activity = ui::card_well(&mut commands, bottom_row, "ACTIVITY");
+    for (index, label) in [
+        (0u8, "working"),
+        (1, "resting"),
+        (2, "praying"),
+        (3, "about the day"),
+    ] {
+        let value = ui::ruled_row(&mut commands, activity, label);
+        commands.entity(value).insert(ActivityRow(index));
+    }
+
+    // DETAILS: the civic ladder and the trades, side by side.
+    commands.entity(details).insert(Node {
+        width: percent(100),
+        flex_grow: 1.0,
+        min_height: px(0),
+        flex_direction: FlexDirection::Row,
+        column_gap: px(10),
+        align_items: AlignItems::Stretch,
+        display: Display::None,
+        ..default()
+    });
+    let ladder = ui::card_well(&mut commands, details, "THE CIVIC LADDER");
+    commands.spawn((
+        BuildingRows,
+        Node {
+            width: percent(100),
+            flex_grow: 1.0,
+            min_height: px(0),
+            flex_direction: FlexDirection::Column,
+            row_gap: px(4),
+            overflow: Overflow::scroll_y(),
+            ..default()
+        },
+        ui::Scrollable,
+        ScrollPosition::DEFAULT,
+        Interaction::default(),
+        ChildOf(ladder),
+    ));
+    let trades = ui::card_well(&mut commands, details, "THE TRADES");
+    commands.spawn((
+        TradeRows,
+        Node {
+            width: percent(100),
+            flex_grow: 1.0,
+            min_height: px(0),
+            flex_direction: FlexDirection::Column,
+            row_gap: px(4),
+            overflow: Overflow::scroll_y(),
+            ..default()
+        },
+        ui::Scrollable,
+        ScrollPosition::DEFAULT,
+        Interaction::default(),
+        ChildOf(trades),
+    ));
+
+    // ---- Band three: the land itself. -------------------------------------
+    let land = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                height: px(40),
+                flex_shrink: 0.0,
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: px(10),
+                padding: UiRect::axes(px(12), px(4)),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(0)),
+                margin: UiRect::top(px(5)),
+                ..default()
+            },
+            BackgroundColor(ui::theme::title_bg().with_alpha(0.55)),
+            BorderColor::all(ui::theme::panel_border()),
+            ChildOf(window.body),
+        ))
+        .id();
+    tree_glyph(&mut commands, land, ui::theme::accent().with_alpha(0.7));
+    commands.spawn((VillageLand, ui::dim(""), ChildOf(land)));
+}
+
+/// The strip's people icon opens the People window where it still stands.
+pub(crate) fn handle_codex_tabs(
+    tabs: Query<&Interaction, (Changed<Interaction>, With<CodexPeopleTab>)>,
+    mut people: Query<&mut Visibility, With<super::people::PeoplePanel>>,
+) {
+    for interaction in &tabs {
+        if *interaction == Interaction::Pressed {
+            for mut visibility in &mut people {
+                *visibility = if *visibility == Visibility::Hidden {
+                    Visibility::Visible
+                } else {
+                    Visibility::Hidden
+                };
+            }
+        }
+    }
+}
+
+/// What kind of place this is, in the game's voice.
+fn epithet(souls: usize, believer_fraction: f32) -> String {
+    let size = match souls {
+        0..=14 => "A hamlet",
+        15..=39 => "A small village",
+        40..=79 => "A village",
+        80..=149 => "A town",
+        _ => "A city",
+    };
+    let standing = if believer_fraction >= 0.6 {
+        "strong in faith"
+    } else if believer_fraction >= 0.3 {
+        "growing in faith"
+    } else if believer_fraction > 0.05 {
+        "of wavering faith"
+    } else {
+        "that does not yet believe"
+    };
+    format!("{size}, {standing}")
 }
 
 /// Fills the ledger while it is open.
@@ -221,6 +747,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
 pub(crate) fn update_village_panel(
     panels: Query<&Visibility, With<VillagePanel>>,
     site: Option<Res<crate::villager::SettlementSite>>,
+    settlements: Query<&crate::villager::Settlement>,
     stores: Query<&crate::villager::work::Stockpile>,
     villagers: Query<
         (
@@ -229,6 +756,7 @@ pub(crate) fn update_village_panel(
             Option<&crate::villager::belief::Faith>,
             Option<&crate::villager::home::Home>,
             Has<crate::creature::Childhood>,
+            Option<&Activity>,
         ),
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
@@ -249,6 +777,10 @@ pub(crate) fn update_village_panel(
             Without<VillageCard>,
             Without<VillageGaugeValue>,
             Without<VillageLand>,
+            Without<LedgerName>,
+            Without<LedgerRailName>,
+            Without<LedgerEpithet>,
+            Without<ActivityRow>,
         ),
     >,
     mut gauges: ParamSet<(
@@ -256,6 +788,10 @@ pub(crate) fn update_village_panel(
         Query<(&VillageGaugeFill, &mut Node)>,
         Query<(&VillageGaugeValue, &mut Text)>,
         Query<&mut Text, (With<VillageLand>, Without<HappinessWhy>)>,
+        Query<&mut Text, With<LedgerName>>,
+        Query<&mut Text, With<LedgerRailName>>,
+        Query<&mut Text, With<LedgerEpithet>>,
+        Query<(&ActivityRow, &mut Text)>,
     )>,
 ) {
     if !panels.iter().any(|v| *v != Visibility::Hidden) {
@@ -271,7 +807,10 @@ pub(crate) fn update_village_panel(
     let mut roofless_adults = 0usize;
     let mut weary = 0usize;
     let mut hungry = 0usize;
-    for (needs, morale, faith, home, child) in &villagers {
+    let mut working = 0usize;
+    let mut resting = 0usize;
+    let mut praying = 0usize;
+    for (needs, morale, faith, home, child, activity) in &villagers {
         spirits += morale.map_or(0.6, |m| m.spirits);
         fed += 1.0 - needs.map_or(0.3, |n| n.hunger);
         if home.is_some() {
@@ -290,11 +829,57 @@ pub(crate) fn update_village_panel(
         if t > crate::villager::belief::Faith::BELIEVER {
             believers += 1;
         }
+        match activity {
+            Some(Activity::Working)
+            | Some(Activity::Hauling)
+            | Some(Activity::TendingFire)
+            | Some(Activity::Bearing) => working += 1,
+            Some(Activity::Sleeping) | Some(Activity::Sheltering) => resting += 1,
+            Some(Activity::Praying) => praying += 1,
+            _ => {}
+        }
     }
+    let about = living.saturating_sub(working + resting + praying);
     let houses = huts.iter().count();
     let (food, timber, stone) = site
+        .as_ref()
         .and_then(|site| stores.get(site.settlement).ok())
         .map_or((0.0, 0.0, 0.0), |s| (s.food(), s.timber, s.stone));
+
+    // The name at the head of the page, and its standing beneath.
+    let name = site
+        .as_ref()
+        .and_then(|site| settlements.get(site.settlement).ok())
+        .map_or_else(|| "the village".to_string(), |s| s.name.clone());
+    for mut text in &mut gauges.p4() {
+        let engraved = name.to_uppercase();
+        if text.0 != engraved {
+            *text = Text::new(engraved);
+        }
+    }
+    for mut text in &mut gauges.p5() {
+        if text.0 != name {
+            *text = Text::new(name.clone());
+        }
+    }
+    let standing = epithet(living, believers as f32 / living as f32);
+    for mut text in &mut gauges.p6() {
+        if text.0 != standing {
+            *text = Text::new(standing.clone());
+        }
+    }
+    for (row, mut text) in &mut gauges.p7() {
+        let count = match row.0 {
+            0 => working,
+            1 => resting,
+            2 => praying,
+            _ => about,
+        };
+        let fresh = format!("{count} / {living}");
+        if text.0 != fresh {
+            *text = Text::new(fresh);
+        }
+    }
 
     for (card, mut text) in &mut gauges.p0() {
         let fresh = match card.0 {
@@ -367,9 +952,9 @@ pub(crate) fn update_village_panel(
         *text = Text::new(fresh);
     }
 
-    let standing = trees.iter().filter(|t| t.harvestable()).count();
+    let standing_trees = trees.iter().filter(|t| t.harvestable()).count();
     let fresh = format!(
-        "{standing} trees standing  -  {} wild things  -  {} at rest in the ground",
+        "{standing_trees} trees standing  -  {} wild things  -  {} at rest in the ground",
         wildlife.iter().count(),
         graves.iter().count(),
     );
@@ -380,7 +965,73 @@ pub(crate) fn update_village_panel(
     }
 }
 
-/// Rebuilds the FAITH roster while the ledger is open: every soul, ranked
+/// Rebuilds the DETAILS wells on a slow clock while the codex is open: every
+/// standing building by kind, and every trade by its head-count.
+#[allow(clippy::type_complexity)]
+pub(crate) fn update_ledger_details(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut last_rebuild: Local<f32>,
+    panels: Query<&Visibility, With<VillagePanel>>,
+    building_wells: Query<Entity, With<BuildingRows>>,
+    trade_wells: Query<Entity, With<TradeRows>>,
+    buildings: Query<&crate::villager::work::Building>,
+    pending: Query<(), With<crate::villager::work::ConstructionSite>>,
+    trades: Query<
+        &crate::villager::work::Vocation,
+        (With<Villager>, Without<crate::creature::Corpse>),
+    >,
+) {
+    if !panels.iter().any(|v| *v != Visibility::Hidden) {
+        return;
+    }
+    *last_rebuild += time.delta_secs();
+    if *last_rebuild < 2.0 {
+        return;
+    }
+    *last_rebuild = 0.0;
+    let (Ok(building_well), Ok(trade_well)) = (building_wells.single(), trade_wells.single())
+    else {
+        return;
+    };
+
+    let mut kinds: BTreeMap<&'static str, usize> = BTreeMap::new();
+    for building in &buildings {
+        *kinds.entry(building.kind.name()).or_default() += 1;
+    }
+    commands.entity(building_well).despawn_related::<Children>();
+    for (name, count) in &kinds {
+        let value = ui::ruled_row(&mut commands, building_well, name);
+        commands.entity(value).insert(Text::new(format!("{count}")));
+    }
+    let rising = pending.iter().count();
+    if rising > 0 {
+        commands.spawn((
+            ui::dim(format!("{rising} under construction")),
+            ChildOf(building_well),
+        ));
+    }
+    if kinds.is_empty() && rising == 0 {
+        commands.spawn((
+            ui::dim("nothing yet stands but the banner"),
+            ChildOf(building_well),
+        ));
+    }
+
+    let mut counts: BTreeMap<&'static str, usize> = BTreeMap::new();
+    for vocation in &trades {
+        *counts.entry(vocation.describe()).or_default() += 1;
+    }
+    let mut ranked: Vec<_> = counts.into_iter().collect();
+    ranked.sort_by_key(|(name, count)| (std::cmp::Reverse(*count), *name));
+    commands.entity(trade_well).despawn_related::<Children>();
+    for (name, count) in ranked {
+        let value = ui::ruled_row(&mut commands, trade_well, name);
+        commands.entity(value).insert(Text::new(format!("{count}")));
+    }
+}
+
+/// Rebuilds the FAITH roster while the codex is open: every soul, ranked
 /// by their faith, each with the last reason their heart moved - a god
 /// reads congregations the way shepherds count sheep.
 #[allow(clippy::type_complexity)]
