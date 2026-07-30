@@ -484,7 +484,13 @@ fn populate_chunks(
                     // suppression discards geometry, never random draws, or
                     // one felled tree would rearrange the whole forest on
                     // the next chunk rebuild.
-                    let bare = terrain.is_worked_within(x, z, 4.0) || stripped.is_stripped(x, z);
+                    // The square belongs to the village: no tree seeds
+                    // inside the banner's circle, whatever the noise says.
+                    let square = settlement.as_ref().is_some_and(|site| {
+                        Vec2::new(x - site.centre.x, z - site.centre.z).length() < 10.0
+                    });
+                    let bare =
+                        terrain.is_worked_within(x, z, 4.0) || stripped.is_stripped(x, z) || square;
                     if rng.chance(tree_chance * (0.55 + density)) {
                         let kind = *rng.pick(TreeKind::for_biome(biome));
                         if !bare {

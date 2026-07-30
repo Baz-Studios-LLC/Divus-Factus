@@ -44,7 +44,7 @@ pub(crate) enum Ledger {
 
 impl Ledger {
     /// Reads an event's shelf from its own words.
-    fn of(text: &str) -> Ledger {
+    pub(crate) fn of(text: &str) -> Ledger {
         let t = text.to_lowercase();
         let hit = |keys: &[&str]| keys.iter().any(|k| t.contains(k));
         if hit(&[
@@ -91,7 +91,7 @@ impl Ledger {
     }
 
     /// The shelf's colour: its accent bar, its glyph, its tally pill.
-    fn colour(self) -> Color {
+    pub(crate) fn colour(self) -> Color {
         match self {
             Ledger::Lives => palette::shade(&palette::CLOTH_RED, 0.72),
             Ledger::Works => palette::shade(&palette::WOOD, 0.72),
@@ -103,7 +103,7 @@ impl Ledger {
 
 /// Draws a shelf's glyph into a 16×16 canvas, from plain nodes in the same
 /// hand-set vocabulary as the toolbar icons.
-fn spawn_glyph(commands: &mut Commands, parent: Entity, ledger: Ledger) {
+pub(crate) fn spawn_glyph(commands: &mut Commands, parent: Entity, ledger: Ledger) {
     let canvas = commands
         .spawn((
             Node {

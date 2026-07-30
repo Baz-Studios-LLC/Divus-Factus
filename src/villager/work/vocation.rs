@@ -64,6 +64,10 @@ impl Skills {
     }
 
     /// The words for a level of craft, in the order a life earns them.
+    pub fn tier_word(skill: f32) -> &'static str {
+        Self::tier(skill)
+    }
+
     fn tier(skill: f32) -> &'static str {
         if skill < 0.15 {
             "new to it"

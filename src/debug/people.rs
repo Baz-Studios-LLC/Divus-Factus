@@ -73,9 +73,6 @@ pub(crate) struct DetailSeen;
 pub(crate) struct DetailLife;
 
 /// The full life story on its own tab, every entry dated.
-#[derive(Component)]
-pub(crate) struct DetailChronicle;
-
 /// The dossier content, shown only while someone is selected.
 #[derive(Component)]
 pub(crate) struct DetailPage;
@@ -83,6 +80,18 @@ pub(crate) struct DetailPage;
 /// The empty state shown when no one is selected.
 #[derive(Component)]
 pub(crate) struct DetailEmpty;
+
+/// The craft ledger's rebuilt-on-change container.
+#[derive(Component)]
+pub(crate) struct CraftWell;
+
+/// The genealogy's rebuilt-on-change container.
+#[derive(Component)]
+pub(crate) struct KinWell;
+
+/// The life story's rebuilt-on-change container.
+#[derive(Component)]
+pub(crate) struct LifeWell;
 
 /// A roster row's face: who it belongs to and its resting shade, so the
 /// selected row can glow and the rest can zebra.
@@ -223,8 +232,12 @@ pub(crate) fn spawn_people_panel(mut commands: Commands, mut images: ResMut<Asse
 
     // Two faces of a person: the soul as it stands, and the life as it
     // was lived. The chronicle deserves its own page, not a footnote.
-    let tabs = ui::tab_bar(&mut commands, page, &["THE SOUL", "THE LIFE"]);
-    let (soul, life_tab) = (tabs[0], tabs[1]);
+    let tabs = ui::tab_bar(
+        &mut commands,
+        page,
+        &["THE SOUL", "KIN & CRAFT", "THE LIFE"],
+    );
+    let (soul, kin_tab, life_tab) = (tabs[0], tabs[1], tabs[2]);
 
     // Every readout the hover card has, permanent and orderly.
     for (value, label) in [
@@ -250,34 +263,54 @@ pub(crate) fn spawn_people_panel(mut commands: Commands, mut images: ResMut<Asse
     ui::section_header(&mut commands, soul, "LATELY");
     commands.spawn((DetailLife, ui::dim(""), ChildOf(soul)));
 
-    // THE LIFE: the whole story, newest first, in its own scrolling well.
-    let well = commands
-        .spawn((
-            Node {
-                width: percent(100),
-                max_height: px(300),
-                flex_direction: FlexDirection::Column,
-                overflow: Overflow::scroll_y(),
-                padding: UiRect::all(px(8)),
-                border_radius: BorderRadius::all(px(6)),
-                ..default()
-            },
-            BackgroundColor(Color::BLACK.with_alpha(0.35)),
-            ui::Scrollable,
-            ChildOf(life_tab),
-        ))
-        .id();
-    let story = commands
-        .spawn((
-            DetailChronicle,
-            ui::dim(""),
-            Node {
-                max_width: px(250),
-                ..default()
-            },
-        ))
-        .id();
-    commands.entity(story).insert(ChildOf(well));
+    // KIN & CRAFT: the family tree and the working hands.
+    ui::section_header(&mut commands, kin_tab, "THE CRAFT");
+    commands.spawn((
+        CraftWell,
+        Node {
+            width: percent(100),
+            flex_direction: FlexDirection::Column,
+            row_gap: px(6),
+            padding: UiRect::all(px(8)),
+            border_radius: BorderRadius::all(px(6)),
+            ..default()
+        },
+        BackgroundColor(Color::BLACK.with_alpha(0.25)),
+        ChildOf(kin_tab),
+    ));
+    ui::section_header(&mut commands, kin_tab, "THE KIN");
+    commands.spawn((
+        KinWell,
+        Node {
+            width: percent(100),
+            flex_direction: FlexDirection::Column,
+            row_gap: px(7),
+            padding: UiRect::all(px(8)),
+            border_radius: BorderRadius::all(px(6)),
+            ..default()
+        },
+        BackgroundColor(Color::BLACK.with_alpha(0.25)),
+        ChildOf(kin_tab),
+    ));
+
+    // THE LIFE: the whole story, newest first, set in the chronicle's own
+    // language - day bands, shelf glyphs, striped rows.
+    commands.spawn((
+        LifeWell,
+        Node {
+            width: percent(100),
+            max_height: px(330),
+            flex_direction: FlexDirection::Column,
+            overflow: Overflow::scroll_y(),
+            padding: UiRect::all(px(8)),
+            row_gap: px(2),
+            border_radius: BorderRadius::all(px(6)),
+            ..default()
+        },
+        BackgroundColor(Color::BLACK.with_alpha(0.35)),
+        ui::Scrollable,
+        ChildOf(life_tab),
+    ));
     commands.insert_resource(PaperdollTarget(target));
 }
 
@@ -540,7 +573,6 @@ pub(crate) fn update_person_detail(
         Query<&mut Text, With<PersonDetailText>>,
         Query<&mut Text, With<DetailSeen>>,
         Query<&mut Text, With<DetailLife>>,
-        Query<&mut Text, With<DetailChronicle>>,
     )>,
 ) {
     if !panels.iter().any(|v| *v != Visibility::Hidden) {
@@ -696,30 +728,291 @@ pub(crate) fn update_person_detail(
     {
         *text = Text::new(fresh);
     }
+}
 
-    // THE LIFE tab: everything, newest first, each entry dated.
-    let fresh = chronicle.map_or_else(
-        || "unwritten".to_string(),
-        |chronicle| {
-            chronicle
-                .events
-                .iter()
-                .rev()
-                .map(|event| {
-                    format!(
-                        "{}  {}",
-                        crate::calendar::date_of_day(event.day),
-                        event.text
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join("\n")
-        },
-    );
-    if let Ok(mut text) = texts.p6().single_mut()
-        && text.0 != fresh
-    {
-        *text = Text::new(fresh);
+/// A clickable soul: a small plaque that selects its person when pressed.
+/// The dead lie quiet - named, dimmed, unclickable.
+fn kin_card(commands: &mut Commands, parent: Entity, who: Entity, name: &str, gone: bool) {
+    let card = commands
+        .spawn((
+            Node {
+                padding: UiRect::axes(px(10), px(4)),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(999)),
+                ..default()
+            },
+            BackgroundColor(if gone {
+                Color::BLACK.with_alpha(0.2)
+            } else {
+                ui::theme::title_bg()
+            }),
+            BorderColor::all(ui::theme::card_border()),
+            ChildOf(parent),
+        ))
+        .id();
+    if !gone {
+        commands
+            .entity(card)
+            .insert((PersonRow(who), ui::UiButton, Interaction::default()));
+    }
+    let text = if gone {
+        format!("{name} - at rest")
+    } else {
+        name.to_string()
+    };
+    if gone {
+        commands.spawn((ui::dim(text), ChildOf(card)));
+    } else {
+        commands.spawn((ui::label(text), ChildOf(card)));
+    }
+}
+
+/// Rebuilds the craft ledger, the family tree and the life story when the
+/// chosen person - or their story - changes.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn update_dossier(
+    mut commands: Commands,
+    selected: Res<SelectedPerson>,
+    panels: Query<&Visibility, With<PeoplePanel>>,
+    craft_wells: Query<Entity, With<CraftWell>>,
+    kin_wells: Query<Entity, With<KinWell>>,
+    life_wells: Query<Entity, With<LifeWell>>,
+    souls: Query<(
+        Option<&crate::villager::work::Skills>,
+        Option<&Chronicle>,
+        Option<&Spouse>,
+        Option<&Parentage>,
+    )>,
+    parentages: Query<(Entity, &Parentage)>,
+    names: Query<&Person>,
+    corpses: Query<(), With<crate::creature::Corpse>>,
+    mut last: Local<(Option<Entity>, usize)>,
+) {
+    if !panels.iter().any(|v| *v != Visibility::Hidden) {
+        return;
+    }
+    let Some(person) = selected.0 else {
+        return;
+    };
+    let Ok((skills, chronicle, spouse, parentage)) = souls.get(person) else {
+        return;
+    };
+    let story_len = chronicle.map_or(0, |c| c.events.len());
+    if last.0 == Some(person) && last.1 == story_len {
+        return;
+    }
+    *last = (Some(person), story_len);
+
+    // THE CRAFT: one bar per calling ever practised, deepest first.
+    for well in &craft_wells {
+        commands.entity(well).despawn_related::<Children>();
+        let mut crafts: Vec<(crate::villager::work::Vocation, f32)> =
+            skills.map_or_else(Vec::new, |s| s.0.clone());
+        crafts.sort_by(|a, b| b.1.total_cmp(&a.1));
+        if crafts.is_empty() {
+            commands.spawn((ui::dim("no craft yet - young hands"), ChildOf(well)));
+        }
+        for (vocation, skill) in crafts {
+            let row = commands
+                .spawn((
+                    Node {
+                        width: percent(100),
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: px(10),
+                        ..default()
+                    },
+                    ChildOf(well),
+                ))
+                .id();
+            commands.spawn((
+                ui::label(vocation.describe().to_string()),
+                Node {
+                    width: px(150),
+                    flex_shrink: 0.0,
+                    ..default()
+                },
+                ChildOf(row),
+            ));
+            let track = commands
+                .spawn((
+                    Node {
+                        width: px(170),
+                        height: px(9),
+                        border_radius: BorderRadius::all(px(5)),
+                        flex_shrink: 0.0,
+                        overflow: Overflow::clip(),
+                        ..default()
+                    },
+                    BackgroundColor(Color::WHITE.with_alpha(0.07)),
+                    ChildOf(row),
+                ))
+                .id();
+            commands.spawn((
+                Node {
+                    width: percent((skill * 100.0).max(2.0)),
+                    height: percent(100),
+                    border_radius: BorderRadius::all(px(5)),
+                    ..default()
+                },
+                BackgroundColor(crate::palette::shade(
+                    &crate::palette::CLOTH_GOLD,
+                    0.55 + skill * 0.35,
+                )),
+                ChildOf(track),
+            ));
+            commands.spawn((
+                ui::dim(crate::villager::work::Skills::tier_word(skill)),
+                ChildOf(row),
+            ));
+        }
+    }
+
+    // THE KIN: born to, wed to, and the children - each living soul a
+    // plaque that opens their own page.
+    for well in &kin_wells {
+        commands.entity(well).despawn_related::<Children>();
+        let relation = |commands: &mut Commands, label: &str, kin: Vec<Entity>| {
+            let row = commands
+                .spawn((
+                    Node {
+                        width: percent(100),
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: px(8),
+                        flex_wrap: FlexWrap::Wrap,
+                        row_gap: px(5),
+                        ..default()
+                    },
+                    ChildOf(well),
+                ))
+                .id();
+            commands.spawn((
+                ui::dim(label.to_string()),
+                Node {
+                    width: px(84),
+                    flex_shrink: 0.0,
+                    ..default()
+                },
+                ChildOf(row),
+            ));
+            let mut any = false;
+            for kin_entity in kin {
+                if let Ok(kin_person) = names.get(kin_entity) {
+                    any = true;
+                    kin_card(
+                        commands,
+                        row,
+                        kin_entity,
+                        &kin_person.name,
+                        corpses.get(kin_entity).is_ok(),
+                    );
+                }
+            }
+            if !any {
+                commands.spawn((ui::dim("-"), ChildOf(row)));
+            }
+        };
+        relation(
+            &mut commands,
+            "BORN TO",
+            parentage.map_or_else(Vec::new, |p| vec![p.mother, p.father]),
+        );
+        relation(
+            &mut commands,
+            "WED TO",
+            spouse.map_or_else(Vec::new, |s| vec![s.0]),
+        );
+        let children: Vec<Entity> = parentages
+            .iter()
+            .filter(|(_, p)| p.mother == person || p.father == person)
+            .map(|(child, _)| child)
+            .collect();
+        relation(&mut commands, "CHILDREN", children);
+    }
+
+    // THE LIFE: the story in day bands, the chronicle's own language.
+    for well in &life_wells {
+        commands.entity(well).despawn_related::<Children>();
+        let Some(chronicle) = chronicle else {
+            commands.spawn((ui::dim("no story yet"), ChildOf(well)));
+            continue;
+        };
+        let mut current_day = u32::MAX;
+        let mut stripe = false;
+        for event in chronicle.events.iter().rev().take(120) {
+            if event.day != current_day {
+                current_day = event.day;
+                stripe = false;
+                let band = commands
+                    .spawn((
+                        Node {
+                            width: percent(100),
+                            padding: UiRect::axes(px(10), px(4)),
+                            margin: UiRect::top(px(6)),
+                            border: UiRect::left(px(3)),
+                            border_radius: BorderRadius::all(px(5)),
+                            ..default()
+                        },
+                        BorderColor::all(ui::theme::accent().with_alpha(0.8)),
+                        BackgroundColor(ui::theme::title_bg().with_alpha(0.85)),
+                        ChildOf(well),
+                    ))
+                    .id();
+                commands.spawn((
+                    Text::new(crate::calendar::date_of_day(event.day).to_uppercase()),
+                    TextFont {
+                        font_size: FontSize::Px(12.0),
+                        ..default()
+                    },
+                    TextColor(ui::theme::accent()),
+                    ChildOf(band),
+                ));
+            }
+            let ledger = super::history::Ledger::of(&event.text);
+            let row = commands
+                .spawn((
+                    Node {
+                        width: percent(100),
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: px(8),
+                        padding: UiRect::axes(px(6), px(4)),
+                        border_radius: BorderRadius::all(px(4)),
+                        ..default()
+                    },
+                    BackgroundColor(if stripe {
+                        Color::WHITE.with_alpha(0.028)
+                    } else {
+                        Color::NONE
+                    }),
+                    ChildOf(well),
+                ))
+                .id();
+            stripe = !stripe;
+            super::history::spawn_glyph(&mut commands, row, ledger);
+            commands.spawn((
+                ui::body(event.text.clone()),
+                Node {
+                    flex_grow: 1.0,
+                    ..default()
+                },
+                ChildOf(row),
+            ));
+        }
+        if chronicle.events.len() > 120 {
+            commands.spawn((
+                ui::dim(format!(
+                    "... and {} earlier days of this life",
+                    chronicle.events.len() - 120
+                )),
+                Node {
+                    padding: UiRect::axes(px(10), px(8)),
+                    ..default()
+                },
+                ChildOf(well),
+            ));
+        }
     }
 }
 

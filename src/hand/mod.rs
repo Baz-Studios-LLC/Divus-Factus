@@ -431,6 +431,7 @@ fn handle_grab_and_release(
         ResMut<Assets<Mesh>>,
         Res<crate::terrain::TerrainAssets>,
         ResMut<crate::scatter::DirtyGroves>,
+        ResMut<crate::scatter::StrippedGround>,
     ),
     matters: Query<&crate::matter::Matter>,
     pointer: Res<PointerContext>,
@@ -485,7 +486,7 @@ fn handle_grab_and_release(
         if let Ok((tree, body, home)) = trees.get(entity) {
             // Torn from the ground AND from its grove: the tree takes its
             // own body with it, and the grove closes over the gap.
-            let (meshes, terrain_assets, dirty_groves) = &mut grove_kit;
+            let (meshes, terrain_assets, dirty_groves, stripped) = &mut grove_kit;
             crate::scatter::stand_alone(
                 &mut commands,
                 meshes,
@@ -495,6 +496,9 @@ fn handle_grab_and_release(
                 home,
                 dirty_groves,
             );
+            // The ground remembers the uprooting: no chunk rebuild quietly
+            // replants what the god tore out.
+            stripped.strip(position.x, position.z);
             commands
                 .entity(entity)
                 .remove::<ChildOf>()
