@@ -131,7 +131,7 @@ fn spawn_title(
     // The logotype — the game's one blessed piece of non-procedural art.
     let title = commands
         .spawn((
-            ImageNode::new(assets.load("title-logo.png")),
+            ImageNode::new(assets.load("EgregoreLogo.png")),
             Node {
                 width: px(640),
                 margin: UiRect::bottom(px(-40.0)).with_top(px(-60.0)),
