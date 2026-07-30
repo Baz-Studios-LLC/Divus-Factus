@@ -768,7 +768,10 @@ fn found_anew(world: &mut World) {
     let seed = crate::WorldSeed::default();
     world.insert_resource(Terrain::new(seed.0));
     world.insert_resource(seed);
-    world.insert_resource(crate::calendar::WorldClock { elapsed: 0.0 });
+    // The clock's own default, not zero: games open mid-morning, and raw
+    // zero is the small hours - returning to the title showed a new world
+    // sunk in a night nobody asked for.
+    world.insert_resource(crate::calendar::WorldClock::default());
 
     // Everything the old world wrote into the annals, blank again.
     world.insert_resource(crate::villager::explore::KnownWorld::default());
