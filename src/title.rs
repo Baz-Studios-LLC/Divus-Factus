@@ -35,6 +35,7 @@ impl Plugin for TitlePlugin {
                     sync_hud.run_if(state_changed::<GameState>),
                     handle_choice.run_if(in_state(GameState::Title)),
                     auto_begin.run_if(in_state(GameState::Title)),
+                    auto_title.run_if(in_state(GameState::Playing)),
                     handle_settings,
                     style_menu_buttons,
                     toggle_pause_menu.run_if(in_state(GameState::Playing)),
@@ -90,6 +91,12 @@ struct ExitButton;
 
 #[derive(Component)]
 struct PauseSavesButton;
+
+/// The pause menu's way back to the front door. The world is not torn down —
+/// it keeps living, exactly as it does behind the title — the camera simply
+/// climbs back to the god's vantage and the veil returns.
+#[derive(Component)]
+struct TitleReturnButton;
 
 /// The settings overlay, above the title.
 #[derive(Component)]
@@ -544,6 +551,8 @@ fn toggle_pause_menu(
             commands.entity(settings).insert(PauseSettingsButton);
             let saves = menu_button(&mut commands, window.body, "Saves");
             commands.entity(saves).insert(PauseSavesButton);
+            let title = menu_button(&mut commands, window.body, "Title");
+            commands.entity(title).insert(TitleReturnButton);
             let exit = menu_button(&mut commands, window.body, "Exit Game");
             commands.entity(exit).insert(ExitButton);
             time.pause();
@@ -551,7 +560,7 @@ fn toggle_pause_menu(
     }
 }
 
-/// The pause menu's three doors.
+/// The pause menu's doors.
 #[allow(clippy::type_complexity)]
 fn handle_pause_menu(
     mut commands: Commands,
@@ -560,11 +569,39 @@ fn handle_pause_menu(
     saves: Query<&Interaction, (Changed<Interaction>, With<PauseSavesButton>)>,
     mut saves_panels: Query<&mut Visibility, With<crate::save::SavesPanel>>,
     exit: Query<&Interaction, (Changed<Interaction>, With<ExitButton>)>,
+    to_title: Query<&Interaction, (Changed<Interaction>, With<TitleReturnButton>)>,
     open_settings: Query<Entity, With<SettingsScreen>>,
     menus: Query<Entity, With<PauseMenu>>,
     mut time: ResMut<Time<Virtual>>,
+    mut next: ResMut<NextState<GameState>>,
+    (mut survey, mut markers, mut armed): (
+        ResMut<crate::survey::Survey>,
+        ResMut<crate::markers::MarkerMode>,
+        ResMut<crate::miracles::SelectedMiracle>,
+    ),
     mut app_exit: MessageWriter<AppExit>,
 ) {
+    for interaction in &to_title {
+        if *interaction == Interaction::Pressed {
+            for menu in &menus {
+                commands.entity(menu).insert(Visibility::Hidden);
+            }
+            for mut visibility in &mut saves_panels {
+                *visibility = Visibility::Hidden;
+            }
+            // Nothing of the abandoned game follows the god upstairs: no
+            // follow, no open sight, no marks, no armed miracle - and the
+            // clock runs on, because the title overlooks a living world.
+            time.unpause();
+            survey.on = false;
+            markers.0 = false;
+            armed.0 = None;
+            // The world itself is replaced with a freshly-founded one, so
+            // Begin from the title is a true new game.
+            commands.insert_resource(crate::save::PendingNewWorld);
+            next.set(GameState::Title);
+        }
+    }
     for interaction in &resume {
         if *interaction == Interaction::Pressed {
             for menu in &menus {
@@ -667,7 +704,48 @@ fn auto_begin(
     };
     *waited += time.delta_secs();
     if *waited >= after {
+        // Reset rather than latch: if the game walks back to the title (the
+        // pause menu's Title door), the next Begin fires after a full wait
+        // again — pressing it on the title's first frame would dive on the
+        // OLD world's coordinates before the fresh founding has landed.
+        *waited = 0.0;
         begin_descent(&mut commands, chunks.as_deref(), site.as_deref(), &mut next);
+    }
+}
+
+/// Capture tooling: EGREGORE_AUTOTITLE=seconds walks back to the title after
+/// N seconds of play — through the same door as the pause menu's Title
+/// button, new world and all — so the whole loop can be proven on film.
+#[allow(clippy::type_complexity)]
+fn auto_title(
+    mut commands: Commands,
+    time: Res<Time<Real>>,
+    mut waited: Local<f32>,
+    mut fired: Local<bool>,
+    (mut survey, mut markers, mut armed): (
+        ResMut<crate::survey::Survey>,
+        ResMut<crate::markers::MarkerMode>,
+        ResMut<crate::miracles::SelectedMiracle>,
+    ),
+    mut next: ResMut<NextState<GameState>>,
+) {
+    if *fired {
+        return;
+    }
+    let Some(after) = std::env::var("EGREGORE_AUTOTITLE")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+    else {
+        return;
+    };
+    *waited += time.delta_secs();
+    if *waited >= after {
+        *fired = true;
+        survey.on = false;
+        markers.0 = false;
+        armed.0 = None;
+        commands.insert_resource(crate::save::PendingNewWorld);
+        next.set(GameState::Title);
     }
 }
 

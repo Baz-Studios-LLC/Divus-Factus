@@ -197,14 +197,29 @@ fn slot_path(slot: u8) -> std::path::PathBuf {
 #[derive(Resource)]
 pub struct PendingSave(pub u8);
 
+/// A request to abandon the current world and found a new one on a fresh
+/// seed — the pause menu's Title door. Processed by `process_requests`.
+#[derive(Resource)]
+pub struct PendingNewWorld;
+
 #[derive(Resource)]
 pub struct PendingLoad(pub u8);
 
-fn request_pending(save: Option<Res<PendingSave>>, load: Option<Res<PendingLoad>>) -> bool {
-    save.is_some() || load.is_some()
+fn request_pending(
+    save: Option<Res<PendingSave>>,
+    load: Option<Res<PendingLoad>>,
+    anew: Option<Res<PendingNewWorld>>,
+) -> bool {
+    save.is_some() || load.is_some() || anew.is_some()
 }
 
 fn process_requests(world: &mut World) {
+    // The pause menu's Title door: abandon this world, found a fresh one for
+    // the title to overlook. Handled before the on-title guard below — by the
+    // time this runs, the state machine is already walking back to Title.
+    if world.remove_resource::<PendingNewWorld>().is_some() {
+        found_anew(world);
+    }
     if let Some(PendingSave(slot)) = world.remove_resource::<PendingSave>() {
         let outcome = match gather(world) {
             Some(save) => write_slot(slot, &save),
@@ -693,8 +708,11 @@ fn gather(world: &mut World) -> Option<SaveGame> {
 
 // --------------------------------------------------------------- restoring
 
-fn apply(world: &mut World, save: SaveGame) {
-    // 1. Clear the dynamic world. Recursive despawns take children with them.
+/// Sweeps the living world away: every creature, building, chunk and loose
+/// stone, plus whatever the hand or camera was holding onto. Step one of any
+/// world replacement — loading a save, or founding a new world from the
+/// pause menu's Title door.
+fn raze(world: &mut World) {
     let mut doomed: Vec<Entity> = Vec::new();
     macro_rules! sweep {
         ($t:ty) => {
@@ -735,6 +753,48 @@ fn apply(world: &mut World, save: SaveGame) {
     if let Some(mut follow) = world.get_resource_mut::<crate::camera::FollowTarget>() {
         follow.entity = None;
     }
+}
+
+/// Tears the current world down and founds a brand-new one on a fresh seed.
+///
+/// This is what makes the pause menu's Title button honest: the vantage the
+/// title then overlooks is a NEW world, so Begin is a true new game rather
+/// than a descent back into the one just abandoned.
+fn found_anew(world: &mut World) {
+    raze(world);
+
+    // A fresh seed from the clock — the same door a fresh launch walks
+    // through, so EGREGORE_SEED still pins reproducible worlds.
+    let seed = crate::WorldSeed::default();
+    world.insert_resource(Terrain::new(seed.0));
+    world.insert_resource(seed);
+    world.insert_resource(crate::calendar::WorldClock { elapsed: 0.0 });
+
+    // Everything the old world wrote into the annals, blank again.
+    world.insert_resource(crate::villager::explore::KnownWorld::default());
+    world.insert_resource(crate::villager::WorldChronicle::default());
+    world.insert_resource(crate::villager::work::KitchenWarm::default());
+    if let Some(mut trails) = world.get_resource_mut::<crate::trails::Trails>() {
+        trails.restore(std::iter::empty());
+    }
+    if let Some(mut stripped) = world.get_resource_mut::<crate::scatter::StrippedGround>() {
+        stripped.0.clear();
+    }
+    if let Some(mut groves) = world.get_resource_mut::<crate::scatter::DirtyGroves>() {
+        groves.0.clear();
+    }
+    world.insert_resource(crate::weather::Weather::default());
+    world.insert_resource(Belief::default());
+    world.insert_resource(Legend::default());
+
+    // Found the new settlement the same way a fresh launch does — new site,
+    // new founders, new names, a new first page of the chronicle.
+    let _ = world.run_system_once(crate::villager::spawn_settlement);
+}
+
+fn apply(world: &mut World, save: SaveGame) {
+    // 1. Clear the dynamic world.
+    raze(world);
 
     // 2. The ground remembers.
     let terrain = Terrain::new(save.seed);
