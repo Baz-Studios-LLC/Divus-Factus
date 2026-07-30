@@ -507,3 +507,14 @@ language. Active window always on top (done).
 3. The person dossier: the People window grown into the chronicle's
    design language - genealogy tree, skills ledger, personal
    chronicle, relationships. The voyeur's heart.
+
+**The Codex (decided 2026-07-29, Baz delegated, hard-road rule).** One
+grand window in the mockup's language houses the reading surfaces as
+icon-tab sections: PEOPLE, VILLAGE, CHRONICLE, FAITH, THE WORLD. The
+toolbar's buttons open the codex to a section. Cinzel titles, stat
+icon chips, roster with genome-swatch thumbnails + count + sort,
+WANTS/HAS SEEN as side cards, LATELY with a date column, and the
+portrait sitting in a REAL 3D niche built on the doll stage (arch,
+plinth, vignette) - not painted rectangles. Build order: niche, then
+the People section interior, then the codex shell, then migrate the
+other panels in.
