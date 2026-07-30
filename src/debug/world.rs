@@ -856,6 +856,7 @@ pub(crate) fn update_world_markers(
     panels: Query<&Visibility, With<WorldPanel>>,
     time: Res<Time>,
     mut last_rebuild: Local<f32>,
+    mut fingerprint: Local<u64>,
     map: Res<WorldMap>,
     site: Option<Res<crate::villager::SettlementSite>>,
     settlements: Query<&crate::villager::Settlement>,
@@ -884,6 +885,26 @@ pub(crate) fn update_world_markers(
     let Ok(well) = wells.single() else {
         return;
     };
+    // Redraw the overlay only when something on it would move.
+    let fresh = {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::hash::DefaultHasher::new();
+        (map.radius as i32).hash(&mut hasher);
+        (map.centre.x as i32, map.centre.y as i32).hash(&mut hasher);
+        villagers.iter().count().hash(&mut hasher);
+        for cairn in &cairns {
+            let at = cairn.translation();
+            ((at.x * 4.0) as i32, (at.z * 4.0) as i32).hash(&mut hasher);
+        }
+        if let Some(known) = known.as_ref() {
+            known.pockets.len().hash(&mut hasher);
+        }
+        hasher.finish()
+    };
+    if fresh == *fingerprint {
+        return;
+    }
+    *fingerprint = fresh;
     commands.entity(well).despawn_related::<Children>();
 
     let radius_z = map.radius * MAP_H as f32 / MAP_W as f32;

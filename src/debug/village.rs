@@ -1325,6 +1325,7 @@ pub(crate) fn update_ledger_details(
     codex: Res<Codex>,
     time: Res<Time>,
     mut last_rebuild: Local<f32>,
+    mut fingerprint: Local<u64>,
     panels: Query<&Visibility, With<VillagePanel>>,
     building_wells: Query<Entity, With<BuildingRows>>,
     trade_wells: Query<Entity, With<TradeRows>>,
@@ -1352,12 +1353,34 @@ pub(crate) fn update_ledger_details(
     for building in &buildings {
         *kinds.entry(building.kind.name()).or_default() += 1;
     }
+    let mut counts: BTreeMap<&'static str, usize> = BTreeMap::new();
+    for vocation in &trades {
+        *counts.entry(vocation.describe()).or_default() += 1;
+    }
+    let rising = pending.iter().count();
+    // Rebuild only when the content itself changes: tearing the rows down
+    // on a timer made the whole page flinch every two seconds.
+    let fresh = {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::hash::DefaultHasher::new();
+        for entry in &kinds {
+            entry.hash(&mut hasher);
+        }
+        for entry in &counts {
+            entry.hash(&mut hasher);
+        }
+        rising.hash(&mut hasher);
+        hasher.finish()
+    };
+    if fresh == *fingerprint {
+        return;
+    }
+    *fingerprint = fresh;
     commands.entity(building_well).despawn_related::<Children>();
     for (name, count) in &kinds {
         let value = ui::ruled_row(&mut commands, building_well, name);
         commands.entity(value).insert(Text::new(format!("{count}")));
     }
-    let rising = pending.iter().count();
     if rising > 0 {
         commands.spawn((
             ui::dim(format!("{rising} under construction")),
@@ -1371,10 +1394,6 @@ pub(crate) fn update_ledger_details(
         ));
     }
 
-    let mut counts: BTreeMap<&'static str, usize> = BTreeMap::new();
-    for vocation in &trades {
-        *counts.entry(vocation.describe()).or_default() += 1;
-    }
     let mut ranked: Vec<_> = counts.into_iter().collect();
     ranked.sort_by_key(|(name, count)| (std::cmp::Reverse(*count), *name));
     commands.entity(trade_well).despawn_related::<Children>();
@@ -1393,6 +1412,7 @@ pub(crate) fn update_faith_roster(
     codex: Res<Codex>,
     time: Res<Time>,
     mut last_rebuild: Local<f32>,
+    mut fingerprint: Local<u64>,
     panels: Query<&Visibility, With<VillagePanel>>,
     rosters: Query<Entity, With<FaithRoster>>,
     flock: Query<
@@ -1416,6 +1436,20 @@ pub(crate) fn update_faith_roster(
     let Ok(roster) = rosters.single() else {
         return;
     };
+    // Rebuild only when a soul's line would actually read differently.
+    let fresh = {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::hash::DefaultHasher::new();
+        for (person, faith, _, _) in &flock {
+            person.name.hash(&mut hasher);
+            ((faith.map_or(0.0, |f| f.trust) * 100.0) as i32).hash(&mut hasher);
+        }
+        hasher.finish()
+    };
+    if fresh == *fingerprint {
+        return;
+    }
+    *fingerprint = fresh;
     commands.entity(roster).despawn_related::<Children>();
 
     let mut souls: Vec<_> = flock.iter().collect();
