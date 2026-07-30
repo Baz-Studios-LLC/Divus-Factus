@@ -68,10 +68,6 @@ pub(crate) struct DetailSubtitle;
 #[derive(Component)]
 pub(crate) struct DetailSeen;
 
-/// The LIFE body text in the detail pane.
-#[derive(Component)]
-pub(crate) struct DetailLife;
-
 /// The full life story on its own tab, every entry dated.
 /// The dossier content, shown only while someone is selected.
 #[derive(Component)]
@@ -93,6 +89,18 @@ pub(crate) struct KinWell;
 #[derive(Component)]
 pub(crate) struct LifeWell;
 
+/// The LATELY card's dated rows, rebuilt with the dossier.
+#[derive(Component)]
+pub(crate) struct LatelyWell;
+
+/// Which way the roster reads.
+#[derive(Resource, Default)]
+pub(crate) struct RosterSort(pub bool);
+
+/// The little A-Z / Z-A toggle in the roster's header.
+#[derive(Component)]
+pub(crate) struct SortButton;
+
 /// A roster row's face: who it belongs to and its resting shade, so the
 /// selected row can glow and the rest can zebra.
 #[derive(Component)]
@@ -107,7 +115,13 @@ pub(crate) fn spawn_people_panel(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let split = ui::split_view(&mut commands, "THE PEOPLE", 300.0, 640.0);
+    let split = ui::split_view_titled(
+        &mut commands,
+        "PEOPLE",
+        Some("The mortals of your world."),
+        320.0,
+        700.0,
+    );
     // Capture mode opens the window and picks somebody, so an unattended
     // screenshot can prove the pane works.
     let starts = if crate::capture_path().is_some() {
@@ -115,10 +129,37 @@ pub(crate) fn spawn_people_panel(
     } else {
         Visibility::Hidden
     };
-    commands
-        .entity(split.window.root)
-        .insert((Name::new("People Panel"), PeoplePanel, starts));
-    commands.entity(split.list).insert(PeopleRows);
+    commands.entity(split.window.root).insert((
+        Name::new("People Panel"),
+        PeoplePanel,
+        starts,
+        // An explicit width, or percent-sized children resolve against
+        // the screen instead of the window - the chronicle's lesson.
+        Node {
+            width: px(1160),
+            flex_direction: FlexDirection::Column,
+            padding: px(5).into(),
+            border: UiRect::all(px(2)),
+            border_radius: BorderRadius::all(px(12)),
+            ..default()
+        },
+    ));
+    commands.entity(split.list).insert((
+        PeopleRows,
+        // The roster holds its ground: without flex_shrink 0 the stat
+        // grid's minimum widths crushed the list to a ribbon.
+        Node {
+            width: px(320),
+            flex_shrink: 0.0,
+            height: percent(100),
+            flex_direction: FlexDirection::Column,
+            row_gap: px(2),
+            overflow: Overflow::scroll_y(),
+            padding: UiRect::all(px(6)),
+            border_radius: BorderRadius::all(px(6)),
+            ..default()
+        },
+    ));
 
     // The paperdoll: a private little stage far under the world, drawn by its
     // own camera to a texture the detail pane shows. The doll is the person's
@@ -348,29 +389,129 @@ pub(crate) fn spawn_people_panel(
     );
     let (soul, kin_tab, life_tab) = (tabs[0], tabs[1], tabs[2]);
 
-    // Every readout the hover card has, permanent and orderly.
+    // Every readout the hover card has, as a two-column grid of chipped
+    // rows - each stat wearing its little engraved glyph.
+    let grid = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                flex_direction: FlexDirection::Row,
+                flex_wrap: FlexWrap::Wrap,
+                row_gap: px(3),
+                padding: UiRect::all(px(6)),
+                border_radius: BorderRadius::all(px(6)),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.22)),
+            ChildOf(soul),
+        ))
+        .id();
     for (value, label) in [
-        (InspectorValue::State, "state"),
-        (InspectorValue::Hunger, "hunger"),
-        (InspectorValue::Rest, "rest"),
-        (InspectorValue::Health, "health"),
-        (InspectorValue::Spirits, "spirits"),
-        (InspectorValue::Heart, "heart"),
-        (InspectorValue::Manner, "manner"),
-        (InspectorValue::FaithIn, "faith"),
-        (InspectorValue::Work, "work"),
-        (InspectorValue::Family, "family"),
-        (InspectorValue::Seen, "seen you"),
+        (InspectorValue::State, "STATE"),
+        (InspectorValue::Heart, "HEART"),
+        (InspectorValue::Hunger, "HUNGER"),
+        (InspectorValue::Manner, "MANNER"),
+        (InspectorValue::Rest, "REST"),
+        (InspectorValue::FaithIn, "FAITH"),
+        (InspectorValue::Health, "HEALTH"),
+        (InspectorValue::Work, "WORK"),
+        (InspectorValue::Spirits, "SPIRITS"),
+        (InspectorValue::Family, "FAMILY"),
+        (InspectorValue::Seen, "SEEN YOU"),
     ] {
-        let row = ui::stat_row(&mut commands, soul, label, None);
-        commands.entity(row.value).insert(DetailStat(value));
+        let cell = commands
+            .spawn((
+                Node {
+                    width: percent(50),
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: px(8),
+                    padding: UiRect::axes(px(4), px(3)),
+                    ..default()
+                },
+                ChildOf(grid),
+            ))
+            .id();
+        stat_chip(&mut commands, cell, value);
+        commands.spawn((
+            ui::dim(label),
+            Node {
+                width: px(72),
+                flex_shrink: 0.0,
+                ..default()
+            },
+            ChildOf(cell),
+        ));
+        commands.spawn((
+            DetailStat(value),
+            ui::body(""),
+            Node {
+                flex_grow: 1.0,
+                ..default()
+            },
+            ChildOf(cell),
+        ));
     }
-    ui::section_header(&mut commands, soul, "WANTS");
-    commands.spawn((PersonDetailText, ui::body(""), ChildOf(soul)));
-    ui::section_header(&mut commands, soul, "HAS SEEN");
-    commands.spawn((DetailSeen, ui::body(""), ChildOf(soul)));
-    ui::section_header(&mut commands, soul, "LATELY");
-    commands.spawn((DetailLife, ui::dim(""), ChildOf(soul)));
+
+    // WANTS and HAS SEEN, side by side; LATELY beneath with its dates in
+    // the margin - the mockup's lower third.
+    let cards = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                flex_direction: FlexDirection::Row,
+                column_gap: px(10),
+                align_items: AlignItems::Stretch,
+                ..default()
+            },
+            ChildOf(soul),
+        ))
+        .id();
+    let card = |commands: &mut Commands, parent: Entity, title: &str| -> Entity {
+        let card = commands
+            .spawn((
+                Node {
+                    flex_grow: 1.0,
+                    flex_basis: px(0),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: px(6),
+                    padding: UiRect::all(px(10)),
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::all(px(6)),
+                    ..default()
+                },
+                BackgroundColor(Color::BLACK.with_alpha(0.22)),
+                BorderColor::all(ui::theme::text_dim().with_alpha(0.18)),
+                ChildOf(parent),
+            ))
+            .id();
+        commands.spawn((
+            Text::new(title),
+            ui::DisplayFace,
+            TextFont {
+                font_size: FontSize::Px(13.0),
+                ..default()
+            },
+            TextColor(ui::theme::accent()),
+            ChildOf(card),
+        ));
+        card
+    };
+    let wants_card = card(&mut commands, cards, "WANTS");
+    commands.spawn((PersonDetailText, ui::body(""), ChildOf(wants_card)));
+    let seen_card = card(&mut commands, cards, "HAS SEEN");
+    commands.spawn((DetailSeen, ui::body(""), ChildOf(seen_card)));
+    let lately_card = card(&mut commands, soul, "LATELY");
+    commands.spawn((
+        LatelyWell,
+        Node {
+            width: percent(100),
+            flex_direction: FlexDirection::Column,
+            row_gap: px(3),
+            ..default()
+        },
+        ChildOf(lately_card),
+    ));
 
     // KIN & CRAFT: the family tree and the working hands.
     ui::section_header(&mut commands, kin_tab, "THE CRAFT");
@@ -433,11 +574,14 @@ pub(crate) fn update_people_panel(
     panels: Query<&Visibility, With<PeoplePanel>>,
     containers: Query<Entity, With<PeopleRows>>,
     mut labels: Query<(&RowLabel, &mut Text)>,
+    sort: Res<RosterSort>,
+    mut last_sort: Local<bool>,
+    settlements: Query<&Settlement>,
     people: Query<
         (
             Entity,
             &Person,
-            Option<&crate::villager::work::Vocation>,
+            &crate::creature::genome::CreatureGenome,
             &Activity,
         ),
         (With<Villager>, Without<crate::creature::Corpse>),
@@ -460,37 +604,70 @@ pub(crate) fn update_people_panel(
         return;
     };
 
-    // The same people as last pass: refresh each row's words IN PLACE.
-    // Tearing the rows down and rebuilding them was a once-a-heartbeat
-    // flicker across the whole roster.
+    // Rebuild only when the roll of the living - or the sort - changes.
+    let _ = &mut labels;
     let mut current: Vec<Entity> = people.iter().map(|(e, ..)| e).collect();
     current.sort();
-    if current == *roster && !just_opened {
-        for (label, mut text) in &mut labels {
-            let Ok((_, person, vocation, activity)) = people.get(label.0) else {
-                continue;
-            };
-            let doing = match activity {
-                Activity::Working => vocation.map_or("at work", |v| v.describe()),
-                other => state_phrase(Some(other), None),
-            };
-            let fresh = format!("{} - {}", person.name, doing);
-            if text.0 != fresh {
-                *text = Text::new(fresh);
-            }
-        }
+    if current == *roster && *last_sort == sort.0 && !just_opened {
         return;
     }
     *roster = current;
+    *last_sort = sort.0;
     commands.entity(container).despawn_related::<Children>();
 
+    // The roster's masthead: what this list is, which way it reads, and
+    // how many souls it holds.
+    let head = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: px(8),
+                padding: UiRect::axes(px(8), px(6)),
+                border: UiRect::bottom(px(1)),
+                ..default()
+            },
+            BorderColor::all(ui::theme::text_dim().with_alpha(0.25)),
+            ChildOf(container),
+        ))
+        .id();
+    commands.spawn((
+        ui::dim("ALL PEOPLE"),
+        Node {
+            flex_grow: 1.0,
+            ..default()
+        },
+        ChildOf(head),
+    ));
+    let sort_button = commands
+        .spawn((
+            SortButton,
+            ui::UiButton,
+            Node {
+                padding: UiRect::axes(px(7), px(1)),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(4)),
+                ..default()
+            },
+            BorderColor::all(ui::theme::panel_border()),
+            Interaction::default(),
+            ChildOf(head),
+        ))
+        .id();
+    commands.spawn((
+        ui::dim(if sort.0 { "Z-A" } else { "A-Z" }),
+        ChildOf(sort_button),
+    ));
+    commands.spawn((ui::dim(format!("{}", roster.len())), ChildOf(head)));
+
+    let village = settlements.iter().next().map(|s| s.name.clone());
     let mut names: Vec<_> = people.iter().collect();
     names.sort_by(|a, b| a.1.name.cmp(&b.1.name));
-    for (index, (entity, person, vocation, activity)) in names.into_iter().enumerate() {
-        let doing = match activity {
-            Activity::Working => vocation.map_or("at work", |v| v.describe()),
-            other => state_phrase(Some(other), None),
-        };
+    if sort.0 {
+        names.reverse();
+    }
+    for (index, (entity, person, genome, _)) in names.into_iter().enumerate() {
         let base = if index % 2 == 1 { 0.045 } else { 0.0 };
         let row = commands
             .spawn((
@@ -502,9 +679,9 @@ pub(crate) fn update_people_panel(
                     width: percent(100),
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
-                    column_gap: px(4),
-                    padding: UiRect::right(px(4)),
-                    border_radius: BorderRadius::all(px(3)),
+                    column_gap: px(6),
+                    padding: UiRect::right(px(6)),
+                    border_radius: BorderRadius::all(px(4)),
                     ..default()
                 },
                 BackgroundColor(Color::WHITE.with_alpha(base)),
@@ -517,8 +694,11 @@ pub(crate) fn update_people_panel(
                 ui::UiButton,
                 Node {
                     flex_grow: 1.0,
-                    padding: UiRect::axes(px(6), px(2)),
-                    border_radius: BorderRadius::all(px(3)),
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: px(8),
+                    padding: UiRect::axes(px(6), px(4)),
+                    border_radius: BorderRadius::all(px(4)),
                     ..default()
                 },
                 BackgroundColor(ui::theme::panel_bg().with_alpha(0.0)),
@@ -526,33 +706,138 @@ pub(crate) fn update_people_panel(
                 ChildOf(row),
             ))
             .id();
+        // The thumbnail: this person's own colours as a little bust -
+        // hair over face over shoulders.
+        let bust = commands
+            .spawn((
+                Node {
+                    width: px(20),
+                    height: px(28),
+                    flex_shrink: 0.0,
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                ChildOf(name_button),
+            ))
+            .id();
+        let swatch = |commands: &mut Commands,
+                      tone: crate::creature::genome::Tone,
+                      w: f32,
+                      h: f32,
+                      round: BorderRadius| {
+            commands
+                .spawn((
+                    Node {
+                        width: px(w),
+                        height: px(h),
+                        border_radius: round,
+                        ..default()
+                    },
+                    BackgroundColor(crate::palette::color_at(tone.palette_index())),
+                ))
+                .id()
+        };
+        let hair = swatch(
+            &mut commands,
+            genome.hair,
+            14.0,
+            6.0,
+            BorderRadius::top(px(3)),
+        );
+        let face = swatch(
+            &mut commands,
+            genome.skin,
+            12.0,
+            9.0,
+            BorderRadius::bottom(px(2)),
+        );
+        let torso = swatch(
+            &mut commands,
+            genome.cloth,
+            18.0,
+            11.0,
+            BorderRadius::top(px(4)),
+        );
+        for part in [hair, face, torso] {
+            commands.entity(part).insert(ChildOf(bust));
+        }
+        // Name over standing, the mockup's two lines.
+        let words = commands
+            .spawn((
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    ..default()
+                },
+                ChildOf(name_button),
+            ))
+            .id();
         commands.spawn((
             RowLabel(entity),
-            ui::body(format!("{} - {}", person.name, doing)),
-            ChildOf(name_button),
+            ui::label(person.name.clone()),
+            ChildOf(words),
         ));
-        // The little chevron flies the camera to them; the name just opens
-        // their page.
+        commands.spawn((
+            ui::dim(format!(
+                "{} of {}",
+                super::person_phrase(genome.sex, genome.age),
+                village.as_deref().unwrap_or("the wilds")
+            )),
+            ChildOf(words),
+        ));
+        // The eye flies the camera to them; the row opens their page.
         let follow_button = commands
             .spawn((
                 FollowButton(entity),
                 ui::UiButton,
                 Node {
-                    width: px(18),
-                    height: px(18),
+                    width: px(22),
+                    height: px(22),
                     flex_shrink: 0.0,
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
                     border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(px(3)),
+                    border_radius: BorderRadius::all(px(999)),
                     ..default()
                 },
-                BorderColor::all(ui::theme::panel_border()),
+                BackgroundColor(ui::theme::title_bg()),
+                BorderColor::all(ui::theme::accent().with_alpha(0.4)),
                 Interaction::default(),
                 ChildOf(row),
             ))
             .id();
-        commands.spawn((ui::dim(">"), ChildOf(follow_button)));
+        for (l, t, w, h, r, bright) in [
+            (4.5, 7.5, 12.0, 6.0, 6.0, false),
+            (8.5, 8.5, 4.0, 4.0, 4.0, true),
+        ] {
+            commands.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(l),
+                    top: px(t),
+                    width: px(w),
+                    height: px(h),
+                    border_radius: BorderRadius::all(px(r)),
+                    ..default()
+                },
+                BackgroundColor(if bright {
+                    crate::palette::shade(&crate::palette::BONE, 0.95)
+                } else {
+                    ui::theme::accent().with_alpha(0.85)
+                }),
+                ChildOf(follow_button),
+            ));
+        }
+    }
+}
+
+/// The sort toggle flips the roster's reading order.
+pub(crate) fn handle_roster_sort(
+    clicks: Query<&Interaction, (With<SortButton>, Changed<Interaction>)>,
+    mut sort: ResMut<RosterSort>,
+) {
+    for interaction in &clicks {
+        if *interaction == Interaction::Pressed {
+            sort.0 = !sort.0;
+        }
     }
 }
 
@@ -687,7 +972,6 @@ pub(crate) fn update_person_detail(
         Query<(&DetailStat, &mut Text)>,
         Query<&mut Text, With<PersonDetailText>>,
         Query<&mut Text, With<DetailSeen>>,
-        Query<&mut Text, With<DetailLife>>,
     )>,
 ) {
     if !panels.iter().any(|v| *v != Visibility::Hidden) {
@@ -820,28 +1104,144 @@ pub(crate) fn update_person_detail(
     {
         *text = Text::new(fresh);
     }
+}
 
-    let fresh = chronicle.as_ref().map_or_else(
-        || "unwritten".to_string(),
-        |chronicle| {
-            let tail = chronicle.events.len().saturating_sub(4);
-            chronicle.events[tail..]
-                .iter()
-                .map(|event| {
-                    format!(
-                        "{}  {}",
-                        crate::calendar::date_of_day(event.day),
-                        event.text
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join("\n")
-        },
-    );
-    if let Ok(mut text) = texts.p5().single_mut()
-        && text.0 != fresh
-    {
-        *text = Text::new(fresh);
+/// A circled glyph for one readout, drawn in the same hand-set node
+/// vocabulary as the chronicle's shelf marks: gold line-work in a ring.
+fn stat_chip(commands: &mut Commands, parent: Entity, which: InspectorValue) {
+    let ink = ui::theme::accent().with_alpha(0.92);
+    let chip = commands
+        .spawn((
+            Node {
+                width: px(24),
+                height: px(24),
+                flex_shrink: 0.0,
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(999)),
+                ..default()
+            },
+            BackgroundColor(ui::theme::title_bg()),
+            BorderColor::all(ink.with_alpha(0.45)),
+            ChildOf(parent),
+        ))
+        .id();
+    let mut mark = |node: Node, turned: bool, bright: bool| {
+        let colour = if bright {
+            crate::palette::shade(&crate::palette::BONE, 0.95)
+        } else {
+            ink
+        };
+        if turned {
+            commands.spawn((
+                node,
+                UiTransform::from_rotation(Rot2::degrees(45.0)),
+                BackgroundColor(colour),
+                ChildOf(chip),
+            ));
+        } else {
+            commands.spawn((node, BackgroundColor(colour), ChildOf(chip)));
+        }
+    };
+    let at = |left: f32, top: f32, w: f32, h: f32, round: f32| Node {
+        position_type: PositionType::Absolute,
+        left: px(left),
+        top: px(top),
+        width: px(w),
+        height: px(h),
+        border_radius: BorderRadius::all(px(round)),
+        ..default()
+    };
+    match which {
+        // A compass rose: the turned square and its heart.
+        InspectorValue::State => {
+            mark(at(7.0, 7.0, 8.0, 8.0, 0.0), true, false);
+            mark(at(9.5, 9.5, 3.0, 3.0, 0.0), true, true);
+        }
+        // A bowl.
+        InspectorValue::Hunger => {
+            mark(
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(6),
+                    top: px(10),
+                    width: px(10),
+                    height: px(6),
+                    border_radius: BorderRadius::bottom(px(6)),
+                    ..default()
+                },
+                false,
+                false,
+            );
+            mark(at(5.0, 9.0, 12.0, 2.0, 1.0), false, false);
+        }
+        // A crescent moon: a disc with a bite of chip-dark.
+        InspectorValue::Rest => {
+            mark(at(6.5, 6.5, 9.0, 9.0, 9.0), false, false);
+            let bite = commands
+                .spawn((
+                    at(9.5, 5.5, 8.0, 8.0, 8.0),
+                    BackgroundColor(ui::theme::title_bg()),
+                    ChildOf(chip),
+                ))
+                .id();
+            let _ = bite;
+        }
+        // The healer's cross.
+        InspectorValue::Health => {
+            mark(at(10.0, 6.0, 3.0, 11.0, 1.0), false, false);
+            mark(at(6.0, 10.0, 11.0, 3.0, 1.0), false, false);
+        }
+        // A spark.
+        InspectorValue::Spirits => {
+            mark(at(8.0, 8.0, 7.0, 7.0, 0.0), true, false);
+            mark(at(10.0, 10.0, 3.0, 3.0, 0.0), true, true);
+        }
+        // A heart: two lobes and the turned point.
+        InspectorValue::Heart => {
+            mark(at(6.5, 7.0, 5.5, 5.5, 5.5), false, false);
+            mark(at(11.0, 7.0, 5.5, 5.5, 5.5), false, false);
+            mark(at(8.5, 9.0, 6.0, 6.0, 0.0), true, false);
+        }
+        // A manner of speaking: three uneven strokes.
+        InspectorValue::Manner => {
+            mark(at(6.0, 8.0, 2.5, 8.0, 1.0), false, false);
+            mark(at(10.0, 6.0, 2.5, 10.0, 1.0), false, false);
+            mark(at(14.0, 9.0, 2.5, 7.0, 1.0), false, false);
+        }
+        // A shrine: lintel over two pillars.
+        InspectorValue::FaithIn => {
+            mark(at(6.0, 7.0, 11.0, 2.5, 1.0), false, false);
+            mark(at(7.5, 10.0, 2.5, 7.0, 0.0), false, false);
+            mark(at(13.0, 10.0, 2.5, 7.0, 0.0), false, false);
+        }
+        // The hammer.
+        InspectorValue::Work => {
+            mark(at(10.5, 8.0, 2.5, 10.0, 1.0), true, false);
+            mark(at(8.0, 5.5, 8.0, 3.5, 1.0), false, false);
+        }
+        // Two heads together.
+        InspectorValue::Family => {
+            mark(at(6.0, 7.0, 5.0, 5.0, 5.0), false, false);
+            mark(at(11.5, 7.0, 5.0, 5.0, 5.0), false, false);
+            mark(
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(5),
+                    top: px(13),
+                    width: px(13),
+                    height: px(5),
+                    border_radius: BorderRadius::top(px(5)),
+                    ..default()
+                },
+                false,
+                false,
+            );
+        }
+        // The god's eye.
+        InspectorValue::Seen => {
+            mark(at(5.5, 8.5, 12.0, 7.0, 7.0), false, false);
+            mark(at(10.0, 10.0, 4.0, 4.0, 4.0), false, true);
+        }
     }
 }
 
@@ -892,6 +1292,7 @@ pub(crate) fn update_dossier(
     craft_wells: Query<Entity, With<CraftWell>>,
     kin_wells: Query<Entity, With<KinWell>>,
     life_wells: Query<Entity, With<LifeWell>>,
+    lately_wells: Query<Entity, With<LatelyWell>>,
     souls: Query<(
         Option<&crate::villager::work::Skills>,
         Option<&Chronicle>,
@@ -1127,6 +1528,49 @@ pub(crate) fn update_dossier(
                 },
                 ChildOf(well),
             ));
+        }
+    }
+
+    // LATELY: the last few turnings, dates in the margin.
+    for well in &lately_wells {
+        commands.entity(well).despawn_related::<Children>();
+        let Some(chronicle) = chronicle else {
+            commands.spawn((ui::dim("unwritten"), ChildOf(well)));
+            continue;
+        };
+        let tail = chronicle.events.len().saturating_sub(4);
+        for event in &chronicle.events[tail..] {
+            let row = commands
+                .spawn((
+                    Node {
+                        width: percent(100),
+                        flex_direction: FlexDirection::Row,
+                        column_gap: px(10),
+                        ..default()
+                    },
+                    ChildOf(well),
+                ))
+                .id();
+            commands.spawn((
+                ui::dim(crate::calendar::date_of_day(event.day)),
+                Node {
+                    width: px(128),
+                    flex_shrink: 0.0,
+                    ..default()
+                },
+                ChildOf(row),
+            ));
+            commands.spawn((
+                ui::body(event.text.clone()),
+                Node {
+                    flex_grow: 1.0,
+                    ..default()
+                },
+                ChildOf(row),
+            ));
+        }
+        if tail == chronicle.events.len() {
+            commands.spawn((ui::dim("a quiet life, so far"), ChildOf(well)));
         }
     }
 }

@@ -44,6 +44,7 @@ impl Plugin for DebugPlugin {
         app.add_plugins(FrameTimeDiagnosticsPlugin::default())
             .init_resource::<DebugState>()
             .init_resource::<SelectedPerson>()
+            .init_resource::<RosterSort>()
             .add_systems(
                 Startup,
                 (
@@ -66,6 +67,7 @@ impl Plugin for DebugPlugin {
                     update_people_panel,
                     update_history_panel,
                     handle_people_rows,
+                    handle_roster_sort,
                     update_inspector,
                     screenshot_on_request,
                 )

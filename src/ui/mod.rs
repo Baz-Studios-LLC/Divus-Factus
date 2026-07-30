@@ -757,6 +757,16 @@ fn window_impl(
     min_width: f32,
     centred: bool,
 ) -> WindowHandles {
+    window_impl_titled(commands, title, None, min_width, centred)
+}
+
+fn window_impl_titled(
+    commands: &mut Commands,
+    title: &str,
+    subtitle: Option<&str>,
+    min_width: f32,
+    centred: bool,
+) -> WindowHandles {
     let strip = commands
         .spawn(Node {
             position_type: PositionType::Absolute,
@@ -835,6 +845,16 @@ fn window_impl(
             ChildOf(frame),
         ))
         .id();
+    let title_words = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: px(1),
+                ..default()
+            },
+            ChildOf(title_bar),
+        ))
+        .id();
     commands.spawn((
         Text::new(title),
         DisplayFace,
@@ -843,8 +863,11 @@ fn window_impl(
             ..default()
         },
         TextColor(theme::accent()),
-        ChildOf(title_bar),
+        ChildOf(title_words),
     ));
+    if let Some(subtitle) = subtitle {
+        commands.spawn((dim(subtitle), ChildOf(title_words)));
+    }
     let close = commands
         .spawn((
             CloseButton(root),
@@ -1135,9 +1158,20 @@ pub struct SplitView {
 /// A two-pane window: a fixed-width list column beside a detail pane, split
 /// by a hairline. The caller fills both sides; the chrome is shared.
 pub fn split_view(commands: &mut Commands, title: &str, list_width: f32, height: f32) -> SplitView {
+    split_view_titled(commands, title, None, list_width, height)
+}
+
+/// A split view whose banner carries a quiet second line.
+pub fn split_view_titled(
+    commands: &mut Commands,
+    title: &str,
+    subtitle: Option<&str>,
+    list_width: f32,
+    height: f32,
+) -> SplitView {
     // A generous FIXED frame: content must never resize the window - a
     // panel that breathes with every text change is seasickness, not UI.
-    let window = self::window(commands, title, list_width + 500.0);
+    let window = window_impl_titled(commands, title, subtitle, list_width + 500.0, false);
     let row = commands
         .spawn((
             Node {
