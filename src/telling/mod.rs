@@ -33,11 +33,14 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
-use candle_core::quantized::gguf_file;
-use candle_core::{Device, Tensor};
-use candle_transformers::generation::LogitsProcessor;
-use candle_transformers::models::quantized_qwen2::ModelWeights;
-use tokenizers::Tokenizer;
+use llama_cpp_2::context::params::LlamaContextParams;
+use llama_cpp_2::llama_backend::LlamaBackend;
+use llama_cpp_2::llama_batch::LlamaBatch;
+#[allow(deprecated)]
+use llama_cpp_2::model::Special;
+use llama_cpp_2::model::params::LlamaModelParams;
+use llama_cpp_2::model::{AddBos, LlamaModel};
+use llama_cpp_2::sampling::LlamaSampler;
 
 use crate::villager::traits::Bearing;
 use crate::villager::work::Vocation;
@@ -267,7 +270,7 @@ enum Ask {
     Retell(Retelling),
     Muse(Box<Musing>),
     /// Put down one voice and take up another, mid-session.
-    Switch(std::path::PathBuf, std::path::PathBuf),
+    Switch(std::path::PathBuf),
 }
 
 /// What comes back, keyed the way it was asked.
@@ -412,9 +415,6 @@ impl Tongue {
     /// the OLD voice's words, and serving them from the new one would make
     /// the switch look like it did nothing.
     pub fn switch_to(&mut self, weights: std::path::PathBuf) {
-        let Some(tokenizer) = tokenizer_for(&weights) else {
-            return;
-        };
         if let (Some(dir), Some(name)) = (model_dir(), weights.file_name()) {
             let _ = std::fs::write(dir.join("chosen"), name.to_string_lossy().as_bytes());
         }
@@ -429,7 +429,7 @@ impl Tongue {
             "{} (loading)",
             weights.file_name().unwrap_or_default().to_string_lossy()
         );
-        let _ = self.ask.send(Ask::Switch(weights, tokenizer));
+        let _ = self.ask.send(Ask::Switch(weights));
     }
 
     /// Takes in whatever the thread has finished.
@@ -531,7 +531,7 @@ pub fn model_dir() -> Option<std::path::PathBuf> {
 /// to drop a larger `.gguf` in the folder — the biggest file wins, on the
 /// reasoning that nobody puts one there by accident. That is the whole of the
 /// "bring your own bigger model" feature, and it costs nothing.
-fn find_model() -> Option<(std::path::PathBuf, std::path::PathBuf)> {
+fn find_model() -> Option<std::path::PathBuf> {
     // A remembered choice outranks size: the settings page writes one when
     // the player switches, and it must survive a restart or the switch was
     // a lie. A choice whose file has since been deleted falls through.
@@ -540,9 +540,7 @@ fn find_model() -> Option<(std::path::PathBuf, std::path::PathBuf)> {
         .ok()
         .map(|name| dir.join(name.trim()))
         .filter(|path| path.is_file());
-    let model = chosen.or_else(|| list_models().into_iter().next())?;
-    let tokenizer = tokenizer_for(&model)?;
-    Some((model, tokenizer))
+    chosen.or_else(|| list_models().into_iter().next())
 }
 
 /// Every model on disk, largest first — the order the settings page shows.
@@ -568,24 +566,6 @@ pub fn list_models() -> Vec<std::path::PathBuf> {
     weights.into_iter().map(|(_, path)| path).collect()
 }
 
-/// A tokenizer named for this model, or the only one in the folder.
-fn tokenizer_for(model: &std::path::Path) -> Option<std::path::PathBuf> {
-    let dir = model.parent()?;
-    let stem = model.file_stem()?.to_string_lossy().to_string();
-    let paired = dir.join(format!("{stem}-tokenizer.json"));
-    if paired.exists() {
-        return Some(paired);
-    }
-    std::fs::read_dir(dir)
-        .ok()?
-        .filter_map(|entry| {
-            let path = entry.ok()?.path();
-            let name = path.file_name()?.to_string_lossy().to_string();
-            name.ends_with("tokenizer.json").then_some(path)
-        })
-        .next()
-}
-
 /// Installs the teller. Silent and free when there are no weights to read.
 pub struct TellingPlugin;
 
@@ -596,7 +576,7 @@ impl Plugin for TellingPlugin {
         if std::env::var("DIVUS_FACTUS_TELLER").is_ok_and(|dial| dial == "0") {
             return;
         }
-        let Some((weights, tokenizer)) = find_model() else {
+        let Some(weights) = find_model() else {
             // No model on disk: the village keeps to its written lines, and
             // nothing about the game is worse than it was.
             return;
@@ -629,7 +609,7 @@ impl Plugin for TellingPlugin {
             .name("teller".into())
             .stack_size(8 * 1024 * 1024)
             .spawn(move || {
-                let mut voice = match Voice::load(&weights, &tokenizer) {
+                let mut voice = match Voice::load(&weights) {
                     Ok(voice) => voice,
                     Err(e) => {
                         warn!("the teller could not read its model: {e}");
@@ -657,24 +637,22 @@ impl Plugin for TellingPlugin {
                             Answer::Mused(of.who, of.is_reply(), line)
                         }
                         // Not counted against inflight: a switch is not a line.
-                        Ask::Switch(weights, tokenizer) => {
-                            match Voice::load(&weights, &tokenizer) {
-                                Ok(fresh) => {
-                                    voice = fresh;
-                                    Answer::Switched(Some(
-                                        weights
-                                            .file_name()
-                                            .unwrap_or_default()
-                                            .to_string_lossy()
-                                            .to_string(),
-                                    ))
-                                }
-                                Err(e) => {
-                                    warn!("the teller could not take up {weights:?}: {e}");
-                                    Answer::Switched(None)
-                                }
+                        Ask::Switch(weights) => match Voice::load(&weights) {
+                            Ok(fresh) => {
+                                voice = fresh;
+                                Answer::Switched(Some(
+                                    weights
+                                        .file_name()
+                                        .unwrap_or_default()
+                                        .to_string_lossy()
+                                        .to_string(),
+                                ))
                             }
-                        }
+                            Err(e) => {
+                                warn!("the teller could not take up {weights:?}: {e}");
+                                Answer::Switched(None)
+                            }
+                        },
                     };
                     if answers.send(answer).is_err() {
                         break;
@@ -702,43 +680,29 @@ impl Plugin for TellingPlugin {
 
 /// The loaded model, and everything needed to speak with it.
 ///
-/// Lives only on the teller thread. Nothing here is `Send` across a system
-/// boundary and nothing needs to be.
+/// Lives only on the teller thread. llama.cpp underneath: the tokenizer comes
+/// out of the GGUF itself, and generation runs on CPU cores the game barely
+/// uses — the GPU is the renderer's alone, which is what ended the hitch.
 struct Voice {
-    model: ModelWeights,
-    tokenizer: Tokenizer,
-    device: Device,
-    /// Qwen closes a turn with `<|im_end|>`; without it the model talks past
-    /// its own answer.
-    end_of_turn: u32,
+    backend: LlamaBackend,
+    model: LlamaModel,
     /// Varied per call, or every villager in the world says one thing.
     draws: u64,
 }
 
 impl Voice {
-    fn load(weights: &std::path::Path, tokenizer: &std::path::Path) -> Result<Voice, String> {
-        // CPU, always. The renderer has sole call on the GPU: a model's
-        // prompt prefill is one indivisible dispatch Metal cannot schedule a
-        // frame around, and it showed up as a hitch before every bubble —
-        // even from the small model. On cores the game barely uses, the
-        // teller costs the frame nothing; a line just takes a few seconds to
-        // arrive, and nothing anywhere waits on one. The cost lands only on
-        // the biggest models, which want minutes of cores per line — the
-        // price of electing one, until the day the prefill can be chunked.
-        let device = Device::Cpu;
-        let mut file = std::fs::File::open(weights).map_err(|e| e.to_string())?;
-        let content = gguf_file::Content::read(&mut file).map_err(|e| e.to_string())?;
+    fn load(weights: &std::path::Path) -> Result<Voice, String> {
+        // CPU, always: the renderer has sole call on the GPU, and a model's
+        // prompt prefill is one indivisible dispatch that showed up as a
+        // hitch before every bubble. On llama.cpp's kernels the CPU is fast
+        // enough that nothing misses it.
+        let backend = LlamaBackend::init().map_err(|e| e.to_string())?;
+        let params = LlamaModelParams::default();
         let model =
-            ModelWeights::from_gguf(content, &mut file, &device).map_err(|e| e.to_string())?;
-        let tokenizer = Tokenizer::from_file(tokenizer).map_err(|e| e.to_string())?;
-        let end_of_turn = tokenizer
-            .token_to_id("<|im_end|>")
-            .ok_or("the tokenizer has no <|im_end|>")?;
+            LlamaModel::load_from_file(&backend, weights, &params).map_err(|e| e.to_string())?;
         Ok(Voice {
+            backend,
             model,
-            tokenizer,
-            device,
-            end_of_turn,
             draws: 0,
         })
     }
@@ -820,46 +784,72 @@ impl Voice {
         Some(line)
     }
 
+    #[allow(deprecated)] // token_to_str's Special: fine until the crate's replacement lands
     fn generate(&mut self, prompt: &str, seed: u64) -> Result<String, String> {
-        let encoded = self
-            .tokenizer
-            .encode(prompt, true)
-            .map_err(|e| e.to_string())?;
-        let tokens = encoded.get_ids();
-        // Warm enough to differ between tellers, cool enough to obey.
-        let mut sampler = LogitsProcessor::new(seed, Some(0.8), Some(0.9));
-
-        // The prompt in one pass; `forward` yields the last position's logits.
-        let tensor = |ids: &[u32]| Tensor::new(ids, &self.device).map_err(|e| e.to_string());
-        let input = tensor(tokens)?.unsqueeze(0).map_err(|e| e.to_string())?;
-        let logits = self
+        // A fresh context per line: the prompts share no prefix worth caching
+        // once the dossier is in them, and a clean KV slate is the simplest
+        // correctness there is.
+        let mut ctx = self
             .model
-            .forward(&input, 0)
-            .and_then(|l| l.squeeze(0))
+            .new_context(
+                &self.backend,
+                LlamaContextParams::default()
+                    .with_n_ctx(std::num::NonZeroU32::new(2048))
+                    // Polite parallelism: the game is running on these cores.
+                    .with_n_threads(6)
+                    .with_n_threads_batch(6),
+            )
             .map_err(|e| e.to_string())?;
-        let mut next = sampler.sample(&logits).map_err(|e| e.to_string())?;
 
-        let mut out: Vec<u32> = Vec::new();
-        for step in 0..MAX_TOKENS {
-            if next == self.end_of_turn {
-                break;
-            }
-            out.push(next);
-            let input = tensor(&[next])?.unsqueeze(0).map_err(|e| e.to_string())?;
-            let logits = self
-                .model
-                .forward(&input, tokens.len() + step)
-                .and_then(|l| l.squeeze(0))
+        // ChatML's <|im_start|> markers are special tokens; the parser must
+        // be told to read them as such or they tokenize as punctuation soup.
+        let tokens = self
+            .model
+            .str_to_token(prompt, AddBos::Never)
+            .map_err(|e| e.to_string())?;
+
+        let mut batch = LlamaBatch::new(2048, 1);
+        let last = tokens.len() as i32 - 1;
+        for (i, token) in tokens.iter().enumerate() {
+            batch
+                .add(*token, i as i32, &[0], i as i32 == last)
                 .map_err(|e| e.to_string())?;
-            next = sampler.sample(&logits).map_err(|e| e.to_string())?;
-            // One sentence: a newline ends the turn whatever the model thinks.
-            if let Ok(so_far) = self.tokenizer.decode(&out, true)
-                && so_far.contains('\n')
-            {
+        }
+        ctx.decode(&mut batch).map_err(|e| e.to_string())?;
+
+        // Warm enough to differ between tellers, cool enough to obey.
+        let mut sampler = LlamaSampler::chain_simple([
+            LlamaSampler::top_p(0.9, 1),
+            LlamaSampler::temp(0.8),
+            LlamaSampler::dist(seed as u32),
+        ]);
+
+        let mut out = String::new();
+        let mut position = tokens.len() as i32;
+        for _ in 0..MAX_TOKENS {
+            let token = sampler.sample(&ctx, batch.n_tokens() - 1);
+            sampler.accept(token);
+            // The GGUF knows its own turn-enders; <|im_end|> is one of them.
+            if self.model.is_eog_token(token) {
                 break;
             }
+            let piece = self
+                .model
+                .token_to_str(token, Special::Tokenize)
+                .unwrap_or_default();
+            out.push_str(&piece);
+            // One sentence: a newline ends the turn whatever the model thinks.
+            if out.contains('\n') {
+                break;
+            }
+            batch.clear();
+            batch
+                .add(token, position, &[0], true)
+                .map_err(|e| e.to_string())?;
+            ctx.decode(&mut batch).map_err(|e| e.to_string())?;
+            position += 1;
         }
-        self.tokenizer.decode(&out, true).map_err(|e| e.to_string())
+        Ok(out)
     }
 }
 

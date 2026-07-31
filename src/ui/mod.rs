@@ -113,14 +113,13 @@ fn speak(
         // Speech wears the gold border everything divine-adjacent wears;
         // thoughts wear a soft blue and dimmer text — readable as "inner"
         // at a glance, with no punctuation dressing.
-        let border = if say.thought {
-            palette::shade(&palette::CLOTH_BLUE, 0.7).with_alpha(0.9)
-        } else if say.own_words {
-            // The teller's own words, marked while the feature is being
-            // judged: green is used nowhere else in the interface, so a
-            // glance at a crowded square tells you which lines were made
-            // and which were written.
+        let border = if say.own_words {
+            // Their OWN words wear green whether spoken or thought — the
+            // marker is about authorship, and a composed thought deserves
+            // the same flag as composed speech.
             palette::shade(&palette::GRASS, 0.85).with_alpha(0.95)
+        } else if say.thought {
+            palette::shade(&palette::CLOTH_BLUE, 0.7).with_alpha(0.9)
         } else {
             theme::panel_border()
         };
