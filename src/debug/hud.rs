@@ -443,7 +443,7 @@ pub(crate) fn update_dev_overlay(
         if *visibility == Visibility::Hidden {
             continue;
         }
-        let fresh = format!("fps {fps:.0} · {frame:.1}ms · worst {:.0}ms", *worst);
+        let fresh = format!("fps {fps:.0} / {frame:.1}ms / worst {:.0}ms", *worst);
         if text.0 != fresh {
             *text = Text::new(fresh);
         }
