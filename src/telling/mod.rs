@@ -1268,8 +1268,13 @@ pub fn speaks_only_of(line: &str, known: &[&str]) -> bool {
 /// Tidies an admissible line into the shape the bubbles expect.
 pub fn tidy(line: &str) -> String {
     let mut out = line.trim().trim_matches('"').trim().to_string();
-    // The bubbles run lower-case; a capital reads as a caption.
-    if let Some(first) = out.chars().next()
+    // The bubbles run lower-case; a capital reads as a caption. The pronoun
+    // I is the one exception — it is capital anywhere, including first, and
+    // "i wish I had someone" was the bug that proved it.
+    let leading_i =
+        out == "I" || out.starts_with("I ") || out.starts_with("I'") || out.starts_with("I,");
+    if !leading_i
+        && let Some(first) = out.chars().next()
         && first.is_uppercase()
     {
         out = first.to_lowercase().collect::<String>() + &out[first.len_utf8()..];
@@ -1320,6 +1325,15 @@ mod tests {
             "something lifted him clean off"
         );
         assert_eq!(tidy("  \"he just rose\"  "), "he just rose");
+        // The speaking I keeps its capital even at the head of the line.
+        assert_eq!(
+            tidy("I wish I had someone to come home to."),
+            "I wish I had someone to come home to"
+        );
+        assert_eq!(
+            tidy("I'll not walk that field again"),
+            "I'll not walk that field again"
+        );
         // A question or a cry keeps its mark.
         assert_eq!(tidy("was it the god?"), "was it the god?");
     }
