@@ -609,6 +609,15 @@ impl Plugin for TellingPlugin {
             .name("teller".into())
             .stack_size(8 * 1024 * 1024)
             .spawn(move || {
+                // Background QoS: llama.cpp's worker pool inherits the QoS of
+                // the thread that calls decode, so demoting THIS thread
+                // demotes every core the teller touches — the frame is always
+                // scheduled first, and the last trace of the pre-bubble hitch
+                // goes with it. A line arrives a beat later; nothing waits.
+                #[cfg(target_os = "macos")]
+                unsafe {
+                    libc::pthread_set_qos_class_self_np(libc::qos_class_t::QOS_CLASS_UTILITY, 0);
+                }
                 let mut voice = match Voice::load(&weights) {
                     Ok(voice) => voice,
                     Err(e) => {
@@ -794,10 +803,14 @@ impl Voice {
             .new_context(
                 &self.backend,
                 LlamaContextParams::default()
-                    .with_n_ctx(std::num::NonZeroU32::new(2048))
-                    // Polite parallelism: the game is running on these cores.
-                    .with_n_threads(6)
-                    .with_n_threads_batch(6),
+                    // Just enough for the prompt and one mouthful: a smaller
+                    // KV cache is a smaller allocation per line.
+                    .with_n_ctx(std::num::NonZeroU32::new(1280))
+                    // Polite parallelism: the game is running on these cores,
+                    // and three of them prefill a slim prompt in well under a
+                    // second anyway.
+                    .with_n_threads(3)
+                    .with_n_threads_batch(3),
             )
             .map_err(|e| e.to_string())?;
 
@@ -808,7 +821,7 @@ impl Voice {
             .str_to_token(prompt, AddBos::Never)
             .map_err(|e| e.to_string())?;
 
-        let mut batch = LlamaBatch::new(2048, 1);
+        let mut batch = LlamaBatch::new(1280, 1);
         let last = tokens.len() as i32 - 1;
         for (i, token) in tokens.iter().enumerate() {
             batch

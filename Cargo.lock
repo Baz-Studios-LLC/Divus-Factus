@@ -2597,6 +2597,7 @@ dependencies = [
  "bevy_ecs",
  "candle-core",
  "candle-transformers",
+ "libc",
  "llama-cpp-2",
  "serde",
  "serde_json",
