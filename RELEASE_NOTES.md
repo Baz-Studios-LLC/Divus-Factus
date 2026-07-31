@@ -1,15 +1,25 @@
-## The Codex
+## Divus Factus
 
-**One book to rule the panels** — every window in the game is now a page of THE CODEX: a single grand tome, opened with Tab, centred on the screen, with five icon tabs across its head. The scattered panels of old are gone — and so is the entire top toolbar. The screen belongs to the world; the book belongs to you.
+**A new name** — the game was called Egregore until now. A game called Egregor shipped on Steam in 2024, so the name had to go. Everything follows it: the window, the save folder, the bundle, the launcher entry. The word still appears in the design notes where it means the occult idea — a being sustained by collective belief — rather than the title.
 
-**THE LEDGER** — the village's whole account: souls, houses and believers on engraved plates, wellbeing and stores as gauges with a why-line under happiness, the day's activity in ruled rows, the faith roster behind its tab, the civic ladder and the trades on the DETAILS page — and the land's census at the foot: trees standing, wild things, and those at rest in the ground. The eye on the village's entry flies you home.
+**Your old villages will not be found.** Saves lived under the old name's folder and are not migrated. Sorry — this is the price of a rename, and better paid now than later.
 
-**THE PEOPLE** — the flagship dossier, rebound into the codex untouched: roster, carved-niche portrait, the eleven measures of a soul, kin, craft, and a life banded by day.
+## Two ways a village spreads
 
-**THE CHRONICLE** — reset as a reading room: ALL EVENTS and the four shelves as tabs, a rail of time filters with live counts (each year unfolds its seasons), importance as four coloured bells — majestic, important, noteworthy, common — season bands ruling the page, each happening with its hour, its glyph, the names of the living it speaks of, and a star for your bookmarks.
+**THE LONGHOUSE** — a house is a family's: four beds under one roof. Everyone else now has a longhouse, eight beds and none of them kin. A child who comes of age leaves the family house for it; a marriage moves the pair back out into a house of their own. Neither move is scripted anywhere — both fall out of the village asking, once a day, whether anyone is sleeping under the wrong roof. And strangers no longer bunk in with a family, not even at the founding.
 
-**THE DEITY** — the god's own mirror: the name your people gave, the epithet earned or counselled, all five miracles with their true costs and locks, how the congregation feels in four honest lines, your presence in the world — and FAITH OVER TIME, a daily record of total faith kept from this build on and saved with the world: the god's whole biography in one line. The god's room stands built and deliberately empty. For now.
+**COLONIES** — a town pressed for room and food, whose explorers have found somewhere better, will send a party out to found a town of its own. They walk there. It takes days, you can watch them go, and a god who objects has that long to intervene. On arrival they raise a banner, a fire, a woodpile and a name — and from that moment they are their own people, with their own stores, their own harvest and their own famine.
 
-**THE WORLD** — the page with a real map. Not an illustration: every pixel is sampled from the same terrain that builds the ground your people walk — heights hillshaded, biomes, rivers, the sea in depth-graded blues — painting itself a few rows at a time like a cartographer at work, zoomable to three radii. Your village is tagged with its name; every waystone cairn is a gold diamond; and beyond the ring of the known world the land is drawn as dark rumour until your explorers push it back. The map is your village's knowledge, made visible. Around it: the sky's full report, the season wheel turning with the year, honest trends, and the world's recent events stamped by day.
+**HOMESTEADS** — not every family wants a neighbour through the wall. Some houses are now raised out past the town's rings on their own ground, with a plot of field turned beside them. They are still the town's: they walk in to its square, eat from its stores, answer its famine watch. They simply live out.
 
-**A steadier hand** — the miracle bar, and the time controls now wear invisible aprons: the pointing hand holds its pose across their whole neighbourhood instead of flickering at the margins.
+## The people
+
+**FAMILY NAMES** — every villager carries a house name now, and it is a genuinely separate system from given names: each village's tongue reserves a sound that appears in no first name, so a surname can never be mistaken for one. A wife takes her husband's house at the wedding, and the house she was born into is remembered — which is what a family tree will need when it comes.
+
+**FEWER CHILDREN, LATER** — a couple's chance of another child falls with each they already have. Large families are still possible. They are simply remarkable now.
+
+## Fixes
+
+**Roofs now stand over their own walls** — two faults in the shared roof geometry, so both were wrong on every gabled building in the game: the ridge beam hung in the air above where the roof actually met, and the wider a building was the further its eaves sank below the wall top, letting walls poke up through their own roof. Shed roofs had the same class of fault, which studded every sawmill and storehouse with little tabs. All of it is derived from one pitch and one span now, so a fix cannot mend one roof and leave the rest.
+
+**Every town simulates fully** — the groundwork under the colonies. Stores, work, hearths, prayer, fields, burials and the famine watch all belong to a particular town now rather than to *the* town. Found along the way: children were being born as citizens of whichever town the camera happened to be on, one town's blacksmith was sharpening every town's tools, and every settlement would have buried its dead in the first one's graveyard.
