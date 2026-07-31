@@ -115,7 +115,9 @@ pub struct Conversing {
     pub until: f64,
     pub spoke_at: Option<f64>,
     pub replied: bool,
-    pub kind: Option<crate::witness::DivineEventKind>,
+    /// The whole memory, not just its kind: the telling needs who it
+    /// happened to, in the teller's own terms.
+    pub kind: Option<crate::witness::Memory>,
     /// What the other party is telling — so a listener who saw the same
     /// thing can answer as a fellow witness, not a doubter.
     pub hearing: Option<crate::witness::DivineEventKind>,
@@ -160,7 +162,7 @@ pub(crate) fn meet_to_talk(
         if paired.contains(&teller) {
             continue;
         }
-        let Some(&kind) = witnessed.recent.first() else {
+        let Some(memory) = witnessed.recent.first().cloned() else {
             continue;
         };
         if !matches!(*activity, Activity::Idle | Activity::Wandering) {
@@ -198,8 +200,8 @@ pub(crate) fn meet_to_talk(
                 until,
                 spoke_at: None,
                 replied: false,
-                kind: Some(kind),
                 hearing: None,
+                kind: Some(memory.clone()),
             },
             Activity::Chatting,
         ));
@@ -210,7 +212,7 @@ pub(crate) fn meet_to_talk(
                 spoke_at: None,
                 replied: false,
                 kind: None,
-                hearing: Some(kind),
+                hearing: Some(memory.kind),
             },
             Activity::Chatting,
         ));
@@ -288,9 +290,10 @@ pub(crate) fn hold_conversations(
         target.0 = None;
 
         // Met: the teller speaks once; the listener takes it in and replies.
-        if let Some(kind) = talk.kind
+        if let Some(memory) = talk.kind.clone()
             && talk.spoke_at.is_none()
         {
+            let kind = memory.kind;
             talk.spoke_at = Some(clock.elapsed);
             let teller_name = minds
                 .get(entity)
@@ -344,6 +347,7 @@ pub(crate) fn hold_conversations(
                         voice,
                         trust,
                         bearing,
+                        memory.whom.clone(),
                         nature.map_or(0.5, |t| t.boldness),
                         told_before,
                     ))
@@ -373,7 +377,7 @@ pub(crate) fn hold_conversations(
             if let Ok((listener_person, mut witnessed, chronicle, faith)) =
                 minds.get_mut(talk.partner)
             {
-                if !witnessed.recent.contains(&kind) {
+                if !witnessed.remembers(kind) {
                     witnessed.secondhand = witnessed.secondhand.saturating_add(1);
                     if let Some(mut chronicle) = chronicle {
                         chronicle.hear(clock.day(), &teller_name, &told);
@@ -397,7 +401,7 @@ pub(crate) fn hold_conversations(
             let saw_it_too = talk.hearing.is_some_and(|kind| {
                 minds
                     .get(entity)
-                    .is_ok_and(|(_, witnessed, _, _)| witnessed.recent.contains(&kind))
+                    .is_ok_and(|(_, witnessed, _, _)| witnessed.remembers(kind))
             });
             let reply = if saw_it_too {
                 *rng.0.pick(&[

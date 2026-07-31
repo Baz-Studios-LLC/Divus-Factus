@@ -29,7 +29,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
@@ -41,7 +41,7 @@ use tokenizers::Tokenizer;
 
 use crate::villager::traits::Bearing;
 use crate::villager::work::Vocation;
-use crate::witness::DivineEventKind;
+use crate::witness::{DivineEventKind, Whom};
 
 /// How many requests may be outstanding at once.
 ///
@@ -151,7 +151,7 @@ impl FaithBand {
 /// what makes the whole thing affordable. A village of twenty produces a few
 /// dozen shapes over a long session, not thousands of requests — while the
 /// lines still differ by who is speaking and how they came by the story.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct TellingKey {
     pub kind: DivineEventKind,
     pub hand: Hand,
@@ -162,6 +162,12 @@ pub struct TellingKey {
     /// on one would hand a gloomy villager a line composed for a cheerful
     /// one, which is worse than handing them a generic line.
     pub bearing: Bearing,
+    /// Who it happened to, in the teller's own terms. In the key for the same
+    /// reason the manner is: a line composed about "Feitreh, your brother" put
+    /// in the mouth of someone he is nothing to would be the model telling the
+    /// player something false about the world. The key holding a name is what
+    /// stops a cached specific from ever crossing to the wrong teller.
+    pub whom: Option<Whom>,
 }
 
 /// One villager's telling of one act, as fields rather than prose.
@@ -175,12 +181,14 @@ pub struct Retelling {
 }
 
 impl Retelling {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         kind: DivineEventKind,
         hand: Hand,
         voice: Option<Vocation>,
         trust: f32,
         bearing: Bearing,
+        whom: Option<Whom>,
         boldness: f32,
         told: u32,
     ) -> Retelling {
@@ -191,6 +199,7 @@ impl Retelling {
                 voice,
                 faith: FaithBand::of(trust),
                 bearing,
+                whom,
             },
             boldness,
             told,
@@ -267,7 +276,7 @@ impl Tongue {
             return;
         }
         // One outstanding request per shape at a time.
-        if !self.asked.insert(of.key) {
+        if !self.asked.insert(of.key.clone()) {
             return;
         }
         self.inflight.fetch_add(1, Ordering::Relaxed);
@@ -284,11 +293,8 @@ impl Tongue {
             return;
         };
         let mut arrived: Vec<(TellingKey, Option<String>)> = Vec::new();
-        loop {
-            match heard.try_recv() {
-                Ok(answer) => arrived.push(answer),
-                Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => break,
-            }
+        while let Ok(answer) = heard.try_recv() {
+            arrived.push(answer);
         }
         drop(heard);
         for (key, line) in arrived {
@@ -504,6 +510,15 @@ impl Voice {
         if !admissible(line) {
             return None;
         }
+        // The truth gate: the only name this telling may drop is the one the
+        // simulation put in it. A line that reaches for any other has invented
+        // someone, and an invented person on screen poisons the premise that
+        // the village is real — including the shots' own example name, if the
+        // model parrots it back for the wrong subject.
+        let known: Vec<&str> = of.key.whom.iter().map(|w| w.name.as_str()).collect();
+        if !speaks_only_of(line, &known) {
+            return None;
+        }
         let line = tidy(line);
         // Shown the written lines as examples, a small model will sometimes
         // hand one straight back. Treated as a miss: a line already in the
@@ -587,6 +602,12 @@ fn describe(of: &Retelling) -> String {
         format!("how you know: {}", of.key.hand.word()),
         format!("your belief: {}", of.key.faith.word()),
     ];
+    // The one specific in the telling: who it befell, by name and by what
+    // they are to the teller. This is what turns "saw someone hurled across
+    // the ground" into a story about Feitreh, your brother.
+    if let Some(whom) = &of.key.whom {
+        lines.push(format!("who it happened to: {}", whom.phrase()));
+    }
     if let Some(voice) = of.key.voice {
         lines.push(format!("your trade: {}", voice.describe()));
     }
@@ -625,14 +646,14 @@ fn shots() -> Vec<(Retelling, String)> {
                    which: usize| {
         let said = kind.rumors()[which % kind.rumors().len()].to_string();
         (
-            Retelling::new(kind, hand, Some(voice), trust, bearing, 0.5, 0),
+            Retelling::new(kind, hand, Some(voice), trust, bearing, None, 0.5, 0),
             said,
         )
     };
     // Three examples, three different manners — including one Plain, so the
     // model sees that the manner line is sometimes simply absent rather than
     // learning to expect it and inventing one when it is missing.
-    vec![
+    let mut shots = vec![
         example(
             DivineEventKind::Lifted,
             Hand::Witnessed,
@@ -657,7 +678,32 @@ fn shots() -> Vec<(Retelling, String)> {
             Bearing::Bleak,
             2,
         ),
-    ]
+    ];
+    // One example that NAMES its subject, with an answer written for it —
+    // the only shot not drawn from the rumour corpus, because the corpus
+    // predates subjects and never names one. Without this, a model handed
+    // "who it happened to: Feitreh, your brother" treats the name as one
+    // more field to ignore; shown once how a teller uses it, it uses it.
+    // The example name is made up, which is safe on both sides: it appears
+    // in the prompt (never checked), and if the model parrots it back for a
+    // different subject, the truth gate refuses the line.
+    shots.push((
+        Retelling::new(
+            DivineEventKind::Thrown,
+            Hand::Witnessed,
+            Some(Vocation::Farmer),
+            0.6,
+            Bearing::Plain,
+            Some(Whom {
+                name: "Sathei".into(),
+                tie: "your neighbour".into(),
+            }),
+            0.5,
+            0,
+        ),
+        "it flung Sathei across the square like a sack of grain".into(),
+    ));
+    shots
 }
 
 /// Qwen speaks ChatML. Getting this wrong is the difference between a
@@ -699,6 +745,43 @@ pub fn admissible(line: &str) -> bool {
     let lower = trimmed.to_ascii_lowercase();
     if ANACHRONISMS.iter().any(|bad| lower.contains(bad)) {
         return false;
+    }
+    true
+}
+
+/// Whether a line speaks only of people the teller actually knows of.
+///
+/// The truth gate. A model asked about "Feitreh, your neighbour" will now and
+/// then reach for a name of its own — a cousin Marcus, a village elder nobody
+/// has ever heard of — and a single invented person on screen poisons the
+/// whole premise that the village is real. So the rule is structural rather
+/// than hopeful: every capitalised word in the line must be a name the
+/// simulation gave it. Anything else is a miss, exactly as if no model had
+/// answered.
+///
+/// There is deliberately NO exemption for the first word. The whole register —
+/// every written rumour, every worked example — runs lowercase, so the model
+/// imitating its examples starts lowercase too, and a line that opens with a
+/// capital is already drifting. Exempting it as sentence case would be the one
+/// door left open ("Marcus saw it too" walks straight through), and the cost
+/// of keeping it shut is only that an occasional honestly-capitalised line
+/// falls back to a written one. The speaking I, which is legitimately capital
+/// anywhere, is the sole exception.
+pub fn speaks_only_of(line: &str, known: &[&str]) -> bool {
+    for word in line.split_whitespace() {
+        let word = word.trim_matches(|c: char| !c.is_alphanumeric());
+        let Some(first) = word.chars().next() else {
+            continue;
+        };
+        if !first.is_uppercase() {
+            continue;
+        }
+        if word == "I" || word.starts_with("I'") {
+            continue;
+        }
+        if !known.contains(&word) {
+            return false;
+        }
     }
     true
 }
@@ -803,6 +886,7 @@ mod tests {
             Some(Vocation::Fisher),
             0.8,
             Bearing::Plain,
+            None,
             0.4,
             0,
         );
@@ -812,6 +896,7 @@ mod tests {
             Some(Vocation::Fisher),
             0.95,
             Bearing::Plain,
+            None,
             0.9,
             7,
         );
@@ -825,6 +910,7 @@ mod tests {
             Some(Vocation::Fisher),
             0.8,
             Bearing::Plain,
+            None,
             0.4,
             0,
         );
@@ -840,10 +926,81 @@ mod tests {
             Some(Vocation::Fisher),
             0.8,
             Bearing::Bleak,
+            None,
             0.4,
             0,
         );
         assert_ne!(a.key, gloomy.key, "the manner must divide the cache");
+    }
+
+    #[test]
+    fn no_invented_name_survives_the_truth_gate() {
+        // The gate that makes invention structurally impossible rather than
+        // unlikely: every capitalised word must be a name the simulation gave.
+        let known = ["Feitreh"];
+        // The subject may be named; nobody else may.
+        assert!(speaks_only_of("they took Feitreh right up", &known));
+        assert!(!speaks_only_of("Marcus saw it too, ask him", &known));
+        assert!(!speaks_only_of(
+            "the elder Tobias warned us of this",
+            &known
+        ));
+        // With no subject, no name at all may appear — including the few-shot
+        // example's own, parroted back for the wrong telling.
+        assert!(!speaks_only_of(
+            "it flung Sathei across the square like a sack of grain",
+            &[]
+        ));
+        // No sentence-case exemption, even at the head of the line — that
+        // door is exactly where an invented name walks through. The village's
+        // register is lowercase, so an honest line rarely pays this, and one
+        // that does only falls back to a written phrasing.
+        assert!(!speaks_only_of("The sky split open, I swear it", &[]));
+        assert!(speaks_only_of("the sky split open, I swear it", &[]));
+        // The speaking I is the one legitimate capital.
+        assert!(speaks_only_of("I'll not walk that field again", &[]));
+        assert!(speaks_only_of("I saw it, I did", &[]));
+        // Punctuation does not smuggle a name past the gate.
+        assert!(!speaks_only_of("it was Marcus, I tell you", &known));
+        // But the same known name wrapped in punctuation still passes.
+        assert!(speaks_only_of("poor Feitreh, poor soul", &known));
+    }
+
+    #[test]
+    fn the_subject_reaches_the_prompt_and_divides_the_cache() {
+        let with = |whom: Option<Whom>| {
+            Retelling::new(
+                DivineEventKind::Thrown,
+                Hand::Witnessed,
+                Some(Vocation::Fisher),
+                0.8,
+                Bearing::Plain,
+                whom,
+                0.4,
+                0,
+            )
+        };
+        let brother = with(Some(Whom {
+            name: "Feitreh".into(),
+            tie: "your brother".into(),
+        }));
+        assert!(
+            describe(&brother).contains("who it happened to: Feitreh, your brother"),
+            "the prompt must carry the subject: {}",
+            describe(&brother),
+        );
+        // No subject, no line — not a line saying there is no subject.
+        assert!(!describe(&with(None)).contains("who it happened to"));
+
+        // The same act befalling a stranger is a different telling. Without
+        // this split, a line composed about a brother would be served to
+        // someone he is nothing to.
+        let stranger = with(Some(Whom {
+            name: "Feitreh".into(),
+            tie: "your neighbour".into(),
+        }));
+        assert_ne!(brother.key, stranger.key);
+        assert_ne!(brother.key, with(None).key);
     }
 
     #[test]
@@ -855,6 +1012,7 @@ mod tests {
                 Some(Vocation::Fisher),
                 0.8,
                 bearing,
+                None,
                 0.4,
                 0,
             ))
@@ -900,6 +1058,7 @@ mod tests {
             Some(Vocation::Mason),
             0.1,
             Bearing::Plain,
+            None,
             0.2,
             0,
         );
@@ -924,6 +1083,7 @@ mod tests {
             Some(Vocation::Fisher),
             0.9,
             Bearing::Plain,
+            None,
             0.5,
             0,
         )));

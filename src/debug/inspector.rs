@@ -444,7 +444,14 @@ pub(crate) fn update_inspector(
                     .recent
                     .iter()
                     .take(4)
-                    .map(|kind| format!("- {}", kind.describe()))
+                    .map(|memory| match &memory.whom {
+                        // The memory knows who it befell: "saw someone hurled
+                        // across the ground — Feitreh, your neighbour".
+                        Some(whom) => {
+                            format!("- {} — {}", memory.kind.describe(), whom.phrase())
+                        }
+                        None => format!("- {}", memory.kind.describe()),
+                    })
                     .collect::<Vec<_>>()
                     .join("\n")
             };

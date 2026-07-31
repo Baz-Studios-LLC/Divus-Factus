@@ -17,6 +17,7 @@ pub mod traits;
 pub mod work;
 
 mod gossip;
+pub mod kin;
 pub(crate) use gossip::*;
 
 use bevy::prelude::*;
@@ -2346,7 +2347,10 @@ mod tests {
             MoveTarget::default(),
             Person::born("Bob".into(), "Teller".into()),
             crate::witness::Witnessed {
-                recent: vec![crate::witness::DivineEventKind::Thrown],
+                recent: vec![crate::witness::Memory {
+                    kind: crate::witness::DivineEventKind::Thrown,
+                    whom: None,
+                }],
                 total: 1,
                 secondhand: 0,
                 told: 0,
@@ -2408,7 +2412,10 @@ mod tests {
             MoveTarget::default(),
             Person::born("Bob".into(), "Teller".into()),
             crate::witness::Witnessed {
-                recent: vec![crate::witness::DivineEventKind::Thrown],
+                recent: vec![crate::witness::Memory {
+                    kind: crate::witness::DivineEventKind::Thrown,
+                    whom: None,
+                }],
                 total: 1,
                 secondhand: 0,
                 told: 0,
@@ -2475,7 +2482,10 @@ mod tests {
                     Person::born(name.into(), "Teller".into()),
                     crate::witness::Witnessed {
                         recent: if saw {
-                            vec![crate::witness::DivineEventKind::Thrown]
+                            vec![crate::witness::Memory {
+                                kind: crate::witness::DivineEventKind::Thrown,
+                                whom: None,
+                            }]
                         } else {
                             vec![]
                         },

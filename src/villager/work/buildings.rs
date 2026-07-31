@@ -2112,7 +2112,7 @@ pub(crate) fn sermons(
                 && at.translation.distance(shrine) < 6.0
                 && !witnessed.recent.is_empty()
         })
-        .map(|(preacher, _, witnessed, _, _, _, _)| (preacher, witnessed.recent[0]))
+        .map(|(preacher, _, witnessed, _, _, _, _)| (preacher, witnessed.recent[0].kind))
     else {
         return;
     };

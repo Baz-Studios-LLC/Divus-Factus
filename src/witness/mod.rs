@@ -31,7 +31,48 @@ impl Plugin for WitnessPlugin {
                 .chain()
                 .in_set(WitnessSet),
         );
+        // Capture tooling: only the player's hand ever sets a subject on an
+        // event, so an unattended soak can never exercise the "it happened to
+        // Feitreh, your brother" path without this.
+        if std::env::var("DIVUS_FACTUS_THROW_TEST").is_ok() {
+            app.add_systems(Update, throw_test_harness);
+        }
     }
+}
+
+/// Hurls one villager before the whole village, periodically, as the hand
+/// would. Only registered under DIVUS_FACTUS_THROW_TEST.
+///
+/// The event is written with a subject but nobody actually moves: what is
+/// being tested is the witnessing — the memory with a name and a tie in it,
+/// the conversations that retell it, and the truth gate over the words.
+fn throw_test_harness(
+    time: Res<Time>,
+    mut waited: Local<f32>,
+    mut events: MessageWriter<DivineEvent>,
+    villagers: Query<(Entity, &Transform), With<Villager>>,
+) {
+    *waited += time.delta_secs();
+    if *waited < 20.0 {
+        return;
+    }
+    *waited = 0.0;
+    // A different victim each round, so different ties get exercised.
+    let count = villagers.iter().count();
+    if count == 0 {
+        return;
+    }
+    let pick = (time.elapsed_secs() as usize) % count;
+    let Some((victim, at)) = villagers.iter().nth(pick) else {
+        return;
+    };
+    info!("throw test: a villager is hurled before the village");
+    events.write(DivineEvent {
+        kind: DivineEventKind::Thrown,
+        position: at.translation,
+        subject: Some(victim),
+        intensity: 1.0,
+    });
 }
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
@@ -244,6 +285,62 @@ impl ReactionKind {
     }
 }
 
+/// Who a memory is about, as the witness themself would say it.
+///
+/// A name and a tie rather than an [`Entity`], for two reasons that point the
+/// same way. Saves: entities are remapped on load, and a memory that pointed
+/// at one would dangle; the words survive as words. And truth: the tie is
+/// computed at the moment of seeing, from the witness's own threads — the same
+/// act is "your brother struck" to one onlooker and "a neighbour struck" to
+/// the one beside them, and that difference belongs IN the memory.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Whom {
+    /// Their given name — the part a truth-checked retelling is allowed to say.
+    pub name: String,
+    /// What they are to the witness: "your brother", "your neighbour".
+    pub tie: String,
+}
+
+impl Whom {
+    /// The phrase a prompt or a chronicle wants: "Feitreh, your brother".
+    pub fn phrase(&self) -> String {
+        format!("{}, {}", self.name, self.tie)
+    }
+}
+
+/// One thing a villager saw the god do: what it was, and to whom.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(from = "MemoryOnDisk")]
+pub struct Memory {
+    pub kind: DivineEventKind,
+    /// Who it happened to, if it happened to anyone the witness could name.
+    #[serde(default)]
+    pub whom: Option<Whom>,
+}
+
+/// A memory as older saves wrote it: the bare kind, no subject. Deserializing
+/// through this keeps every pre-subject save loadable — the untagged try-order
+/// reads the new object shape first and falls back to the bare string.
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum MemoryOnDisk {
+    Whole {
+        kind: DivineEventKind,
+        #[serde(default)]
+        whom: Option<Whom>,
+    },
+    Bare(DivineEventKind),
+}
+
+impl From<MemoryOnDisk> for Memory {
+    fn from(disk: MemoryOnDisk) -> Memory {
+        match disk {
+            MemoryOnDisk::Whole { kind, whom } => Memory { kind, whom },
+            MemoryOnDisk::Bare(kind) => Memory { kind, whom: None },
+        }
+    }
+}
+
 /// What a villager has seen the god do.
 ///
 /// Capped and counted rather than kept whole. The complete record is what `history`
@@ -251,7 +348,7 @@ impl ReactionKind {
 #[derive(Component, Default, Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct Witnessed {
     /// Most recent first.
-    pub recent: Vec<DivineEventKind>,
+    pub recent: Vec<Memory>,
     /// Everything they have ever seen, including what has fallen out of `recent`.
     pub total: u32,
     /// Stories heard from others, never seen with their own eyes.
@@ -266,12 +363,17 @@ impl Witnessed {
     /// How many memories a villager keeps.
     pub const CAPACITY: usize = 8;
 
-    fn record(&mut self, kind: DivineEventKind) {
-        self.recent.insert(0, kind);
+    fn record(&mut self, kind: DivineEventKind, whom: Option<Whom>) {
+        self.recent.insert(0, Memory { kind, whom });
         self.recent.truncate(Self::CAPACITY);
         self.total = self.total.saturating_add(1);
         // A fresh sight rekindles the urge to tell it.
         self.told = 0;
+    }
+
+    /// Whether they carry a memory of this kind of act, whoever it befell.
+    pub fn remembers(&self, kind: DivineEventKind) -> bool {
+        self.recent.iter().any(|memory| memory.kind == kind)
     }
 
     /// Whether this person has ever seen anything at all.
@@ -310,9 +412,41 @@ fn perceive_events(
         ),
         (With<Villager>, Without<Held>),
     >,
+    // The threads that name a subject: read-only, and none of them appear
+    // mutably in the query above, so the two coexist.
+    threads: Query<(
+        Option<&crate::villager::Person>,
+        Option<&crate::villager::Spouse>,
+        Option<&crate::villager::Parentage>,
+        Option<&crate::creature::genome::CreatureGenome>,
+    )>,
 ) {
+    // Gathers what one entity's threads are, for the kinship question.
+    let threads_of = |entity: Entity| -> crate::villager::kin::Threads<'_> {
+        let Ok((person, spouse, parents, genome)) = threads.get(entity) else {
+            return crate::villager::kin::Threads::default();
+        };
+        crate::villager::kin::Threads {
+            sex: genome.map(|g| g.sex),
+            spouse: spouse.map(|s| s.0),
+            parents: parents.map(|p| (p.mother, p.father)),
+            house: person.map(|p| p.surname.as_str()),
+            born_house: person.map(|p| p.born_surname.as_str()),
+        }
+    };
+
     for event in events.read() {
         let carry = event.kind.carry() * (0.6 + event.intensity * 0.6);
+
+        // The subject's name, if they have one — a wolf thrown across a field
+        // is remembered, but not by name. Resolved once per event; only the
+        // TIE differs per witness.
+        let subject_name = event.subject.and_then(|subject| {
+            threads
+                .get(subject)
+                .ok()
+                .and_then(|(person, ..)| person.map(|p| p.name.clone()))
+        });
 
         for (entity, transform, temperament, mut witnessed, mut motion) in &mut villagers {
             // The subject of an act is not a witness to it. They are the one it
@@ -329,7 +463,26 @@ fn perceive_events(
             let closeness = 1.0 - (distance / carry).clamp(0.0, 1.0);
             let kind = choose_reaction(event.kind, temperament.boldness, closeness);
 
-            witnessed.record(event.kind);
+            // Who it happened to, as THIS witness holds it: the same act is
+            // "your brother struck" to one onlooker and "a neighbour struck"
+            // to the one beside them. Computed here, at the moment of seeing,
+            // because this is the last place the subject is an entity — in
+            // the memory they are a name and a tie.
+            let whom = match (&subject_name, event.subject) {
+                (Some(name), Some(subject)) => Some(Whom {
+                    name: name.clone(),
+                    tie: crate::villager::kin::tie(
+                        entity,
+                        threads_of(entity),
+                        subject,
+                        threads_of(subject),
+                    )
+                    .word()
+                    .to_string(),
+                }),
+                _ => None,
+            };
+            witnessed.record(event.kind, whom);
 
             // A visible start, so it reads as a reaction rather than a decision.
             motion.flail = motion.flail.max(match kind {
@@ -508,7 +661,7 @@ mod tests {
         let mut w = Witnessed::default();
         assert!(w.is_innocent());
         for _ in 0..50 {
-            w.record(DivineEventKind::Lifted);
+            w.record(DivineEventKind::Lifted, None);
         }
         assert_eq!(w.recent.len(), Witnessed::CAPACITY);
         assert_eq!(w.total, 50);
@@ -518,9 +671,45 @@ mod tests {
     #[test]
     fn the_newest_memory_comes_first() {
         let mut w = Witnessed::default();
-        w.record(DivineEventKind::Lifted);
-        w.record(DivineEventKind::Thrown);
-        assert_eq!(w.recent[0], DivineEventKind::Thrown);
+        w.record(DivineEventKind::Lifted, None);
+        w.record(
+            DivineEventKind::Thrown,
+            Some(Whom {
+                name: "Feitreh".into(),
+                tie: "your neighbour".into(),
+            }),
+        );
+        assert_eq!(w.recent[0].kind, DivineEventKind::Thrown);
+        assert_eq!(
+            w.recent[0].whom.as_ref().map(|w| w.phrase()).as_deref(),
+            Some("Feitreh, your neighbour"),
+            "a memory keeps who it happened to",
+        );
+    }
+
+    #[test]
+    fn memories_from_before_subjects_still_load() {
+        // A save written when `recent` was a bare list of kinds must come
+        // back as memories with no subject — the rename price was paid once,
+        // and save compatibility is not broken twice for one feature.
+        let old = r#"{"recent":["Smote","Lifted"],"total":2,"secondhand":1}"#;
+        let loaded: Witnessed = serde_json::from_str(old).expect("an old memory must load");
+        assert_eq!(loaded.recent.len(), 2);
+        assert_eq!(loaded.recent[0].kind, DivineEventKind::Smote);
+        assert_eq!(loaded.recent[0].whom, None);
+
+        // And what is written now reads back whole.
+        let mut fresh = Witnessed::default();
+        fresh.record(
+            DivineEventKind::Thrown,
+            Some(Whom {
+                name: "Feitreh".into(),
+                tie: "your brother".into(),
+            }),
+        );
+        let round: Witnessed =
+            serde_json::from_str(&serde_json::to_string(&fresh).unwrap()).unwrap();
+        assert_eq!(round.recent, fresh.recent);
     }
 
     #[test]

@@ -1145,7 +1145,10 @@ pub(crate) fn update_person_detail(
             .recent
             .iter()
             .take(3)
-            .map(|kind| format!("- {}", kind.describe()))
+            .map(|memory| match &memory.whom {
+                Some(whom) => format!("- {} — {}", memory.kind.describe(), whom.phrase()),
+                None => format!("- {}", memory.kind.describe()),
+            })
             .collect::<Vec<_>>()
             .join("\n"),
         _ => "nothing they could not explain".to_string(),
