@@ -266,6 +266,8 @@ impl Retelling {
 enum Ask {
     Retell(Retelling),
     Muse(Box<Musing>),
+    /// Put down one voice and take up another, mid-session.
+    Switch(std::path::PathBuf, std::path::PathBuf),
 }
 
 /// What comes back, keyed the way it was asked.
@@ -274,6 +276,9 @@ enum Answer {
     /// The bool says whether it was a reply, so an answer composed for a
     /// conversation is never shown as a stray idle thought.
     Mused(Entity, bool, Option<String>),
+    /// The switch happened (the new voice's name), or it did not (None) and
+    /// the old voice carries on.
+    Switched(Option<String>),
 }
 
 #[derive(Resource)]
@@ -297,6 +302,8 @@ pub struct Tongue {
     /// Failed asks so far, and whether the teller has already given up.
     misses: u32,
     quiet: bool,
+    /// The file the voice was loaded from, as shown in the settings page.
+    current: String,
 }
 
 impl Tongue {
@@ -391,6 +398,40 @@ impl Tongue {
         self.mused.keys().copied().collect()
     }
 
+    /// The model the teller speaks with, by file name.
+    pub fn speaking_with(&mut self) -> String {
+        self.collect();
+        self.current.clone()
+    }
+
+    /// Puts down the current voice and takes up the given weights.
+    ///
+    /// The swap happens on the worker thread — the loading seconds never
+    /// touch a frame — and the choice is written down so the same voice
+    /// answers on the next launch. Every cached line is dropped: they were
+    /// the OLD voice's words, and serving them from the new one would make
+    /// the switch look like it did nothing.
+    pub fn switch_to(&mut self, weights: std::path::PathBuf) {
+        let Some(tokenizer) = tokenizer_for(&weights) else {
+            return;
+        };
+        if let (Some(dir), Some(name)) = (model_dir(), weights.file_name()) {
+            let _ = std::fs::write(dir.join("chosen"), name.to_string_lossy().as_bytes());
+        }
+        self.ready.clear();
+        self.asked.clear();
+        self.mused.clear();
+        self.replies.clear();
+        self.musing.clear();
+        self.quiet = false;
+        self.misses = 0;
+        self.current = format!(
+            "{} (loading)",
+            weights.file_name().unwrap_or_default().to_string_lossy()
+        );
+        let _ = self.ask.send(Ask::Switch(weights, tokenizer));
+    }
+
     /// Takes in whatever the thread has finished.
     fn collect(&mut self) {
         // A `Receiver` is `Send` but not `Sync`, and a Bevy resource must be
@@ -418,6 +459,15 @@ impl Tongue {
                     } else {
                         None
                     }
+                }
+                Answer::Switched(name) => {
+                    if let Some(name) = name {
+                        info!("the teller now speaks with {name}");
+                        self.current = name;
+                    } else {
+                        self.current = self.current.replace(" (loading)", " (failed)");
+                    }
+                    continue;
                 }
                 Answer::Mused(who, reply, line) => {
                     self.musing.remove(&(who, reply));
@@ -482,9 +532,28 @@ pub fn model_dir() -> Option<std::path::PathBuf> {
 /// reasoning that nobody puts one there by accident. That is the whole of the
 /// "bring your own bigger model" feature, and it costs nothing.
 fn find_model() -> Option<(std::path::PathBuf, std::path::PathBuf)> {
+    // A remembered choice outranks size: the settings page writes one when
+    // the player switches, and it must survive a restart or the switch was
+    // a lie. A choice whose file has since been deleted falls through.
     let dir = model_dir()?;
+    let chosen = std::fs::read_to_string(dir.join("chosen"))
+        .ok()
+        .map(|name| dir.join(name.trim()))
+        .filter(|path| path.is_file());
+    let model = chosen.or_else(|| list_models().into_iter().next())?;
+    let tokenizer = tokenizer_for(&model)?;
+    Some((model, tokenizer))
+}
+
+/// Every model on disk, largest first — the order the settings page shows.
+pub fn list_models() -> Vec<std::path::PathBuf> {
+    let Some(dir) = model_dir() else {
+        return Vec::new();
+    };
     let mut weights: Vec<(u64, std::path::PathBuf)> = std::fs::read_dir(&dir)
-        .ok()?
+        .ok()
+        .into_iter()
+        .flatten()
         .filter_map(|entry| {
             let path = entry.ok()?.path();
             if path.extension().is_some_and(|e| e == "gguf") {
@@ -496,24 +565,25 @@ fn find_model() -> Option<(std::path::PathBuf, std::path::PathBuf)> {
         })
         .collect();
     weights.sort_by_key(|(size, _)| std::cmp::Reverse(*size));
-    let (_, model) = weights.into_iter().next()?;
+    weights.into_iter().map(|(_, path)| path).collect()
+}
 
-    // A tokenizer named for this model, or the only one in the folder.
+/// A tokenizer named for this model, or the only one in the folder.
+fn tokenizer_for(model: &std::path::Path) -> Option<std::path::PathBuf> {
+    let dir = model.parent()?;
     let stem = model.file_stem()?.to_string_lossy().to_string();
     let paired = dir.join(format!("{stem}-tokenizer.json"));
-    let tokenizer = if paired.exists() {
-        paired
-    } else {
-        std::fs::read_dir(&dir)
-            .ok()?
-            .filter_map(|entry| {
-                let path = entry.ok()?.path();
-                let name = path.file_name()?.to_string_lossy().to_string();
-                name.ends_with("tokenizer.json").then_some(path)
-            })
-            .next()?
-    };
-    Some((model, tokenizer))
+    if paired.exists() {
+        return Some(paired);
+    }
+    std::fs::read_dir(dir)
+        .ok()?
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            let name = path.file_name()?.to_string_lossy().to_string();
+            name.ends_with("tokenizer.json").then_some(path)
+        })
+        .next()
 }
 
 /// Installs the teller. Silent and free when there are no weights to read.
@@ -531,10 +601,12 @@ impl Plugin for TellingPlugin {
             // nothing about the game is worse than it was.
             return;
         };
-        info!(
-            "the teller found {}",
-            weights.file_name().unwrap_or_default().to_string_lossy()
-        );
+        let weights_name = weights
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        info!("the teller found {weights_name}");
 
         let (ask, requests) = channel::<Ask>();
         let (answers, heard) = channel::<Answer>();
@@ -545,6 +617,7 @@ impl Plugin for TellingPlugin {
         let refuse = |ask: Ask| match ask {
             Ask::Retell(of) => Answer::Told(of.key, None),
             Ask::Muse(of) => Answer::Mused(of.who, of.is_reply(), None),
+            Ask::Switch(..) => Answer::Switched(None),
         };
 
         // One plain thread owning the model. No async runtime: this is a queue
@@ -575,14 +648,34 @@ impl Plugin for TellingPlugin {
                     let answer = match asked {
                         Ask::Retell(of) => {
                             let line = voice.retell(&of);
+                            worker_inflight.fetch_sub(1, Ordering::Relaxed);
                             Answer::Told(of.key, line)
                         }
                         Ask::Muse(of) => {
                             let line = voice.muse(&of);
+                            worker_inflight.fetch_sub(1, Ordering::Relaxed);
                             Answer::Mused(of.who, of.is_reply(), line)
                         }
+                        // Not counted against inflight: a switch is not a line.
+                        Ask::Switch(weights, tokenizer) => {
+                            match Voice::load(&weights, &tokenizer) {
+                                Ok(fresh) => {
+                                    voice = fresh;
+                                    Answer::Switched(Some(
+                                        weights
+                                            .file_name()
+                                            .unwrap_or_default()
+                                            .to_string_lossy()
+                                            .to_string(),
+                                    ))
+                                }
+                                Err(e) => {
+                                    warn!("the teller could not take up {weights:?}: {e}");
+                                    Answer::Switched(None)
+                                }
+                            }
+                        }
                     };
-                    worker_inflight.fetch_sub(1, Ordering::Relaxed);
                     if answers.send(answer).is_err() {
                         break;
                     }
@@ -602,6 +695,7 @@ impl Plugin for TellingPlugin {
             heard: Mutex::new(heard),
             misses: 0,
             quiet: false,
+            current: weights_name,
         });
     }
 }
