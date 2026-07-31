@@ -107,7 +107,7 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
         (HudValue::Focus, "focus", "F4/F5"),
         (HudValue::Visibility, "visibility", "F6/F7"),
         (HudValue::Exposure, "exposure", "F8/F9"),
-        (HudValue::Saturation, "saturation", "`/F11"),
+        (HudValue::Saturation, "saturation", "F12/F11"),
         (HudValue::DepthOfField, "depth of field", "F10"),
     ];
     for (value, label, hint) in look_rows {
@@ -258,7 +258,10 @@ pub(crate) fn handle_tuning_input(
     if keys.just_pressed(KeyCode::F11) {
         changed |= nudge(&mut look.saturation, 0.05, 0.0, 3.0);
     }
-    if keys.just_pressed(KeyCode::Backquote) {
+    // F12 down, F11 up. This WAS the backquote, until the backquote became
+    // the dev overlay's toggle and every press quietly drained the world's
+    // colour on the way.
+    if keys.just_pressed(KeyCode::F12) {
         changed |= nudge(&mut look.saturation, -0.05, 0.0, 3.0);
     }
 
@@ -404,6 +407,33 @@ pub(crate) fn update_hud(
         };
         // Only touch the text when it actually changed; rewriting every value
         // every frame re-runs text layout for the whole panel.
+        if text.0 != fresh {
+            *text = Text::new(fresh);
+        }
+    }
+}
+
+/// Keeps the overlay's readout live even while the F1 panel sleeps.
+pub(crate) fn update_dev_overlay(
+    time: Res<Time<Real>>,
+    mut since_last: Local<f32>,
+    diagnostics: Res<DiagnosticsStore>,
+    mut overlay: Query<(&mut Text, &Visibility), With<DevOverlay>>,
+) {
+    *since_last += time.delta_secs();
+    if *since_last < 0.25 {
+        return;
+    }
+    *since_last = 0.0;
+    let fps = diagnostics
+        .get(&FrameTimeDiagnosticsPlugin::FPS)
+        .and_then(|d| d.smoothed())
+        .unwrap_or(0.0);
+    for (mut text, visibility) in &mut overlay {
+        if *visibility == Visibility::Hidden {
+            continue;
+        }
+        let fresh = format!("fps {fps:.0}");
         if text.0 != fresh {
             *text = Text::new(fresh);
         }

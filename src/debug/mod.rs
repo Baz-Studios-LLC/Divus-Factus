@@ -66,6 +66,7 @@ impl Plugin for DebugPlugin {
                 (
                     handle_tuning_input,
                     toggle_dev_overlay,
+                    update_dev_overlay,
                     handle_toolbar,
                     update_hud,
                     update_world_panel,
