@@ -233,6 +233,8 @@ pub(crate) fn hold_conversations(
     // about it, what goes in their chronicle — happens whether or not anyone
     // is watching, because that is the simulation and not its presentation.
     attention: Option<Res<crate::attention::Attention>>,
+    now: Option<Res<crate::now::WorldNow>>,
+    members: Query<&MemberOf>,
     mut pairs: Query<
         (
             Entity,
@@ -362,7 +364,64 @@ pub(crate) fn hold_conversations(
             // the simulation's draw from the shared stream does not depend on
             // whether a model happened to answer in time.
             let written = (*rng.0.pick(kind.rumors())).to_string();
-            let told = spoken.unwrap_or(written).replace("the god", god);
+            // Kept in the world's own register — "the god", never the name —
+            // because it goes back INTO a prompt as what the listener heard.
+            let told_plain = spoken.unwrap_or(written);
+            let told = told_plain.replace("the god", god);
+
+            // The listener's answer starts composing NOW, while the telling
+            // hangs in the air: the reply beat lands several seconds from
+            // here, which is more than a line takes, so the answer is
+            // almost always waiting when their turn comes.
+            if let Some(tongue) = tongue.as_mut()
+                && let Some(partner_at) = spot_of(talk.partner)
+                && crate::attention::regard(attention.as_deref(), partner_at).worth_composing()
+            {
+                let (voice, _, bearing) = voices
+                    .get(talk.partner)
+                    .map(|(v, t, manner)| {
+                        (
+                            v.copied(),
+                            t,
+                            manner.map(|m| m.bearing()).unwrap_or_default(),
+                        )
+                    })
+                    .unwrap_or((None, None, traits::Bearing::default()));
+                let (saw_it_too, trust, listener_name) = minds
+                    .get(talk.partner)
+                    .map(|(person, witnessed, _, faith)| {
+                        (
+                            witnessed.remembers(kind),
+                            faith.map_or(0.3, |f| f.trust),
+                            person.name.clone(),
+                        )
+                    })
+                    .unwrap_or((false, 0.3, String::new()));
+                let place = members
+                    .get(talk.partner)
+                    .ok()
+                    .and_then(|member| now.as_ref()?.places.get(&member.0).cloned());
+                // Every name the answer may use: their own, the teller's,
+                // their place, and whoever the story itself is about.
+                let mut known: Vec<String> = vec![listener_name, teller_name.clone()];
+                known.extend(place.as_ref().map(|p| p.name.clone()));
+                known.extend(memory.whom.as_ref().map(|w| w.name.clone()));
+                tongue.muse(crate::telling::Musing {
+                    who: talk.partner,
+                    voice,
+                    bearing,
+                    faith: crate::telling::FaithBand::of(trust),
+                    body: Vec::new(),
+                    place: place.map(|p| p.lines()).unwrap_or_default(),
+                    mind: if saw_it_too {
+                        "you stood there and saw it happen too".into()
+                    } else {
+                        "whether to believe a word of it".into()
+                    },
+                    heard: Some(told_plain.clone()),
+                    known,
+                });
+            }
             // The bubble is for the player; the telling is for the village.
             // Off the frame there is no bubble, and everything below still
             // happens.
@@ -396,6 +455,30 @@ pub(crate) fn hold_conversations(
         // The reply, a beat after the meeting settles, from the listener.
         if talk.kind.is_none() && !talk.replied && clock.elapsed > talk.until - 9.0 {
             talk.replied = true;
+            let regard = crate::attention::regard(attention.as_deref(), at.translation);
+            // Their own answer, if it came back in time. Composed against
+            // the actual words they heard, so it reacts instead of picking
+            // from a bowl of stock reactions.
+            let composed = tongue.as_mut().and_then(|tongue| tongue.take_reply(entity));
+            if let Some(line) = composed {
+                if regard.worth_saying() {
+                    info!("an answer in their own words: {line}");
+                    say.write(crate::ui::Say {
+                        speaker: entity,
+                        text: line.replace("the god", god),
+                        thought: false,
+                        own_words: true,
+                    });
+                }
+                continue;
+            }
+            // A watched listener whose answer never came says nothing — a
+            // beat of silence is honest, a stock line under the god's nose
+            // is the thing being retired. The written replies keep serving
+            // the middle distance, where nothing is composed at all.
+            if regard.worth_composing() && tongue.is_some() {
+                continue;
+            }
             // A listener who stood there too answers as a fellow witness,
             // not a doubter — shared awe, not scepticism.
             let saw_it_too = talk.hearing.is_some_and(|kind| {
@@ -427,7 +510,7 @@ pub(crate) fn hold_conversations(
                     "I will believe it when I see it",
                 ])
             };
-            if crate::attention::regard(attention.as_deref(), at.translation).worth_saying() {
+            if regard.worth_saying() {
                 say.write(crate::ui::Say {
                     speaker: entity,
                     text: reply.replace("the god", god),

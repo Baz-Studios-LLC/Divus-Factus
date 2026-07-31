@@ -576,6 +576,7 @@ pub(super) fn small_talk(
     clock: Res<crate::calendar::WorldClock>,
     weather: Option<Res<crate::weather::Weather>>,
     attention: Option<Res<crate::attention::Attention>>,
+    tongue: Option<Res<crate::telling::Tongue>>,
     mut rng: ResMut<SimRng>,
     mut say: MessageWriter<crate::ui::Say>,
     villagers: Query<
@@ -617,9 +618,17 @@ pub(super) fn small_talk(
     // there is composed, weighted, spent out of the freshness rings and then
     // thrown away unheard. Nothing about the simulation is gated here — small
     // talk has no consequences — only who is worth drawing.
+    //
+    // And when the teller is on, the closely watched are not drawn at all:
+    // their words come composed, from `muse_the_watched`, and a written line
+    // on top of a composed one would have them talking over themselves. The
+    // written murmur keeps the MIDDLE distance alive — figures whose bubbles
+    // are legible but who are too small to spend a model's time on.
+    let composing = tongue.is_some();
     let seen: Vec<usize> = (0..all.len())
         .filter(|&i| {
-            crate::attention::regard(attention.as_deref(), all[i].1.translation).worth_saying()
+            let regard = crate::attention::regard(attention.as_deref(), all[i].1.translation);
+            regard.worth_saying() && !(composing && regard.worth_composing())
         })
         .collect();
     if seen.is_empty() {
@@ -774,6 +783,12 @@ pub(super) fn muse_the_watched(
     if *since_last < 5.0 {
         return;
     }
+    // The murmur's own odds, so composed talk keeps the easy, uneven pace
+    // the written murmur always had rather than arriving on a metronome.
+    if !rng.0.chance(0.75) {
+        *since_last = 0.0;
+        return;
+    }
     *since_last = 0.0;
 
     // The watched and idle, not asked recently.
@@ -852,18 +867,23 @@ pub(super) fn muse_the_watched(
         body,
         place,
         mind,
+        heard: None,
         known,
     });
 }
 
-/// Shows the thoughts that have come back, over the heads they belong to.
+/// Shows the words that have come back, over the heads they belong to.
+///
+/// The same rule the written murmur has always kept: a thought if alone, said
+/// aloud if anyone stands close enough to hear — the composed line does not
+/// know or care which it will be.
 #[allow(clippy::type_complexity)]
 pub(super) fn show_musings(
     tongue: Option<ResMut<crate::telling::Tongue>>,
     attention: Option<Res<crate::attention::Attention>>,
     name: Option<Res<super::DivineName>>,
     mut say: MessageWriter<crate::ui::Say>,
-    thinkers: Query<&Transform, (With<Villager>, Without<Corpse>, Without<Held>)>,
+    thinkers: Query<(Entity, &Transform), (With<Villager>, Without<Corpse>, Without<Held>)>,
 ) {
     let Some(mut tongue) = tongue else {
         return;
@@ -872,7 +892,7 @@ pub(super) fn show_musings(
     for who in tongue.mused_heads() {
         // Composed a moment ago, but the moment may have moved on: whoever
         // died, was seized, or wandered out of regard thinks it silently.
-        let Ok(at) = thinkers.get(who) else {
+        let Ok((_, at)) = thinkers.get(who) else {
             tongue.take_musing(who);
             continue;
         };
@@ -880,14 +900,20 @@ pub(super) fn show_musings(
             tongue.take_musing(who);
             continue;
         }
-        let Some(thought) = tongue.take_musing(who) else {
+        let Some(line) = tongue.take_musing(who) else {
             continue;
         };
-        info!("a watched head thinks its own thought: {thought}");
+        let heard = thinkers.iter().any(|(other, other_at)| {
+            other != who && other_at.translation.distance(at.translation) < EARSHOT
+        });
+        info!(
+            "a watched head finds its own words{}: {line}",
+            if heard { ", aloud" } else { "" }
+        );
         say.write(crate::ui::Say {
             speaker: who,
-            text: thought.replace("the god", god),
-            thought: true,
+            text: line.replace("the god", god),
+            thought: !heard,
             own_words: true,
         });
     }

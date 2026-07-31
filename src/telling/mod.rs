@@ -203,9 +203,20 @@ pub struct Musing {
     pub place: Vec<String>,
     /// The one thing pressing on them, chosen by the sim.
     pub mind: String,
+    /// What was just said to them, when this is a reply rather than an idle
+    /// thought. Changes the instruction from inward to answering, and the
+    /// words come back spoken rather than mused.
+    pub heard: Option<String>,
     /// Every proper noun the thought is allowed to contain: their own name,
     /// their place, their people. The truth gate holds the words to this.
     pub known: Vec<String>,
+}
+
+impl Musing {
+    /// Whether this is an answer to someone rather than a private moment.
+    fn is_reply(&self) -> bool {
+        self.heard.is_some()
+    }
 }
 
 impl Retelling {
@@ -260,7 +271,9 @@ enum Ask {
 /// What comes back, keyed the way it was asked.
 enum Answer {
     Told(TellingKey, Option<String>),
-    Mused(Entity, Option<String>),
+    /// The bool says whether it was a reply, so an answer composed for a
+    /// conversation is never shown as a stray idle thought.
+    Mused(Entity, bool, Option<String>),
 }
 
 #[derive(Resource)]
@@ -271,8 +284,11 @@ pub struct Tongue {
     asked: HashSet<TellingKey>,
     /// Thoughts that have come back, waiting to be shown.
     mused: HashMap<Entity, String>,
-    /// Whose thoughts are being composed right now.
-    musing: HashSet<Entity>,
+    /// Replies that have come back, waiting for the conversation's beat.
+    replies: HashMap<Entity, String>,
+    /// Whose words are being composed right now, and of which kind — a
+    /// person can have an idle thought and a reply in flight at once.
+    musing: HashSet<(Entity, bool)>,
     /// Rotated so a shape with several lines does not always give the first.
     turn: usize,
     inflight: Arc<AtomicUsize>,
@@ -341,8 +357,13 @@ impl Tongue {
         if self.inflight.load(Ordering::Relaxed) >= MAX_INFLIGHT {
             return;
         }
-        // One thought per head at a time, in composition or waiting unshown.
-        if self.mused.contains_key(&of.who) || !self.musing.insert(of.who) {
+        // One of each kind per head at a time, composing or waiting unshown.
+        let waiting = if of.is_reply() {
+            self.replies.contains_key(&of.who)
+        } else {
+            self.mused.contains_key(&of.who)
+        };
+        if waiting || !self.musing.insert((of.who, of.is_reply())) {
             return;
         }
         self.inflight.fetch_add(1, Ordering::Relaxed);
@@ -356,6 +377,12 @@ impl Tongue {
     pub fn take_musing(&mut self, who: Entity) -> Option<String> {
         self.collect();
         self.mused.remove(&who)
+    }
+
+    /// The composed reply waiting for this person, if any.
+    pub fn take_reply(&mut self, who: Entity) -> Option<String> {
+        self.collect();
+        self.replies.remove(&who)
     }
 
     /// Everyone whose thought has come back and not yet been shown.
@@ -392,10 +419,14 @@ impl Tongue {
                         None
                     }
                 }
-                Answer::Mused(who, line) => {
-                    self.musing.remove(&who);
+                Answer::Mused(who, reply, line) => {
+                    self.musing.remove(&(who, reply));
                     if let Some(line) = line {
-                        self.mused.insert(who, line.clone());
+                        if reply {
+                            self.replies.insert(who, line.clone());
+                        } else {
+                            self.mused.insert(who, line.clone());
+                        }
                         Some(line)
                     } else {
                         None
@@ -513,7 +544,7 @@ impl Plugin for TellingPlugin {
         // shape marked as asked and never answered.
         let refuse = |ask: Ask| match ask {
             Ask::Retell(of) => Answer::Told(of.key, None),
-            Ask::Muse(of) => Answer::Mused(of.who, None),
+            Ask::Muse(of) => Answer::Mused(of.who, of.is_reply(), None),
         };
 
         // One plain thread owning the model. No async runtime: this is a queue
@@ -548,7 +579,7 @@ impl Plugin for TellingPlugin {
                         }
                         Ask::Muse(of) => {
                             let line = voice.muse(&of);
-                            Answer::Mused(of.who, line)
+                            Answer::Mused(of.who, of.is_reply(), line)
                         }
                     };
                     worker_inflight.fetch_sub(1, Ordering::Relaxed);
@@ -563,6 +594,7 @@ impl Plugin for TellingPlugin {
             ready: HashMap::new(),
             asked: HashSet::new(),
             mused: HashMap::new(),
+            replies: HashMap::new(),
             musing: HashSet::new(),
             turn: 0,
             inflight,
@@ -650,7 +682,7 @@ impl Voice {
     /// One villager's thought, or `None` if what came back is unfit to think.
     fn muse(&mut self, of: &Musing) -> Option<String> {
         self.draws += 1;
-        let prompt = muse_chatml(&describe_musing(of));
+        let prompt = muse_chatml(of.is_reply(), &describe_musing(of));
         let raw = self.generate(&prompt, self.draws).ok()?;
         let line = raw.lines().next()?;
         if !admissible(line) {
@@ -663,10 +695,23 @@ impl Voice {
             return None;
         }
         let line = tidy(line);
-        // A worked example handed straight back is not this person's thought.
-        if muse_shots()
+        // A worked example handed straight back is not this person's thought —
+        // and a reply that merely echoes what it was answering is not a reply.
+        let shots = if of.is_reply() {
+            reply_shots()
+        } else {
+            muse_shots()
+        };
+        if shots
             .iter()
             .any(|(_, said)| said.eq_ignore_ascii_case(&line))
+        {
+            return None;
+        }
+        if of
+            .heard
+            .as_ref()
+            .is_some_and(|heard| heard.eq_ignore_ascii_case(&line))
         {
             return None;
         }
@@ -874,6 +919,21 @@ fn muse_system_prompt() -> &'static str {
      Say 'the god', never a name."
 }
 
+/// What the model is told about answering a neighbour.
+///
+/// The third and last register: not a story performed, not a thought kept in,
+/// but the short word back across a fence. The reply must react to what was
+/// said rather than restate it — small models love to echo, and the ban does
+/// more work here than anywhere.
+fn reply_system_prompt() -> &'static str {
+    "You are a villager in a pre-industrial village. A neighbour has just told \
+     you something; answer ONLY with the words you would say back: one short \
+     mouthful, under twelve words, plain and spoken. React to it — believe it, \
+     doubt it, fear it, want more of it — never repeat it back. Never name \
+     your trade, your belief, your manner or your nature. No quotation marks, \
+     no modern words. Say 'the god', never a name."
+}
+
 /// A musing's circumstances, as fields rather than prose.
 ///
 /// The place lines come first — a thought starts from where you are standing —
@@ -890,6 +950,9 @@ fn describe_musing(of: &Musing) -> String {
     lines.push(format!("your belief: {}", of.faith.word()));
     if !of.body.is_empty() {
         lines.push(format!("your body: {}", of.body.join(", and ")));
+    }
+    if let Some(heard) = &of.heard {
+        lines.push(format!("they just told you: {heard}"));
     }
     lines.push(format!("on your mind: {}", of.mind));
     lines.join("\n")
@@ -917,6 +980,7 @@ fn muse_shots() -> Vec<(Musing, &'static str)> {
                 body: vec!["hungry"],
                 place: place("Harrowfen", "autumn, rain falling", "the larder runs thin"),
                 mind: "the empty larder".into(),
+                heard: None,
                 known: vec!["Harrowfen".into()],
             },
             // From the hungry pool in the small-talk corpus.
@@ -935,6 +999,7 @@ fn muse_shots() -> Vec<(Musing, &'static str)> {
                     "the larder holds, for now",
                 ),
                 mind: "no roof of your own yet".into(),
+                heard: None,
                 known: vec!["Harrowfen".into()],
             },
             // From the roofless pool.
@@ -953,6 +1018,7 @@ fn muse_shots() -> Vec<(Musing, &'static str)> {
                     "the stores stand full",
                 ),
                 mind: "a fine day at the water".into(),
+                heard: None,
                 known: vec!["Harrowfen".into()],
             },
             // From the clear-sky pool.
@@ -961,10 +1027,70 @@ fn muse_shots() -> Vec<(Musing, &'static str)> {
     ]
 }
 
-/// ChatML for a musing, mirroring [`chatml`].
-fn muse_chatml(user: &str) -> String {
-    let mut out = format!("<|im_start|>system\n{}<|im_end|>\n", muse_system_prompt());
-    for (fields, said) in muse_shots() {
+/// Worked examples for answering, whose answers are the game's own written
+/// replies — the sceptic's, the believer's, the frightened one's.
+fn reply_shots() -> Vec<(Musing, &'static str)> {
+    let place = vec![
+        "where you live: the village of Harrowfen".to_string(),
+        "the time: autumn, the sky grey and low".to_string(),
+        "the village: the larder holds, for now".to_string(),
+    ];
+    let heard = |voice, bearing, faith, told: &str, mind: &str| Musing {
+        who: Entity::PLACEHOLDER,
+        voice: Some(voice),
+        bearing,
+        faith,
+        body: vec![],
+        place: place.clone(),
+        mind: mind.into(),
+        heard: Some(told.into()),
+        known: vec!["Harrowfen".into()],
+    };
+    vec![
+        (
+            heard(
+                Vocation::Mason,
+                Bearing::Plain,
+                FaithBand::Doubting,
+                "one bolt, out of a sky with no storm in it",
+                "whether to believe a word of it",
+            ),
+            // The doubter's written reply.
+            "I will believe it when I see it",
+        ),
+        (
+            heard(
+                Vocation::Gatherer,
+                Bearing::Terse,
+                FaithBand::Sure,
+                "the larder was empty and then it was not, they say",
+                "whether to believe a word of it",
+            ),
+            "so the stories are true",
+        ),
+        (
+            heard(
+                Vocation::Fisher,
+                Bearing::Plain,
+                FaithBand::Wavering,
+                "he just rose, feet kicking at nothing",
+                "you stood there and saw it happen too",
+            ),
+            // The fellow witness's written reply.
+            "no story. I stood right beside you",
+        ),
+    ]
+}
+
+/// ChatML for a musing or a reply, mirroring [`chatml`].
+fn muse_chatml(reply: bool, user: &str) -> String {
+    let (system, shots) = if reply {
+        (reply_system_prompt(), reply_shots())
+    } else {
+        (muse_system_prompt(), muse_shots())
+    };
+    let mut out = format!("<|im_start|>system\n{system}<|im_end|>\n");
+    for (fields, said) in shots {
         out.push_str(&format!(
             "<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n{said}<|im_end|>\n",
             describe_musing(&fields)
