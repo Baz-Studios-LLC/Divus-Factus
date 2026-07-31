@@ -231,6 +231,22 @@ pub(crate) fn scroll_glyph(commands: &mut Commands, parent: Entity, tint: Color)
     }
 }
 
+/// Sliders: three rails, knobs at their own stations — the settings mark.
+pub(crate) fn sliders_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+    let c = glyph_canvas(commands, parent, 18.0);
+    for (top, knob_left) in [(3.5, 11.0), (8.0, 4.5), (12.5, 8.0)] {
+        bar(
+            commands,
+            c,
+            (3.0, top + 1.0, 12.0, 1.4),
+            0.0,
+            tint.with_alpha(0.55),
+            false,
+        );
+        bar(commands, c, (knob_left, top, 2.6, 3.6), 0.0, tint, false);
+    }
+}
+
 /// A person: head over shoulders.
 pub(crate) fn person_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     let c = glyph_canvas(commands, parent, 18.0);
@@ -558,15 +574,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
     ));
 
     let settings_tab = tab(&mut commands, false, true);
-    commands.spawn((
-        Text::new("⚙"),
-        TextFont {
-            font_size: FontSize::Px(15.0),
-            ..default()
-        },
-        TextColor(ink.with_alpha(0.8)),
-        ChildOf(settings_tab),
-    ));
+    sliders_glyph(&mut commands, settings_tab, ink.with_alpha(0.8));
     commands.entity(settings_tab).insert((
         CodexTab(CodexPage::Settings),
         ui::HoverHint::new("The Settings", "the god's own preferences"),
@@ -1689,7 +1697,7 @@ fn build_settings_page(commands: &mut Commands, page: Entity) {
             ChildOf(button),
         ));
     };
-    arrow(commands, "◀", -1);
+    arrow(commands, "<", -1);
     commands.spawn((
         TellerModelText,
         Text::new("..."),
@@ -1700,7 +1708,7 @@ fn build_settings_page(commands: &mut Commands, page: Entity) {
         TextColor(ui::theme::text()),
         ChildOf(row),
     ));
-    arrow(commands, "▶", 1);
+    arrow(commands, ">", 1);
     commands.spawn((
         Text::new(
             "the voice the villagers borrow. larger models speak better and \
@@ -1720,7 +1728,7 @@ fn build_settings_page(commands: &mut Commands, page: Entity) {
         },
         ChildOf(page),
     ));
-    heading(commands, "HOT KEYS · VIDEO · SOUND");
+    heading(commands, "HOT KEYS / VIDEO / SOUND");
     commands.spawn((
         Text::new("to come, as the game grows into them."),
         TextFont {

@@ -70,7 +70,7 @@ const GIVE_UP_AFTER: u32 = 24;
 const MAX_TOKENS: usize = 48;
 
 /// The longest a retelling may run before it stops sounding like speech.
-const MAX_WORDS: usize = 16;
+const MAX_WORDS: usize = 18;
 
 /// Words no villager in this world has. A model reaching for any of them has
 /// slipped out of the setting, and the written line is better.
@@ -717,10 +717,15 @@ struct Voice {
 
 impl Voice {
     fn load(weights: &std::path::Path, tokenizer: &std::path::Path) -> Result<Voice, String> {
-        // Metal where there is Metal. The renderer has first call on the GPU,
-        // but a 1.5B model's share of it is small and the alternative is
-        // seconds per line on CPU.
-        let device = Device::new_metal(0).unwrap_or(Device::Cpu);
+        // CPU, always. The renderer has sole call on the GPU: a model's
+        // prompt prefill is one indivisible dispatch Metal cannot schedule a
+        // frame around, and it showed up as a hitch before every bubble —
+        // even from the small model. On cores the game barely uses, the
+        // teller costs the frame nothing; a line just takes a few seconds to
+        // arrive, and nothing anywhere waits on one. The cost lands only on
+        // the biggest models, which want minutes of cores per line — the
+        // price of electing one, until the day the prefill can be chunked.
+        let device = Device::Cpu;
         let mut file = std::fs::File::open(weights).map_err(|e| e.to_string())?;
         let content = gguf_file::Content::read(&mut file).map_err(|e| e.to_string())?;
         let model =
@@ -767,6 +772,9 @@ impl Voice {
             .rumors()
             .iter()
             .any(|written| written.eq_ignore_ascii_case(&line))
+            || shots()
+                .iter()
+                .any(|(_, said)| said.eq_ignore_ascii_case(&line))
         {
             return None;
         }
@@ -865,9 +873,10 @@ fn system_prompt() -> &'static str {
     // model reads the fields aloud: "My trade is hunts. My nature is steady."
     "You are a villager in a pre-industrial village, telling a neighbour what you \
      know of something strange. Answer ONLY with the words you would say: one \
-     whole simple sentence, under twelve words, the way an ordinary person \
-     actually talks. Plain everyday speech — never poetry, no riddles, no \
-     proverbs, no grand images. Never repeat the details back. Never name your \
+     complete spoken sentence of eight to sixteen words, with a subject — the \
+     way an ordinary person actually talks, never a clipped fragment. Plain \
+     everyday speech — no poetry, no riddles, no proverbs. Never repeat the \
+     details back. Never name your \
      trade, your belief, your manner or your nature — let them show in HOW you \
      say it. Never explain or narrate. No quotation marks, no modern words. \
      Say 'the god', never a name."
@@ -979,7 +988,7 @@ fn shots() -> Vec<(Retelling, String)> {
             0.5,
             0,
         ),
-        "it flung Sathei across the square like a sack of grain".into(),
+        "it threw Sathei across the square like a sack of grain".into(),
     ));
     shots
 }
@@ -1008,10 +1017,10 @@ fn chatml(user: &str) -> String {
 /// world in the same mouth.
 fn muse_system_prompt() -> &'static str {
     "You are a villager in a pre-industrial village. Give ONLY the thought \
-     passing through your head right now: one whole simple sentence, under \
-     twelve words, the way an ordinary person grumbles or wonders to themself. \
-     Plain everyday speech — never poetry, no riddles, no proverbs, no grand \
-     images. Never repeat the details back. Never name your trade, your \
+     passing through your head right now: one complete sentence of eight to \
+     sixteen words, with a subject, the way an ordinary person grumbles or \
+     wonders to themself — never a clipped fragment. Plain everyday speech — \
+     no poetry, no riddles, no proverbs. Never repeat the details back. Never name your trade, your \
      belief, your manner or your nature — let them show in HOW you think. No \
      quotation marks, no modern words. Say 'the god', never a name."
 }
@@ -1024,10 +1033,11 @@ fn muse_system_prompt() -> &'static str {
 /// more work here than anywhere.
 fn reply_system_prompt() -> &'static str {
     "You are a villager in a pre-industrial village. A neighbour has just told \
-     you something; answer ONLY with the words you would say back: one whole \
-     simple sentence, under twelve words, the way an ordinary person actually \
-     talks. React to it — believe it, doubt it, fear it, want more of it — \
-     never repeat it back. Plain everyday speech, never poetry, no proverbs. \
+     you something; answer ONLY with the words you would say back: one \
+     complete spoken sentence with a subject, eight to sixteen words, the way \
+     an ordinary person actually talks — never a clipped fragment. React to \
+     it — believe it, doubt it, fear it, want more of it — never repeat it \
+     back. Plain everyday speech, no poetry, no proverbs. \
      Never name your trade, your belief, your manner or your nature. No \
      quotation marks, no modern words. Say 'the god', never a name."
 }
@@ -1081,10 +1091,11 @@ fn muse_shots() -> Vec<(Musing, &'static str)> {
                 heard: None,
                 known: vec!["Harrowfen".into()],
             },
-            // From the hungry pool in the small-talk corpus — the plain
-            // grumble, not the aphorism: the model copies its examples far
-            // harder than its instructions, so the examples must TALK.
-            "when did I last eat",
+            // Hand-written whole sentences, no longer lifted from the corpus:
+            // the corpus lines are clipped fragments by design, and the model
+            // copies its examples far harder than its instructions — shown
+            // fragments, the whole village spoke in them.
+            "I cannot remember when I last ate a proper meal",
         ),
         (
             Musing {
@@ -1102,8 +1113,7 @@ fn muse_shots() -> Vec<(Musing, &'static str)> {
                 heard: None,
                 known: vec!["Harrowfen".into()],
             },
-            // From the roofless pool.
-            "a roof of my own, someday",
+            "I want a roof of my own before the cold comes",
         ),
         (
             Musing {
@@ -1121,8 +1131,7 @@ fn muse_shots() -> Vec<(Musing, &'static str)> {
                 heard: None,
                 known: vec!["Harrowfen".into()],
             },
-            // From the fisher's own pool.
-            "the water was kind today",
+            "the water was kind to me today, and that is enough",
         ),
     ]
 }
@@ -1156,7 +1165,7 @@ fn reply_shots() -> Vec<(Musing, &'static str)> {
                 "whether to believe a word of it",
             ),
             // The doubter's written reply.
-            "I will believe it when I see it",
+            "I will believe that when I see it myself",
         ),
         (
             heard(
@@ -1166,7 +1175,7 @@ fn reply_shots() -> Vec<(Musing, &'static str)> {
                 "the larder was empty and then it was not, they say",
                 "whether to believe a word of it",
             ),
-            "so the stories are true",
+            "so the stories people tell are true after all",
         ),
         (
             heard(
@@ -1177,7 +1186,7 @@ fn reply_shots() -> Vec<(Musing, &'static str)> {
                 "you stood there and saw it happen too",
             ),
             // The fellow witness's written reply.
-            "no story. I stood right beside you",
+            "that is no story — I stood right there beside you",
         ),
     ]
 }
