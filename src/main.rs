@@ -15,6 +15,7 @@ mod meshbuild;
 mod miracles;
 mod navigation;
 mod noise;
+mod now;
 mod palette;
 mod render;
 mod rng;
@@ -151,8 +152,10 @@ fn main() {
             speed::SpeedPlugin,
             survey::SurveyPlugin,
             markers::MarkersPlugin,
-            // Before the teller: it decides what the teller is asked for.
+            // Before the teller: they decide what the teller is asked for,
+            // and what the asking is allowed to say.
             attention::AttentionPlugin,
+            now::NowPlugin,
             telling::TellingPlugin,
         ))
         .add_systems(Startup, spawn_lighting)

@@ -119,6 +119,8 @@ impl Plugin for VillagerPlugin {
                     rites::burials,
                     seek_company,
                     speech::small_talk,
+                    speech::muse_the_watched,
+                    speech::show_musings,
                     stretch_settlement,
                     explore::expeditions,
                     explore::escort_duty,

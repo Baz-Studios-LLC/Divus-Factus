@@ -180,6 +180,34 @@ pub struct Retelling {
     pub told: u32,
 }
 
+/// One villager's inward moment: everything true about them right now,
+/// assembled on the main thread where the components live, shipped to the
+/// worker as plain data.
+///
+/// Unlike a [`Retelling`] this is not cached by shape — a thought is this
+/// person, this place, this moment, and serving it to anyone else would be
+/// the lie the whole design exists to prevent. What makes that affordable is
+/// that thoughts have no listener and therefore no deadline: they are asked
+/// for ahead of need, by [`Regard::Close`](crate::attention::Regard), for the
+/// handful of people the god is actually watching.
+#[derive(Clone, Debug)]
+pub struct Musing {
+    /// Whose thought this is; the answer comes back keyed on it.
+    pub who: Entity,
+    pub voice: Option<Vocation>,
+    pub bearing: Bearing,
+    pub faith: FaithBand,
+    /// What the body is saying: "hungry", "worn out". Empty when it is quiet.
+    pub body: Vec<&'static str>,
+    /// The settlement's now, from [`crate::now::WorldNow`].
+    pub place: Vec<String>,
+    /// The one thing pressing on them, chosen by the sim.
+    pub mind: String,
+    /// Every proper noun the thought is allowed to contain: their own name,
+    /// their place, their people. The truth gate holds the words to this.
+    pub known: Vec<String>,
+}
+
 impl Retelling {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -223,17 +251,33 @@ impl Retelling {
 ///
 /// Absent entirely unless the dial is set, which is what makes this module
 /// free when it is off.
+/// What the game asks the worker for.
+enum Ask {
+    Retell(Retelling),
+    Muse(Box<Musing>),
+}
+
+/// What comes back, keyed the way it was asked.
+enum Answer {
+    Told(TellingKey, Option<String>),
+    Mused(Entity, Option<String>),
+}
+
 #[derive(Resource)]
 pub struct Tongue {
     ready: HashMap<TellingKey, Vec<String>>,
     /// Which shapes have been asked about, so the same request is not made
     /// again every time two people meet.
     asked: HashSet<TellingKey>,
+    /// Thoughts that have come back, waiting to be shown.
+    mused: HashMap<Entity, String>,
+    /// Whose thoughts are being composed right now.
+    musing: HashSet<Entity>,
     /// Rotated so a shape with several lines does not always give the first.
     turn: usize,
     inflight: Arc<AtomicUsize>,
-    ask: Sender<Retelling>,
-    heard: Mutex<Receiver<(TellingKey, Option<String>)>>,
+    ask: Sender<Ask>,
+    heard: Mutex<Receiver<Answer>>,
     /// Failed asks so far, and whether the teller has already given up.
     misses: u32,
     quiet: bool,
@@ -280,9 +324,44 @@ impl Tongue {
             return;
         }
         self.inflight.fetch_add(1, Ordering::Relaxed);
-        if self.ask.send(of.clone()).is_err() {
+        if self.ask.send(Ask::Retell(of.clone())).is_err() {
             self.inflight.fetch_sub(1, Ordering::Relaxed);
         }
+    }
+
+    /// Asks for someone's thought, ahead of needing it.
+    ///
+    /// Refused quietly when the queue is full or their last thought has not
+    /// come back yet — a thought that never gets composed simply never
+    /// appears, and the written murmur carries on.
+    pub fn muse(&mut self, of: Musing) {
+        if self.quiet {
+            return;
+        }
+        if self.inflight.load(Ordering::Relaxed) >= MAX_INFLIGHT {
+            return;
+        }
+        // One thought per head at a time, in composition or waiting unshown.
+        if self.mused.contains_key(&of.who) || !self.musing.insert(of.who) {
+            return;
+        }
+        self.inflight.fetch_add(1, Ordering::Relaxed);
+        if self.ask.send(Ask::Muse(Box::new(of))).is_err() {
+            self.inflight.fetch_sub(1, Ordering::Relaxed);
+        }
+    }
+
+    /// The composed thought waiting for this person, if any. Taking it makes
+    /// room for their next.
+    pub fn take_musing(&mut self, who: Entity) -> Option<String> {
+        self.collect();
+        self.mused.remove(&who)
+    }
+
+    /// Everyone whose thought has come back and not yet been shown.
+    pub fn mused_heads(&mut self) -> Vec<Entity> {
+        self.collect();
+        self.mused.keys().copied().collect()
     }
 
     /// Takes in whatever the thread has finished.
@@ -292,23 +371,39 @@ impl Tongue {
         let Ok(heard) = self.heard.lock() else {
             return;
         };
-        let mut arrived: Vec<(TellingKey, Option<String>)> = Vec::new();
+        let mut arrived: Vec<Answer> = Vec::new();
         while let Ok(answer) = heard.try_recv() {
             arrived.push(answer);
         }
         drop(heard);
-        for (key, line) in arrived {
-            // Cleared either way: a shape that failed must be askable again,
-            // or a model that starts up late would never be reached.
-            self.asked.remove(&key);
-            match line {
-                Some(line) => {
-                    self.misses = 0;
-                    let lines = self.ready.entry(key).or_default();
-                    if !lines.iter().any(|held| held == &line) {
-                        lines.push(line);
+        for answer in arrived {
+            let line = match answer {
+                Answer::Told(key, line) => {
+                    // Cleared either way: a shape that failed must be askable
+                    // again, or a model that starts up late is never reached.
+                    self.asked.remove(&key);
+                    if let Some(line) = line {
+                        let lines = self.ready.entry(key).or_default();
+                        if !lines.iter().any(|held| held == &line) {
+                            lines.push(line.clone());
+                        }
+                        Some(line)
+                    } else {
+                        None
                     }
                 }
+                Answer::Mused(who, line) => {
+                    self.musing.remove(&who);
+                    if let Some(line) = line {
+                        self.mused.insert(who, line.clone());
+                        Some(line)
+                    } else {
+                        None
+                    }
+                }
+            };
+            match line {
+                Some(_) => self.misses = 0,
                 None => {
                     self.misses += 1;
                     if self.misses >= GIVE_UP_AFTER && !self.quiet {
@@ -410,9 +505,16 @@ impl Plugin for TellingPlugin {
             weights.file_name().unwrap_or_default().to_string_lossy()
         );
 
-        let (ask, requests) = channel::<Retelling>();
-        let (answers, heard) = channel::<(TellingKey, Option<String>)>();
+        let (ask, requests) = channel::<Ask>();
+        let (answers, heard) = channel::<Answer>();
         let inflight = Arc::new(AtomicUsize::new(0));
+
+        // Every ask is answered, success or not: silence would leave the
+        // shape marked as asked and never answered.
+        let refuse = |ask: Ask| match ask {
+            Ask::Retell(of) => Answer::Told(of.key, None),
+            Ask::Muse(of) => Answer::Mused(of.who, None),
+        };
 
         // One plain thread owning the model. No async runtime: this is a queue
         // of one short generation at a time, and the game never waits on it.
@@ -428,9 +530,9 @@ impl Plugin for TellingPlugin {
                     Err(e) => {
                         warn!("the teller could not read its model: {e}");
                         // Drain and refuse, so callers stop asking.
-                        while let Ok(of) = requests.recv() {
+                        while let Ok(asked) = requests.recv() {
                             worker_inflight.fetch_sub(1, Ordering::Relaxed);
-                            if answers.send((of.key, None)).is_err() {
+                            if answers.send(refuse(asked)).is_err() {
                                 return;
                             }
                         }
@@ -438,12 +540,19 @@ impl Plugin for TellingPlugin {
                     }
                 };
                 info!("the teller has its voice");
-                while let Ok(of) = requests.recv() {
-                    let line = voice.retell(&of);
+                while let Ok(asked) = requests.recv() {
+                    let answer = match asked {
+                        Ask::Retell(of) => {
+                            let line = voice.retell(&of);
+                            Answer::Told(of.key, line)
+                        }
+                        Ask::Muse(of) => {
+                            let line = voice.muse(&of);
+                            Answer::Mused(of.who, line)
+                        }
+                    };
                     worker_inflight.fetch_sub(1, Ordering::Relaxed);
-                    // Both outcomes reported: silence would leave the shape
-                    // marked as asked and never answered.
-                    if answers.send((of.key, line)).is_err() {
+                    if answers.send(answer).is_err() {
                         break;
                     }
                 }
@@ -453,6 +562,8 @@ impl Plugin for TellingPlugin {
         app.insert_resource(Tongue {
             ready: HashMap::new(),
             asked: HashSet::new(),
+            mused: HashMap::new(),
+            musing: HashSet::new(),
             turn: 0,
             inflight,
             ask,
@@ -530,6 +641,32 @@ impl Voice {
             .rumors()
             .iter()
             .any(|written| written.eq_ignore_ascii_case(&line))
+        {
+            return None;
+        }
+        Some(line)
+    }
+
+    /// One villager's thought, or `None` if what came back is unfit to think.
+    fn muse(&mut self, of: &Musing) -> Option<String> {
+        self.draws += 1;
+        let prompt = muse_chatml(&describe_musing(of));
+        let raw = self.generate(&prompt, self.draws).ok()?;
+        let line = raw.lines().next()?;
+        if !admissible(line) {
+            return None;
+        }
+        // The same truth gate as speech: a thought may name this person's own
+        // world — themself, their place, their people — and nobody else.
+        let known: Vec<&str> = of.known.iter().map(String::as_str).collect();
+        if !speaks_only_of(line, &known) {
+            return None;
+        }
+        let line = tidy(line);
+        // A worked example handed straight back is not this person's thought.
+        if muse_shots()
+            .iter()
+            .any(|(_, said)| said.eq_ignore_ascii_case(&line))
         {
             return None;
         }
@@ -714,6 +851,123 @@ fn chatml(user: &str) -> String {
         out.push_str(&format!(
             "<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n{said}<|im_end|>\n",
             describe(&fields)
+        ));
+    }
+    out.push_str(&format!(
+        "<|im_start|>user\n{user}<|im_end|>\n<|im_start|>assistant\n"
+    ));
+    out
+}
+
+/// What the model is told about thinking, as against telling.
+///
+/// A thought has no audience, and the instruction leans on that: inward,
+/// unperformed, half a sentence is fine. Everything else — the register, the
+/// bans, the god's name — matches the speaking prompt, because it is the same
+/// world in the same mouth.
+fn muse_system_prompt() -> &'static str {
+    "You are a villager in a pre-industrial village. Give ONLY the thought \
+     passing through your head right now: one short mouthful, under twelve \
+     words, plain and inward, not spoken to anyone. Never repeat the details \
+     back. Never name your trade, your belief, your manner or your nature — \
+     let them show in HOW you think. No quotation marks, no modern words. \
+     Say 'the god', never a name."
+}
+
+/// A musing's circumstances, as fields rather than prose.
+///
+/// The place lines come first — a thought starts from where you are standing —
+/// and the pressing thing comes last, nearest the answer, which is where a
+/// small model's attention actually lands.
+fn describe_musing(of: &Musing) -> String {
+    let mut lines = of.place.clone();
+    if let Some(voice) = of.voice {
+        lines.push(format!("your trade: {}", voice.describe()));
+    }
+    if let Some(manner) = of.bearing.word() {
+        lines.push(format!("your manner: {manner}"));
+    }
+    lines.push(format!("your belief: {}", of.faith.word()));
+    if !of.body.is_empty() {
+        lines.push(format!("your body: {}", of.body.join(", and ")));
+    }
+    lines.push(format!("on your mind: {}", of.mind));
+    lines.join("\n")
+}
+
+/// Worked examples for thinking, anchored to the small-talk corpus the same
+/// way the retelling shots anchor to the rumours: the answers are lines a
+/// person wrote for this world, so the model learns this register rather
+/// than inventing one.
+fn muse_shots() -> Vec<(Musing, &'static str)> {
+    let place = |name: &str, time: &str, village: &str| {
+        vec![
+            format!("where you live: the village of {name}"),
+            format!("the time: {time}"),
+            format!("the village: {village}"),
+        ]
+    };
+    vec![
+        (
+            Musing {
+                who: Entity::PLACEHOLDER,
+                voice: Some(Vocation::Farmer),
+                bearing: Bearing::Bleak,
+                faith: FaithBand::Wavering,
+                body: vec!["hungry"],
+                place: place("Harrowfen", "autumn, rain falling", "the larder runs thin"),
+                mind: "the empty larder".into(),
+                known: vec!["Harrowfen".into()],
+            },
+            // From the hungry pool in the small-talk corpus.
+            "thin soup and thinner hope",
+        ),
+        (
+            Musing {
+                who: Entity::PLACEHOLDER,
+                voice: Some(Vocation::Mason),
+                bearing: Bearing::Plain,
+                faith: FaithBand::Doubting,
+                body: vec![],
+                place: place(
+                    "Harrowfen",
+                    "autumn, the sky grey and low",
+                    "the larder holds, for now",
+                ),
+                mind: "no roof of your own yet".into(),
+                known: vec!["Harrowfen".into()],
+            },
+            // From the roofless pool.
+            "someday a door will close behind me",
+        ),
+        (
+            Musing {
+                who: Entity::PLACEHOLDER,
+                voice: Some(Vocation::Fisher),
+                bearing: Bearing::Bright,
+                faith: FaithBand::Sure,
+                body: vec![],
+                place: place(
+                    "Harrowfen",
+                    "summer, the sky clear",
+                    "the stores stand full",
+                ),
+                mind: "a fine day at the water".into(),
+                known: vec!["Harrowfen".into()],
+            },
+            // From the clear-sky pool.
+            "a sky like this forgives a lot",
+        ),
+    ]
+}
+
+/// ChatML for a musing, mirroring [`chatml`].
+fn muse_chatml(user: &str) -> String {
+    let mut out = format!("<|im_start|>system\n{}<|im_end|>\n", muse_system_prompt());
+    for (fields, said) in muse_shots() {
+        out.push_str(&format!(
+            "<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n{said}<|im_end|>\n",
+            describe_musing(&fields)
         ));
     }
     out.push_str(&format!(
