@@ -4,7 +4,9 @@
 
 **Whole sentences.** Villagers now speak in complete, plain sentences instead of clipped fragments — "i hope the new field will help, but I still don't know what I should believe" — and their talk picks up whatever has lately happened in the village: weddings, wolves, ground broken, lightning.
 
-**Green means their own words.** Composed thoughts now wear the green border too, not just composed speech, so a glance tells you exactly which words were made for that person in that moment.
+**Every word on screen is their own.** The written stock lines are retired from the bubbles entirely — at every distance, a villager either speaks words composed for them in that moment, or holds their peace. And every bubble now reads as a proper sentence: a capital to open, a stop to close.
+
+**Green means their own words.** Composed thoughts wear the green border too, not just composed speech — which now means every bubble should wear it.
 
 ## The codex learns Settings
 

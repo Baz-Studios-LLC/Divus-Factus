@@ -69,6 +69,27 @@ pub struct Say {
     pub own_words: bool,
 }
 
+/// Dresses a line for its bubble: a capital to open, a full stop to close
+/// unless the line already ends in its own mark. Every bubble passes through
+/// here, so the hand-written corpus and the composed lines wear the same
+/// grammar without editing two hundred strings.
+fn sentence(text: &str) -> String {
+    let trimmed = text.trim();
+    let mut out = String::with_capacity(trimmed.len() + 1);
+    let mut chars = trimmed.chars();
+    if let Some(first) = chars.next() {
+        out.extend(first.to_uppercase());
+        out.push_str(chars.as_str());
+    }
+    if !matches!(
+        out.chars().last(),
+        Some('.') | Some('?') | Some('!') | Some('…') | None
+    ) {
+        out.push('.');
+    }
+    out
+}
+
 /// A live bubble, following its speaker until it fades.
 #[derive(Component)]
 struct Bubble {
@@ -96,6 +117,15 @@ fn speak(
     live: Query<&Bubble>,
 ) {
     for say in messages.read() {
+        // Only their OWN words reach the screen — no written line, however
+        // handsome, plays anywhere at any distance. A moment nothing was
+        // composed for is a quiet moment; the simulation underneath keeps
+        // every consequence either way. (The green border stays while the
+        // feature is judged: now it should be on every bubble, and one
+        // without it is a bug showing itself.)
+        if !say.own_words {
+            continue;
+        }
         if live.iter().count() >= BUBBLE_CAP || live.iter().any(|b| b.speaker == say.speaker) {
             continue;
         }
@@ -313,7 +343,7 @@ fn speak(
             ));
         }
         commands.spawn((
-            Text::new(say.text.clone()),
+            Text::new(sentence(&say.text)),
             // The text itself must know the wrap width: a shrink-wrapped
             // bubble measures its text at full one-line width, and the
             // late wrap spills lines out the bottom of the border. The
@@ -1952,6 +1982,15 @@ mod tests {
             assert_eq!(pinned_vertical, 1, "{anchor:?}");
             assert_eq!(pinned_horizontal, 1, "{anchor:?}");
         }
+    }
+
+    #[test]
+    fn every_bubble_reads_as_a_proper_sentence() {
+        assert_eq!(sentence("my belly aches"), "My belly aches.");
+        assert_eq!(sentence("was it the god?"), "Was it the god?");
+        assert_eq!(sentence("I saw it, I did"), "I saw it, I did.");
+        assert_eq!(sentence("so it goes..."), "So it goes...");
+        assert_eq!(sentence(""), "");
     }
 
     #[test]
