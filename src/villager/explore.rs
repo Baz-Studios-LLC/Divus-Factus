@@ -91,11 +91,17 @@ pub(super) fn expeditions(
     terrain: Option<Res<Terrain>>,
     site: Option<Res<SettlementSite>>,
     homes: (Query<&super::MemberOf>, Query<&super::SettlementGround>),
+    // Bundled with a spare slot's worth of company: this system sits at
+    // Bevy's parameter ceiling.
     mut known: ResMut<KnownWorld>,
     weather: Option<Res<crate::weather::Weather>>,
     mut rng: ResMut<super::SimRng>,
     mut notices: MessageWriter<crate::ui::Notice>,
-    mut say: MessageWriter<crate::ui::Say>,
+    mut say: (
+        MessageWriter<crate::ui::Say>,
+        Option<ResMut<crate::telling::Tongue>>,
+        Option<Res<crate::attention::Attention>>,
+    ),
     stores: Query<&crate::villager::work::Stockpile>,
     trees: Query<(&GlobalTransform, &FellableTree)>,
     bushes: Query<(&GlobalTransform, &crate::scatter::FoodSource)>,
@@ -238,12 +244,35 @@ pub(super) fn expeditions(
             // Every return stretches the cairn ring a little: even a walk
             // that found nothing proves the ground between.
             known.radius += 9.0;
-            say.write(crate::ui::Say {
-                speaker: entity,
-                text: what.to_string(),
-                thought: false,
-                own_words: false,
-            });
+            // A watched homecoming is told in the explorer's own words.
+            let composed = say
+                .1
+                .as_mut()
+                .filter(|_| {
+                    crate::attention::regard(say.2.as_deref(), at.translation).worth_composing()
+                })
+                .map(|tongue| {
+                    tongue.muse(crate::telling::Musing {
+                        who: entity,
+                        voice: Some(crate::villager::work::Vocation::Explorer),
+                        bearing: crate::villager::traits::Bearing::Plain,
+                        faith: crate::telling::FaithBand::Wavering,
+                        body: Vec::new(),
+                        place: Vec::new(),
+                        mind: format!("you walked far past the cairns and found {what}"),
+                        heard: None,
+                        known: Vec::new(),
+                    })
+                })
+                .is_some();
+            if !composed {
+                say.0.write(crate::ui::Say {
+                    speaker: entity,
+                    text: what.to_string(),
+                    thought: false,
+                    own_words: false,
+                });
+            }
             if let Some(mut chronicle) = chronicle {
                 chronicle.record(
                     clock.day(),

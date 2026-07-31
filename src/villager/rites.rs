@@ -67,6 +67,10 @@ pub(super) fn mark_the_dead(
     mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,
     mut say: MessageWriter<crate::ui::Say>,
+    mut telling: (
+        Option<ResMut<crate::telling::Tongue>>,
+        Option<Res<crate::attention::Attention>>,
+    ),
     fallen: Query<
         (Entity, &Transform, &Person, Option<&Parentage>),
         (Added<Corpse>, With<Villager>),
@@ -120,12 +124,40 @@ pub(super) fn mark_the_dead(
                 chronicle.record(day, format!("wept for {}", person.name));
             }
             if family {
-                say.write(crate::ui::Say {
-                    speaker: mourner,
-                    text: format!("{}...", person.name),
-                    thought: true,
-                    own_words: false,
-                });
+                // Watched grief is composed: this mourner, over this body,
+                // today. The dead one's name is the only name grief may say.
+                let composed = telling
+                    .0
+                    .as_mut()
+                    .filter(|_| {
+                        crate::attention::regard(telling.1.as_deref(), at.translation)
+                            .worth_composing()
+                    })
+                    .map(|tongue| {
+                        tongue.muse(crate::telling::Musing {
+                            who: mourner,
+                            voice: None,
+                            bearing: crate::villager::traits::Bearing::Plain,
+                            faith: crate::telling::FaithBand::Wavering,
+                            body: Vec::new(),
+                            place: Vec::new(),
+                            mind: format!(
+                                "you stand over the body of {}, dead this day",
+                                person.name
+                            ),
+                            heard: None,
+                            known: vec![person.name.clone()],
+                        })
+                    })
+                    .is_some();
+                if !composed {
+                    say.write(crate::ui::Say {
+                        speaker: mourner,
+                        text: format!("{}...", person.name),
+                        thought: true,
+                        own_words: false,
+                    });
+                }
             }
         }
     }

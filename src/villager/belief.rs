@@ -125,6 +125,11 @@ pub(super) fn kneel(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut notices: MessageWriter<crate::ui::Notice>,
     mut say: MessageWriter<crate::ui::Say>,
+    // Bundled: some of these systems already press Bevy's parameter ceiling.
+    mut telling: (
+        Option<ResMut<crate::telling::Tongue>>,
+        Option<Res<crate::attention::Attention>>,
+    ),
     mut hungry: Query<
         (
             Entity,
@@ -192,12 +197,38 @@ pub(super) fn kneel(
         ));
 
         info!("{} prays to {god} for food", person.name);
-        say.write(crate::ui::Say {
-            speaker: entity,
-            text: format!("{god}, we are hungry. hear me"),
-            thought: true,
-            own_words: false,
-        });
+        // A watched prayer is composed — this person, this hunger, kneeling
+        // now — and arrives over their head a breath later. Elsewhere, the
+        // written words serve as they always have.
+        let composed = telling
+            .0
+            .as_mut()
+            .filter(|_| {
+                crate::attention::regard(telling.1.as_deref(), transform.translation)
+                    .worth_composing()
+            })
+            .map(|tongue| {
+                tongue.muse(crate::telling::Musing {
+                    who: entity,
+                    voice: None,
+                    bearing: crate::villager::traits::Bearing::Plain,
+                    faith: crate::telling::FaithBand::Sure,
+                    body: vec!["hungry"],
+                    place: Vec::new(),
+                    mind: "you kneel and beg the god for food".into(),
+                    heard: None,
+                    known: Vec::new(),
+                })
+            })
+            .is_some();
+        if !composed {
+            say.write(crate::ui::Say {
+                speaker: entity,
+                text: format!("{god}, we are hungry. hear me"),
+                thought: true,
+                own_words: false,
+            });
+        }
         notices.write(crate::ui::Notice::new(format!(
             "{} prays to {god} for food",
             person.name

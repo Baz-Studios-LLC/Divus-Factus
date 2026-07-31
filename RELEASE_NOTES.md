@@ -1,5 +1,9 @@
 ## The villagers find their own words
 
+**Prayers, grief and homecomings too** — a watched villager kneeling in hunger, weeping over kin, or returning from past the cairns speaks from that moment, in their own words, like everything else.
+
+**Natural speech** — the whole village now talks in plain everyday sentences instead of fragments and proverbs, and small talk picks up whatever has lately happened: weddings, wolves, ground broken, lightning.
+
 **This update installs a language model** (~1.1 GB, once — later updates skip it). It runs inside the game, on your machine: no account, no server, nothing to set up. Click update, play.
 
 **Watched villagers speak and think for themselves.** Zoom in on anyone and their words are composed for them, in the moment, from what is actually true: their village, the season, the sky, the larder, their trade, their manner, their belief, their body, and the one thing pressing on them. A thought if they are alone, said aloud if anyone stands close enough to hear. Generated lines wear a green border while the feature is being judged; the written lines still serve the middle distance.
