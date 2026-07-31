@@ -577,6 +577,7 @@ fn drowning(
                 speaker: entity,
                 text: "help! the water has me".to_string(),
                 thought: false,
+                own_words: false,
             });
         }
     }

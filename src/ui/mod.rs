@@ -60,6 +60,13 @@ pub struct Say {
     pub speaker: Entity,
     pub text: String,
     pub thought: bool,
+    /// Whether these are the villager's OWN words, put together for this
+    /// telling, rather than one of the written phrasings.
+    ///
+    /// Carried only so a bubble can be told apart while the teller is being
+    /// judged: a generated line wears a green border. Nothing in the
+    /// simulation reads this, and it is not saved.
+    pub own_words: bool,
 }
 
 /// A live bubble, following its speaker until it fades.
@@ -95,6 +102,12 @@ fn speak(
         // at a glance, with no punctuation dressing.
         let border = if say.thought {
             palette::shade(&palette::CLOTH_BLUE, 0.7).with_alpha(0.9)
+        } else if say.own_words {
+            // The teller's own words, marked while the feature is being
+            // judged: green is used nowhere else in the interface, so a
+            // glance at a crowded square tells you which lines were made
+            // and which were written.
+            palette::shade(&palette::GRASS, 0.85).with_alpha(0.95)
         } else {
             theme::panel_border()
         };

@@ -124,6 +124,7 @@ pub(super) fn mark_the_dead(
                     speaker: mourner,
                     text: format!("{}...", person.name),
                     thought: true,
+                    own_words: false,
                 });
             }
         }

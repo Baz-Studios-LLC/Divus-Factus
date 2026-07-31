@@ -325,6 +325,12 @@ pub(crate) fn hold_conversations(
                     told_before,
                 ))
             });
+            // Logged when it is the model's, so a run can be read back and
+            // judged: everything else in the square is a written line.
+            if let Some(line) = &spoken {
+                info!("{teller_name} tells it in their own words: {line}");
+            }
+            let own_words = spoken.is_some();
             let told = spoken
                 .unwrap_or_else(|| (*rng.0.pick(kind.rumors())).to_string())
                 .replace("the god", god);
@@ -332,6 +338,7 @@ pub(crate) fn hold_conversations(
                 speaker: entity,
                 text: told.clone(),
                 thought: false,
+                own_words,
             });
             if let Ok((listener_person, mut witnessed, chronicle, faith)) =
                 minds.get_mut(talk.partner)
@@ -390,6 +397,7 @@ pub(crate) fn hold_conversations(
                 speaker: entity,
                 text: reply.replace("the god", god),
                 thought: false,
+                own_words: false,
             });
         }
     }

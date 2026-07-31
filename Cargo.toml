@@ -15,6 +15,21 @@ bevy_ecs = { version = "0.19.0", features = ["debug"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+# The villagers' own words. A small language model, in-process, on the player's
+# own machine — no daemon to install, no server to reach, nothing for anyone to
+# do but launch the game. Pure Rust (no C++ toolchain), Metal on Apple silicon
+# and CPU everywhere else.
+#
+# Weights are NOT compiled in: they sit beside the game's saves, fetched once by
+# the launcher, and the game speaks its written lines when they are absent.
+candle-core = "0.9"
+candle-transformers = "0.9"
+tokenizers = { version = "0.21", default-features = false, features = ["onig"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+candle-core = { version = "0.9", features = ["metal"] }
+candle-transformers = { version = "0.9", features = ["metal"] }
+
 # Bevy is far too slow in a fully unoptimized debug build. Optimizing dependencies
 # while leaving our own crate unoptimized keeps iteration fast and the game playable.
 [profile.dev.package."*"]

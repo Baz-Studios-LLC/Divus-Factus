@@ -242,6 +242,7 @@ pub(super) fn expeditions(
                 speaker: entity,
                 text: what.to_string(),
                 thought: false,
+                own_words: false,
             });
             if let Some(mut chronicle) = chronicle {
                 chronicle.record(

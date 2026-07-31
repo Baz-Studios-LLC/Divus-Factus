@@ -19,22 +19,25 @@
 //!    structured event, never the prose. A world remains rebuildable from its
 //!    seed, which is the property the whole save format rests on.
 //!
-//! On by default while the game is in development, so every run exercises it;
-//! `DIVUS_FACTUS_TELLER=0` turns it off. Nothing is required to be installed —
-//! with no model listening it gives up after a few attempts, says so once, and
-//! the village goes on speaking its written lines. The model is spoken to over
-//! a plain JSON POST to localhost: no crate for it, because `serde_json` is
-//! already here and the request is forty lines.
+//! The model runs IN THIS PROCESS. There is no daemon to install, no server to
+//! reach, nothing for a player to do but launch the game — which is the whole
+//! requirement. Weights are not compiled in: they sit beside the saves, the
+//! launcher fetches them once, and their absence costs nothing because the
+//! written lines are always there.
+//!
+//! `DIVUS_FACTUS_TELLER=0` turns it off.
 
 use std::collections::{HashMap, HashSet};
-use std::io::{Read, Write};
-use std::net::TcpStream;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use bevy::prelude::*;
+use candle_core::quantized::gguf_file;
+use candle_core::{Device, Tensor};
+use candle_transformers::generation::LogitsProcessor;
+use candle_transformers::models::quantized_qwen2::ModelWeights;
+use tokenizers::Tokenizer;
 
 use crate::villager::work::Vocation;
 use crate::witness::DivineEventKind;
@@ -59,15 +62,11 @@ const LINES_PER_KEY: usize = 3;
 /// weights refuses connections too and deserves a second chance.
 const GIVE_UP_AFTER: u32 = 24;
 
-/// The model asked by default: small and quick on purpose. A retelling is one
-/// short sentence under hard constraints — the smallest instruct model that
-/// can follow "one sentence, plain words" does the job, leaves the frame
-/// budget alone, and answers fast enough to keep up with the mill.
-const DEFAULT_MODEL: &str = "llama3.2:1b";
-
-/// Where the local model listens. Localhost only, always: villager chatter is
-/// not worth a network round trip or a question about where the words went.
-const DEFAULT_ENDPOINT: &str = "127.0.0.1:11434";
+/// The most tokens one line may take before it stops being a line.
+///
+/// A villager says a mouthful, not a paragraph, and a runaway generation is
+/// wasted time on a thread the game is waiting for nothing from.
+const MAX_TOKENS: usize = 48;
 
 /// The longest a retelling may run before it stops sounding like speech.
 const MAX_WORDS: usize = 16;
@@ -311,37 +310,125 @@ impl Tongue {
     }
 }
 
-/// Installs the teller, but only if the player asked for it.
+/// Where the weights live: beside the game's own saves, NOT inside the
+/// installed game folder — which the launcher wipes and re-unpacks on every
+/// update. Fetched once, kept forever.
+///
+/// The launcher writes here by mirroring this same convention; macOS hands a
+/// bundle to LaunchServices and drops the environment on the way, so there is
+/// no channel to be told a path. If this moves, the launcher's `support_path`
+/// moves with it.
+pub fn model_dir() -> Option<std::path::PathBuf> {
+    let home = std::env::var("HOME").ok();
+    if cfg!(target_os = "macos") {
+        Some(
+            std::path::PathBuf::from(home?).join("Library/Application Support/Divus Factus/models"),
+        )
+    } else if cfg!(target_os = "windows") {
+        Some(
+            std::path::PathBuf::from(std::env::var("APPDATA").ok()?)
+                .join("Divus Factus")
+                .join("models"),
+        )
+    } else {
+        Some(std::path::PathBuf::from(home?).join(".local/share/divus-factus/models"))
+    }
+}
+
+/// The weights and tokenizer to speak with, chosen from whatever is on disk.
+///
+/// Discovered rather than named, so a player who wants a better voice only has
+/// to drop a larger `.gguf` in the folder — the biggest file wins, on the
+/// reasoning that nobody puts one there by accident. That is the whole of the
+/// "bring your own bigger model" feature, and it costs nothing.
+fn find_model() -> Option<(std::path::PathBuf, std::path::PathBuf)> {
+    let dir = model_dir()?;
+    let mut weights: Vec<(u64, std::path::PathBuf)> = std::fs::read_dir(&dir)
+        .ok()?
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            if path.extension().is_some_and(|e| e == "gguf") {
+                let size = path.metadata().ok()?.len();
+                Some((size, path))
+            } else {
+                None
+            }
+        })
+        .collect();
+    weights.sort_by_key(|(size, _)| std::cmp::Reverse(*size));
+    let (_, model) = weights.into_iter().next()?;
+
+    // A tokenizer named for this model, or the only one in the folder.
+    let stem = model.file_stem()?.to_string_lossy().to_string();
+    let paired = dir.join(format!("{stem}-tokenizer.json"));
+    let tokenizer = if paired.exists() {
+        paired
+    } else {
+        std::fs::read_dir(&dir)
+            .ok()?
+            .filter_map(|entry| {
+                let path = entry.ok()?.path();
+                let name = path.file_name()?.to_string_lossy().to_string();
+                name.ends_with("tokenizer.json").then_some(path)
+            })
+            .next()?
+    };
+    Some((model, tokenizer))
+}
+
+/// Installs the teller. Silent and free when there are no weights to read.
 pub struct TellingPlugin;
 
 impl Plugin for TellingPlugin {
     fn build(&self, app: &mut App) {
-        // On unless explicitly silenced. Costs nothing when no model answers.
+        // On unless explicitly silenced — the point is that a player does
+        // nothing to get this.
         if std::env::var("DIVUS_FACTUS_TELLER").is_ok_and(|dial| dial == "0") {
             return;
         }
-        let model = std::env::var("DIVUS_FACTUS_TELLER_MODEL")
-            .unwrap_or_else(|_| DEFAULT_MODEL.to_string());
-        let endpoint = std::env::var("DIVUS_FACTUS_TELLER_AT")
-            .unwrap_or_else(|_| DEFAULT_ENDPOINT.to_string());
-        info!("the teller is listening: {model} at {endpoint}");
+        let Some((weights, tokenizer)) = find_model() else {
+            // No model on disk: the village keeps to its written lines, and
+            // nothing about the game is worse than it was.
+            return;
+        };
+        info!(
+            "the teller found {}",
+            weights.file_name().unwrap_or_default().to_string_lossy()
+        );
 
         let (ask, requests) = channel::<Retelling>();
         let (answers, heard) = channel::<(TellingKey, Option<String>)>();
         let inflight = Arc::new(AtomicUsize::new(0));
 
-        // One plain thread, owning the whole conversation with the model. No
-        // async runtime: this codebase has two dependencies and does not need
-        // a third to send one HTTP request at a time.
+        // One plain thread owning the model. No async runtime: this is a queue
+        // of one short generation at a time, and the game never waits on it.
+        // Loading happens HERE rather than on the main thread, so a second and
+        // a half of weight-reading never shows up as a stutter.
         let worker_inflight = Arc::clone(&inflight);
         std::thread::Builder::new()
             .name("teller".into())
+            .stack_size(8 * 1024 * 1024)
             .spawn(move || {
+                let mut voice = match Voice::load(&weights, &tokenizer) {
+                    Ok(voice) => voice,
+                    Err(e) => {
+                        warn!("the teller could not read its model: {e}");
+                        // Drain and refuse, so callers stop asking.
+                        while let Ok(of) = requests.recv() {
+                            worker_inflight.fetch_sub(1, Ordering::Relaxed);
+                            if answers.send((of.key, None)).is_err() {
+                                return;
+                            }
+                        }
+                        return;
+                    }
+                };
+                info!("the teller has its voice");
                 while let Ok(of) = requests.recv() {
-                    let line = ask_the_model(&endpoint, &model, &of);
+                    let line = voice.retell(&of);
                     worker_inflight.fetch_sub(1, Ordering::Relaxed);
-                    // Both outcomes are reported. Silence would leave the
-                    // shape marked as asked and never answered.
+                    // Both outcomes reported: silence would leave the shape
+                    // marked as asked and never answered.
                     if answers.send((of.key, line)).is_err() {
                         break;
                     }
@@ -362,19 +449,130 @@ impl Plugin for TellingPlugin {
     }
 }
 
+/// The loaded model, and everything needed to speak with it.
+///
+/// Lives only on the teller thread. Nothing here is `Send` across a system
+/// boundary and nothing needs to be.
+struct Voice {
+    model: ModelWeights,
+    tokenizer: Tokenizer,
+    device: Device,
+    /// Qwen closes a turn with `<|im_end|>`; without it the model talks past
+    /// its own answer.
+    end_of_turn: u32,
+    /// Varied per call, or every villager in the world says one thing.
+    draws: u64,
+}
+
+impl Voice {
+    fn load(weights: &std::path::Path, tokenizer: &std::path::Path) -> Result<Voice, String> {
+        // Metal where there is Metal. The renderer has first call on the GPU,
+        // but a 1.5B model's share of it is small and the alternative is
+        // seconds per line on CPU.
+        let device = Device::new_metal(0).unwrap_or(Device::Cpu);
+        let mut file = std::fs::File::open(weights).map_err(|e| e.to_string())?;
+        let content = gguf_file::Content::read(&mut file).map_err(|e| e.to_string())?;
+        let model =
+            ModelWeights::from_gguf(content, &mut file, &device).map_err(|e| e.to_string())?;
+        let tokenizer = Tokenizer::from_file(tokenizer).map_err(|e| e.to_string())?;
+        let end_of_turn = tokenizer
+            .token_to_id("<|im_end|>")
+            .ok_or("the tokenizer has no <|im_end|>")?;
+        Ok(Voice {
+            model,
+            tokenizer,
+            device,
+            end_of_turn,
+            draws: 0,
+        })
+    }
+
+    /// One villager's line, or `None` if what came back is unfit to say.
+    fn retell(&mut self, of: &Retelling) -> Option<String> {
+        self.draws += 1;
+        let prompt = chatml(&describe(of));
+        let raw = self.generate(&prompt, self.draws).ok()?;
+        let line = raw.lines().next()?;
+        if !admissible(line) {
+            return None;
+        }
+        let line = tidy(line);
+        // Shown the written lines as examples, a small model will sometimes
+        // hand one straight back. Treated as a miss: a line already in the
+        // corpus adds nothing the fallback would not have given for free, and
+        // caching it would crowd out the ones it actually composed.
+        if of
+            .key
+            .kind
+            .rumors()
+            .iter()
+            .any(|written| written.eq_ignore_ascii_case(&line))
+        {
+            return None;
+        }
+        Some(line)
+    }
+
+    fn generate(&mut self, prompt: &str, seed: u64) -> Result<String, String> {
+        let encoded = self
+            .tokenizer
+            .encode(prompt, true)
+            .map_err(|e| e.to_string())?;
+        let tokens = encoded.get_ids();
+        // Warm enough to differ between tellers, cool enough to obey.
+        let mut sampler = LogitsProcessor::new(seed, Some(0.8), Some(0.9));
+
+        // The prompt in one pass; `forward` yields the last position's logits.
+        let tensor = |ids: &[u32]| Tensor::new(ids, &self.device).map_err(|e| e.to_string());
+        let input = tensor(tokens)?.unsqueeze(0).map_err(|e| e.to_string())?;
+        let logits = self
+            .model
+            .forward(&input, 0)
+            .and_then(|l| l.squeeze(0))
+            .map_err(|e| e.to_string())?;
+        let mut next = sampler.sample(&logits).map_err(|e| e.to_string())?;
+
+        let mut out: Vec<u32> = Vec::new();
+        for step in 0..MAX_TOKENS {
+            if next == self.end_of_turn {
+                break;
+            }
+            out.push(next);
+            let input = tensor(&[next])?.unsqueeze(0).map_err(|e| e.to_string())?;
+            let logits = self
+                .model
+                .forward(&input, tokens.len() + step)
+                .and_then(|l| l.squeeze(0))
+                .map_err(|e| e.to_string())?;
+            next = sampler.sample(&logits).map_err(|e| e.to_string())?;
+            // One sentence: a newline ends the turn whatever the model thinks.
+            if let Ok(so_far) = self.tokenizer.decode(&out, true)
+                && so_far.contains('\n')
+            {
+                break;
+            }
+        }
+        self.tokenizer.decode(&out, true).map_err(|e| e.to_string())
+    }
+}
+
 /// What the model is told about its part, once.
 fn system_prompt() -> &'static str {
     // "the god" rather than a name, always: the people name their own god in
-    // their own tongue, and the caller substitutes it afterwards. A model
+    // their own tongue and the caller substitutes it afterwards. A model
     // inventing a name would quietly break that.
-    "You are one villager in a pre-industrial village, telling a neighbour \
-     about something strange you know of. Reply with ONE short sentence of \
-     plain spoken words, first person, under fourteen words. Never explain, \
-     never narrate, never use quotation marks. Always say 'the god' and never \
-     invent a name for it. No modern words."
+    //
+    // "Never repeat the details back" earns its place — without it a small
+    // model reads the fields aloud: "My trade is hunts. My nature is steady."
+    "You are a villager in a pre-industrial village, telling a neighbour what you \
+     know of something strange. Answer ONLY with the words you would say: one \
+     short mouthful, under twelve words, plain and spoken. Never repeat the \
+     details back. Never mention your trade, your belief or your nature. Never \
+     explain or narrate. No quotation marks, no modern words. Say 'the god', \
+     never a name."
 }
 
-/// The teller's own circumstances, as fields.
+/// The teller's own circumstances, as fields rather than prose.
 fn describe(of: &Retelling) -> String {
     let mut lines = vec![
         format!("what happened: {}", of.key.kind.describe()),
@@ -398,10 +596,59 @@ fn describe(of: &Retelling) -> String {
     lines.join("\n")
 }
 
+/// Worked examples, whose answers are the game's OWN written rumours.
+///
+/// This is the highest-leverage part of the whole feature. A small model
+/// follows examples far better than it follows rules — showing it three did
+/// more for quality than any amount of instruction, taking the share of
+/// usable lines from two thirds to all of them. And because the answers are
+/// read out of [`DivineEventKind::rumors`] rather than copied, the hand-written
+/// corpus is no longer only the fallback: it is what teaches the model this
+/// world's register. Writing more rumours now improves the generated ones too.
+fn shots() -> Vec<(Retelling, String)> {
+    let example = |kind: DivineEventKind, hand: Hand, trust: f32, voice: Vocation, which: usize| {
+        let said = kind.rumors()[which % kind.rumors().len()].to_string();
+        (Retelling::new(kind, hand, Some(voice), trust, 0.5, 0), said)
+    };
+    vec![
+        example(
+            DivineEventKind::Lifted,
+            Hand::Witnessed,
+            0.8,
+            Vocation::Gatherer,
+            1,
+        ),
+        example(DivineEventKind::Smote, Hand::Heard, 0.4, Vocation::Mason, 2),
+        example(
+            DivineEventKind::Provided,
+            Hand::Distant,
+            0.1,
+            Vocation::Hunter,
+            2,
+        ),
+    ]
+}
+
+/// Qwen speaks ChatML. Getting this wrong is the difference between a
+/// villager's line and the model reciting its instructions back.
+fn chatml(user: &str) -> String {
+    let mut out = format!("<|im_start|>system\n{}<|im_end|>\n", system_prompt());
+    for (fields, said) in shots() {
+        out.push_str(&format!(
+            "<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n{said}<|im_end|>\n",
+            describe(&fields)
+        ));
+    }
+    out.push_str(&format!(
+        "<|im_start|>user\n{user}<|im_end|>\n<|im_start|>assistant\n"
+    ));
+    out
+}
+
 /// Whether a line the model produced is fit to put in a villager's mouth.
 ///
 /// Nothing that comes back is trusted. A malformed answer is indistinguishable
-/// from the model being switched off, which is the point: there is exactly one
+/// from there being no model at all, which is the point: there is exactly one
 /// fallback path and it is always available.
 pub fn admissible(line: &str) -> bool {
     let trimmed = line.trim();
@@ -425,10 +672,10 @@ pub fn admissible(line: &str) -> bool {
     true
 }
 
-/// Tidies an admissible line into the shape the bubble expects.
+/// Tidies an admissible line into the shape the bubbles expect.
 pub fn tidy(line: &str) -> String {
     let mut out = line.trim().trim_matches('"').trim().to_string();
-    // The bubbles are lower-case throughout; a capital reads as a title.
+    // The bubbles run lower-case; a capital reads as a caption.
     if let Some(first) = out.chars().next()
         && first.is_uppercase()
     {
@@ -439,63 +686,6 @@ pub fn tidy(line: &str) -> String {
         out.pop();
     }
     out
-}
-
-/// Asks the local model for one line. Runs on the teller thread only.
-fn ask_the_model(endpoint: &str, model: &str, of: &Retelling) -> Option<String> {
-    let payload = serde_json::json!({
-        "model": model,
-        "system": system_prompt(),
-        "prompt": describe(of),
-        "stream": false,
-        "options": {
-            // Warm enough to vary between tellers, cool enough to obey.
-            "temperature": 0.9,
-            "num_predict": 40,
-        },
-    });
-    let raw = post_json(endpoint, "/api/generate", &payload)?;
-    let parsed: serde_json::Value = serde_json::from_slice(&raw).ok()?;
-    let line = parsed.get("response")?.as_str()?;
-    let line = line.lines().next()?;
-    if !admissible(line) {
-        return None;
-    }
-    Some(tidy(line))
-}
-
-/// A JSON POST to a local address, by hand.
-///
-/// Forty lines against a whole HTTP crate, in a project that hand-rolls its
-/// own noise and its own random numbers. `Connection: close` lets the reply be
-/// read to the end without chunk parsing.
-fn post_json(endpoint: &str, path: &str, body: &serde_json::Value) -> Option<Vec<u8>> {
-    let body = serde_json::to_vec(body).ok()?;
-    let mut stream = TcpStream::connect(endpoint).ok()?;
-    stream
-        .set_write_timeout(Some(Duration::from_secs(5)))
-        .ok()?;
-    stream
-        .set_read_timeout(Some(Duration::from_secs(30)))
-        .ok()?;
-
-    let head = format!(
-        "POST {path} HTTP/1.1\r\n\
-         Host: {endpoint}\r\n\
-         Content-Type: application/json\r\n\
-         Content-Length: {}\r\n\
-         Connection: close\r\n\r\n",
-        body.len()
-    );
-    stream.write_all(head.as_bytes()).ok()?;
-    stream.write_all(&body).ok()?;
-    stream.flush().ok()?;
-
-    let mut raw = Vec::new();
-    stream.read_to_end(&mut raw).ok()?;
-    // Split the head from the body on the blank line.
-    let split = raw.windows(4).position(|w| w == b"\r\n\r\n")? + 4;
-    Some(raw[split..].to_vec())
 }
 
 #[cfg(test)]
@@ -623,6 +813,37 @@ mod tests {
         assert!(prompt.contains("your belief"));
         assert!(prompt.contains("your trade"));
         // The people name their own god; the model must not.
-        assert!(system_prompt().contains("never invent a name"));
+        assert!(system_prompt().contains("never a name"));
+    }
+
+    #[test]
+    fn the_prompt_shows_the_model_the_villages_own_lines() {
+        // The few-shot answers are read out of the game's rumour corpus, not
+        // copied beside it — so rewriting a rumour rewrites the example, and
+        // the hand-written lines keep teaching the register rather than
+        // drifting out of step with it.
+        let built = chatml(&describe(&Retelling::new(
+            DivineEventKind::Smote,
+            Hand::Witnessed,
+            Some(Vocation::Fisher),
+            0.9,
+            0.5,
+            0,
+        )));
+        for (_, said) in shots() {
+            assert!(
+                built.contains(&said),
+                "the prompt should carry the written line {said:?}",
+            );
+            // And every example must itself be something we would accept.
+            assert!(admissible(&said), "{said:?} would be rejected as an answer");
+        }
+        // ChatML, closed properly, ending on the assistant's turn to speak.
+        assert!(built.starts_with("<|im_start|>system"));
+        assert!(built.ends_with("<|im_start|>assistant\n"));
+        assert_eq!(
+            built.matches("<|im_end|>").count(),
+            1 + shots().len() * 2 + 1
+        );
     }
 }

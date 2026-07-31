@@ -2121,6 +2121,7 @@ pub(crate) fn sermons(
         speaker: preacher,
         text: format!("hear how {}", sermon.rumor().replace("the god", god)),
         thought: false,
+        own_words: false,
     });
 
     // Incense on the coals: the telling carries further and sinks

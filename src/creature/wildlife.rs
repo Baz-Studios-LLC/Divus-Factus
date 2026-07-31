@@ -494,6 +494,7 @@ pub(super) fn wolves_stalk(
                     speaker: *quarry,
                     text: "wolves! WOLVES!".to_string(),
                     thought: false,
+                    own_words: false,
                 });
             }
         }

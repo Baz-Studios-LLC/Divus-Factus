@@ -196,6 +196,7 @@ pub(super) fn kneel(
             speaker: entity,
             text: format!("{god}, we are hungry. hear me"),
             thought: true,
+            own_words: false,
         });
         notices.write(crate::ui::Notice::new(format!(
             "{} prays to {god} for food",

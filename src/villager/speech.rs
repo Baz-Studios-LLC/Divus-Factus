@@ -652,6 +652,7 @@ pub(super) fn small_talk(
         speaker,
         text: line.replace("the god", god),
         thought: !heard,
+        own_words: false,
     });
 }
 
