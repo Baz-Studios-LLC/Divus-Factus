@@ -13,6 +13,12 @@ use crate::ui;
 #[derive(Component)]
 pub(crate) struct HudPanel;
 
+/// The dev overlay: a bare corner readout on the backquote key, apart from
+/// the heavy F1 instrument panel. Starts with the frame rate; grows a line
+/// at a time as a number earns its place.
+#[derive(Component)]
+pub(crate) struct DevOverlay;
+
 /// Which live readout a HUD value text shows. One enum, one update system —
 /// adding a row to the HUD is adding a variant, a label and a match arm.
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +45,22 @@ pub(crate) enum HudValue {
 }
 
 pub(crate) fn spawn_hud(mut commands: Commands) {
+    // The dev overlay, hidden until the backquote asks for it. It borrows
+    // the HUD's own live values — a row here is a HudValue and a Node.
+    commands.spawn((
+        DevOverlay,
+        HudValue::Fps,
+        ui::dim(""),
+        Node {
+            position_type: PositionType::Absolute,
+            left: px(10),
+            top: px(8),
+            ..default()
+        },
+        Visibility::Hidden,
+        GlobalZIndex(210),
+    ));
+
     // Both panels come from the interface kit; this module only decides what
     // words go in them.
     let hud = ui::panel(
@@ -385,5 +407,22 @@ pub(crate) fn update_hud(
         if text.0 != fresh {
             *text = Text::new(fresh);
         }
+    }
+}
+
+/// The backquote shows and hides the dev overlay.
+pub(crate) fn toggle_dev_overlay(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut overlay: Query<&mut Visibility, With<DevOverlay>>,
+) {
+    if !keys.just_pressed(KeyCode::Backquote) {
+        return;
+    }
+    for mut visibility in &mut overlay {
+        *visibility = if *visibility == Visibility::Hidden {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
     }
 }
