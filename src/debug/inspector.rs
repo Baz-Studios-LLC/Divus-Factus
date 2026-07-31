@@ -90,7 +90,13 @@ pub(crate) fn update_inspector(
     ),
     kin_names: Query<&Person>,
     settlements: Query<&Settlement>,
-    huts: Query<(), With<crate::villager::work::Hut>>,
+    huts: Query<
+        Has<crate::villager::work::Longhouse>,
+        Or<(
+            With<crate::villager::work::Hut>,
+            With<crate::villager::work::Longhouse>,
+        )>,
+    >,
     rising: (
         Query<(
             &crate::villager::work::ConstructionSite,
@@ -331,7 +337,7 @@ pub(crate) fn update_inspector(
             node.display = Display::None;
         }
         if let Ok(mut name) = texts.p0().single_mut() {
-            *name = Text::new(format!("The grave of {}", person.name));
+            *name = Text::new(format!("The grave of {}", person.full_name()));
         }
         if let Ok(mut subtitle) = texts.p1().single_mut() {
             *subtitle = Text::new(format!("laid to rest on day {}", grave.day));
@@ -373,7 +379,7 @@ pub(crate) fn update_inspector(
             node.display = Display::Flex;
         }
         if let Ok(mut name) = texts.p0().single_mut() {
-            *name = Text::new(person.name.clone());
+            *name = Text::new(person.full_name());
         }
 
         let who = genome.map_or("a soul", |g| person_phrase(g.sex, g.age));
@@ -473,8 +479,9 @@ pub(crate) fn update_inspector(
         node.display = Display::None;
     }
 
-    let (title, description) = if huts.get(entity).is_ok() {
-        // A finished house: the household, and what each of them is up to.
+    let (title, description) = if let Ok(longhouse) = huts.get(entity) {
+        // A finished roof: who sleeps under it, and what each of them is
+        // up to. Which roof it is says who they are to each other.
         let village = settlements
             .iter()
             .next()
@@ -483,13 +490,25 @@ pub(crate) fn update_inspector(
             .iter()
             .filter(|(_, home, _)| home.0 == entity)
             .map(|(person, _, activity)| {
-                format!("{} - {}", person.name, state_phrase(Some(activity), None))
+                format!(
+                    "{} - {}",
+                    person.full_name(),
+                    state_phrase(Some(activity), None)
+                )
             })
             .collect();
         (
-            format!("A house of {village}"),
+            if longhouse {
+                format!("The longhouse of {village}")
+            } else {
+                format!("A house of {village}")
+            },
             if residents.is_empty() {
-                "no one yet calls it home".to_string()
+                if longhouse {
+                    "no one has taken a bed here yet".to_string()
+                } else {
+                    "no one yet calls it home".to_string()
+                }
             } else {
                 residents.join("\n")
             },
@@ -540,7 +559,7 @@ pub(crate) fn update_inspector(
     } else if let Ok(vitality) = corpse {
         let name = people
             .get(entity)
-            .map(|(person, ..)| format!("the body of {}", person.name))
+            .map(|(person, ..)| format!("the body of {}", person.full_name()))
             .unwrap_or_else(|_| "a body".to_string());
         let cause = match vitality {
             Some(v) if v.violent => "broken against the earth",

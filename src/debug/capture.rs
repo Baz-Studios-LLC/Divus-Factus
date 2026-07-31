@@ -18,7 +18,7 @@ pub(crate) struct AutoCapture {
 pub(crate) fn auto_capture(
     mut commands: Commands,
     // Real time: the capture delay is a wall-clock promise, and must not
-    // stretch on the title screen's pause or shrink under EGREGORE_SPEED.
+    // stretch on the title screen's pause or shrink under DIVUS_FACTUS_SPEED.
     time: Res<Time<Real>>,
     mut capture: ResMut<AutoCapture>,
     target: Option<Res<crate::render::CaptureTarget>>,
@@ -70,7 +70,7 @@ pub(crate) fn screenshot_on_request(
     mut counter: Local<u32>,
 ) {
     if keys.just_pressed(KeyCode::F12) {
-        let path = format!("egregore-{:03}.png", *counter);
+        let path = format!("divus-factus-{:03}.png", *counter);
         *counter += 1;
         info!("saving screenshot to {path}");
         commands
@@ -100,10 +100,10 @@ pub(crate) fn capture_preselect(
     }
     // Every window lives in the codex now: captures open it on the People
     // page with somebody selected (a screenshot always has a subject),
-    // EGREGORE_OPEN=village stays on the ledger, =history turns to the
+    // DIVUS_FACTUS_OPEN=village stays on the ledger, =history turns to the
     // chronicle - and =none keeps the book closed, for photographing the
     // world itself.
-    if std::env::var("EGREGORE_OPEN").is_ok_and(|w| w == "none") {
+    if std::env::var("DIVUS_FACTUS_OPEN").is_ok_and(|w| w == "none") {
         return;
     }
     for mut visibility in &mut codex_windows {
@@ -111,7 +111,7 @@ pub(crate) fn capture_preselect(
             *visibility = Visibility::Visible;
         }
     }
-    let wanted = match std::env::var("EGREGORE_OPEN").as_deref() {
+    let wanted = match std::env::var("DIVUS_FACTUS_OPEN").as_deref() {
         Ok("village") => super::village::CodexPage::Ledger,
         Ok("history") => super::village::CodexPage::Chronicle,
         Ok("god") => super::village::CodexPage::Deity,

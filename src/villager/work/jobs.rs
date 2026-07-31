@@ -153,7 +153,7 @@ pub(crate) fn take_up_work(
     clock: Res<crate::calendar::WorldClock>,
     terrain: Res<Terrain>,
     known: Option<Res<crate::villager::explore::KnownWorld>>,
-    site: Option<Res<SettlementSite>>,
+    members: Query<&crate::villager::MemberOf>,
     mut rng: ResMut<SimRng>,
     mut workers: Query<
         (
@@ -172,7 +172,13 @@ pub(crate) fn take_up_work(
         ),
     >,
     bushes: Query<(Entity, &GlobalTransform, &FoodSource), Without<Villager>>,
-    build_sites: Query<(Entity, &Transform, &ConstructionSite, &Blueprint)>,
+    build_sites: Query<(
+        Entity,
+        &Transform,
+        &ConstructionSite,
+        &Blueprint,
+        &crate::villager::MemberOf,
+    )>,
     trees: Query<(Entity, &GlobalTransform, &crate::scatter::FellableTree)>,
     boulders: Query<(Entity, &GlobalTransform), With<crate::matter::Boulder>>,
     town: (
@@ -182,7 +188,7 @@ pub(crate) fn take_up_work(
         Query<(Entity, &GlobalTransform, &crate::matter::Deposit)>,
         Query<(Entity, &GlobalTransform, &crate::scatter::SacredFlora)>,
     ),
-    mut stores: Query<&mut Stockpile>,
+    mut towns: Query<(&crate::villager::SettlementGround, &mut Stockpile)>,
     game: Query<
         (Entity, &Transform, &CreatureGenome),
         (
@@ -202,20 +208,40 @@ pub(crate) fn take_up_work(
         ),
     >,
 ) {
-    let Some(site) = site else {
-        return;
-    };
     let (buildings, fields, patients, deposits, sacred) = town;
     // A thin larder keeps the food trades working after dark - lanterns
     // on the dock - because the village eats all night whether or not
-    // anyone is producing.
-    let mouths = workers.iter().count();
-    let larder_thin = stores
-        .get(site.settlement)
-        .is_ok_and(|s| s.food() < mouths as f32);
+    // anyone is producing. Counted per TOWN: one settlement's famine is no
+    // reason for another's fishers to work through the night. Gathered
+    // before the loop, because the worker query is borrowed mutably in it.
+    let mut mouths_by_town: std::collections::HashMap<Entity, usize> =
+        std::collections::HashMap::new();
+    for (worker, ..) in workers.iter() {
+        if let Ok(member) = members.get(worker) {
+            *mouths_by_town.entry(member.0).or_default() += 1;
+        }
+    }
     let daylight = is_work_hour(clock.time_of_day());
 
     for (entity, transform, needs, vocation, mut activity, shunned) in &mut workers {
+        // Everything below is asked of the worker's OWN town: its square, its
+        // larder, its building plots.
+        let Ok(&crate::villager::MemberOf(home)) = members.get(entity) else {
+            continue;
+        };
+        let Some((centre, food, timber, stone, clay)) = towns.get(home).ok().map(|(g, store)| {
+            (
+                g.centre,
+                store.food(),
+                store.timber,
+                store.stone,
+                store.clay,
+            )
+        }) else {
+            continue;
+        };
+        let mouths = mouths_by_town.get(&home).copied().unwrap_or(0);
+        let larder_thin = food < mouths as f32;
         if !matches!(*activity, Activity::Idle | Activity::Wandering) {
             continue;
         }
@@ -276,7 +302,7 @@ pub(crate) fn take_up_work(
                         &permitted,
                     )
                 };
-                if stores.get(site.settlement).is_ok_and(|s| s.food() >= 25.0) {
+                if food >= 25.0 {
                     sacred_job().or(food_job)
                 } else {
                     food_job.or_else(sacred_job)
@@ -320,7 +346,7 @@ pub(crate) fn take_up_work(
                     Job::at(at, Some(dock), at.distance(transform.translation))
                 })
                 .or_else(|| {
-                    find_shore(&terrain, site.centre, &mut rng.0)
+                    find_shore(&terrain, centre, &mut rng.0)
                         .filter(|at| permitted(*at))
                         .map(|at| Job::at(at, None, at.distance(transform.translation)))
                 }),
@@ -350,7 +376,7 @@ pub(crate) fn take_up_work(
                         )
                     })
                     .or_else(|| {
-                        find_ground(&terrain, site.centre, &mut rng.0, |t, x, z| {
+                        find_ground(&terrain, centre, &mut rng.0, |t, x, z| {
                             matches!(t.biome_at(x, z), Biome::Alpine)
                                 || t.height_at(x, z) > WATER_LEVEL + 40.0
                         })
@@ -369,7 +395,7 @@ pub(crate) fn take_up_work(
                     &known_far,
                     &permitted,
                 );
-                if stores.get(site.settlement).is_ok_and(|s| s.stone >= 12.0) {
+                if stone >= 12.0 {
                     ore_job.or(stone_job)
                 } else {
                     stone_job.or(ore_job)
@@ -393,13 +419,12 @@ pub(crate) fn take_up_work(
 
             // Carpenters go where ground is broken — if there is timber to work.
             Vocation::Carpenter => {
-                if stores
-                    .get(site.settlement)
-                    .is_ok_and(|s| s.timber >= 1.0 || s.stone >= 1.0 || s.clay >= 1.0)
-                {
+                if timber >= 1.0 || stone >= 1.0 || clay >= 1.0 {
                     build_sites
                         .iter()
-                        .filter(|(_, _, cs, plan)| cs.stone_laid >= cs.footing_stone(plan.kind))
+                        .filter(|(_, _, cs, plan, member)| {
+                            member.0 == home && cs.stone_laid >= cs.footing_stone(plan.kind)
+                        })
                         .map(|(house, house_transform, ..)| {
                             (
                                 house,
@@ -416,13 +441,12 @@ pub(crate) fn take_up_work(
 
             // Masons serve any site whose foundation still wants stone.
             Vocation::Mason => {
-                let laying = if stores
-                    .get(site.settlement)
-                    .is_ok_and(|s| s.stone >= 1.0 || s.clay >= 1.0)
-                {
+                let laying = if stone >= 1.0 || clay >= 1.0 {
                     build_sites
                         .iter()
-                        .filter(|(_, _, cs, plan)| cs.stone_laid < cs.footing_stone(plan.kind))
+                        .filter(|(_, _, cs, plan, member)| {
+                            member.0 == home && cs.stone_laid < cs.footing_stone(plan.kind)
+                        })
                         .map(|(b, t, ..)| {
                             (
                                 b,
@@ -448,7 +472,7 @@ pub(crate) fn take_up_work(
                         )
                     })
                     .or_else(|| {
-                        if stores.get(site.settlement).is_ok_and(|s| s.clay >= 14.0) {
+                        if clay >= 14.0 {
                             return None;
                         }
                         nearest_job(
@@ -472,7 +496,26 @@ pub(crate) fn take_up_work(
                 let mine = fields
                     .iter()
                     .find(|(_, _, f)| f.farmer == entity)
-                    .map(|(f, t, _)| (f, t.translation));
+                    .map(|(f, t, _)| (f, t.translation))
+                    // Failing that, the nearest plot nobody has claimed —
+                    // which is how a homestead's own ground, turned when its
+                    // roof went on, ends up worked by whoever lives there.
+                    .or_else(|| {
+                        fields
+                            .iter()
+                            .filter(|(_, _, f)| f.farmer == Entity::PLACEHOLDER)
+                            .map(|(f, t, _)| (f, t.translation))
+                            .filter(|(_, at)| at.distance(transform.translation) < WORK_REACH)
+                            .min_by(|a, b| {
+                                a.1.distance(transform.translation)
+                                    .total_cmp(&b.1.distance(transform.translation))
+                            })
+                            .inspect(|(field, _)| {
+                                // Taken: from here it is theirs, and the
+                                // ordinary "work my own field" path owns it.
+                                commands.entity(*field).insert(ClaimField(entity));
+                            })
+                    });
                 match mine {
                     Some((field, at)) => {
                         Some(Job::at(at, Some(field), at.distance(transform.translation)))
@@ -500,8 +543,8 @@ pub(crate) fn take_up_work(
                             .iter()
                             .min_by(|a, b| {
                                 a.1.translation
-                                    .distance(site.centre)
-                                    .total_cmp(&b.1.translation.distance(site.centre))
+                                    .distance(centre)
+                                    .total_cmp(&b.1.translation.distance(centre))
                             })
                             .map(|(_, t, _)| (t.translation, t.rotation));
                         let gridded = anchor.and_then(|(origin, rotation)| {
@@ -526,7 +569,7 @@ pub(crate) fn take_up_work(
                         // falls back to the open ring slots.
                         gridded
                             .or_else(|| {
-                                village_slots(site.centre, 5..7)
+                                village_slots(centre, 5..7)
                                     .into_iter()
                                     .map(|(x, z, _)| Vec3::new(x, terrain.height_at(x, z), z))
                                     .find(|at| {
@@ -585,7 +628,7 @@ pub(crate) fn take_up_work(
                     .unwrap_or_else(|| {
                         let angle = rng.0.range(0.0, std::f32::consts::TAU);
                         let (sin, cos) = angle.sin_cos();
-                        let (x, z) = (site.centre.x + cos * 22.0, site.centre.z + sin * 22.0);
+                        let (x, z) = (centre.x + cos * 22.0, centre.z + sin * 22.0);
                         Vec3::new(x, terrain.height_at(x, z), z)
                     });
                 Some(Job::at(post, None, post.distance(transform.translation)))
@@ -598,13 +641,12 @@ pub(crate) fn take_up_work(
             // half-starvation of travel, capped at three - and a village
             // too poor to provision the road keeps its people near home,
             // where the famine watch will say so out loud.
-            let round_trip =
-                job.site.distance(transform.translation) + job.site.distance(site.centre);
+            let round_trip = job.site.distance(transform.translation) + job.site.distance(centre);
             let meals = ((round_trip / 2.4) / (super::super::SECONDS_TO_STARVE * 0.5))
                 .floor()
                 .min(3.0);
             if meals >= 1.0 && !feeds_the_village {
-                let Ok(mut store) = stores.get_mut(site.settlement) else {
+                let Ok((_, mut store)) = towns.get_mut(home) else {
                     continue;
                 };
                 if store.food() < meals + 2.0 {

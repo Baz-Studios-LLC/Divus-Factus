@@ -10,10 +10,20 @@ use crate::terrain::{Terrain, WATER_LEVEL};
 /// Timber one ordinary house costs, delivered one unit per work cycle.
 pub const HOUSE_TIMBER: f32 = 6.0;
 
+/// Timber a longhouse costs. Twice the beds, twice the timber — the price
+/// per head is the same, but it is a single long commitment rather than
+/// two small ones, which is why a village only starts one when it has hands
+/// enough to finish it.
+pub const LONGHOUSE_TIMBER: f32 = 12.0;
+
 /// What a building is for. Shape, cost and effect all follow from it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum BuildingKind {
     House,
+    /// One long roof over the unwed: where the grown children of full
+    /// houses sleep until they marry out of it. A house is a family; a
+    /// longhouse is everyone else.
+    Longhouse,
     /// Mills felled timber: every tree yields more once it stands.
     Sawmill,
     /// Tools for everyone: work cycles run faster.
@@ -54,6 +64,7 @@ impl BuildingKind {
     pub fn timber_cost(self) -> f32 {
         match self {
             BuildingKind::House => HOUSE_TIMBER,
+            BuildingKind::Longhouse => LONGHOUSE_TIMBER,
             BuildingKind::Sawmill => 8.0,
             BuildingKind::Blacksmith => 8.0,
             BuildingKind::Tavern => 9.0,
@@ -77,6 +88,7 @@ impl BuildingKind {
     pub fn stone_cost(self) -> f32 {
         match self {
             BuildingKind::House => 2.0,
+            BuildingKind::Longhouse => 4.0,
             BuildingKind::Sawmill => 2.0,
             BuildingKind::Blacksmith => 6.0,
             BuildingKind::Tavern => 2.0,
@@ -101,6 +113,7 @@ impl BuildingKind {
     pub fn name(self) -> &'static str {
         match self {
             BuildingKind::House => "A house",
+            BuildingKind::Longhouse => "The longhouse",
             BuildingKind::Sawmill => "The sawmill",
             BuildingKind::Blacksmith => "The blacksmith",
             BuildingKind::Tavern => "The tavern",
@@ -172,7 +185,9 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
         Mill | Shrine => 12,
         Bakery => 14,
         TownHall => 18,
-        House => 0,
+        // Shelter is not civic ambition: both roofs are planned by need in
+        // `plan_houses`, never by this ladder.
+        House | Longhouse => 0,
     };
     let mut best: Option<(f32, BuildingKind)> = None;
     for kind in candidates {
@@ -221,13 +236,63 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
             Shrine => needs.believers as f32 * 0.12,
             Watchtower => needs.wolves_near as f32 * 0.4,
             TownHall => (needs.population as f32 - 16.0) / 8.0,
-            House => 0.0,
+            House | Longhouse => 0.0,
         };
         if score > best.map_or(0.0, |(b, _)| b) {
             best = Some((score, kind));
         }
     }
     best.filter(|(score, _)| *score >= 0.45).map(|(_, k)| k)
+}
+
+/// What the village's two roofs are carrying, and what is already rising.
+#[derive(Default, Debug, Clone, Copy)]
+pub struct RoofNeeds {
+    /// The wed and the children: everyone with a claim on a family room.
+    pub family_souls: usize,
+    /// Everyone else — in practice the grown and unmarried.
+    pub single_souls: usize,
+    pub houses: usize,
+    pub longhouses: usize,
+    pub population: usize,
+    pub house_rising: bool,
+    pub longhouse_rising: bool,
+}
+
+/// Which roof to break ground on next, if either.
+///
+/// The village builds AHEAD of need on both roofs at once: it wants a whole
+/// spare house AND a whole spare longhouse standing empty at all times, so
+/// growth never waits on a construction site. A town that builds exactly
+/// what it needs is always one wedding behind — and a wedding needs a house
+/// free the day it happens, not a fortnight later.
+///
+/// The fire circle is deliberately not counted as shelter here. It is the
+/// shortfall made visible, not capacity to plan around.
+pub fn next_roof(needs: &RoofNeeds) -> Option<BuildingKind> {
+    use crate::villager::home::{HOUSE_CAPACITY, LONGHOUSE_CAPACITY};
+
+    let family_slack = (needs.houses * HOUSE_CAPACITY) as i32 - needs.family_souls as i32;
+    let single_slack = (needs.longhouses * LONGHOUSE_CAPACITY) as i32 - needs.single_souls as i32;
+
+    let want_house = family_slack < HOUSE_CAPACITY as i32 && !needs.house_rising;
+    // A longhouse is a big single commitment: eight beds' worth of timber in
+    // one build. A hamlet puts what it has into family roofs first and
+    // sleeps its handful of unwed by the fire until there are enough of them
+    // to be worth a long roof.
+    let want_longhouse = single_slack < LONGHOUSE_CAPACITY as i32
+        && needs.population >= 8
+        && !needs.longhouse_rising;
+
+    // Whichever roof is further behind goes first, so neither queue starves
+    // the other in a village that needs both.
+    match (want_house, want_longhouse) {
+        (true, true) if family_slack <= single_slack => Some(BuildingKind::House),
+        (true, true) => Some(BuildingKind::Longhouse),
+        (true, false) => Some(BuildingKind::House),
+        (false, true) => Some(BuildingKind::Longhouse),
+        (false, false) => None,
+    }
 }
 
 /// What a building's body is raised FROM. The land decides: timber where
@@ -294,6 +359,23 @@ impl Blueprint {
                     pal::shade(&pal::SAND, rng.range(0.45, 0.6))
                 },
                 shed_roof: rng.chance(0.12),
+                stuff: BuildStuff::Timber,
+            },
+            // Long and plain: one roof, one ridge, a row of doors. It is
+            // built to house people who are not related to each other, and
+            // it looks it — no paint, no pride, just length.
+            BuildingKind::Longhouse => Blueprint {
+                kind,
+                half_w: rng.range(2.0, 2.3),
+                half_d: rng.range(5.0, 6.0),
+                wall_h: rng.range(2.0, 2.3),
+                walls: if rng.chance(0.7) {
+                    pal::shade(&pal::WOOD, rng.range(0.5, 0.7))
+                } else {
+                    pal::shade(&pal::BONE, rng.range(0.75, 0.9))
+                },
+                roof: pal::shade(&pal::EARTH, rng.range(0.28, 0.42)),
+                shed_roof: false,
                 stuff: BuildStuff::Timber,
             },
             BuildingKind::Sawmill => Blueprint {
@@ -505,9 +587,76 @@ pub struct Building {
     pub kind: BuildingKind,
 }
 
-/// A finished house.
+/// A finished house: a roof for one family.
 #[derive(Component)]
 pub struct Hut;
+
+/// A finished longhouse: a roof for everyone with no family to sleep beside.
+#[derive(Component)]
+pub struct Longhouse;
+
+/// A house that stands out past the rings, on its own ground, with its own
+/// plot beside it.
+///
+/// Still the town's: its people belong to the settlement, eat from its stores,
+/// carry timber to its woodpile and answer its famine watch. They simply do
+/// not live in the square. Not every family wants a neighbour through the
+/// wall, and a town where nobody chose otherwise reads as a single clump
+/// rather than a place people settled.
+#[derive(Component)]
+pub struct Homestead;
+
+/// How often a new family house is raised out on its own instead of in the
+/// rings. Most families want the square; roughly one in four would rather
+/// have the room.
+const HOMESTEAD_CHANCE: f32 = 0.28;
+
+/// A town needs a proper core before anyone chooses to live outside it.
+const HOMESTEAD_MIN_POP: usize = 10;
+
+/// How far past the outermost ring a homestead's ground begins.
+const HOMESTEAD_STANDOFF: f32 = 26.0;
+
+/// And how much further out it may go — kept inside a working walk, so the
+/// square, the stores and the fire are all still a real part of their day.
+const HOMESTEAD_SPREAD: f32 = 95.0;
+
+/// How much clear ground a homestead keeps around itself. Far more than a
+/// street house: the whole point is the room.
+const HOMESTEAD_CLEARANCE: f32 = 38.0;
+
+/// Candidate plots for a homestead: scattered in a band beyond the town's
+/// rings, door turned back toward the square.
+///
+/// A band rather than the ring pattern, because the rings ARE the town — a
+/// holding placed on one would just be another street house standing further
+/// out.
+pub(crate) fn homestead_slots(
+    centre: Vec3,
+    ring_reach: u32,
+    rng: &mut Rng,
+) -> Vec<(f32, f32, f32)> {
+    let inner = 14.0 + ring_reach as f32 * 9.0 + HOMESTEAD_STANDOFF;
+    // And never past a working walk: a holding whose people cannot reach the
+    // square is not a holding, it is an abandonment. A town whose streets have
+    // already grown out this far has no room left for new ones, and the caller
+    // falls back to building in the rings.
+    let outer = (inner + HOMESTEAD_SPREAD).min(crate::villager::work::WORK_REACH - 8.0);
+    if inner >= outer {
+        return Vec::new();
+    }
+    (0..90)
+        .map(|_| {
+            let angle = rng.range(0.0, std::f32::consts::TAU);
+            let reach = rng.range(inner, outer);
+            let (sin, cos) = angle.sin_cos();
+            let (x, z) = (centre.x + cos * reach, centre.z + sin * reach);
+            // The door still faces home.
+            let toward = Vec3::new(centre.x - x, 0.0, centre.z - z).normalize_or_zero();
+            (x, z, (-toward.z).atan2(toward.x))
+        })
+        .collect()
+}
 
 /// The moment a dock finishes — fresh-built or restored from a save — its
 /// deck is opened to foot traffic: the terrain learns the planks as a
@@ -543,6 +692,175 @@ pub(crate) fn open_boardwalks(
 /// total `cost`: frame, walls, roof, at thirds of the way.
 pub fn stage_for(progress: f32, cost: f32) -> u8 {
     ((progress / cost.max(1.0) * 3.0) as u8).min(2)
+}
+
+/// The pitch every gabled roof in the world is cut to, in radians.
+const GABLE_PITCH: f32 = 0.50;
+/// How far a roof's underside clears the wall top at the outer edge of the
+/// overhang. The reason walls do not poke through their own roofs.
+const GABLE_SEAT: f32 = 0.12;
+/// How far the eaves reach out past the gable wall.
+const GABLE_OUT: f32 = 0.55;
+/// How far the two slabs run past the ridge line, so they meet rather than
+/// leaving a seam of daylight along the top.
+const GABLE_LAP: f32 = 0.10;
+
+/// How far a gabled roof's underside stands above the wall top, half a
+/// building's width `w` from its middle. The single number the slabs, the
+/// ridge beam and the gable end-caps are all cut from.
+///
+/// Everything is derived rather than tuned, because tuned numbers drift: the
+/// first version of this drew the ridge beam a fifth of the building's width
+/// ABOVE where the slabs actually met — a beam hanging in the air over every
+/// gabled roof in the game — and made the slabs long enough that their outer
+/// edges sank *below* the wall top, so the walls poked up through the roof
+/// near the eaves. Both got worse the wider the building, because the eave
+/// height was a constant while the slab length scaled with `w`.
+pub fn gable_peak(w: f32) -> f32 {
+    GABLE_SEAT + gable_span(w) * GABLE_PITCH.tan()
+}
+
+/// Half the width a gabled roof covers: the gable wall, plus the overhang.
+fn gable_span(w: f32) -> f32 {
+    // The gable end walls run a touch wider than the side walls, by their own
+    // thickness; the roof has to clear the wider of the two.
+    w * 1.05 + GABLE_OUT
+}
+
+/// The pitch a lean-to is cut to. Shallow on purpose: a working shed is a
+/// shallow thing, and the sawmill should not look like a chapel.
+const SHED_PITCH: f32 = 0.13;
+
+/// How far a lean-to's underside stands above the wall top at its high side.
+fn shed_head(w: f32) -> f32 {
+    GABLE_SEAT + (w + gable_span(w)) * SHED_PITCH.tan()
+}
+
+/// Raises a lean-to: one tilted slab, the tall band that closes the high
+/// side, and the stepped wedges that fill the sloping triangle at each end.
+///
+/// The wedges are the reason this is derived rather than tuned. They are
+/// axis-aligned boxes sitting under a slope, and the roof above one is
+/// LOWEST over its left-hand edge — so a wedge whose height came from its
+/// step number instead of from the roof above it always broke through at that
+/// corner. Every shed roof in the game was studded with little tabs.
+fn raise_shed(
+    part: &mut impl FnMut(Vec3, Vec3, f32, &Handle<StandardMaterial>),
+    w: f32,
+    d: f32,
+    h: f32,
+    roof: &Handle<StandardMaterial>,
+    wall: &Handle<StandardMaterial>,
+) {
+    let tan = SHED_PITCH.tan();
+    let cos = SHED_PITCH.cos();
+    let span = gable_span(w);
+    // The underside, measured up from the wall top, at any point across.
+    let under = |x: f32| GABLE_SEAT + (x + span) * tan;
+
+    // The slab: low edge out over -span, high edge out over +span.
+    part(
+        Vec3::new(0.0, h + under(0.0) + 0.06, 0.0),
+        Vec3::new(2.0 * span / cos, 0.12, d * 2.4),
+        SHED_PITCH,
+        roof,
+    );
+
+    // The high wall, closing wall top to slab on the tall side. Measured at
+    // the near face of the wall, where the roof is lowest across it.
+    let head = under(w - 0.09);
+    part(
+        Vec3::new(w, h + head * 0.5, 0.0),
+        Vec3::new(0.18, head, d * 2.1),
+        0.0,
+        wall,
+    );
+
+    // The sloping ends, as a staircase. Each tread rises only as far as the
+    // roof allows over its low edge, so no corner can breach the slab.
+    let limit = w * 1.05;
+    let steps = 6;
+    for k in 0..steps {
+        let step = 2.0 * limit / steps as f32;
+        let left = -limit + k as f32 * step;
+        let tread = under(left) - 0.02;
+        if tread <= 0.03 {
+            continue;
+        }
+        for zed in [-d, d] {
+            part(
+                Vec3::new(left + step * 0.5, h + tread * 0.5, zed),
+                Vec3::new(step, tread, 0.16),
+                0.0,
+                wall,
+            );
+        }
+    }
+}
+
+/// Raises a gabled roof: two slabs, the ridge beam they meet under, and the
+/// stepped end-caps that close the triangles at either end.
+///
+/// `w`, `d` and `h` are the building's half-width, half-depth and wall height;
+/// the ridge runs along the local Z axis. Shared by every gabled building so
+/// that a fix here cannot fix one roof and leave the rest wrong.
+fn raise_gable(
+    part: &mut impl FnMut(Vec3, Vec3, f32, &Handle<StandardMaterial>),
+    w: f32,
+    d: f32,
+    h: f32,
+    roof: &Handle<StandardMaterial>,
+    wall: &Handle<StandardMaterial>,
+    frame: &Handle<StandardMaterial>,
+) {
+    let tan = GABLE_PITCH.tan();
+    let cos = GABLE_PITCH.cos();
+    let span = gable_span(w);
+    let peak = gable_peak(w);
+
+    // Each slab covers from a little past the ridge out to the eave. Its
+    // length is the hypotenuse of that run, so the covered span is exact
+    // whatever the pitch.
+    let reach = span + GABLE_LAP;
+    let centre_x = (span - GABLE_LAP) * 0.5;
+    let centre_y = GABLE_SEAT + (span - centre_x) * tan + 0.06;
+    for side in [-1.0_f32, 1.0] {
+        part(
+            Vec3::new(side * centre_x, h + centre_y, 0.0),
+            Vec3::new(reach / cos, 0.12, d * 2.35),
+            -side * GABLE_PITCH,
+            roof,
+        );
+    }
+
+    // The ridge beam sits ON the join, straddling it.
+    part(
+        Vec3::new(0.0, h + peak, 0.0),
+        Vec3::new(0.2, 0.2, d * 2.4),
+        0.0,
+        frame,
+    );
+
+    // The end-caps: bands stepped up under the slope, each only as wide as
+    // the roof above it, and never wider than the wall below it.
+    let limit = w * 1.05;
+    for zed in [-d, d] {
+        let mut y = 0.0_f32;
+        while y < peak - 0.02 {
+            let band = (peak - y).min(0.26);
+            let top = y + band;
+            // The roof's underside at this height, which is how wide the
+            // masonry may be without breaking through it.
+            let half = ((span - (top - GABLE_SEAT) / tan).min(limit) - 0.04).max(0.06);
+            part(
+                Vec3::new(0.0, h + y + band * 0.5, zed),
+                Vec3::new(half * 2.0, band, 0.16),
+                0.0,
+                wall,
+            );
+            y = top;
+        }
+    }
 }
 
 /// Raises the visible stage of a building under construction, shaped and
@@ -860,6 +1178,118 @@ pub(crate) fn raise_stage(
         return;
     }
 
+    // A longhouse is a house stretched until it stops being one: the same
+    // carpentry, but bay after bay of it, and a door to each bay instead of
+    // one door to a home. The long axis is local Z; the doors face +X with
+    // the rest of the village's.
+    if plan.kind == BuildingKind::Longhouse {
+        // Bays, not rooms: each is one door's worth of frontage, and the
+        // count follows the rolled length so a long roof never grows a
+        // lonely single door.
+        let bays = ((d * 2.0 / 3.4).round() as i32).clamp(3, 4);
+        let bay_z = |i: i32| -d + (i as f32 + 0.5) * (d * 2.0 / bays as f32);
+        match stage {
+            // Ground broken: a post at every bay line down both long walls,
+            // and sills running the full length.
+            0 => {
+                for i in 0..=bays {
+                    let z = -d + i as f32 * (d * 2.0 / bays as f32);
+                    for x in [-w, w] {
+                        part(
+                            Vec3::new(x, 0.55, z),
+                            Vec3::new(0.16, 1.1, 0.16),
+                            0.0,
+                            &frame,
+                        );
+                    }
+                }
+                for x in [-w, w] {
+                    part(
+                        Vec3::new(x, 0.08, 0.0),
+                        Vec3::new(0.14, 0.16, d * 2.1),
+                        0.0,
+                        &frame,
+                    );
+                }
+                for z in [-d, d] {
+                    part(
+                        Vec3::new(0.0, 0.08, z),
+                        Vec3::new(w * 2.1, 0.16, 0.14),
+                        0.0,
+                        &frame,
+                    );
+                }
+            }
+            // Walls: the back and both ends solid, the front broken by one
+            // door per bay with a lintel over each.
+            1 => {
+                part(
+                    Vec3::new(-w, h * 0.5, 0.0),
+                    Vec3::new(0.18, h, d * 2.1),
+                    0.0,
+                    &wall,
+                );
+                for z in [-d, d] {
+                    part(
+                        Vec3::new(0.0, h * 0.5, z),
+                        Vec3::new(w * 2.1, h, 0.18),
+                        0.0,
+                        &wall,
+                    );
+                }
+                // The front wall, run as the segments BETWEEN the doors so
+                // the gaps land exactly on the bay centres however the
+                // length rolled.
+                let gap = 1.0;
+                let mut edge = -d;
+                for i in 0..bays {
+                    let door = bay_z(i);
+                    let left = door - gap * 0.5;
+                    if left > edge {
+                        part(
+                            Vec3::new(w, h * 0.5, (edge + left) * 0.5),
+                            Vec3::new(0.18, h, left - edge),
+                            0.0,
+                            &wall,
+                        );
+                    }
+                    part(
+                        Vec3::new(w, h - 0.06, door),
+                        Vec3::new(0.18, 0.24, gap + 0.4),
+                        0.0,
+                        &frame,
+                    );
+                    edge = door + gap * 0.5;
+                }
+                if edge < d {
+                    part(
+                        Vec3::new(w, h * 0.5, (edge + d) * 0.5),
+                        Vec3::new(0.18, h, d - edge),
+                        0.0,
+                        &wall,
+                    );
+                }
+            }
+            // The roof: one long gable, and a smoke louver over every
+            // other bay — the tell that more than one hearth burns under it.
+            _ => {
+                raise_gable(&mut part, w, d, h, &roof, &wall, &frame);
+                // A smoke louver over every other bay — the tell that more
+                // than one hearth burns under this roof. They straddle the
+                // ridge beam, so they follow it wherever the pitch puts it.
+                for i in (0..bays).step_by(2) {
+                    part(
+                        Vec3::new(0.0, h + gable_peak(w) + 0.20, bay_z(i)),
+                        Vec3::new(0.5, 0.34, 0.7),
+                        0.0,
+                        &frame,
+                    );
+                }
+            }
+        }
+        return;
+    }
+
     match stage {
         // Ground broken: corner posts and sill beams (plus laid stone for the
         // buildings whose foundations demand it).
@@ -963,100 +1393,21 @@ pub(crate) fn raise_stage(
         // The roof: gable, or a working shed's single tilted slab.
         _ => {
             if plan.shed_roof {
-                // A real lean-to: the slab's low edge seats on the wall top,
-                // the high side is walled to meet it, and the sloping sides
-                // are closed with stepped wedges.
-                let slope = 0.13_f32;
-                let rise = (2.0 * w) * slope.tan();
-                part(
-                    Vec3::new(0.0, h + rise * 0.5 + 0.05, 0.0),
-                    Vec3::new(w * 2.35 / slope.cos(), 0.12, d * 2.4),
-                    slope,
-                    &roof,
-                );
-                // The high wall band, over the door side.
-                part(
-                    Vec3::new(w, h + rise * 0.5, 0.0),
-                    Vec3::new(0.18, rise + 0.08, d * 2.1),
-                    0.0,
-                    &wall,
-                );
-                // Stepped wedges up the sloping sides.
-                let steps = 4;
-                for k in 0..steps {
-                    let band_h = rise / steps as f32;
-                    let left = -w + (k as f32) * (2.0 * w / steps as f32);
-                    let width = w - left;
-                    for zed in [-d, d] {
-                        part(
-                            Vec3::new(left + width * 0.5, h + (k as f32 + 0.5) * band_h, zed),
-                            Vec3::new(width, band_h + 0.03, 0.16),
-                            0.0,
-                            &wall,
-                        );
-                    }
-                }
+                raise_shed(&mut part, w, d, h, &roof, &wall);
             } else {
-                let slab = w * 1.42;
-                part(
-                    Vec3::new(-w * 0.55, h + 0.45, 0.0),
-                    Vec3::new(slab, 0.12, d * 2.35),
-                    0.55,
-                    &roof,
-                );
-                part(
-                    Vec3::new(w * 0.55, h + 0.45, 0.0),
-                    Vec3::new(slab, 0.12, d * 2.35),
-                    -0.55,
-                    &roof,
-                );
-                part(
-                    Vec3::new(0.0, h + 0.45 + w * 0.58, 0.0),
-                    Vec3::new(0.2, 0.2, d * 2.4),
-                    0.0,
-                    &frame,
-                );
-                // Gable end-caps: each band's width comes from the roof
-                // slabs' actual underside line - the slabs pass through
-                // (0.55w, eaves) at slope 0.613 - so nothing ever pokes
-                // through the roof, on any rolled size.
-                let pitch = 0.613; // tan of the slab tilt
-                let eave = 0.45;
-                let peak = eave + w * 0.55 * pitch;
-                for zed in [-d, d] {
-                    let mut y = 0.02_f32;
-                    loop {
-                        let band_top = y + 0.26;
-                        let half = (w * 0.55 - (band_top - eave) / pitch).min(w * 0.92) - 0.06;
-                        if half < 0.12 {
-                            break;
-                        }
-                        part(
-                            Vec3::new(0.0, h + y + 0.13, zed),
-                            Vec3::new(half * 2.0, 0.26, 0.16),
-                            0.0,
-                            &wall,
-                        );
-                        y += 0.26;
-                    }
-                    // The last sliver under the ridge, plugged with one
-                    // narrow block sized to what actually remains.
-                    let remaining = (peak - 0.05) - y;
-                    if remaining > 0.05 {
-                        let half =
-                            (w * 0.55 - (y + remaining * 0.7 - eave) / pitch).max(0.1) - 0.02;
-                        part(
-                            Vec3::new(0.0, h + y + remaining * 0.5, zed),
-                            Vec3::new((half * 2.0).max(0.14), remaining, 0.16),
-                            0.0,
-                            &wall,
-                        );
-                    }
-                }
+                raise_gable(&mut part, w, d, h, &roof, &wall, &frame);
             }
+            // The gilded finial: on the ridge for a gable, on the high wall
+            // for a shed. Either way it follows the roof rather than a
+            // number copied out of it.
             if matches!(plan.kind, BuildingKind::TownHall | BuildingKind::Shrine) {
+                let top = if plan.shed_roof {
+                    shed_head(w) + 0.2
+                } else {
+                    gable_peak(w) + 0.3
+                };
                 part(
-                    Vec3::new(0.0, h + 0.45 + w * 0.58 + 0.35, 0.0),
+                    Vec3::new(0.0, h + top, 0.0),
                     Vec3::new(0.35, 0.35, 0.35),
                     0.0,
                     &gold,
@@ -1101,7 +1452,8 @@ pub(crate) fn plan_houses(
     time: Res<Time>,
     mut since_last: Local<f32>,
     terrain: Res<Terrain>,
-    site: Option<Res<SettlementSite>>,
+    towns: Query<(Entity, &crate::villager::SettlementGround)>,
+    mut turn: Local<usize>,
     mut rng: ResMut<SimRng>,
     mut stores: Query<&mut Stockpile>,
     mut notices: MessageWriter<crate::ui::Notice>,
@@ -1127,24 +1479,47 @@ pub(crate) fn plan_houses(
                 Option<&crate::villager::belief::Faith>,
                 Option<&Vitality>,
                 Has<crate::creature::Childhood>,
+                Option<&crate::villager::Spouse>,
+                Option<&crate::villager::MemberOf>,
             ),
             (With<Villager>, Without<Corpse>),
         >,
         Query<&Field>,
         Query<(&Transform, &CreatureGenome), With<crate::creature::wildlife::Wild>>,
     ),
-    civics: Query<&Building>,
-    pending: Query<(&Blueprint, &ConstructionSite)>,
-    roofs: Query<&Transform, Or<(With<ConstructionSite>, With<Hut>, With<Building>)>>,
+    // Bundled: this system sits at Bevy's parameter ceiling, and the three
+    // plot queries belong together anyway — what stands, what is rising, and
+    // what ground is already taken.
+    plots: (
+        Query<(&Building, &crate::villager::MemberOf)>,
+        Query<(&Blueprint, &ConstructionSite, &crate::villager::MemberOf)>,
+        Query<&Transform, Or<(With<ConstructionSite>, With<Hut>, With<Building>)>>,
+    ),
 ) {
     *since_last += time.delta_secs();
     if *since_last < 12.0 {
         return;
     }
     *since_last = 0.0;
+    let (civics, pending, roofs) = plots;
 
-    let Some(site) = site else {
+    // One town plans per tick, taken strictly in turn. The census below is
+    // not cheap, and running it once per town per tick would scale badly; the
+    // cost is that a settlement breaks ground a little less often the more
+    // towns there are, which is a fair trade.
+    let mut roster: Vec<(Entity, crate::villager::SettlementGround)> =
+        towns.iter().map(|(town, ground)| (town, *ground)).collect();
+    if roster.is_empty() {
         return;
+    }
+    roster.sort_unstable_by_key(|(town, _)| town.to_bits());
+    *turn = (*turn).wrapping_add(1) % roster.len();
+    let (settlement, home_ground) = roster[*turn];
+    let site = crate::villager::SettlementSite {
+        centre: home_ground.centre,
+        radius: home_ground.radius,
+        woodpile: home_ground.woodpile,
+        settlement,
     };
     let (souls, fields, wild) = census;
 
@@ -1158,9 +1533,23 @@ pub(crate) fn plan_houses(
     let mut farmers = 0usize;
     let mut foresters = 0usize;
     let mut miners = 0usize;
-    for (vocation, morale, home, faith, vitality, child) in &souls {
+    // Shelter demand splits in two, because the roofs do: the wed and their
+    // children want family houses, everyone else wants longhouse beds. A
+    // village with four spare house rooms and no longhouse bed is not
+    // housed — it is two buildings away from housed.
+    let mut family_souls = 0usize;
+    let mut single_souls = 0usize;
+    for (vocation, morale, home, faith, vitality, child, spouse, member) in &souls {
+        if member.map(|m| m.0) != Some(settlement) {
+            continue;
+        }
         population += 1;
         spirits_sum += morale.spirits;
+        if crate::villager::home::wants_family_roof(spouse, child) {
+            family_souls += 1;
+        } else {
+            single_souls += 1;
+        }
         if home.is_none() && !child {
             roofless_adults += 1;
         }
@@ -1180,7 +1569,12 @@ pub(crate) fn plan_houses(
     }
 
     let has_kind = |kind: BuildingKind| {
-        civics.iter().any(|b| b.kind == kind) || pending.iter().any(|(b, _)| b.kind == kind)
+        civics
+            .iter()
+            .any(|(b, member)| b.kind == kind && member.0 == settlement)
+            || pending
+                .iter()
+                .any(|(b, _, member)| b.kind == kind && member.0 == settlement)
     };
     let Ok(store_now) = stores.get(site.settlement) else {
         return;
@@ -1236,28 +1630,43 @@ pub(crate) fn plan_houses(
         && !has_kind(BuildingKind::Dock)
     {
         BuildingKind::Dock
-    } else if (roofless_adults > 0 || {
-        // Build AHEAD of need: the village keeps at least one empty
-        // house's worth of room, so growth never waits on a construction
-        // site. A town that builds exactly what it needs is always one
-        // wedding behind.
-        let houses = civics
-            .iter()
-            .filter(|b| b.kind == BuildingKind::House)
-            .count();
-        let capacity = crate::villager::home::shelter_capacity(houses);
-        (capacity as i32 - population as i32) < crate::villager::home::HOUSE_CAPACITY as i32
-    }) && !pending.iter().any(|(b, _)| b.kind == BuildingKind::House)
-    {
-        BuildingKind::House
+    } else if let Some(roof) = {
+        let rising = |kind: BuildingKind| {
+            pending
+                .iter()
+                .any(|(b, _, member)| b.kind == kind && member.0 == settlement)
+        };
+        let standing = |kind: BuildingKind| {
+            civics
+                .iter()
+                .filter(|(b, member)| b.kind == kind && member.0 == settlement)
+                .count()
+        };
+        next_roof(&RoofNeeds {
+            family_souls,
+            single_souls,
+            houses: standing(BuildingKind::House),
+            longhouses: standing(BuildingKind::Longhouse),
+            population,
+            house_rising: rising(BuildingKind::House),
+            longhouse_rising: rising(BuildingKind::Longhouse),
+        })
+    } {
+        roof
     } else if roofless_adults > 0 {
-        // A house is already rising for them - say so, with arithmetic,
+        // A roof is already rising for them - say so, with arithmetic,
         // so a stalled build is a visible fact instead of a silent
         // population ceiling.
-        if let Some((plan, cs)) = pending.iter().find(|(b, _)| b.kind == BuildingKind::House) {
+        if let Some((plan, cs, _)) = pending.iter().find(|(b, _, member)| {
+            member.0 == settlement
+                && matches!(b.kind, BuildingKind::House | BuildingKind::Longhouse)
+        }) {
             info!(
-                "housing watch: {} roofless; a house stands at {:.0} of {:.0} timber, {:.0} of {:.0} footing stone",
+                "housing watch: {} roofless ({} want family rooms, {} want longhouse beds); {} stands at {:.0} of {:.0} timber, {:.0} of {:.0} footing stone",
                 roofless_adults,
+                family_souls,
+                single_souls,
+                plan.kind.name().to_lowercase(),
                 cs.progress,
                 plan.kind.timber_cost(),
                 cs.stone_laid,
@@ -1286,7 +1695,10 @@ pub(crate) fn plan_houses(
                     genome.species == Species::Wolf && at.translation.distance(site.centre) < 130.0
                 })
                 .count(),
-            pending_builds: pending.iter().count(),
+            pending_builds: pending
+                .iter()
+                .filter(|(_, _, member)| member.0 == settlement)
+                .count(),
             shore_near,
             miners,
             rock_near,
@@ -1364,6 +1776,7 @@ pub(crate) fn plan_houses(
             .spawn((
                 Name::new(format!("{}, rising", plan.kind.name())),
                 ConstructionSite::default(),
+                crate::villager::MemberOf(site.settlement),
                 plan.clone(),
                 Transform::from_translation(face).with_rotation(Quat::from_rotation_y(yaw)),
                 Visibility::default(),
@@ -1429,6 +1842,7 @@ pub(crate) fn plan_houses(
             .spawn((
                 Name::new(format!("{}, rising", plan.kind.name())),
                 ConstructionSite::default(),
+                crate::villager::MemberOf(site.settlement),
                 plan.clone(),
                 Transform::from_translation(shore).with_rotation(Quat::from_rotation_y(yaw)),
                 Visibility::default(),
@@ -1456,12 +1870,47 @@ pub(crate) fn plan_houses(
     // growing city pushes its streets outward instead of hitting a wall
     // of full plots.
     let ring_reach = 5 + (population / 6) as u32;
-    let rings = if kind == BuildingKind::House {
+    // Both roofs are homes, and homes leave the plaza to the civic works.
+    let dwelling = matches!(kind, BuildingKind::House | BuildingKind::Longhouse);
+    let rings = if dwelling {
         1..ring_reach
     } else {
         0..ring_reach.min(7)
     };
-    'darts: for (x, z, yaw) in village_slots(site.centre, rings) {
+    // A longhouse is two and a half houses long, and the plot test runs on
+    // world axes while the building is turned to face the centre — so it is
+    // probed square, at its LONGEST extent, whichever way it ends up lying.
+    // Conservative by construction: it turns down plots it could have used
+    // rather than dropping one gable end into a hillside.
+    // Some families would rather have the room than the neighbours: now and
+    // then a family house is raised out past the rings on its own ground,
+    // with a plot beside it. Still the town's people — they walk in to the
+    // square, the stores and the fire — they simply do not live in it.
+    let mut homestead = kind == BuildingKind::House
+        && population >= HOMESTEAD_MIN_POP
+        && rng.0.chance(HOMESTEAD_CHANCE);
+    let mut plots = if homestead {
+        homestead_slots(site.centre, ring_reach, &mut rng.0)
+    } else {
+        Vec::new()
+    };
+    if homestead && plots.is_empty() {
+        // The streets have grown out as far as a holding could stand; this
+        // family takes a plot in the rings after all.
+        homestead = false;
+    }
+    let (probe, clearance) = if kind == BuildingKind::Longhouse {
+        (6.4, 17.0)
+    } else if homestead {
+        // A wider probe, because the plot needs flat ground beside the house.
+        (4.2, HOMESTEAD_CLEARANCE)
+    } else {
+        (1.9, 10.0)
+    };
+    if !homestead {
+        plots = village_slots(site.centre, rings);
+    }
+    'darts: for (x, z, yaw) in plots {
         if !terrain.is_walkable(x, z) {
             continue;
         }
@@ -1470,7 +1919,12 @@ pub(crate) fn plan_houses(
         if centre_height < WATER_LEVEL + 2.5 {
             continue;
         }
-        for (dx, dz) in [(-1.7, -1.9), (1.7, -1.9), (-1.7, 1.9), (1.7, 1.9)] {
+        for (dx, dz) in [
+            (-probe, -probe),
+            (probe, -probe),
+            (-probe, probe),
+            (probe, probe),
+        ] {
             let corner = terrain.height_at(x + dx, z + dz);
             if !terrain.is_walkable(x + dx, z + dz) || (corner - centre_height).abs() > 0.9 {
                 continue 'darts;
@@ -1489,20 +1943,25 @@ pub(crate) fn plan_houses(
         }
         let at = Vec3::new(x, centre_height, z);
         for other in &roofs {
-            if other.translation.distance(at) < 10.0 {
+            if other.translation.distance(at) < clearance {
                 continue 'darts;
             }
         }
 
         let mut plan = Blueprint::roll(kind, &mut rng.0);
+        if homestead {
+            // A farmhouse is broader than a street house: it has work to
+            // shelter as well as people, and no neighbour to crowd.
+            plan.half_w *= 1.18;
+            plan.half_d *= 1.12;
+        }
         // A land of woods and nothing else still shelters its people: with
-        // no stone in the pile and no clay to brick, a timber house is
+        // no stone in the pile and no clay to brick, a timber home is
         // post-framed straight into the earth and owes the masons nothing.
         // Another path to a roof — until fire comes to the world, when
         // these will be the homes that fear it.
-        let timber_footing =
-            kind == BuildingKind::House && store_now.stone < 1.0 && store_now.clay < 1.0;
-        if kind == BuildingKind::House {
+        let timber_footing = dwelling && store_now.stone < 1.0 && store_now.clay < 1.0;
+        if dwelling {
             // The land dictates the walls: too few standing trees within a
             // working walk makes timber homes a fantasy - build from what
             // the ground actually gives.
@@ -1568,6 +2027,7 @@ pub(crate) fn plan_houses(
                     timber_footing,
                     ..default()
                 },
+                crate::villager::MemberOf(site.settlement),
                 plan.clone(),
                 Transform::from_translation(at).with_rotation(Quat::from_rotation_y(yaw)),
                 Visibility::default(),
@@ -1575,6 +2035,10 @@ pub(crate) fn plan_houses(
                 crate::hand::Rooted,
             ))
             .id();
+        if homestead {
+            commands.entity(building).insert(Homestead);
+            info!("ground was broken for a holding outside {}", site.centre);
+        }
         raise_stage(
             &mut commands,
             &mut meshes,
@@ -1584,6 +2048,9 @@ pub(crate) fn plan_houses(
             &plan,
         );
         info!("ground was broken: {}", plan.kind.name());
+        // Houses go up all the time and are not news; everything else is,
+        // the longhouse most of all — it is the village admitting it has
+        // more grown children than rooms to put them in.
         if plan.kind != BuildingKind::House {
             notices.write(crate::ui::Notice::new(format!(
                 "Ground was broken for {}",
@@ -1688,5 +2155,271 @@ pub(crate) fn sermons(
                 ),
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::villager::home::{HOUSE_CAPACITY, LONGHOUSE_CAPACITY};
+
+    /// A village whose roofs exactly fit its people, with nothing rising.
+    fn snug(family: usize, single: usize) -> RoofNeeds {
+        RoofNeeds {
+            family_souls: family,
+            single_souls: single,
+            houses: family.div_ceil(HOUSE_CAPACITY),
+            longhouses: single.div_ceil(LONGHOUSE_CAPACITY),
+            population: family + single,
+            house_rising: false,
+            longhouse_rising: false,
+        }
+    }
+
+    #[test]
+    fn a_gabled_roof_clears_its_own_walls_at_every_rolled_size() {
+        // The bug this pins: the eave height was a constant while the slab
+        // length scaled with the building's width, so the wider the building
+        // the further its roof edge sank BELOW the wall top — and the walls
+        // came up through the roof near the eaves. Every gabled kind, at
+        // every size the blueprints roll.
+        let tan = GABLE_PITCH.tan();
+        for w in [0.8, 1.3, 1.7, 2.1, 2.5, 2.9, 3.4] {
+            let span = gable_span(w);
+            // The roof must cover the wall it sits on, overhang included.
+            assert!(
+                span > w * 1.05,
+                "at w={w} the roof does not reach the gable wall",
+            );
+            // Underside at the outermost point of the roof, relative to the
+            // wall top. Positive means the wall stays under cover.
+            let at_eave = GABLE_SEAT;
+            assert!(
+                at_eave > 0.0,
+                "at w={w} the eave sits on or below the wall top",
+            );
+            // And at the wall line itself it is higher still.
+            let at_wall = GABLE_SEAT + (span - w * 1.05) * tan;
+            assert!(at_wall > at_eave, "at w={w} the roof slopes the wrong way",);
+        }
+    }
+
+    #[test]
+    fn a_shed_roofs_stepped_ends_stay_under_the_slab() {
+        // The sawmill bug: each stepped wedge is an axis-aligned box under a
+        // slope, and the roof above it is LOWEST over its left-hand edge. A
+        // wedge sized from its step number instead of from the roof above
+        // breaks through at that corner — eight little tabs on every shed
+        // roof in the game. Every tread must clear.
+        let tan = SHED_PITCH.tan();
+        for w in [1.4, 1.7, 2.3, 2.8] {
+            let span = gable_span(w);
+            let under = |x: f32| GABLE_SEAT + (x + span) * tan;
+            let limit = w * 1.05;
+            let steps = 6;
+            for k in 0..steps {
+                let step = 2.0 * limit / steps as f32;
+                let left = -limit + k as f32 * step;
+                let tread = under(left) - 0.02;
+                if tread <= 0.03 {
+                    continue;
+                }
+                // The roof is lowest over `left`; the tread must sit below it.
+                assert!(
+                    tread < under(left),
+                    "at w={w} tread {k} tops {tread} against a roof at {}",
+                    under(left),
+                );
+            }
+            // The slab must clear the wall top along its whole width, and the
+            // high side must genuinely stand taller than the low side.
+            assert!(under(-limit) > 0.0, "at w={w} the low eave cuts the wall");
+            assert!(shed_head(w) > under(-limit), "at w={w} the shed is flat");
+        }
+    }
+
+    #[test]
+    fn the_ridge_beam_sits_where_the_slabs_actually_meet() {
+        // The other half of the bug: the ridge was drawn a fifth of the
+        // building's width above the join, so a beam hung in mid-air over
+        // every gabled roof in the game. `gable_peak` is now the one number
+        // the slabs, the beam and the end-caps are all cut from, so it must
+        // equal the height the slope reaches at the middle of the building.
+        let tan = GABLE_PITCH.tan();
+        for w in [0.9, 1.6, 2.2, 3.0] {
+            let reached = GABLE_SEAT + gable_span(w) * tan;
+            assert!(
+                (gable_peak(w) - reached).abs() < 1e-5,
+                "at w={w} the ridge is at {} but the slopes reach {reached}",
+                gable_peak(w),
+            );
+            // And a peak has to be above the wall it caps, or there is no roof.
+            assert!(gable_peak(w) > GABLE_SEAT, "at w={w} the roof is flat");
+        }
+    }
+
+    #[test]
+    fn a_holding_stands_clear_of_the_town_but_within_a_walk() {
+        // The whole point: outside the rings, so it reads as its own place —
+        // and inside a working walk, so its people are still the town's.
+        let mut rng = crate::rng::Rng::new(4);
+        let mut any = false;
+        for population in [10usize, 24, 60, 200] {
+            let ring_reach = 5 + (population / 6) as u32;
+            let outermost = 14.0 + ring_reach as f32 * 9.0;
+            let plots = homestead_slots(Vec3::ZERO, ring_reach, &mut rng);
+            // A town whose streets already reach a working walk has no room
+            // left for new holdings, and says so by offering no plots.
+            if plots.is_empty() {
+                continue;
+            }
+            any = true;
+            for (x, z, _) in plots {
+                let out = Vec3::new(x, 0.0, z).length();
+                assert!(
+                    out > outermost,
+                    "at population {population} a holding at {out:.0} sits inside the rings ({outermost:.0})",
+                );
+                assert!(
+                    out < crate::villager::work::WORK_REACH,
+                    "a holding at {out:.0} is past a working walk",
+                );
+            }
+        }
+        assert!(any, "no town size could place a holding at all");
+    }
+
+    #[test]
+    fn a_holding_faces_the_town_it_belongs_to() {
+        // The door looks homeward: these are the town's people living out, not
+        // a separate settlement turning its back.
+        let mut rng = crate::rng::Rng::new(9);
+        for (x, z, yaw) in homestead_slots(Vec3::ZERO, 6, &mut rng) {
+            let facing = Vec3::new(yaw.cos(), 0.0, -yaw.sin());
+            let homeward = Vec3::new(-x, 0.0, -z).normalize_or_zero();
+            assert!(
+                facing.dot(homeward) > 0.9,
+                "a holding at ({x:.0}, {z:.0}) faces away from the square",
+            );
+        }
+    }
+
+    #[test]
+    fn most_families_still_want_the_square() {
+        // Some, not all: a town where everyone moved out is not a town.
+        assert!(HOMESTEAD_CHANCE > 0.0 && HOMESTEAD_CHANCE < 0.5);
+        // And a holding keeps far more room around it than a street house.
+        assert!(HOMESTEAD_CLEARANCE > 30.0);
+    }
+
+    #[test]
+    fn a_hamlet_roofs_its_families_before_it_dreams_of_a_longhouse() {
+        // Five people cannot spare twelve timber for eight beds they will
+        // not fill. Family roofs first; the unwed take the firelight.
+        let needs = RoofNeeds {
+            family_souls: 4,
+            single_souls: 1,
+            houses: 0,
+            longhouses: 0,
+            population: 5,
+            ..default()
+        };
+        assert_eq!(next_roof(&needs), Some(BuildingKind::House));
+    }
+
+    #[test]
+    fn grown_children_with_nowhere_to_go_raise_a_longhouse() {
+        // Houses enough and to spare, but six unwed adults and no long
+        // roof: the next build is theirs.
+        let needs = RoofNeeds {
+            family_souls: 4,
+            single_souls: 6,
+            houses: 3,
+            longhouses: 0,
+            population: 10,
+            ..default()
+        };
+        assert_eq!(next_roof(&needs), Some(BuildingKind::Longhouse));
+    }
+
+    #[test]
+    fn the_village_always_wants_one_spare_of_each() {
+        // The whole rule in one assertion: roofs that fit the population
+        // exactly are not enough — a village housed to the last bed is
+        // still one wedding and one birthday from the rain.
+        for (family, single) in [(8, 16), (4, 8), (12, 24)] {
+            let needs = snug(family, single);
+            assert!(
+                next_roof(&needs).is_some(),
+                "a village of {family} kin and {single} unwed, housed exactly, should still be building"
+            );
+        }
+    }
+
+    #[test]
+    fn a_whole_spare_roof_of_each_kind_contents_it() {
+        // And the appetite stops there: one empty house and one empty
+        // longhouse is slack, not a shortage.
+        let needs = RoofNeeds {
+            family_souls: 8,
+            single_souls: 8,
+            houses: 3,
+            longhouses: 2,
+            population: 16,
+            ..default()
+        };
+        assert_eq!(next_roof(&needs), None);
+    }
+
+    #[test]
+    fn nothing_doubles_up_on_a_roof_already_rising() {
+        let wants_house = RoofNeeds {
+            family_souls: 8,
+            single_souls: 0,
+            houses: 2,
+            longhouses: 1,
+            population: 8,
+            ..default()
+        };
+        assert_eq!(next_roof(&wants_house), Some(BuildingKind::House));
+        assert_eq!(
+            next_roof(&RoofNeeds {
+                house_rising: true,
+                ..wants_house
+            }),
+            None
+        );
+    }
+
+    #[test]
+    fn the_roof_further_behind_goes_first() {
+        // Both wanted, but fourteen unwed against one longhouse is the
+        // louder need than six kin against one house.
+        let crowded_longhouse = RoofNeeds {
+            family_souls: 6,
+            single_souls: 14,
+            houses: 1,
+            longhouses: 1,
+            population: 20,
+            ..default()
+        };
+        assert_eq!(next_roof(&crowded_longhouse), Some(BuildingKind::Longhouse));
+        // Turn the shortage around and the answer turns with it.
+        let crowded_houses = RoofNeeds {
+            family_souls: 14,
+            single_souls: 6,
+            ..crowded_longhouse
+        };
+        assert_eq!(next_roof(&crowded_houses), Some(BuildingKind::House));
+    }
+
+    #[test]
+    fn a_longhouse_costs_what_the_beds_it_adds_are_worth() {
+        // Per bed, the two roofs price the same: the longhouse is a bigger
+        // commitment, not a better deal, so choosing it is about who needs
+        // housing rather than about timber efficiency.
+        let per_house = BuildingKind::House.timber_cost() / HOUSE_CAPACITY as f32;
+        let per_long = BuildingKind::Longhouse.timber_cost() / LONGHOUSE_CAPACITY as f32;
+        assert!((per_house - per_long).abs() < 0.01);
     }
 }

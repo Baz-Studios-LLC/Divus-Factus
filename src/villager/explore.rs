@@ -90,6 +90,7 @@ pub(super) fn expeditions(
     clock: Res<crate::calendar::WorldClock>,
     terrain: Option<Res<Terrain>>,
     site: Option<Res<SettlementSite>>,
+    homes: (Query<&super::MemberOf>, Query<&super::SettlementGround>),
     mut known: ResMut<KnownWorld>,
     weather: Option<Res<crate::weather::Weather>>,
     mut rng: ResMut<super::SimRng>,
@@ -121,18 +122,19 @@ pub(super) fn expeditions(
     let (Some(terrain), Some(site)) = (terrain, site) else {
         return;
     };
+    let (members, grounds) = homes;
     let dt = time.delta_secs();
 
     // What the village wants and cannot reach is what sends people out.
     // Scarcity is the engine of the map: a full woodpile keeps everyone
     // home, an empty one with no known tree left to fell puts someone on
     // the road. The two wants that kill are timber and food.
-    let timber_short = stores.iter().next().is_none_or(|s| s.timber < 8.0);
+    let timber_short = stores.iter().all(|s| s.timber < 8.0) || stores.iter().next().is_none();
     let wood_known = trees
         .iter()
         .any(|(at, tree)| tree.harvestable() && known.knows(at.translation()));
     let wood_want = timber_short && !wood_known;
-    let food_short = stores.iter().next().is_none_or(|s| s.food() < 10.0);
+    let food_short = stores.iter().all(|s| s.food() < 10.0) || stores.iter().next().is_none();
     let berries_known = bushes
         .iter()
         .any(|(at, bush)| bush.amount > 0.5 && known.knows(at.translation()));
@@ -166,8 +168,13 @@ pub(super) fn expeditions(
                 continue;
             }
             if expedition.homeward {
-                if at.translation.distance(site.centre) > 6.0 {
-                    target.0 = Some(site.centre);
+                let square = members
+                    .get(entity)
+                    .ok()
+                    .and_then(|member| grounds.get(member.0).ok())
+                    .map_or(site.centre, |ground| ground.centre);
+                if at.translation.distance(square) > 6.0 {
+                    target.0 = Some(square);
                 } else {
                     commands.entity(entity).remove::<Expedition>();
                     *activity = Activity::Idle;

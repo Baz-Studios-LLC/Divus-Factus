@@ -1,4 +1,4 @@
-# Egregore — Game Design Overview
+# Divus Factus — Game Design Overview
 
 > In the beginning…
 > Man created God.
@@ -11,7 +11,7 @@ existence by collective human belief, sustained by it, and — critically — *d
 ## The central inversion
 
 Most god games treat belief as mana plus experience points: villagers pray, a bar fills,
-the player spends it from a menu of powers they chose. Egregore inverts that.
+the player spends it from a menu of powers they chose. Divus Factus inverts that.
 
 **You can only do what they believe you can do.**
 

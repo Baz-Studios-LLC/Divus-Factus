@@ -136,7 +136,7 @@ fn toggle_survey(
 ) {
     if !*booted {
         *booted = true;
-        if std::env::var("EGREGORE_SURVEY").is_ok() {
+        if std::env::var("DIVUS_FACTUS_SURVEY").is_ok() {
             survey.on = true;
         }
     }

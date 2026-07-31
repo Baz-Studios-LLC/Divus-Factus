@@ -82,7 +82,7 @@ fn spawn_loading_screen(mut commands: Commands, time: Res<Time<Real>>) {
         ))
         .with_children(|parent| {
             parent.spawn((
-                Text::new("EGREGORE"),
+                Text::new("DIVUS FACTUS"),
                 TextFont {
                     font_size: FontSize::Px(40.0),
                     ..default()

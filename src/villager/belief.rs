@@ -118,7 +118,7 @@ pub(super) fn kneel(
     mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,
     name: Option<Res<DivineName>>,
-    site: Option<Res<SettlementSite>>,
+    members: Query<&MemberOf>,
     stores: Query<&super::work::Stockpile>,
     bushes: Query<(&GlobalTransform, &FoodSource)>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -144,16 +144,16 @@ pub(super) fn kneel(
         ),
     >,
 ) {
-    let Some(site) = site else {
-        return;
-    };
-    let store_has_food = stores
-        .get(site.settlement)
-        .is_ok_and(|store| store.food() >= 1.0);
-
     let god = name.as_ref().map_or("their god", |n| n.0.as_str());
 
     for (entity, transform, needs, person, mut activity, mut target, chronicle) in &mut hungry {
+        // Prayer answers an empty larder — this person's OWN larder. A full
+        // store in the next town over is no comfort here.
+        let store_has_food = members
+            .get(entity)
+            .ok()
+            .and_then(|member| stores.get(member.0).ok())
+            .is_some_and(|store| store.food() >= 1.0);
         if needs.hunger < DESPERATE_HUNGER || store_has_food {
             continue;
         }
@@ -600,9 +600,7 @@ mod tests {
             .spawn((
                 Villager,
                 Transform::default(),
-                Person {
-                    name: "Asketh".into(),
-                },
+                Person::born("Asketh".into(), "Prayerly".into()),
                 Needs {
                     hunger: 0.9,
                     ..default()

@@ -1,6 +1,6 @@
 //! Deterministic pseudo-random number generation.
 //!
-//! Everything in Egregore that is procedurally generated — terrain, creature bodies,
+//! Everything in Divus Factus that is procedurally generated — terrain, creature bodies,
 //! names — derives from an explicit seed so that a given world can be reproduced
 //! exactly. That rules out `rand`'s thread-local generators, and a PCG32 is small
 //! enough that pulling in a dependency for it would not pay for itself.

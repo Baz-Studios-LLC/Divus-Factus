@@ -1,5 +1,5 @@
 #!/bin/bash
-# Double-click launcher for Egregore.
+# Double-click launcher for Divus Factus.
 #
 # Finder opens .command files in a fresh Terminal rooted at the home directory and
 # with a login shell that may not have picked up the Rust toolchain, so this both
@@ -17,7 +17,7 @@ if ! command -v cargo >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "Building Egregore..."
+echo "Building Divus Factus..."
 echo
 
 # Assets resolve relative to the manifest, so the game must be launched through
@@ -31,6 +31,6 @@ echo
 
 if [ $status -ne 0 ]; then
     # Keep the window open so build errors are readable instead of vanishing.
-    echo "Egregore exited with status $status."
+    echo "Divus Factus exited with status $status."
     read -r -p "Press Return to close."
 fi

@@ -8,7 +8,9 @@ use crate::creature::genome::{Age, CreatureGenome};
 use crate::rng::Rng;
 use crate::terrain::{Terrain, WATER_LEVEL};
 /// A calling. Rolled once at adulthood and kept.
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Component, Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum Vocation {
     Gatherer,
     Fisher,

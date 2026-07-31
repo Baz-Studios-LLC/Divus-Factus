@@ -18,9 +18,7 @@ use crate::creature::anim::CreatureMotion;
 use crate::creature::{Airborne, Childhood, Corpse, Held, MoveTarget};
 use crate::terrain::{Terrain, WATER_LEVEL};
 
-use super::{
-    Activity, Chronicle, Morale, Parentage, Person, SettlementSite, Spouse, Villager, work,
-};
+use super::{Activity, Chronicle, Morale, Parentage, Person, Spouse, Villager, work};
 
 /// How long the village stands with its dead before anyone thinks of spades.
 const MOURNING_SECONDS: f64 = 35.0;
@@ -49,9 +47,11 @@ pub struct Bearing(pub Entity);
 #[derive(Component)]
 pub struct Borne;
 
-/// Where the village buries its dead. Chosen at the first burial and kept.
-#[derive(Resource)]
-pub struct RestingGround(pub Vec3);
+/// Where each town buries its dead. A town's ground is chosen at its first
+/// burial and kept — keyed by settlement, because a second town does not walk
+/// its dead across the map to lie in the first one's graveyard.
+#[derive(Resource, Default)]
+pub struct RestingGround(pub std::collections::HashMap<Entity, Vec3>);
 
 /// A grave. The dead person's [`Person`] and [`Chronicle`] live on the same
 /// entity, so hovering a headstone reads the life that ended under it.
@@ -175,8 +175,8 @@ pub(super) fn burials(
     mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,
     terrain: Option<Res<Terrain>>,
-    site: Option<Res<SettlementSite>>,
-    ground: Option<Res<RestingGround>>,
+    towns: Query<(Entity, &super::SettlementGround)>,
+    mut ground: ResMut<RestingGround>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut notices: MessageWriter<crate::ui::Notice>,
@@ -217,7 +217,7 @@ pub(super) fn burials(
         ),
     >,
 ) {
-    let (Some(terrain), Some(site)) = (terrain, site) else {
+    let Some(terrain) = terrain else {
         return;
     };
 
@@ -231,24 +231,31 @@ pub(super) fn burials(
         .map(|(body, ..)| body)
         .collect();
 
-    let resting = match ground {
-        Some(ground) => Some(ground.0),
-        None => {
-            if due.is_empty() {
-                None
-            } else {
-                // Past the fields, on dry ground: the far ring of the village
-                // pattern, where the living seldom have business.
-                let spot = work::village_slots(site.centre, 7..10)
-                    .into_iter()
-                    .map(|(x, z, _)| Vec3::new(x, terrain.height_at(x, z), z))
-                    .find(|at| terrain.is_walkable(at.x, at.z) && at.y > WATER_LEVEL + 2.0);
-                if let Some(spot) = spot {
-                    commands.insert_resource(RestingGround(spot));
-                }
-                spot
+    // Each town's resting ground, chosen the first time that town needs one:
+    // past its own fields, on dry ground, in the far ring of its own pattern.
+    if !due.is_empty() {
+        for (town, home_ground) in &towns {
+            if ground.0.contains_key(&town) {
+                continue;
+            }
+            let spot = work::village_slots(home_ground.centre, 7..10)
+                .into_iter()
+                .map(|(x, z, _)| Vec3::new(x, terrain.height_at(x, z), z))
+                .find(|at| terrain.is_walkable(at.x, at.z) && at.y > WATER_LEVEL + 2.0);
+            if let Some(spot) = spot {
+                ground.0.insert(town, spot);
             }
         }
+    }
+    // The nearest town's graveyard: a body is carried to the ground of
+    // whoever will bury it, which in practice is the town it died beside.
+    let resting_for = |at: Vec3| {
+        ground
+            .0
+            .iter()
+            .map(|(town, spot)| (*town, *spot))
+            .min_by(|a, b| a.1.distance(at).total_cmp(&b.1.distance(at)))
+            .map(|(_, spot)| spot)
     };
 
     // Call a bearer for each unclaimed body: the priest if the village has
@@ -325,7 +332,8 @@ pub(super) fn burials(
         body_transform.translation = at.translation + Vec3::Y * 1.5;
         body_transform.rotation = at.rotation * Quat::from_rotation_z(std::f32::consts::FRAC_PI_2);
 
-        let Some(resting) = resting else {
+        // The graveyard of whichever town lies nearest the bearer.
+        let Some(resting) = resting_for(at.translation) else {
             continue;
         };
         // Graves stand in rows, filled in the order the village filled them.
@@ -347,7 +355,12 @@ pub(super) fn burials(
         let day = clock.day();
         let mut story = dead_chronicle.cloned().unwrap_or_default();
         story.record(day, "was laid to rest");
-        let toward = (site.centre - spot).with_y(0.0).normalize_or_zero();
+        let nearest_square = towns
+            .iter()
+            .map(|(_, home_ground)| home_ground.centre)
+            .min_by(|a, b| a.distance(spot).total_cmp(&b.distance(spot)))
+            .unwrap_or(spot + Vec3::X);
+        let toward = (nearest_square - spot).with_y(0.0).normalize_or_zero();
         let yaw = (-toward.z).atan2(toward.x);
         let grave = commands
             .spawn((
@@ -418,14 +431,14 @@ mod tests {
         app.world_mut().spawn((
             Villager,
             Corpse,
-            Person { name: "Odo".into() },
+            Person::born("Odo".into(), "Gravely".into()),
             Transform::from_xyz(0.0, 0.0, 0.0),
         ));
         let neighbour = app
             .world_mut()
             .spawn((
                 Villager,
-                Person { name: "Ma".into() },
+                Person::born("Ma".into(), "Gravely".into()),
                 Transform::from_xyz(4.0, 0.0, 0.0),
                 Activity::Idle,
                 Morale::default(),

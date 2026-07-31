@@ -189,6 +189,21 @@ impl StoreTrends {
     }
 }
 
+/// Whether a given town has finished works of a kind.
+///
+/// The question every per-town industry asks, and the reason buildings carry
+/// a [`crate::villager::MemberOf`]: asked globally, one town's blacksmith
+/// sharpened every town's tools and one town's bakery fed the whole map.
+fn has_works(
+    buildings: &Query<(&Building, &crate::villager::MemberOf)>,
+    town: Entity,
+    kind: BuildingKind,
+) -> bool {
+    buildings
+        .iter()
+        .any(|(building, member)| building.kind == kind && member.0 == town)
+}
+
 /// Samples the stores every couple of seconds, keeping about ninety.
 pub(crate) fn track_store_trends(
     clock: Res<crate::calendar::WorldClock>,
@@ -258,24 +273,29 @@ pub(crate) fn shoulder_sack(
 #[allow(clippy::type_complexity)]
 pub(crate) fn stores_move_indoors(
     mut commands: Commands,
-    site: Option<Res<SettlementSite>>,
     stores: Query<&Stockpile>,
     mut notices: MessageWriter<crate::ui::Notice>,
-    new_buildings: Query<(&Transform, &Building), Added<Building>>,
-    standing: Query<&Building>,
-    piles: Query<(Entity, &StorePile), Without<Rehouse>>,
+    new_buildings: Query<(&Transform, &Building, &crate::villager::MemberOf), Added<Building>>,
+    standing: Query<(&Building, &crate::villager::MemberOf)>,
+    piles: Query<(Entity, &StorePile, &crate::villager::MemberOf), Without<Rehouse>>,
 ) {
-    let Some(store) = site
-        .as_ref()
-        .and_then(|site| stores.get(site.settlement).ok())
-    else {
-        return;
-    };
-    for (at, building) in &new_buildings {
+    for (at, building, owner) in &new_buildings {
+        // A storehouse shelters its OWN town's piles. Without this, the first
+        // colony to raise one would have reorganised the mother town's square
+        // from across the map.
+        let town = owner.0;
+        let Ok(store) = stores.get(town) else {
+            continue;
+        };
         match building.kind {
             BuildingKind::Storehouse => {
-                let granary_stands = standing.iter().any(|b| b.kind == BuildingKind::Granary);
-                for (pile, kind) in &piles {
+                let granary_stands = standing
+                    .iter()
+                    .any(|(b, m)| b.kind == BuildingKind::Granary && m.0 == town);
+                for (pile, kind, pile_owner) in &piles {
+                    if pile_owner.0 != town {
+                        continue;
+                    }
                     let (local, goal) = match kind.0 {
                         PileKind::Timber => {
                             (Vec3::new(-0.9, 0.0, 0.5), store.timber.min(24.0) as u8)
@@ -300,8 +320,8 @@ pub(crate) fn stores_move_indoors(
                 ));
             }
             BuildingKind::Granary => {
-                for (pile, kind) in &piles {
-                    if kind.0 != PileKind::Food {
+                for (pile, kind, pile_owner) in &piles {
+                    if pile_owner.0 != town || kind.0 != PileKind::Food {
                         continue;
                     }
                     commands.entity(pile).insert(Rehouse {
@@ -430,18 +450,23 @@ pub(crate) fn rehouse_stores(
 
 /// The stone and food stores, countable at a glance like the woodpile.
 pub(crate) fn update_store_piles(
-    site: Option<Res<SettlementSite>>,
     stores: Query<&Stockpile>,
-    mut blocks: Query<(&StonePileBlock, &mut Visibility), Without<FoodSack>>,
-    mut sacks: Query<(&FoodSack, &mut Visibility), Without<StonePileBlock>>,
+    owners: Query<&crate::villager::MemberOf>,
+    mut blocks: Query<(&StonePileBlock, &ChildOf, &mut Visibility), Without<FoodSack>>,
+    mut sacks: Query<(&FoodSack, &ChildOf, &mut Visibility), Without<StonePileBlock>>,
 ) {
-    let Some(site) = site else {
-        return;
+    // A block belongs to a pile and a pile to a town: every settlement's
+    // square shows its own stores.
+    let store_of = |parent: Entity| {
+        owners
+            .get(parent)
+            .ok()
+            .and_then(|member| stores.get(member.0).ok())
     };
-    let Ok(store) = stores.get(site.settlement) else {
-        return;
-    };
-    for (block, mut visibility) in &mut blocks {
+    for (block, parent, mut visibility) in &mut blocks {
+        let Some(store) = store_of(parent.parent()) else {
+            continue;
+        };
         let wanted = if (block.0 as f32) < store.stone.min(12.0) {
             Visibility::Inherited
         } else {
@@ -451,7 +476,10 @@ pub(crate) fn update_store_piles(
             *visibility = wanted;
         }
     }
-    for (sack, mut visibility) in &mut sacks {
+    for (sack, parent, mut visibility) in &mut sacks {
+        let Some(store) = store_of(parent.parent()) else {
+            continue;
+        };
         // Two food to the sack, or the pile would dwarf the village.
         let wanted = if (sack.0 as f32) * 2.0 < store.food().min(24.0) {
             Visibility::Inherited
@@ -476,13 +504,13 @@ pub(crate) fn update_store_piles(
 pub(crate) fn famine_watch(
     time: Res<Time>,
     mut since_last: Local<f32>,
-    mut last_said: Local<String>,
-    site: Option<Res<SettlementSite>>,
-    stores: Query<&Stockpile>,
+    mut last_said: Local<std::collections::HashMap<Entity, String>>,
+    towns: Query<(Entity, &crate::villager::SettlementGround, &Stockpile)>,
+    members: Query<&crate::villager::MemberOf>,
     settlements: Query<&crate::villager::Settlement>,
     trends: Res<StoreTrends>,
     folk: Query<
-        (&Transform, Option<&Vocation>),
+        (Entity, &Transform, Option<&Vocation>),
         (
             With<Villager>,
             Without<Corpse>,
@@ -497,69 +525,76 @@ pub(crate) fn famine_watch(
         return;
     }
     *since_last = 0.0;
-    let Some(site) = site else {
-        return;
-    };
-    let Ok(store) = stores.get(site.settlement) else {
-        return;
-    };
-    let mouths = folk.iter().count();
-    if store.food() >= mouths as f32 * 1.5 {
-        last_said.clear();
-        return;
-    }
-    let village = settlements
-        .get(site.settlement)
-        .map_or("the village", |s| s.name.as_str());
-    let hands = folk
-        .iter()
-        .filter(|(_, vocation)| {
-            matches!(
-                vocation,
-                Some(Vocation::Fisher)
-                    | Some(Vocation::Gatherer)
-                    | Some(Vocation::Hunter)
-                    | Some(Vocation::Farmer)
-            )
-        })
-        .count();
-    let fruiting_near = bushes
-        .iter()
-        .filter(|(at, bush)| bush.amount > 0.3 && at.translation().distance(site.centre) < 170.0)
-        .count();
-    let nearest_berries = bushes
-        .iter()
-        .filter(|(_, bush)| bush.amount > 0.3)
-        .map(|(at, _)| at.translation().distance(site.centre) as u32)
-        .min();
-    let rate = trends.rate_per_minute(PileKind::Food);
-
-    let line = if hands == 0 {
-        format!("famine watch: nobody in {village} works a food trade")
-    } else if fruiting_near == 0 {
-        match nearest_berries {
-            Some(d) => format!(
-                "famine watch: the near land is picked bare - the closest berries stand {d} strides from {village}"
-            ),
-            None => format!("famine watch: not a fruiting bush remains anywhere near {village}"),
+    // Every town keeps its own watch. A colony can starve while its mother
+    // town is fat, and the ledger has to say which one is in trouble.
+    for (town, ground, store) in &towns {
+        let of_town = |who: Entity| members.get(who).is_ok_and(|m| m.0 == town);
+        let mouths = folk.iter().filter(|(who, ..)| of_town(*who)).count();
+        if mouths == 0 {
+            continue;
         }
-    } else if rate < -0.5 {
-        format!(
-            "famine watch: {village} eats {:.0} more than it gathers each minute, {hands} hands feeding {mouths} mouths",
-            -rate
-        )
-    } else {
-        // Rounded to fives so the ledger records the squeeze, not every
-        // twitch of the count.
-        format!(
-            "famine watch: {village} holds about {:.0} food for {mouths} mouths, {hands} hands at the food trades",
-            (store.food() / 5.0).round() * 5.0
-        )
-    };
-    if *last_said != line {
-        *last_said = line.clone();
-        info!("{line}");
-        notices.write(crate::ui::Notice::new(line));
+        if store.food() >= mouths as f32 * 1.5 {
+            last_said.remove(&town);
+            continue;
+        }
+        let village = settlements
+            .get(town)
+            .map_or("the village", |s| s.name.as_str());
+        let hands = folk
+            .iter()
+            .filter(|(who, ..)| of_town(*who))
+            .filter(|(_, _, vocation)| {
+                matches!(
+                    vocation,
+                    Some(Vocation::Fisher)
+                        | Some(Vocation::Gatherer)
+                        | Some(Vocation::Hunter)
+                        | Some(Vocation::Farmer)
+                )
+            })
+            .count();
+        let fruiting_near = bushes
+            .iter()
+            .filter(|(at, bush)| {
+                bush.amount > 0.3 && at.translation().distance(ground.centre) < 170.0
+            })
+            .count();
+        let nearest_berries = bushes
+            .iter()
+            .filter(|(_, bush)| bush.amount > 0.3)
+            .map(|(at, _)| at.translation().distance(ground.centre) as u32)
+            .min();
+        let rate = trends.rate_per_minute(PileKind::Food);
+
+        let line = if hands == 0 {
+            format!("famine watch: nobody in {village} works a food trade")
+        } else if fruiting_near == 0 {
+            match nearest_berries {
+                Some(d) => format!(
+                    "famine watch: the near land is picked bare - the closest berries stand {d} strides from {village}"
+                ),
+                None => {
+                    format!("famine watch: not a fruiting bush remains anywhere near {village}")
+                }
+            }
+        } else if rate < -0.5 {
+            format!(
+                "famine watch: {village} eats {:.0} more than it gathers each minute, {hands} hands feeding {mouths} mouths",
+                -rate
+            )
+        } else {
+            // Rounded to fives so the ledger records the squeeze, not every
+            // twitch of the count.
+            format!(
+                "famine watch: {village} holds about {:.0} food for {mouths} mouths, {hands} hands at the food trades",
+                (store.food() / 5.0).round() * 5.0
+            )
+        };
+        if last_said.get(&town) != Some(&line) {
+            last_said.insert(town, line.clone());
+            info!("{line}");
+            notices.write(crate::ui::Notice::new(line));
+        }
     }
 }
 
@@ -570,9 +605,8 @@ pub(crate) fn famine_watch(
 pub(crate) fn smelt(
     time: Res<Time>,
     mut since_last: Local<f32>,
-    site: Option<Res<SettlementSite>>,
-    buildings: Query<&Building>,
-    mut stores: Query<&mut Stockpile>,
+    buildings: Query<(&Building, &crate::villager::MemberOf)>,
+    mut towns: Query<(Entity, &mut Stockpile)>,
 ) {
     *since_last += time.delta_secs();
     if *since_last < 22.0 {
@@ -580,22 +614,20 @@ pub(crate) fn smelt(
     }
     let interval = *since_last;
     *since_last = 0.0;
-    let Some(site) = site else {
-        return;
-    };
-    if !buildings.iter().any(|b| b.kind == BuildingKind::Blacksmith) {
-        return;
-    }
-    let Ok(mut store) = stores.get_mut(site.settlement) else {
-        return;
-    };
-    if store.ore >= 1.0 {
-        store.ore -= 1.0;
-        store.iron += 1.0;
-    }
-    // Tools wear: the edge is spent slowly whenever iron is in use.
-    if store.iron > 0.0 {
-        store.iron = (store.iron - 0.004 * interval).max(0.0);
+    // Every town smelts its own ore at its own forge. A blacksmith is a
+    // building in ONE settlement, not a fact about the world.
+    for (town, mut store) in &mut towns {
+        if !has_works(&buildings, town, BuildingKind::Blacksmith) {
+            continue;
+        }
+        if store.ore >= 1.0 {
+            store.ore -= 1.0;
+            store.iron += 1.0;
+        }
+        // Tools wear: the edge is spent slowly whenever iron is in use.
+        if store.iron > 0.0 {
+            store.iron = (store.iron - 0.004 * interval).max(0.0);
+        }
     }
 }
 
@@ -605,31 +637,30 @@ pub(crate) fn smelt(
 pub(crate) fn dye_cloth(
     time: Res<Time>,
     mut since_last: Local<f32>,
-    site: Option<Res<SettlementSite>>,
-    buildings: Query<&Building>,
-    mut stores: Query<&mut Stockpile>,
-    mut wearers: Query<&mut crate::villager::Morale, With<Villager>>,
+    buildings: Query<(&Building, &crate::villager::MemberOf)>,
+    mut towns: Query<(Entity, &mut Stockpile)>,
+    mut wearers: Query<(&mut crate::villager::Morale, &crate::villager::MemberOf), With<Villager>>,
 ) {
     *since_last += time.delta_secs();
     if *since_last < 45.0 {
         return;
     }
     *since_last = 0.0;
-    let Some(site) = site else {
-        return;
-    };
-    if !buildings.iter().any(|b| b.kind == BuildingKind::Weaver) {
-        return;
-    }
-    let Ok(mut store) = stores.get_mut(site.settlement) else {
-        return;
-    };
-    if store.dye < 0.3 {
-        return;
-    }
-    store.dye -= 0.3;
-    for mut morale in &mut wearers {
-        morale.spirits = (morale.spirits + 0.03).min(1.0);
+    for (town, mut store) in &mut towns {
+        if !has_works(&buildings, town, BuildingKind::Weaver) {
+            continue;
+        }
+        if store.dye < 0.3 {
+            continue;
+        }
+        store.dye -= 0.3;
+        // Bright cloth on the backs of the people who wove it, and nobody
+        // else's: a neighbouring town's weaver does not dress this one.
+        for (mut morale, member) in &mut wearers {
+            if member.0 == town {
+                morale.spirits = (morale.spirits + 0.03).min(1.0);
+            }
+        }
     }
 }
 
@@ -639,27 +670,22 @@ pub(crate) fn dye_cloth(
 pub(crate) fn bake(
     time: Res<Time>,
     mut since_last: Local<f32>,
-    site: Option<Res<SettlementSite>>,
-    buildings: Query<&Building>,
-    mut stores: Query<&mut Stockpile>,
+    buildings: Query<(&Building, &crate::villager::MemberOf)>,
+    mut towns: Query<(Entity, &mut Stockpile)>,
 ) {
     *since_last += time.delta_secs();
     if *since_last < 25.0 {
         return;
     }
     *since_last = 0.0;
-    let Some(site) = site else {
-        return;
-    };
-    if !buildings.iter().any(|b| b.kind == BuildingKind::Bakery) {
-        return;
-    }
-    let Ok(mut store) = stores.get_mut(site.settlement) else {
-        return;
-    };
-    if store.larder.grain >= 1.0 {
-        store.larder.grain -= 1.0;
-        store.larder.bread += 1.3;
+    for (town, mut store) in &mut towns {
+        if !has_works(&buildings, town, BuildingKind::Bakery) {
+            continue;
+        }
+        if store.larder.grain >= 1.0 {
+            store.larder.grain -= 1.0;
+            store.larder.bread += 1.3;
+        }
     }
 }
 
@@ -667,8 +693,8 @@ pub(crate) fn eat_from_store(
     mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,
     kitchen: Res<KitchenWarm>,
-    site: Option<Res<SettlementSite>>,
-    mut stores: Query<&mut Stockpile>,
+    members: Query<&crate::villager::MemberOf>,
+    mut towns: Query<(&crate::villager::SettlementGround, &mut Stockpile)>,
     bushes: Query<(&GlobalTransform, &FoodSource)>,
     mut hungry: Query<
         (
@@ -690,16 +716,21 @@ pub(crate) fn eat_from_store(
     >,
 ) {
     let cooked = clock.elapsed < kitchen.until;
-    let Some(site) = site else {
-        return;
-    };
-    let Ok(mut store) = stores.get_mut(site.settlement) else {
-        return;
-    };
 
     for (who, transform, mut needs, mut morale, mut activity, mut target, manner, last) in
         &mut hungry
     {
+        // Everyone eats from their OWN town's larder and walks to their own
+        // square to do it. Reaching for one global store was the thing that
+        // made a second settlement impossible: two towns would have shared
+        // one pile of food across the whole map.
+        let Ok(&crate::villager::MemberOf(home)) = members.get(who) else {
+            continue;
+        };
+        let Ok((ground, mut store)) = towns.get_mut(home) else {
+            continue;
+        };
+        let centre = ground.centre;
         match *activity {
             Activity::VisitingStore => {
                 if store.food() < 1.0 {
@@ -707,8 +738,8 @@ pub(crate) fn eat_from_store(
                     target.0 = None;
                     continue;
                 }
-                if transform.translation.distance(site.centre) > 4.0 {
-                    target.0 = Some(site.centre);
+                if transform.translation.distance(centre) > 4.0 {
+                    target.0 = Some(centre);
                     continue;
                 }
                 // The meal comes out of the larder by kind — bread first
@@ -759,7 +790,7 @@ pub(crate) fn eat_from_store(
                 });
                 if !bush_near && needs.hunger > DOWN_TOOLS_HUNGER && store.food() >= 1.0 {
                     *activity = Activity::VisitingStore;
-                    target.0 = Some(site.centre);
+                    target.0 = Some(centre);
                 }
             }
             _ => {}

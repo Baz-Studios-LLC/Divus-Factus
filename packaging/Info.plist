@@ -3,15 +3,15 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>Egregore</string>
+	<string>Divus Factus</string>
 	<key>CFBundleDisplayName</key>
-	<string>Egregore</string>
+	<string>Divus Factus</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.bazstudios.egregore</string>
+	<string>com.bazstudios.divusfactus</string>
 	<key>CFBundleExecutable</key>
-	<string>egregore</string>
+	<string>divus-factus</string>
 	<key>CFBundleIconFile</key>
-	<string>Egregore</string>
+	<string>DivusFactus</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleInfoDictionaryVersion</key>

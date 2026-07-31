@@ -44,7 +44,7 @@ const WORK_SECONDS: f32 = 6.0;
 const WORK_RANGE: f32 = 2.8;
 
 /// How far afield anyone will go to work.
-const WORK_REACH: f32 = 170.0;
+pub(crate) const WORK_REACH: f32 = 170.0;
 
 /// How far the stone plinth rises above grade. Every building's timber sits
 /// on this, and the plinth reaches well below grade — so nothing clips into
@@ -60,8 +60,8 @@ const CARCASS_FOOD: f32 = 3.0;
 /// Carriers walk their wood to the pile and put it down.
 pub(super) fn haul_wood(
     mut commands: Commands,
-    site: Option<Res<SettlementSite>>,
-    mut stores: Query<&mut Stockpile>,
+    members: Query<&crate::villager::MemberOf>,
+    mut towns: Query<(&crate::villager::SettlementGround, &mut Stockpile)>,
     children: Query<&Children>,
     loads: Query<Entity, With<WoodLoad>>,
     mut haulers: Query<
@@ -80,13 +80,6 @@ pub(super) fn haul_wood(
         ),
     >,
 ) {
-    let Some(site) = site else {
-        return;
-    };
-    let Ok(mut store) = stores.get_mut(site.settlement) else {
-        return;
-    };
-
     for (entity, transform, carrying, mut activity, mut target) in &mut haulers {
         match *activity {
             Activity::Hauling => {}
@@ -98,8 +91,18 @@ pub(super) fn haul_wood(
             _ => continue,
         }
 
-        if transform.translation.distance(site.woodpile) > 2.6 {
-            target.0 = Some(site.woodpile);
+        // Timber goes to the hauler's OWN woodpile. Reaching for the focused
+        // town's pile would have every carpenter in the world walking to one
+        // square with their armful.
+        let Ok(&crate::villager::MemberOf(home)) = members.get(entity) else {
+            continue;
+        };
+        let Ok((ground, mut store)) = towns.get_mut(home) else {
+            continue;
+        };
+
+        if transform.translation.distance(ground.woodpile) > 2.6 {
+            target.0 = Some(ground.woodpile);
             continue;
         }
         store.timber += carrying.amount;
@@ -112,18 +115,21 @@ pub(super) fn haul_wood(
 
 /// The pile shows what the store holds, log by log.
 pub(super) fn update_woodpile(
-    site: Option<Res<SettlementSite>>,
     stores: Query<&Stockpile>,
+    piles: Query<&crate::villager::MemberOf>,
     moving: Query<&Rehouse>,
     mut logs: Query<(&WoodpileLog, &ChildOf, &mut Visibility)>,
 ) {
-    let Some(site) = site else {
-        return;
-    };
-    let Ok(store) = stores.get(site.settlement) else {
-        return;
-    };
     for (log, parent, mut visibility) in &mut logs {
+        // A log belongs to a pile, and a pile to a town: each settlement's
+        // woodpile shows its own timber, not the focused town's.
+        let Some(store) = piles
+            .get(parent.parent())
+            .ok()
+            .and_then(|member| stores.get(member.0).ok())
+        else {
+            continue;
+        };
         let away = moving.get(parent.parent()).map_or(0.0, |r| r.hauled as f32);
         let shown = (log.0 as f32) < store.timber.min(24.0) - away;
         let wanted = if shown {
@@ -266,8 +272,8 @@ pub struct SalvageHauler(pub Entity);
 pub(super) fn salvage_timber(
     mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,
-    site: Option<Res<SettlementSite>>,
-    mut stores: Query<&mut Stockpile>,
+    members: Query<&crate::villager::MemberOf>,
+    mut towns: Query<(Entity, &crate::villager::SettlementGround, &mut Stockpile)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut witnessed: MessageWriter<crate::witness::DivineEvent>,
@@ -304,12 +310,10 @@ pub(super) fn salvage_timber(
         ),
     >,
 ) {
-    let Some(site) = site else {
-        return;
-    };
-    let Ok(mut store) = stores.get_mut(site.settlement) else {
-        return;
-    };
+    // Every town's square, gathered before the mutable loops below: a loose
+    // log is worth salvaging if it lies near ANY settlement, not just the one
+    // the player is watching.
+    let centres: Vec<Vec3> = towns.iter().map(|(_, ground, _)| ground.centre).collect();
 
     // Carriers in progress first.
     let mut carrying: Vec<Entity> = Vec::new();
@@ -351,11 +355,21 @@ pub(super) fn salvage_timber(
                 }
             }
             Err(_) => {
-                // Log gone (or already shouldered): walk it home.
-                if at.translation.distance(site.woodpile) > 2.2 {
-                    target.0 = Some(site.woodpile);
+                // Log gone (or already shouldered): walk it home — to the
+                // carrier's own woodpile.
+                let Some((pile, town)) = members
+                    .get(villager)
+                    .ok()
+                    .and_then(|m| towns.get(m.0).ok().map(|(t, g, _)| (g.woodpile, t)))
+                else {
+                    continue;
+                };
+                if at.translation.distance(pile) > 2.2 {
+                    target.0 = Some(pile);
                 } else {
-                    store.timber += 2.0;
+                    if let Ok((_, _, mut store)) = towns.get_mut(town) {
+                        store.timber += 2.0;
+                    }
                     shed_wood(&mut commands, villager, &children, &loads);
                     commands.entity(villager).remove::<SalvageHauler>();
                     *activity = Activity::Idle;
@@ -373,7 +387,10 @@ pub(super) fn salvage_timber(
         if carrying.contains(&log) {
             continue;
         }
-        if log_at.translation.distance(site.centre) > 70.0 {
+        if !centres
+            .iter()
+            .any(|centre| log_at.translation.distance(*centre) <= 70.0)
+        {
             continue;
         }
         let volunteer = villagers
@@ -394,14 +411,16 @@ pub(super) fn salvage_timber(
     }
 }
 
-/// Whether a build site is a house, for the personal-stake speedup.
-fn plan_kind_is_house(
+/// Whether a build site is somewhere people will sleep, for the
+/// personal-stake speedup. Either roof counts: a carpenter with no bed of
+/// their own is as invested in the longhouse going up as in a house.
+fn plan_kind_is_home(
     build_sites: &Query<(&mut ConstructionSite, &Blueprint)>,
     site: Entity,
 ) -> bool {
     build_sites
         .get(site)
-        .is_ok_and(|(_, plan)| plan.kind == BuildingKind::House)
+        .is_ok_and(|(_, plan)| matches!(plan.kind, BuildingKind::House | BuildingKind::Longhouse))
 }
 
 /// Work gets done: walk there, do the thing, and the stockpile grows.
@@ -410,8 +429,8 @@ pub(super) fn do_work(
     time: Res<Time>,
     clock: Res<crate::calendar::WorldClock>,
     mut rng: ResMut<SimRng>,
-    mut stores: Query<&mut Stockpile>,
-    site: Option<Res<SettlementSite>>,
+    mut towns: Query<(&crate::villager::SettlementGround, &mut Stockpile)>,
+    members: Query<&crate::villager::MemberOf>,
     mut workers: Query<
         (
             Entity,
@@ -470,6 +489,10 @@ pub(super) fn do_work(
         Query<(&mut ConstructionSite, &Blueprint)>,
         Query<&super::Settlement>,
         MessageWriter<crate::ui::Notice>,
+        // Which sites are holdings, and where each site stands — a homestead
+        // breaks its own ground the moment its roof is on.
+        Query<(), With<Homestead>>,
+        Query<&Transform, With<Blueprint>>,
     ),
     ground: (
         Res<Terrain>,
@@ -493,7 +516,15 @@ pub(super) fn do_work(
     >,
 ) {
     let dt = time.delta_secs();
-    let workers_alive = workers.iter().count();
+    // Mouths per town, so one settlement's thin larder does not push
+    // another settlement's trades into working after dark.
+    let mut alive_by_town: std::collections::HashMap<Entity, usize> =
+        std::collections::HashMap::new();
+    for (worker, ..) in workers.iter() {
+        if let Ok(member) = members.get(worker) {
+            *alive_by_town.entry(member.0).or_default() += 1;
+        }
+    }
     let (ref carrying, ref children, ref loads, ref _buildings) = context;
     let (carrying, children, loads) = (carrying, children, loads);
     let (
@@ -504,16 +535,10 @@ pub(super) fn do_work(
         mut deposits_mut,
         mut sacred_mut,
     ) = trades;
-    let (mut build_sites, settlements, mut notices) = civic;
+    let (mut build_sites, settlements, mut notices, steadings, build_at) = civic;
     let (terrain, mut chunks, mut grass, weather, mut stripped, terrain_assets, mut dirty_groves) =
         ground;
     let (mut meshes, mut materials) = assets;
-    let Some(site) = site else {
-        return;
-    };
-    let Ok(mut store) = stores.get_mut(site.settlement) else {
-        return;
-    };
 
     for (
         entity,
@@ -532,6 +557,19 @@ pub(super) fn do_work(
             commands.entity(entity).remove::<Job>();
             continue;
         }
+
+        // Every trade fills its OWN town's store and walks back to its own
+        // square. `home` in this scope is the villager's house; `town` is
+        // the settlement they belong to.
+        let Ok(&crate::villager::MemberOf(town)) = members.get(entity) else {
+            continue;
+        };
+        let Ok((ground, mut store)) = towns.get_mut(town) else {
+            continue;
+        };
+        let centre = ground.centre;
+        let woodpile = ground.woodpile;
+        let workers_alive = alive_by_town.get(&town).copied().unwrap_or(0);
 
         // Shifts end: at day's end, or when hunger calls. The food trades
         // do not down tools for hunger — their meal is at the worksite —
@@ -561,7 +599,7 @@ pub(super) fn do_work(
         // shift's end is hunger ON ARRIVAL, not hunger here - a worker
         // two hundred strides out must leave two hundred strides early.
         // Meals still in the satchel buy the road back.
-        let walk_home = transform.translation.distance(site.centre) / 2.4;
+        let walk_home = transform.translation.distance(centre) / 2.4;
         let projected = needs.hunger + walk_home / SECONDS_TO_STARVE - rations_left * 0.6;
         if !on_shift || (projected > DOWN_TOOLS_HUNGER && !feeds_the_village) {
             *activity = Activity::Idle;
@@ -631,7 +669,7 @@ pub(super) fn do_work(
                     let angle = rng.0.range(0.0, std::f32::consts::TAU);
                     let (sin, cos) = angle.sin_cos();
                     let reach = rng.0.range(14.0, 30.0);
-                    let (x, z) = (site.centre.x + cos * reach, site.centre.z + sin * reach);
+                    let (x, z) = (centre.x + cos * reach, centre.z + sin * reach);
                     job.site = Vec3::new(x, 0.0, z);
                 }
             }
@@ -666,14 +704,14 @@ pub(super) fn do_work(
                     commands.entity(entity).remove::<Job>();
                     continue;
                 }
-                if transform.translation.distance(site.woodpile) > 2.6 {
-                    target.0 = Some(site.woodpile);
+                if transform.translation.distance(woodpile) > 2.6 {
+                    target.0 = Some(woodpile);
                     job.patience -= dt;
                     if job.patience <= 0.0 {
                         *activity = Activity::Idle;
                         target.0 = None;
                         commands.entity(entity).remove::<Job>().insert(Shunned {
-                            site: site.woodpile,
+                            site: woodpile,
                             remaining: 90.0,
                         });
                     }
@@ -713,7 +751,7 @@ pub(super) fn do_work(
             // their own drives nails like it is personal, because it is.
             target.0 = None;
             motion.flail = motion.flail.max(0.3);
-            let stake = if plan_kind_is_house(&build_sites, house) && home.is_none() {
+            let stake = if plan_kind_is_home(&build_sites, house) && home.is_none() {
                 1.4
             } else {
                 1.0
@@ -746,14 +784,46 @@ pub(super) fn do_work(
             }
             if construction.progress >= cost {
                 let kind = plan.kind;
+                let steading = steadings.get(house).is_ok();
+                let house_at = build_at.get(house).map(|t| *t).ok();
+                let plan_size = plan.half_w.max(plan.half_d);
                 let mut done = commands.entity(house);
                 done.remove::<ConstructionSite>()
                     .insert((Building { kind }, Name::new(kind.name())));
-                if kind == BuildingKind::House {
-                    done.insert(Hut);
+                match kind {
+                    BuildingKind::House => {
+                        done.insert(Hut);
+                    }
+                    BuildingKind::Longhouse => {
+                        done.insert(Longhouse);
+                    }
+                    _ => {}
+                }
+                // A holding comes with its ground broken: a plot turned beside
+                // the house, waiting for whoever lives there to work it. Left
+                // unclaimed on purpose — the farmer who moves in takes it, and
+                // that is how the field ends up belonging to the family rather
+                // than to the town's grid.
+                if steading && let Some(house_at) = house_at {
+                    let beside = house_at.translation
+                        + house_at.rotation * Vec3::new(0.0, 0.0, plan_size + 4.2);
+                    let beside =
+                        Vec3::new(beside.x, terrain.height_at(beside.x, beside.z), beside.z);
+                    if terrain.is_walkable(beside.x, beside.z) {
+                        raise_field(
+                            &mut commands,
+                            &mut meshes,
+                            &mut materials,
+                            &mut rng.0,
+                            beside,
+                            house_at.rotation,
+                            0.05,
+                            Entity::PLACEHOLDER,
+                        );
+                    }
                 }
                 let home = settlements
-                    .get(site.settlement)
+                    .get(town)
                     .map(|s| s.name.as_str())
                     .unwrap_or("the village");
                 info!("{} raised {} in {}", person.name, kind.name(), home);
@@ -799,8 +869,8 @@ pub(super) fn do_work(
                     commands.entity(entity).remove::<Job>();
                     continue;
                 }
-                if transform.translation.distance(site.woodpile) > 2.6 {
-                    target.0 = Some(site.woodpile);
+                if transform.translation.distance(woodpile) > 2.6 {
+                    target.0 = Some(woodpile);
                     job.patience -= dt;
                     if job.patience <= 0.0 {
                         *activity = Activity::Idle;
@@ -1242,7 +1312,7 @@ pub(super) fn do_work(
                         .map(|t| t.rotation)
                         .unwrap_or_else(|| {
                             Quat::from_rotation_y({
-                                let toward = (site.centre - at).with_y(0.0);
+                                let toward = (centre - at).with_y(0.0);
                                 let toward = toward.normalize_or_zero();
                                 (-toward.z).atan2(toward.x)
                             })

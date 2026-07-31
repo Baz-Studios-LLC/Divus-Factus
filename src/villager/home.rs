@@ -14,11 +14,11 @@
 
 use bevy::prelude::*;
 
-use super::work::{Hut, Stockpile};
-use super::{Activity, Chronicle, Needs, Person, SettlementSite, SimRng, Villager};
+use super::work::{Hut, Longhouse, Stockpile};
+use super::{Activity, Chronicle, Needs, Parentage, Person, SimRng, Spouse, Villager};
 use crate::creature::anim::CreatureMotion;
 use crate::creature::genome::{Age, CreatureGenome};
-use crate::creature::{Airborne, Corpse, Held, MoveTarget};
+use crate::creature::{Airborne, Childhood, Corpse, Held, MoveTarget};
 use crate::palette;
 
 /// Seconds of burning one log buys.
@@ -27,16 +27,40 @@ const SECONDS_PER_LOG: f32 = 75.0;
 /// Below this much burn-time left, someone goes for wood.
 const LOW_FUEL: f32 = 45.0;
 
-/// How many people one house sleeps.
+/// How many people one house sleeps: a couple and their children.
 pub const HOUSE_CAPACITY: usize = 4;
+
+/// How many the longhouse sleeps. Twice a house, and none of them kin.
+pub const LONGHOUSE_CAPACITY: usize = 8;
 
 /// How many can sleep rough in the fire's circle before the village is
 /// genuinely overfull. The founders' allowance, roughly.
 pub const FIRE_CIRCLE_SHELTER: usize = 8;
 
 /// How many people the village can shelter at all.
-pub fn shelter_capacity(houses: usize) -> usize {
-    FIRE_CIRCLE_SHELTER + houses * HOUSE_CAPACITY
+pub fn shelter_capacity(houses: usize, longhouses: usize) -> usize {
+    FIRE_CIRCLE_SHELTER + houses * HOUSE_CAPACITY + longhouses * LONGHOUSE_CAPACITY
+}
+
+/// Whether this person belongs under a family roof rather than in the
+/// longhouse: the wed, and every child.
+///
+/// Widowhood does not evict anyone — `Spouse` outlives its person on
+/// purpose, so a widow keeps the house she was married into. Coming of age
+/// does: an adult with no spouse of their own has no claim on a family's
+/// room, whoever their parents are.
+pub fn wants_family_roof(spouse: Option<&Spouse>, child: bool) -> bool {
+    spouse.is_some() || child
+}
+
+/// Whether someone should give up the bed they have.
+///
+/// Two conditions, and the second is the one that is easy to get backwards:
+/// they must be under the wrong roof, and the roof they are moving *to* must
+/// have room. Checking the roof they are leaving instead strands people in
+/// the square with a bed waiting for them.
+fn should_rehome(wants_longhouse: bool, in_longhouse: bool, room_in_wanted: bool) -> bool {
+    wants_longhouse != in_longhouse && room_in_wanted
 }
 
 /// The village fire: fuel in seconds of burning, and who is off fetching wood
@@ -62,7 +86,7 @@ pub struct Firelight;
 pub(super) fn take_shelter(
     clock: Res<crate::calendar::WorldClock>,
     weather: Option<Res<crate::weather::Weather>>,
-    homes: Query<&Transform, (With<Hut>, Without<Villager>)>,
+    homes: Query<&Transform, (Or<(With<Hut>, With<Longhouse>)>, Without<Villager>)>,
     fires: Query<&GlobalTransform, (With<Bonfire>, Without<Villager>)>,
     mut villagers: Query<
         (
@@ -339,7 +363,7 @@ pub(super) fn burn(
 pub(super) fn tend_fire(
     clock: Res<crate::calendar::WorldClock>,
     mut notices: MessageWriter<crate::ui::Notice>,
-    site: Option<Res<SettlementSite>>,
+    hearths: Query<&super::MemberOf>,
     mut stores: Query<&mut Stockpile>,
     mut fires: Query<(Entity, &GlobalTransform, &mut Bonfire)>,
     mut villagers: Query<
@@ -349,6 +373,7 @@ pub(super) fn tend_fire(
             &CreatureGenome,
             &mut Activity,
             &mut MoveTarget,
+            Option<&super::MemberOf>,
         ),
         (
             With<Villager>,
@@ -358,20 +383,21 @@ pub(super) fn tend_fire(
         ),
     >,
 ) {
-    let Some(site) = site else {
-        return;
-    };
-    let Ok(mut store) = stores.get_mut(site.settlement) else {
-        return;
-    };
-
     for (fire_entity, fire_at, mut fire) in &mut fires {
         let fire_pos = fire_at.translation();
+        // Each hearth burns its own town's timber, and is tended by its own
+        // town's people.
+        let Some(town) = hearths.get(fire_entity).ok().map(|member| member.0) else {
+            continue;
+        };
+        let Ok(mut store) = stores.get_mut(town) else {
+            continue;
+        };
 
         // Current tender walks the wood over and feeds the flame.
         if let Some(tender) = fire.tender {
             match villagers.get_mut(tender) {
-                Ok((_, transform, _, mut activity, mut target))
+                Ok((_, transform, _, mut activity, mut target, _))
                     if *activity == Activity::TendingFire =>
                 {
                     if transform.translation.distance(fire_pos) > 2.4 {
@@ -405,11 +431,12 @@ pub(super) fn tend_fire(
         if evening_on && fire.fuel < LOW_FUEL && store.timber >= 1.0 {
             let volunteer = villagers
                 .iter_mut()
-                .filter(|(_, _, genome, activity, _)| {
+                .filter(|(_, _, genome, activity, _, member)| {
                     genome.age == Age::Adult
+                        && member.is_some_and(|m| m.0 == town)
                         && matches!(**activity, Activity::Idle | Activity::Wandering)
                 })
-                .map(|(entity, transform, _, activity, target)| {
+                .map(|(entity, transform, _, activity, target, _)| {
                     (
                         entity,
                         transform.translation.distance(fire_pos),
@@ -428,18 +455,37 @@ pub(super) fn tend_fire(
     }
 }
 
-/// People claim beds in finished houses, nearest first, four to a roof.
+/// People claim beds, nearest first — but not just any bed.
+///
+/// A house is a family's: the wed and their children. The longhouse takes
+/// everyone else, which in practice means the village's young adults, in
+/// the stretch of life between coming of age and marrying out of it. The
+/// two roofs are not interchangeable, and which one someone walks into at
+/// dusk says exactly where they stand in the village.
+///
+/// The one exception is the founding: before any longhouse stands, the
+/// unattached take houses rather than sleep in the rain. `rehome_the_misplaced`
+/// sorts them out the day a longhouse is finished.
+#[allow(clippy::type_complexity)]
 pub(super) fn assign_homes(
     mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,
-    huts: Query<(Entity, &Transform), With<Hut>>,
+    roofs: Query<(Entity, &Transform, Has<Longhouse>), Or<(With<Hut>, With<Longhouse>)>>,
     tenants: Query<&Home>,
     mut homeless: Query<
-        (Entity, &Transform, &Person, Option<&mut Chronicle>),
+        (
+            Entity,
+            &Transform,
+            &Person,
+            Option<&mut Chronicle>,
+            Option<&Spouse>,
+            Option<&Parentage>,
+            Has<Childhood>,
+        ),
         (With<Villager>, Without<Home>, Without<Corpse>),
     >,
 ) {
-    if huts.is_empty() {
+    if roofs.is_empty() {
         return;
     }
 
@@ -447,28 +493,184 @@ pub(super) fn assign_homes(
     for home in &tenants {
         *occupancy.entry(home.0).or_default() += 1;
     }
+    // Placements made this pass, so a couple widowed of their house — or
+    // newly wed out of the longhouse — lands under ONE roof rather than two.
+    // `commands` are deferred, so `tenants` cannot see them yet.
+    let mut placed: std::collections::HashMap<Entity, Entity> = std::collections::HashMap::new();
 
-    for (entity, transform, person, chronicle) in &mut homeless {
-        let Some((hut, _)) = huts
-            .iter()
-            .filter(|(hut, _)| occupancy.get(hut).copied().unwrap_or(0) < HOUSE_CAPACITY)
-            .map(|(hut, hut_transform)| {
-                (
-                    hut,
-                    hut_transform.translation.distance(transform.translation),
-                )
+    let capacity = |longhouse: bool| {
+        if longhouse {
+            LONGHOUSE_CAPACITY
+        } else {
+            HOUSE_CAPACITY
+        }
+    };
+    let has_room =
+        |roof: Entity, longhouse: bool, occupancy: &std::collections::HashMap<Entity, usize>| {
+            occupancy.get(&roof).copied().unwrap_or(0) < capacity(longhouse)
+        };
+    for (entity, transform, person, chronicle, spouse, parentage, child) in &mut homeless {
+        // The rule holds even at the founding, when no longhouse stands yet:
+        // strangers do not move in with a family. An earlier version let the
+        // unwed take houses until the first longhouse was finished, and
+        // because a house costs half what a longhouse does it always finished
+        // first — so every new game opened with a married couple and two
+        // strangers under one roof, which is the exact thing the longhouse
+        // exists to prevent. The unwed keep to the fire until their roof is
+        // up, and the planner puts that roof first.
+        let want_longhouse = !wants_family_roof(spouse, child);
+
+        // Kin first: a child joins a parent's roof, and a spouse joins
+        // their partner's — but only if it is the roof they both belong
+        // under. A newly wed pair still bedded down in the longhouse move
+        // to a house together rather than one following the other in and
+        // both being moved out again the next morning.
+        let kin: Option<Entity> = if child {
+            parentage.and_then(|p| {
+                [p.mother, p.father].into_iter().find_map(|parent| {
+                    placed
+                        .get(&parent)
+                        .copied()
+                        .or_else(|| tenants.get(parent).ok().map(|h| h.0))
+                })
             })
-            .min_by(|a, b| a.1.total_cmp(&b.1))
-        else {
-            return;
+        } else {
+            spouse.and_then(|s| {
+                placed
+                    .get(&s.0)
+                    .copied()
+                    .or_else(|| tenants.get(s.0).ok().map(|h| h.0))
+            })
+        };
+        let kin_roof = kin.filter(|roof| {
+            roofs.get(*roof).is_ok_and(|(_, _, long)| {
+                long == want_longhouse && has_room(*roof, long, &occupancy)
+            })
+        });
+
+        let roof = kin_roof.or_else(|| {
+            // Otherwise the nearest roof of the right kind. The unattached
+            // want the longhouse; the wed and their children want a house.
+            roofs
+                .iter()
+                .filter(|(roof, _, long)| {
+                    *long == want_longhouse && has_room(*roof, *long, &occupancy)
+                })
+                .map(|(roof, at, _)| (roof, at.translation.distance(transform.translation)))
+                .min_by(|a, b| a.1.total_cmp(&b.1))
+                .map(|(roof, _)| roof)
+        });
+
+        let Some(roof) = roof else {
+            // No bed of the right kind. Sleeping by the fire beats taking a
+            // family's room, so they wait for the build.
+            continue;
         };
 
-        commands.entity(entity).insert(Home(hut));
-        *occupancy.entry(hut).or_default() += 1;
-        info!("{} moved into a house", person.name);
-        if let Some(mut chronicle) = chronicle {
-            chronicle.record(clock.day(), "moved under a roof of their own");
+        commands.entity(entity).insert(Home(roof));
+        *occupancy.entry(roof).or_default() += 1;
+        placed.insert(entity, roof);
+
+        let longhouse = roofs.get(roof).map(|(_, _, long)| long).unwrap_or(false);
+        if longhouse {
+            info!("{} took a bed in the longhouse", person.name);
+            if let Some(mut chronicle) = chronicle {
+                chronicle.record(clock.day(), "took a bed in the longhouse");
+            }
+        } else {
+            info!("{} moved into a house", person.name);
+            if let Some(mut chronicle) = chronicle {
+                chronicle.record(clock.day(), "moved under a roof of their own");
+            }
         }
+    }
+}
+
+/// The village sorts itself: whoever is sleeping under the wrong roof gives
+/// up their bed as soon as a right one exists.
+///
+/// This is where the lifecycle actually turns. A child comes of age and the
+/// family house is no longer theirs — they carry their blanket to the
+/// longhouse. Two longhouse sleepers marry, and a house falls open to them.
+/// Neither move is scripted anywhere; both fall out of asking, once a day,
+/// whether anyone is in the wrong building.
+///
+/// It only takes the `Home` away. `assign_homes` does the placing on the
+/// next pass, so there is exactly one piece of code that decides who sleeps
+/// where.
+#[allow(clippy::type_complexity)]
+pub(super) fn rehome_the_misplaced(
+    mut commands: Commands,
+    time: Res<Time>,
+    clock: Res<crate::calendar::WorldClock>,
+    mut since_last: Local<f32>,
+    roofs: Query<(Entity, Has<Longhouse>), Or<(With<Hut>, With<Longhouse>)>>,
+    tenants: Query<&Home>,
+    housed: Query<
+        (
+            Entity,
+            &Person,
+            &Home,
+            &Activity,
+            Option<&Spouse>,
+            Has<Childhood>,
+        ),
+        (With<Villager>, Without<Corpse>, Without<Held>),
+    >,
+) {
+    *since_last += time.delta_secs();
+    if *since_last < 9.0 {
+        return;
+    }
+    *since_last = 0.0;
+
+    // Never at night, and never mid-errand: a villager hidden inside a
+    // building is being stood in for by that building, and pulling their
+    // home out from under them there would strand them invisible.
+    if clock.is_night() {
+        return;
+    }
+
+    let mut occupancy: std::collections::HashMap<Entity, usize> = std::collections::HashMap::new();
+    for home in &tenants {
+        *occupancy.entry(home.0).or_default() += 1;
+    }
+    let room_of_kind = |longhouse: bool, occupancy: &std::collections::HashMap<Entity, usize>| {
+        let cap = if longhouse {
+            LONGHOUSE_CAPACITY
+        } else {
+            HOUSE_CAPACITY
+        };
+        roofs.iter().any(|(roof, long)| {
+            long == longhouse && occupancy.get(&roof).copied().unwrap_or(0) < cap
+        })
+    };
+
+    // One move a pass. A village that reshuffles six people at once reads
+    // as a glitch; one person walking their bedding across the square reads
+    // as a life changing.
+    for (entity, person, home, activity, spouse, child) in &housed {
+        if !matches!(*activity, Activity::Idle | Activity::Wandering) {
+            continue;
+        }
+        let Ok((_, in_longhouse)) = roofs.get(home.0) else {
+            continue;
+        };
+        let wants_longhouse = !wants_family_roof(spouse, child);
+        if !should_rehome(
+            wants_longhouse,
+            in_longhouse,
+            room_of_kind(wants_longhouse, &occupancy),
+        ) {
+            continue;
+        }
+        commands.entity(entity).remove::<Home>();
+        if wants_longhouse {
+            info!("{} left the family house for the longhouse", person.name);
+        } else {
+            info!("{} left the longhouse for a house", person.name);
+        }
+        return;
     }
 }
 
@@ -478,7 +680,7 @@ pub(super) fn assign_homes(
 /// drift to the fire instead — the lit circle is a census of who has no roof.
 pub(super) fn night_routine(
     clock: Res<crate::calendar::WorldClock>,
-    homes: Query<&Transform, (With<Hut>, Without<Villager>)>,
+    homes: Query<&Transform, (Or<(With<Hut>, With<Longhouse>)>, Without<Villager>)>,
     fires: Query<&GlobalTransform, (With<Bonfire>, Without<Villager>)>,
     mut rng: ResMut<SimRng>,
     mut villagers: Query<
@@ -746,5 +948,207 @@ mod tests {
     #[test]
     fn houses_sleep_families_not_crowds() {
         assert!((2..=6).contains(&HOUSE_CAPACITY));
+    }
+
+    #[test]
+    fn a_longhouse_is_worth_more_than_a_house() {
+        // The whole point of the long roof is that it sleeps more per
+        // building than the family homes it takes pressure off.
+        assert!(LONGHOUSE_CAPACITY > HOUSE_CAPACITY);
+    }
+
+    #[test]
+    fn both_roofs_count_toward_shelter() {
+        let bare = shelter_capacity(0, 0);
+        assert_eq!(bare, FIRE_CIRCLE_SHELTER);
+        assert_eq!(shelter_capacity(1, 0), bare + HOUSE_CAPACITY);
+        assert_eq!(shelter_capacity(0, 1), bare + LONGHOUSE_CAPACITY);
+        assert_eq!(
+            shelter_capacity(3, 2),
+            bare + 3 * HOUSE_CAPACITY + 2 * LONGHOUSE_CAPACITY
+        );
+    }
+
+    #[test]
+    fn the_wed_and_the_children_want_houses() {
+        let spouse = Spouse(Entity::from_raw_u32(3).unwrap());
+
+        // A married adult, and any child.
+        assert!(wants_family_roof(Some(&spouse), false));
+        assert!(wants_family_roof(None, true));
+        // A widow keeps the house: Spouse outlives its person.
+        assert!(wants_family_roof(Some(&spouse), false));
+    }
+
+    /// A village with one house, one longhouse, and a clock at midday.
+    ///
+    /// Both housing systems run each update, in the order the plugin runs
+    /// them, and the clock is set well clear of night — `rehome_the_misplaced`
+    /// will not move anyone who might be indoors and hidden.
+    fn village() -> (App, Entity, Entity) {
+        let mut app = App::new();
+        let mut time = Time::<()>::default();
+        time.advance_by(std::time::Duration::from_secs(10));
+        app.insert_resource(time);
+        app.insert_resource(crate::calendar::WorldClock {
+            elapsed: (crate::calendar::DAY_SECONDS as f64) * 0.4,
+        });
+        app.add_systems(Update, (assign_homes, rehome_the_misplaced).chain());
+
+        let house = app.world_mut().spawn((Hut, Transform::default())).id();
+        let longhouse = app
+            .world_mut()
+            .spawn((Longhouse, Transform::from_xyz(20.0, 0.0, 0.0)))
+            .id();
+        (app, house, longhouse)
+    }
+
+    fn villager(app: &mut App, name: &str, home: Option<Entity>) -> Entity {
+        let mut person = app.world_mut().spawn((
+            Villager,
+            Transform::default(),
+            Activity::Idle,
+            Person::born(name.into(), "Testly".into()),
+        ));
+        if let Some(home) = home {
+            person.insert(Home(home));
+        }
+        person.id()
+    }
+
+    fn home_of(app: &App, who: Entity) -> Option<Entity> {
+        app.world().entity(who).get::<Home>().map(|h| h.0)
+    }
+
+    #[test]
+    fn coming_of_age_moves_a_grown_child_to_the_longhouse() {
+        // The lifecycle's first turn, and nothing scripts it: the day
+        // `Childhood` comes off, the family room stops being theirs.
+        let (mut app, house, longhouse) = village();
+        let mother = villager(&mut app, "Mother", Some(house));
+        let father = villager(&mut app, "Father", Some(house));
+        app.world_mut().entity_mut(mother).insert(Spouse(father));
+        app.world_mut().entity_mut(father).insert(Spouse(mother));
+        let grown = villager(&mut app, "Grown", Some(house));
+
+        // Several passes: one move per pass, then the placement after it.
+        for _ in 0..4 {
+            app.update();
+        }
+
+        assert_eq!(
+            home_of(&app, grown),
+            Some(longhouse),
+            "an adult with no spouse should have left the family house",
+        );
+        assert_eq!(home_of(&app, mother), Some(house), "the wed keep the house");
+        assert_eq!(home_of(&app, father), Some(house), "the wed keep the house");
+    }
+
+    #[test]
+    fn a_couple_marries_out_of_the_longhouse_into_one_house() {
+        // And the turn back. The pair must land under the SAME roof — the
+        // failure this guards is a newly wed couple assigned to two
+        // different empty houses on the same pass.
+        let (mut app, house, longhouse) = village();
+        let groom = villager(&mut app, "Groom", Some(longhouse));
+        let bride = villager(&mut app, "Bride", Some(longhouse));
+
+        app.update();
+        assert_eq!(home_of(&app, groom), Some(longhouse), "unwed belong here");
+
+        app.world_mut().entity_mut(groom).insert(Spouse(bride));
+        app.world_mut().entity_mut(bride).insert(Spouse(groom));
+        for _ in 0..4 {
+            app.update();
+        }
+
+        assert_eq!(home_of(&app, groom), Some(house));
+        assert_eq!(
+            home_of(&app, bride),
+            Some(house),
+            "a married pair sleep under one roof",
+        );
+    }
+
+    #[test]
+    fn strangers_never_move_in_with_a_family() {
+        // The bug this pins, reported from a fresh game: the first building
+        // finished was a house, and it filled with a married couple and two
+        // unrelated adults. A house costs half what a longhouse does, so it
+        // always wins the race — the rule has to hold before any longhouse
+        // exists, not just after.
+        let (mut app, house, _longhouse) = village();
+        // Strip the longhouse out: this is the founding, with only a house.
+        app.world_mut().entity_mut(_longhouse).despawn();
+
+        let husband = villager(&mut app, "Tiahok", None);
+        let wife = villager(&mut app, "Yebuzia", None);
+        app.world_mut().entity_mut(husband).insert(Spouse(wife));
+        app.world_mut().entity_mut(wife).insert(Spouse(husband));
+        let stranger_a = villager(&mut app, "Wokle", None);
+        let stranger_b = villager(&mut app, "Drehe", None);
+
+        for _ in 0..6 {
+            app.update();
+        }
+
+        assert_eq!(
+            home_of(&app, husband),
+            Some(house),
+            "the couple get the house"
+        );
+        assert_eq!(home_of(&app, wife), Some(house), "and they get it together");
+        assert_eq!(
+            home_of(&app, stranger_a),
+            None,
+            "an unwed adult waits for the longhouse rather than joining a family",
+        );
+        assert_eq!(home_of(&app, stranger_b), None);
+    }
+
+    #[test]
+    fn the_unwed_wait_for_their_own_roof_even_when_a_house_stands_empty() {
+        // No longhouse, one wholly empty house, one unwed adult: he still
+        // sleeps by the fire. A house is a family's, and an empty one is a
+        // family's that has not arrived yet.
+        let mut app = App::new();
+        let mut time = Time::<()>::default();
+        time.advance_by(std::time::Duration::from_secs(10));
+        app.insert_resource(time);
+        app.insert_resource(crate::calendar::WorldClock {
+            elapsed: (crate::calendar::DAY_SECONDS as f64) * 0.4,
+        });
+        app.add_systems(Update, (assign_homes, rehome_the_misplaced).chain());
+        app.world_mut().spawn((Hut, Transform::default()));
+        let lodger = villager(&mut app, "Lodger", None);
+
+        for _ in 0..4 {
+            app.update();
+        }
+
+        assert_eq!(home_of(&app, lodger), None);
+    }
+
+    #[test]
+    fn a_bed_is_given_up_only_for_one_that_is_free() {
+        // Under the wrong roof, with the right kind free: go.
+        assert!(should_rehome(true, false, true));
+        assert!(should_rehome(false, true, true));
+        // Under the wrong roof, but nothing free to move into: stay put.
+        // Leaving here would trade a bed for the fire circle.
+        assert!(!should_rehome(true, false, false));
+        assert!(!should_rehome(false, true, false));
+        // Already home. Room elsewhere is not a reason to move.
+        assert!(!should_rehome(true, true, true));
+        assert!(!should_rehome(false, false, true));
+    }
+
+    #[test]
+    fn coming_of_age_ends_the_claim_on_a_family_room() {
+        // The lifecycle turns on exactly this: the same person, unwed, is
+        // family while a child and longhouse material the day after.
+        assert!(wants_family_roof(None, true));
+        assert!(!wants_family_roof(None, false));
     }
 }

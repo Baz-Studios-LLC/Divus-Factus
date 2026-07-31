@@ -1127,7 +1127,13 @@ pub(crate) fn update_village_panel(
         ),
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
-    huts: Query<(), With<crate::villager::work::Hut>>,
+    huts: Query<
+        (),
+        Or<(
+            With<crate::villager::work::Hut>,
+            With<crate::villager::work::Longhouse>,
+        )>,
+    >,
     trees: Query<&crate::scatter::FellableTree>,
     wildlife: Query<
         (),
@@ -1207,6 +1213,8 @@ pub(crate) fn update_village_panel(
         }
     }
     let about = living.saturating_sub(working + resting + praying);
+    // Both roofs count toward the headline number: it answers "how many
+    // buildings do these people sleep in", not "how many are family homes".
     let houses = huts.iter().count();
     let (food, timber, stone) = site
         .as_ref()

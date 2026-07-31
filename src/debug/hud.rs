@@ -41,7 +41,12 @@ pub(crate) enum HudValue {
 pub(crate) fn spawn_hud(mut commands: Commands) {
     // Both panels come from the interface kit; this module only decides what
     // words go in them.
-    let hud = ui::panel(&mut commands, ui::Anchor::TopLeft, Some("EGREGORE"), None);
+    let hud = ui::panel(
+        &mut commands,
+        ui::Anchor::TopLeft,
+        Some("DIVUS FACTUS"),
+        None,
+    );
     commands
         .entity(hud.root)
         .insert((Name::new("Debug HUD"), HudPanel));

@@ -486,10 +486,10 @@ pub(crate) fn ease_manifestation(
     >,
     mut forced: Local<Option<(Option<f32>, Option<f32>)>>,
 ) {
-    // EGREGORE_LEAN / EGREGORE_GRANDEUR pin the apparition for photography.
+    // DIVUS_FACTUS_LEAN / DIVUS_FACTUS_GRANDEUR pin the apparition for photography.
     let (forced_lean, forced_grandeur) = *forced.get_or_insert_with(|| {
         let read = |name: &str| std::env::var(name).ok().and_then(|v| v.parse::<f32>().ok());
-        (read("EGREGORE_LEAN"), read("EGREGORE_GRANDEUR"))
+        (read("DIVUS_FACTUS_LEAN"), read("DIVUS_FACTUS_GRANDEUR"))
     });
 
     let lean_target = forced_lean.unwrap_or_else(|| {

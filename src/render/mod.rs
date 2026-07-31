@@ -68,7 +68,7 @@ impl Default for TitleLens {
     fn default() -> Self {
         // Unattended captures frame their own shot and skip the front door,
         // so they start sharp rather than easing out of a blur nobody sees.
-        // Title portraits (EGREGORE_TITLE) keep the dream.
+        // Title portraits (DIVUS_FACTUS_TITLE) keep the dream.
         let capturing = crate::capture_path().is_some() && !crate::title::title_capture();
         TitleLens(if capturing { 0.0 } else { 1.0 })
     }

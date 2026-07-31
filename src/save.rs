@@ -26,7 +26,8 @@ use crate::villager::explore::KnownWorld;
 use crate::villager::home::Bonfire;
 use crate::villager::traits::Traits;
 use crate::villager::work::{
-    Blueprint, Building, BuildingKind, ConstructionSite, Field, Hut, PileKind, Stockpile, StorePile,
+    Blueprint, Building, BuildingKind, ConstructionSite, Field, Homestead, Hut, Longhouse,
+    PileKind, Stockpile, StorePile,
 };
 use crate::villager::{
     Activity, Chronicle, MemberOf, Morale, Needs, Parentage, Person, Prime, RestoringSeed,
@@ -51,10 +52,10 @@ impl Plugin for SavePlugin {
             )
             .add_systems(Update, patch_wild)
             .add_systems(Update, process_requests.run_if(request_pending));
-        if std::env::var("EGREGORE_SAVE_TEST").is_ok() {
+        if std::env::var("DIVUS_FACTUS_SAVE_TEST").is_ok() {
             app.add_systems(Update, save_test_harness);
         }
-        if std::env::var("EGREGORE_TITLE_LOAD_TEST").is_ok() {
+        if std::env::var("DIVUS_FACTUS_TITLE_LOAD_TEST").is_ok() {
             app.add_systems(Update, title_load_test_harness);
         }
     }
@@ -84,6 +85,11 @@ struct PersonSave {
     mother: Option<usize>,
     father: Option<usize>,
     home: Option<usize>,
+    /// How many children she has borne. Absent in saves written before
+    /// fertility began to fall with each birth; such mothers load as though
+    /// their first child were still ahead of them.
+    #[serde(default)]
+    borne: u32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -97,6 +103,9 @@ struct BuildingSave {
     stone_laid: f32,
     #[serde(default)]
     timber_footing: bool,
+    /// Whether this house stands out past the rings on its own ground.
+    #[serde(default)]
+    homestead: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -183,13 +192,13 @@ struct SaveGame {
 fn slots_dir() -> std::path::PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
     let base = if cfg!(target_os = "macos") {
-        format!("{home}/Library/Application Support/Egregore/saves")
+        format!("{home}/Library/Application Support/Divus Factus/saves")
     } else if cfg!(target_os = "windows") {
         std::env::var("APPDATA")
-            .map(|a| format!("{a}/Egregore/saves"))
+            .map(|a| format!("{a}/Divus Factus/saves"))
             .unwrap_or_else(|_| "saves".into())
     } else {
-        format!("{home}/.local/share/egregore/saves")
+        format!("{home}/.local/share/divus-factus/saves")
     };
     std::path::PathBuf::from(base)
 }
@@ -402,13 +411,14 @@ fn gather(world: &mut World) -> Option<SaveGame> {
     // Buildings first, so homes can point into the list.
     let mut building_ids: Vec<Entity> = Vec::new();
     let mut buildings: Vec<BuildingSave> = Vec::new();
-    for (entity, transform, blueprint, building, site_state) in world
+    for (entity, transform, blueprint, building, site_state, homestead) in world
         .query::<(
             Entity,
             &Transform,
             &Blueprint,
             Option<&Building>,
             Option<&ConstructionSite>,
+            Has<Homestead>,
         )>()
         .iter(world)
     {
@@ -433,6 +443,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
             stage,
             stone_laid,
             timber_footing,
+            homestead,
         });
     }
 
@@ -455,7 +466,12 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         f32,
         Option<f32>,
         Option<f32>,
-        (Option<Entity>, Option<(Entity, Entity)>, Option<Entity>),
+        (
+            Option<Entity>,
+            Option<(Entity, Entity)>,
+            Option<Entity>,
+            u32,
+        ),
     )> = Vec::new();
     for (entity, transform, person, genome, needs, morale, temperament, witnessed, extras, ties) in
         world
@@ -482,12 +498,13 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                     Option<&Spouse>,
                     Option<&Parentage>,
                     Option<&crate::villager::home::Home>,
+                    Option<&crate::villager::Motherhood>,
                 ),
             ), (With<Villager>, Without<Corpse>)>()
             .iter(world)
     {
         let (faith, traits, chronicle, vocation, skills, vitality, prime, childhood) = extras;
-        let (spouse, parentage, home) = ties;
+        let (spouse, parentage, home, motherhood) = ties;
         people_ids.push(entity);
         raw.push((
             entity,
@@ -515,6 +532,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                 spouse.map(|s| s.0),
                 parentage.map(|p| (p.mother, p.father)),
                 home.map(|h| h.0),
+                motherhood.map_or(0, |m| m.borne),
             ),
         ));
     }
@@ -539,7 +557,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                 harm,
                 prime,
                 childhood,
-                (spouse, parents, home),
+                (spouse, parents, home, borne),
             )| {
                 PersonSave {
                     pos,
@@ -561,6 +579,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                     mother: parents.and_then(|(m, _)| index_of(m, &people_ids)),
                     father: parents.and_then(|(_, f)| index_of(f, &people_ids)),
                     home: home.and_then(|e| index_of(e, &building_ids)),
+                    borne,
                 }
             },
         )
@@ -779,7 +798,7 @@ fn found_anew(world: &mut World) {
     raze(world);
 
     // A fresh seed from the clock — the same door a fresh launch walks
-    // through, so EGREGORE_SEED still pins reproducible worlds.
+    // through, so DIVUS_FACTUS_SEED still pins reproducible worlds.
     let seed = crate::WorldSeed::default();
     world.insert_resource(Terrain::new(seed.0));
     world.insert_resource(seed);
@@ -947,6 +966,10 @@ fn apply(world: &mut World, save: SaveGame) {
             let entity = commands
                 .spawn((
                     b.blueprint.clone(),
+                    // Which town raised it. Restored the same way it is
+                    // stamped when ground is broken, so a loaded world's
+                    // trades serve their own settlement and not every one.
+                    MemberOf(settlement_entity),
                     Transform::from_translation(b.pos).with_rotation(b.rot),
                     Visibility::default(),
                     crate::hand::PickRadius(b.blueprint.half_w.max(b.blueprint.half_d) + 0.9),
@@ -963,8 +986,18 @@ fn apply(world: &mut World, save: SaveGame) {
                 commands
                     .entity(entity)
                     .insert((Building { kind }, Name::new(kind.name())));
-                if kind == BuildingKind::House {
-                    commands.entity(entity).insert(Hut);
+                match kind {
+                    BuildingKind::House => {
+                        commands.entity(entity).insert(Hut);
+                    }
+                    BuildingKind::Longhouse => {
+                        commands.entity(entity).insert(Longhouse);
+                    }
+                    _ => {}
+                }
+                // A holding out past the rings stays a holding on reload.
+                if b.homestead {
+                    commands.entity(entity).insert(Homestead);
                 }
             } else {
                 commands.entity(entity).insert((
@@ -1083,6 +1116,11 @@ fn apply(world: &mut World, save: SaveGame) {
             }
             if let Some(remaining) = p.childhood {
                 e.insert(Childhood { remaining });
+            }
+            // A mother's history of births, so her fertility resumes where it
+            // left off rather than starting over on load.
+            if p.borne > 0 {
+                e.insert(crate::villager::Motherhood { borne: p.borne });
             }
         }
         world.flush();
@@ -1379,7 +1417,7 @@ fn patch_wild(
 }
 
 /// Unattended round-trip check: save to slot 3 at 25 s, load it at 32 s.
-/// Only registered under EGREGORE_SAVE_TEST; greppable in the log.
+/// Only registered under DIVUS_FACTUS_SAVE_TEST; greppable in the log.
 fn save_test_harness(mut commands: Commands, time: Res<Time>, mut fired: Local<u8>) {
     if *fired == 0 && time.elapsed_secs() > 25.0 {
         *fired = 1;
@@ -1395,7 +1433,7 @@ fn save_test_harness(mut commands: Commands, time: Res<Time>, mut fired: Local<u
 
 /// Presses the title screen's LOAD button from the environment: requests
 /// slot 3 while still on the title, then reports each state the flow
-/// passes through. Only registered under EGREGORE_TITLE_LOAD_TEST.
+/// passes through. Only registered under DIVUS_FACTUS_TITLE_LOAD_TEST.
 fn title_load_test_harness(
     mut commands: Commands,
     time: Res<Time<Real>>,

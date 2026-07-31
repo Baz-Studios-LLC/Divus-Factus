@@ -822,7 +822,7 @@ pub(crate) fn update_people_panel(
             .id();
         commands.spawn((
             RowLabel(entity),
-            ui::label(person.name.clone()),
+            ui::label(person.full_name()),
             ChildOf(words),
         ));
         commands.spawn((
@@ -1056,10 +1056,11 @@ pub(crate) fn update_person_detail(
         node.display = Display::None;
     }
 
+    let formal = person.full_name();
     if let Ok(mut name) = texts.p0().single_mut()
-        && name.0 != person.name
+        && name.0 != formal
     {
-        *name = Text::new(person.name.clone());
+        *name = Text::new(formal);
     }
     let who = genome.map_or("a soul", |g| person_phrase(g.sex, g.age));
     let of = member_of
@@ -1470,7 +1471,7 @@ pub(crate) fn update_dossier(
                         commands,
                         row,
                         kin_entity,
-                        &kin_person.name,
+                        &kin_person.full_name(),
                         corpses.get(kin_entity).is_ok(),
                     );
                 }

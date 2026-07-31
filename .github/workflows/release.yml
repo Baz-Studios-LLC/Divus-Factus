@@ -48,18 +48,18 @@ jobs:
       - name: Package — macOS .app.tar.gz
         if: runner.os == 'macOS'
         run: |
-          bash packaging/macos-app.sh target/release/egregore "${{ steps.ver.outputs.version }}" build
+          bash packaging/macos-app.sh target/release/divus-factus "${{ steps.ver.outputs.version }}" build
           mkdir -p dist
-          tar -czf "dist/Egregore-macos-aarch64.app.tar.gz" -C build Egregore.app
+          tar -czf "dist/DivusFactus-macos-aarch64.app.tar.gz" -C build DivusFactus.app
 
       - name: Package — Windows .zip (binary + assets)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist, stage | Out-Null
-          Copy-Item target\release\egregore.exe stage\Egregore.exe
+          Copy-Item target\release\divus-factus.exe stage\DivusFactus.exe
           Copy-Item -Recurse assets stage\assets
-          Compress-Archive -Path stage\* -DestinationPath dist\Egregore-windows-x86_64.zip -Force
+          Compress-Archive -Path stage\* -DestinationPath dist\DivusFactus-windows-x86_64.zip -Force
 
       - name: Attach to release
         uses: softprops/action-gh-release@v2

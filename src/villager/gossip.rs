@@ -71,7 +71,7 @@ pub(crate) fn form_bonds(
         }
 
         let (man, _, him) = men.swap_remove(slot);
-        info!("{} and {} were wed", her.name, him.name);
+        info!("{} and {} were wed", her.full_name(), him.full_name());
         notices.write(crate::ui::Notice::new(format!(
             "{} and {} were wed",
             her.name, him.name
@@ -79,12 +79,24 @@ pub(crate) fn form_bonds(
         commands.entity(woman).insert(Spouse(man));
         commands.entity(man).insert(Spouse(woman));
 
+        // She takes his house. `born_surname` is deliberately left as it was:
+        // it is the only thread left back to the parents who raised her, and
+        // a family tree drawn without it loses every maternal line at the
+        // first wedding.
+        if !him.surname.is_empty() && him.surname != her.surname {
+            commands.entity(woman).insert(Person {
+                name: her.name.clone(),
+                surname: him.surname.clone(),
+                born_surname: her.born_surname.clone(),
+            });
+        }
+
         let day = clock.day();
         if let Ok(mut chronicle) = chronicles.get_mut(woman) {
-            chronicle.record(day, format!("wed {}", him.name));
+            chronicle.record(day, format!("wed {} and took his name", him.full_name()));
         }
         if let Ok(mut chronicle) = chronicles.get_mut(man) {
-            chronicle.record(day, format!("wed {}", her.name));
+            chronicle.record(day, format!("wed {}", her.full_name()));
         }
     }
 }
@@ -230,7 +242,15 @@ pub(crate) fn hold_conversations(
         Option<&mut Chronicle>,
         Option<&mut belief::Faith>,
     )>,
+    // Who each teller is, for putting the story in their own mouth. Absent
+    // unless the teller is switched on, in which case none of this runs.
+    voices: Query<(
+        Option<&work::Vocation>,
+        Option<&crate::witness::Temperament>,
+    )>,
+    tongue: Option<ResMut<crate::telling::Tongue>>,
 ) {
+    let mut tongue = tongue;
     // Positions snapshot so both halves of a pair can steer at each other.
     let spots: Vec<(Entity, Vec3)> = pairs
         .iter()
@@ -271,7 +291,43 @@ pub(crate) fn hold_conversations(
                 .map(|(p, ..)| p.name.clone())
                 .unwrap_or_default();
             // The same story never wears the same words twice in a row.
-            let told = (*rng.0.pick(kind.rumors())).replace("the god", god);
+            //
+            // If the teller is listening, the line comes from this villager's
+            // own circumstances — what they saw with their own eyes against
+            // what they were merely told, their trade, their belief. If it is
+            // not, or has nothing ready, the written phrasings answer. There
+            // is one fallback and it is always there.
+            let spoken = tongue.as_mut().and_then(|tongue| {
+                let (voice, manner) = voices
+                    .get(entity)
+                    .map(|(v, t)| (v.copied(), t))
+                    .unwrap_or((None, None));
+                let (hand, told_before) = minds
+                    .get(entity)
+                    .map(|(_, witnessed, ..)| {
+                        (
+                            crate::telling::Retelling::hand_of(witnessed),
+                            witnessed.told,
+                        )
+                    })
+                    .unwrap_or((crate::telling::Hand::Heard, 0));
+                let trust = minds
+                    .get(entity)
+                    .ok()
+                    .and_then(|(_, _, _, faith)| faith.map(|f| f.trust))
+                    .unwrap_or(0.3);
+                tongue.line(&crate::telling::Retelling::new(
+                    kind,
+                    hand,
+                    voice,
+                    trust,
+                    manner.map_or(0.5, |t| t.boldness),
+                    told_before,
+                ))
+            });
+            let told = spoken
+                .unwrap_or_else(|| (*rng.0.pick(kind.rumors())).to_string())
+                .replace("the god", god);
             say.write(crate::ui::Say {
                 speaker: entity,
                 text: told.clone(),
@@ -407,5 +463,73 @@ pub(crate) fn seek_company(
             continue;
         };
         target.0 = Some(*near + Vec3::new(rng.0.range(-2.0, 2.0), 0.0, rng.0.range(-2.0, 2.0)));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::creature::genome::CreatureGenome;
+    use crate::rng::Rng;
+
+    /// One woman and one man, grown, standing close enough to court.
+    fn courting_pair(app: &mut App) -> (Entity, Entity) {
+        let mut adult = |sex: Sex, name: &str, house: &str, at: f32| {
+            let mut genome =
+                CreatureGenome::random(crate::creature::genome::Species::Human, &mut Rng::new(1));
+            genome.sex = sex;
+            genome.age = Age::Adult;
+            app.world_mut()
+                .spawn((
+                    Villager,
+                    Transform::from_xyz(at, 0.0, 0.0),
+                    genome,
+                    Person::born(name.into(), house.into()),
+                    Chronicle::default(),
+                ))
+                .id()
+        };
+        let bride = adult(Sex::Female, "Temewa", "Kirap", 0.0);
+        let groom = adult(Sex::Male, "Shezirav", "Rohap", 1.0);
+        (bride, groom)
+    }
+
+    #[test]
+    fn a_bride_takes_her_husbands_house_and_keeps_her_own_on_record() {
+        let mut app = App::new();
+        let mut time = Time::<()>::default();
+        time.advance_by(std::time::Duration::from_secs_f32(BOND_INTERVAL + 1.0));
+        app.insert_resource(time);
+        app.init_resource::<crate::calendar::WorldClock>();
+        // A seed that clears the 0.4 "some pairs never happen" roll.
+        app.insert_resource(SimRng(Rng::new(3)));
+        app.add_message::<crate::ui::Notice>();
+        app.add_systems(Update, form_bonds);
+
+        let (bride, groom) = courting_pair(&mut app);
+        for _ in 0..12 {
+            app.update();
+        }
+
+        let world = app.world();
+        assert!(
+            world.entity(bride).get::<Spouse>().is_some(),
+            "the pair never wed, so there is nothing to test",
+        );
+
+        let wife = world.entity(bride).get::<Person>().unwrap();
+        let husband = world.entity(groom).get::<Person>().unwrap();
+        assert_eq!(wife.surname, husband.surname, "she takes his house");
+        assert_eq!(
+            wife.born_surname, "Kirap",
+            "her birth house is the family tree's only thread back to her parents",
+        );
+        assert_eq!(wife.maiden_house(), Some("Kirap"));
+        assert_eq!(wife.full_name(), "Temewa Rohap");
+        assert_eq!(wife.name_with_house(), "Temewa Rohap (of Kirap)");
+
+        // His own name is untouched, and carries no maiden note.
+        assert_eq!(husband.full_name(), "Shezirav Rohap");
+        assert_eq!(husband.maiden_house(), None);
     }
 }

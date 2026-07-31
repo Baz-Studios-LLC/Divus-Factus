@@ -33,10 +33,10 @@ pub struct SimSpeed {
 }
 
 impl Default for SimSpeed {
-    /// EGREGORE_SPEED starts a run hasted — the fast-forward dial that
+    /// DIVUS_FACTUS_SPEED starts a run hasted — the fast-forward dial that
     /// makes hour-scale balance testable in minutes.
     fn default() -> Self {
-        let speed = std::env::var("EGREGORE_SPEED")
+        let speed = std::env::var("DIVUS_FACTUS_SPEED")
             .ok()
             .and_then(|v| v.parse::<f32>().ok())
             .unwrap_or(1.0)

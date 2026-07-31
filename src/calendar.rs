@@ -114,16 +114,16 @@ pub struct WorldClock {
 
 impl Default for WorldClock {
     /// Games open mid-morning: the first thing the player sees should be the
-    /// world lit well, not a night they had no say in. `EGREGORE_CLOCK=0.8`
+    /// world lit well, not a night they had no say in. `DIVUS_FACTUS_CLOCK=0.8`
     /// starts elsewhere in the day, for looking at dusk without waiting for it.
     fn default() -> Self {
-        let start = std::env::var("EGREGORE_CLOCK")
+        let start = std::env::var("DIVUS_FACTUS_CLOCK")
             .ok()
             .and_then(|v| v.parse::<f32>().ok())
             .unwrap_or(0.22);
-        // EGREGORE_DAY jumps the calendar for testing a season without
+        // DIVUS_FACTUS_DAY jumps the calendar for testing a season without
         // living to it: 29 is the first day of summer, 85 of winter.
-        let day = std::env::var("EGREGORE_DAY")
+        let day = std::env::var("DIVUS_FACTUS_DAY")
             .ok()
             .and_then(|v| v.parse::<u32>().ok())
             .map_or(0, |d| d.saturating_sub(1));

@@ -1,4 +1,4 @@
-//! Egregore — a god game about a deity made, sustained and defined by the people
+//! Divus Factus — a god game about a deity made, sustained and defined by the people
 //! who believe in it.
 
 mod calendar;
@@ -23,6 +23,7 @@ mod sigil;
 mod sky;
 mod speed;
 mod survey;
+mod telling;
 mod terrain;
 mod title;
 mod trails;
@@ -43,7 +44,7 @@ use bevy::prelude::*;
 /// the window, which an unfocused or occluded window on macOS will not do. Capture
 /// mode therefore routes the final image through an offscreen target instead, which
 /// is compositor-independent and gives the same picture the player would see.
-pub const CAPTURE_VAR: &str = "EGREGORE_CAPTURE";
+pub const CAPTURE_VAR: &str = "DIVUS_FACTUS_CAPTURE";
 
 /// The path to capture to, if capture mode is active.
 pub fn capture_path() -> Option<String> {
@@ -83,14 +84,14 @@ impl Default for WorldSeed {
     /// A different world every launch.
     ///
     /// Taken from the clock rather than a fixed constant, so the same landscape does
-    /// not greet the player every time. Set `EGREGORE_SEED` to reproduce a specific
+    /// not greet the player every time. Set `DIVUS_FACTUS_SEED` to reproduce a specific
     /// world — worth having, since every procedural system here derives from this one
     /// number and a memorable world would otherwise be unrecoverable.
     fn default() -> Self {
-        if let Ok(seed) = std::env::var("EGREGORE_SEED")
+        if let Ok(seed) = std::env::var("DIVUS_FACTUS_SEED")
             && let Ok(parsed) = seed.parse::<u32>()
         {
-            info!("world seed {parsed} (from EGREGORE_SEED)");
+            info!("world seed {parsed} (from DIVUS_FACTUS_SEED)");
             return WorldSeed(parsed);
         }
 
@@ -99,7 +100,7 @@ impl Default for WorldSeed {
             .map(|d| d.subsec_nanos() ^ (d.as_secs() as u32).rotate_left(13))
             .unwrap_or(0x2024_1101);
 
-        info!("world seed {seed} — set EGREGORE_SEED={seed} to return here");
+        info!("world seed {seed} — set DIVUS_FACTUS_SEED={seed} to return here");
         WorldSeed(seed)
     }
 }
@@ -108,7 +109,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                title: "Egregore".into(),
+                title: "Divus Factus".into(),
                 resolution: (1600u32, 900u32).into(),
                 ..default()
             }),
@@ -149,6 +150,7 @@ fn main() {
             speed::SpeedPlugin,
             survey::SurveyPlugin,
             markers::MarkersPlugin,
+            telling::TellingPlugin,
         ))
         .add_systems(Startup, spawn_lighting)
         .run();

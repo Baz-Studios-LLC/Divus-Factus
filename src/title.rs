@@ -54,7 +54,7 @@ impl Plugin for TitlePlugin {
 /// True when an unattended capture wants to photograph the title screen
 /// itself instead of skipping past it into the world.
 pub fn title_capture() -> bool {
-    std::env::var("EGREGORE_TITLE").is_ok()
+    std::env::var("DIVUS_FACTUS_TITLE").is_ok()
 }
 
 #[derive(Component)]
@@ -355,7 +355,7 @@ fn spawn_title(
     let title = commands
         .spawn((
             TitleArt,
-            ImageNode::new(assets.load("EgregoreLogo.png")),
+            ImageNode::new(assets.load("DivusFactusLogo.png")),
             Node {
                 width: px(860),
                 margin: UiRect::bottom(px(40.0)),
@@ -711,7 +711,7 @@ fn begin_descent(
     }
 }
 
-/// Capture tooling: EGREGORE_AUTOBEGIN=seconds presses Begin unattended, so
+/// Capture tooling: DIVUS_FACTUS_AUTOBEGIN=seconds presses Begin unattended, so
 /// the descent itself can be photographed.
 fn auto_begin(
     mut commands: Commands,
@@ -721,7 +721,7 @@ fn auto_begin(
     site: Option<Res<crate::villager::SettlementSite>>,
     mut next: ResMut<NextState<GameState>>,
 ) {
-    let Some(after) = std::env::var("EGREGORE_AUTOBEGIN")
+    let Some(after) = std::env::var("DIVUS_FACTUS_AUTOBEGIN")
         .ok()
         .and_then(|v| v.parse::<f32>().ok())
     else {
@@ -738,7 +738,7 @@ fn auto_begin(
     }
 }
 
-/// Capture tooling: EGREGORE_AUTOTITLE=seconds walks back to the title after
+/// Capture tooling: DIVUS_FACTUS_AUTOTITLE=seconds walks back to the title after
 /// N seconds of play — through the same door as the pause menu's Title
 /// button, new world and all — so the whole loop can be proven on film.
 #[allow(clippy::type_complexity)]
@@ -757,7 +757,7 @@ fn auto_title(
     if *fired {
         return;
     }
-    let Some(after) = std::env::var("EGREGORE_AUTOTITLE")
+    let Some(after) = std::env::var("DIVUS_FACTUS_AUTOTITLE")
         .ok()
         .and_then(|v| v.parse::<f32>().ok())
     else {

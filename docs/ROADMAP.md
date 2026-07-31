@@ -1,4 +1,4 @@
-# Egregore — Development Roadmap
+# Divus Factus — Development Roadmap
 
 Ordered by risk, not by feature list. The unknowns go first; the things we already know are
 achievable wait.
@@ -31,7 +31,7 @@ panel — because no amount of simulation depth rescues a god game whose hand fe
 - [x] Custom water shader: rotated-octave waves, fresnel, distance fade,
       depth-based transparency and shoreline foam via the depth prepass
 - [x] Treeline and snowline that wander with noise instead of drawing contours
-- [x] Random seed per launch (EGREGORE_SEED to reproduce)
+- [x] Random seed per launch (DIVUS_FACTUS_SEED to reproduce)
 - [x] Rivers v2: lazy hydrology — springs traced downhill, level clamped
       monotone, so rivers cannot flow uphill by construction
 - [x] Rivers born small: width and depth mature along the course
@@ -64,7 +64,7 @@ panel — because no amount of simulation depth rescues a god game whose hand fe
 - [x] Children come of age: bodies rebuilt as adults, so a village that can
       die can also endure
 - [x] Day and night: a world clock drives the sun's path, light, fog, sky and
-      sea; the calendar shows in the HUD (EGREGORE_CLOCK jumps to any hour)
+      sea; the calendar shows in the HUD (DIVUS_FACTUS_CLOCK jumps to any hour)
 - [x] Settlements are founded things: a named entity in the people's own
       tongue, with a founder and members, shown in the inspector
 - [x] Every person has a chronicle: born, wed, came of age, touched by the
@@ -436,7 +436,7 @@ so the defense ladder grows in lockstep with the threat ladder:
 - *Human threats arrive with schism:* the first raid is never a spawned
   bandit camp — it is the splinter town that failed, coming back armed in
   a hungry winter. Every threat has a chronicle behind it.
-- *The Egregore twist — walls are a confession:* a congregation that
+- *The Divus Factus twist — walls are a confession:* a congregation that
   truly trusts its god under-builds (the god is the wall); a doubting or
   dread-ruled town builds high and mans the tower. Faith becomes readable
   in the skyline, and defense investment is doctrine made visible.
@@ -463,7 +463,7 @@ camp in a lean season, chronicled with its why. What they feed:
 - schism practice: a camp is settlement-lite — sited, growing, raiding,
   discoverable, destroyable — exercising multi-settlement muscles before
   human splinter towns need them
-- the Egregore question: who do the villagers SAY sent the raid? False
+- the Divus Factus question: who do the villagers SAY sent the raid? False
   attribution feeds on fear; and one wild future door — a dread-heavy
   god's legend reaching the deep woods and finding its second
   congregation there

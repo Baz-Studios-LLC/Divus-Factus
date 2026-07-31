@@ -49,7 +49,7 @@ pub struct DivineEvent {
 }
 
 /// The kinds of act a villager can witness.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum DivineEventKind {
     /// Someone was lifted off the ground.
     Lifted,

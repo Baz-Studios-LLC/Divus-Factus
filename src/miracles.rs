@@ -73,7 +73,7 @@ impl Plugin for MiraclesPlugin {
                     .chain()
                     .after(CameraSet),
             );
-        if std::env::var("EGREGORE_GLORY_TEST").is_ok() {
+        if std::env::var("DIVUS_FACTUS_GLORY_TEST").is_ok() {
             app.add_systems(Update, glory_test_harness);
         }
     }
@@ -238,7 +238,7 @@ fn tick_glory(
 }
 
 /// Raises one of each glory near the settlement, once, so a capture run
-/// can look at them. Only registered under EGREGORE_GLORY_TEST.
+/// can look at them. Only registered under DIVUS_FACTUS_GLORY_TEST.
 fn glory_test_harness(
     mut commands: Commands,
     time: Res<Time>,

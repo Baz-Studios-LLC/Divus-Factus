@@ -121,9 +121,9 @@ impl Plugin for DebugPlugin {
                 path,
                 // Long enough for terrain generation, scatter and the first frames
                 // of animation to settle, so the capture is representative.
-                // EGREGORE_CAPTURE_DELAY overrides it, for photographing things
+                // DIVUS_FACTUS_CAPTURE_DELAY overrides it, for photographing things
                 // that take minutes to happen — a village being built, say.
-                delay: std::env::var("EGREGORE_CAPTURE_DELAY")
+                delay: std::env::var("DIVUS_FACTUS_CAPTURE_DELAY")
                     .ok()
                     .and_then(|v| v.parse().ok())
                     .unwrap_or(9.0),
@@ -246,7 +246,7 @@ fn family_phrase(
     if let Some(spouse) = spouse {
         let name = kin
             .get(spouse.0)
-            .map(|p| p.name.clone())
+            .map(|p| p.full_name())
             .unwrap_or_else(|_| "one now gone".into());
         return if corpses.get(spouse.0).is_ok() {
             format!("widowed of {name}")
@@ -257,11 +257,11 @@ fn family_phrase(
     if let Some(parents) = parentage {
         let mother = kin
             .get(parents.mother)
-            .map(|p| p.name.clone())
+            .map(|p| p.full_name())
             .unwrap_or_else(|_| "a mother now gone".into());
         let father = kin
             .get(parents.father)
-            .map(|p| p.name.clone())
+            .map(|p| p.full_name())
             .unwrap_or_else(|_| "a father now gone".into());
         return format!("born to {mother} and {father}");
     }

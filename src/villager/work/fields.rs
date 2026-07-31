@@ -120,3 +120,22 @@ pub(crate) fn grow_crops(
         }
     }
 }
+
+/// Hands an unclaimed plot to a farmer.
+///
+/// A homestead turns its own ground when its roof goes on, before anyone has
+/// moved in. This is how that ground finds its farmer: the first one to walk
+/// out and take it.
+#[derive(Component)]
+pub struct ClaimField(pub Entity);
+
+/// Settles claims made this tick.
+pub(crate) fn settle_field_claims(
+    mut commands: Commands,
+    mut claimed: Query<(Entity, &ClaimField, &mut Field)>,
+) {
+    for (field, claim, mut plot) in &mut claimed {
+        plot.farmer = claim.0;
+        commands.entity(field).remove::<ClaimField>();
+    }
+}

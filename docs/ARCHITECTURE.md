@@ -1,4 +1,4 @@
-# Egregore — Technical Architecture
+# Divus Factus — Technical Architecture
 
 Rust + Bevy 0.19. One dependency: `bevy`. Everything else is written here on purpose —
 see [Dependencies](#dependencies).
@@ -239,7 +239,7 @@ All time derives from one `WorldClock` (600 s/day). The visual consequences are
 funnelled through a single `Sky` resource — sun bearing, light colours, horizon,
 daylight fraction — and lights, fog, `ClearColor` and the water shader all read
 `Sky` rather than the clock. Seasons and weather, when they come, bend `Sky` in
-one place instead of touching every consumer. `EGREGORE_CLOCK=0.85` starts the
+one place instead of touching every consumer. `DIVUS_FACTUS_CLOCK=0.85` starts the
 game at any hour, which is how dusk gets art-directed without waiting for it.
 
 ### One interface kit, and the hand is the only cursor
@@ -309,7 +309,7 @@ There are no asset files — every mesh, colour and animation is generated at ru
 Unattended screenshot (renders one frame to a file and exits):
 
 ```bash
-EGREGORE_CAPTURE=/tmp/shot.png cargo run
+DIVUS_FACTUS_CAPTURE=/tmp/shot.png cargo run
 ```
 
 Capture mode routes the final image through an offscreen target rather than reading back

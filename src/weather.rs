@@ -128,7 +128,7 @@ fn progress_fronts(
     if clock.elapsed >= weather.next_front {
         // Clear-ish weather is the ordinary day; storms are events. An
         // override for photographing and testing particular skies.
-        weather.target = match std::env::var("EGREGORE_WEATHER").as_deref() {
+        weather.target = match std::env::var("DIVUS_FACTUS_WEATHER").as_deref() {
             Ok("clear") => 0.1,
             Ok("rain") => 0.7,
             Ok("storm") => 1.0,

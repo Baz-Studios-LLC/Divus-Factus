@@ -7,6 +7,7 @@
 //! means adding a scorer, not editing a branch.
 
 pub mod belief;
+pub mod colony;
 pub mod explore;
 pub mod home;
 pub mod names;
@@ -174,10 +175,14 @@ impl Plugin for VillagerPlugin {
                         work::smelt,
                         work::dye_cloth,
                         work::famine_watch,
+                        work::settle_field_claims,
                     )
                         .chain(),
                     (
                         home::assign_homes,
+                        home::rehome_the_misplaced,
+                        colony::muster_colonists,
+                        colony::walk_to_the_new_ground,
                         home::burn_weathered,
                         home::take_shelter,
                         home::tavern_evenings,
@@ -229,12 +234,75 @@ pub struct Parentage {
 
 /// Who someone is.
 ///
-/// Fixed at birth and never changed. Everything the belief system will eventually
-/// record — what they saw, what they concluded, who they told — hangs off a person
-/// rather than an entity id.
+/// The given name is fixed at birth and never changes. Everything the belief
+/// system will eventually record — what they saw, what they concluded, who they
+/// told — hangs off a person rather than an entity id.
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Person {
     pub name: String,
+    /// The family name they answer to now, carried down the father's line. A
+    /// wife takes her husband's at the wedding, so a household reads as one
+    /// house. Empty for anyone restored from a save written before families
+    /// had names.
+    #[serde(default)]
+    pub surname: String,
+    /// The house they were BORN into, set once and never changed.
+    ///
+    /// Kept because the marriage that renames a woman is exactly the edge a
+    /// family tree needs to draw: without this, a wife is cut loose from her
+    /// parents the day she weds and the maternal half of every lineage
+    /// vanishes. Equal to `surname` for anyone who never changed it.
+    #[serde(default)]
+    pub born_surname: String,
+}
+
+impl Person {
+    /// A person newly come into the world, born to a house.
+    pub fn born(name: String, surname: String) -> Person {
+        Person {
+            name,
+            born_surname: surname.clone(),
+            surname,
+        }
+    }
+
+    /// Given name and family name together, for anywhere a person is being
+    /// *identified* rather than merely mentioned. Logs and notices keep to
+    /// the given name — "Daekru raised a house" reads better than the full
+    /// formal version, and the village would say it that way too.
+    pub fn full_name(&self) -> String {
+        if self.surname.is_empty() {
+            self.name.clone()
+        } else {
+            format!("{} {}", self.name, self.surname)
+        }
+    }
+
+    /// The house they were born into, where that is not the one they carry —
+    /// the thread back to their parents for anyone reading a family tree.
+    ///
+    /// Nothing draws the tree yet, so nothing on screen calls this. It exists
+    /// because the data has to be *kept* from the first wedding onward: a
+    /// maiden name that was never recorded cannot be recovered later.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn maiden_house(&self) -> Option<&str> {
+        let born = self.born_surname.as_str();
+        if born.is_empty() || born == self.surname {
+            None
+        } else {
+            Some(born)
+        }
+    }
+
+    /// The full name with the birth house noted where it differs: the form a
+    /// codex or a family tree wants, as against the form a neighbour shouts.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn name_with_house(&self) -> String {
+        match self.maiden_house() {
+            Some(born) => format!("{} (of {born})", self.full_name()),
+            None => self.full_name(),
+        }
+    }
 }
 
 /// A community: a named place people belong to.
@@ -371,7 +439,28 @@ impl Chronicle {
     }
 }
 
-/// The settlement's centre. Villagers wander around it and return to it.
+/// Where a settlement stands, and how far the ground it works reaches.
+///
+/// A **component**, on the settlement entity, beside its name, banner and
+/// stockpile — because the world is going to hold more than one town, and a
+/// town's own position cannot live in a resource once that is true. Systems
+/// reach it through a villager's [`MemberOf`]: whose town you belong to
+/// decides which square you walk back to at dusk.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct SettlementGround {
+    pub centre: Vec3,
+    pub radius: f32,
+    /// Where the visible woodpile stands; where timber is delivered and drawn.
+    pub woodpile: Vec3,
+}
+
+/// The town the player's eye is on: the one the camera opens over, the one the
+/// codex panels read, and the one world generation seeded the map around.
+///
+/// Deliberately NOT the town the simulation works from. Every system that acts
+/// on a person resolves their own settlement through [`MemberOf`] instead, so
+/// that a second town is simulated exactly as fully as the first. This is a
+/// convenience for the interface, and for the founding, and nothing more.
 #[derive(Resource, Debug, Clone, Copy)]
 pub struct SettlementSite {
     pub centre: Vec3,
@@ -380,6 +469,17 @@ pub struct SettlementSite {
     pub woodpile: Vec3,
     /// The [`Settlement`] entity itself, for membership and naming.
     pub settlement: Entity,
+}
+
+impl SettlementSite {
+    /// The ground half of this, as it sits on the settlement entity.
+    pub fn ground(&self) -> SettlementGround {
+        SettlementGround {
+            centre: self.centre,
+            radius: self.radius,
+            woodpile: self.woodpile,
+        }
+    }
 }
 
 /// What this community shares that is not genetic — for now, its language.
@@ -488,6 +588,137 @@ const SETTLEMENT_SEARCH_RADIUS: f32 = 900.0;
 
 /// Finds a walkable, dry, reasonably flat site for the settlement — near
 /// water on some worlds, well inland on others.
+/// Scores one patch of ground as a place to raise a town, or rejects it.
+///
+/// Shared by the world's first settlement and by every colony founded after
+/// it, so a daughter town is held to exactly the standards its parent was:
+/// dry, buildable, off the mountain, with timber and stone in a working walk.
+///
+/// Returns the score, the spot, and how much wood and rock lie in reach.
+fn score_town_ground(
+    terrain: &Terrain,
+    x: f32,
+    z: f32,
+    coastal_yearning: f32,
+) -> Option<(f32, Vec3, f32, f32)> {
+    if !terrain.is_walkable(x, z) {
+        return None;
+    }
+
+    let height = terrain.height_at(x, z);
+    if height < WATER_LEVEL + 3.0 {
+        // The banner itself stands well above the tide, always.
+        return None;
+    }
+    // And never on the mountain: summits are for mines, not banners.
+    // The founding fire belongs on low country, with the rock a walk
+    // away — not under the bedrolls.
+    if height > WATER_LEVEL + 30.0 {
+        return None;
+    }
+
+    // Survey in two bands. The town band is where the building rings and
+    // the fields actually go — it must be dry, walkable ground, as a hard
+    // requirement: a beachfront banner leaves half the village standing
+    // in the sea waiting for plots that can never pass. The reach band is
+    // where the water should be — near enough to fish, far enough that
+    // no house drowns for it.
+    let mut buildable = 0;
+    let mut town_samples = 0;
+    let mut town_misses = 0;
+    'survey: for angle_step in 0..12 {
+        let angle = angle_step as f32 / 12.0 * std::f32::consts::TAU;
+        for distance in [6.0, 12.0, 18.0, 24.0, 30.0, 36.0] {
+            let sx = x + angle.cos() * distance;
+            let sz = z + angle.sin() * distance;
+            town_samples += 1;
+            if terrain.is_walkable(sx, sz) && terrain.height_at(sx, sz) > WATER_LEVEL + 2.0 {
+                buildable += 1;
+            } else {
+                town_misses += 1;
+                if town_misses > 18 {
+                    // Too wet or broken to ever pass; stop surveying.
+                    break 'survey;
+                }
+            }
+        }
+    }
+    if town_misses > 18 {
+        return None;
+    }
+    let buildable_fraction = buildable as f32 / town_samples as f32;
+    if buildable_fraction < MIN_SETTLEMENT_LAND {
+        return None;
+    }
+
+    let mut reach_water = 0;
+    let mut reach_samples = 0;
+    for angle_step in 0..12 {
+        let angle = angle_step as f32 / 12.0 * std::f32::consts::TAU;
+        for distance in [42.0, 50.0, 58.0] {
+            let sx = x + angle.cos() * distance;
+            let sz = z + angle.sin() * distance;
+            reach_samples += 1;
+            if terrain.is_submerged(sx, sz) {
+                reach_water += 1;
+            }
+        }
+    }
+    let water_fraction = reach_water as f32 / reach_samples as f32;
+    let flatness = 1.0 - terrain.slope_at(x, z);
+
+    // Some shoreline in reach is desirable, a lot is a peninsula. Peak
+    // the reward around a quarter of the outer band being water.
+    let shoreline = 1.0 - ((water_fraction - 0.25) / 0.25).abs().min(1.0);
+
+    // The materials band: what the founders could actually build from.
+    // Sample the working-walk ring for ground that will bear trees (the
+    // same forest field the scatterer seeds from) and for the steep rocky
+    // ground that sheds boulders. A pretty shore with nothing to cut or
+    // quarry is a slow death; timber in reach outweighs any view.
+    let mut timber = 0.0;
+    let mut stony = 0;
+    let mut material_samples = 0;
+    for angle_step in 0..12 {
+        let angle = angle_step as f32 / 12.0 * std::f32::consts::TAU;
+        for distance in [45.0, 70.0, 95.0, 120.0] {
+            let sx = x + angle.cos() * distance;
+            let sz = z + angle.sin() * distance;
+            material_samples += 1;
+            if terrain.is_submerged(sx, sz) {
+                continue;
+            }
+            if terrain.slope_at(sx, sz) > 0.42 {
+                // Rock scores only at a respectful distance: a mountain
+                // IN walking reach is wealth, a mountain OVER the
+                // bedrolls is a hard place to raise a street.
+                if distance >= 70.0 {
+                    stony += 1;
+                }
+            } else if terrain.forest_at(sx, sz) > 0.50 && terrain.moisture_at(sx, sz) > 0.38 {
+                // Weight by how thickly this biome actually grows trees,
+                // so an arid "forest" cell promises what it delivers.
+                timber += match terrain.biome_at(sx, sz) {
+                    Biome::Arid => 0.2,
+                    Biome::Alpine => 0.35,
+                    _ => 1.0,
+                };
+            }
+        }
+    }
+    // Saturate at about a third of the ring bearing wood: enough to found
+    // on, and it keeps whole-forest sites from drowning every other need.
+    let timberland = (timber / material_samples as f32 / 0.33).min(1.0);
+    let stoneland = (stony as f32 / material_samples as f32 / 0.20).min(1.0);
+
+    let score = buildable_fraction * 4.0
+        + flatness * 2.0
+        + timberland * 3.0
+        + stoneland * 1.0
+        + shoreline * coastal_yearning;
+    Some((score, Vec3::new(x, height, z), timberland, stoneland))
+}
+
 fn choose_settlement_site(terrain: &Terrain, rng: &mut Rng) -> Vec3 {
     let mut best: Option<(f32, Vec3, f32, f32)> = None;
     // How much this founding people care for the sea. Rolled per world:
@@ -500,123 +731,11 @@ fn choose_settlement_site(terrain: &Terrain, rng: &mut Rng) -> Vec3 {
         let x = rng.range(-SETTLEMENT_SEARCH_RADIUS, SETTLEMENT_SEARCH_RADIUS);
         let z = rng.range(-SETTLEMENT_SEARCH_RADIUS, SETTLEMENT_SEARCH_RADIUS);
 
-        if !terrain.is_walkable(x, z) {
+        let Some(candidate) = score_town_ground(terrain, x, z, coastal_yearning) else {
             continue;
-        }
-
-        let height = terrain.height_at(x, z);
-        if height < WATER_LEVEL + 3.0 {
-            // The banner itself stands well above the tide, always.
-            continue;
-        }
-        // And never on the mountain: summits are for mines, not banners.
-        // The founding fire belongs on low country, with the rock a walk
-        // away — not under the bedrolls.
-        if height > WATER_LEVEL + 30.0 {
-            continue;
-        }
-
-        // Survey in two bands. The town band is where the building rings and
-        // the fields actually go — it must be dry, walkable ground, as a hard
-        // requirement: a beachfront banner leaves half the village standing
-        // in the sea waiting for plots that can never pass. The reach band is
-        // where the water should be — near enough to fish, far enough that
-        // no house drowns for it.
-        let mut buildable = 0;
-        let mut town_samples = 0;
-        let mut town_misses = 0;
-        'survey: for angle_step in 0..12 {
-            let angle = angle_step as f32 / 12.0 * std::f32::consts::TAU;
-            for distance in [6.0, 12.0, 18.0, 24.0, 30.0, 36.0] {
-                let sx = x + angle.cos() * distance;
-                let sz = z + angle.sin() * distance;
-                town_samples += 1;
-                if terrain.is_walkable(sx, sz) && terrain.height_at(sx, sz) > WATER_LEVEL + 2.0 {
-                    buildable += 1;
-                } else {
-                    town_misses += 1;
-                    if town_misses > 18 {
-                        // Too wet or broken to ever pass; stop surveying.
-                        break 'survey;
-                    }
-                }
-            }
-        }
-        if town_misses > 18 {
-            continue;
-        }
-        let buildable_fraction = buildable as f32 / town_samples as f32;
-        if buildable_fraction < MIN_SETTLEMENT_LAND {
-            continue;
-        }
-
-        let mut reach_water = 0;
-        let mut reach_samples = 0;
-        for angle_step in 0..12 {
-            let angle = angle_step as f32 / 12.0 * std::f32::consts::TAU;
-            for distance in [42.0, 50.0, 58.0] {
-                let sx = x + angle.cos() * distance;
-                let sz = z + angle.sin() * distance;
-                reach_samples += 1;
-                if terrain.is_submerged(sx, sz) {
-                    reach_water += 1;
-                }
-            }
-        }
-        let water_fraction = reach_water as f32 / reach_samples as f32;
-        let flatness = 1.0 - terrain.slope_at(x, z);
-
-        // Some shoreline in reach is desirable, a lot is a peninsula. Peak
-        // the reward around a quarter of the outer band being water.
-        let shoreline = 1.0 - ((water_fraction - 0.25) / 0.25).abs().min(1.0);
-
-        // The materials band: what the founders could actually build from.
-        // Sample the working-walk ring for ground that will bear trees (the
-        // same forest field the scatterer seeds from) and for the steep rocky
-        // ground that sheds boulders. A pretty shore with nothing to cut or
-        // quarry is a slow death; timber in reach outweighs any view.
-        let mut timber = 0.0;
-        let mut stony = 0;
-        let mut material_samples = 0;
-        for angle_step in 0..12 {
-            let angle = angle_step as f32 / 12.0 * std::f32::consts::TAU;
-            for distance in [45.0, 70.0, 95.0, 120.0] {
-                let sx = x + angle.cos() * distance;
-                let sz = z + angle.sin() * distance;
-                material_samples += 1;
-                if terrain.is_submerged(sx, sz) {
-                    continue;
-                }
-                if terrain.slope_at(sx, sz) > 0.42 {
-                    // Rock scores only at a respectful distance: a mountain
-                    // IN walking reach is wealth, a mountain OVER the
-                    // bedrolls is a hard place to raise a street.
-                    if distance >= 70.0 {
-                        stony += 1;
-                    }
-                } else if terrain.forest_at(sx, sz) > 0.50 && terrain.moisture_at(sx, sz) > 0.38 {
-                    // Weight by how thickly this biome actually grows trees,
-                    // so an arid "forest" cell promises what it delivers.
-                    timber += match terrain.biome_at(sx, sz) {
-                        Biome::Arid => 0.2,
-                        Biome::Alpine => 0.35,
-                        _ => 1.0,
-                    };
-                }
-            }
-        }
-        // Saturate at about a third of the ring bearing wood: enough to found
-        // on, and it keeps whole-forest sites from drowning every other need.
-        let timberland = (timber / material_samples as f32 / 0.33).min(1.0);
-        let stoneland = (stony as f32 / material_samples as f32 / 0.20).min(1.0);
-
-        let score = buildable_fraction * 4.0
-            + flatness * 2.0
-            + timberland * 3.0
-            + stoneland * 1.0
-            + shoreline * coastal_yearning;
-        if best.is_none_or(|(b, ..)| score > b) {
-            best = Some((score, Vec3::new(x, height, z), timberland, stoneland));
+        };
+        if best.is_none_or(|(b, ..)| candidate.0 > b) {
+            best = Some(candidate);
         }
     }
 
@@ -644,6 +763,367 @@ pub struct RestoringSeed {
     /// The banner as it flew: (cloth ramp, sigil). None re-rolls once, for
     /// saves older than heraldry.
     pub banner: Option<(usize, usize)>,
+}
+
+/// Raises a town: the settlement entity itself, with its name, arms, ground
+/// and a founder's satchel of provisions.
+///
+/// Split out of `spawn_settlement` so that a town can be founded at any
+/// moment of a run and not only at world generation. Everything a settlement
+/// needs to *be* a settlement is here; nothing about the world around it.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn spawn_town(
+    commands: &mut Commands<'_, '_>,
+    centre: Vec3,
+    settlement_name: &str,
+    founded: u32,
+    banner_ramp: usize,
+    sigil: usize,
+) -> Entity {
+    let settlement_name = settlement_name.to_string();
+    let settlement = commands
+        .spawn((
+            Name::new(format!("Settlement of {settlement_name}")),
+            Settlement {
+                name: settlement_name.clone(),
+                founded,
+                banner_ramp,
+                sigil,
+            },
+            // The banner is the town's face: hover it and the inspector opens
+            // on the settlement. Rooted — a god who can uproot the town square
+            // is a bug, not a feature. Yet.
+            crate::hand::PickRadius(3.4),
+            crate::hand::Rooted,
+            // The founders arrive with a few days' provisions, not nothing:
+            // the first bad berry season should be a scare, not a wipe.
+            work::Stockpile {
+                // A mixed satchel: berries picked on the road, a little
+                // grain from wherever they came from.
+                larder: work::Larder {
+                    berries: 4.0,
+                    grain: 2.0,
+                    ..default()
+                },
+                timber: 0.0,
+                stone: 0.0,
+                ..default()
+            },
+            Transform::from_translation(centre),
+            Visibility::default(),
+        ))
+        .id();
+
+    commands.entity(settlement).insert(SettlementGround {
+        centre,
+        radius: 36.0,
+        woodpile: centre,
+    });
+    settlement
+}
+
+/// Raises everything that makes a town's square a square: the banner, the
+/// fire, the woodpile, the stone pile and the food sacks.
+///
+/// Returns where the woodpile stands, which is where timber is delivered and
+/// drawn from for the rest of that town's life.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn raise_town_fixtures(
+    commands: &mut Commands<'_, '_>,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    terrain: &Terrain,
+    centre: Vec3,
+    settlement: Entity,
+    banner_ramp: usize,
+    sigil: usize,
+) -> Vec3 {
+    // The banner that marks the town's heart — a pole, a crossarm, and a drop
+    // of cloth in the village's colour. This is where the stockpile lives and
+    // where the hungry come when the bushes are bare.
+    {
+        let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+        let wood = materials.add(StandardMaterial {
+            base_color: palette::shade(&palette::WOOD, 0.55),
+            perceptual_roughness: 0.9,
+            ..default()
+        });
+        let cloth = materials.add(StandardMaterial {
+            base_color: palette::shade(&palette::ALL_RAMPS[banner_ramp], 0.8),
+            perceptual_roughness: 0.85,
+            double_sided: false,
+            cull_mode: None,
+            ..default()
+        });
+        let trim = materials.add(StandardMaterial {
+            base_color: palette::shade(&palette::CLOTH_GOLD, 0.9),
+            perceptual_roughness: 0.6,
+            ..default()
+        });
+
+        fn part_rotated(
+            commands: &mut Commands,
+            cube: &Handle<Mesh>,
+            material: &Handle<StandardMaterial>,
+            settlement: Entity,
+            offset: Vec3,
+            rotation: Quat,
+            size: Vec3,
+        ) {
+            commands.spawn((
+                Mesh3d(cube.clone()),
+                MeshMaterial3d(material.clone()),
+                Transform::from_translation(offset)
+                    .with_rotation(rotation)
+                    .with_scale(size),
+                ChildOf(settlement),
+            ));
+        }
+        let mut part = |offset: Vec3, size: Vec3, material: &Handle<StandardMaterial>| {
+            commands.spawn((
+                Mesh3d(cube.clone()),
+                MeshMaterial3d(material.clone()),
+                Transform::from_translation(offset).with_scale(size),
+                ChildOf(settlement),
+            ));
+        };
+
+        // Pole, crossarm, finial.
+        part(Vec3::new(0.0, 2.4, 0.0), Vec3::new(0.16, 4.8, 0.16), &wood);
+        part(Vec3::new(0.7, 4.55, 0.0), Vec3::new(1.6, 0.14, 0.14), &wood);
+        part(Vec3::new(0.0, 4.95, 0.0), Vec3::new(0.3, 0.3, 0.3), &trim);
+        // The cloth hangs from the crossarm.
+        part(
+            Vec3::new(0.75, 3.55, 0.0),
+            Vec3::new(1.3, 1.9, 0.06),
+            &cloth,
+        );
+        // A gold hem along its foot.
+        part(
+            Vec3::new(0.75, 2.55, 0.0),
+            Vec3::new(1.3, 0.14, 0.08),
+            &trim,
+        );
+        // The sign, in blocks proud of the cloth, on both faces - the very
+        // rectangles the codex draws, made voxel, inked by the rule of
+        // tincture so it reads on any cloth.
+        let field = palette::shade(&palette::ALL_RAMPS[banner_ramp], 0.8).to_srgba();
+        let sign_material = if crate::sigil::gold_reads_on([field.red, field.green, field.blue]) {
+            trim.clone()
+        } else {
+            let dark = crate::sigil::dark_ink();
+            materials.add(StandardMaterial {
+                base_color: Color::srgb(dark[0], dark[1], dark[2]),
+                perceptual_roughness: 0.7,
+                ..default()
+            })
+        };
+        for &(x, y, w, h, turn, _round) in crate::sigil::rects(sigil) {
+            let unit = 1.05 / 16.0;
+            let cx = (x + w * 0.5) / 16.0 - 0.5;
+            let cy = (y + h * 0.5) / 16.0 - 0.5;
+            for face in [-1.0f32, 1.0] {
+                part_rotated(
+                    commands,
+                    &cube,
+                    &sign_material,
+                    settlement,
+                    Vec3::new(0.75 + cx * 1.05, 3.62 - cy * 1.05, face * 0.05),
+                    Quat::from_rotation_z(-turn.to_radians()),
+                    Vec3::new(w * unit, h * unit, 0.035),
+                );
+            }
+        }
+    }
+
+    // The village fire, a few steps from the banner — on the driest ground
+    // around it. Nobody builds their hearth facing the tide.
+    let fire_angle = (0..12)
+        .map(|step| step as f32 / 12.0 * std::f32::consts::TAU)
+        .max_by(|a, b| {
+            let dryness = |angle: f32| {
+                let (sin, cos) = angle.sin_cos();
+                [4.5_f32, 9.0, 14.0]
+                    .iter()
+                    .map(|reach| terrain.height_at(centre.x + cos * reach, centre.z + sin * reach))
+                    .fold(f32::INFINITY, f32::min)
+            };
+            dryness(*a).total_cmp(&dryness(*b))
+        })
+        .unwrap_or(0.0);
+    {
+        let (sin, cos) = fire_angle.sin_cos();
+        let (fx, fz) = (centre.x + cos * 4.5, centre.z + sin * 4.5);
+        let fire_at = Vec3::new(fx, terrain.height_at(fx, fz), fz);
+        let fire = home::spawn_bonfire(commands, meshes, materials, fire_at);
+        // Whose hearth it is. Each town tends its own fire from its own
+        // woodpile, so the fire has to know which town that is.
+        commands.entity(fire).insert(MemberOf(settlement));
+    }
+
+    // The woodpile, across the square from the fire: every log the village
+    // owns, stacked and countable at a glance.
+    let woodpile = {
+        let (sin, cos) = (fire_angle + std::f32::consts::PI * 0.8).sin_cos();
+        let (wx, wz) = (centre.x + cos * 5.0, centre.z + sin * 5.0);
+        let at = Vec3::new(wx, terrain.height_at(wx, wz), wz);
+
+        let log_mesh = meshes.add(Cuboid::new(1.3, 0.2, 0.2));
+        let log_material = materials.add(StandardMaterial {
+            base_color: palette::shade(&palette::WOOD, 0.42),
+            perceptual_roughness: 0.95,
+            ..default()
+        });
+        let pile = commands
+            .spawn((
+                Name::new("The woodpile"),
+                work::StorePile(work::PileKind::Timber),
+                MemberOf(settlement),
+                Transform::from_translation(at),
+                Visibility::default(),
+                crate::hand::PickRadius(1.8),
+                crate::hand::Rooted,
+            ))
+            .id();
+        for i in 0..24u8 {
+            let layer = i / 4;
+            let slot = (i % 4) as f32;
+            let across = slot * 0.26 - 0.39;
+            let y = 0.12 + layer as f32 * 0.21;
+            let (offset, yaw) = if layer % 2 == 0 {
+                (Vec3::new(0.0, y, across), 0.0)
+            } else {
+                (Vec3::new(across, y, 0.0), std::f32::consts::FRAC_PI_2)
+            };
+            commands.spawn((
+                work::WoodpileLog(i),
+                Mesh3d(log_mesh.clone()),
+                MeshMaterial3d(log_material.clone()),
+                Transform::from_translation(offset).with_rotation(Quat::from_rotation_y(yaw)),
+                Visibility::Hidden,
+                ChildOf(pile),
+            ));
+        }
+        at
+    };
+
+    // The stone pile and the food sacks flank the woodpile: the whole
+    // larder of the village, standing in the square where it can be seen.
+    {
+        let (sin, cos) = (fire_angle + std::f32::consts::PI * 0.62).sin_cos();
+        let (px_, pz) = (centre.x + cos * 6.2, centre.z + sin * 6.2);
+        let at = Vec3::new(px_, terrain.height_at(px_, pz), pz);
+        let block_mesh = meshes.add(Cuboid::new(0.42, 0.34, 0.42));
+        let block_material = materials.add(StandardMaterial {
+            base_color: palette::shade(&palette::STONE, 0.5),
+            perceptual_roughness: 1.0,
+            ..default()
+        });
+        let pile = commands
+            .spawn((
+                Name::new("The stone pile"),
+                work::StorePile(work::PileKind::Stone),
+                MemberOf(settlement),
+                Transform::from_translation(at),
+                Visibility::default(),
+                crate::hand::PickRadius(1.4),
+                crate::hand::Rooted,
+            ))
+            .id();
+        for i in 0..12u8 {
+            let layer = i / 4;
+            let slot = (i % 4) as f32;
+            commands.spawn((
+                work::StonePileBlock(i),
+                Mesh3d(block_mesh.clone()),
+                MeshMaterial3d(block_material.clone()),
+                Transform::from_xyz(
+                    (slot % 2.0) * 0.46 - 0.23 + layer as f32 * 0.08,
+                    0.17 + layer as f32 * 0.35,
+                    (slot / 2.0).floor() * 0.46 - 0.23,
+                ),
+                Visibility::Hidden,
+                ChildOf(pile),
+            ));
+        }
+    }
+    {
+        let (sin, cos) = (fire_angle + std::f32::consts::PI * 0.98).sin_cos();
+        let (px_, pz) = (centre.x + cos * 6.2, centre.z + sin * 6.2);
+        let at = Vec3::new(px_, terrain.height_at(px_, pz), pz);
+        let sack_mesh = meshes.add(Cuboid::new(0.4, 0.34, 0.4));
+        let sack_material = materials.add(StandardMaterial {
+            base_color: palette::shade(&palette::BONE, 0.6),
+            perceptual_roughness: 1.0,
+            ..default()
+        });
+        let pile = commands
+            .spawn((
+                Name::new("The food store"),
+                work::StorePile(work::PileKind::Food),
+                MemberOf(settlement),
+                Transform::from_translation(at),
+                Visibility::default(),
+                crate::hand::PickRadius(1.4),
+                crate::hand::Rooted,
+            ))
+            .id();
+        for i in 0..12u8 {
+            let layer = i / 4;
+            let slot = (i % 4) as f32;
+            commands.spawn((
+                work::FoodSack(i),
+                Mesh3d(sack_mesh.clone()),
+                MeshMaterial3d(sack_material.clone()),
+                Transform::from_xyz(
+                    (slot % 2.0) * 0.44 - 0.22,
+                    0.17 + layer as f32 * 0.33,
+                    (slot / 2.0).floor() * 0.44 - 0.22 + layer as f32 * 0.07,
+                )
+                .with_rotation(Quat::from_rotation_y(i as f32 * 0.4)),
+                Visibility::Hidden,
+                ChildOf(pile),
+            ));
+        }
+    }
+
+    woodpile
+}
+
+/// Founds a town whole: the settlement and its square together.
+///
+/// The one entry point for a new settlement, wherever it comes from — world
+/// generation at the start, or a party of colonists walking out of a crowded
+/// village mid-game.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn found_settlement(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    terrain: &Terrain,
+    centre: Vec3,
+    name: &str,
+    founded: u32,
+    banner_ramp: usize,
+    sigil: usize,
+) -> (Entity, Vec3) {
+    let settlement = spawn_town(commands, centre, name, founded, banner_ramp, sigil);
+    let woodpile = raise_town_fixtures(
+        commands,
+        meshes,
+        materials,
+        terrain,
+        centre,
+        settlement,
+        banner_ramp,
+        sigil,
+    );
+    commands.entity(settlement).insert(SettlementGround {
+        centre,
+        radius: 36.0,
+        woodpile,
+    });
+    (settlement, woodpile)
 }
 
 pub(crate) fn spawn_settlement(
@@ -685,38 +1165,14 @@ pub(crate) fn spawn_settlement(
                 (rng.next_u32() as usize) % crate::sigil::SIGILS.len(),
             )
         });
-    let settlement = commands
-        .spawn((
-            Name::new(format!("Settlement of {settlement_name}")),
-            Settlement {
-                name: settlement_name.clone(),
-                founded: restoring.as_ref().map_or(clock.day(), |r| r.founded),
-                banner_ramp,
-                sigil,
-            },
-            // The banner is the town's face: hover it and the inspector opens
-            // on the settlement. Rooted — a god who can uproot the town square
-            // is a bug, not a feature. Yet.
-            crate::hand::PickRadius(3.4),
-            crate::hand::Rooted,
-            // The founders arrive with a few days' provisions, not nothing:
-            // the first bad berry season should be a scare, not a wipe.
-            work::Stockpile {
-                // A mixed satchel: berries picked on the road, a little
-                // grain from wherever they came from.
-                larder: work::Larder {
-                    berries: 4.0,
-                    grain: 2.0,
-                    ..default()
-                },
-                timber: 0.0,
-                stone: 0.0,
-                ..default()
-            },
-            Transform::from_translation(centre),
-            Visibility::default(),
-        ))
-        .id();
+    let settlement = spawn_town(
+        &mut commands,
+        centre,
+        &settlement_name,
+        restoring.as_ref().map_or(clock.day(), |r| r.founded),
+        banner_ramp,
+        sigil,
+    );
     if restoring.is_none() {
         let sign = crate::sigil::name(sigil);
         info!("the village of {settlement_name} was founded under the sign of {sign}");
@@ -810,248 +1266,18 @@ pub(crate) fn spawn_settlement(
     }
     commands.insert_resource(DivineName(divine_name));
 
-    // The banner that marks the town's heart — a pole, a crossarm, and a drop
-    // of cloth in the village's colour. This is where the stockpile lives and
-    // where the hungry come when the bushes are bare.
-    {
-        let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
-        let wood = materials.add(StandardMaterial {
-            base_color: palette::shade(&palette::WOOD, 0.55),
-            perceptual_roughness: 0.9,
-            ..default()
-        });
-        let cloth = materials.add(StandardMaterial {
-            base_color: palette::shade(&palette::ALL_RAMPS[banner_ramp], 0.8),
-            perceptual_roughness: 0.85,
-            double_sided: false,
-            cull_mode: None,
-            ..default()
-        });
-        let trim = materials.add(StandardMaterial {
-            base_color: palette::shade(&palette::CLOTH_GOLD, 0.9),
-            perceptual_roughness: 0.6,
-            ..default()
-        });
-
-        fn part_rotated(
-            commands: &mut Commands,
-            cube: &Handle<Mesh>,
-            material: &Handle<StandardMaterial>,
-            settlement: Entity,
-            offset: Vec3,
-            rotation: Quat,
-            size: Vec3,
-        ) {
-            commands.spawn((
-                Mesh3d(cube.clone()),
-                MeshMaterial3d(material.clone()),
-                Transform::from_translation(offset)
-                    .with_rotation(rotation)
-                    .with_scale(size),
-                ChildOf(settlement),
-            ));
-        }
-        let mut part = |offset: Vec3, size: Vec3, material: &Handle<StandardMaterial>| {
-            commands.spawn((
-                Mesh3d(cube.clone()),
-                MeshMaterial3d(material.clone()),
-                Transform::from_translation(offset).with_scale(size),
-                ChildOf(settlement),
-            ));
-        };
-
-        // Pole, crossarm, finial.
-        part(Vec3::new(0.0, 2.4, 0.0), Vec3::new(0.16, 4.8, 0.16), &wood);
-        part(Vec3::new(0.7, 4.55, 0.0), Vec3::new(1.6, 0.14, 0.14), &wood);
-        part(Vec3::new(0.0, 4.95, 0.0), Vec3::new(0.3, 0.3, 0.3), &trim);
-        // The cloth hangs from the crossarm.
-        part(
-            Vec3::new(0.75, 3.55, 0.0),
-            Vec3::new(1.3, 1.9, 0.06),
-            &cloth,
-        );
-        // A gold hem along its foot.
-        part(
-            Vec3::new(0.75, 2.55, 0.0),
-            Vec3::new(1.3, 0.14, 0.08),
-            &trim,
-        );
-        // The sign, in blocks proud of the cloth, on both faces - the very
-        // rectangles the codex draws, made voxel, inked by the rule of
-        // tincture so it reads on any cloth.
-        let field = palette::shade(&palette::ALL_RAMPS[banner_ramp], 0.8).to_srgba();
-        let sign_material = if crate::sigil::gold_reads_on([field.red, field.green, field.blue]) {
-            trim.clone()
-        } else {
-            let dark = crate::sigil::dark_ink();
-            materials.add(StandardMaterial {
-                base_color: Color::srgb(dark[0], dark[1], dark[2]),
-                perceptual_roughness: 0.7,
-                ..default()
-            })
-        };
-        for &(x, y, w, h, turn, _round) in crate::sigil::rects(sigil) {
-            let unit = 1.05 / 16.0;
-            let cx = (x + w * 0.5) / 16.0 - 0.5;
-            let cy = (y + h * 0.5) / 16.0 - 0.5;
-            for face in [-1.0f32, 1.0] {
-                part_rotated(
-                    &mut commands,
-                    &cube,
-                    &sign_material,
-                    settlement,
-                    Vec3::new(0.75 + cx * 1.05, 3.62 - cy * 1.05, face * 0.05),
-                    Quat::from_rotation_z(-turn.to_radians()),
-                    Vec3::new(w * unit, h * unit, 0.035),
-                );
-            }
-        }
-    }
-
-    // The village fire, a few steps from the banner — on the driest ground
-    // around it. Nobody builds their hearth facing the tide.
-    let fire_angle = (0..12)
-        .map(|step| step as f32 / 12.0 * std::f32::consts::TAU)
-        .max_by(|a, b| {
-            let dryness = |angle: f32| {
-                let (sin, cos) = angle.sin_cos();
-                [4.5_f32, 9.0, 14.0]
-                    .iter()
-                    .map(|reach| terrain.height_at(centre.x + cos * reach, centre.z + sin * reach))
-                    .fold(f32::INFINITY, f32::min)
-            };
-            dryness(*a).total_cmp(&dryness(*b))
-        })
-        .unwrap_or(0.0);
-    {
-        let (sin, cos) = fire_angle.sin_cos();
-        let (fx, fz) = (centre.x + cos * 4.5, centre.z + sin * 4.5);
-        let fire_at = Vec3::new(fx, terrain.height_at(fx, fz), fz);
-        home::spawn_bonfire(&mut commands, &mut meshes, &mut materials, fire_at);
-    }
-
-    // The woodpile, across the square from the fire: every log the village
-    // owns, stacked and countable at a glance.
-    let woodpile = {
-        let (sin, cos) = (fire_angle + std::f32::consts::PI * 0.8).sin_cos();
-        let (wx, wz) = (centre.x + cos * 5.0, centre.z + sin * 5.0);
-        let at = Vec3::new(wx, terrain.height_at(wx, wz), wz);
-
-        let log_mesh = meshes.add(Cuboid::new(1.3, 0.2, 0.2));
-        let log_material = materials.add(StandardMaterial {
-            base_color: palette::shade(&palette::WOOD, 0.42),
-            perceptual_roughness: 0.95,
-            ..default()
-        });
-        let pile = commands
-            .spawn((
-                Name::new("The woodpile"),
-                work::StorePile(work::PileKind::Timber),
-                Transform::from_translation(at),
-                Visibility::default(),
-                crate::hand::PickRadius(1.8),
-                crate::hand::Rooted,
-            ))
-            .id();
-        for i in 0..24u8 {
-            let layer = i / 4;
-            let slot = (i % 4) as f32;
-            let across = slot * 0.26 - 0.39;
-            let y = 0.12 + layer as f32 * 0.21;
-            let (offset, yaw) = if layer % 2 == 0 {
-                (Vec3::new(0.0, y, across), 0.0)
-            } else {
-                (Vec3::new(across, y, 0.0), std::f32::consts::FRAC_PI_2)
-            };
-            commands.spawn((
-                work::WoodpileLog(i),
-                Mesh3d(log_mesh.clone()),
-                MeshMaterial3d(log_material.clone()),
-                Transform::from_translation(offset).with_rotation(Quat::from_rotation_y(yaw)),
-                Visibility::Hidden,
-                ChildOf(pile),
-            ));
-        }
-        at
-    };
-
-    // The stone pile and the food sacks flank the woodpile: the whole
-    // larder of the village, standing in the square where it can be seen.
-    {
-        let (sin, cos) = (fire_angle + std::f32::consts::PI * 0.62).sin_cos();
-        let (px_, pz) = (centre.x + cos * 6.2, centre.z + sin * 6.2);
-        let at = Vec3::new(px_, terrain.height_at(px_, pz), pz);
-        let block_mesh = meshes.add(Cuboid::new(0.42, 0.34, 0.42));
-        let block_material = materials.add(StandardMaterial {
-            base_color: palette::shade(&palette::STONE, 0.5),
-            perceptual_roughness: 1.0,
-            ..default()
-        });
-        let pile = commands
-            .spawn((
-                Name::new("The stone pile"),
-                work::StorePile(work::PileKind::Stone),
-                Transform::from_translation(at),
-                Visibility::default(),
-                crate::hand::PickRadius(1.4),
-                crate::hand::Rooted,
-            ))
-            .id();
-        for i in 0..12u8 {
-            let layer = i / 4;
-            let slot = (i % 4) as f32;
-            commands.spawn((
-                work::StonePileBlock(i),
-                Mesh3d(block_mesh.clone()),
-                MeshMaterial3d(block_material.clone()),
-                Transform::from_xyz(
-                    (slot % 2.0) * 0.46 - 0.23 + layer as f32 * 0.08,
-                    0.17 + layer as f32 * 0.35,
-                    (slot / 2.0).floor() * 0.46 - 0.23,
-                ),
-                Visibility::Hidden,
-                ChildOf(pile),
-            ));
-        }
-    }
-    {
-        let (sin, cos) = (fire_angle + std::f32::consts::PI * 0.98).sin_cos();
-        let (px_, pz) = (centre.x + cos * 6.2, centre.z + sin * 6.2);
-        let at = Vec3::new(px_, terrain.height_at(px_, pz), pz);
-        let sack_mesh = meshes.add(Cuboid::new(0.4, 0.34, 0.4));
-        let sack_material = materials.add(StandardMaterial {
-            base_color: palette::shade(&palette::BONE, 0.6),
-            perceptual_roughness: 1.0,
-            ..default()
-        });
-        let pile = commands
-            .spawn((
-                Name::new("The food store"),
-                work::StorePile(work::PileKind::Food),
-                Transform::from_translation(at),
-                Visibility::default(),
-                crate::hand::PickRadius(1.4),
-                crate::hand::Rooted,
-            ))
-            .id();
-        for i in 0..12u8 {
-            let layer = i / 4;
-            let slot = (i % 4) as f32;
-            commands.spawn((
-                work::FoodSack(i),
-                Mesh3d(sack_mesh.clone()),
-                MeshMaterial3d(sack_material.clone()),
-                Transform::from_xyz(
-                    (slot % 2.0) * 0.44 - 0.22,
-                    0.17 + layer as f32 * 0.33,
-                    (slot / 2.0).floor() * 0.44 - 0.22 + layer as f32 * 0.07,
-                )
-                .with_rotation(Quat::from_rotation_y(i as f32 * 0.4)),
-                Visibility::Hidden,
-                ChildOf(pile),
-            ));
-        }
-    }
+    // The square itself, raised by the same code that raises a colony's:
+    // banner, fire, woodpile, stone pile, food sacks.
+    let woodpile = raise_town_fixtures(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &terrain,
+        centre,
+        settlement,
+        banner_ramp,
+        sigil,
+    );
 
     let site = SettlementSite {
         centre,
@@ -1059,6 +1285,10 @@ pub(crate) fn spawn_settlement(
         woodpile,
         settlement,
     };
+    // The same ground, on the town itself. One source of truth: the resource
+    // says which town the player is looking at, the component says where that
+    // town is — and every other town carries its own.
+    commands.entity(settlement).insert(site.ground());
     let day = clock.day();
 
     let founders = if restoring.is_some() {
@@ -1086,9 +1316,15 @@ pub(crate) fn spawn_settlement(
         commands.entity(entity).insert((
             Villager,
             traits::Traits::roll(&mut rng),
-            Person {
-                name: language.name_for(genome_sex, &mut rng),
-            },
+            // Founders are strangers to one another: twelve people, twelve
+            // houses. Paternal descent will thin that down over the
+            // generations on its own — the names that survive are the ones
+            // that had sons, which is how a village ends up with a handful
+            // of old families and a lot of forgotten ones.
+            Person::born(
+                language.name_for(genome_sex, &mut rng),
+                language.surname(&mut rng),
+            ),
             crate::witness::Temperament::random(&mut rng),
             crate::witness::Witnessed::default(),
             Needs {
@@ -1193,23 +1429,32 @@ fn stretch_settlement(
     time: Res<Time>,
     mut since_last: Local<f32>,
     mut site: Option<ResMut<SettlementSite>>,
-    buildings: Query<&GlobalTransform, With<work::Building>>,
+    mut towns: Query<(Entity, &mut SettlementGround)>,
+    buildings: Query<(&GlobalTransform, &MemberOf), With<work::Building>>,
 ) {
     *since_last += time.delta_secs();
     if *since_last < 12.0 {
         return;
     }
     *since_last = 0.0;
-    let Some(site) = site.as_mut() else {
-        return;
-    };
-    let furthest = buildings
-        .iter()
-        .map(|at| at.translation().distance(site.centre))
-        .fold(0.0f32, f32::max);
-    let stretched = (furthest + 14.0).max(36.0);
-    if (stretched - site.radius).abs() > 1.0 {
-        site.radius = stretched;
+    // Each town's working ground grows with its OWN build-out. A far-flung
+    // mine in one settlement should not stretch another settlement's reach.
+    for (town, mut ground) in &mut towns {
+        let furthest = buildings
+            .iter()
+            .filter(|(_, member)| member.0 == town)
+            .map(|(at, _)| at.translation().distance(ground.centre))
+            .fold(0.0f32, f32::max);
+        let stretched = (furthest + 14.0).max(36.0);
+        if (stretched - ground.radius).abs() > 1.0 {
+            ground.radius = stretched;
+            // Keep the interface pointer in step for the town on screen.
+            if let Some(site) = site.as_mut()
+                && site.settlement == town
+            {
+                site.radius = stretched;
+            }
+        }
     }
 }
 
@@ -1230,8 +1475,8 @@ fn point_camera_at_settlement(
     rig.distance = 80.0;
     rig.target_distance = 80.0;
 
-    // Capture tooling: EGREGORE_DISTANCE overrides the zoom.
-    if let Some(distance) = std::env::var("EGREGORE_DISTANCE")
+    // Capture tooling: DIVUS_FACTUS_DISTANCE overrides the zoom.
+    if let Some(distance) = std::env::var("DIVUS_FACTUS_DISTANCE")
         .ok()
         .and_then(|v| v.parse::<f32>().ok())
     {
@@ -1239,9 +1484,9 @@ fn point_camera_at_settlement(
         rig.target_distance = distance;
     }
 
-    // Capture tooling: EGREGORE_PITCH flattens the camera to photograph the
+    // Capture tooling: DIVUS_FACTUS_PITCH flattens the camera to photograph the
     // horizon and sky instead of the ground.
-    if let Some(pitch) = std::env::var("EGREGORE_PITCH")
+    if let Some(pitch) = std::env::var("DIVUS_FACTUS_PITCH")
         .ok()
         .and_then(|v| v.parse::<f32>().ok())
     {
@@ -1249,10 +1494,10 @@ fn point_camera_at_settlement(
         rig.target_pitch = pitch;
     }
 
-    // Capture tooling: EGREGORE_AIM_RIVER points the unattended screenshot at the
+    // Capture tooling: DIVUS_FACTUS_AIM_RIVER points the unattended screenshot at the
     // nearest river instead of the settlement.
     if crate::capture_path().is_some()
-        && std::env::var("EGREGORE_AIM_RIVER").is_ok()
+        && std::env::var("DIVUS_FACTUS_AIM_RIVER").is_ok()
         && let Some(t) = terrain_probe.as_deref()
     {
         'search: for iz in -60..60 {
@@ -1594,6 +1839,23 @@ fn chronicle_divine_touch(
 /// The season of recovery and nursing after a birth: while it runs, this
 /// mother bears no second child. Without it, one prolific couple filled a
 /// year with twenty-three children off an even dice pick.
+/// How many children a woman has borne. Counted rather than derived from
+/// living children, because the dead become graves and a mother's history
+/// should not be rewritten by losing them.
+#[derive(Component, Debug, Default, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct Motherhood {
+    pub borne: u32,
+}
+
+/// A couple's chance of another child, falling with each they already have.
+///
+/// Not a hard cap: a large family stays *possible*, it just stops being the
+/// likely thing. Each birth takes roughly a third off the odds, so the first
+/// few children come readily and the seventh is a rarity worth remarking on.
+pub fn fertility(borne: u32) -> f32 {
+    0.68_f32.powi(borne as i32)
+}
+
 #[derive(Component)]
 pub struct NewMother {
     pub until: f64,
@@ -1611,8 +1873,13 @@ fn births(
     mut chronicles: Query<&mut Chronicle>,
     mut notices: MessageWriter<crate::ui::Notice>,
     town_halls: Query<&work::Building>,
-    huts: Query<(), With<work::Hut>>,
-    stores: Query<&work::Stockpile>,
+    // Bundled: this system sits at Bevy's parameter ceiling.
+    shelter: (
+        Query<(), With<work::Hut>>,
+        Query<(), With<work::Longhouse>>,
+        Query<&work::Stockpile>,
+        Query<&Motherhood>,
+    ),
     mut rng: ResMut<SimRng>,
     villagers: Query<
         (
@@ -1623,6 +1890,7 @@ fn births(
             &Person,
             Option<&Spouse>,
             Option<&NewMother>,
+            Option<&MemberOf>,
         ),
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
@@ -1636,6 +1904,7 @@ fn births(
     let Some(culture) = culture else {
         return;
     };
+    let (huts, longhouses, stores, borne) = shelter;
 
     let living = villagers.iter().count();
     let average_hunger = if living == 0 {
@@ -1650,7 +1919,7 @@ fn births(
     // Nobody is born into a village that cannot shelter them: houses are
     // the roof on growth, and the only one - build more, grow more.
     let _ = town_halls;
-    let cap = home::shelter_capacity(huts.iter().count());
+    let cap = home::shelter_capacity(huts.iter().count(), longhouses.iter().count());
     let food_stored = site
         .as_ref()
         .and_then(|s| stores.get(s.settlement).ok())
@@ -1664,13 +1933,13 @@ fn births(
     // the pick among eligible mothers is even.
     let mothers: Vec<_> = villagers
         .iter()
-        .filter(|(_, _, genome, _, _, spouse, recovery)| {
+        .filter(|(_, _, genome, _, _, spouse, recovery, _)| {
             genome.age == Age::Adult
                 && genome.sex == Sex::Female
                 && spouse.is_some()
                 && recovery.is_none_or(|r| clock.elapsed > r.until)
         })
-        .filter(|(_, _, _, _, _, spouse, _)| {
+        .filter(|(_, _, _, _, _, spouse, _, _)| {
             // The husband must himself still be living — a widow bears no child.
             spouse.is_some_and(|s| {
                 villagers
@@ -1684,23 +1953,61 @@ fn births(
         return;
     }
 
-    let pick = rng.0.range_i(0, mothers.len() as i32 - 1) as usize;
-    let (mother, mother_t, mother_g, _, mother_p, spouse, _) = &mothers[pick];
+    // Who bears is weighted by how many she already has, and WHETHER anyone
+    // bears is then gated on the same number. The first keeps births moving to
+    // the couples with room for them; the second is what actually slows a
+    // village down as its families fill up.
+    let weights: Vec<f32> = mothers
+        .iter()
+        .map(|(who, ..)| fertility(borne.get(*who).map_or(0, |m| m.borne)))
+        .collect();
+    let total: f32 = weights.iter().sum();
+    if total <= 0.0 {
+        return;
+    }
+    let mut roll = rng.0.range(0.0, total);
+    let mut pick = weights.len() - 1;
+    for (index, weight) in weights.iter().enumerate() {
+        if roll < *weight {
+            pick = index;
+            break;
+        }
+        roll -= *weight;
+    }
+    let (mother, mother_t, mother_g, _, mother_p, spouse, _, mother_home) = &mothers[pick];
+    let already_borne = borne.get(*mother).map_or(0, |m| m.borne);
+    if !rng.0.chance(fertility(already_borne)) {
+        return;
+    }
     let father = spouse.expect("filtered above").0;
     let Ok((_, _, father_g, _, father_p, ..)) = villagers.get(father) else {
         return;
     };
     // A birth is followed by a season of nursing before the next.
+    commands.entity(*mother).insert(Motherhood {
+        borne: already_borne + 1,
+    });
     commands.entity(*mother).insert(NewMother {
         until: clock.elapsed + crate::calendar::DAY_SECONDS as f64 * 24.0,
     });
 
     let child_genome = CreatureGenome::child_of(mother_g, father_g, &mut rng.0);
     let name = culture.language.name_for(child_genome.sex, &mut rng.0);
+    // The house name descends the father's line. A child of a founder whose
+    // own name predates surnames takes the mother's rather than none.
+    let surname = if father_p.surname.is_empty() {
+        mother_p.surname.clone()
+    } else {
+        father_p.surname.clone()
+    };
     let position = random_walkable_point(&terrain, &mut rng.0, mother_t.translation, 4.0)
         .unwrap_or(mother_t.translation);
 
-    info!("{name} was born to {} and {}", mother_p.name, father_p.name);
+    info!(
+        "{name} {surname} was born to {} and {}",
+        mother_p.full_name(),
+        father_p.full_name()
+    );
     notices.write(crate::ui::Notice::new(format!(
         "{name} was born to {} and {}",
         mother_p.name, father_p.name
@@ -1735,7 +2042,7 @@ fn births(
     commands.entity(entity).insert((
         Villager,
         traits::Traits::roll(&mut rng.0),
-        Person { name: name.clone() },
+        Person::born(name.clone(), surname),
         Parentage {
             mother: *mother,
             father,
@@ -1753,8 +2060,14 @@ fn births(
         Morale::default(),
         Activity::Idle,
     ));
-    if let Some(site) = site {
-        commands.entity(entity).insert(MemberOf(site.settlement));
+    // The child belongs to the town that bore them. Reading the focused
+    // settlement here instead meant every baby in the world was born a
+    // citizen of whichever town the player happened to be looking at.
+    if let Some(home) = mother_home
+        .map(|m| m.0)
+        .or_else(|| site.as_ref().map(|s| s.settlement))
+    {
+        commands.entity(entity).insert(MemberOf(home));
     }
 }
 
@@ -1873,10 +2186,12 @@ fn choose_activity(
 fn pursue_activity(
     time: Res<Time>,
     terrain: Res<Terrain>,
-    site: Option<Res<SettlementSite>>,
+    members: Query<&MemberOf>,
+    grounds: Query<&SettlementGround>,
     mut sim_rng: ResMut<SimRng>,
     mut villagers: Query<
         (
+            Entity,
             &mut Activity,
             &mut Needs,
             &mut MoveTarget,
@@ -1888,11 +2203,15 @@ fn pursue_activity(
     mut food: Query<(&GlobalTransform, &mut FoodSource), Without<Villager>>,
 ) {
     let dt = time.delta_secs();
-    let Some(site) = site else {
-        return;
-    };
 
-    for (mut activity, mut needs, mut target, mut motion, transform) in &mut villagers {
+    for (who, mut activity, mut needs, mut target, mut motion, transform) in &mut villagers {
+        // Home is wherever this person belongs, which after a town splits is
+        // no longer the same square for everybody.
+        let home_ground = members
+            .get(who)
+            .ok()
+            .and_then(|member| grounds.get(member.0).ok())
+            .copied();
         match *activity {
             Activity::Idle => {
                 target.0 = None;
@@ -1902,13 +2221,22 @@ fn pursue_activity(
                 if target.0.is_none() {
                     // Wander around the settlement rather than the whole map, so the
                     // population stays somewhere the player can watch it.
-                    let origin = if transform.translation.distance(site.centre) > site.radius {
-                        site.centre
+                    let Some(home_ground) = home_ground else {
+                        continue;
+                    };
+                    let origin = if transform.translation.distance(home_ground.centre)
+                        > home_ground.radius
+                    {
+                        home_ground.centre
                     } else {
                         transform.translation
                     };
-                    target.0 =
-                        random_walkable_point(&terrain, &mut sim_rng.0, origin, site.radius * 0.7);
+                    target.0 = random_walkable_point(
+                        &terrain,
+                        &mut sim_rng.0,
+                        origin,
+                        home_ground.radius * 0.7,
+                    );
                 }
             }
 
@@ -2012,7 +2340,7 @@ mod tests {
             Transform::from_xyz(0.0, 0.0, 0.0),
             Activity::Idle,
             MoveTarget::default(),
-            Person { name: "Bob".into() },
+            Person::born("Bob".into(), "Teller".into()),
             crate::witness::Witnessed {
                 recent: vec![crate::witness::DivineEventKind::Thrown],
                 total: 1,
@@ -2028,7 +2356,7 @@ mod tests {
                 Transform::from_xyz(1.4, 0.0, 0.0),
                 Activity::Idle,
                 MoveTarget::default(),
-                Person { name: "Sue".into() },
+                Person::born("Sue".into(), "Hearer".into()),
                 crate::witness::Witnessed::default(),
                 Chronicle::default(),
             ))
@@ -2086,9 +2414,7 @@ mod tests {
             })
             .expect("spawn system runs");
         app.world_mut().entity_mut(entity).insert((
-            Person {
-                name: "Testling".into(),
-            },
+            Person::born("Testling".into(), "Youngly".into()),
             Childhood { remaining: 0.0 },
         ));
 
@@ -2115,6 +2441,36 @@ mod tests {
         );
         let limbs_after = grown.get::<Children>().map_or(0, |c| c.len());
         assert!(limbs_after > 0, "came of age but has no body");
+    }
+
+    #[test]
+    fn fertility_falls_with_every_child() {
+        // Strictly decreasing, so each birth genuinely makes the next less
+        // likely rather than plateauing after the first.
+        let mut previous = fertility(0);
+        assert!(
+            (previous - 1.0).abs() < 1e-6,
+            "the first child should be unhindered"
+        );
+        for borne in 1..12 {
+            let now = fertility(borne);
+            assert!(
+                now < previous,
+                "child {borne} should be less likely than the one before"
+            );
+            previous = now;
+        }
+    }
+
+    #[test]
+    fn a_large_family_stays_possible_but_unlikely() {
+        // Not a hard cap: the seventh child is a rarity, not an impossibility,
+        // so a remarkable family can still happen.
+        assert!(fertility(6) > 0.0);
+        assert!(fertility(6) < 0.15, "a seventh child should be rare");
+        // And the early ones come readily enough to grow a village.
+        assert!(fertility(1) > 0.5);
+        assert!(fertility(2) > 0.3);
     }
 
     #[test]

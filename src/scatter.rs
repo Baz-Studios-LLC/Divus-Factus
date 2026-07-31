@@ -383,9 +383,9 @@ fn populate_chunks(
         return;
     }
     let library = library.get_or_insert_with(|| ScatterMeshes::build(&mut meshes, world_seed.0));
-    // EGREGORE_SCARCE starves the land of berry bushes — the famine dial, for
+    // DIVUS_FACTUS_SCARCE starves the land of berry bushes — the famine dial, for
     // exercising the prayer loop without waiting for a bad year.
-    let scarcity = if std::env::var("EGREGORE_SCARCE").is_ok() {
+    let scarcity = if std::env::var("DIVUS_FACTUS_SCARCE").is_ok() {
         0.04
     } else {
         1.0
