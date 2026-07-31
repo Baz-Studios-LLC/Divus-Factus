@@ -492,7 +492,11 @@ pub(super) fn do_work(
         // Which sites are holdings, and where each site stands — a homestead
         // breaks its own ground the moment its roof is on.
         Query<(), With<Homestead>>,
-        Query<&Transform, With<Blueprint>>,
+        // Disjoint from the boulder query above, which takes Transform
+        // mutably. Bevy reasons on component sets, not on what can actually
+        // co-occur, so a build site and a boulder must be told apart
+        // explicitly even though no entity is ever both.
+        Query<&Transform, (With<Blueprint>, Without<crate::matter::Boulder>)>,
     ),
     ground: (
         Res<Terrain>,

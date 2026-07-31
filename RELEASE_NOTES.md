@@ -1,3 +1,12 @@
+## It boots
+
+**v0.3.0 crashed on startup.** Two faults, both introduced by the settlement rewrite and both invisible to the test suite, because the tests assemble small worlds rather than the real one:
+
+- Two queries in the working day both reached for a building's position, one of them mutably. Bevy reasons about which components a query *could* touch rather than which ones ever actually co-occur, so a build site and a boulder had to be told apart explicitly even though nothing is ever both.
+- Each town's graveyard became a thing the burial system writes to rather than reads, and it was never registered.
+
+Neither could be caught by a unit test. Both are caught by starting the game once, which is now what happens before a release goes out.
+
 ## Divus Factus
 
 **A new name** — the game was called Egregore until now. A game called Egregor shipped on Steam in 2024, so the name had to go. Everything follows it: the window, the save folder, the bundle, the launcher entry. The word still appears in the design notes where it means the occult idea — a being sustained by collective belief — rather than the title.

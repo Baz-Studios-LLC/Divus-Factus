@@ -2037,7 +2037,10 @@ pub(crate) fn plan_houses(
             .id();
         if homestead {
             commands.entity(building).insert(Homestead);
-            info!("ground was broken for a holding outside {}", site.centre);
+            info!(
+                "ground was broken for a holding {:.0} strides out of town",
+                site.centre.distance(at)
+            );
         }
         raise_stage(
             &mut commands,

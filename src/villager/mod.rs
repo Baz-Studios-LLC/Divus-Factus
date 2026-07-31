@@ -96,6 +96,10 @@ pub struct VillagerPlugin;
 impl Plugin for VillagerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<WorldChronicle>()
+            // Each town's graveyard, keyed by settlement. Registered rather
+            // than inserted on first burial, because the system that chooses
+            // the ground now writes into it.
+            .init_resource::<rites::RestingGround>()
             .init_resource::<work::KitchenWarm>()
             .init_resource::<work::StoreTrends>()
             .init_resource::<belief::Belief>()
