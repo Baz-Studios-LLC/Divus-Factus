@@ -633,38 +633,71 @@ impl Plugin for TellingPlugin {
                     }
                 };
                 info!("the teller has its voice");
-                while let Ok(asked) = requests.recv() {
-                    let answer = match asked {
-                        Ask::Retell(of) => {
-                            let line = voice.retell(&of);
-                            worker_inflight.fetch_sub(1, Ordering::Relaxed);
-                            Answer::Told(of.key, line)
-                        }
-                        Ask::Muse(of) => {
-                            let line = voice.muse(&of);
-                            worker_inflight.fetch_sub(1, Ordering::Relaxed);
-                            Answer::Mused(of.who, of.is_reply(), line)
-                        }
-                        // Not counted against inflight: a switch is not a line.
-                        Ask::Switch(weights) => match Voice::load(&weights) {
-                            Ok(fresh) => {
-                                voice = fresh;
-                                Answer::Switched(Some(
-                                    weights
-                                        .file_name()
-                                        .unwrap_or_default()
-                                        .to_string_lossy()
-                                        .to_string(),
-                                ))
+                // Varied per draw, or every villager says one thing.
+                let mut draws: u64 = 0;
+                loop {
+                    let mut ctx = match voice.context() {
+                        Ok(ctx) => ctx,
+                        Err(e) => {
+                            warn!("the teller could not open a context: {e}");
+                            while let Ok(asked) = requests.recv() {
+                                worker_inflight.fetch_sub(1, Ordering::Relaxed);
+                                if answers.send(refuse(asked)).is_err() {
+                                    return;
+                                }
                             }
-                            Err(e) => {
-                                warn!("the teller could not take up {weights:?}: {e}");
-                                Answer::Switched(None)
+                            return;
+                        }
+                    };
+                    let mut take_up: Option<std::path::PathBuf> = None;
+                    while let Ok(asked) = requests.recv() {
+                        let answer = match asked {
+                            Ask::Retell(of) => {
+                                draws += 1;
+                                let line = voice.retell(&mut ctx, &of, draws);
+                                worker_inflight.fetch_sub(1, Ordering::Relaxed);
+                                Answer::Told(of.key, line)
                             }
-                        },
+                            Ask::Muse(of) => {
+                                draws += 1;
+                                let line = voice.muse(&mut ctx, &of, draws);
+                                worker_inflight.fetch_sub(1, Ordering::Relaxed);
+                                Answer::Mused(of.who, of.is_reply(), line)
+                            }
+                            // Not counted against inflight: not a line. The
+                            // context borrows the voice, so the swap happens
+                            // outside this inner loop, after the drop.
+                            Ask::Switch(weights) => {
+                                take_up = Some(weights);
+                                break;
+                            }
+                        };
+                        if answers.send(answer).is_err() {
+                            return;
+                        }
+                    }
+                    drop(ctx);
+                    let Some(weights) = take_up else {
+                        return;
+                    };
+                    let answer = match Voice::load(&weights) {
+                        Ok(fresh) => {
+                            voice = fresh;
+                            Answer::Switched(Some(
+                                weights
+                                    .file_name()
+                                    .unwrap_or_default()
+                                    .to_string_lossy()
+                                    .to_string(),
+                            ))
+                        }
+                        Err(e) => {
+                            warn!("the teller could not take up {weights:?}: {e}");
+                            Answer::Switched(None)
+                        }
                     };
                     if answers.send(answer).is_err() {
-                        break;
+                        return;
                     }
                 }
             })
@@ -695,8 +728,6 @@ impl Plugin for TellingPlugin {
 struct Voice {
     backend: LlamaBackend,
     model: LlamaModel,
-    /// Varied per call, or every villager in the world says one thing.
-    draws: u64,
 }
 
 impl Voice {
@@ -709,18 +740,34 @@ impl Voice {
         let params = LlamaModelParams::default();
         let model =
             LlamaModel::load_from_file(&backend, weights, &params).map_err(|e| e.to_string())?;
-        Ok(Voice {
-            backend,
-            model,
-            draws: 0,
-        })
+        Ok(Voice { backend, model })
+    }
+
+    /// One long-lived context: the KV cache is a large allocation, and
+    /// rebuilding it per line churned the VM hard enough to stall the frame
+    /// from the kernel's side — the hitch's last address. Cleared between
+    /// lines instead.
+    fn context(&self) -> Result<llama_cpp_2::context::LlamaContext<'_>, String> {
+        self.model
+            .new_context(
+                &self.backend,
+                LlamaContextParams::default()
+                    .with_n_ctx(std::num::NonZeroU32::new(1280))
+                    .with_n_threads(3)
+                    .with_n_threads_batch(3),
+            )
+            .map_err(|e| e.to_string())
     }
 
     /// One villager's line, or `None` if what came back is unfit to say.
-    fn retell(&mut self, of: &Retelling) -> Option<String> {
-        self.draws += 1;
+    fn retell(
+        &self,
+        ctx: &mut llama_cpp_2::context::LlamaContext<'_>,
+        of: &Retelling,
+        seed: u64,
+    ) -> Option<String> {
         let prompt = chatml(&describe(of));
-        let raw = self.generate(&prompt, self.draws).ok()?;
+        let raw = self.generate(ctx, &prompt, seed).ok()?;
         let line = raw.lines().next()?;
         if !admissible(line) {
             return None;
@@ -755,10 +802,14 @@ impl Voice {
     }
 
     /// One villager's thought, or `None` if what came back is unfit to think.
-    fn muse(&mut self, of: &Musing) -> Option<String> {
-        self.draws += 1;
+    fn muse(
+        &self,
+        ctx: &mut llama_cpp_2::context::LlamaContext<'_>,
+        of: &Musing,
+        seed: u64,
+    ) -> Option<String> {
         let prompt = muse_chatml(of.is_reply(), &describe_musing(of));
-        let raw = self.generate(&prompt, self.draws).ok()?;
+        let raw = self.generate(ctx, &prompt, seed).ok()?;
         let line = raw.lines().next()?;
         if !admissible(line) {
             return None;
@@ -794,25 +845,16 @@ impl Voice {
     }
 
     #[allow(deprecated)] // token_to_str's Special: fine until the crate's replacement lands
-    fn generate(&mut self, prompt: &str, seed: u64) -> Result<String, String> {
-        // A fresh context per line: the prompts share no prefix worth caching
-        // once the dossier is in them, and a clean KV slate is the simplest
-        // correctness there is.
-        let mut ctx = self
-            .model
-            .new_context(
-                &self.backend,
-                LlamaContextParams::default()
-                    // Just enough for the prompt and one mouthful: a smaller
-                    // KV cache is a smaller allocation per line.
-                    .with_n_ctx(std::num::NonZeroU32::new(1280))
-                    // Polite parallelism: the game is running on these cores,
-                    // and three of them prefill a slim prompt in well under a
-                    // second anyway.
-                    .with_n_threads(3)
-                    .with_n_threads_batch(3),
-            )
-            .map_err(|e| e.to_string())?;
+    fn generate(
+        &self,
+        ctx: &mut llama_cpp_2::context::LlamaContext<'_>,
+        prompt: &str,
+        seed: u64,
+    ) -> Result<String, String> {
+        // The context lives as long as the voice; only its MEMORY is wiped
+        // between lines. The prompts share no prefix worth keeping once the
+        // dossier is in them, and a clean slate is the simplest correctness.
+        ctx.clear_kv_cache();
 
         // ChatML's <|im_start|> markers are special tokens; the parser must
         // be told to read them as such or they tokenize as punctuation soup.
