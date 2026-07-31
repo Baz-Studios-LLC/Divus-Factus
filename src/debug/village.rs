@@ -101,6 +101,7 @@ pub(crate) enum CodexPage {
     Chronicle,
     Deity,
     World,
+    Settings,
 }
 
 /// The codex's spine: which page is open, and the handles the page-turn
@@ -119,6 +120,8 @@ pub(crate) struct Codex {
     pub chronicle_tab: Entity,
     pub deity_tab: Entity,
     pub world_tab: Entity,
+    pub settings_page: Entity,
+    pub settings_tab: Entity,
     pub title_text: Entity,
     pub subtitle_text: Option<Entity>,
 }
@@ -466,6 +469,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
     let chronicle_page = bound_page();
     let deity_page = bound_page();
     let world_page = bound_page();
+    let settings_page = bound_page();
 
     // The codex strip: five pages, two residents. Dark tabs are pages still
     // being written.
@@ -553,9 +557,27 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         ),
     ));
 
+    let settings_tab = tab(&mut commands, false, true);
+    commands.spawn((
+        Text::new("⚙"),
+        TextFont {
+            font_size: FontSize::Px(15.0),
+            ..default()
+        },
+        TextColor(ink.with_alpha(0.8)),
+        ChildOf(settings_tab),
+    ));
+    commands.entity(settings_tab).insert((
+        CodexTab(CodexPage::Settings),
+        ui::HoverHint::new("The Settings", "the god's own preferences"),
+    ));
+    build_settings_page(&mut commands, settings_page);
+
     commands.insert_resource(Codex {
         page: CodexPage::Ledger,
         root: window.root,
+        settings_page,
+        settings_tab,
         ledger_page,
         people_page,
         chronicle_page,
@@ -1011,6 +1033,7 @@ pub(crate) fn apply_codex_page(
         .get(codex.root)
         .is_ok_and(|v| *v != Visibility::Hidden);
     let pages = [
+        (codex.settings_page, codex.page == CodexPage::Settings),
         (codex.ledger_page, codex.page == CodexPage::Ledger),
         (codex.people_page, codex.page == CodexPage::People),
         (codex.chronicle_page, codex.page == CodexPage::Chronicle),
@@ -1039,6 +1062,7 @@ pub(crate) fn apply_codex_page(
         return;
     }
     let tabs = [
+        (codex.settings_tab, codex.page == CodexPage::Settings),
         (codex.ledger_tab, codex.page == CodexPage::Ledger),
         (codex.people_tab, codex.page == CodexPage::People),
         (codex.chronicle_tab, codex.page == CodexPage::Chronicle),
@@ -1073,6 +1097,7 @@ pub(crate) fn apply_codex_page(
             "THE WORLD",
             "The lands your people walk. The seasons turn. The world endures.",
         ),
+        CodexPage::Settings => ("THE SETTINGS", "The god's own preferences."),
     };
     if let Ok(mut text) = texts.get_mut(codex.title_text)
         && text.0 != title
@@ -1595,5 +1620,161 @@ pub(crate) fn update_faith_roster(
         if text.0 != fresh {
             *text = Text::new(fresh);
         }
+    }
+}
+
+/// The value text showing which model the teller speaks with.
+#[derive(Component)]
+pub(crate) struct TellerModelText;
+
+/// A button that steps the teller to the previous (-1) or next (+1) model.
+#[derive(Component)]
+pub(crate) struct SwitchModel(pub i8);
+
+/// Lays out the settings page: the teller's voice now, everything else as
+/// the sections arrive (hotkeys, video, sound — the hand's colour still
+/// lives on the title's Settings until it moves in here).
+fn build_settings_page(commands: &mut Commands, page: Entity) {
+    let heading = |commands: &mut Commands, label: &str| {
+        commands.spawn((
+            Text::new(label.to_string()),
+            TextFont {
+                font_size: FontSize::Px(12.0),
+                ..default()
+            },
+            TextColor(ui::theme::accent().with_alpha(0.9)),
+            Node {
+                margin: UiRect::top(px(14)),
+                ..default()
+            },
+            ChildOf(page),
+        ));
+    };
+    heading(commands, "THE TELLER");
+    let row = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: px(10),
+                margin: UiRect::top(px(6)),
+                ..default()
+            },
+            ChildOf(page),
+        ))
+        .id();
+    let arrow = |commands: &mut Commands, glyph: &str, step: i8| {
+        let button = commands
+            .spawn((
+                SwitchModel(step),
+                Interaction::default(),
+                Node {
+                    padding: UiRect::axes(px(10), px(4)),
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::all(px(7)),
+                    ..default()
+                },
+                BackgroundColor(Color::BLACK.with_alpha(0.18)),
+                BorderColor::all(ui::theme::panel_border().with_alpha(0.5)),
+                ChildOf(row),
+            ))
+            .id();
+        commands.spawn((
+            Text::new(glyph.to_string()),
+            TextFont {
+                font_size: FontSize::Px(13.0),
+                ..default()
+            },
+            TextColor(ui::theme::text()),
+            ChildOf(button),
+        ));
+    };
+    arrow(commands, "◀", -1);
+    commands.spawn((
+        TellerModelText,
+        Text::new("..."),
+        TextFont {
+            font_size: FontSize::Px(13.0),
+            ..default()
+        },
+        TextColor(ui::theme::text()),
+        ChildOf(row),
+    ));
+    arrow(commands, "▶", 1);
+    commands.spawn((
+        Text::new(
+            "the voice the villagers borrow. larger models speak better and \
+             cost more of the machine; a change takes hold in a few seconds. \
+             drop any .gguf into the models folder beside your saves to add it \
+             here.",
+        ),
+        TextFont {
+            font_size: FontSize::Px(11.0),
+            ..default()
+        },
+        TextColor(ui::theme::text_dim()),
+        Node {
+            max_width: px(430),
+            margin: UiRect::top(px(6)),
+            ..default()
+        },
+        ChildOf(page),
+    ));
+    heading(commands, "HOT KEYS · VIDEO · SOUND");
+    commands.spawn((
+        Text::new("to come, as the game grows into them."),
+        TextFont {
+            font_size: FontSize::Px(11.0),
+            ..default()
+        },
+        TextColor(ui::theme::text_dim().with_alpha(0.7)),
+        Node {
+            margin: UiRect::top(px(4)),
+            ..default()
+        },
+        ChildOf(page),
+    ));
+}
+
+/// Keeps the teller row true and turns the arrows into switches.
+pub(crate) fn settings_panel(
+    codex: Option<Res<Codex>>,
+    mut tongue: Option<ResMut<crate::telling::Tongue>>,
+    mut labels: Query<&mut Text, With<TellerModelText>>,
+    buttons: Query<(&Interaction, &SwitchModel), Changed<Interaction>>,
+) {
+    let Some(codex) = codex else {
+        return;
+    };
+    if codex.page != CodexPage::Settings {
+        return;
+    }
+    let current = match tongue.as_mut() {
+        Some(tongue) => tongue.speaking_with(),
+        None => "no model installed — the village keeps its written lines".to_string(),
+    };
+    for mut label in &mut labels {
+        if label.0 != current {
+            *label = Text::new(current.clone());
+        }
+    }
+    let Some(tongue) = tongue.as_mut() else {
+        return;
+    };
+    for (interaction, step) in &buttons {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        let models = crate::telling::list_models();
+        if models.len() < 2 {
+            continue;
+        }
+        let now = tongue.speaking_with();
+        let here = models
+            .iter()
+            .position(|m| m.file_name().is_some_and(|n| n.to_string_lossy() == now))
+            .unwrap_or(0);
+        let next = (here as i64 + step.0 as i64).rem_euclid(models.len() as i64) as usize;
+        tongue.switch_to(models[next].clone());
     }
 }

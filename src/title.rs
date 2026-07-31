@@ -375,6 +375,24 @@ fn spawn_title(
         .insert((SettingsButton, TitleMenu));
     let quit = menu_button(&mut commands, screen, "Quit");
     commands.entity(quit).insert((QuitButton, TitleMenu));
+
+    // The build, small and out of the composition's way — the first thing a
+    // bug report needs and the last thing a title should shout.
+    commands.spawn((
+        Text::new(concat!("v", env!("CARGO_PKG_VERSION"))),
+        TextFont {
+            font_size: FontSize::Px(11.0),
+            ..default()
+        },
+        TextColor(ui::theme::text_dim().with_alpha(0.55)),
+        Node {
+            position_type: PositionType::Absolute,
+            right: px(14),
+            bottom: px(10),
+            ..default()
+        },
+        ChildOf(screen),
+    ));
 }
 
 // ---------------------------------------------------------------------------
