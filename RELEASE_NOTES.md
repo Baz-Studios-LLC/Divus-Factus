@@ -1,21 +1,16 @@
-## The villagers find their own words
+## The village finds its tongue
 
-**Prayers, grief and homecomings too** — a watched villager kneeling in hunger, weeping over kin, or returning from past the cairns speaks from that moment, in their own words, like everything else.
+**A new engine under the villagers' words.** The language model now runs on llama.cpp, statically linked into the game — same model, same install, nothing new to do, but a line that took fifteen seconds to compose now takes under one. And it runs entirely on CPU cores the game barely uses, which ends the little hitch that used to precede every bubble: the GPU belongs to the renderer alone, always.
 
-**Natural speech** — the whole village now talks in plain everyday sentences instead of fragments and proverbs, and small talk picks up whatever has lately happened: weddings, wolves, ground broken, lightning.
+**Whole sentences.** Villagers now speak in complete, plain sentences instead of clipped fragments — "i hope the new field will help, but I still don't know what I should believe" — and their talk picks up whatever has lately happened in the village: weddings, wolves, ground broken, lightning.
 
-**This update installs a language model** (~1.1 GB, once — later updates skip it). It runs inside the game, on your machine: no account, no server, nothing to set up. Click update, play.
+**Green means their own words.** Composed thoughts now wear the green border too, not just composed speech, so a glance tells you exactly which words were made for that person in that moment.
 
-**Watched villagers speak and think for themselves.** Zoom in on anyone and their words are composed for them, in the moment, from what is actually true: their village, the season, the sky, the larder, their trade, their manner, their belief, their body, and the one thing pressing on them. A thought if they are alone, said aloud if anyone stands close enough to hear. Generated lines wear a green border while the feature is being judged; the written lines still serve the middle distance.
+## The codex learns Settings
 
-**Stories name their people.** A villager who sees the god act on someone remembers *who* — by name, and by what that person is to them. The same throw is "Feitreh, your brother" to one witness and "Feitreh, your neighbour" to the next, and each tells it their own way. The inspector's memories panel shows it too.
+A new page behind the sliders tab: see which model the villagers borrow, and switch between any models in your folder with a click — the change takes hold in seconds and is remembered. Hotkeys, video and sound will live here as they arrive.
 
-**Replies answer what was said.** A listener's response is composed against the teller's actual words — belief, doubt, fear, or the shared awe of a fellow witness — not picked from a bowl of stock reactions.
+## Small things
 
-**Nothing invented survives.** Every generated line passes a truth gate: it may only name people and places the simulation itself supplied. A model that reaches for a name of its own is refused, every time, structurally.
-
-**The village only performs where you are looking.** Speech is composed for whoever you are watching up close, written in the middle distance, and absent off-frame — while belief, gossip and knowledge keep spreading everywhere, watched or not.
-
-## Fixes
-
-**The stranded camera.** Pressing Begin in the instant between the world finishing and the founding landing left the camera parked at the title vantage for the whole session, with the village a thousand units below. It now waits the extra frame.
+- The build number sits quietly in the title screen's corner.
+- A dev overlay on the backquote key shows the frame rate; saturation tuning moved to F12 to make room for it.
