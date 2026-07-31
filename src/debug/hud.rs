@@ -417,11 +417,17 @@ pub(crate) fn update_hud(
 pub(crate) fn update_dev_overlay(
     time: Res<Time<Real>>,
     mut since_last: Local<f32>,
+    // The worst frame of the last window — the number optimization actually
+    // answers to. Averages hide hitches; this one cannot.
+    mut worst: Local<f32>,
     diagnostics: Res<DiagnosticsStore>,
     mut overlay: Query<(&mut Text, &Visibility), With<DevOverlay>>,
 ) {
+    // Tracked every frame, whatever the readout cadence: a one-frame spike
+    // between refreshes is exactly the thing being hunted.
+    *worst = worst.max(time.delta_secs() * 1000.0);
     *since_last += time.delta_secs();
-    if *since_last < 0.25 {
+    if *since_last < 0.5 {
         return;
     }
     *since_last = 0.0;
@@ -429,15 +435,20 @@ pub(crate) fn update_dev_overlay(
         .get(&FrameTimeDiagnosticsPlugin::FPS)
         .and_then(|d| d.smoothed())
         .unwrap_or(0.0);
+    let frame = diagnostics
+        .get(&FrameTimeDiagnosticsPlugin::FRAME_TIME)
+        .and_then(|d| d.smoothed())
+        .unwrap_or(0.0);
     for (mut text, visibility) in &mut overlay {
         if *visibility == Visibility::Hidden {
             continue;
         }
-        let fresh = format!("fps {fps:.0}");
+        let fresh = format!("fps {fps:.0} · {frame:.1}ms · worst {:.0}ms", *worst);
         if text.0 != fresh {
             *text = Text::new(fresh);
         }
     }
+    *worst = 0.0;
 }
 
 /// The backquote shows and hides the dev overlay.
