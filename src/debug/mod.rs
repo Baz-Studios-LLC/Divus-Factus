@@ -67,6 +67,7 @@ impl Plugin for DebugPlugin {
                     handle_tuning_input,
                     toggle_dev_overlay,
                     update_dev_overlay,
+                    report_frames.run_if(|| std::env::var("DIVUS_FACTUS_FRAMES").is_ok()),
                     handle_toolbar,
                     update_hud,
                     update_world_panel,

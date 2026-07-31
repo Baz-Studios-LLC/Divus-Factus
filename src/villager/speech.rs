@@ -889,6 +889,8 @@ pub(super) fn show_musings(
         return;
     };
     let god = name.as_ref().map_or("the god", |n| n.0.as_str());
+    let started = std::time::Instant::now();
+    let mut showed = 0u32;
     for who in tongue.mused_heads() {
         // Composed a moment ago, but the moment may have moved on: whoever
         // died, was seized, or wandered out of regard thinks it silently.
@@ -916,6 +918,13 @@ pub(super) fn show_musings(
             thought: !heard,
             own_words: true,
         });
+        showed += 1;
+    }
+    if showed > 0 {
+        let ms = started.elapsed().as_secs_f32() * 1000.0;
+        if ms > 2.0 {
+            info!("scrub: show_musings took {ms:.1}ms");
+        }
     }
 }
 

@@ -41,6 +41,7 @@ impl Plugin for UiPlugin {
                     style_buttons,
                     drag_windows,
                     close_windows,
+                    prune_hidden_windows,
                     scroll_regions,
                     focus_windows,
                     dress_display_text,
@@ -107,6 +108,8 @@ const BUBBLE_CAP: usize = 7;
 /// Spawns a bubble per Say, skipping speakers who already have one.
 fn speak(
     mut commands: Commands,
+    // Scrub telemetry: a bubble's true cost, attributed rather than guessed.
+    mut spent: Local<f32>,
     // Real time: a bubble is for the player's eyes, and must stay
     // readable however hard the world is hasted.
     time: Res<Time<Real>>,
@@ -116,6 +119,8 @@ fn speak(
     speakers: Query<&GlobalTransform, Without<Bubble>>,
     live: Query<&Bubble>,
 ) {
+    let started = std::time::Instant::now();
+    let mut spawned = 0u32;
     for say in messages.read() {
         // Only their OWN words reach the screen — no written line, however
         // handsome, plays anywhere at any distance. A moment nothing was
@@ -364,6 +369,16 @@ fn speak(
             }),
             ChildOf(bubble),
         ));
+        spawned += 1;
+    }
+    if spawned > 0 {
+        *spent = started.elapsed().as_secs_f32() * 1000.0;
+        if *spent > 2.0 {
+            info!(
+                "scrub: speak spawned {spawned} bubble(s) in {:.1}ms",
+                *spent
+            );
+        }
     }
 }
 
@@ -1454,6 +1469,28 @@ pub fn close_windows(
             && let Ok(mut visibility) = visibility.get_mut(close.0)
         {
             *visibility = Visibility::Hidden;
+        }
+    }
+}
+
+/// Keeps every hidden window out of the LAYOUT tree, not just off the screen.
+///
+/// The scrub's biggest single find: a `Visibility::Hidden` tree still gets
+/// laid out, so every closed panel was a tax on every UI change anywhere —
+/// spawning one thought bubble re-laid-out the whole shut codex. Syncing
+/// `Display::None` onto hidden windows prunes them from the computation
+/// entirely; visibility remains the single source of truth.
+pub fn prune_hidden_windows(
+    mut windows: Query<(&Visibility, &mut Node), (With<Panel>, Changed<Visibility>)>,
+) {
+    for (visibility, mut node) in &mut windows {
+        let display = if *visibility == Visibility::Hidden {
+            Display::None
+        } else {
+            Display::Flex
+        };
+        if node.display != display {
+            node.display = display;
         }
     }
 }

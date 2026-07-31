@@ -1040,6 +1040,20 @@ pub(crate) fn apply_codex_page(
     let window_open = visibilities
         .get(codex.root)
         .is_ok_and(|v| *v != Visibility::Hidden);
+    // A closed codex leaves the LAYOUT tree entirely, not just the screen.
+    // Hidden-but-displayed, its hundreds of nodes were re-laid-out every time
+    // any bubble anywhere dirtied the UI — most of the cost of showing a
+    // thought was recomputing a book nobody had open.
+    if let Ok(mut node) = nodes.get_mut(codex.root) {
+        let display = if window_open {
+            Display::Flex
+        } else {
+            Display::None
+        };
+        if node.display != display {
+            node.display = display;
+        }
+    }
     let pages = [
         (codex.settings_page, codex.page == CodexPage::Settings),
         (codex.ledger_page, codex.page == CodexPage::Ledger),
