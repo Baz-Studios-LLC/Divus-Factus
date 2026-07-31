@@ -2076,6 +2076,9 @@ pub(crate) fn sermons(
     site: Option<Res<SettlementSite>>,
     mut stores: Query<&mut Stockpile>,
     shrines: Query<(&GlobalTransform, &Building)>,
+    attention: Option<Res<crate::attention::Attention>>,
+    mut tongue: Option<ResMut<crate::telling::Tongue>>,
+    manners: Query<&crate::villager::traits::Traits>,
     mut congregation: Query<
         (
             Entity,
@@ -2104,7 +2107,7 @@ pub(crate) fn sermons(
     };
 
     // The priest must be at their post, with something to tell.
-    let Some((preacher, sermon)) = congregation
+    let Some((preacher, at, memory, hand, trust, told)) = congregation
         .iter()
         .find(|(_, at, witnessed, _, _, vocation, activity)| {
             **vocation == Vocation::Priest
@@ -2112,17 +2115,60 @@ pub(crate) fn sermons(
                 && at.translation.distance(shrine) < 6.0
                 && !witnessed.recent.is_empty()
         })
-        .map(|(preacher, _, witnessed, _, _, _, _)| (preacher, witnessed.recent[0].kind))
+        .map(|(preacher, at, witnessed, faith, _, _, _)| {
+            (
+                preacher,
+                at.translation,
+                witnessed.recent[0].clone(),
+                crate::telling::Retelling::hand_of(witnessed),
+                faith.trust,
+                witnessed.told,
+            )
+        })
     else {
         return;
     };
+    let sermon = memory.kind;
     let god = name.as_ref().map_or("the god", |n| n.0.as_str());
-    say.write(crate::ui::Say {
-        speaker: preacher,
-        text: format!("hear how {}", sermon.rumor().replace("the god", god)),
-        thought: false,
-        own_words: false,
-    });
+
+    // A watched pulpit preaches in the priest's own words — the same teller,
+    // the same truth gate, the same key as any retelling, so a sermon about
+    // "Feitreh, your neighbour" can never be served to the wrong parish. A
+    // watched sermon whose words never came back is a silent blessing; the
+    // written line keeps serving the middle distance and the model-less.
+    let regard = crate::attention::regard(attention.as_deref(), at);
+    let composed = tongue
+        .as_mut()
+        .filter(|_| regard.worth_composing())
+        .and_then(|tongue| {
+            tongue.line(&crate::telling::Retelling::new(
+                sermon,
+                hand,
+                Some(Vocation::Priest),
+                trust,
+                manners
+                    .get(preacher)
+                    .map(|m| m.bearing())
+                    .unwrap_or_default(),
+                memory.whom.clone(),
+                0.5,
+                told,
+            ))
+        });
+    let own_words = composed.is_some();
+    if let Some(line) = &composed {
+        info!("the priest preaches it in their own words: {line}");
+    }
+    let silent = composed.is_none() && regard.worth_composing() && tongue.is_some();
+    if regard.worth_saying() && !silent {
+        let line = composed.unwrap_or_else(|| sermon.rumor().to_string());
+        say.write(crate::ui::Say {
+            speaker: preacher,
+            text: format!("hear how {}", line.replace("the god", god)),
+            thought: false,
+            own_words,
+        });
+    }
 
     // Incense on the coals: the telling carries further and sinks
     // deeper. Sacred goods spend themselves feeding belief - that is

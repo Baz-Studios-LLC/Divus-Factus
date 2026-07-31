@@ -771,10 +771,12 @@ fn system_prompt() -> &'static str {
     // model reads the fields aloud: "My trade is hunts. My nature is steady."
     "You are a villager in a pre-industrial village, telling a neighbour what you \
      know of something strange. Answer ONLY with the words you would say: one \
-     short mouthful, under twelve words, plain and spoken. Never repeat the \
-     details back. Never name your trade, your belief, your manner or your \
-     nature — let them show in HOW you say it. Never explain or narrate. No \
-     quotation marks, no modern words. Say 'the god', never a name."
+     whole simple sentence, under twelve words, the way an ordinary person \
+     actually talks. Plain everyday speech — never poetry, no riddles, no \
+     proverbs, no grand images. Never repeat the details back. Never name your \
+     trade, your belief, your manner or your nature — let them show in HOW you \
+     say it. Never explain or narrate. No quotation marks, no modern words. \
+     Say 'the god', never a name."
 }
 
 /// The teller's own circumstances, as fields rather than prose.
@@ -912,11 +914,12 @@ fn chatml(user: &str) -> String {
 /// world in the same mouth.
 fn muse_system_prompt() -> &'static str {
     "You are a villager in a pre-industrial village. Give ONLY the thought \
-     passing through your head right now: one short mouthful, under twelve \
-     words, plain and inward, not spoken to anyone. Never repeat the details \
-     back. Never name your trade, your belief, your manner or your nature — \
-     let them show in HOW you think. No quotation marks, no modern words. \
-     Say 'the god', never a name."
+     passing through your head right now: one whole simple sentence, under \
+     twelve words, the way an ordinary person grumbles or wonders to themself. \
+     Plain everyday speech — never poetry, no riddles, no proverbs, no grand \
+     images. Never repeat the details back. Never name your trade, your \
+     belief, your manner or your nature — let them show in HOW you think. No \
+     quotation marks, no modern words. Say 'the god', never a name."
 }
 
 /// What the model is told about answering a neighbour.
@@ -927,11 +930,12 @@ fn muse_system_prompt() -> &'static str {
 /// more work here than anywhere.
 fn reply_system_prompt() -> &'static str {
     "You are a villager in a pre-industrial village. A neighbour has just told \
-     you something; answer ONLY with the words you would say back: one short \
-     mouthful, under twelve words, plain and spoken. React to it — believe it, \
-     doubt it, fear it, want more of it — never repeat it back. Never name \
-     your trade, your belief, your manner or your nature. No quotation marks, \
-     no modern words. Say 'the god', never a name."
+     you something; answer ONLY with the words you would say back: one whole \
+     simple sentence, under twelve words, the way an ordinary person actually \
+     talks. React to it — believe it, doubt it, fear it, want more of it — \
+     never repeat it back. Plain everyday speech, never poetry, no proverbs. \
+     Never name your trade, your belief, your manner or your nature. No \
+     quotation marks, no modern words. Say 'the god', never a name."
 }
 
 /// A musing's circumstances, as fields rather than prose.
@@ -983,8 +987,10 @@ fn muse_shots() -> Vec<(Musing, &'static str)> {
                 heard: None,
                 known: vec!["Harrowfen".into()],
             },
-            // From the hungry pool in the small-talk corpus.
-            "thin soup and thinner hope",
+            // From the hungry pool in the small-talk corpus — the plain
+            // grumble, not the aphorism: the model copies its examples far
+            // harder than its instructions, so the examples must TALK.
+            "when did I last eat",
         ),
         (
             Musing {
@@ -1003,7 +1009,7 @@ fn muse_shots() -> Vec<(Musing, &'static str)> {
                 known: vec!["Harrowfen".into()],
             },
             // From the roofless pool.
-            "someday a door will close behind me",
+            "a roof of my own, someday",
         ),
         (
             Musing {
@@ -1021,8 +1027,8 @@ fn muse_shots() -> Vec<(Musing, &'static str)> {
                 heard: None,
                 known: vec!["Harrowfen".into()],
             },
-            // From the clear-sky pool.
-            "a sky like this forgives a lot",
+            // From the fisher's own pool.
+            "the water was kind today",
         ),
     ]
 }

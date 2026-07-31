@@ -360,6 +360,13 @@ pub(crate) fn hold_conversations(
                 info!("{teller_name} tells it in their own words: {line}");
             }
             let own_words = spoken.is_some();
+            // A watched telling whose words never came back shows NOTHING:
+            // the pair still meet, the knowledge still moves, the chronicle
+            // still records — only the bubble is withheld. Under the god's
+            // nose it is their own words or a quiet exchange, never stock.
+            // The first ask of each story shape lands here, once, while the
+            // cache fills.
+            let missed = spoken.is_none() && regard.worth_composing() && tongue.is_some();
             // Drawn every telling whether or not it is the one used, so that
             // the simulation's draw from the shared stream does not depend on
             // whether a model happened to answer in time.
@@ -372,8 +379,11 @@ pub(crate) fn hold_conversations(
             // The listener's answer starts composing NOW, while the telling
             // hangs in the air: the reply beat lands several seconds from
             // here, which is more than a line takes, so the answer is
-            // almost always waiting when their turn comes.
-            if let Some(tongue) = tongue.as_mut()
+            // almost always waiting when their turn comes. A telling that
+            // was itself withheld asks for no answer — half a conversation
+            // on screen would be stranger than a quiet one.
+            if !missed
+                && let Some(tongue) = tongue.as_mut()
                 && let Some(partner_at) = spot_of(talk.partner)
                 && crate::attention::regard(attention.as_deref(), partner_at).worth_composing()
             {
@@ -425,7 +435,7 @@ pub(crate) fn hold_conversations(
             // The bubble is for the player; the telling is for the village.
             // Off the frame there is no bubble, and everything below still
             // happens.
-            if regard.worth_saying() {
+            if regard.worth_saying() && !missed {
                 say.write(crate::ui::Say {
                     speaker: entity,
                     text: told.clone(),

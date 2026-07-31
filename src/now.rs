@@ -66,6 +66,10 @@ pub struct PlaceNow {
     pub sky: &'static str,
     pub roofless: usize,
     pub larder: Larder,
+    /// What has lately happened, in the notices' own words — a wedding, a
+    /// wolf slain, ground broken. The same lines the player reads, so what
+    /// the village talks about is what the village announced.
+    pub lately: Vec<String>,
 }
 
 impl PlaceNow {
@@ -82,6 +86,9 @@ impl PlaceNow {
                 "the village also: {} still sleep without a roof",
                 count_word(self.roofless)
             ));
+        }
+        for happening in &self.lately {
+            lines.push(format!("lately: {happening}"));
         }
         lines
     }
@@ -123,12 +130,28 @@ pub struct WorldNow {
 fn take_stock(
     time: Res<Time>,
     mut since_last: Local<f32>,
+    mut lately: Local<std::collections::VecDeque<String>>,
+    mut notices: MessageReader<crate::ui::Notice>,
     mut now: ResMut<WorldNow>,
     clock: Res<crate::calendar::WorldClock>,
     weather: Option<Res<crate::weather::Weather>>,
     towns: Query<(Entity, &Settlement, &crate::villager::work::Stockpile)>,
     folk: Query<(&MemberOf, Option<&Home>), (With<Villager>, Without<crate::creature::Corpse>)>,
 ) {
+    // Notices are read every frame — a reader that only wakes on the slow
+    // tick would miss everything announced in between. Digits are kept out
+    // of prompts, and the fanfares (foundings, namings) are already carried
+    // by the place lines themselves.
+    for notice in notices.read() {
+        if notice.text.chars().any(|c| c.is_ascii_digit()) {
+            continue;
+        }
+        lately.push_back(notice.text.to_lowercase());
+        while lately.len() > 3 {
+            lately.pop_front();
+        }
+    }
+
     *since_last += time.delta_secs();
     // First pass runs immediately, so no prompt ever sees an empty world.
     if *since_last < 10.0 && !now.places.is_empty() {
@@ -156,6 +179,7 @@ fn take_stock(
                 sky: sky_phrase(weather.as_ref().map(|w| w.kind())),
                 roofless: roofless.get(&town).copied().unwrap_or(0),
                 larder: Larder::of(store.food(), fed),
+                lately: lately.iter().cloned().collect(),
             },
         );
     }
@@ -195,6 +219,7 @@ mod tests {
             sky: "a storm overhead",
             roofless: 0,
             larder: Larder::Thin,
+            lately: vec!["fithzu tilled a new field".into()],
         };
         let lines = place.lines().join("\n");
         assert!(lines.contains("the village of Fribe"));
@@ -224,6 +249,7 @@ mod tests {
                 sky: "the sky clear",
                 roofless: n,
                 larder: Larder::Enough,
+                lately: vec![],
             };
             for line in place.lines() {
                 assert!(
