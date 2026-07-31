@@ -90,11 +90,24 @@ fn speak(
     // readable however hard the world is hasted.
     time: Res<Time<Real>>,
     mut messages: MessageReader<Say>,
+    attention: Option<Res<crate::attention::Attention>>,
     names: Query<&crate::villager::Person>,
+    speakers: Query<&GlobalTransform, Without<Bubble>>,
     live: Query<&Bubble>,
 ) {
     for say in messages.read() {
         if live.iter().count() >= BUBBLE_CAP || live.iter().any(|b| b.speaker == say.speaker) {
+            continue;
+        }
+        // The one place every line in the game passes through, whoever wrote
+        // it. A bubble over someone off the frame is built and hidden in the
+        // same breath, and one over a speck across the valley is a full-sized
+        // box of text with nothing under it to belong to. Neither is worth a
+        // slot out of the seven, and neither is worth the words.
+        let seen = speakers.get(say.speaker).is_ok_and(|at| {
+            crate::attention::regard(attention.as_deref(), at.translation()).worth_saying()
+        });
+        if !seen {
             continue;
         }
         // Speech wears the gold border everything divine-adjacent wears;

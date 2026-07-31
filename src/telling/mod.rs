@@ -39,6 +39,7 @@ use candle_transformers::generation::LogitsProcessor;
 use candle_transformers::models::quantized_qwen2::ModelWeights;
 use tokenizers::Tokenizer;
 
+use crate::villager::traits::Bearing;
 use crate::villager::work::Vocation;
 use crate::witness::DivineEventKind;
 
@@ -156,6 +157,11 @@ pub struct TellingKey {
     pub hand: Hand,
     pub voice: Option<Vocation>,
     pub faith: FaithBand,
+    /// Which way this person's manner bends their words. Part of the key and
+    /// not merely the prompt: a shape that mentions a manner but does not key
+    /// on one would hand a gloomy villager a line composed for a cheerful
+    /// one, which is worse than handing them a generic line.
+    pub bearing: Bearing,
 }
 
 /// One villager's telling of one act, as fields rather than prose.
@@ -174,6 +180,7 @@ impl Retelling {
         hand: Hand,
         voice: Option<Vocation>,
         trust: f32,
+        bearing: Bearing,
         boldness: f32,
         told: u32,
     ) -> Retelling {
@@ -183,6 +190,7 @@ impl Retelling {
                 hand,
                 voice,
                 faith: FaithBand::of(trust),
+                bearing,
             },
             boldness,
             told,
@@ -567,9 +575,9 @@ fn system_prompt() -> &'static str {
     "You are a villager in a pre-industrial village, telling a neighbour what you \
      know of something strange. Answer ONLY with the words you would say: one \
      short mouthful, under twelve words, plain and spoken. Never repeat the \
-     details back. Never mention your trade, your belief or your nature. Never \
-     explain or narrate. No quotation marks, no modern words. Say 'the god', \
-     never a name."
+     details back. Never name your trade, your belief, your manner or your \
+     nature — let them show in HOW you say it. Never explain or narrate. No \
+     quotation marks, no modern words. Say 'the god', never a name."
 }
 
 /// The teller's own circumstances, as fields rather than prose.
@@ -581,6 +589,9 @@ fn describe(of: &Retelling) -> String {
     ];
     if let Some(voice) = of.key.voice {
         lines.push(format!("your trade: {}", voice.describe()));
+    }
+    if let Some(manner) = of.key.bearing.word() {
+        lines.push(format!("your manner: {manner}"));
     }
     lines.push(
         match of.boldness {
@@ -606,24 +617,44 @@ fn describe(of: &Retelling) -> String {
 /// corpus is no longer only the fallback: it is what teaches the model this
 /// world's register. Writing more rumours now improves the generated ones too.
 fn shots() -> Vec<(Retelling, String)> {
-    let example = |kind: DivineEventKind, hand: Hand, trust: f32, voice: Vocation, which: usize| {
+    let example = |kind: DivineEventKind,
+                   hand: Hand,
+                   trust: f32,
+                   voice: Vocation,
+                   bearing: Bearing,
+                   which: usize| {
         let said = kind.rumors()[which % kind.rumors().len()].to_string();
-        (Retelling::new(kind, hand, Some(voice), trust, 0.5, 0), said)
+        (
+            Retelling::new(kind, hand, Some(voice), trust, bearing, 0.5, 0),
+            said,
+        )
     };
+    // Three examples, three different manners — including one Plain, so the
+    // model sees that the manner line is sometimes simply absent rather than
+    // learning to expect it and inventing one when it is missing.
     vec![
         example(
             DivineEventKind::Lifted,
             Hand::Witnessed,
             0.8,
             Vocation::Gatherer,
+            Bearing::Plain,
             1,
         ),
-        example(DivineEventKind::Smote, Hand::Heard, 0.4, Vocation::Mason, 2),
+        example(
+            DivineEventKind::Smote,
+            Hand::Heard,
+            0.4,
+            Vocation::Mason,
+            Bearing::Terse,
+            2,
+        ),
         example(
             DivineEventKind::Provided,
             Hand::Distant,
             0.1,
             Vocation::Hunter,
+            Bearing::Bleak,
             2,
         ),
     ]
@@ -771,6 +802,7 @@ mod tests {
             Hand::Witnessed,
             Some(Vocation::Fisher),
             0.8,
+            Bearing::Plain,
             0.4,
             0,
         );
@@ -779,6 +811,7 @@ mod tests {
             Hand::Witnessed,
             Some(Vocation::Fisher),
             0.95,
+            Bearing::Plain,
             0.9,
             7,
         );
@@ -791,10 +824,72 @@ mod tests {
             Hand::Distant,
             Some(Vocation::Fisher),
             0.8,
+            Bearing::Plain,
             0.4,
             0,
         );
         assert_ne!(a.key, heard.key);
+
+        // And so is the grain of the person. The prompt tells the model about
+        // their manner, so the cache MUST divide on it — a shape that mentions
+        // a manner without keying on one would hand a gloomy villager a line
+        // composed for a cheerful one.
+        let gloomy = Retelling::new(
+            DivineEventKind::Smote,
+            Hand::Witnessed,
+            Some(Vocation::Fisher),
+            0.8,
+            Bearing::Bleak,
+            0.4,
+            0,
+        );
+        assert_ne!(a.key, gloomy.key, "the manner must divide the cache");
+    }
+
+    #[test]
+    fn a_manner_reaches_the_prompt_and_a_plain_one_says_nothing() {
+        let of = |bearing| {
+            describe(&Retelling::new(
+                DivineEventKind::Smote,
+                Hand::Witnessed,
+                Some(Vocation::Fisher),
+                0.8,
+                bearing,
+                0.4,
+                0,
+            ))
+        };
+        assert!(of(Bearing::Bleak).contains("your manner: expects the worst"));
+        assert!(of(Bearing::Terse).contains("your manner:"));
+        // A manner that bends nothing is left out entirely rather than spending
+        // a line of the prompt telling the model to disregard something.
+        assert!(
+            !of(Bearing::Plain).contains("your manner"),
+            "an unremarkable manner should not reach the prompt at all",
+        );
+    }
+
+    #[test]
+    fn every_manner_the_traits_can_produce_is_one_the_teller_knows() {
+        use crate::villager::traits::{Trait, Traits};
+        // The mapping is the seam between two modules, and a trait added on one
+        // side without a manner on the other would silently fall through to
+        // Plain. Every speech-bending trait must land somewhere real.
+        for (trait_, expected) in [
+            (Trait::Quiet, Bearing::Terse),
+            (Trait::Gloomy, Bearing::Bleak),
+            (Trait::Cheerful, Bearing::Bright),
+            (Trait::Diligent, Bearing::Plain),
+        ] {
+            assert_eq!(Traits(vec![trait_]).bearing(), expected, "{trait_:?}");
+        }
+        // Brevity governs the delivery of whatever else is true.
+        assert_eq!(
+            Traits(vec![Trait::Cheerful, Trait::Quiet]).bearing(),
+            Bearing::Terse,
+            "a quiet cheerful person is short about the good news",
+        );
+        assert_eq!(Traits(Vec::new()).bearing(), Bearing::Plain);
     }
 
     #[test]
@@ -804,6 +899,7 @@ mod tests {
             Hand::Heard,
             Some(Vocation::Mason),
             0.1,
+            Bearing::Plain,
             0.2,
             0,
         );
@@ -827,6 +923,7 @@ mod tests {
             Hand::Witnessed,
             Some(Vocation::Fisher),
             0.9,
+            Bearing::Plain,
             0.5,
             0,
         )));

@@ -226,6 +226,11 @@ pub(crate) fn hold_conversations(
     name: Option<Res<DivineName>>,
     mut say: MessageWriter<crate::ui::Say>,
     mut rng: ResMut<SimRng>,
+    // Only the WORDS are aimed at the camera. Everything below that changes
+    // hands — what the listener now carries secondhand, what their faith does
+    // about it, what goes in their chronicle — happens whether or not anyone
+    // is watching, because that is the simulation and not its presentation.
+    attention: Option<Res<crate::attention::Attention>>,
     mut pairs: Query<
         (
             Entity,
@@ -247,6 +252,7 @@ pub(crate) fn hold_conversations(
     voices: Query<(
         Option<&work::Vocation>,
         Option<&crate::witness::Temperament>,
+        Option<&traits::Traits>,
     )>,
     tongue: Option<ResMut<crate::telling::Tongue>>,
 ) {
@@ -297,49 +303,73 @@ pub(crate) fn hold_conversations(
             // what they were merely told, their trade, their belief. If it is
             // not, or has nothing ready, the written phrasings answer. There
             // is one fallback and it is always there.
-            let spoken = tongue.as_mut().and_then(|tongue| {
-                let (voice, manner) = voices
-                    .get(entity)
-                    .map(|(v, t)| (v.copied(), t))
-                    .unwrap_or((None, None));
-                let (hand, told_before) = minds
-                    .get(entity)
-                    .map(|(_, witnessed, ..)| {
-                        (
-                            crate::telling::Retelling::hand_of(witnessed),
-                            witnessed.told,
-                        )
-                    })
-                    .unwrap_or((crate::telling::Hand::Heard, 0));
-                let trust = minds
-                    .get(entity)
-                    .ok()
-                    .and_then(|(_, _, _, faith)| faith.map(|f| f.trust))
-                    .unwrap_or(0.3);
-                tongue.line(&crate::telling::Retelling::new(
-                    kind,
-                    hand,
-                    voice,
-                    trust,
-                    manner.map_or(0.5, |t| t.boldness),
-                    told_before,
-                ))
-            });
+            //
+            // Asked for only when the god is close enough to read the answer.
+            // A composed line is a second and a half of a model's time, and
+            // spending it on a conversation happening off the frame buys
+            // nothing — the written phrasing is instant and reads identically
+            // to nobody.
+            let regard = crate::attention::regard(attention.as_deref(), at.translation);
+            let spoken = tongue
+                .as_mut()
+                .filter(|_| regard.worth_composing())
+                .and_then(|tongue| {
+                    let (voice, nature, bearing) = voices
+                        .get(entity)
+                        .map(|(v, t, manner)| {
+                            (
+                                v.copied(),
+                                t,
+                                manner.map(|m| m.bearing()).unwrap_or_default(),
+                            )
+                        })
+                        .unwrap_or((None, None, traits::Bearing::default()));
+                    let (hand, told_before) = minds
+                        .get(entity)
+                        .map(|(_, witnessed, ..)| {
+                            (
+                                crate::telling::Retelling::hand_of(witnessed),
+                                witnessed.told,
+                            )
+                        })
+                        .unwrap_or((crate::telling::Hand::Heard, 0));
+                    let trust = minds
+                        .get(entity)
+                        .ok()
+                        .and_then(|(_, _, _, faith)| faith.map(|f| f.trust))
+                        .unwrap_or(0.3);
+                    tongue.line(&crate::telling::Retelling::new(
+                        kind,
+                        hand,
+                        voice,
+                        trust,
+                        bearing,
+                        nature.map_or(0.5, |t| t.boldness),
+                        told_before,
+                    ))
+                });
             // Logged when it is the model's, so a run can be read back and
             // judged: everything else in the square is a written line.
             if let Some(line) = &spoken {
                 info!("{teller_name} tells it in their own words: {line}");
             }
             let own_words = spoken.is_some();
-            let told = spoken
-                .unwrap_or_else(|| (*rng.0.pick(kind.rumors())).to_string())
-                .replace("the god", god);
-            say.write(crate::ui::Say {
-                speaker: entity,
-                text: told.clone(),
-                thought: false,
-                own_words,
-            });
+            // Drawn every telling whether or not it is the one used, so that
+            // the simulation's draw from the shared stream does not depend on
+            // whether a model happened to answer in time.
+            let written = (*rng.0.pick(kind.rumors())).to_string();
+            let told = spoken.unwrap_or(written).replace("the god", god);
+            // The bubble is for the player; the telling is for the village.
+            // Off the frame there is no bubble, and everything below still
+            // happens.
+            if regard.worth_saying() {
+                say.write(crate::ui::Say {
+                    speaker: entity,
+                    text: told.clone(),
+                    thought: false,
+                    own_words,
+                });
+            }
             if let Ok((listener_person, mut witnessed, chronicle, faith)) =
                 minds.get_mut(talk.partner)
             {
@@ -393,12 +423,14 @@ pub(crate) fn hold_conversations(
                     "I will believe it when I see it",
                 ])
             };
-            say.write(crate::ui::Say {
-                speaker: entity,
-                text: reply.replace("the god", god),
-                thought: false,
-                own_words: false,
-            });
+            if crate::attention::regard(attention.as_deref(), at.translation).worth_saying() {
+                say.write(crate::ui::Say {
+                    speaker: entity,
+                    text: reply.replace("the god", god),
+                    thought: false,
+                    own_words: false,
+                });
+            }
         }
     }
 }

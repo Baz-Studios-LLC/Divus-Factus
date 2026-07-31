@@ -575,6 +575,7 @@ pub(super) fn small_talk(
     name: Option<Res<super::DivineName>>,
     clock: Res<crate::calendar::WorldClock>,
     weather: Option<Res<crate::weather::Weather>>,
+    attention: Option<Res<crate::attention::Attention>>,
     mut rng: ResMut<SimRng>,
     mut say: MessageWriter<crate::ui::Say>,
     villagers: Query<
@@ -611,8 +612,21 @@ pub(super) fn small_talk(
     if all.is_empty() {
         return;
     }
+    // The murmur is drawn from the people the god can actually see. Four towns
+    // in, most of the world is off the frame at any moment, and a line said
+    // there is composed, weighted, spent out of the freshness rings and then
+    // thrown away unheard. Nothing about the simulation is gated here — small
+    // talk has no consequences — only who is worth drawing.
+    let seen: Vec<usize> = (0..all.len())
+        .filter(|&i| {
+            crate::attention::regard(attention.as_deref(), all[i].1.translation).worth_saying()
+        })
+        .collect();
+    if seen.is_empty() {
+        return;
+    }
     let (speaker, at, needs, morale, activity, extras) =
-        all[(rng.0.f32() * all.len() as f32) as usize % all.len()];
+        all[seen[(rng.0.f32() * seen.len() as f32) as usize % seen.len()]];
     let (vitality, faith, witnessed, genome, spouse, house, vocation, manner) = extras;
 
     let pool = candidates(

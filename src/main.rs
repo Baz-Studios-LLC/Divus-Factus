@@ -1,6 +1,7 @@
 //! Divus Factus — a god game about a deity made, sustained and defined by the people
 //! who believe in it.
 
+mod attention;
 mod calendar;
 mod camera;
 mod creature;
@@ -150,6 +151,8 @@ fn main() {
             speed::SpeedPlugin,
             survey::SurveyPlugin,
             markers::MarkersPlugin,
+            // Before the teller: it decides what the teller is asked for.
+            attention::AttentionPlugin,
             telling::TellingPlugin,
         ))
         .add_systems(Startup, spawn_lighting)

@@ -701,14 +701,24 @@ fn begin_descent(
     site: Option<&crate::villager::SettlementSite>,
     next: &mut NextState<GameState>,
 ) {
+    // Nowhere to descend TO yet, so do not leave. The founding lands a moment
+    // after the terrain does, and pressing on through that gap used to drop the
+    // player into a playing world with the camera still up at the title
+    // vantage — the village a thousand units below, no dive queued, and nothing
+    // that would ever queue one, since the opening framing is a PostStartup
+    // pass that has long since run. The whole session then looked like a world
+    // that had simply forgotten to zoom in.
+    //
+    // The caller retries, so waiting costs a frame rather than the press.
+    let Some(site) = site else {
+        return;
+    };
     if chunks.is_some_and(|c| c.is_complete()) {
         next.set(GameState::Playing);
     } else {
         next.set(GameState::Loading);
     }
-    if let Some(site) = site {
-        commands.insert_resource(crate::camera::CameraDive::descend_to(site.centre));
-    }
+    commands.insert_resource(crate::camera::CameraDive::descend_to(site.centre));
 }
 
 /// Capture tooling: DIVUS_FACTUS_AUTOBEGIN=seconds presses Begin unattended, so
