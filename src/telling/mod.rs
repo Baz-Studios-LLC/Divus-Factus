@@ -753,8 +753,8 @@ impl Voice {
                 &self.backend,
                 LlamaContextParams::default()
                     .with_n_ctx(std::num::NonZeroU32::new(1280))
-                    .with_n_threads(3)
-                    .with_n_threads_batch(3),
+                    .with_n_threads(2)
+                    .with_n_threads_batch(2),
             )
             .map_err(|e| e.to_string())
     }
@@ -863,14 +863,29 @@ impl Voice {
             .str_to_token(prompt, AddBos::Never)
             .map_err(|e| e.to_string())?;
 
+        // The prompt is fed in SMALL SIPS with a breath between each. Not for
+        // the arithmetic — for the MEMORY BUS. This machine's GPU and CPU
+        // drink from the same unified memory, and prefilling a whole prompt
+        // in one burst streams the model's entire weights through the
+        // controller the renderer is feeding from: no thread priority can
+        // protect the frame from that. Chunked, with pauses, the same work
+        // happens as a hum instead of a spike. (llama.cpp masks offset
+        // batches correctly, so this is safe here where it was not in the
+        // old engine.) Costs ~100ms per line; nothing waits on a line.
         let mut batch = LlamaBatch::new(1280, 1);
-        let last = tokens.len() as i32 - 1;
-        for (i, token) in tokens.iter().enumerate() {
-            batch
-                .add(*token, i as i32, &[0], i as i32 == last)
-                .map_err(|e| e.to_string())?;
+        let last = tokens.len() - 1;
+        for (chunk_index, chunk) in tokens.chunks(48).enumerate() {
+            batch.clear();
+            let start = chunk_index * 48;
+            for (i, token) in chunk.iter().enumerate() {
+                let position = start + i;
+                batch
+                    .add(*token, position as i32, &[0], position == last)
+                    .map_err(|e| e.to_string())?;
+            }
+            ctx.decode(&mut batch).map_err(|e| e.to_string())?;
+            std::thread::sleep(std::time::Duration::from_millis(8));
         }
-        ctx.decode(&mut batch).map_err(|e| e.to_string())?;
 
         // Warm enough to differ between tellers, cool enough to obey.
         let mut sampler = LlamaSampler::chain_simple([
