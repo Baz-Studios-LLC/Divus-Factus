@@ -52,8 +52,9 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
         ui::dim(""),
         Node {
             position_type: PositionType::Absolute,
-            left: px(10),
-            top: px(8),
+            // Below the date card, which owns the corner itself.
+            left: px(18),
+            top: px(70),
             ..default()
         },
         Visibility::Hidden,

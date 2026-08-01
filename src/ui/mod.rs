@@ -27,7 +27,7 @@ impl Plugin for UiPlugin {
             .init_resource::<WindowDrag>()
             .add_message::<Notice>()
             .add_message::<Say>()
-            .add_systems(Startup, (spawn_toast_shelf, load_fonts))
+            .add_systems(Startup, (spawn_toast_shelf, load_fonts, spawn_date_card))
             .add_systems(PreUpdate, track_pointer.after(bevy::ui::UiSystems::Focus))
             .add_systems(
                 Update,
@@ -48,8 +48,110 @@ impl Plugin for UiPlugin {
                     switch_tabs,
                     speak.run_if(in_state(crate::GameState::Playing)),
                     float_bubbles,
+                    update_date_card,
                 ),
             );
+    }
+}
+
+/// The date, written large in the world's own hand: season and day above,
+/// the year small beneath. Top-left, always readable, only during play.
+#[derive(Component)]
+struct DateBig;
+
+#[derive(Component)]
+struct DateSmall;
+
+#[derive(Component)]
+struct DateCard;
+
+fn spawn_date_card(mut commands: Commands) {
+    let card = commands
+        .spawn((
+            DateCard,
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(18),
+                top: px(12),
+                flex_direction: FlexDirection::Column,
+                row_gap: px(0),
+                ..default()
+            },
+            GlobalZIndex(60),
+            Visibility::Hidden,
+        ))
+        .id();
+    commands.spawn((
+        DateBig,
+        Text::new(""),
+        TextFont {
+            font_size: FontSize::Px(30.0),
+            ..default()
+        },
+        TextColor(theme::accent().with_alpha(0.95)),
+        ChildOf(card),
+    ));
+    commands.spawn((
+        DateSmall,
+        Text::new(""),
+        TextFont {
+            font_size: FontSize::Px(13.0),
+            ..default()
+        },
+        TextColor(theme::text_dim().with_alpha(0.85)),
+        ChildOf(card),
+    ));
+}
+
+/// Keeps the date true, twice a second, and only during play.
+fn update_date_card(
+    time: Res<Time<Real>>,
+    mut since: Local<f32>,
+    state: Res<State<crate::GameState>>,
+    clock: Option<Res<crate::calendar::WorldClock>>,
+    debug: Option<Res<crate::debug::DebugState>>,
+    mut card: Query<&mut Visibility, With<DateCard>>,
+    mut big: Query<&mut Text, (With<DateBig>, Without<DateSmall>)>,
+    mut small: Query<&mut Text, (With<DateSmall>, Without<DateBig>)>,
+) {
+    *since += time.delta_secs();
+    if *since < 0.5 {
+        return;
+    }
+    *since = 0.0;
+    // The F1 instrument panel owns this corner while it is up, and it
+    // carries the date already.
+    let playing =
+        *state.get() == crate::GameState::Playing && !debug.is_some_and(|d| d.hud_visible);
+    for mut visibility in &mut card {
+        *visibility = if playing {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+    }
+    if !playing {
+        return;
+    }
+    let Some(clock) = clock else {
+        return;
+    };
+    let season = clock.season().name();
+    let mut season_cased: String = season.to_string();
+    if let Some(first) = season_cased.get_mut(0..1) {
+        first.make_ascii_uppercase();
+    }
+    let heading = format!("{} {}", season_cased, clock.day_of_season());
+    let sub = format!("YEAR {} - {}", clock.year(), clock.phase_name());
+    if let Ok(mut text) = big.single_mut()
+        && text.0 != heading
+    {
+        *text = Text::new(heading);
+    }
+    if let Ok(mut text) = small.single_mut()
+        && text.0 != sub
+    {
+        *text = Text::new(sub);
     }
 }
 
