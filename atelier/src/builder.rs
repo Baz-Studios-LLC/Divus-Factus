@@ -55,6 +55,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     structure("WALL, 1M", PartKind::Wall(1.0), "walls"),
     structure("WALL, 2M", PartKind::Wall(2.0), "walls"),
     structure("WALL, 4M", PartKind::Wall(4.0), "walls"),
+    structure("CORNER POLE", PartKind::Prop("pole"), "frame"),
     structure("FLOOR, 2M", PartKind::Floor, "footing"),
     structure("ROOF PANEL", PartKind::Roof, "roof"),
 ];
@@ -218,6 +219,20 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         PartKind::Prop("trough") => vec![
             slab(0.0, 0.15, 0.0, 1.2, 0.3, 0.45, "wood", 0.45),
             slab(0.0, 0.27, 0.0, 1.08, 0.04, 0.33, "water", 0.7),
+        ],
+        PartKind::Prop("pole") => vec![
+            // The corner post: shoulders over both wall ends at a meeting,
+            // a shade darker so the frame reads against the panels.
+            slab(
+                0.0,
+                WALL_HIGH * 0.5,
+                0.0,
+                0.32,
+                WALL_HIGH,
+                0.32,
+                "wood",
+                0.45,
+            ),
         ],
         PartKind::Prop("mannequin") => vec![
             // The game's adult, boxed in bone: a measuring stick with a
@@ -390,10 +405,14 @@ fn kind_from_name(name: &str) -> Option<PartKind> {
         return rest.parse::<f32>().ok().map(PartKind::Wall);
     }
     if let Some(wanted) = name.strip_prefix("prop:") {
-        return FURNITURE.iter().chain(DECOR).find_map(|e| match e.kind {
-            PartKind::Prop(p) if p == wanted => Some(e.kind),
-            _ => None,
-        });
+        return STRUCTURE
+            .iter()
+            .chain(FURNITURE)
+            .chain(DECOR)
+            .find_map(|e| match e.kind {
+                PartKind::Prop(p) if p == wanted => Some(e.kind),
+                _ => None,
+            });
     }
     if let Some(widget) = name.strip_prefix("widget:") {
         return WIDGETS
