@@ -29,6 +29,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -55,6 +56,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -81,6 +83,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -107,6 +110,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -133,6 +137,7 @@
    ],
    "alpha": 0.35,
    "form": "box",
+   "cloth": "sky:0.8",
    "stage": "walls"
   },
   {
@@ -159,6 +164,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -185,6 +191,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -211,6 +218,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -237,6 +245,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -263,6 +272,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -289,6 +299,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -315,6 +326,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -341,6 +353,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -367,6 +380,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -393,6 +407,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -419,6 +434,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -445,6 +461,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -471,6 +488,7 @@
    ],
    "alpha": 0.35,
    "form": "box",
+   "cloth": "sky:0.8",
    "stage": "walls"
   },
   {
@@ -497,6 +515,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -523,6 +542,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -549,6 +569,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "stone:0.55",
    "stage": "footing"
   },
   {
@@ -575,6 +596,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "stone:0.6",
    "stage": "furnishing"
   },
   {
@@ -601,6 +623,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "stone:0.25",
    "stage": "furnishing"
   },
   {
@@ -627,6 +650,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -653,6 +677,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -679,6 +704,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -705,6 +731,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.65",
    "stage": "furnishing"
   },
   {
@@ -731,6 +758,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "furnishing"
   },
   {
@@ -757,6 +785,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "furnishing"
   },
   {
@@ -783,6 +812,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "furnishing"
   },
   {
@@ -809,6 +839,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "furnishing"
   },
   {
@@ -835,6 +866,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -861,6 +893,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -887,6 +920,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -913,6 +947,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -939,6 +974,7 @@
    ],
    "alpha": 0.35,
    "form": "box",
+   "cloth": "sky:0.8",
    "stage": "walls"
   },
   {
@@ -965,6 +1001,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -991,6 +1028,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -1017,6 +1055,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "stone:0.6",
    "stage": "footing"
   },
   {
@@ -1043,6 +1082,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "stone:0.55",
    "stage": "footing"
   },
   {
@@ -1069,6 +1109,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "stone:0.5",
    "stage": "footing"
   },
   {
@@ -1095,6 +1136,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -1121,6 +1163,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -1147,6 +1190,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -1173,6 +1217,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -1199,6 +1244,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.35",
    "stage": "walls"
   },
   {
@@ -1225,6 +1271,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "cloth-gold:0.8",
    "stage": "walls"
   },
   {
@@ -1251,6 +1298,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -1277,6 +1325,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -1303,6 +1352,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -1329,6 +1379,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -1355,6 +1406,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -1381,6 +1433,7 @@
    ],
    "alpha": 0.35,
    "form": "box",
+   "cloth": "sky:0.8",
    "stage": "walls"
   },
   {
@@ -1407,6 +1460,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -1433,6 +1487,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -1459,6 +1514,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -1485,6 +1541,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -1511,6 +1568,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -1537,6 +1595,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -1563,6 +1622,7 @@
    ],
    "alpha": 0.35,
    "form": "box",
+   "cloth": "sky:0.8",
    "stage": "walls"
   },
   {
@@ -1589,6 +1649,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -1615,6 +1676,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -1641,6 +1703,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -1667,6 +1730,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -1693,6 +1757,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -1719,6 +1784,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -1745,6 +1811,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -1771,6 +1838,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -1797,6 +1865,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -1823,6 +1892,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -1849,6 +1919,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -1875,6 +1946,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -1901,6 +1973,7 @@
    ],
    "alpha": 0.35,
    "form": "box",
+   "cloth": "sky:0.8",
    "stage": "walls"
   },
   {
@@ -1927,6 +2000,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -1953,6 +2027,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -1979,6 +2054,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2005,6 +2081,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2031,6 +2108,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2057,6 +2135,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -2083,6 +2162,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -2109,6 +2189,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -2135,6 +2216,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -2161,6 +2243,7 @@
    ],
    "alpha": 0.35,
    "form": "box",
+   "cloth": "sky:0.8",
    "stage": "walls"
   },
   {
@@ -2187,6 +2270,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -2213,6 +2297,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -2239,6 +2324,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2265,6 +2351,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2291,6 +2378,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2317,6 +2405,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -2343,6 +2432,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -2369,6 +2459,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -2395,6 +2486,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -2421,6 +2513,7 @@
    ],
    "alpha": 0.35,
    "form": "box",
+   "cloth": "sky:0.8",
    "stage": "walls"
   },
   {
@@ -2447,6 +2540,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -2473,6 +2567,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -2499,6 +2594,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2525,6 +2621,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2551,6 +2648,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2577,6 +2675,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2603,6 +2702,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2629,6 +2729,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2655,6 +2756,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2681,6 +2783,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -2707,6 +2810,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -2733,6 +2837,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -2759,6 +2864,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -2785,6 +2891,7 @@
    ],
    "alpha": 0.35,
    "form": "box",
+   "cloth": "sky:0.8",
    "stage": "walls"
   },
   {
@@ -2811,6 +2918,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -2837,6 +2945,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "walls"
   },
   {
@@ -2863,6 +2972,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2889,6 +2999,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2915,6 +3026,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2941,6 +3053,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2967,6 +3080,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -2993,6 +3107,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -3019,6 +3134,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.55",
    "stage": "furnishing"
   },
   {
@@ -3045,6 +3161,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "bone:0.8",
    "stage": "furnishing"
   },
   {
@@ -3071,6 +3188,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "bone:0.95",
    "stage": "furnishing"
   },
   {
@@ -3097,6 +3215,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "bone:0.95",
    "stage": "furnishing"
   },
   {
@@ -3123,6 +3242,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -3149,6 +3269,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -3175,6 +3296,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -3201,6 +3323,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -3227,6 +3350,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -3253,6 +3377,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -3279,6 +3404,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -3305,6 +3431,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -3331,6 +3458,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -3357,6 +3485,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -3383,6 +3512,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -3409,6 +3539,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -3435,6 +3566,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "walls"
   },
   {
@@ -3461,6 +3593,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -3487,6 +3620,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -3513,6 +3647,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -3539,6 +3674,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -3565,6 +3701,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   },
   {
@@ -3591,6 +3728,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.65",
    "stage": "furnishing"
   },
   {
@@ -3617,6 +3755,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "furnishing"
   },
   {
@@ -3643,6 +3782,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "furnishing"
   },
   {
@@ -3669,6 +3809,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "furnishing"
   },
   {
@@ -3695,6 +3836,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "furnishing"
   },
   {
@@ -3721,6 +3863,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.65",
    "stage": "furnishing"
   },
   {
@@ -3747,6 +3890,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "furnishing"
   },
   {
@@ -3773,6 +3917,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "furnishing"
   },
   {
@@ -3799,6 +3944,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "furnishing"
   },
   {
@@ -3825,6 +3971,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "furnishing"
   },
   {
@@ -3851,6 +3998,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.55",
    "stage": "furnishing"
   },
   {
@@ -3877,6 +4025,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "bone:0.8",
    "stage": "furnishing"
   },
   {
@@ -3903,6 +4052,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "bone:0.95",
    "stage": "furnishing"
   },
   {
@@ -3929,6 +4079,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.55",
    "stage": "furnishing"
   },
   {
@@ -3955,6 +4106,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "bone:0.8",
    "stage": "furnishing"
   },
   {
@@ -3981,6 +4133,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "bone:0.95",
    "stage": "furnishing"
   },
   {
@@ -4007,6 +4160,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.6",
    "stage": "furnishing"
   },
   {
@@ -4033,6 +4187,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "furnishing"
   },
   {
@@ -4059,6 +4214,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.55",
    "stage": "furnishing"
   },
   {
@@ -4085,6 +4241,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.6",
    "stage": "furnishing"
   },
   {
@@ -4111,6 +4268,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "furnishing"
   },
   {
@@ -4137,6 +4295,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.55",
    "stage": "furnishing"
   },
   {
@@ -4163,6 +4322,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.6",
    "stage": "furnishing"
   },
   {
@@ -4189,6 +4349,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "furnishing"
   },
   {
@@ -4215,6 +4376,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.55",
    "stage": "furnishing"
   },
   {
@@ -4241,6 +4403,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.6",
    "stage": "furnishing"
   },
   {
@@ -4267,6 +4430,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.45",
    "stage": "furnishing"
   },
   {
@@ -4293,6 +4457,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.55",
    "stage": "furnishing"
   },
   {
@@ -4319,6 +4484,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "furnishing"
   },
   {
@@ -4345,6 +4511,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.62",
    "stage": "furnishing"
   },
   {
@@ -4371,6 +4538,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.62",
    "stage": "furnishing"
   },
   {
@@ -4397,6 +4565,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "cloth-gold:0.7",
    "stage": "furnishing"
   },
   {
@@ -4423,6 +4592,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.5",
    "stage": "furnishing"
   },
   {
@@ -4449,6 +4619,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.62",
    "stage": "furnishing"
   },
   {
@@ -4475,6 +4646,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.62",
    "stage": "furnishing"
   },
   {
@@ -4501,6 +4673,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "cloth-gold:0.7",
    "stage": "furnishing"
   },
   {
@@ -4527,6 +4700,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "cloth-red:0.55",
    "stage": "furnishing"
   },
   {
@@ -4553,17 +4727,18 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "cloth-red:0.75",
    "stage": "furnishing"
   },
   {
    "at": [
     -0.4684,
-    4.875,
+    4.0312,
     5.2262
    ],
    "size": [
     7.9375,
-    4.0,
+    2.3125,
     0.25
    ],
    "turn": [
@@ -4579,17 +4754,18 @@
    ],
    "alpha": 1.0,
    "form": "wedge",
+   "cloth": "wood:0.65",
    "stage": "roof"
   },
   {
    "at": [
     -0.4684,
-    4.875,
+    4.0312,
     -5.1965
    ],
    "size": [
     7.9375,
-    4.0,
+    2.3125,
     0.25
    ],
    "turn": [
@@ -4605,6 +4781,7 @@
    ],
    "alpha": 1.0,
    "form": "wedge",
+   "cloth": "wood:0.65",
    "stage": "roof"
   },
   {
@@ -4631,6 +4808,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "earth:0.4",
    "stage": "roof"
   },
   {
@@ -4657,6 +4835,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "earth:0.4",
    "stage": "roof"
   },
   {
@@ -4683,6 +4862,7 @@
    ],
    "alpha": 1.0,
    "form": "box",
+   "cloth": "wood:0.7",
    "stage": "walls"
   }
  ],

@@ -21,9 +21,14 @@ pub struct Box3 {
     pub rgb: [u8; 3],
     #[serde(default = "opaque")]
     pub alpha: f32,
-    /// "box", "wedge" or "ridge" - the bench's three shapes.
+    /// "box", "wedge", "ridge" or "log" - the bench's own shapes.
     #[serde(default)]
     pub form: String,
+    /// The cloth this piece was painted in, named: "wood:0.7". The
+    /// house's own wall and roof cloths are re-dyed per building, so a
+    /// street of one blueprint is still a street of different houses.
+    #[serde(default)]
+    pub cloth: String,
     /// footing, walls, roof, furnishing.
     pub stage: String,
 }
@@ -51,6 +56,27 @@ pub struct Baked {
     pub high: f32,
     pub boxes: Vec<Box3>,
     pub marks: Vec<Mark>,
+    /// The cloths that cover the most of this building at each stage -
+    /// its walls and its roof. Worked out when the file is read, by
+    /// VOLUME rather than by count: a house wears more window frames
+    /// than walls, and the frames are not what a village re-dyes.
+    #[serde(skip)]
+    pub wall_cloth: String,
+    #[serde(skip)]
+    pub roof_cloth: String,
+}
+
+/// The cloth covering the most of a stage, by volume.
+fn dominant(boxes: &[Box3], stage: &str) -> String {
+    let mut bulk: std::collections::HashMap<&str, f32> = std::collections::HashMap::new();
+    for piece in boxes.iter().filter(|b| b.stage == stage) {
+        let volume = piece.size[0] * piece.size[1] * piece.size[2];
+        *bulk.entry(piece.cloth.as_str()).or_default() += volume;
+    }
+    bulk.into_iter()
+        .max_by(|a, b| a.1.total_cmp(&b.1))
+        .map(|(cloth, _)| cloth.to_string())
+        .unwrap_or_default()
 }
 
 /// The buildings carried in, read once and held for the life of the
@@ -79,7 +105,9 @@ fn carried() -> &'static Vec<Baked> {
                     .ok()
                     .and_then(|text| serde_json::from_str::<Baked>(&text).ok())
                 {
-                    Some(work) => {
+                    Some(mut work) => {
+                        work.wall_cloth = dominant(&work.boxes, "walls");
+                        work.roof_cloth = dominant(&work.boxes, "roof");
                         info!(
                             "carried in {}: {} boxes, {} marks",
                             work.name,
@@ -195,12 +223,24 @@ pub fn raise_baked(
     site: Entity,
     stage: u8,
     work: &Baked,
+    // The cloths this particular house wears, rolled with its plan.
+    wall_dye: Color,
+    roof_dye: Color,
 ) {
     let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
     let wedge = meshes.add(prism(false));
     let ridge = meshes.add(prism(true));
     for piece in work.boxes.iter().filter(|b| stage_of(&b.stage) == stage) {
-        let colour = Color::srgb_u8(piece.rgb[0], piece.rgb[1], piece.rgb[2]);
+        // The house's own walls and roof take this building's cloth;
+        // every frame, sill, floorboard and stick of furniture keeps
+        // exactly what the maker painted it.
+        let colour = if !piece.cloth.is_empty() && piece.cloth == work.wall_cloth {
+            wall_dye
+        } else if !piece.cloth.is_empty() && piece.cloth == work.roof_cloth {
+            roof_dye
+        } else {
+            Color::srgb_u8(piece.rgb[0], piece.rgb[1], piece.rgb[2])
+        };
         let clear = piece.alpha < 0.999;
         let mesh = match piece.form.as_str() {
             "wedge" => wedge.clone(),

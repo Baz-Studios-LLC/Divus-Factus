@@ -4343,10 +4343,14 @@ mod bake {
                         | PartKind::Roof(..) => "roof",
                         _ => record.stage.as_str(),
                     };
+                    // The cloth is named as well as resolved: the game
+                    // re-dyes a house's own walls and roof per building,
+                    // the way it always rolled its own, and leaves every
+                    // other piece exactly as it was painted.
                     boxes.push(format!(
                         "    {{\"at\": {}, \"size\": {}, \"turn\": [{:.5}, {:.5}, {:.5}, {:.5}], \
                          \"rgb\": [{}, {}, {}], \"alpha\": {:.2}, \"form\": \"{form}\", \
-                         \"stage\": \"{}\"}}",
+                         \"cloth\": \"{ramp}:{shade}\", \"stage\": \"{}\"}}",
                         say(centre),
                         say(size),
                         turn.x,

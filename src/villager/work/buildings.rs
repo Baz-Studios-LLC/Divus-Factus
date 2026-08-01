@@ -947,7 +947,9 @@ pub(crate) fn raise_stage(
     if plan.kind == BuildingKind::House
         && let Some(work) = super::baked::house()
     {
-        super::baked::raise_baked(commands, meshes, materials, site, stage, work);
+        super::baked::raise_baked(
+            commands, meshes, materials, site, stage, work, plan.walls, plan.roof,
+        );
         return;
     }
 
