@@ -17,8 +17,9 @@ use crate::stage::BuilderFurniture;
 const WALL_THICK: f32 = 0.24;
 const WALL_HIGH: f32 = 2.4;
 
-/// One box of a part's body: offset from the part origin, size, ramp, shade.
-struct Slab(Vec3, Vec3, String, f32);
+/// One box of a part's body: offset from the part origin, size, ramp,
+/// shade, and how much of the world shows through it (1.0 = none).
+struct Slab(Vec3, Vec3, String, f32, f32);
 
 /// What a shelf entry stands for.
 #[derive(Clone, Copy, PartialEq)]
@@ -117,6 +118,17 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             Vec3::new(sx, sy, sz),
             ramp.to_string(),
             shade,
+            1.0,
+        )
+    };
+    // Glass: the world shows through it.
+    let glass = |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32| {
+        Slab(
+            Vec3::new(x, y, z),
+            Vec3::new(sx, sy, sz),
+            ramp.to_string(),
+            shade,
+            0.35,
         )
     };
     let mut slabs = match kind {
@@ -268,7 +280,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(0.49, 1.35, 0.0, 0.07, 1.04, 0.28, "wood", 0.45),
             slab(0.0, 0.86, 0.0, 1.05, 0.08, 0.32, "wood", 0.45),
             slab(0.0, 1.84, 0.0, 1.05, 0.08, 0.28, "wood", 0.45),
-            slab(0.0, 1.35, 0.0, 0.92, 0.92, 0.05, "sky", 0.75),
+            glass(0.0, 1.35, 0.0, 0.92, 0.92, 0.05, "sky", 0.8),
             slab(0.0, 1.35, 0.02, 0.05, 0.92, 0.04, "wood", 0.5),
             slab(0.0, 1.35, 0.02, 0.92, 0.05, 0.04, "wood", 0.5),
         ],
@@ -546,10 +558,17 @@ fn spawn_part(
         commands.entity(root).insert(Ghost);
     }
     let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-    for Slab(at, size, ramp, shade) in body_of(kind, repaint) {
+    for Slab(at, size, ramp, shade, clarity) in body_of(kind, repaint) {
         let mut color = palette.shade(&ramp, shade);
-        if translucent {
-            color = color.with_alpha(if ghostly { 0.45 } else { 0.55 });
+        let see_through = translucent || clarity < 1.0;
+        if see_through {
+            color = color.with_alpha(if ghostly {
+                0.45
+            } else if matches!(kind, PartKind::Widget(_)) {
+                0.55
+            } else {
+                clarity
+            });
         }
         commands.spawn((
             Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
@@ -557,7 +576,7 @@ fn spawn_part(
                 base_color: color,
                 perceptual_roughness: 0.95,
                 reflectance: 0.03,
-                alpha_mode: if translucent {
+                alpha_mode: if see_through {
                     AlphaMode::Blend
                 } else {
                     AlphaMode::Opaque
@@ -1190,7 +1209,7 @@ fn support_height(
             * (Vec3::new(x, 0.0, z)
                 - Vec3::new(transform.translation.x, 0.0, transform.translation.z));
         let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-        for Slab(at, size, _, _) in body_of(&kind, repaint) {
+        for Slab(at, size, ..) in body_of(&kind, repaint) {
             if (local.x - at.x).abs() <= size.x * 0.5 && (local.z - at.z).abs() <= size.z * 0.5 {
                 top = top.max(transform.translation.y + at.y + size.y * 0.5);
             }
@@ -1316,7 +1335,7 @@ fn ray_pick(
         let origin = inverse * (ray.origin - transform.translation);
         let toward = inverse * Vec3::from(ray.direction);
         let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-        for Slab(at, size, _, _) in body_of(&kind, repaint) {
+        for Slab(at, size, ..) in body_of(&kind, repaint) {
             let low = at - size * 0.5;
             let high = at + size * 0.5;
             // The slab method: entry and exit along each axis.
