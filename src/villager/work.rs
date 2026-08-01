@@ -23,6 +23,7 @@ use crate::creature::{Airborne, Corpse, Creature, Held, MoveTarget, Vitality};
 use crate::scatter::FoodSource;
 use crate::terrain::Terrain;
 
+pub(crate) mod baked;
 mod buildings;
 mod carry;
 mod fields;
@@ -804,14 +805,16 @@ pub(super) fn do_work(
                     .insert((Building { kind }, Name::new(kind.name())));
                 match kind {
                     BuildingKind::House => {
-                        done.insert((
-                            Hut,
-                            Shell {
+                        done.insert(Hut);
+                        // A carried-in house brings its own shell and
+                        // furnishings, below, out of its own marks.
+                        if baked::house().is_none() {
+                            done.insert(Shell {
                                 half_w: plan.half_w,
                                 half_d: plan.half_d,
                                 doors_z: vec![0.0],
-                            },
-                        ));
+                            });
+                        }
                     }
                     BuildingKind::Longhouse => {
                         // One door per bay, mirroring the walls' own gaps.
@@ -830,6 +833,14 @@ pub(super) fn do_work(
                         ));
                     }
                     _ => {}
+                }
+                // The carried-in house furnishes itself: the beds it
+                // holds, the doors it opens, the table its family
+                // gathers at, all read from the marks the bench wrote.
+                if kind == BuildingKind::House
+                    && let Some(work) = baked::house()
+                {
+                    baked::furnish_baked(&mut commands, house, work);
                 }
                 // A holding comes with its ground broken: a plot turned beside
                 // the house, waiting for whoever lives there to work it. Left

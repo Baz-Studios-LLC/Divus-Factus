@@ -160,6 +160,12 @@ fn load_fonts(mut commands: Commands, assets: Res<AssetServer>) {
     });
 }
 
+/// The palette, for the bake to resolve colours with.
+#[cfg(test)]
+pub fn load_palette_for_bake() -> Palette {
+    load_palette()
+}
+
 /// Reads the palette relative to the crate first (so `cargo run` works from
 /// anywhere), then the working directory, then gives up gracefully.
 fn load_palette() -> Palette {

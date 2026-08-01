@@ -3995,3 +3995,191 @@ pub(crate) fn lift_roofs(
         }
     }
 }
+
+#[cfg(test)]
+mod bake {
+    use super::*;
+
+    /// Bakes every saved work into what the game can eat: plain boxes
+    /// with resolved colours, and the marks that say what the place is
+    /// FOR. Run by hand when a building is ready to be carried in:
+    /// `cargo test bake_the_works -- --ignored --nocapture`
+    ///
+    /// The game shares no code with the bench, so the bench resolves its
+    /// own catalogue and palette here and hands over the result.
+    #[test]
+    #[ignore = "a hand-run export, not a check"]
+    fn bake_the_works() {
+        let palette = crate::look::load_palette_for_bake();
+        let dir = bench_path().parent().unwrap().to_path_buf();
+        let baked_dir = dir.parent().unwrap().join("baked");
+        std::fs::create_dir_all(&baked_dir).expect("baked dir");
+
+        for entry in std::fs::read_dir(&dir).expect("out/buildings") {
+            let path = entry.expect("entry").path();
+            if path.extension().is_none_or(|e| e != "json") {
+                continue;
+            }
+            let Ok(text) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            let Ok(work) = serde_json::from_str::<Workbench>(&text) else {
+                continue;
+            };
+            let name = path.file_stem().unwrap().to_string_lossy().to_string();
+
+            // The bounds of everything that is not a scale reference, so
+            // the building can be recentred on its own footprint.
+            let mut low = Vec3::splat(f32::INFINITY);
+            let mut high = Vec3::splat(f32::NEG_INFINITY);
+            for record in &work.parts {
+                if record.part == "prop:mannequin" {
+                    continue;
+                }
+                let Some(kind) = kind_from_name(&record.part) else {
+                    continue;
+                };
+                let turn = pose(record.yaw, record.tilt, record.flip);
+                for Slab(mut at, size, ..) in body_of(&kind, None) {
+                    if record.flip {
+                        at.x = -at.x;
+                    }
+                    let centre = Vec3::from(record.at) + turn * at;
+                    let reach = (turn * (size * 0.5)).abs();
+                    low = low.min(centre - reach);
+                    high = high.max(centre + reach);
+                }
+            }
+            let middle = Vec3::new((low.x + high.x) * 0.5, 0.0, (low.z + high.z) * 0.5);
+
+            let mut boxes: Vec<String> = Vec::new();
+            let mut marks: Vec<String> = Vec::new();
+            let say = |v: Vec3| format!("[{:.4}, {:.4}, {:.4}]", v.x, v.y, v.z);
+
+            for record in &work.parts {
+                if record.part == "prop:mannequin" {
+                    continue;
+                }
+                let Some(kind) = kind_from_name(&record.part) else {
+                    continue;
+                };
+                let turn = pose(record.yaw, record.tilt, record.flip);
+                let anchor = Vec3::from(record.at) - middle;
+
+                // What the place is for, read from the widgets that say
+                // so and from the furniture that means it.
+                let mark = |what: &str, at: Vec3, yaw: f32| {
+                    format!(
+                        "    {{\"mark\": \"{what}\", \"at\": {}, \"yaw\": {:.4}}}",
+                        say(at),
+                        yaw
+                    )
+                };
+                match kind {
+                    PartKind::Widget(what) => {
+                        marks.push(mark(what, anchor, record.yaw));
+                        continue;
+                    }
+                    PartKind::Prop("bed") => marks.push(mark("sleep", anchor, record.yaw)),
+                    PartKind::Prop("bed-double") => {
+                        for side in [-0.27_f32, 0.27] {
+                            marks.push(mark(
+                                "sleep",
+                                anchor + turn * Vec3::new(side, 0.0, 0.0),
+                                record.yaw,
+                            ));
+                        }
+                    }
+                    PartKind::Prop("cradle") => marks.push(mark("sleep", anchor, record.yaw)),
+                    PartKind::Prop("chair" | "stool") => {
+                        marks.push(mark("sit", anchor, record.yaw))
+                    }
+                    PartKind::Prop("bench") => {
+                        for side in [-0.35_f32, 0.35] {
+                            marks.push(mark(
+                                "sit",
+                                anchor + turn * Vec3::new(side, 0.0, 0.0),
+                                record.yaw,
+                            ));
+                        }
+                    }
+                    PartKind::Prop("couch") => {
+                        for side in [-0.44_f32, 0.44] {
+                            marks.push(mark(
+                                "sit",
+                                anchor + turn * Vec3::new(side, 0.0, 0.0),
+                                record.yaw,
+                            ));
+                        }
+                    }
+                    PartKind::Prop("hearth") => {
+                        marks.push(mark("fire", anchor, record.yaw));
+                        marks.push(mark("smoke", anchor, record.yaw));
+                    }
+                    PartKind::Prop("table") => marks.push(mark("table", anchor, record.yaw)),
+                    PartKind::Prop("chest" | "cupboard" | "wardrobe" | "shelves") => {
+                        marks.push(mark("store", anchor, record.yaw))
+                    }
+                    PartKind::Prop("anvil" | "loom") => {
+                        marks.push(mark("work", anchor, record.yaw))
+                    }
+                    PartKind::Prop("candle") => marks.push(mark("light", anchor, record.yaw)),
+                    _ => {}
+                }
+
+                // The body itself, as boxes the game can simply draw.
+                let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
+                for Slab(mut at, size, ramp, shade, clarity, shape) in body_of(&kind, repaint) {
+                    if record.flip {
+                        at.x = -at.x;
+                    }
+                    let centre = anchor + turn * at;
+                    let colour = palette.shade(&ramp, shade).to_srgba();
+                    let form = match shape {
+                        Shape::Box => "box",
+                        Shape::Wedge => "wedge",
+                        Shape::Ridge => "ridge",
+                    };
+                    boxes.push(format!(
+                        "    {{\"at\": {}, \"size\": {}, \"turn\": [{:.5}, {:.5}, {:.5}, {:.5}], \
+                         \"rgb\": [{}, {}, {}], \"alpha\": {:.2}, \"form\": \"{form}\", \
+                         \"stage\": \"{}\"}}",
+                        say(centre),
+                        say(size),
+                        turn.x,
+                        turn.y,
+                        turn.z,
+                        turn.w,
+                        (colour.red * 255.0).round() as u8,
+                        (colour.green * 255.0).round() as u8,
+                        (colour.blue * 255.0).round() as u8,
+                        clarity,
+                        record.stage,
+                    ));
+                }
+            }
+
+            let span = high - low;
+            let json = format!(
+                "{{\n  \"format\": 1,\n  \"name\": \"{name}\",\n  \
+                 \"half_w\": {:.4},\n  \"half_d\": {:.4},\n  \"high\": {:.4},\n  \
+                 \"boxes\": [\n{}\n  ],\n  \"marks\": [\n{}\n  ]\n}}\n",
+                span.x * 0.5,
+                span.z * 0.5,
+                high.y,
+                boxes.join(",\n"),
+                marks.join(",\n"),
+            );
+            let out = baked_dir.join(format!("{name}.json"));
+            std::fs::write(&out, json).expect("write baked");
+            println!(
+                "baked {name}: {} boxes, {} marks, {:.2} x {:.2} x {:.2}",
+                boxes.len(),
+                marks.len(),
+                span.x,
+                span.z,
+                high.y
+            );
+        }
+    }
+}

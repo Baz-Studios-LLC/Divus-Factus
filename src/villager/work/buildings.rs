@@ -341,10 +341,15 @@ impl Blueprint {
         match kind {
             BuildingKind::House => Blueprint {
                 kind,
-                // Sized for its interior: four beds, a floor to cross, a
-                // doorway lane. The world has room to spare.
-                half_w: rng.range(2.6, 3.2),
-                half_d: rng.range(2.7, 3.4),
+                // A carried-in house brings its own footprint, so the
+                // plots are cut to fit it; otherwise the village's own
+                // sizing stands - four beds, a floor to cross, a lane.
+                half_w: super::baked::house()
+                    .map(|work| work.half_w)
+                    .unwrap_or_else(|| rng.range(2.6, 3.2)),
+                half_d: super::baked::house()
+                    .map(|work| work.half_d)
+                    .unwrap_or_else(|| rng.range(2.7, 3.4)),
                 wall_h: rng.range(2.2, 2.7),
                 // Timber homes mostly; some whitewashed, a few painted in a
                 // cloth colour — a street, not a barracks.
@@ -914,6 +919,15 @@ pub(crate) fn raise_stage(
     stage: u8,
     plan: &Blueprint,
 ) {
+    // A house carried in from the bench is raised from its own boxes;
+    // the village's own hand still builds everything else.
+    if plan.kind == BuildingKind::House
+        && let Some(work) = super::baked::house()
+    {
+        super::baked::raise_baked(commands, meshes, materials, site, stage, work);
+        return;
+    }
+
     let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
     let frame = materials.add(StandardMaterial {
         base_color: crate::palette::shade(&crate::palette::WOOD, 0.45),
