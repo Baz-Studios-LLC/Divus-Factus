@@ -1160,12 +1160,80 @@ fn cursor_point(
     Some(ray.get_point(reach))
 }
 
+/// Whether this kind counts as structure - walls, their leavings, floors
+/// and roofs. Structure rests only on structure; props rest on anything.
+fn is_structure(kind: &PartKind) -> bool {
+    matches!(
+        kind,
+        PartKind::Wall(_) | PartKind::Seg { .. } | PartKind::Floor | PartKind::Roof
+    )
+}
+
+/// The height of whatever stands beneath a point: the highest slab top
+/// whose footprint holds it. Widgets hold nothing up; structure is picky
+/// about what it stands on.
+fn support_height(
+    placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    x: f32,
+    z: f32,
+    carrying_structure: bool,
+    except: Option<Entity>,
+) -> f32 {
+    let mut top = 0.0f32;
+    for (entity, transform, record) in placed {
+        if Some(entity) == except {
+            continue;
+        }
+        let Some(kind) = kind_from_name(&record.part) else {
+            continue;
+        };
+        if matches!(kind, PartKind::Widget(_)) {
+            continue;
+        }
+        if carrying_structure && !is_structure(&kind) {
+            continue;
+        }
+        // Tilted panels make poor tables; let them pass.
+        if record.tilt.abs() > 0.01 {
+            continue;
+        }
+        let local = Quat::from_rotation_y(-record.yaw)
+            * (Vec3::new(x, 0.0, z)
+                - Vec3::new(transform.translation.x, 0.0, transform.translation.z));
+        let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
+        for Slab(at, size, _, _) in body_of(&kind, repaint) {
+            if (local.x - at.x).abs() <= size.x * 0.5 && (local.z - at.z).abs() <= size.z * 0.5 {
+                top = top.max(transform.translation.y + at.y + size.y * 0.5);
+            }
+        }
+    }
+    top
+}
+
+/// The ends of every standing full-height wall piece, for the magnets.
+fn wall_ends(placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>) -> Vec<Vec3> {
+    let mut ends = Vec::new();
+    for (_, transform, record) in placed {
+        let long = match kind_from_name(&record.part) {
+            Some(PartKind::Wall(long)) => long,
+            Some(PartKind::Seg { long, lift, .. }) if lift == 0.0 => long,
+            _ => continue,
+        };
+        let along = Quat::from_rotation_y(record.yaw) * Vec3::X;
+        ends.push(transform.translation + along * (long * 0.5));
+        ends.push(transform.translation - along * (long * 0.5));
+    }
+    ends
+}
+
+#[allow(clippy::too_many_arguments)]
 fn move_ghost(
     bench: Res<Bench>,
     hand: Res<Hand>,
     keys: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    placed: Query<(Entity, &Transform, &Placed), Without<Ghost>>,
     mut ghosts: Query<&mut Transform, With<Ghost>>,
 ) {
     if *bench != Bench::Builder {
@@ -1175,19 +1243,57 @@ fn move_ghost(
         return;
     };
     // Quarter-metre snap by default; holding shift tightens the grid to
-    // five centimetres, for nestling a pole into a corner niche or a
-    // stool against a table leg. Wall faces sit 0.12 off the grid, so
-    // the coarse snap alone can never quite reach them.
+    // five centimetres for the odd exact nestling.
     let grid = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
         20.0
     } else {
         4.0
     };
-    let snapped = Vec3::new(
+    let mut snapped = Vec3::new(
         (point.x * grid).round() / grid,
-        hand.lift,
+        0.0,
         (point.z * grid).round() / grid,
     );
+
+    let Some(kind) = hand.kind else {
+        return;
+    };
+
+    // Walls click to wall ends - a butt joint or a square corner - and
+    // the corner pole magnetizes to the same points it exists to cover.
+    let magnetic = matches!(kind, PartKind::Wall(_)) || kind == PartKind::Prop("pole");
+    if magnetic {
+        let ends = wall_ends(&placed);
+        let my_ends: Vec<Vec3> = match kind {
+            PartKind::Wall(long) => {
+                let along = Quat::from_rotation_y(hand.yaw) * Vec3::X;
+                vec![
+                    snapped + along * (long * 0.5),
+                    snapped - along * (long * 0.5),
+                ]
+            }
+            _ => vec![snapped],
+        };
+        let mut pull: Option<(f32, Vec3)> = None;
+        for mine in &my_ends {
+            for theirs in &ends {
+                let gap = Vec3::new(theirs.x - mine.x, 0.0, theirs.z - mine.z);
+                let reach = gap.length();
+                if reach < 0.4 && pull.as_ref().is_none_or(|(best, _)| reach < *best) {
+                    pull = Some((reach, gap));
+                }
+            }
+        }
+        if let Some((_, gap)) = pull {
+            snapped += gap;
+        }
+    }
+
+    // Whatever lies beneath carries the part; Q and E add height on top
+    // of that, so a roof panel rides the wall tops on its own.
+    let support = support_height(&placed, snapped.x, snapped.z, is_structure(&kind), None);
+    snapped.y = support + hand.lift;
+
     for mut transform in &mut ghosts {
         transform.translation = snapped;
         transform.rotation = Quat::from_rotation_y(hand.yaw) * Quat::from_rotation_x(hand.tilt);
@@ -1391,13 +1497,22 @@ fn place_grab_remove(
             && let Some(kind) = kind_from_name(&record.part)
         {
             // Picking back up: the part leaves the floor and rides the
-            // cursor again with its paint, turn and height intact.
+            // cursor again with its paint and turn intact. Only the height
+            // ABOVE its old support comes along - the new resting place
+            // supplies its own.
+            let beneath = support_height(
+                &placed,
+                transform.translation.x,
+                transform.translation.z,
+                is_structure(&kind),
+                Some(grabbed),
+            );
             *hand = Hand {
                 kind: Some(kind),
                 stage: record.stage.clone(),
                 yaw: record.yaw,
                 tilt: record.tilt,
-                lift: transform.translation.y,
+                lift: (transform.translation.y - beneath).max(0.0),
                 ramp: record.ramp.clone(),
                 shade: record.shade,
             };
