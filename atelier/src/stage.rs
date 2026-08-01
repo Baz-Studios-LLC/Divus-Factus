@@ -37,13 +37,27 @@ fn dress_stage(
         brightness: 220.0,
         ..default()
     });
+    // The key light stands over the maker's shoulder - the working perch
+    // looks from +X +Z - so the faces you are looking at are the lit
+    // ones and the shadows fall away behind the work.
     commands.spawn((
         DirectionalLight {
             illuminance: 9_000.0,
             shadow_maps_enabled: true,
             ..default()
         },
-        Transform::from_rotation(Quat::from_euler(EulerRot::YXZ, -0.8, -0.9, 0.0)),
+        Transform::from_xyz(9.0, 12.0, 7.0).looking_at(Vec3::ZERO, Vec3::Y),
+    ));
+    // The fill: a cooler, dimmer light from the far side, casting no
+    // shadows of its own, so the backs of things read instead of going
+    // to pitch.
+    commands.spawn((
+        DirectionalLight {
+            color: Color::srgb(0.82, 0.86, 1.0),
+            illuminance: 3_200.0,
+            ..default()
+        },
+        Transform::from_xyz(-8.0, 6.0, -9.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 
     let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
