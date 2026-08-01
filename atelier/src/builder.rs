@@ -661,11 +661,13 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(0.0, 0.5625, 0.6875, 0.5, 0.125, 0.375, "bone", 0.95),
         ],
         PartKind::Prop("bed-double") => vec![
-            // Room for two, and the same honest length.
-            slab(0.0, 0.25, 0.0, 1.5, 0.25, 2.0, "wood", 0.55),
-            slab(0.0, 0.4375, 0.0, 1.375, 0.1875, 1.875, "bone", 0.8),
-            slab(-0.3125, 0.5625, 0.6875, 0.5, 0.125, 0.375, "bone", 0.95),
-            slab(0.3125, 0.5625, 0.6875, 0.5, 0.125, 0.375, "bone", 0.95),
+            // Room for two who each take three-quarters of a metre with
+            // their arms at their sides: a mattress of one and three
+            // quarters, so nobody sleeps inside their spouse.
+            slab(0.0, 0.25, 0.0, 1.875, 0.25, 2.0, "wood", 0.55),
+            slab(0.0, 0.4375, 0.0, 1.75, 0.1875, 1.875, "bone", 0.8),
+            slab(-0.4375, 0.5625, 0.6875, 0.5625, 0.125, 0.375, "bone", 0.95),
+            slab(0.4375, 0.5625, 0.6875, 0.5625, 0.125, 0.375, "bone", 0.95),
         ],
         PartKind::Prop("table") => {
             let mut parts = vec![slab(0.0, 0.72, 0.0, 1.5, 0.1, 0.9, "wood", 0.65)];
@@ -4463,7 +4465,7 @@ mod bake {
                     }
                     PartKind::Prop("bed") => marks.push(mark("sleep", anchor, record.yaw)),
                     PartKind::Prop("bed-double") => {
-                        for side in [-0.27_f32, 0.27] {
+                        for side in [-0.4375_f32, 0.4375] {
                             marks.push(mark(
                                 "sleep",
                                 anchor + turn * Vec3::new(side, 0.0, 0.0),
