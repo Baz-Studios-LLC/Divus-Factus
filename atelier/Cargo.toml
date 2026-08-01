@@ -1,0 +1,21 @@
+[package]
+name = "divus-factus-atelier"
+version = "0.1.0"
+edition = "2024"
+description = "The maker's own bench: buildings and animations for Divus Factus, authored by hand and exported as files."
+
+# Its own workspace on purpose: the Atelier and the game are two programs
+# that speak only through files. The game's build, CI and packaging never
+# see this crate.
+[workspace]
+
+[dependencies]
+bevy = "0.19"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

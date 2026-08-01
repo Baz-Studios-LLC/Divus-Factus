@@ -363,6 +363,56 @@ pub fn shade_blend(a: &Ramp, b: &Ramp, blend: f32, t: f32) -> Color {
 
 #[cfg(test)]
 mod tests {
+    /// Writes the palette out for the Atelier, which paints with the game's
+    /// own ramps but shares none of its code. Run by hand when the palette
+    /// changes: `cargo test export_palette_for_atelier -- --ignored`
+    #[test]
+    #[ignore = "a hand-run export, not a check"]
+    fn export_palette_for_atelier() {
+        let named: &[(&str, &super::Ramp)] = &[
+            ("stone", &super::STONE),
+            ("earth", &super::EARTH),
+            ("grass", &super::GRASS),
+            ("foliage", &super::FOLIAGE),
+            ("sand", &super::SAND),
+            ("water", &super::WATER),
+            ("sky", &super::SKY),
+            ("wood", &super::WOOD),
+            ("bone", &super::BONE),
+            ("cloth-red", &super::CLOTH_RED),
+            ("cloth-blue", &super::CLOTH_BLUE),
+            ("cloth-gold", &super::CLOTH_GOLD),
+            ("cloth-green", &super::CLOTH_GREEN),
+            ("skin-pale", &super::SKIN_PALE),
+            ("skin-mid", &super::SKIN_MID),
+            ("skin-deep", &super::SKIN_DEEP),
+            ("snow", &super::SNOW),
+            ("scrub", &super::SCRUB),
+            ("cloth-purple", &super::CLOTH_PURPLE),
+            ("cloth-wine", &super::CLOTH_WINE),
+            ("cloth-teal", &super::CLOTH_TEAL),
+            ("cloth-rust", &super::CLOTH_RUST),
+            ("cloth-sable", &super::CLOTH_SABLE),
+            ("cloth-pink", &super::CLOTH_PINK),
+        ];
+        let ramps: Vec<String> = named
+            .iter()
+            .map(|(name, ramp)| {
+                let steps: Vec<String> = ramp
+                    .iter()
+                    .map(|[r, g, b]| format!("[{r},{g},{b}]"))
+                    .collect();
+                format!(
+                    "    {{\"name\": \"{name}\", \"steps\": [{}]}}",
+                    steps.join(", ")
+                )
+            })
+            .collect();
+        let json = format!("{{\n  \"ramps\": [\n{}\n  ]\n}}\n", ramps.join(",\n"));
+        std::fs::create_dir_all("atelier/data").expect("atelier/data");
+        std::fs::write("atelier/data/palette.json", json).expect("write palette.json");
+    }
+
     use super::*;
 
     #[test]
