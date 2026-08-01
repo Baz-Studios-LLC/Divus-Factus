@@ -2097,13 +2097,18 @@ fn footprint_samples(kind: &PartKind, at: Vec3, yaw: f32) -> Vec<Vec3> {
 /// whose footprint holds it. Widgets hold nothing up; structure is picky
 /// about what it stands on.
 fn support_height(
-    placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    placed: &Query<(Entity, &Transform, &Placed, &Visibility), Without<Ghost>>,
     samples: &[Vec3],
     carrying_structure: bool,
     except: Option<Entity>,
 ) -> f32 {
     let mut top = 0.0f32;
-    for (entity, transform, record) in placed {
+    for (entity, transform, record, showing) in placed {
+        // A wall the cutaway has taken away holds nothing up and
+        // catches nothing: what you cannot see, you cannot build on.
+        if *showing == Visibility::Hidden {
+            continue;
+        }
         if Some(entity) == except {
             continue;
         }
@@ -2161,10 +2166,13 @@ struct PlatformRect {
 }
 
 fn platform_rects(
-    placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    placed: &Query<(Entity, &Transform, &Placed, &Visibility), Without<Ghost>>,
 ) -> Vec<PlatformRect> {
     let mut rects = Vec::new();
-    for (_, transform, record) in placed {
+    for (_, transform, record, showing) in placed {
+        if *showing == Visibility::Hidden {
+            continue;
+        }
         let Some(kind) = kind_from_name(&record.part) else {
             continue;
         };
@@ -2196,9 +2204,14 @@ const PLINTH_REVEAL: f32 = WALL_THICK * 0.5;
 /// The ends of every standing full-height wall piece, for the magnets.
 /// Every standing wall end, with the direction it points out of its own
 /// wall - the joint math needs to know which way a tip faces.
-fn wall_ends(placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>) -> Vec<(Vec3, Vec3)> {
+fn wall_ends(
+    placed: &Query<(Entity, &Transform, &Placed, &Visibility), Without<Ghost>>,
+) -> Vec<(Vec3, Vec3)> {
     let mut ends = Vec::new();
-    for (_, transform, record) in placed {
+    for (_, transform, record, showing) in placed {
+        if *showing == Visibility::Hidden {
+            continue;
+        }
         let long = match kind_from_name(&record.part) {
             Some(PartKind::Wall(long)) => long,
             Some(PartKind::Seg { long, lift, .. }) if lift == 0.0 => long,
@@ -2224,7 +2237,7 @@ fn move_ghost(
     keys: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    placed: Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    placed: Query<(Entity, &Transform, &Placed, &Visibility), Without<Ghost>>,
     mut ghosts: Query<(Entity, &mut Transform, &Placed), With<Ghost>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -2691,7 +2704,7 @@ pub(crate) struct DimsText;
 fn ray_scan(
     windows: &Query<&Window>,
     cameras: &Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    placed: &Query<(Entity, &Transform, &Placed, &Visibility), Without<Ghost>>,
 ) -> (Option<Entity>, Option<Hit>) {
     let Some(ray) = windows
         .iter()
@@ -2709,7 +2722,12 @@ fn ray_scan(
     // build target) - widgets are markers, not masonry.
     let mut first_any: Option<(Entity, f32)> = None;
     let mut first_solid: Option<(f32, Hit)> = None;
-    for (entity, transform, record) in placed {
+    for (entity, transform, record, showing) in placed {
+        // A wall the cutaway has taken away holds nothing up and
+        // catches nothing: what you cannot see, you cannot build on.
+        if *showing == Visibility::Hidden {
+            continue;
+        }
         let Some(kind) = kind_from_name(&record.part) else {
             continue;
         };
@@ -2784,7 +2802,7 @@ fn feel_ahead(
     mut hovered: ResMut<Hovered>,
     windows: Query<&Window>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    placed: Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    placed: Query<(Entity, &Transform, &Placed, &Visibility), Without<Ghost>>,
     hovers: Query<&Interaction>,
     children: Query<&Children>,
     slabs: Query<&MeshMaterial3d<StandardMaterial>>,
@@ -2857,7 +2875,7 @@ fn place_grab_remove(
     palette: Res<Palette>,
     ghosts: Query<Entity, With<Ghost>>,
     ghost_spots: Query<(&Transform, &Placed), With<Ghost>>,
-    placed: Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    placed: Query<(Entity, &Transform, &Placed, &Visibility), Without<Ghost>>,
     hovers: Query<&Interaction>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -2955,7 +2973,7 @@ fn place_grab_remove(
                 );
             }
         } else if let Some(grabbed) = hovered.grab
-            && let Ok((_, transform, record)) = placed.get(grabbed)
+            && let Ok((_, transform, record, _)) = placed.get(grabbed)
             && let Some(kind) = kind_from_name(&record.part)
         {
             // An opening picked up closes the wall behind it.
@@ -3025,10 +3043,10 @@ fn heal_wall(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     palette: &Palette,
-    placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    placed: &Query<(Entity, &Transform, &Placed, &Visibility), Without<Ghost>>,
     frame: Entity,
 ) -> bool {
-    let Ok((_, frame_at, _)) = placed.get(frame) else {
+    let Ok((_, frame_at, _, _)) = placed.get(frame) else {
         return false;
     };
     let spot = frame_at.translation;
@@ -3043,11 +3061,11 @@ fn heal_wall_at(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     palette: &Palette,
-    placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    placed: &Query<(Entity, &Transform, &Placed, &Visibility), Without<Ghost>>,
     frame: Entity,
     spot: Vec3,
 ) -> bool {
-    let Ok((_, _, frame_record)) = placed.get(frame) else {
+    let Ok((_, _, frame_record, _)) = placed.get(frame) else {
         return false;
     };
     let width = match kind_from_name(&frame_record.part) {
@@ -3062,7 +3080,12 @@ fn heal_wall_at(
     let mut low = -width * 0.5;
     let mut high = width * 0.5;
     let mut cloth: Option<Placed> = None;
-    for (entity, transform, record) in placed {
+    for (entity, transform, record, showing) in placed {
+        // A wall the cutaway has taken away holds nothing up and
+        // catches nothing: what you cannot see, you cannot build on.
+        if *showing == Visibility::Hidden {
+            continue;
+        }
         if entity == frame {
             continue;
         }
@@ -3153,7 +3176,7 @@ fn punch_wall(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     palette: &Palette,
-    placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    placed: &Query<(Entity, &Transform, &Placed, &Visibility), Without<Ghost>>,
     aimed: Option<(Entity, Vec3, Vec3)>,
     at: Vec3,
     wide: f32,
@@ -3166,7 +3189,7 @@ fn punch_wall(
     // by proximity is the fallback for a blind click.
     let mut best: Option<(Entity, f32, Vec3, f32, f32, Placed)> = None;
     if let Some((touched, point, _)) = aimed
-        && let Ok((entity, transform, record)) = placed.get(touched)
+        && let Ok((entity, transform, record, _)) = placed.get(touched)
         && let Some(length) = punchable_length(record)
     {
         let along = Quat::from_rotation_y(record.yaw) * Vec3::X;
@@ -3176,7 +3199,12 @@ fn punch_wall(
         }
     }
     if best.is_none() {
-        for (entity, transform, record) in placed {
+        for (entity, transform, record, showing) in placed {
+            // A wall the cutaway has taken away holds nothing up and
+            // catches nothing: what you cannot see, you cannot build on.
+            if *showing == Visibility::Hidden {
+                continue;
+            }
             let Some(length) = punchable_length(record) else {
                 continue;
             };
@@ -3202,7 +3230,7 @@ fn punch_wall(
     let centre_of = |offset: f32| {
         let base = placed
             .get(wall)
-            .map(|(_, tf, _)| tf.translation)
+            .map(|(_, tf, _, _)| tf.translation)
             .unwrap_or(at);
         base + along * offset
     };
@@ -3253,7 +3281,7 @@ fn punch_wall(
 
     let base = placed
         .get(wall)
-        .map(|(_, tf, _)| tf.translation)
+        .map(|(_, tf, _, _)| tf.translation)
         .unwrap_or(at);
     commands.entity(wall).despawn();
     for (kind, spot) in leavings {
@@ -4148,7 +4176,7 @@ fn reflow_openings(
     buttons: Res<ButtonInput<MouseButton>>,
     selected: Res<crate::gizmo::Selected>,
     mut came_from: Local<Option<(Entity, Vec3)>>,
-    placed: Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    placed: Query<(Entity, &Transform, &Placed, &Visibility), Without<Ghost>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     palette: Res<Palette>,
@@ -4164,8 +4192,8 @@ fn reflow_openings(
         *came_from = selected
             .0
             .and_then(|part| placed.get(part).ok())
-            .filter(|(_, _, record)| opening_of(record).is_some())
-            .map(|(entity, at, _)| (entity, at.translation));
+            .filter(|(_, _, record, _)| opening_of(record).is_some())
+            .map(|(entity, at, _, _)| (entity, at.translation));
         return;
     }
     if !buttons.just_released(MouseButton::Left) {
@@ -4174,7 +4202,7 @@ fn reflow_openings(
     let Some((frame, old_spot)) = came_from.take() else {
         return;
     };
-    let Ok((_, at, record)) = placed.get(frame) else {
+    let Ok((_, at, record, _)) = placed.get(frame) else {
         return;
     };
     let now = at.translation;
