@@ -2912,7 +2912,11 @@ pub(crate) fn dims_panel(
                     Some((a, b)) => (a.parse::<f32>().ok(), b.parse::<f32>().ok()),
                     None => (text.parse::<f32>().ok(), None),
                 };
-                if let Some(w) = w_in.map(lattice) {
+                // Typed numbers are UNITS - sixteenths of a metre - so a
+                // wall is 40 tall and a room 48 wide, no decimals needed.
+                let units = |value: f32| lattice(value / 16.0);
+                let _ = &lattice;
+                if let Some(w) = w_in.map(units) {
                     let d = d_in.map(lattice);
                     let made = match kind {
                         PartKind::Wall(_) => Some(PartKind::Wall(w)),
@@ -2948,20 +2952,22 @@ pub(crate) fn dims_panel(
         }
     } else if let Some(drawn) = ghosts.iter().next().and_then(|g| kind_from_name(&g.part)) {
         // Live measure while stretch-drawing.
+        let units = |value: f32| format!("{}", (value * 16.0).round() as i64);
         said = match drawn {
-            PartKind::Wall(long) => Some(format!("wall - {long}m")),
-            PartKind::Trim { long, .. } => Some(format!("trim - {long}m")),
-            PartKind::Floor(w, d) => Some(format!("floor - {w} x {d}")),
-            PartKind::Foundation(w, d) => Some(format!("foundation - {w} x {d}")),
-            PartKind::Roof(w, d) => Some(format!("roof - {w} x {d}")),
+            PartKind::Wall(long) => Some(format!("wall - {}", units(long))),
+            PartKind::Trim { long, .. } => Some(format!("trim - {}", units(long))),
+            PartKind::Floor(w, d) => Some(format!("floor - {} x {}", units(w), units(d))),
+            PartKind::Foundation(w, d) => Some(format!("foundation - {} x {}", units(w), units(d))),
+            PartKind::Roof(w, d) => Some(format!("roof - {} x {}", units(w), units(d))),
             _ => None,
         };
     } else if *tool == crate::gizmo::ToolMode::Resize
         && let Some((_, w, d)) = sized
     {
+        let units = |value: f32| format!("{}", (value * 16.0).round() as i64);
         said = Some(match d {
-            Some(d) => format!("{w} x {d} - D to type"),
-            None => format!("{w}m - D to type"),
+            Some(d) => format!("{} x {} - D to type", units(w), units(d)),
+            None => format!("{} - D to type", units(w)),
         });
         if keys.just_pressed(KeyCode::KeyD) {
             entry.0 = Some(String::new());

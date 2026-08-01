@@ -33,8 +33,10 @@ local X: positive carries the free end forward).
 
 ### Blueprints: `out/buildings/<name>.json`
 
-**The lattice**: every coordinate and dimension is a whole multiple of
-1/16 m - the universal quantum. Coarse work steps 4/16, joints land on
+**The lattice**: the bench speaks in UNITS, and one unit - 1/16 m - is
+the smallest measure that exists. Every coordinate and dimension is a
+whole number of them. The files below still carry metres (divide by 16)
+so the game's world and old exports stay true. Coarse work steps 4/16, joints land on
 2/16, fine work on 1/16. Binary fractions carry exactly in floats, so
 two parts that should meet, meet. STRUCTURAL DIMENSIONS obey it too:
 walls 0.25 x 2.5, floors and roofs 0.125 thick, foundations 0.375,

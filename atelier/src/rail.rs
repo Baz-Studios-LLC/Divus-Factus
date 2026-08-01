@@ -229,7 +229,7 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
             "1 - 6",
             "front, right, back, left,\noverhead, and the perch",
         ),
-        ("shift", "fine snap, 1/16m"),
+        ("shift", "fine snap, 1 unit"),
         ("F", "face snap on and off"),
         ("tab", "normal, move, resize;\nclick selects, drag a handle"),
         ("D", "type exact dimensions\nof the resize selection"),
