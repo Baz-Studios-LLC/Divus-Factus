@@ -34,7 +34,9 @@ impl OrbitRig {
     }
 
     fn ground_right(&self) -> Vec3 {
-        self.ground_forward().cross(Vec3::Y) * -1.0
+        // forward x up is the true right hand; the negation that used to
+        // sit here swapped A and D and dragged the bench backwards.
+        self.ground_forward().cross(Vec3::Y)
     }
 }
 
