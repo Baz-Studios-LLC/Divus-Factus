@@ -68,6 +68,12 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     structure("CORNER POLE", PartKind::Prop("pole"), "frame"),
     structure("TRIM, 2M", PartKind::Prop("trim"), "walls"),
     structure("TRIM, STONE", PartKind::Prop("trim-stone"), "walls"),
+    structure("TRIM CORNER", PartKind::Prop("trim-corner"), "walls"),
+    structure(
+        "TRIM CORNER, STONE",
+        PartKind::Prop("trim-corner-stone"),
+        "walls",
+    ),
     structure("DOOR", PartKind::Prop("door"), "walls"),
     structure("WINDOW", PartKind::Prop("window"), "walls"),
     structure("FOUNDATION, 2M", PartKind::Prop("foundation"), "footing"),
@@ -316,6 +322,17 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // The mason's fascia: the same strip cut in stone, for water
             // tables, footing courses and dressed edges.
             slab(0.0, 0.15, 0.0, 2.0, 0.3, 0.125, "stone", 0.55),
+        ],
+        PartKind::Prop("trim-corner") => vec![
+            // An L that wraps an outside corner: two legs meeting at the
+            // origin, turned to face with R. Runs of straight trim meet
+            // its ends on the grid.
+            slab(0.1875, 0.15, 0.0, 0.375, 0.3, 0.125, "wood", 0.5),
+            slab(0.0, 0.15, 0.1875, 0.125, 0.3, 0.375, "wood", 0.5),
+        ],
+        PartKind::Prop("trim-corner-stone") => vec![
+            slab(0.1875, 0.15, 0.0, 0.375, 0.3, 0.125, "stone", 0.55),
+            slab(0.0, 0.15, 0.1875, 0.125, 0.3, 0.375, "stone", 0.55),
         ],
         PartKind::Prop("foundation") => vec![
             // The game's plinth height exactly: houses stand on these, and
