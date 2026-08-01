@@ -350,7 +350,6 @@ fn ray_reach(ray: &Ray3d, point: Vec3) -> f32 {
 fn work_gizmo(
     mut commands: Commands,
     buttons: Res<ButtonInput<MouseButton>>,
-    keys: Res<ButtonInput<KeyCode>>,
     selected: Res<Selected>,
     mut drag: ResMut<GizmoDrag>,
     mut hot: ResMut<GizmoHot>,
@@ -450,13 +449,8 @@ fn work_gizmo(
         Grip::Size { on_x, w0, d0 } => {
             // Pulling outward along the handle grows the dimension; the
             // far end stands still, so the centre walks half the growth.
-            // A quarter-metre step, or a fine sixteenth with shift held.
-            let grid = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
-                16.0
-            } else {
-                4.0
-            };
-            let pull = ((t - state.t0) * grid).round() / grid;
+            // One atom per step, always: resizing is fine work by nature.
+            let pull = ((t - state.t0) * 16.0).round() / 16.0;
             let Some(kind) = builder::kind_from_name(&record.part) else {
                 return;
             };
