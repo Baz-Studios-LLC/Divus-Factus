@@ -37,7 +37,13 @@ impl Plugin for ScatterPlugin {
             .init_resource::<DirtyGroves>()
             .add_systems(
                 Update,
-                (sway_foliage, topple_trees, sink_spent, rebake_groves),
+                (
+                    sway_foliage,
+                    topple_trees,
+                    sink_spent,
+                    rebake_groves,
+                    collect_groves,
+                ),
             )
             // PostUpdate, deliberately: chunks spawned during Update - by
             // streaming or by a building levelling the ground - get their
@@ -733,49 +739,105 @@ pub struct GroveMesh;
 #[derive(Resource, Default)]
 pub struct DirtyGroves(pub Vec<Entity>);
 
+/// Groves waiting out their debounce: entity → seconds left until the bake.
+///
+/// A burning grove is re-marked with every spread, and each finished bake
+/// costs a real GPU upload — rebaking eagerly meant paying that upload over
+/// and over while the fire crawled. A grove bakes only after it has stayed
+/// QUIET this long; the fallen tree's ghost stands in its old merged mesh a
+/// beat longer, which is invisible next to a burning stand.
+const GROVE_QUIET: f32 = 2.0;
+
+/// A grove mesh being rebuilt on the compute pool, to be collected when done.
+#[derive(Component)]
+pub(crate) struct RebakingGrove(bevy::tasks::Task<Mesh>);
+
 /// Rebakes dirty groves from their surviving members, and buries groves
 /// with none left.
+///
+/// The geometry work happens OFF the main thread. A grove is the merged mesh
+/// of a whole chunk's stand, and a big one is a quarter of a second of
+/// vertex-pushing — a storm that torched one mid-frame used to stall the
+/// frame by exactly that much, the scrub's largest single spike. Now this
+/// system only gathers the surviving trees' seeds (cheap) and hands the bake
+/// to the compute pool; [`collect_groves`] swaps the finished mesh in a frame
+/// or two later. The old silhouette stands in the meantime, which nobody has
+/// ever seen to complain about.
 pub(crate) fn rebake_groves(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
+    time: Res<Time>,
+    mut waiting: Local<std::collections::HashMap<Entity, f32>>,
     mut dirty: ResMut<DirtyGroves>,
     trees: Query<(&Transform, &TreeBody, &InGrove)>,
-    mut groves: Query<&Transform, With<GroveMesh>>,
+    groves: Query<&Transform, (With<GroveMesh>, Without<RebakingGrove>)>,
 ) {
-    if dirty.0.is_empty() {
+    // Fresh marks (re)start their grove's quiet clock.
+    for grove in dirty.0.drain(..) {
+        waiting.insert(grove, GROVE_QUIET);
+    }
+    if waiting.is_empty() {
         return;
     }
-    let mut done: Vec<Entity> = Vec::new();
-    for grove in dirty.0.drain(..) {
-        if done.contains(&grove) {
-            continue;
-        }
-        done.push(grove);
-        // The grove may have unloaded with its chunk mid-frame.
-        let Ok(grove_at) = groves.get_mut(grove) else {
+    let dt = time.delta_secs();
+    let ripe: Vec<Entity> = waiting
+        .iter_mut()
+        .filter_map(|(grove, left)| {
+            *left -= dt;
+            (*left <= 0.0).then_some(*grove)
+        })
+        .collect();
+    if ripe.is_empty() {
+        return;
+    }
+    let pool = bevy::tasks::AsyncComputeTaskPool::get();
+    for grove in ripe {
+        waiting.remove(&grove);
+        // The grove may have unloaded with its chunk mid-frame, or already
+        // be mid-rebake — a re-mark lands again through fire's next spread.
+        let Ok(grove_at) = groves.get(grove) else {
             continue;
         };
-        let mut builder = MeshBuilder::default();
-        let mut standing = 0;
-        for (tree_at, body, home) in &trees {
-            if home.0 != grove {
-                continue;
-            }
-            standing += 1;
-            bake_tree(
-                &mut builder,
-                tree_at.translation - grove_at.translation,
-                body.kind,
-                &mut Rng::new(body.seed),
-            );
-        }
-        if standing == 0 {
+        // Everything the bake needs, as plain data the task can own.
+        let stand: Vec<(Vec3, TreeKind, u64)> = trees
+            .iter()
+            .filter(|(_, _, home)| home.0 == grove)
+            .map(|(at, body, _)| (at.translation - grove_at.translation, body.kind, body.seed))
+            .collect();
+        if stand.is_empty() {
             commands.entity(grove).despawn();
-        } else {
-            commands
-                .entity(grove)
-                .insert(Mesh3d(meshes.add(builder.build())));
+            continue;
         }
+        let task = pool.spawn(async move {
+            let mut builder = MeshBuilder::default();
+            for (offset, kind, seed) in stand {
+                bake_tree(&mut builder, offset, kind, &mut Rng::new(seed));
+            }
+            builder.build()
+        });
+        commands.entity(grove).insert(RebakingGrove(task));
+    }
+}
+
+/// Collects finished grove bakes and swaps the new mesh in.
+pub(crate) fn collect_groves(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut baking: Query<(Entity, &mut RebakingGrove)>,
+) {
+    // AT MOST ONE swap per frame: the bake is free by now, but handing the
+    // renderer a fresh multi-megabyte mesh is a real upload, and two groves
+    // finishing together used to pay both in the same frame.
+    for (grove, mut rebake) in &mut baking {
+        let Some(mesh) =
+            bevy::tasks::block_on(bevy::tasks::futures_lite::future::poll_once(&mut rebake.0))
+        else {
+            continue;
+        };
+        commands
+            .entity(grove)
+            .remove::<RebakingGrove>()
+            .insert(Mesh3d(meshes.add(mesh)));
+        break;
     }
 }
 
