@@ -41,6 +41,9 @@ enum Grip {
     /// dimensions when the grip closed. The handle's own direction
     /// already points out of the pulled end.
     Size { on_x: bool, w0: f32, d0: f32 },
+    /// Pull a whole roof's eaves out past the walls, leaving the gables
+    /// where the building is.
+    Over { o0: f32 },
 }
 
 #[derive(Resource, Default)]
@@ -200,7 +203,7 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                 PartKind::Floor(w, d) => Some((w, d, true)),
                 PartKind::Foundation(w, d) => Some((w, d, true)),
                 PartKind::Roof(w, d) => Some((w, d, true)),
-                PartKind::GableRoof(w, d) => Some((w, d, true)),
+                PartKind::GableRoof(w, d, _) => Some((w, d, true)),
                 _ => None,
             });
             let Some((w, d, both)) = sized else {
@@ -232,6 +235,21 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                             w0: w,
                             d0: d,
                         },
+                    ));
+                }
+            }
+            // A whole roof carries two more, in gold: the eaves, which
+            // reach out past the walls without taking the gables with
+            // them.
+            if let Some(PartKind::GableRoof(_, span, over)) = builder::kind_from_name(&record.part)
+            {
+                for end in [-1.0f32, 1.0] {
+                    let dir = spin * (Vec3::Z * end);
+                    handles.push((
+                        dir,
+                        dir * (span * 0.5 + over + 0.35),
+                        "cloth-gold",
+                        Grip::Over { o0: over },
                     ));
                 }
             }
@@ -456,6 +474,32 @@ fn work_gizmo(
             transform.translation = state.start_at + state.dir * step;
             record.at = transform.translation.into();
         }
+        Grip::Over { o0 } => {
+            // The eaves reach out in whole units; the walls beneath and
+            // the gables at the ends do not move at all.
+            let pull = ((t - state.t0) * 16.0).round() / 16.0;
+            let over = (o0 + pull).clamp(0.0, 3.0);
+            let Some(PartKind::GableRoof(long, span, was)) = builder::kind_from_name(&record.part)
+            else {
+                return;
+            };
+            if (over - was).abs() < 1e-4 {
+                return;
+            }
+            let made = PartKind::GableRoof(long, span, over);
+            record.part = builder::part_name(&made);
+            commands.entity(part).despawn_related::<Children>();
+            builder::dress_part(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &palette,
+                &made,
+                &record,
+                part,
+                false,
+            );
+        }
         Grip::Size { on_x, w0, d0 } => {
             // Pulling outward along the handle grows the dimension; the
             // far end stands still, so the centre walks half the growth.
@@ -484,7 +528,7 @@ fn work_gizmo(
                 PartKind::Floor(..) => PartKind::Floor(w, d),
                 PartKind::Foundation(..) => PartKind::Foundation(w, d),
                 PartKind::Roof(..) => PartKind::Roof(w, d),
-                PartKind::GableRoof(..) => PartKind::GableRoof(w, d),
+                PartKind::GableRoof(_, _, over) => PartKind::GableRoof(w, d, over),
                 _ => return,
             };
             let fresh = builder::part_name(&made);

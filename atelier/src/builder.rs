@@ -200,7 +200,7 @@ pub enum PartKind {
     RidgeLog(f32),
     /// A whole gable roof: both slopes and the ridge between them, drawn
     /// once over the walls instead of lined up slope by slope.
-    GableRoof(f32, f32),
+    GableRoof(f32, f32, f32),
     /// What a whole roof looks like while it is being sized: the ground
     /// it will cover, with a gold line down the way the ridge will run.
     /// It is never placed - the record beneath it names the roof.
@@ -261,7 +261,9 @@ impl PartKind {
             PartKind::GableRun => PartKind::Gable(w),
             PartKind::RidgeRun => PartKind::Ridge(w),
             PartKind::RidgeLogRun => PartKind::RidgeLog(w),
-            PartKind::GableRoofRun => PartKind::GableRoof(w, d),
+            // A hand's breadth of overhang to begin with; the gold
+            // handles pull it further without moving the gables.
+            PartKind::GableRoofRun => PartKind::GableRoof(w, d, 0.25),
             PartKind::SegRun { high, lift } => PartKind::Seg {
                 long: w,
                 high: *high,
@@ -546,7 +548,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             vec![ridge(0.0, 0.0625, 0.0, *long, 0.125, 0.5, "earth", 0.35)]
         }
         PartKind::RidgeRun => vec![ridge(0.0, 0.0625, 0.0, 0.25, 0.125, 0.5, "earth", 0.35)],
-        PartKind::GableRoof(long, span) => {
+        PartKind::GableRoof(long, span, over) => {
             // Both slopes at once, meeting over the middle: no lining up
             // two panels and hoping. The eaves rest at y=0, so the part
             // seats straight onto the wall tops.
@@ -555,14 +557,15 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             let rise = half * pitch.tan();
             let slope = (half * half + rise * rise).sqrt();
             let thick = 0.125;
-            let over = 0.25; // a little overhang past the eaves
+            // The slopes reach past the building on every side by the
+            // overhang; the gables stay where the walls are.
             let mut sides = Vec::new();
             for way in [-1.0_f32, 1.0] {
                 sides.push(leaning(
                     0.0,
                     rise * 0.5 + thick * 0.5,
-                    way * half * 0.5,
-                    *long,
+                    way * (half * 0.5 + over * 0.5 * pitch.cos()),
+                    long + over * 2.0,
                     thick,
                     slope + over,
                     "earth",
@@ -1217,7 +1220,7 @@ pub fn part_name(kind: &PartKind) -> String {
         PartKind::Gable(long) => format!("gable-{long}"),
         PartKind::Ridge(long) => format!("ridge-{long}"),
         PartKind::RidgeLog(long) => format!("ridgelog-{long}"),
-        PartKind::GableRoof(long, span) => format!("gableroof-{long}x{span}"),
+        PartKind::GableRoof(long, span, over) => format!("gableroof-{long}x{span}x{over}"),
         PartKind::RoofPlan(w, d) => format!("roofplan-{w}x{d}"),
         PartKind::Floor(w, d) => format!("floor-{w}x{d}"),
         PartKind::Foundation(w, d) => format!("foundation-{w}x{d}"),
@@ -1242,7 +1245,13 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
         return rest.parse::<f32>().ok().map(PartKind::Wall);
     }
     if let Some(rest) = name.strip_prefix("gableroof-") {
-        return sides_of(rest).map(|(w, d)| PartKind::GableRoof(w, d));
+        // Three numbers now: the building it covers, and the overhang.
+        // Two is an older roof, from before the eaves could be pulled.
+        let mut parts = rest.split('x');
+        let long = parts.next()?.parse().ok()?;
+        let span = parts.next()?.parse().ok()?;
+        let over = parts.next().and_then(|o| o.parse().ok()).unwrap_or(0.25);
+        return Some(PartKind::GableRoof(long, span, over));
     }
     if let Some(rest) = name.strip_prefix("ridgelog-") {
         return rest.parse::<f32>().ok().map(PartKind::RidgeLog);
@@ -2334,7 +2343,7 @@ fn move_ghost(
         // second click lands. Far easier to judge than two slopes
         // swinging about in the air.
         let shown = match made {
-            PartKind::GableRoof(w, d) => PartKind::RoofPlan(w, d),
+            PartKind::GableRoof(w, d, _) => PartKind::RoofPlan(w, d),
             other => other,
         };
         // Redraw only when the drawn size changed; otherwise carry the
@@ -3710,7 +3719,7 @@ pub(crate) fn dims_panel(
             PartKind::Wall(long) => Some((part, long, None)),
             PartKind::Seg { long, .. } => Some((part, long, None)),
             PartKind::Trim { long, .. } => Some((part, long, None)),
-            PartKind::GableRoof(w, d) => Some((part, w, Some(d))),
+            PartKind::GableRoof(w, d, _) => Some((part, w, Some(d))),
             PartKind::Floor(w, d) | PartKind::Foundation(w, d) | PartKind::Roof(w, d) => {
                 Some((part, w, Some(d)))
             }
@@ -3779,8 +3788,8 @@ pub(crate) fn dims_panel(
                             Some(PartKind::Foundation(w, d.unwrap_or(old)))
                         }
                         PartKind::Roof(_, old) => Some(PartKind::Roof(w, d.unwrap_or(old))),
-                        PartKind::GableRoof(_, old) => {
-                            Some(PartKind::GableRoof(w, d.unwrap_or(old)))
+                        PartKind::GableRoof(_, old, over) => {
+                            Some(PartKind::GableRoof(w, d.unwrap_or(old), over))
                         }
                         _ => None,
                     };
