@@ -945,34 +945,42 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // own facing. No guessing whether a bed is long enough, or
             // which end the pillow wants to be.
             if *name == "sleep" {
+                // The village's median adult, measured from its own
+                // genome: 1.75 head to heel, a half-metre head, a torso
+                // seven units across. Head at the facing end.
                 return vec![
-                    // Head, at the facing end.
-                    slab(0.6875, 0.25, 0.0, 0.4375, 0.4375, 0.4375, ramp, shade),
-                    // Torso.
-                    slab(0.125, 0.1875, 0.0, 0.75, 0.3125, 0.4375, ramp, shade),
+                    slab(0.625, 0.25, 0.0, 0.5, 0.5, 0.5, ramp, shade),
+                    slab(0.0625, 0.125, 0.0, 0.625, 0.25, 0.4375, ramp, shade),
                     // Arms alongside.
-                    slab(0.125, 0.125, -0.3125, 0.625, 0.1875, 0.1875, ramp, shade),
-                    slab(0.125, 0.125, 0.3125, 0.625, 0.1875, 0.1875, ramp, shade),
+                    slab(0.0625, 0.09375, -0.3125, 0.5, 0.1875, 0.1875, ramp, shade),
+                    slab(0.0625, 0.09375, 0.3125, 0.5, 0.1875, 0.1875, ramp, shade),
                     // Legs, to the foot of the bed.
-                    slab(-0.5625, 0.125, -0.125, 0.625, 0.25, 0.1875, ramp, shade),
-                    slab(-0.5625, 0.125, 0.125, 0.625, 0.25, 0.1875, ramp, shade),
+                    slab(-0.5625, 0.09375, -0.125, 0.625, 0.1875, 0.1875, ramp, shade),
+                    slab(-0.5625, 0.09375, 0.125, 0.625, 0.1875, 0.1875, ramp, shade),
                 ];
             }
             // A seat is shaped like the sitter: knees toward the facing,
             // so a stool's height and a table's clearance can be judged
             // by eye instead of by arithmetic.
             if *name == "sit" {
+                // The same adult, sat on a stool's own seat: hips at
+                // seven units, the crown a shade over a metre and a half.
+                // Knees toward the facing.
                 return vec![
-                    // Head.
-                    slab(0.0, 1.1875, 0.0, 0.4375, 0.4375, 0.4375, ramp, shade),
-                    // Torso, upright from the seat.
-                    slab(0.0, 0.75, 0.0, 0.4375, 0.5625, 0.3125, ramp, shade),
+                    slab(0.0, 1.3125, 0.0, 0.5, 0.5, 0.5, ramp, shade),
+                    // Torso: deep front to back, wide across.
+                    slab(0.0, 0.75, 0.0, 0.25, 0.625, 0.4375, ramp, shade),
+                    // Arms hanging at the sides.
+                    slab(0.0, 0.8125, -0.3125, 0.1875, 0.5, 0.1875, ramp, shade),
+                    slab(0.0, 0.8125, 0.3125, 0.1875, 0.5, 0.1875, ramp, shade),
                     // Thighs, forward to the knees.
-                    slab(0.1875, 0.4375, -0.125, 0.5, 0.1875, 0.1875, ramp, shade),
-                    slab(0.1875, 0.4375, 0.125, 0.5, 0.1875, 0.1875, ramp, shade),
+                    slab(
+                        0.21875, 0.34375, -0.125, 0.4375, 0.1875, 0.1875, ramp, shade,
+                    ),
+                    slab(0.21875, 0.34375, 0.125, 0.4375, 0.1875, 0.1875, ramp, shade),
                     // Shins, down to the floor.
-                    slab(0.375, 0.1875, -0.125, 0.1875, 0.375, 0.1875, ramp, shade),
-                    slab(0.375, 0.1875, 0.125, 0.1875, 0.375, 0.1875, ramp, shade),
+                    slab(0.4375, 0.1875, -0.125, 0.1875, 0.375, 0.1875, ramp, shade),
+                    slab(0.4375, 0.1875, 0.125, 0.1875, 0.375, 0.1875, ramp, shade),
                 ];
             }
             vec![

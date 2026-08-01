@@ -21,7 +21,7 @@
       "at": [
         -0.125,
         0.375,
-        1.4329592
+        1.4954592
       ],
       "yaw": -0.0,
       "tilt": 0.0,
@@ -1067,13 +1067,13 @@
       "flip": false
     },
     {
-      "part": "widget:sleep",
+      "part": "widget:fire",
       "at": [
-        -6.3125,
-        0.725574,
-        -5.5
+        -1.9999998,
+        0.6875,
+        3.3849998
       ],
-      "yaw": 4.712389,
+      "yaw": 1.5707964,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
@@ -1081,11 +1081,53 @@
       "flip": false
     },
     {
-      "part": "widget:fire",
+      "part": "widget:sleep",
       "at": [
-        -1.9999998,
-        0.6875,
-        3.3849998
+        -6.25,
+        0.905,
+        -5.5
+      ],
+      "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "widget",
+      "flip": false
+    },
+    {
+      "part": "widget:sleep",
+      "at": [
+        -5.75,
+        0.905,
+        -5.5
+      ],
+      "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "widget",
+      "flip": false
+    },
+    {
+      "part": "widget:sleep",
+      "at": [
+        -1.0,
+        0.905,
+        -2.75
+      ],
+      "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "widget",
+      "flip": false
+    },
+    {
+      "part": "widget:sleep",
+      "at": [
+        -1.0,
+        0.905,
+        -5.5
       ],
       "yaw": 1.5707964,
       "tilt": 0.0,
