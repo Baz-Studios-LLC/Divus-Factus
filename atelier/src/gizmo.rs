@@ -6,6 +6,7 @@
 //! every snap deliberately silent while the arrows are in charge.
 
 use bevy::prelude::*;
+use bevy::camera::visibility::RenderLayers;
 
 use crate::Bench;
 use crate::builder::{Hovered, Naming, Placed};
@@ -33,6 +34,14 @@ struct GizmoRoot;
 #[derive(Component)]
 struct GizmoArrow(Vec3);
 
+/// The camera that draws the arrows over everything: it runs after the
+/// main camera with a fresh depth buffer, so no wall can bury them.
+#[derive(Component)]
+struct GizmoCamera;
+
+/// The render layer the arrows live on, seen only by their own camera.
+const ARROW_LAYER: usize = 1;
+
 pub struct GizmoPlugin;
 
 impl Plugin for GizmoPlugin {
@@ -40,7 +49,40 @@ impl Plugin for GizmoPlugin {
         app.init_resource::<Selected>()
             .init_resource::<GizmoDrag>()
             .init_resource::<GizmoHot>()
-            .add_systems(Update, (select_part, dress_gizmo, work_gizmo).chain());
+            .add_systems(Startup, raise_gizmo_camera)
+            .add_systems(
+                Update,
+                (select_part, dress_gizmo, work_gizmo, ride_along).chain(),
+            );
+    }
+}
+
+/// The overlay camera: same eye as the bench camera, drawing only the
+/// arrow layer, after everything, onto a cleared depth buffer.
+fn raise_gizmo_camera(mut commands: Commands) {
+    commands.spawn((
+        GizmoCamera,
+        Camera3d::default(),
+        Camera {
+            order: 1,
+            clear_color: bevy::camera::ClearColorConfig::None,
+            ..default()
+        },
+        RenderLayers::layer(ARROW_LAYER),
+        Transform::default(),
+    ));
+}
+
+/// The overlay camera wears the bench camera's exact pose every frame.
+fn ride_along(
+    bench_camera: Query<&Transform, (With<Camera3d>, Without<GizmoCamera>)>,
+    mut overlay: Query<&mut Transform, With<GizmoCamera>>,
+) {
+    let Ok(eye) = bench_camera.single() else {
+        return;
+    };
+    for mut camera in &mut overlay {
+        *camera = *eye;
     }
 }
 
@@ -132,17 +174,20 @@ fn dress_gizmo(
                         ChildOf(root),
                     ))
                     .id();
-                // The shaft, then the head at its far end.
+                // The shaft, then the head at its far end - each stamped
+                // onto the arrow layer, since layers do not inherit.
                 commands.spawn((
                     Mesh3d(cube.clone()),
                     MeshMaterial3d(material.clone()),
                     Transform::from_scale(Vec3::splat(0.05) + axis.abs() * (1.3 - 0.05)),
+                    RenderLayers::layer(ARROW_LAYER),
                     ChildOf(arrow),
                 ));
                 commands.spawn((
                     Mesh3d(cube.clone()),
                     MeshMaterial3d(material),
                     Transform::from_translation(axis * 0.72).with_scale(Vec3::splat(0.14)),
+                    RenderLayers::layer(ARROW_LAYER),
                     ChildOf(arrow),
                 ));
             }
