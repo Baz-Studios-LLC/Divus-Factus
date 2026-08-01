@@ -1462,7 +1462,7 @@ pub(crate) fn raise_stage(
                 // the door lane along the front left clear.
                 floor(w, d);
                 let berths = crate::villager::home::LONGHOUSE_CAPACITY as u8;
-                let length = (w * 0.95).clamp(1.1, 1.6);
+                let length = (w * 0.95).clamp(1.75, 2.1);
                 for slot in 0..berths {
                     let z = -d + (slot as f32 + 0.5) * (d * 2.0 / berths as f32);
                     bed(
@@ -1617,7 +1617,7 @@ pub(crate) fn raise_stage(
                 );
 
                 // The bedroom: two beds along each side wall, heads out.
-                let length = ((d * 0.85 + split) * 0.8).clamp(1.1, 1.6);
+                let length = ((d * 0.85 + split) * 0.8).clamp(1.75, 2.1);
                 for slot in 0..crate::villager::home::HOUSE_CAPACITY as u8 {
                     let side = if slot % 2 == 0 { -1.0 } else { 1.0 };
                     let rank = slot < 2;

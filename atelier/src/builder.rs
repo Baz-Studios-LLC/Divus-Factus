@@ -652,18 +652,20 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             vec![slab(0.0, 0.15625, 0.0, 0.25, 0.3125, 0.125, ramp, shade)]
         }
         PartKind::Prop("bed") => vec![
-            // The game's own bed: frame, mattress, pillow at +Z (the head).
-            slab(0.0, 0.26, 0.0, 0.76, 0.24, 1.64, "wood", 0.55),
-            slab(0.0, 0.44, 0.0, 0.62, 0.18, 1.5, "bone", 0.8),
-            slab(0.0, 0.56, 0.55, 0.46, 0.1, 0.32, "bone", 0.95),
+            // Long enough for the villager who will lie in it: the
+            // sleeper is 1.75 head to heel, so the mattress is 1.875 and
+            // the frame two metres. The old bed was a metre and a half,
+            // and everyone's feet hung off the end of it.
+            slab(0.0, 0.25, 0.0, 0.875, 0.25, 2.0, "wood", 0.55),
+            slab(0.0, 0.4375, 0.0, 0.75, 0.1875, 1.875, "bone", 0.8),
+            slab(0.0, 0.5625, 0.6875, 0.5, 0.125, 0.375, "bone", 0.95),
         ],
         PartKind::Prop("bed-double") => vec![
-            // Room for two: the single's proportions, widened, with a
-            // pillow for each head at +Z.
-            slab(0.0, 0.26, 0.0, 1.29, 0.24, 1.64, "wood", 0.55),
-            slab(0.0, 0.44, 0.0, 1.15, 0.18, 1.5, "bone", 0.8),
-            slab(-0.27, 0.56, 0.55, 0.42, 0.1, 0.32, "bone", 0.95),
-            slab(0.27, 0.56, 0.55, 0.42, 0.1, 0.32, "bone", 0.95),
+            // Room for two, and the same honest length.
+            slab(0.0, 0.25, 0.0, 1.5, 0.25, 2.0, "wood", 0.55),
+            slab(0.0, 0.4375, 0.0, 1.375, 0.1875, 1.875, "bone", 0.8),
+            slab(-0.3125, 0.5625, 0.6875, 0.5, 0.125, 0.375, "bone", 0.95),
+            slab(0.3125, 0.5625, 0.6875, 0.5, 0.125, 0.375, "bone", 0.95),
         ],
         PartKind::Prop("table") => {
             let mut parts = vec![slab(0.0, 0.72, 0.0, 1.5, 0.1, 0.9, "wood", 0.65)];
@@ -1235,6 +1237,7 @@ impl Plugin for BuilderPlugin {
                     steer_hand,
                     toggle_snap_mode,
                     disarm_on_mode,
+                    turn_part,
                     reflow_openings,
                     lift_roofs,
                     copy_and_paste,
@@ -4579,4 +4582,33 @@ mod bake {
             );
         }
     }
+}
+
+/// R turns whatever is selected, in whichever mode: the hand's own
+/// quarter-turn belongs to placing, but a part already standing should
+/// answer the same key.
+#[allow(clippy::too_many_arguments)]
+fn turn_part(
+    keys: Res<ButtonInput<KeyCode>>,
+    bench: Res<Bench>,
+    naming: Res<Naming>,
+    dims: Res<DimsEntry>,
+    selected: Res<crate::gizmo::Selected>,
+    mut parts: Query<(&mut Transform, &mut Placed), Without<Ghost>>,
+) {
+    if *bench != Bench::Builder
+        || naming.0.is_some()
+        || dims.0.is_some()
+        || !keys.just_pressed(KeyCode::KeyR)
+    {
+        return;
+    }
+    let Some(part) = selected.0 else {
+        return;
+    };
+    let Ok((mut transform, mut record)) = parts.get_mut(part) else {
+        return;
+    };
+    record.yaw = (record.yaw + std::f32::consts::FRAC_PI_2).rem_euclid(std::f32::consts::TAU);
+    transform.rotation = pose(record.yaw, record.tilt, record.flip);
 }

@@ -985,7 +985,7 @@
     {
       "part": "prop:chair",
       "at": [
-        -6.75,
+        -6.9375,
         0.375,
         1.375
       ],
@@ -1130,6 +1130,62 @@
         -5.5
       ],
       "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "widget",
+      "flip": false
+    },
+    {
+      "part": "widget:sit",
+      "at": [
+        -6.875,
+        0.39250004,
+        1.375
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "widget",
+      "flip": false
+    },
+    {
+      "part": "widget:sit",
+      "at": [
+        -5.1875005,
+        0.3125,
+        1.35625
+      ],
+      "yaw": 3.1415927,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "widget",
+      "flip": false
+    },
+    {
+      "part": "widget:sit",
+      "at": [
+        -6.0,
+        0.875,
+        0.33374983
+      ],
+      "yaw": 3.1415927,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "widget",
+      "flip": false
+    },
+    {
+      "part": "widget:sit",
+      "at": [
+        -6.0,
+        1.125,
+        2.92375
+      ],
+      "yaw": 3.1415927,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
