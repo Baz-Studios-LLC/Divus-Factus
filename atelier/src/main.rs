@@ -10,6 +10,7 @@ use bevy::prelude::*;
 
 mod builder;
 mod camera;
+mod gizmo;
 mod look;
 mod rail;
 mod stage;
@@ -36,6 +37,6 @@ fn main() {
         }))
         .init_resource::<Bench>()
         .add_plugins((look::LookPlugin, camera::CameraPlugin, stage::StagePlugin))
-        .add_plugins((rail::RailPlugin, builder::BuilderPlugin))
+        .add_plugins((rail::RailPlugin, builder::BuilderPlugin, gizmo::GizmoPlugin))
         .run();
 }

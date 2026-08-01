@@ -1874,6 +1874,7 @@ fn place_grab_remove(
     bench: Res<Bench>,
     naming: Res<Naming>,
     hovered: Res<Hovered>,
+    gizmo_hot: Res<crate::gizmo::GizmoHot>,
     mut hand: ResMut<Hand>,
     palette: Res<Palette>,
     ghosts: Query<Entity, With<Ghost>>,
@@ -1883,7 +1884,7 @@ fn place_grab_remove(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    if *bench != Bench::Builder || naming.0.is_some() {
+    if *bench != Bench::Builder || naming.0.is_some() || gizmo_hot.0 {
         return;
     }
     // A click that lands on UI is the UI's business.
