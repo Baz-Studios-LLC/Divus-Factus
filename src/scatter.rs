@@ -95,7 +95,10 @@ impl TreeKind {
 
 /// Bakes a tree of the given kind into `builder`.
 fn bake_tree(builder: &mut MeshBuilder, position: Vec3, kind: TreeKind, rng: &mut Rng) {
-    let height = rng.range(2.6, 5.4);
+    // Half again the old stand: trees used to read stubby beside the houses.
+    // One roll drives every dimension, so old worlds keep their exact layout
+    // — the same forests, grown up.
+    let height = rng.range(3.9, 8.1);
     let yaw = rng.range(0.0, std::f32::consts::TAU);
 
     let bark = match kind {

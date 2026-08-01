@@ -400,7 +400,7 @@ fn fire_spreads(
                     )) * 10.0,
                     ..default()
                 })),
-                Transform::from_xyz(0.0, 2.2, 0.0).with_scale(Vec3::new(1.3, 2.6, 1.3)),
+                Transform::from_xyz(0.0, 3.3, 0.0).with_scale(Vec3::new(1.9, 3.9, 1.9)),
                 bevy::light::NotShadowCaster,
                 ChildOf(tree),
             ));
