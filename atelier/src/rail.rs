@@ -151,6 +151,7 @@ fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>) 
             "front, right, back, left,\noverhead, and the perch",
         ),
         ("shift", "fine snap, 5cm"),
+        ("F", "face snap on and off"),
         ("RMB drag", "swing the camera"),
         ("MMB drag", "pull the bench along"),
         ("wheel", "draw near, pull away"),

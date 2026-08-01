@@ -546,6 +546,29 @@ struct NamingCard;
 #[derive(Component)]
 struct NameText;
 
+/// F walks between face snapping and plain ground placement.
+fn toggle_snap_mode(
+    keys: Res<ButtonInput<KeyCode>>,
+    bench: Res<Bench>,
+    naming: Res<Naming>,
+    mut mode: ResMut<SnapMode>,
+    mut labels: Query<&mut Text, With<SnapModeText>>,
+) {
+    if *bench == Bench::Builder && naming.0.is_none() && keys.just_pressed(KeyCode::KeyF) {
+        mode.face = !mode.face;
+    }
+    let word = if mode.face {
+        "face snap - on (F)"
+    } else {
+        "face snap - off (F)"
+    };
+    for mut label in &mut labels {
+        if label.0 != word {
+            *label = Text::new(word);
+        }
+    }
+}
+
 pub struct BuilderPlugin;
 
 impl Plugin for BuilderPlugin {
@@ -554,6 +577,7 @@ impl Plugin for BuilderPlugin {
             .init_resource::<Naming>()
             .init_resource::<Hovered>()
             .init_resource::<WorkName>()
+            .init_resource::<SnapMode>()
             .add_systems(Startup, raise_shelf)
             .add_systems(
                 Update,
@@ -563,8 +587,9 @@ impl Plugin for BuilderPlugin {
                     work_shelf,
                     work_templates,
                     steer_hand,
-                    move_ghost,
+                    toggle_snap_mode,
                     feel_ahead,
+                    move_ghost,
                     place_grab_remove,
                     save_workbench,
                     take_the_name,
@@ -722,6 +747,18 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
             BorderColor::all(theme::panel_border(&palette)),
         ))
         .id();
+
+    commands.spawn((
+        SnapModeText,
+        Text::new("face snap - on (F)"),
+        TextFont {
+            font: fonts.text.clone().into(),
+            font_size: FontSize::Px(11.0),
+            ..default()
+        },
+        TextColor(theme::text_dim(&palette)),
+        ChildOf(shelf),
+    ));
 
     // READY-MADE: templates and the broom.
     let ready = drawer(&mut commands, &fonts, &palette, shelf, "READY-MADE", true);
@@ -1381,7 +1418,9 @@ fn platform_rects(
 const PLINTH_REVEAL: f32 = WALL_THICK * 0.5;
 
 /// The ends of every standing full-height wall piece, for the magnets.
-fn wall_ends(placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>) -> Vec<Vec3> {
+/// Every standing wall end, with the direction it points out of its own
+/// wall - the joint math needs to know which way a tip faces.
+fn wall_ends(placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>) -> Vec<(Vec3, Vec3)> {
     let mut ends = Vec::new();
     for (_, transform, record) in placed {
         let long = match kind_from_name(&record.part) {
@@ -1390,8 +1429,8 @@ fn wall_ends(placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>) -> V
             _ => continue,
         };
         let along = Quat::from_rotation_y(record.yaw) * Vec3::X;
-        ends.push(transform.translation + along * (long * 0.5));
-        ends.push(transform.translation - along * (long * 0.5));
+        ends.push((transform.translation + along * (long * 0.5), along));
+        ends.push((transform.translation - along * (long * 0.5), -along));
     }
     ends
 }
@@ -1400,6 +1439,8 @@ fn wall_ends(placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>) -> V
 fn move_ghost(
     bench: Res<Bench>,
     hand: Res<Hand>,
+    mode: Res<SnapMode>,
+    hovered: Res<Hovered>,
     keys: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
@@ -1409,6 +1450,69 @@ fn move_ghost(
     if *bench != Bench::Builder {
         return;
     }
+    let Some(kind_now) = hand.kind else {
+        return;
+    };
+
+    // Face-aware placement: the part clings to the face the cursor
+    // points at. The top of a thing stacks; a side is clung to flush,
+    // at the aimed height snapped to clean quarter-metre courses.
+    if mode.face
+        && let Some(hit) = hovered.build
+    {
+        if hit.normal.y > 0.7 {
+            let snapped = Vec3::new(
+                (hit.point.x * 4.0).round() / 4.0,
+                hit.point.y + hand.lift,
+                (hit.point.z * 4.0).round() / 4.0,
+            );
+            for mut transform in &mut ghosts {
+                transform.translation = snapped;
+                transform.rotation =
+                    Quat::from_rotation_y(hand.yaw) * Quat::from_rotation_x(hand.tilt);
+            }
+            return;
+        }
+        if hit.normal.y.abs() < 0.3 {
+            // My reach along the face's normal: how far my centre must
+            // stand off so my body kisses the face.
+            let mut low = Vec3::splat(f32::INFINITY);
+            let mut high = Vec3::splat(f32::NEG_INFINITY);
+            for Slab(at, size, ..) in body_of(&kind_now, None) {
+                low = low.min(at - size * 0.5);
+                high = high.max(at + size * 0.5);
+            }
+            let spin = Quat::from_rotation_y(hand.yaw);
+            let mut reach = 0.0f32;
+            for (cx, cz) in [(-1.0f32, -1.0f32), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+                let corner = spin
+                    * Vec3::new(
+                        if cx < 0.0 { low.x } else { high.x },
+                        0.0,
+                        if cz < 0.0 { low.z } else { high.z },
+                    );
+                reach = reach.max(corner.dot(hit.normal).abs());
+            }
+            // Along the face: quarter-metre order. Up the face: courses
+            // measured from the part's own base, so trim stacks in rings.
+            let tangent = Vec3::Y.cross(hit.normal).normalize_or_zero();
+            let along = (hit.point.dot(tangent) * 4.0).round() / 4.0;
+            let course = ((hit.point.y - hit.base_y).max(0.0) * 4.0).round() / 4.0 + hit.base_y;
+            let anchor = hit.point - tangent * hit.point.dot(tangent) + tangent * along;
+            let snapped = Vec3::new(
+                (anchor + hit.normal * reach).x,
+                course + hand.lift,
+                (anchor + hit.normal * reach).z,
+            );
+            for mut transform in &mut ghosts {
+                transform.translation = snapped;
+                transform.rotation =
+                    Quat::from_rotation_y(hand.yaw) * Quat::from_rotation_x(hand.tilt);
+            }
+            return;
+        }
+    }
+
     let Some(point) = cursor_point(&windows, &cameras, hand.lift) else {
         return;
     };
@@ -1425,9 +1529,7 @@ fn move_ghost(
         (point.z * grid).round() / grid,
     );
 
-    let Some(kind) = hand.kind else {
-        return;
-    };
+    let kind = kind_now;
 
     // Walls click to wall ends - a butt joint or a square corner - and
     // the corner pole magnetizes to the same points it exists to cover.
@@ -1441,7 +1543,7 @@ fn move_ghost(
             for platform in &platforms {
                 let spin = Quat::from_rotation_y(platform.yaw);
                 for (sx, sz) in [(-1.0f32, -1.0f32), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
-                    ends.push(
+                    ends.push((
                         platform.at
                             + spin
                                 * Vec3::new(
@@ -1449,24 +1551,37 @@ fn move_ghost(
                                     0.0,
                                     sz * (platform.half.y - PLINTH_REVEAL),
                                 ),
-                    );
+                        Vec3::ZERO,
+                    ));
                 }
             }
         }
-        let my_ends: Vec<Vec3> = match kind {
+        let my_dir = Quat::from_rotation_y(hand.yaw) * Vec3::X;
+        let my_ends: Vec<(Vec3, Vec3)> = match kind {
             PartKind::Wall(long) => {
-                let along = Quat::from_rotation_y(hand.yaw) * Vec3::X;
                 vec![
-                    snapped + along * (long * 0.5),
-                    snapped - along * (long * 0.5),
+                    (snapped + my_dir * (long * 0.5), my_dir),
+                    (snapped - my_dir * (long * 0.5), -my_dir),
                 ]
             }
-            _ => vec![snapped],
+            _ => vec![(snapped, Vec3::ZERO)],
         };
+        let half_thick = WALL_THICK * 0.5;
         let mut pull: Option<(f32, Vec3)> = None;
-        for mine in &my_ends {
-            for theirs in &ends {
-                let gap = Vec3::new(theirs.x - mine.x, 0.0, theirs.z - mine.z);
+        for (mine, my_out) in &my_ends {
+            for (theirs, their_out) in &ends {
+                // The joint decides the target. Perpendicular tips overlap
+                // into a full corner block, outer faces flush both ways; a
+                // continuation meets end to end; a pole takes the
+                // centreline crossing itself.
+                let target = if *my_out == Vec3::ZERO {
+                    *theirs - *their_out * half_thick
+                } else if my_out.dot(*their_out).abs() < 0.35 {
+                    *theirs - *their_out * half_thick + *my_out * half_thick
+                } else {
+                    *theirs
+                };
+                let gap = Vec3::new(target.x - mine.x, 0.0, target.z - mine.z);
                 let reach = gap.length();
                 if reach < 0.4 && pull.as_ref().is_none_or(|(best, _)| reach < *best) {
                     pull = Some((reach, gap));
@@ -1480,7 +1595,6 @@ fn move_ghost(
             // edge seats flush onto it - outer face to the stone's face -
             // and platform corners then slide it ALONG its line only, so
             // the flush seat is never yanked sideways.
-            let my_dir = Quat::from_rotation_y(hand.yaw) * Vec3::X;
             let mut best: Option<(f32, Vec3)> = None;
             for platform in &platforms {
                 let spin = Quat::from_rotation_y(platform.yaw);
@@ -1559,39 +1673,82 @@ fn move_ghost(
     }
 }
 
-/// The part the cursor's ray touches first, tested against the actual
-/// boxes - so a bed wins over the floor beneath it, and a wall answers
-/// to a click on its face.
-#[derive(Resource, Default)]
-pub struct Hovered(pub Option<Entity>);
+/// What the cursor's ray touched first: the part, where, and through
+/// which face - the face is what placement clings to.
+#[derive(Clone, Copy)]
+pub struct Hit {
+    /// Which part was struck - unread today, but the grab and future
+    /// tools (paint-by-face, measure) will want to know.
+    #[allow(dead_code)]
+    pub entity: Entity,
+    pub point: Vec3,
+    pub normal: Vec3,
+    pub base_y: f32,
+}
 
-fn ray_pick(
+/// The cursor's findings, shared by the glow, the grab and the ghost:
+/// `grab` is the first thing touched (widgets included), `build` the
+/// first solid face a part could cling to.
+#[derive(Resource, Default)]
+pub struct Hovered {
+    pub grab: Option<Entity>,
+    pub build: Option<Hit>,
+}
+
+/// Whether placement clings to the face under the cursor, or ignores
+/// faces and works the ground plane alone. F walks between them.
+#[derive(Resource)]
+pub struct SnapMode {
+    pub face: bool,
+}
+
+impl Default for SnapMode {
+    fn default() -> Self {
+        SnapMode { face: true }
+    }
+}
+
+/// The shelf line that says which mode the hand is in.
+#[derive(Component)]
+struct SnapModeText;
+
+#[allow(clippy::type_complexity)]
+fn ray_scan(
     windows: &Query<&Window>,
     cameras: &Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
-) -> Option<Entity> {
-    let window = windows.iter().next()?;
-    let cursor = window.cursor_position()?;
-    let (camera, camera_at) = cameras.iter().next()?;
-    let ray = camera.viewport_to_world(camera_at, cursor).ok()?;
+) -> (Option<Entity>, Option<Hit>) {
+    let Some(ray) = windows
+        .iter()
+        .next()
+        .and_then(|window| window.cursor_position())
+        .and_then(|cursor| {
+            let (camera, camera_at) = cameras.iter().next()?;
+            camera.viewport_to_world(camera_at, cursor).ok()
+        })
+    else {
+        return (None, None);
+    };
 
-    let mut first: Option<(Entity, f32)> = None;
+    // First thing touched at all (the grab), and first SOLID face (the
+    // build target) - widgets are markers, not masonry.
+    let mut first_any: Option<(Entity, f32)> = None;
+    let mut first_solid: Option<(f32, Hit)> = None;
     for (entity, transform, record) in placed {
         let Some(kind) = kind_from_name(&record.part) else {
             continue;
         };
-        // The ray, carried into the part's own space.
-        let inverse = Quat::from_rotation_y(record.yaw) * Quat::from_rotation_x(record.tilt);
-        let inverse = inverse.inverse();
+        let spin = Quat::from_rotation_y(record.yaw) * Quat::from_rotation_x(record.tilt);
+        let inverse = spin.inverse();
         let origin = inverse * (ray.origin - transform.translation);
         let toward = inverse * Vec3::from(ray.direction);
         let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
         for Slab(at, size, ..) in body_of(&kind, repaint) {
             let low = at - size * 0.5;
             let high = at + size * 0.5;
-            // The slab method: entry and exit along each axis.
             let mut enter = f32::NEG_INFINITY;
             let mut leave = f32::INFINITY;
+            let mut face = Vec3::Y;
             let mut missed = false;
             for axis in 0..3 {
                 let (o, d, lo, hi) = (origin[axis], toward[axis], low[axis], high[axis]);
@@ -1604,19 +1761,41 @@ fn ray_pick(
                 }
                 let a = (lo - o) / d;
                 let b = (hi - o) / d;
-                enter = enter.max(a.min(b));
+                let near = a.min(b);
+                if near > enter {
+                    enter = near;
+                    let mut normal = Vec3::ZERO;
+                    normal[axis] = -toward[axis].signum();
+                    face = normal;
+                }
                 leave = leave.min(a.max(b));
             }
             if missed || enter > leave || leave < 0.0 {
                 continue;
             }
             let reach = enter.max(0.0);
-            if first.is_none_or(|(_, t)| reach < t) {
-                first = Some((entity, reach));
+            if first_any.is_none_or(|(_, t)| reach < t) {
+                first_any = Some((entity, reach));
+            }
+            if !matches!(kind, PartKind::Widget(_))
+                && first_solid.as_ref().is_none_or(|(t, _)| reach < *t)
+            {
+                first_solid = Some((
+                    reach,
+                    Hit {
+                        entity,
+                        point: ray.get_point(reach),
+                        normal: (spin * face).normalize_or_zero(),
+                        base_y: transform.translation.y,
+                    },
+                ));
             }
         }
     }
-    first.map(|(entity, _)| entity)
+    (
+        first_any.map(|(entity, _)| entity),
+        first_solid.map(|(_, hit)| hit),
+    )
 }
 
 /// Keeps the hovered part known, and lights it softly gold while the
@@ -1638,12 +1817,13 @@ fn feel_ahead(
     let over_ui = hovers
         .iter()
         .any(|interaction| *interaction != Interaction::None);
-    let fresh = if *bench == Bench::Builder && naming.0.is_none() && !over_ui {
-        ray_pick(&windows, &cameras, &placed)
+    let (fresh, build) = if *bench == Bench::Builder && naming.0.is_none() && !over_ui {
+        ray_scan(&windows, &cameras, &placed)
     } else {
-        None
+        (None, None)
     };
-    if fresh == hovered.0 {
+    hovered.build = build;
+    if fresh == hovered.grab {
         return;
     }
     // The old glow goes out; the new one comes on only for an empty hand.
@@ -1667,7 +1847,7 @@ fn feel_ahead(
             }
         }
     };
-    if let Some(old) = hovered.0
+    if let Some(old) = hovered.grab
         && placed.contains(old)
     {
         glow(&mut materials, &children, &slabs, old, false);
@@ -1677,7 +1857,7 @@ fn feel_ahead(
     {
         glow(&mut materials, &children, &slabs, new, true);
     }
-    hovered.0 = fresh;
+    hovered.grab = fresh;
 }
 
 /// A full hand places on click. An empty hand picks a placed part back up.
@@ -1751,7 +1931,7 @@ fn place_grab_remove(
                     false,
                 );
             }
-        } else if let Some(grabbed) = hovered.0
+        } else if let Some(grabbed) = hovered.grab
             && let Ok((_, transform, record)) = placed.get(grabbed)
             && let Some(kind) = kind_from_name(&record.part)
         {
@@ -1787,7 +1967,7 @@ fn place_grab_remove(
     }
 
     if keys.just_pressed(KeyCode::KeyX)
-        && let Some(doomed) = hovered.0
+        && let Some(doomed) = hovered.grab
         && placed.contains(doomed)
     {
         commands.entity(doomed).despawn();
