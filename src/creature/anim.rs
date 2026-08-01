@@ -12,6 +12,7 @@ use bevy::prelude::*;
 
 use super::body::CreatureRig;
 use super::genome::CreatureGenome;
+use super::genome::Garment;
 
 /// Per-creature animation state, advanced every frame.
 #[derive(Component, Default)]
@@ -33,6 +34,12 @@ pub struct CreatureMotion {
     /// number on a panel — it is the difference between a crowd of props and a crowd
     /// that has noticed you.
     pub look_at: Option<Vec3>,
+    /// Whether this creature should be on its knees. Written by whatever
+    /// system owns the reason (prayer, for now); the blend eases so they
+    /// sink down and rise rather than snapping.
+    pub kneeling: bool,
+    /// The kneel blend the animator actually drives, 0 standing to 1 down.
+    pub kneel: f32,
 }
 
 impl CreatureMotion {
@@ -64,6 +71,12 @@ pub fn advance_motion(
         // Flailing decays on its own, so anything that sets it can just poke it up
         // and forget about clearing it.
         motion.flail = (motion.flail - dt * 1.2).max(0.0);
+
+        // Kneeling eases toward its target: sinking down is a little slower
+        // than rising, the way weight actually moves.
+        let kneel_to = if motion.kneeling { 1.0 } else { 0.0 };
+        let rate = if motion.kneeling { 2.2 } else { 3.2 };
+        motion.kneel += (kneel_to - motion.kneel).clamp(-rate * dt, rate * dt);
     }
 }
 
@@ -77,12 +90,13 @@ pub fn animate_creatures(
         &GlobalTransform,
         Has<super::Held>,
         Has<super::Airborne>,
+        Has<super::Laden>,
     )>,
     mut transforms: Query<&mut Transform>,
 ) {
     let t = time.elapsed_secs();
 
-    for (rig, genome, motion, global, held, airborne) in &creatures {
+    for (rig, genome, motion, global, held, airborne, laden) in &creatures {
         let gait = &genome.gait;
 
         // Walking blend: 0 standing still, 1 at full walking speed. Everything
@@ -95,14 +109,20 @@ pub fn animate_creatures(
 
         // Body: bob at twice stride frequency (one dip per footfall), sway at
         // stride frequency, lean forward proportional to speed.
+        let kneel = motion.kneel;
+        let leg_len = genome.proportions.leg_length * rig.height;
         if let Ok(mut transform) = transforms.get_mut(rig.body) {
             let bob = -(motion.phase * 2.0).cos() * gait.bounce * rig.height * walk;
             let breathe = breath * 0.004 * rig.height * idle;
             let sway = sin_phase * gait.sway * walk;
             // Forward is negative-X in this rig: lean INTO the stride.
-            let lean = -(gait.lean + walk * 0.09) + motion.flail * 0.25;
+            // Kneeling bows the body forward a little over the folded legs.
+            let lean = -(gait.lean + walk * 0.09) - kneel * 0.18 + motion.flail * 0.25;
 
-            transform.translation = Vec3::new(0.0, bob + breathe, 0.0);
+            // Folded legs sink the body: the shins lie along the ground and
+            // the weight rests just above the heels.
+            let sink = kneel * leg_len * 0.48;
+            transform.translation = Vec3::new(0.0, bob + breathe - sink, 0.0);
             transform.rotation = Quat::from_rotation_z(sway) * Quat::from_rotation_x(lean);
         }
 
@@ -126,7 +146,9 @@ pub fn animate_creatures(
                     scan * idle * 0.6
                 }
             };
-            let pitch = -walk * 0.06 + breath * 0.02 * idle;
+            // A kneeler bows their head; the breath stays, which reads as
+            // murmured prayer rather than a statue.
+            let pitch = -walk * 0.06 + breath * 0.02 * idle + kneel * 0.38;
             let counter_sway = -sin_phase * gait.sway * 0.6 * walk;
 
             // Composed onto the rest pose rather than replacing the transform. A
@@ -138,19 +160,33 @@ pub fn animate_creatures(
                 * Quat::from_rotation_z(counter_sway);
         }
 
-        // Limbs: one sine each, offset by the limb's phase.
+        // Limbs: one sine per segment pair, offset by the limb's phase. The
+        // upper joint swings the whole limb; the hinge bends against it.
+        //
+        // Sign convention, settled the way the sleeper's was - by looking:
+        // for a box hanging on -Y, POSITIVE X rotation carries its free end
+        // forward. So elbows bend positive (forearm rises in front) and
+        // knees bend negative (shin folds behind).
         for limb in &rig.limbs {
             let Ok(mut transform) = transforms.get_mut(limb.entity) else {
                 continue;
             };
 
+            // A long robe does not allow a long stride: robed legs take
+            // shorter, straighter steps, which also keeps the knees inside
+            // the skirt.
+            let robed = !limb.is_arm && matches!(genome.garment, Garment::Robe);
             let amplitude = if limb.is_arm {
                 gait.stride_swing * 0.55
+            } else if robed {
+                gait.stride_swing * 0.6
             } else {
                 gait.stride_swing
             };
 
-            let swing = (motion.phase + limb.phase).sin() * amplitude * walk;
+            // Laden arms hold a burden to the chest: the swing all but stops.
+            let carry = if limb.is_arm && laden { 0.15 } else { 1.0 };
+            let swing = (motion.phase + limb.phase).sin() * amplitude * walk * carry;
 
             // Flailing is two different things. Off the ground it is panic,
             // and every limb kicks. On the ground it is *work* — hammering,
@@ -178,7 +214,59 @@ pub fn animate_creatures(
                 0.0
             };
 
-            transform.rotation = Quat::from_rotation_x(swing + flail + drift);
+            // Kneeling: the sink does most of the work; the thighs tilt
+            // gently forward over the grounded knees, the arms lift a
+            // little toward the clasp of prayer.
+            let kneel_upper = if limb.is_arm {
+                kneel * 0.15
+            } else {
+                kneel * 0.35
+            };
+
+            transform.rotation =
+                Quat::from_rotation_x((swing + flail + drift) * (1.0 - kneel) + kneel_upper);
+
+            // The hinge. Bends are one-signed - a knee does not hyperextend -
+            // so each contribution is shaped before it is summed.
+            let Ok(mut hinge) = transforms.get_mut(limb.lower) else {
+                continue;
+            };
+            let bend = if limb.is_arm {
+                // A living elbow is never quite straight; it bends further as
+                // the arm swings forward, while working pumps it around a
+                // hammering angle, burdens hold it fast to the chest, and
+                // panic in the air throws it around.
+                let rest = 0.18;
+                let stride = swing.max(0.0) * 0.8;
+                let work = if working {
+                    (0.9 + ((t * 13.0 + limb.phase).sin()) * 0.35) * motion.flail.min(1.0)
+                } else if off_ground && motion.flail > 0.0 {
+                    ((t * 11.0 + limb.phase * 3.0).sin()) * motion.flail * 0.7
+                } else {
+                    0.0
+                };
+                let hold = if laden { 1.25 } else { 0.0 };
+                let pray = kneel * 0.55;
+                (rest + stride * (1.0 - kneel) + work + hold).max(0.0) + pray
+            } else {
+                // The knee: a touch of life standing, a bend that peaks as the
+                // leg swings through its recovery, folded right under when
+                // kneeling, kicking when carried off.
+                let rest = -0.06;
+                let knee_room = if robed { 0.3 } else { 1.15 };
+                let stride = -(motion.phase + limb.phase - 0.9).sin().max(0.0)
+                    * gait.stride_swing
+                    * knee_room
+                    * walk;
+                let panic = if off_ground && motion.flail > 0.0 {
+                    -((t * 12.0 + limb.phase * 2.0).sin().abs()) * motion.flail * 0.8
+                } else {
+                    0.0
+                };
+                let fold = kneel * -1.85;
+                (rest + stride * (1.0 - kneel) + panic).min(0.0) + fold
+            };
+            hinge.rotation = Quat::from_rotation_x(bend);
         }
 
         // Tail: trails behind the stride, with a slow idle swish.

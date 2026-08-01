@@ -147,6 +147,12 @@ impl Route {
 #[derive(Component)]
 pub struct Held;
 
+/// Present while this creature's arms are full - a log on the shoulder, a
+/// stone at the chest. The animator stills the arm swing and bends the
+/// elbows to hold the burden instead of swinging through it.
+#[derive(Component)]
+pub struct Laden;
+
 /// Present while the creature is in the air, carrying its current velocity.
 #[derive(Component)]
 pub struct Airborne {

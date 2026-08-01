@@ -49,10 +49,14 @@ pub fn init_creature_assets(
     commands.insert_resource(CreatureAssets { cube, materials });
 }
 
-/// A limb the animator drives.
+/// A limb the animator drives: two segments, hinged at the knee or elbow.
 #[derive(Clone, Copy, Debug)]
 pub struct Limb {
+    /// The upper joint - shoulder or hip. Rotating it swings the whole limb.
     pub entity: Entity,
+    /// The lower joint - elbow or knee - a child of the upper segment.
+    /// Rotating it bends the limb, the way the god hand's fingers curl.
+    pub lower: Entity,
     /// Offset into the stride cycle, in radians. Diagonal pairs share a phase.
     pub phase: f32,
     /// Arms swing counter to legs and at reduced amplitude.
@@ -111,6 +115,57 @@ fn spawn_part(
     ));
 
     joint_entity
+}
+
+/// How far above the upper segment's foot the hinge sits, as a fraction of
+/// limb thickness. The lower segment is slimmer and starts inside the upper
+/// box, so the joint stays covered when it bends instead of opening a gap.
+const HINGE_TUCK: f32 = 0.3;
+
+/// Spawns a two-segment limb hanging from a joint: an upper box from the
+/// shoulder or hip, and a slimmer lower box from a hinge - the elbow or
+/// knee - tucked just inside the upper box's foot. Returns both joints.
+#[allow(clippy::too_many_arguments)]
+fn spawn_limb(
+    commands: &mut Commands,
+    assets: &CreatureAssets,
+    parent: Entity,
+    joint: Vec3,
+    thickness: f32,
+    length: f32,
+    split: f32,
+    upper_tone: Tone,
+    lower_tone: Tone,
+    name: &'static str,
+    lower_name: &'static str,
+) -> (Entity, Entity) {
+    let tuck = thickness * HINGE_TUCK;
+    let upper_len = length * split;
+    let lower_len = length - upper_len + tuck;
+    let upper = spawn_part(
+        commands,
+        assets,
+        parent,
+        joint,
+        Vec3::new(thickness, upper_len, thickness),
+        Vec3::NEG_Y,
+        upper_tone,
+        name,
+    );
+    // The hinge lives in the upper joint's space, so the upper swing carries
+    // the lower segment with it; the lower box is narrower than the upper on
+    // purpose - matching widths would put their faces coplanar and z-fight.
+    let lower = spawn_part(
+        commands,
+        assets,
+        upper,
+        Vec3::new(0.0, -(upper_len - tuck), 0.0),
+        Vec3::new(thickness * 0.82, lower_len, thickness * 0.82),
+        Vec3::NEG_Y,
+        lower_tone,
+        lower_name,
+    );
+    (upper, lower)
 }
 
 /// Shoulder width of a biped's torso.
@@ -340,7 +395,10 @@ fn spawn_garment_features(
                 assets,
                 body,
                 Vec3::new(0.0, leg_len - skirt_len * 0.5, 0.0),
-                Vec3::new(torso_w * 1.26, skirt_len, torso_d * 1.3),
+                // Full enough fore and aft to keep the knees' new swing
+                // inside the cloth; the animator meets it halfway by giving
+                // robe-wearers a shorter, straighter step.
+                Vec3::new(torso_w * 1.34, skirt_len, torso_d * 1.5),
                 genome.cloth.shifted(-1),
                 "Robe",
             );
@@ -362,7 +420,9 @@ fn spawn_garment_features(
                 assets,
                 sash,
                 Vec3::ZERO,
-                Vec3::new(torso_w * 1.5, torso_len * 0.22, torso_d * 1.16),
+                // Ends tucked inside the shoulders: any wider and the tilted
+                // band reaches into the channel the arms swing through.
+                Vec3::new(torso_w * 1.02, torso_len * 0.24, torso_d * 1.16),
                 genome.accent,
                 "Sash",
             );
@@ -474,25 +534,31 @@ fn build_biped(
 
     let mut limbs = Vec::with_capacity(4);
 
-    // Legs. Half a cycle apart so they alternate.
+    // Legs. Half a cycle apart so they alternate; the thigh takes slightly
+    // more than half the length, the way legs actually divide.
     let leg_x = torso_w * 0.26;
+    let leg_tone = if genome.trousers {
+        genome.accent
+    } else {
+        genome.skin.shifted(-1)
+    };
     for (i, side) in [-1.0f32, 1.0].into_iter().enumerate() {
-        let entity = spawn_part(
+        let (entity, lower) = spawn_limb(
             commands,
             assets,
             body,
             Vec3::new(side * leg_x, leg_len, 0.0),
-            Vec3::new(th * 0.85, leg_len, th * 0.85),
-            Vec3::NEG_Y,
-            if genome.trousers {
-                genome.accent
-            } else {
-                genome.skin.shifted(-1)
-            },
+            th * 0.85,
+            leg_len,
+            0.52,
+            leg_tone,
+            leg_tone,
             "Leg",
+            "Shin",
         );
         limbs.push(Limb {
             entity,
+            lower,
             phase: i as f32 * std::f32::consts::PI,
             is_arm: false,
         });
@@ -501,18 +567,22 @@ fn build_biped(
     // Arms, counter-phased against the leg on the same side.
     let shoulder_y = leg_len + torso_len - th * 0.4;
     for (i, side) in [-1.0f32, 1.0].into_iter().enumerate() {
-        let entity = spawn_part(
+        let (entity, lower) = spawn_limb(
             commands,
             assets,
             body,
             Vec3::new(side * (torso_w * 0.5 + th * 0.2), shoulder_y, 0.0),
-            Vec3::new(th * 0.6, arm_len, th * 0.6),
-            Vec3::NEG_Y,
+            th * 0.6,
+            arm_len,
+            0.52,
+            genome.skin,
             genome.skin,
             "Arm",
+            "Forearm",
         );
         limbs.push(Limb {
             entity,
+            lower,
             phase: (i as f32 + 1.0) * std::f32::consts::PI,
             is_arm: true,
         });
@@ -652,18 +722,22 @@ fn build_quadruped(
         (-1.0, leg_z, pi),
         (1.0, leg_z, 0.0),
     ] {
-        let entity = spawn_part(
+        let (entity, lower) = spawn_limb(
             commands,
             assets,
             body,
             Vec3::new(side * leg_x, leg_len, z),
-            Vec3::new(th * 0.7, leg_len, th * 0.7),
-            Vec3::NEG_Y,
+            th * 0.7,
+            leg_len,
+            0.55,
+            genome.skin.shifted(-1),
             genome.skin.shifted(-1),
             "Leg",
+            "Shin",
         );
         limbs.push(Limb {
             entity,
+            lower,
             phase,
             is_arm: false,
         });
@@ -823,6 +897,30 @@ mod tests {
         // Bipeds hold their heads level already, so theirs is identity.
         let (_world, rig) = build_in_test_world(Species::Human, 5);
         assert!(rig.head_rest.angle_between(Quat::IDENTITY) < 1e-5);
+    }
+
+    #[test]
+    fn every_limb_carries_a_hinge() {
+        // Knees and elbows: the lower joint must exist, be distinct, and be a
+        // descendant of its own upper joint so the swing carries the bend.
+        for species in [Species::Human, Species::Wolf] {
+            let (world, rig) = build_in_test_world(species, 11);
+            for limb in &rig.limbs {
+                assert_ne!(limb.entity, limb.lower, "{species:?} hinge is its own hip");
+                let parent = world
+                    .get::<ChildOf>(limb.lower)
+                    .expect("hinge has no parent")
+                    .parent();
+                assert_eq!(parent, limb.entity, "{species:?} hinge hangs elsewhere");
+                let hinge = world
+                    .get::<Transform>(limb.lower)
+                    .expect("hinge has no transform");
+                assert!(
+                    hinge.translation.y < 0.0,
+                    "{species:?} hinge sits above its own joint"
+                );
+            }
+        }
     }
 
     #[test]

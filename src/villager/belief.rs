@@ -114,6 +114,26 @@ impl Belief {
 /// Desperation means real absence: hungry, an empty store, and no fruiting
 /// bush within reach. A player who steals a village's bushes *causes* prayer —
 /// famine is a lever, and so is generosity.
+/// Prayer is something you can see now: whoever is praying goes down on
+/// their knees, and stands back up when the prayer leaves them. One writer
+/// for the posture, so there are no cleanup edges to miss.
+pub(super) fn take_a_knee(
+    mut folk: Query<
+        (&Activity, &mut crate::creature::anim::CreatureMotion),
+        (With<Villager>, Without<crate::creature::Corpse>),
+    >,
+) {
+    // The dial forces the whole village to its knees, so the pose can be
+    // photographed without waiting for someone to feel like praying.
+    let staged = std::env::var("DIVUS_FACTUS_KNEEL_TEST").is_ok();
+    for (activity, mut motion) in &mut folk {
+        let kneeling = staged || matches!(activity, Activity::Praying);
+        if motion.kneeling != kneeling {
+            motion.kneeling = kneeling;
+        }
+    }
+}
+
 pub(super) fn kneel(
     mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,

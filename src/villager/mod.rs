@@ -171,6 +171,7 @@ impl Plugin for VillagerPlugin {
                     (
                         belief::endow_faith,
                         belief::kneel,
+                        belief::take_a_knee,
                         belief::answer_prayers,
                         belief::despair,
                         belief::faith_of_witnesses.after(crate::witness::WitnessSet),

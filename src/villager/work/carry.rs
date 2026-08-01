@@ -42,6 +42,7 @@ pub(crate) fn shoulder_stone(
         Transform::from_xyz(0.0, 1.05, -0.38).with_scale(Vec3::new(0.45, 0.32, 0.34)),
         ChildOf(carrier),
     ));
+    commands.entity(carrier).insert(crate::creature::Laden);
 }
 
 /// Puts a log in someone's arms.
@@ -62,6 +63,7 @@ pub(crate) fn shoulder_wood(
         Transform::from_xyz(0.0, 1.05, -0.38).with_scale(Vec3::new(0.95, 0.2, 0.2)),
         ChildOf(carrier),
     ));
+    commands.entity(carrier).insert(crate::creature::Laden);
 }
 
 /// Takes the log back out of their arms.
@@ -78,4 +80,7 @@ pub(crate) fn shed_wood(
             }
         }
     }
+    commands
+        .entity(carrier)
+        .try_remove::<crate::creature::Laden>();
 }
