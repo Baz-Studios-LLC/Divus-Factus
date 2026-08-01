@@ -940,6 +940,24 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 .find(|(w, _, _)| w == name)
                 .copied()
                 .unwrap_or(("", "bone", 0.5));
+            // The sleeping place is shaped like the sleeper: a body laid
+            // out at the game's own proportions, head toward the widget's
+            // own facing. No guessing whether a bed is long enough, or
+            // which end the pillow wants to be.
+            if *name == "sleep" {
+                return vec![
+                    // Head, at the facing end.
+                    slab(0.6875, 0.25, 0.0, 0.4375, 0.4375, 0.4375, ramp, shade),
+                    // Torso.
+                    slab(0.125, 0.1875, 0.0, 0.75, 0.3125, 0.4375, ramp, shade),
+                    // Arms alongside.
+                    slab(0.125, 0.125, -0.3125, 0.625, 0.1875, 0.1875, ramp, shade),
+                    slab(0.125, 0.125, 0.3125, 0.625, 0.1875, 0.1875, ramp, shade),
+                    // Legs, to the foot of the bed.
+                    slab(-0.5625, 0.125, -0.125, 0.625, 0.25, 0.1875, ramp, shade),
+                    slab(-0.5625, 0.125, 0.125, 0.625, 0.25, 0.1875, ramp, shade),
+                ];
+            }
             vec![
                 slab(0.0, 0.2, 0.0, 0.4, 0.4, 0.4, ramp, shade),
                 // The nose: which way the widget faces.
