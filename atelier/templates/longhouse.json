@@ -3,11 +3,11 @@
   "name": "longhouse",
   "parts": [
     {
-      "part": "floor",
+      "part": "floor-6.0x13.0",
       "at": [
-        -2.0,
+        0,
         0.0,
-        -6.0
+        0
       ],
       "yaw": 0.0,
       "tilt": 0.0,
@@ -16,267 +16,7 @@
       "stage": "footing"
     },
     {
-      "part": "floor",
-      "at": [
-        -2.0,
-        0.0,
-        -4.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        -2.0,
-        0.0,
-        -2.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        -2.0,
-        0.0,
-        0.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        -2.0,
-        0.0,
-        2.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        -2.0,
-        0.0,
-        4.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        -2.0,
-        0.0,
-        6.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        0.0,
-        0.0,
-        -6.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        0.0,
-        0.0,
-        -4.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        0.0,
-        0.0,
-        -2.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        0.0,
-        0.0,
-        2.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        0.0,
-        0.0,
-        4.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        0.0,
-        0.0,
-        6.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        2.0,
-        0.0,
-        -6.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        2.0,
-        0.0,
-        -4.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        2.0,
-        0.0,
-        -2.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        2.0,
-        0.0,
-        0.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        2.0,
-        0.0,
-        2.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        2.0,
-        0.0,
-        4.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "floor",
-      "at": [
-        2.0,
-        0.0,
-        6.0
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "footing"
-    },
-    {
-      "part": "wall-5.8",
+      "part": "wall-6.0",
       "at": [
         0,
         0.0,
@@ -289,7 +29,7 @@
       "stage": "walls"
     },
     {
-      "part": "wall-5.8",
+      "part": "wall-6.0",
       "at": [
         0,
         0.0,
@@ -304,7 +44,7 @@
     {
       "part": "wall-13.0",
       "at": [
-        -2.9,
+        -3.0,
         0.0,
         0
       ],
@@ -317,7 +57,7 @@
     {
       "part": "widget:door",
       "at": [
-        2.9,
+        3.0,
         0.0,
         -3.25
       ],
@@ -330,7 +70,7 @@
     {
       "part": "widget:door",
       "at": [
-        2.9,
+        3.0,
         0.0,
         3.25
       ],
@@ -341,11 +81,11 @@
       "stage": "widget"
     },
     {
-      "part": "wall-3.67",
+      "part": "wall-3.5",
       "at": [
-        2.9,
+        3.0,
         0.0,
-        -4.667
+        -4.75
       ],
       "yaw": 1.5708,
       "tilt": 0.0,
@@ -354,9 +94,9 @@
       "stage": "walls"
     },
     {
-      "part": "wall-3.67",
+      "part": "wall-3.5",
       "at": [
-        2.9,
+        3.0,
         0.0,
         0.0
       ],
@@ -367,11 +107,11 @@
       "stage": "walls"
     },
     {
-      "part": "wall-3.67",
+      "part": "wall-3.5",
       "at": [
-        2.9,
+        3.0,
         0.0,
-        4.667
+        4.75
       ],
       "yaw": 1.5708,
       "tilt": 0.0,
@@ -382,9 +122,9 @@
     {
       "part": "prop:bed",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
-        -5.6
+        -5.5
       ],
       "yaw": -1.5708,
       "tilt": 0.0,
@@ -395,9 +135,9 @@
     {
       "part": "widget:sleep",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
-        -5.6
+        -5.5
       ],
       "yaw": 3.1416,
       "tilt": 0.0,
@@ -408,7 +148,7 @@
     {
       "part": "prop:bed",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
         -4.0
       ],
@@ -421,7 +161,7 @@
     {
       "part": "widget:sleep",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
         -4.0
       ],
@@ -434,9 +174,9 @@
     {
       "part": "prop:bed",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
-        -2.4
+        -2.5
       ],
       "yaw": -1.5708,
       "tilt": 0.0,
@@ -447,9 +187,9 @@
     {
       "part": "widget:sleep",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
-        -2.4
+        -2.5
       ],
       "yaw": 3.1416,
       "tilt": 0.0,
@@ -460,9 +200,9 @@
     {
       "part": "prop:bed",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
-        -0.8
+        -1.0
       ],
       "yaw": -1.5708,
       "tilt": 0.0,
@@ -473,9 +213,9 @@
     {
       "part": "widget:sleep",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
-        -0.8
+        -1.0
       ],
       "yaw": 3.1416,
       "tilt": 0.0,
@@ -486,9 +226,9 @@
     {
       "part": "prop:bed",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
-        0.8
+        0.5
       ],
       "yaw": -1.5708,
       "tilt": 0.0,
@@ -499,9 +239,9 @@
     {
       "part": "widget:sleep",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
-        0.8
+        0.5
       ],
       "yaw": 3.1416,
       "tilt": 0.0,
@@ -512,9 +252,9 @@
     {
       "part": "prop:bed",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
-        2.4
+        2.0
       ],
       "yaw": -1.5708,
       "tilt": 0.0,
@@ -525,9 +265,9 @@
     {
       "part": "widget:sleep",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
-        2.4
+        2.0
       ],
       "yaw": 3.1416,
       "tilt": 0.0,
@@ -538,9 +278,9 @@
     {
       "part": "prop:bed",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
-        4.0
+        3.5
       ],
       "yaw": -1.5708,
       "tilt": 0.0,
@@ -551,9 +291,9 @@
     {
       "part": "widget:sleep",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
-        4.0
+        3.5
       ],
       "yaw": 3.1416,
       "tilt": 0.0,
@@ -564,9 +304,9 @@
     {
       "part": "prop:bed",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
-        5.6
+        5.0
       ],
       "yaw": -1.5708,
       "tilt": 0.0,
@@ -577,9 +317,9 @@
     {
       "part": "widget:sleep",
       "at": [
-        -2.2,
+        -2.25,
         0.0,
-        5.6
+        5.0
       ],
       "yaw": 3.1416,
       "tilt": 0.0,
@@ -590,7 +330,7 @@
     {
       "part": "prop:hearth",
       "at": [
-        1.6,
+        1.75,
         0.0,
         -3.0
       ],
@@ -603,7 +343,7 @@
     {
       "part": "widget:fire",
       "at": [
-        1.6,
+        1.75,
         0.0,
         -3.0
       ],
@@ -616,7 +356,7 @@
     {
       "part": "widget:smoke",
       "at": [
-        1.6,
+        1.75,
         0.0,
         -3.0
       ],
@@ -629,7 +369,7 @@
     {
       "part": "prop:hearth",
       "at": [
-        1.6,
+        1.75,
         0.0,
         3.0
       ],
@@ -642,7 +382,7 @@
     {
       "part": "widget:fire",
       "at": [
-        1.6,
+        1.75,
         0.0,
         3.0
       ],
@@ -655,7 +395,7 @@
     {
       "part": "widget:smoke",
       "at": [
-        1.6,
+        1.75,
         0.0,
         3.0
       ],
@@ -668,7 +408,7 @@
     {
       "part": "prop:table",
       "at": [
-        0.6,
+        0.5,
         0.0,
         0.0
       ],
@@ -681,9 +421,9 @@
     {
       "part": "prop:bench",
       "at": [
-        0.6,
+        0.5,
         0.0,
-        -1.1
+        -1.0
       ],
       "yaw": 0,
       "tilt": 0.0,
@@ -694,9 +434,9 @@
     {
       "part": "widget:sit",
       "at": [
-        0.6,
+        0.5,
         0.0,
-        -1.1
+        -1.0
       ],
       "yaw": 1.5708,
       "tilt": 0.0,
@@ -707,9 +447,9 @@
     {
       "part": "prop:bench",
       "at": [
-        0.6,
+        0.5,
         0.0,
-        1.1
+        1.0
       ],
       "yaw": 3.1416,
       "tilt": 0.0,
@@ -720,9 +460,9 @@
     {
       "part": "widget:sit",
       "at": [
-        0.6,
+        0.5,
         0.0,
-        1.1
+        1.0
       ],
       "yaw": -1.5708,
       "tilt": 0.0,

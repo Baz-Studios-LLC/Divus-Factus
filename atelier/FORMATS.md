@@ -36,7 +36,11 @@ local X: positive carries the free end forward).
 **The lattice**: every coordinate and dimension is a whole multiple of
 1/16 m - the universal quantum. Coarse work steps 4/16, joints land on
 2/16, fine work on 1/16. Binary fractions carry exactly in floats, so
-two parts that should meet, meet.
+two parts that should meet, meet. STRUCTURAL DIMENSIONS obey it too:
+walls 0.25 x 2.5, floors and roofs 0.125 thick, foundations 0.375,
+trim 0.3125 high, door openings 1.25 x 2.125, windows 1.25 x 1.25
+with the sill at 0.75. Furniture stays organic - nothing joins
+against a stool.
 
 Local space: +Y up, metres. Position and orientation on the bench are
 FREE: the import rebases the building on its own bounds, and the door

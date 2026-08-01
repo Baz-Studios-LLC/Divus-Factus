@@ -17,7 +17,7 @@ use crate::stage::BuilderFurniture;
 /// conforms to these when its buildings are replaced. A quarter-metre
 /// wall on a quarter-metre grid means centrelines always land on snaps.
 const WALL_THICK: f32 = 0.25;
-const WALL_HIGH: f32 = 2.4;
+const WALL_HIGH: f32 = 2.5;
 
 /// One box of a part's body: offset from the part origin, size, ramp,
 /// shade, and how much of the world shows through it (1.0 = none).
@@ -230,23 +230,23 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             "wood",
             0.7,
         )],
-        PartKind::Floor(w, d) => vec![slab(0.0, 0.06, 0.0, *w, 0.12, *d, "wood", 0.5)],
-        PartKind::FloorRun => vec![slab(0.0, 0.06, 0.0, 0.25, 0.12, 0.25, "wood", 0.5)],
+        PartKind::Floor(w, d) => vec![slab(0.0, 0.0625, 0.0, *w, 0.125, *d, "wood", 0.5)],
+        PartKind::FloorRun => vec![slab(0.0, 0.0625, 0.0, 0.25, 0.125, 0.25, "wood", 0.5)],
         PartKind::Foundation(w, d) => {
-            vec![slab(0.0, 0.175, 0.0, *w, 0.35, *d, "stone", 0.55)]
+            vec![slab(0.0, 0.1875, 0.0, *w, 0.375, *d, "stone", 0.55)]
         }
         PartKind::FoundationRun => {
-            vec![slab(0.0, 0.175, 0.0, 0.25, 0.35, 0.25, "stone", 0.55)]
+            vec![slab(0.0, 0.1875, 0.0, 0.25, 0.375, 0.25, "stone", 0.55)]
         }
-        PartKind::Roof(w, d) => vec![slab(0.0, 0.07, 0.0, *w, 0.14, *d, "earth", 0.4)],
-        PartKind::RoofRun => vec![slab(0.0, 0.07, 0.0, 0.25, 0.14, 0.25, "earth", 0.4)],
+        PartKind::Roof(w, d) => vec![slab(0.0, 0.0625, 0.0, *w, 0.125, *d, "earth", 0.4)],
+        PartKind::RoofRun => vec![slab(0.0, 0.0625, 0.0, 0.25, 0.125, 0.25, "earth", 0.4)],
         PartKind::Trim { long, stone } => {
             let (ramp, shade) = if *stone {
                 ("stone", 0.55)
             } else {
                 ("wood", 0.5)
             };
-            vec![slab(0.0, 0.15, 0.0, *long, 0.3, 0.125, ramp, shade)]
+            vec![slab(0.0, 0.15625, 0.0, *long, 0.3125, 0.125, ramp, shade)]
         }
         PartKind::TrimRun { stone } => {
             let (ramp, shade) = if *stone {
@@ -254,7 +254,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             } else {
                 ("wood", 0.5)
             };
-            vec![slab(0.0, 0.15, 0.0, 0.25, 0.3, 0.125, ramp, shade)]
+            vec![slab(0.0, 0.15625, 0.0, 0.25, 0.3125, 0.125, ramp, shade)]
         }
         PartKind::Prop("bed") => vec![
             // The game's own bed: frame, mattress, pillow at +Z (the head).
@@ -376,40 +376,50 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             ),
         ],
         PartKind::Prop("door") => vec![
-            // Jambs, lintel board, and the leaf itself, set just proud of
-            // the wall plane with a gold latch.
-            slab(-0.54, 1.0, 0.0, 0.08, 2.0, 0.3, "wood", 0.45),
-            slab(0.54, 1.0, 0.0, 0.08, 2.0, 0.3, "wood", 0.45),
-            slab(0.0, 2.04, 0.0, 1.16, 0.09, 0.3, "wood", 0.45),
-            slab(0.0, 0.98, 0.03, 0.96, 1.94, 0.08, "wood", 0.35),
-            slab(0.35, 1.0, 0.08, 0.07, 0.07, 0.05, "cloth-gold", 0.8),
+            // Jambs, lintel board, and the leaf itself, all on the
+            // lattice, with a gold latch.
+            slab(-0.5625, 1.0, 0.0, 0.125, 2.0, 0.3125, "wood", 0.45),
+            slab(0.5625, 1.0, 0.0, 0.125, 2.0, 0.3125, "wood", 0.45),
+            slab(0.0, 2.0625, 0.0, 1.25, 0.125, 0.3125, "wood", 0.45),
+            slab(0.0, 1.0, 0.03125, 1.0, 1.9375, 0.0625, "wood", 0.35),
+            slab(
+                0.375,
+                1.0,
+                0.0625,
+                0.0625,
+                0.0625,
+                0.0625,
+                "cloth-gold",
+                0.8,
+            ),
         ],
         PartKind::Prop("window") => vec![
-            // Frame boards around the opening and a pale pane within it.
-            slab(-0.49, 1.35, 0.0, 0.07, 1.04, 0.28, "wood", 0.45),
-            slab(0.49, 1.35, 0.0, 0.07, 1.04, 0.28, "wood", 0.45),
-            slab(0.0, 0.86, 0.0, 1.05, 0.08, 0.32, "wood", 0.45),
-            slab(0.0, 1.84, 0.0, 1.05, 0.08, 0.28, "wood", 0.45),
-            glass(0.0, 1.35, 0.0, 0.92, 0.92, 0.05, "sky", 0.8),
-            slab(0.0, 1.35, 0.02, 0.05, 0.92, 0.04, "wood", 0.5),
-            slab(0.0, 1.35, 0.02, 0.92, 0.05, 0.04, "wood", 0.5),
+            // Frame boards around the opening and a pale pane within it,
+            // all on the lattice.
+            slab(-0.5625, 1.375, 0.0, 0.125, 1.125, 0.3125, "wood", 0.45),
+            slab(0.5625, 1.375, 0.0, 0.125, 1.125, 0.3125, "wood", 0.45),
+            slab(0.0, 0.8125, 0.0, 1.25, 0.125, 0.375, "wood", 0.45),
+            slab(0.0, 1.9375, 0.0, 1.25, 0.125, 0.3125, "wood", 0.45),
+            glass(0.0, 1.375, 0.0, 1.0, 1.0, 0.0625, "sky", 0.8),
+            slab(0.0, 1.375, 0.03125, 0.0625, 1.0, 0.0625, "wood", 0.5),
+            slab(0.0, 1.375, 0.03125, 1.0, 0.0625, 0.0625, "wood", 0.5),
         ],
         PartKind::Prop("trim-corner") => vec![
             // An L that wraps an outside corner: two legs meeting at the
             // origin, turned to face with R. Runs of straight trim meet
             // its ends on the grid.
-            slab(0.1875, 0.15, 0.0, 0.375, 0.3, 0.125, "wood", 0.5),
-            slab(0.0, 0.15, 0.1875, 0.125, 0.3, 0.375, "wood", 0.5),
+            slab(0.1875, 0.15625, 0.0, 0.375, 0.3125, 0.125, "wood", 0.5),
+            slab(0.0, 0.15625, 0.1875, 0.125, 0.3125, 0.375, "wood", 0.5),
         ],
         PartKind::Prop("trim-corner-stone") => vec![
-            slab(0.1875, 0.15, 0.0, 0.375, 0.3, 0.125, "stone", 0.55),
-            slab(0.0, 0.15, 0.1875, 0.125, 0.3, 0.375, "stone", 0.55),
+            slab(0.1875, 0.15625, 0.0, 0.375, 0.3125, 0.125, "stone", 0.55),
+            slab(0.0, 0.15625, 0.1875, 0.125, 0.3125, 0.375, "stone", 0.55),
         ],
         PartKind::Prop("steps") => vec![
-            // Three treads rising the plinth's 0.35, approached from +X.
-            slab(0.4, 0.06, 0.0, 0.4, 0.12, 1.2, "stone", 0.6),
-            slab(0.05, 0.175, 0.0, 0.35, 0.35, 1.2, "stone", 0.55),
-            slab(-0.28, 0.29, 0.0, 0.32, 0.58, 1.2, "stone", 0.5),
+            // Three treads rising the foundation's 0.375, from +X.
+            slab(0.375, 0.0625, 0.0, 0.375, 0.125, 1.25, "stone", 0.6),
+            slab(0.0, 0.125, 0.0, 0.375, 0.25, 1.25, "stone", 0.55),
+            slab(-0.375, 0.1875, 0.0, 0.375, 0.375, 1.25, "stone", 0.5),
         ],
         PartKind::Prop("cradle") => vec![
             slab(0.0, 0.3, 0.0, 0.55, 0.3, 0.9, "wood", 0.55),
@@ -2260,8 +2270,8 @@ fn place_grab_remove(
             // stand alone: if one lands on a wall, the wall parts around
             // the opening and the frame settles in.
             let opening = match kind {
-                PartKind::Prop("door") => Some((1.16, 2.04, 0.0_f32, true)),
-                PartKind::Prop("window") => Some((1.05, 1.84, 0.9, false)),
+                PartKind::Prop("door") => Some((1.25, 2.125, 0.0_f32, true)),
+                PartKind::Prop("window") => Some((1.25, 2.0, 0.75, false)),
                 _ => None,
             };
             let punched = if let Some((wide, head, sill, is_door)) = opening
