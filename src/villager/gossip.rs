@@ -117,10 +117,11 @@ pub struct Conversing {
     pub replied: bool,
     /// The whole memory, not just its kind: the telling needs who it
     /// happened to, in the teller's own terms.
+    ///
+    /// (A listener's fellow-witness standing is read at the moment their
+    /// reply is composed, straight from their own memories — the old
+    /// `hearing` echo retired with the stock replies it served.)
     pub kind: Option<crate::witness::Memory>,
-    /// What the other party is telling — so a listener who saw the same
-    /// thing can answer as a fellow witness, not a doubter.
-    pub hearing: Option<crate::witness::DivineEventKind>,
 }
 
 /// Whoever has news finds an idle neighbour and goes TO them: both stop,
@@ -200,7 +201,6 @@ pub(crate) fn meet_to_talk(
                 until,
                 spoke_at: None,
                 replied: false,
-                hearing: None,
                 kind: Some(memory.clone()),
             },
             Activity::Chatting,
@@ -212,7 +212,6 @@ pub(crate) fn meet_to_talk(
                 spoke_at: None,
                 replied: false,
                 kind: None,
-                hearing: Some(memory.kind),
             },
             Activity::Chatting,
         ));
@@ -359,30 +358,24 @@ pub(crate) fn hold_conversations(
             if let Some(line) = &spoken {
                 info!("{teller_name} tells it in their own words: {line}");
             }
-            let own_words = spoken.is_some();
-            // A watched telling whose words never came back shows NOTHING:
-            // the pair still meet, the knowledge still moves, the chronicle
-            // still records — only the bubble is withheld. Under the god's
-            // nose it is their own words or a quiet exchange, never stock.
-            // The first ask of each story shape lands here, once, while the
-            // cache fills.
-            let missed = spoken.is_none() && regard.worth_composing() && tongue.is_some();
             // Drawn every telling whether or not it is the one used, so that
             // the simulation's draw from the shared stream does not depend on
-            // whether a model happened to answer in time.
+            // whether a model happened to answer in time. The written
+            // phrasing never reaches a bubble any more — it serves the
+            // chronicle and the reply prompt, the world's record of what
+            // passed between them.
             let written = (*rng.0.pick(kind.rumors())).to_string();
+            let composed = spoken.is_some();
             // Kept in the world's own register — "the god", never the name —
             // because it goes back INTO a prompt as what the listener heard.
-            let told_plain = spoken.unwrap_or(written);
+            let told_plain = spoken.clone().unwrap_or(written);
             let told = told_plain.replace("the god", god);
 
             // The listener's answer starts composing NOW, while the telling
             // hangs in the air: the reply beat lands several seconds from
             // here, which is more than a line takes, so the answer is
-            // almost always waiting when their turn comes. A telling that
-            // was itself withheld asks for no answer — half a conversation
-            // on screen would be stranger than a quiet one.
-            if !missed
+            // almost always waiting when their turn comes.
+            if composed
                 && let Some(tongue) = tongue.as_mut()
                 && let Some(partner_at) = spot_of(talk.partner)
                 && crate::attention::regard(attention.as_deref(), partner_at).worth_composing()
@@ -433,14 +426,16 @@ pub(crate) fn hold_conversations(
                 });
             }
             // The bubble is for the player; the telling is for the village.
-            // Off the frame there is no bubble, and everything below still
-            // happens.
-            if regard.worth_saying() && !missed {
+            // Only composed words are shown — a telling whose words never
+            // came back happens quietly, and everything below still happens.
+            if let Some(line) = &spoken
+                && regard.worth_saying()
+            {
                 say.write(crate::ui::Say {
                     speaker: entity,
-                    text: told.clone(),
+                    text: line.replace("the god", god),
                     thought: false,
-                    own_words,
+                    own_words: true,
                 });
             }
             if let Ok((listener_person, mut witnessed, chronicle, faith)) =
@@ -482,52 +477,7 @@ pub(crate) fn hold_conversations(
                 }
                 continue;
             }
-            // A watched listener whose answer never came says nothing — a
-            // beat of silence is honest, a stock line under the god's nose
-            // is the thing being retired. The written replies keep serving
-            // the middle distance, where nothing is composed at all.
-            if regard.worth_composing() && tongue.is_some() {
-                continue;
-            }
-            // A listener who stood there too answers as a fellow witness,
-            // not a doubter — shared awe, not scepticism.
-            let saw_it_too = talk.hearing.is_some_and(|kind| {
-                minds
-                    .get(entity)
-                    .is_ok_and(|(_, witnessed, _, _)| witnessed.remembers(kind))
-            });
-            let reply = if saw_it_too {
-                *rng.0.pick(&[
-                    "I saw it too - I can still hardly breathe",
-                    "you too? I thought my eyes had broken",
-                    "I was THERE - every word of it is true",
-                    "no story. I stood right beside you",
-                    "I have thought of nothing else since",
-                    "we saw it together - who will believe us",
-                ])
-            } else {
-                *rng.0.pick(&[
-                    "truly?",
-                    "I half believe it",
-                    "the god again...",
-                    "so the stories are true",
-                    "keep your voice down",
-                    "who else knows of this?",
-                    "you swear it?",
-                    "stranger things have happened here",
-                    "tell it again, slower",
-                    "do not spread that too far",
-                    "I will believe it when I see it",
-                ])
-            };
-            if regard.worth_saying() {
-                say.write(crate::ui::Say {
-                    speaker: entity,
-                    text: reply.replace("the god", god),
-                    thought: false,
-                    own_words: false,
-                });
-            }
+            // No composed answer, no answer: a beat of silence is honest.
         }
     }
 }

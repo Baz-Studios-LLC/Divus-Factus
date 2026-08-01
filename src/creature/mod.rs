@@ -513,7 +513,10 @@ fn drowning(
     time: Res<Time>,
     terrain: Option<Res<Terrain>>,
     mut say_timer: Local<f32>,
-    mut say: MessageWriter<crate::ui::Say>,
+    mut telling: (
+        Option<ResMut<crate::telling::Tongue>>,
+        Option<Res<crate::attention::Attention>>,
+    ),
     mut rng: Local<Option<crate::rng::Rng>>,
     mut swimmers: Query<
         (
@@ -573,12 +576,23 @@ fn drowning(
 
         if *say_timer > 6.0 && rng.chance(0.3) {
             *say_timer = 0.0;
-            say.write(crate::ui::Say {
-                speaker: entity,
-                text: "help! the water has me".to_string(),
-                thought: false,
-                own_words: false,
-            });
+            // A drowning cry in their own words — urgent enough that the
+            // teller answers within a second, and honest silence otherwise.
+            if let Some(tongue) = telling.0.as_mut()
+                && crate::attention::regard(telling.1.as_deref(), at.translation).worth_composing()
+            {
+                tongue.muse(crate::telling::Musing {
+                    who: entity,
+                    voice: None,
+                    bearing: crate::villager::traits::Bearing::Plain,
+                    faith: crate::telling::FaithBand::Wavering,
+                    body: vec!["drowning"],
+                    place: Vec::new(),
+                    mind: "you are in deep water and cannot swim — cry for help".into(),
+                    heard: None,
+                    known: Vec::new(),
+                });
+            }
         }
     }
 }

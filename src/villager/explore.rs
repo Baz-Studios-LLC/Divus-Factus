@@ -98,7 +98,6 @@ pub(super) fn expeditions(
     mut rng: ResMut<super::SimRng>,
     mut notices: MessageWriter<crate::ui::Notice>,
     mut say: (
-        MessageWriter<crate::ui::Say>,
         Option<ResMut<crate::telling::Tongue>>,
         Option<Res<crate::attention::Attention>>,
     ),
@@ -246,10 +245,10 @@ pub(super) fn expeditions(
             known.radius += 9.0;
             // A watched homecoming is told in the explorer's own words.
             let composed = say
-                .1
+                .0
                 .as_mut()
                 .filter(|_| {
-                    crate::attention::regard(say.2.as_deref(), at.translation).worth_composing()
+                    crate::attention::regard(say.1.as_deref(), at.translation).worth_composing()
                 })
                 .map(|tongue| {
                     tongue.muse(crate::telling::Musing {
@@ -265,14 +264,9 @@ pub(super) fn expeditions(
                     })
                 })
                 .is_some();
-            if !composed {
-                say.0.write(crate::ui::Say {
-                    speaker: entity,
-                    text: what.to_string(),
-                    thought: false,
-                    own_words: false,
-                });
-            }
+            // Unwatched or unanswered: the moment passes quietly. Nothing
+            // written plays anywhere any more.
+            let _ = composed;
             if let Some(mut chronicle) = chronicle {
                 chronicle.record(
                     clock.day(),

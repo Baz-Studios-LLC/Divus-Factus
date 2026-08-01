@@ -4,8 +4,8 @@
 //! real mechanic — how fast they work, how hard belief lands, how quickly
 //! the heart mends, how often they talk, how much they eat — so two
 //! villagers with the same job and the same day live it differently. The
-//! inspector speaks them as manner ("diligent, and a glutton"), and small
-//! talk lets them confess themselves.
+//! inspector speaks them as manner ("diligent, and a glutton"), and the
+//! teller bends their words through [`Bearing`].
 
 use bevy::prelude::*;
 
@@ -209,86 +209,6 @@ impl Traits {
         } else {
             Bearing::Plain
         }
-    }
-
-    /// Small-talk lines this manner offers.
-    pub fn lines(&self) -> Vec<&'static str> {
-        let mut lines = Vec::new();
-        for t in &self.0 {
-            lines.extend_from_slice(match t {
-                Trait::Diligent => &[
-                    "idle hands itch",
-                    "the work does not do itself",
-                    "done beats perfect",
-                    "I will rest when the pile is stacked",
-                    "sweat now, sleep well later",
-                ][..],
-                Trait::Devout => &[
-                    "I said my thanks this morning",
-                    "nothing happens unwatched",
-                    "every meal is a small mercy",
-                    "I keep the god's name out of my complaints",
-                    "first fruits first, always",
-                ],
-                Trait::Cheerful => &[
-                    "could be worse, could be raining",
-                    "smile, it costs nothing",
-                    "every day has one good thing, find it",
-                    "laughter keeps the cold out",
-                    "I woke on the right side of the ground",
-                ],
-                Trait::Chatty => &[
-                    "did you hear about the fisher",
-                    "stop me if I told you this",
-                    "I only repeat what I hear, mostly",
-                    "a secret is just a story with buttons",
-                    "come, talk, the work will wait",
-                ],
-                Trait::Hardy => &[
-                    "cold never hurt anyone",
-                    "I have walked further on less",
-                    "blisters are just opinions",
-                    "I have slept on stones and thanked them",
-                    "weather is a mood, ignore it",
-                ],
-                Trait::Slothful => &[
-                    "it will keep until tomorrow",
-                    "why stand when you can sit",
-                    "hurry is a kind of greed",
-                    "rest is also work, thankless work",
-                    "the best ideas come lying down",
-                ],
-                Trait::Skeptic => &[
-                    "I believe what I can bite",
-                    "coincidence wears many masks",
-                    "a story grows a head taller each telling",
-                    "lightning is lightning",
-                    "ask who profits from the miracle",
-                ],
-                Trait::Gloomy => &[
-                    "it will probably rain",
-                    "good times never last",
-                    "every roof leaks eventually",
-                    "I expect little and am rarely wrong",
-                    "the winter will be long, I feel it",
-                ],
-                Trait::Quiet => &[
-                    "mm",
-                    "the wind says enough",
-                    "words wear out, silence does not",
-                    "some things are better unsaid",
-                    "hm",
-                ],
-                Trait::Glutton => &[
-                    "I think about supper all day",
-                    "one more helping, then",
-                    "I dream of bread more than glory",
-                    "the smell from the kitchen is torture",
-                    "share is a strong word",
-                ],
-            });
-        }
-        lines
     }
 }
 

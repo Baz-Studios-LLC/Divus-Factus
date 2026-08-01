@@ -124,7 +124,6 @@ pub(super) fn kneel(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut notices: MessageWriter<crate::ui::Notice>,
-    mut say: MessageWriter<crate::ui::Say>,
     // Bundled: some of these systems already press Bevy's parameter ceiling.
     mut telling: (
         Option<ResMut<crate::telling::Tongue>>,
@@ -221,14 +220,9 @@ pub(super) fn kneel(
                 })
             })
             .is_some();
-        if !composed {
-            say.write(crate::ui::Say {
-                speaker: entity,
-                text: format!("{god}, we are hungry. hear me"),
-                thought: true,
-                own_words: false,
-            });
-        }
+        // Unwatched or unanswered: the moment passes quietly. Nothing
+        // written plays anywhere any more.
+        let _ = composed;
         notices.write(crate::ui::Notice::new(format!(
             "{} prays to {god} for food",
             person.name

@@ -2159,9 +2159,11 @@ pub(crate) fn sermons(
     if let Some(line) = &composed {
         info!("the priest preaches it in their own words: {line}");
     }
-    let silent = composed.is_none() && regard.worth_composing() && tongue.is_some();
-    if regard.worth_saying() && !silent {
-        let line = composed.unwrap_or_else(|| sermon.rumor().to_string());
+    // Composed or silent: an unwatched pulpit still sways its congregation
+    // below; only the bubble is withheld.
+    if let Some(line) = composed
+        && regard.worth_saying()
+    {
         say.write(crate::ui::Say {
             speaker: preacher,
             text: format!("hear how {}", line.replace("the god", god)),

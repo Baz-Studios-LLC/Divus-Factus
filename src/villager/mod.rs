@@ -118,7 +118,6 @@ impl Plugin for VillagerPlugin {
                     rites::mourn,
                     rites::burials,
                     seek_company,
-                    speech::small_talk,
                     speech::muse_the_watched,
                     speech::show_musings,
                     stretch_settlement,
@@ -2457,73 +2456,6 @@ mod tests {
                 .any(|e| e.text.contains("heard from Bob")),
             "an unwatched telling still belongs in her chronicle: {:?}",
             chronicle.events,
-        );
-    }
-
-    #[test]
-    fn nothing_unwatched_asks_for_a_bubble() {
-        // The saving itself. The same meeting run twice — once with an eye on
-        // it, once with the eye turned away — counting the lines each asks for.
-        // The watched run is not decoration: without it, a village that had
-        // simply stopped meeting would pass the silent half.
-        fn hold_a_meeting(watching: crate::attention::Attention) -> usize {
-            let mut app = App::new();
-            app.insert_resource(Time::<()>::default());
-            app.init_resource::<crate::calendar::WorldClock>();
-            app.insert_resource(SimRng(Rng::new(8)));
-            app.insert_resource(watching);
-            app.add_message::<crate::ui::Say>();
-            app.add_systems(Update, (meet_to_talk, hold_conversations).chain());
-
-            for (at, name, saw) in [(0.0, "Bob", true), (1.4, "Sue", false)] {
-                app.world_mut().spawn((
-                    Villager,
-                    Transform::from_xyz(at, 0.0, 0.0),
-                    Activity::Idle,
-                    MoveTarget::default(),
-                    Person::born(name.into(), "Teller".into()),
-                    crate::witness::Witnessed {
-                        recent: if saw {
-                            vec![crate::witness::Memory {
-                                kind: crate::witness::DivineEventKind::Thrown,
-                                whom: None,
-                            }]
-                        } else {
-                            vec![]
-                        },
-                        total: u32::from(saw),
-                        secondhand: 0,
-                        told: 0,
-                    },
-                    Chronicle::default(),
-                ));
-            }
-
-            let mut said = 0usize;
-            for _ in 0..30 {
-                app.world_mut()
-                    .resource_mut::<Time>()
-                    .advance_by(std::time::Duration::from_secs(9));
-                app.update();
-                said += app
-                    .world_mut()
-                    .resource_mut::<Messages<crate::ui::Say>>()
-                    .drain()
-                    .count();
-            }
-            said
-        }
-
-        // `default()` has never seen a camera, which reads as watching
-        // everything — the same generous answer the headless soaks get.
-        assert!(
-            hold_a_meeting(crate::attention::Attention::default()) > 0,
-            "the watched meeting said nothing, so there is nothing to gate",
-        );
-        let unwatched = hold_a_meeting(crate::attention::Attention::blind());
-        assert_eq!(
-            unwatched, 0,
-            "an unwatched village asked for {unwatched} bubbles",
         );
     }
 

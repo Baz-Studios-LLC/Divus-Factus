@@ -525,7 +525,8 @@ pub fn model_dir() -> Option<std::path::PathBuf> {
     }
 }
 
-/// The weights and tokenizer to speak with, chosen from whatever is on disk.
+/// The weights to speak with, chosen from whatever is on disk. (The
+/// tokenizer lives inside the GGUF itself since the llama.cpp move.)
 ///
 /// Discovered rather than named, so a player who wants a better voice only has
 /// to drop a larger `.gguf` in the folder — the biggest file wins, on the

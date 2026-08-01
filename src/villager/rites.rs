@@ -66,7 +66,6 @@ pub struct Grave {
 pub(super) fn mark_the_dead(
     mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,
-    mut say: MessageWriter<crate::ui::Say>,
     mut telling: (
         Option<ResMut<crate::telling::Tongue>>,
         Option<Res<crate::attention::Attention>>,
@@ -150,14 +149,9 @@ pub(super) fn mark_the_dead(
                         })
                     })
                     .is_some();
-                if !composed {
-                    say.write(crate::ui::Say {
-                        speaker: mourner,
-                        text: format!("{}...", person.name),
-                        thought: true,
-                        own_words: false,
-                    });
-                }
+                // Unwatched or unanswered: the moment passes quietly. Nothing
+                // written plays anywhere any more.
+                let _ = composed;
             }
         }
     }

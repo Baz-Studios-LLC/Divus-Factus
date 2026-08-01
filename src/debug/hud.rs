@@ -49,7 +49,6 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
     // the HUD's own live values — a row here is a HudValue and a Node.
     commands.spawn((
         DevOverlay,
-        HudValue::Fps,
         ui::dim(""),
         Node {
             position_type: PositionType::Absolute,

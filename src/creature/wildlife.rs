@@ -413,7 +413,10 @@ pub(super) fn wolves_stalk(
     time: Res<Time>,
     site: Option<Res<crate::villager::SettlementSite>>,
     towers: Query<(&GlobalTransform, &crate::villager::work::Building)>,
-    mut say: MessageWriter<crate::ui::Say>,
+    mut telling: (
+        Option<ResMut<crate::telling::Tongue>>,
+        Option<Res<crate::attention::Attention>>,
+    ),
     mut rng: ResMut<crate::villager::SimRng>,
     mut wolves: Query<
         (&Transform, &CreatureGenome, &mut Wild, &mut MoveTarget),
@@ -489,13 +492,32 @@ pub(super) fn wolves_stalk(
             vitality.harm += dt * 0.3;
             vitality.violent = true;
             motion.flail = 1.0;
-            if rng.0.chance(dt * 0.4) {
-                say.write(crate::ui::Say {
-                    speaker: *quarry,
-                    text: "wolves! WOLVES!".to_string(),
-                    thought: false,
-                    own_words: false,
-                });
+            if rng.0.chance(dt * 0.4)
+                && let Some(tongue) = telling.0.as_mut()
+            {
+                // The scream is composed for the one being torn at; the
+                // attention gate keeps off-screen drama from spending the
+                // teller's slots.
+                let seen = walkers
+                    .get(*quarry)
+                    .map(|(_, at, ..)| {
+                        crate::attention::regard(telling.1.as_deref(), at.translation)
+                            .worth_composing()
+                    })
+                    .unwrap_or(false);
+                if seen {
+                    tongue.muse(crate::telling::Musing {
+                        who: *quarry,
+                        voice: None,
+                        bearing: crate::villager::traits::Bearing::Plain,
+                        faith: crate::telling::FaithBand::Wavering,
+                        body: vec!["hurt"],
+                        place: Vec::new(),
+                        mind: "a wolf is upon you, teeth in your leg — scream".into(),
+                        heard: None,
+                        known: Vec::new(),
+                    });
+                }
             }
         }
         wild.hunger = (wild.hunger - dt * 0.1).max(0.0);
