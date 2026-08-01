@@ -33,6 +33,11 @@ local X: positive carries the free end forward).
 
 ### Blueprints: `out/buildings/<name>.json`
 
+**The lattice**: every coordinate and dimension is a whole multiple of
+1/16 m - the universal quantum. Coarse work steps 4/16, joints land on
+2/16, fine work on 1/16. Binary fractions carry exactly in floats, so
+two parts that should meet, meet.
+
 Local space: +Y up, metres. Position and orientation on the bench are
 FREE: the import rebases the building on its own bounds, and the door
 widget defines the front - the whole blueprint is turned so the (first)
