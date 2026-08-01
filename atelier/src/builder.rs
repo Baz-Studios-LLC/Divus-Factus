@@ -493,17 +493,8 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(-0.5625, 1.0, 0.0, 0.125, 2.0, 0.375, "wood", 0.45),
             slab(0.5625, 1.0, 0.0, 0.125, 2.0, 0.375, "wood", 0.45),
             slab(0.0, 2.0625, 0.0, 1.25, 0.125, 0.375, "wood", 0.45),
-            slab(0.0, 1.0, 0.03125, 1.0, 2.0, 0.0625, "wood", 0.35),
-            slab(
-                0.375,
-                1.0,
-                0.0625,
-                0.0625,
-                0.0625,
-                0.0625,
-                "cloth-gold",
-                0.8,
-            ),
+            slab(0.0, 1.0, 0.0625, 1.0, 2.0, 0.125, "wood", 0.35),
+            slab(0.375, 1.0, 0.125, 0.125, 0.125, 0.125, "cloth-gold", 0.8),
         ],
         PartKind::Prop("doorway") => vec![
             // An opening with no leaf: jambs and a lintel, for the ways
@@ -519,9 +510,9 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(0.5625, 1.375, 0.0, 0.125, 1.125, 0.375, "wood", 0.45),
             slab(0.0, 0.8125, 0.0, 1.25, 0.125, 0.375, "wood", 0.45),
             slab(0.0, 1.9375, 0.0, 1.25, 0.125, 0.375, "wood", 0.45),
-            glass(0.0, 1.375, 0.0, 1.0, 1.0, 0.0625, "sky", 0.8),
-            slab(0.0, 1.375, 0.03125, 0.0625, 1.0, 0.0625, "wood", 0.5),
-            slab(0.0, 1.375, 0.03125, 1.0, 0.0625, 0.0625, "wood", 0.5),
+            glass(0.0, 1.375, 0.0, 1.0, 1.0, 0.125, "sky", 0.8),
+            slab(0.0, 1.375, 0.0625, 0.125, 1.0, 0.125, "wood", 0.5),
+            slab(0.0, 1.375, 0.0625, 1.0, 0.125, 0.125, "wood", 0.5),
         ],
         PartKind::Prop("trim-corner") => vec![
             // An L that wraps an outside corner: two legs meeting at the
