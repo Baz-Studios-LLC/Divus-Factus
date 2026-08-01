@@ -38,6 +38,9 @@ pub enum PartKind {
         long: f32,
         stone: bool,
     },
+    /// The stepped triangle that closes a pitched roof's end: courses of
+    /// wall narrowing to a peak at the roof's own thirty degrees.
+    Gable(f32),
     Floor(f32, f32),
     Foundation(f32, f32),
     Roof(f32, f32),
@@ -48,6 +51,7 @@ pub enum PartKind {
     TrimRun {
         stone: bool,
     },
+    GableRun,
     FloorRun,
     FoundationRun,
     RoofRun,
@@ -59,7 +63,7 @@ impl PartKind {
     /// The runs stretch along one axis; the rect runs stretch two.
     pub fn run_axes(&self) -> Option<u8> {
         match self {
-            PartKind::WallRun | PartKind::TrimRun { .. } => Some(1),
+            PartKind::WallRun | PartKind::TrimRun { .. } | PartKind::GableRun => Some(1),
             PartKind::FloorRun | PartKind::FoundationRun | PartKind::RoofRun => Some(2),
             _ => None,
         }
@@ -73,6 +77,7 @@ impl PartKind {
                 long: w,
                 stone: *stone,
             },
+            PartKind::GableRun => PartKind::Gable(w),
             PartKind::FloorRun => PartKind::Floor(w, d),
             PartKind::FoundationRun => PartKind::Foundation(w, d),
             PartKind::RoofRun => PartKind::Roof(w, d),
@@ -126,6 +131,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     structure("STONE STEPS", PartKind::Prop("steps"), "footing"),
     structure("FLOOR, STRETCH", PartKind::FloorRun, "footing"),
     structure("FLOOR, 2M", PartKind::Floor(2.0, 2.0), "footing"),
+    structure("GABLE, STRETCH", PartKind::GableRun, "walls"),
     structure("ROOF, STRETCH", PartKind::RoofRun, "roof"),
     structure("ROOF PANEL", PartKind::Roof(2.2, 2.2), "roof"),
 ];
@@ -241,6 +247,34 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         }
         PartKind::Roof(w, d) => vec![slab(0.0, 0.0625, 0.0, *w, 0.125, *d, "earth", 0.4)],
         PartKind::RoofRun => vec![slab(0.0, 0.0625, 0.0, 0.25, 0.125, 0.25, "earth", 0.4)],
+        PartKind::Gable(long) => {
+            // Courses of wall narrowing to a peak: the roof's own pitch,
+            // stepped, because everything here is a box.
+            let pitch = 0.577_35_f32; // 30 degrees
+            let course = 0.25_f32;
+            let half = long * 0.5;
+            let mut steps = Vec::new();
+            let mut y = 0.0_f32;
+            while y < half * pitch {
+                let reach = (half - y / pitch).max(0.0);
+                if reach * 2.0 < 0.25 {
+                    break;
+                }
+                steps.push(slab(
+                    0.0,
+                    y + course * 0.5,
+                    0.0,
+                    reach * 2.0,
+                    course,
+                    WALL_THICK,
+                    "wood",
+                    0.65,
+                ));
+                y += course;
+            }
+            steps
+        }
+        PartKind::GableRun => vec![slab(0.0, 0.125, 0.0, 0.25, 0.25, WALL_THICK, "wood", 0.65)],
         PartKind::Trim { long, stone } => {
             let (ramp, shade) = if *stone {
                 ("stone", 0.55)
@@ -768,11 +802,13 @@ pub fn part_name(kind: &PartKind) -> String {
                 format!("trim-{long}")
             }
         }
+        PartKind::Gable(long) => format!("gable-{long}"),
         PartKind::Floor(w, d) => format!("floor-{w}x{d}"),
         PartKind::Foundation(w, d) => format!("foundation-{w}x{d}"),
         PartKind::Roof(w, d) => format!("roof-{w}x{d}"),
         PartKind::WallRun
         | PartKind::TrimRun { .. }
+        | PartKind::GableRun
         | PartKind::FloorRun
         | PartKind::FoundationRun
         | PartKind::RoofRun => "run".to_string(),
@@ -784,6 +820,9 @@ pub fn part_name(kind: &PartKind) -> String {
 pub fn kind_from_name(name: &str) -> Option<PartKind> {
     if let Some(rest) = name.strip_prefix("wall-") {
         return rest.parse::<f32>().ok().map(PartKind::Wall);
+    }
+    if let Some(rest) = name.strip_prefix("gable-") {
+        return rest.parse::<f32>().ok().map(PartKind::Gable);
     }
     if let Some(rest) = name.strip_prefix("trimstone-") {
         return rest
@@ -1553,6 +1592,8 @@ fn is_structure(kind: &PartKind) -> bool {
             | PartKind::RoofRun
             | PartKind::Trim { .. }
             | PartKind::TrimRun { .. }
+            | PartKind::Gable(..)
+            | PartKind::GableRun
             | PartKind::Prop("steps")
             | PartKind::Prop("pole")
     )
@@ -2061,7 +2102,18 @@ fn move_ghost(
     // of that, so a roof panel rides the wall tops on its own.
     let samples = footprint_samples(&kind, snapped, hand.yaw);
     let support = support_height(&placed, &samples, is_structure(&kind), None);
-    snapped.y = support + hand.lift;
+    // A tilted part rests its DOWNHILL EDGE on what carries it and
+    // rises from there - a pitched panel's eave sits on the wall plate
+    // instead of half the slope swinging down into the room.
+    let mut eave = 0.0;
+    if hand.tilt.abs() > 0.001 {
+        let mut deep = 0.0f32;
+        for Slab(at, size, ..) in body_of(&kind, None) {
+            deep = deep.max((at.z.abs() + size.z * 0.5) * 2.0);
+        }
+        eave = deep * 0.5 * hand.tilt.abs().sin();
+    }
+    snapped.y = support + hand.lift + eave;
 
     for (_, mut transform, _) in &mut ghosts {
         transform.translation = snapped;

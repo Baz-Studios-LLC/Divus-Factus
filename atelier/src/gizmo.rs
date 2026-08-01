@@ -188,6 +188,7 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
             let sized = builder::kind_from_name(&record.part).and_then(|kind| match kind {
                 PartKind::Wall(long) => Some((long, 0.0, false)),
                 PartKind::Trim { long, .. } => Some((long, 0.0, false)),
+                PartKind::Gable(long) => Some((long, 0.0, false)),
                 PartKind::Floor(w, d) => Some((w, d, true)),
                 PartKind::Foundation(w, d) => Some((w, d, true)),
                 PartKind::Roof(w, d) => Some((w, d, true)),
@@ -463,6 +464,7 @@ fn work_gizmo(
             let made = match kind {
                 PartKind::Wall(_) => PartKind::Wall(w),
                 PartKind::Trim { stone, .. } => PartKind::Trim { long: w, stone },
+                PartKind::Gable(_) => PartKind::Gable(w),
                 PartKind::Floor(..) => PartKind::Floor(w, d),
                 PartKind::Foundation(..) => PartKind::Foundation(w, d),
                 PartKind::Roof(..) => PartKind::Roof(w, d),
