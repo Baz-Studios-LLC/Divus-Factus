@@ -471,8 +471,9 @@ pub(crate) fn report_frames(time: Res<Time<Real>>, mut window: Local<(f32, u32, 
     *window = (0.0, 0, 0.0);
 }
 
-/// R lifts the roofs off the world — the cutaway view into every interior —
+/// H lifts the roofs off the world — the cutaway view into every interior —
 /// and puts them back. New roofs built while lifted come up lifted too.
+/// (R already belongs to the survey.)
 pub(crate) fn toggle_roofs(
     keys: Res<ButtonInput<KeyCode>>,
     mut lifted: Local<Option<bool>>,
@@ -480,7 +481,7 @@ pub(crate) fn toggle_roofs(
 ) {
     // Capture tooling: DIVUS_FACTUS_ROOFLESS starts the world cut away.
     let lifted = lifted.get_or_insert_with(|| std::env::var("DIVUS_FACTUS_ROOFLESS").is_ok());
-    if keys.just_pressed(KeyCode::KeyR) {
+    if keys.just_pressed(KeyCode::KeyH) {
         *lifted = !*lifted;
     }
     for mut visibility in &mut roofs {
