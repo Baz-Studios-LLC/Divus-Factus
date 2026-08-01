@@ -242,7 +242,15 @@ pub(crate) fn take_up_work(
         };
         let mouths = mouths_by_town.get(&home).copied().unwrap_or(0);
         let larder_thin = food < mouths as f32;
-        if !matches!(*activity, Activity::Idle | Activity::Wandering) {
+        // Sheltering counts as available: rain sent them to the fire, but
+        // rain does not excuse the able-bodied — least of all from raising
+        // the roofs that would get them OUT of it. Without this, one long
+        // downpour parked the whole workforce at a cold fire while the
+        // timber pile sat untouched.
+        if !matches!(
+            *activity,
+            Activity::Idle | Activity::Wandering | Activity::Sheltering
+        ) {
             continue;
         }
         let night_shift = larder_thin

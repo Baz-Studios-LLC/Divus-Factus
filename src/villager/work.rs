@@ -248,7 +248,10 @@ pub(super) fn lend_a_hand(
         }
         for (villager, at, mut activity, _, _, helper, _, manner) in &mut folk {
             if helper.is_some()
-                || !matches!(*activity, Activity::Idle | Activity::Wandering)
+                || !matches!(
+                    *activity,
+                    Activity::Idle | Activity::Wandering | Activity::Sheltering
+                )
                 || manner.is_some_and(|m| m.has(super::traits::Trait::Slothful))
                 || at.translation.distance(site_at.translation) > 45.0
                 || !rng.0.chance(0.01)
@@ -396,7 +399,11 @@ pub(super) fn salvage_timber(
         let volunteer = villagers
             .iter_mut()
             .filter(|(_, _, activity, _, hauler, _)| {
-                hauler.is_none() && matches!(**activity, Activity::Idle | Activity::Wandering)
+                hauler.is_none()
+                    && matches!(
+                        **activity,
+                        Activity::Idle | Activity::Wandering | Activity::Sheltering
+                    )
             })
             .min_by(|a, b| {
                 a.1.translation
