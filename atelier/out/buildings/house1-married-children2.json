@@ -1,0 +1,71 @@
+{
+  "format": 1,
+  "name": "house1-married-children2",
+  "parts": [
+    {
+      "part": "foundation-4.25x4.25",
+      "at": [
+        -2.0,
+        0.0,
+        0.0
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "footing"
+    },
+    {
+      "part": "wall-3.75",
+      "at": [
+        -3.875,
+        0.375,
+        0.12500006
+      ],
+      "yaw": 4.712389,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "walls"
+    },
+    {
+      "part": "wall-4",
+      "at": [
+        -0.125,
+        0.375,
+        -1.1920929e-7
+      ],
+      "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "walls"
+    },
+    {
+      "part": "wall-3.5625",
+      "at": [
+        -1.96875,
+        0.375,
+        1.875
+      ],
+      "yaw": 3.1415927,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "walls"
+    },
+    {
+      "part": "wall-3.75",
+      "at": [
+        -2.125,
+        0.375,
+        -1.8749999
+      ],
+      "yaw": 3.1415927,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "walls"
+    }
+  ]
+}

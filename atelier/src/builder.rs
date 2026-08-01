@@ -707,6 +707,7 @@ impl Plugin for BuilderPlugin {
                     work_templates,
                     steer_hand,
                     toggle_snap_mode,
+                    disarm_on_mode,
                     feel_ahead,
                     move_ghost,
                     place_grab_remove,
@@ -3143,4 +3144,20 @@ fn recall(
         },
         restored.len()
     );
+}
+
+/// Walking into MOVE or RESIZE empties the hand: the ghost belongs to
+/// placement, and those modes are for what already stands.
+fn disarm_on_mode(
+    mut commands: Commands,
+    tool: Res<crate::gizmo::ToolMode>,
+    mut hand: ResMut<Hand>,
+    ghosts: Query<Entity, With<Ghost>>,
+) {
+    if tool.is_changed() && *tool != crate::gizmo::ToolMode::Normal && hand.kind.is_some() {
+        *hand = Hand::default();
+        for ghost in &ghosts {
+            commands.entity(ghost).despawn();
+        }
+    }
 }
