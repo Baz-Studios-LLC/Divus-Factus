@@ -248,7 +248,7 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
     ));
     for (cap, tale) in [
         ("click", "place, or pick back up"),
-        ("X", "remove at the cursor"),
+        ("X / del", "remove at the cursor"),
         ("cmd Z / Y", "undo and redo"),
         (
             "cmd C / V",
@@ -266,7 +266,7 @@ of an L",
         ("Q / E", "lift and lower"),
         ("[ ]", "repaint through the ramps"),
         ("- =", "darker and brighter"),
-        ("esc", "empty the hand"),
+        ("esc / del", "empty the hand"),
         (
             "1 - 6",
             "front, right, back, left,\noverhead, and the perch",

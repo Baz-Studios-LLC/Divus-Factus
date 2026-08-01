@@ -1581,7 +1581,7 @@ fn steer_hand(
     if hand.kind.is_none() || naming.0.is_some() {
         return;
     }
-    if keys.just_pressed(KeyCode::Escape) {
+    if keys.just_pressed(KeyCode::Escape) || keys.just_pressed(KeyCode::Delete) {
         if hand.anchor.is_some() {
             hand.anchor = None;
         } else {
@@ -2578,7 +2578,7 @@ fn place_grab_remove(
         }
     }
 
-    if keys.just_pressed(KeyCode::KeyX)
+    if (keys.just_pressed(KeyCode::KeyX) || keys.just_pressed(KeyCode::Delete))
         && let Some(doomed) = hovered.grab
         && placed.contains(doomed)
     {
