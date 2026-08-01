@@ -694,8 +694,9 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             parts
         }
         PartKind::Prop("stool") => vec![
-            slab(0.0, 0.4, 0.0, 0.38, 0.07, 0.38, "wood", 0.6),
-            slab(0.0, 0.18, 0.0, 0.3, 0.36, 0.3, "wood", 0.45),
+            // Seven units to the seat, and every edge on the lattice.
+            slab(0.0, 0.40625, 0.0, 0.375, 0.0625, 0.375, "wood", 0.6),
+            slab(0.0, 0.1875, 0.0, 0.25, 0.375, 0.25, "wood", 0.45),
         ],
         PartKind::Prop("hearth") => vec![
             slab(0.0, 0.42, 0.0, 0.9, 0.84, 0.6, "stone", 0.6),
@@ -721,19 +722,25 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(0.0, 2.4375, 0.0, 0.875, 0.125, 0.875, "stone", 0.6),
         ],
         PartKind::Prop("chair") => vec![
-            slab(0.0, 0.4, 0.0, 0.4, 0.07, 0.4, "wood", 0.6),
-            slab(0.0, 0.18, 0.0, 0.32, 0.36, 0.32, "wood", 0.45),
-            slab(0.0, 0.72, -0.17, 0.4, 0.72, 0.07, "wood", 0.55),
+            slab(0.0, 0.40625, 0.0, 0.4375, 0.0625, 0.4375, "wood", 0.6),
+            slab(0.0, 0.1875, 0.0, 0.3125, 0.375, 0.3125, "wood", 0.45),
+            // The back, standing where a back actually meets a back.
+            slab(0.0, 0.71875, -0.1875, 0.4375, 0.75, 0.0625, "wood", 0.55),
         ],
         PartKind::Prop("bench") => vec![
-            slab(0.0, 0.4, 0.0, 1.2, 0.08, 0.36, "wood", 0.6),
-            slab(-0.5, 0.18, 0.0, 0.09, 0.36, 0.3, "wood", 0.45),
-            slab(0.5, 0.18, 0.0, 0.09, 0.36, 0.3, "wood", 0.45),
+            // Wide enough for the two bodies it claims to seat, and cut
+            // to the same seven units as every other seat.
+            slab(0.0, 0.40625, 0.0, 1.75, 0.0625, 0.375, "wood", 0.6),
+            slab(-0.75, 0.1875, 0.0, 0.09375, 0.375, 0.3125, "wood", 0.45),
+            slab(0.75, 0.1875, 0.0, 0.09375, 0.375, 0.3125, "wood", 0.45),
         ],
         PartKind::Prop("couch") => vec![
-            // A padded settle: a timber frame with cloth laid in it, the
-            // seat at a stool's own height so the same bodies fit.
-            slab(0.0, 0.2, 0.0, 1.875, 0.4, 0.8, "wood", 0.5),
+            // A padded settle: a timber plinth with cloth laid in it.
+            // The plinth stands BACK from the front of the cushion, the
+            // way an upholstered seat is built - a sitter's shins have to
+            // hang somewhere, and a solid block to the front edge is the
+            // one place they cannot.
+            slab(0.0, 0.2, -0.09375, 1.875, 0.4, 0.625, "wood", 0.5),
             slab(-0.9375, 0.3125, 0.0, 0.1875, 0.625, 0.8, "wood", 0.55),
             slab(0.9375, 0.3125, 0.0, 0.1875, 0.625, 0.8, "wood", 0.55),
             slab(0.0, 0.75, -0.3125, 1.875, 0.75, 0.1875, "wood", 0.55),
@@ -989,21 +996,27 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 // The same adult, sat on a stool's own seat: hips at
                 // seven units, the crown a shade over a metre and a half.
                 // Knees toward the facing.
+                // The seat surface is where the THIGHS rest - seven
+                // units up, which is what every seat in this catalogue
+                // is cut to. The first version hung its hip joint there
+                // instead, so the thighs lay a hand's breadth inside
+                // every chair, stool and cushion in the house.
                 return vec![
+                    // The crown stays where it always was: 25 units.
                     slab(0.0, 1.3125, 0.0, 0.5, 0.5, 0.5, ramp, shade),
-                    // Torso: deep front to back, wide across.
-                    slab(0.0, 0.75, 0.0, 0.25, 0.625, 0.4375, ramp, shade),
+                    // Torso: hip to shoulder, deep front to back.
+                    slab(0.0, 0.84375, 0.0, 0.25, 0.4375, 0.4375, ramp, shade),
                     // Arms hanging at the sides.
-                    slab(0.0, 0.8125, -0.3125, 0.1875, 0.5, 0.1875, ramp, shade),
-                    slab(0.0, 0.8125, 0.3125, 0.1875, 0.5, 0.1875, ramp, shade),
-                    // Thighs, forward to the knees.
+                    slab(0.0, 0.84375, -0.3125, 0.1875, 0.4375, 0.1875, ramp, shade),
+                    slab(0.0, 0.84375, 0.3125, 0.1875, 0.4375, 0.1875, ramp, shade),
+                    // Thighs, resting ON the seat, forward to the knees.
                     slab(
-                        0.21875, 0.34375, -0.125, 0.4375, 0.1875, 0.1875, ramp, shade,
+                        0.21875, 0.53125, -0.125, 0.4375, 0.1875, 0.1875, ramp, shade,
                     ),
-                    slab(0.21875, 0.34375, 0.125, 0.4375, 0.1875, 0.1875, ramp, shade),
-                    // Shins, down to the floor.
-                    slab(0.4375, 0.1875, -0.125, 0.1875, 0.375, 0.1875, ramp, shade),
-                    slab(0.4375, 0.1875, 0.125, 0.1875, 0.375, 0.1875, ramp, shade),
+                    slab(0.21875, 0.53125, 0.125, 0.4375, 0.1875, 0.1875, ramp, shade),
+                    // Shins, from the knee down to the floor.
+                    slab(0.4375, 0.21875, -0.125, 0.1875, 0.4375, 0.1875, ramp, shade),
+                    slab(0.4375, 0.21875, 0.125, 0.1875, 0.4375, 0.1875, ramp, shade),
                 ];
             }
             vec![
@@ -1470,12 +1483,14 @@ pub fn companions(kind: &PartKind) -> Vec<(&'static str, Vec3)> {
         ],
         PartKind::Prop("chair" | "stool") => vec![("sit", Vec3::ZERO)],
         PartKind::Prop("bench") => vec![
-            ("sit", Vec3::new(-0.35, 0.0, 0.0)),
-            ("sit", Vec3::new(0.35, 0.0, 0.0)),
-        ],
-        PartKind::Prop("couch") => vec![
             ("sit", Vec3::new(-0.4375, 0.0, 0.0)),
             ("sit", Vec3::new(0.4375, 0.0, 0.0)),
+        ],
+        // A cushion sits higher than a plank, so the sitter rides up
+        // with it, and forward a touch so the knees clear the plinth.
+        PartKind::Prop("couch") => vec![
+            ("sit", Vec3::new(-0.4375, 0.09375, 0.0)),
+            ("sit", Vec3::new(0.4375, 0.09375, 0.0)),
         ],
         _ => vec![],
     }
