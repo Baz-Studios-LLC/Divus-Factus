@@ -2071,9 +2071,15 @@ pub(crate) fn keybind_panel(
     mut keymap: ResMut<crate::keymap::Keymap>,
     clicked: Query<(&Interaction, &BindButton), Changed<Interaction>>,
     reset: Query<&Interaction, (Changed<Interaction>, With<ResetBinds>)>,
+    tabs: Query<&Interaction, (Changed<Interaction>, With<ui::TabButton>)>,
     mut caps: Query<(&BindCap, &mut Text)>,
     mut borders: Query<(&BindButton, &mut BorderColor)>,
 ) {
+    // Walking to another tab stands an armed rebind down - a cap left
+    // listening behind a hidden page would eat the next key in silence.
+    if tabs.iter().any(|t| *t == Interaction::Pressed) {
+        arming.0 = None;
+    }
     for (interaction, bind) in &clicked {
         if *interaction == Interaction::Pressed {
             // Pressing the cap that is already listening stands it down.
@@ -2150,5 +2156,7 @@ pub(crate) fn catch_rebind(
     keymap.bind(deed, key);
     crate::keymap::save(&keymap);
     arming.0 = None;
-    keys.clear_just_pressed(key);
+    // The whole press is eaten, held state included - a pan key caught
+    // here must not also glide the world behind the book while held.
+    keys.reset(key);
 }

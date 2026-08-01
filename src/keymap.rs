@@ -151,7 +151,8 @@ impl Keymap {
 /// Every key a deed may be bound to, and the short name it wears on a
 /// keycap and in the keys file. What is absent is refused on purpose:
 /// escape, the modifiers, the backquote and the function keys keep their
-/// fixed offices.
+/// fixed offices, and so do the arrows - they are the camera's standing
+/// alternates, and a deed bound over them would fire twice.
 const NAMED: &[(KeyCode, &str)] = &[
     (KeyCode::KeyA, "A"),
     (KeyCode::KeyB, "B"),
@@ -201,10 +202,6 @@ const NAMED: &[(KeyCode, &str)] = &[
     (KeyCode::Quote, "'"),
     (KeyCode::BracketLeft, "["),
     (KeyCode::BracketRight, "]"),
-    (KeyCode::ArrowUp, "Up"),
-    (KeyCode::ArrowDown, "Down"),
-    (KeyCode::ArrowLeft, "Left"),
-    (KeyCode::ArrowRight, "Right"),
     (KeyCode::Enter, "Enter"),
     (KeyCode::Backspace, "Back"),
     (KeyCode::Insert, "Ins"),
