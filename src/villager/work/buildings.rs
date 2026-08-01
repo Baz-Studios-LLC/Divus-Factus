@@ -603,6 +603,12 @@ pub struct Hut;
 #[derive(Component)]
 pub struct RoofPart;
 
+/// A piece of a building's walls - the panels, their leavings, and the
+/// frames set in them. The cutaway takes these down after the roof, so
+/// a house can be watched the way a dollhouse is.
+#[derive(Component)]
+pub struct WallPart;
+
 /// The family table, in the hearth room: supper gathers around it.
 #[derive(Component)]
 pub struct Table;
@@ -995,6 +1001,8 @@ pub(crate) fn raise_stage(
     // cutaway view. Set around the roof-raising calls for the buildings
     // whose interiors exist.
     let roofing = std::cell::Cell::new(false);
+    // And the same for the walls, which come down after the roof does.
+    let walling = std::cell::Cell::new(false);
     let mut part = |offset: Vec3, size: Vec3, rot_z: f32, material: &Handle<StandardMaterial>| {
         let mut cmd = cmd.borrow_mut();
         let mut spawned = cmd.spawn((
@@ -1007,6 +1015,9 @@ pub(crate) fn raise_stage(
         ));
         if roofing.get() {
             spawned.insert(RoofPart);
+        }
+        if walling.get() {
+            spawned.insert(WallPart);
         }
     };
 
@@ -1087,6 +1098,7 @@ pub(crate) fn raise_stage(
             perceptual_roughness: 1.0,
             ..default()
         });
+        walling.set(stage == 1);
         match stage {
             // The portal frame: two squared posts and a lintel proud of
             // them both, braced like the first metre of a drift.

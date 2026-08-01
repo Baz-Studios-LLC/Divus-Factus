@@ -7,8 +7,8 @@ use bevy::prelude::*;
 use bevy::text::FontSize;
 
 use crate::creature::Corpse;
-use crate::villager::{Activity, Person, Villager};
 use crate::villager::work::Vocation;
+use crate::villager::{Activity, Person, Villager};
 
 /// Whether the labels are showing.
 #[derive(Resource, Default)]
@@ -38,8 +38,8 @@ fn toggle_doings(
     }
     mode.0 = !mode.0;
     if mode.0 {
-        let cap = crate::keymap::key_name(keymap.key(crate::keymap::Deed::Doings))
-            .unwrap_or("the key");
+        let cap =
+            crate::keymap::key_name(keymap.key(crate::keymap::Deed::Doings)).unwrap_or("the key");
         notices.write(crate::ui::Notice::new(format!(
             "Every soul says what they are at - press {cap} again for quiet"
         )));

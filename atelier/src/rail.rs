@@ -315,8 +315,8 @@ of an L",
         ("F", "face snap on and off"),
         (
             "H",
-            "lift the roof off, and
-set it back",
+            "the cutaway: whole, roof
+off, walls down as well",
         ),
         ("tab", "normal, move, resize;\nclick selects, drag a handle"),
         ("D", "type exact dimensions\nof the resize selection"),
@@ -539,10 +539,15 @@ fn work_roof_button(
         .iter()
         .any(|interaction| *interaction == Interaction::Pressed)
     {
-        lifted.0 = !lifted.0;
+        lifted.0 = match lifted.0 {
+            crate::builder::Cutaway::Whole => crate::builder::Cutaway::RoofOff,
+            crate::builder::Cutaway::RoofOff => crate::builder::Cutaway::WallsDown,
+            crate::builder::Cutaway::WallsDown => crate::builder::Cutaway::Whole,
+        };
     }
+    let cut = lifted.0 != crate::builder::Cutaway::Whole;
     for mut border in &mut buttons {
-        let dress = BorderColor::all(if lifted.0 {
+        let dress = BorderColor::all(if cut {
             theme::accent(&palette)
         } else {
             theme::panel_border(&palette)
@@ -555,7 +560,7 @@ fn work_roof_button(
         if let Ok(kids) = children.get(button) {
             for &kid in kids {
                 if let Ok(mut colour) = labels.get_mut(kid) {
-                    let wanted = if lifted.0 {
+                    let wanted = if cut {
                         theme::accent(&palette)
                     } else {
                         theme::text_dim(&palette)

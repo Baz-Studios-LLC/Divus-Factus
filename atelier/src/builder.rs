@@ -358,6 +358,7 @@ pub const FURNITURE: &[CatalogEntry] = &[
     prop("BENCH", "bench"),
     prop("COUCH", "couch"),
     prop("HEARTH", "hearth"),
+    prop("CHIMNEY", "chimney"),
     prop("CHEST", "chest"),
     prop("SHELVES", "shelves"),
     prop("CUPBOARD", "cupboard"),
@@ -687,6 +688,14 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         PartKind::Prop("hearth") => vec![
             slab(0.0, 0.42, 0.0, 0.9, 0.84, 0.6, "stone", 0.6),
             slab(0.0, 0.55, 0.12, 0.62, 0.5, 0.44, "stone", 0.25),
+        ],
+        PartKind::Prop("chimney") => vec![
+            // A stack of dressed stone with a capped throat: set it on
+            // the roof over a hearth, or run it up an outside wall.
+            slab(0.0, 1.0, 0.0, 0.875, 2.0, 0.875, "stone", 0.5),
+            slab(0.0, 2.0625, 0.0, 1.0, 0.125, 1.0, "stone", 0.6),
+            slab(0.0, 2.25, 0.0, 0.75, 0.25, 0.75, "stone", 0.45),
+            slab(0.0, 2.4375, 0.0, 0.875, 0.125, 0.875, "stone", 0.6),
         ],
         PartKind::Prop("chair") => vec![
             slab(0.0, 0.4, 0.0, 0.4, 0.07, 0.4, "wood", 0.6),
@@ -4218,9 +4227,19 @@ fn reflow_openings(
     }
 }
 
-/// Whether the roof stands lifted, so the rooms below can be worked on.
+/// How much of the work is standing: all of it, the roof lifted off,
+/// or the walls down as well - the dollhouse view, for furnishing.
+#[derive(Resource, Default, Clone, Copy, PartialEq)]
+pub enum Cutaway {
+    #[default]
+    Whole,
+    RoofOff,
+    WallsDown,
+}
+
+/// Kept as a resource of its own so the rail's button can read it.
 #[derive(Resource, Default)]
-pub struct RoofsLifted(pub bool);
+pub struct RoofsLifted(pub Cutaway);
 
 /// H lifts the roof off and sets it back - everything raised at the
 /// roof stage goes with it, panels and ridge caps alike.
@@ -4237,12 +4256,17 @@ pub(crate) fn lift_roofs(
         && dims.0.is_none()
         && keys.just_pressed(KeyCode::KeyH)
     {
-        lifted.0 = !lifted.0;
+        lifted.0 = match lifted.0 {
+            Cutaway::Whole => Cutaway::RoofOff,
+            Cutaway::RoofOff => Cutaway::WallsDown,
+            Cutaway::WallsDown => Cutaway::Whole,
+        };
     }
     for (record, mut visibility) in &mut parts {
+        let kind = kind_from_name(&record.part);
         let roofish = record.stage == "roof"
             || matches!(
-                kind_from_name(&record.part),
+                kind,
                 Some(
                     PartKind::Gable(..)
                         | PartKind::Ridge(..)
@@ -4251,13 +4275,27 @@ pub(crate) fn lift_roofs(
                         | PartKind::Roof(..)
                 )
             );
-        if !roofish {
-            continue;
-        }
-        let wanted = if lifted.0 {
-            Visibility::Hidden
-        } else {
+        // The walls, and everything set INTO the walls: a door with no
+        // wall around it is a door standing in a field.
+        let wallish = !roofish
+            && (record.stage == "walls"
+                || matches!(
+                    kind,
+                    Some(
+                        PartKind::Wall(..)
+                            | PartKind::Seg { .. }
+                            | PartKind::Prop("door" | "doorway" | "window" | "pole")
+                    )
+                ));
+        let showing = match lifted.0 {
+            Cutaway::Whole => true,
+            Cutaway::RoofOff => !roofish,
+            Cutaway::WallsDown => !roofish && !wallish,
+        };
+        let wanted = if showing {
             Visibility::Inherited
+        } else {
+            Visibility::Hidden
         };
         if *visibility != wanted {
             *visibility = wanted;

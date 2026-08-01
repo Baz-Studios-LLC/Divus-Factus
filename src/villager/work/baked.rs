@@ -9,7 +9,7 @@
 
 use bevy::prelude::*;
 
-use super::buildings::{Bed, Doorway, RoofPart, Shell, Table};
+use super::buildings::{Bed, Doorway, RoofPart, Shell, Table, WallPart};
 
 /// One box of a baked building, in the building's own space.
 #[derive(serde::Deserialize, Clone)]
@@ -264,9 +264,13 @@ pub fn raise_baked(
                 .with_scale(Vec3::from(piece.size)),
             ChildOf(site),
         ));
-        // The roof lifts for the cutaway, the way it always has.
+        // The roof lifts for the cutaway, and the walls come down after
+        // it - windows, doors and their frames with them, since they
+        // are set in the walls.
         if piece.stage == "roof" {
             raised.insert(RoofPart);
+        } else if piece.stage == "walls" {
+            raised.insert(WallPart);
         }
     }
 }

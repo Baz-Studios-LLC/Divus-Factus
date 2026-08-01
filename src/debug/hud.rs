@@ -481,26 +481,65 @@ pub(crate) fn report_frames(time: Res<Time<Real>>, mut window: Local<(f32, u32, 
 /// H lifts the roofs off the world — the cutaway view into every interior —
 /// and puts them back. New roofs built while lifted come up lifted too.
 /// (R already belongs to the survey.)
+/// How much of a building is standing, for the watching god: all of
+/// it, the roof lifted off, or the walls down as well - a dollhouse.
+#[derive(Default, Clone, Copy, PartialEq)]
+pub(crate) enum Cutaway {
+    #[default]
+    Whole,
+    RoofOff,
+    WallsDown,
+}
+
 pub(crate) fn toggle_roofs(
     keys: Res<ButtonInput<KeyCode>>,
     keymap: Res<crate::keymap::Keymap>,
-    mut lifted: Local<Option<bool>>,
-    mut roofs: Query<&mut Visibility, With<crate::villager::work::RoofPart>>,
+    mut cut: Local<Option<Cutaway>>,
+    mut roofs: Query<
+        &mut Visibility,
+        (
+            With<crate::villager::work::RoofPart>,
+            Without<crate::villager::work::WallPart>,
+        ),
+    >,
+    mut walls: Query<
+        &mut Visibility,
+        (
+            With<crate::villager::work::WallPart>,
+            Without<crate::villager::work::RoofPart>,
+        ),
+    >,
 ) {
     // Capture tooling: DIVUS_FACTUS_ROOFLESS starts the world cut away.
-    let lifted = lifted.get_or_insert_with(|| std::env::var("DIVUS_FACTUS_ROOFLESS").is_ok());
-    if keymap.just_pressed(&keys, crate::keymap::Deed::Roofs) {
-        *lifted = !*lifted;
-    }
-    for mut visibility in &mut roofs {
-        let wanted = if *lifted {
-            Visibility::Hidden
+    let cut = cut.get_or_insert_with(|| {
+        if std::env::var("DIVUS_FACTUS_ROOFLESS").is_ok() {
+            Cutaway::RoofOff
         } else {
+            Cutaway::Whole
+        }
+    });
+    if keymap.just_pressed(&keys, crate::keymap::Deed::Roofs) {
+        *cut = match *cut {
+            Cutaway::Whole => Cutaway::RoofOff,
+            Cutaway::RoofOff => Cutaway::WallsDown,
+            Cutaway::WallsDown => Cutaway::Whole,
+        };
+    }
+    let dress = |showing: bool, visibility: &mut Visibility| {
+        let wanted = if showing {
             Visibility::Inherited
+        } else {
+            Visibility::Hidden
         };
         if *visibility != wanted {
             *visibility = wanted;
         }
+    };
+    for mut visibility in &mut roofs {
+        dress(*cut == Cutaway::Whole, &mut visibility);
+    }
+    for mut visibility in &mut walls {
+        dress(*cut != Cutaway::WallsDown, &mut visibility);
     }
 }
 

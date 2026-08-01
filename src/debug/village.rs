@@ -1708,7 +1708,11 @@ const KEYBINDS: &[(&str, &[Bind])] = &[
                 Deed::Survey,
                 "the surveyor's sight: woods, stone, clay, iron, wild food",
             ),
-            Bind::Deed(Deed::Roofs, "lift the roofs and look inside"),
+            Bind::Deed(
+                Deed::Roofs,
+                "the cutaway: whole, roof off,
+walls down as well",
+            ),
             Bind::Deed(Deed::Doings, "every soul says what they are at"),
         ],
     ),

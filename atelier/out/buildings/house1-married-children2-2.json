@@ -1051,6 +1051,20 @@
       "shade": 0.7,
       "stage": "furnishing",
       "flip": false
+    },
+    {
+      "part": "gableroof-10.797664x7.625x0.5625",
+      "at": [
+        -3.9375,
+        2.875,
+        -1.4613318
+      ],
+      "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "roof",
+      "flip": false
     }
   ]
 }
