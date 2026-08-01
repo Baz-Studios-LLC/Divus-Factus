@@ -648,6 +648,13 @@ struct NamingCard;
 #[derive(Component)]
 struct NameText;
 
+/// The card's own buttons, for those who would rather click.
+#[derive(Component)]
+struct NamingSave;
+
+#[derive(Component)]
+struct NamingCancel;
+
 /// F walks between face snapping and plain ground placement; G cycles
 /// the grid interval through the powers of the atom.
 fn toggle_snap_mode(
@@ -2682,6 +2689,55 @@ fn raise_naming_card(commands: &mut Commands, fonts: &Fonts, palette: &Palette) 
         TextColor(theme::text_dim(palette).with_alpha(0.8)),
         ChildOf(card),
     ));
+    let row = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(8.0),
+                margin: UiRect::top(Val::Px(4.0)),
+                ..default()
+            },
+            ChildOf(card),
+        ))
+        .id();
+    for (label, accent) in [("SAVE", true), ("CANCEL", false)] {
+        let button = commands
+            .spawn((
+                Interaction::default(),
+                Node {
+                    padding: UiRect::axes(Val::Px(16.0), Val::Px(6.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::BLACK.with_alpha(0.18)),
+                BorderColor::all(if accent {
+                    theme::accent(palette).with_alpha(0.7)
+                } else {
+                    theme::panel_border(palette)
+                }),
+                ChildOf(row),
+            ))
+            .id();
+        if accent {
+            commands.entity(button).insert(NamingSave);
+        } else {
+            commands.entity(button).insert(NamingCancel);
+        }
+        commands.spawn((
+            Text::new(label),
+            TextFont {
+                font: fonts.display.clone().into(),
+                font_size: FontSize::Px(12.0),
+                ..default()
+            },
+            TextColor(if accent {
+                theme::accent(palette)
+            } else {
+                theme::text_dim(palette)
+            }),
+            ChildOf(button),
+        ));
+    }
 }
 
 /// Typing while the card is up: letters, digits and dashes build the name,
@@ -2699,6 +2755,8 @@ fn take_the_name(
     placed: Query<&Placed, Without<Ghost>>,
     cards: Query<Entity, With<NamingCard>>,
     rows: Query<&LoadFileButton>,
+    saves_click: Query<&Interaction, (Changed<Interaction>, With<NamingSave>)>,
+    cancels_click: Query<&Interaction, (Changed<Interaction>, With<NamingCancel>)>,
     mut shown: Query<&mut Text, With<NameText>>,
     mut save_labels: Query<(Entity, &mut Text), (With<SaveLabel>, Without<NameText>)>,
 ) {
@@ -2732,6 +2790,18 @@ fn take_the_name(
             Key::Escape => done = Some(false),
             _ => {}
         }
+    }
+    if saves_click
+        .iter()
+        .any(|interaction| *interaction == Interaction::Pressed)
+    {
+        done = Some(true);
+    }
+    if cancels_click
+        .iter()
+        .any(|interaction| *interaction == Interaction::Pressed)
+    {
+        done = Some(false);
     }
     for mut text in &mut shown {
         let fresh = format!("{name}_");
