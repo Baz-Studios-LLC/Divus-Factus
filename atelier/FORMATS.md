@@ -61,6 +61,10 @@ game already understands, so the carrying-in is mechanical:
   chest, barrel, crate, shelves, cupboard, pot, basket, rug, woodpile,
   candle, sack, trough — the shelf grows on request), or `widget:<kind>`.
   `prop:mannequin` is the scale reference and is SKIPPED on import.
+  `prop:bed` and `prop:bed-double` carry their own sleep semantics when
+  imported: a double becomes the household's marriage bed - the wedded
+  pair claims it together, each to their own side, and children never
+  do, whatever the shortage.
 - EXPORT A COPY writes `out/buildings/build-<n>.json`, never overwriting;
   the SAVED WORK drawer lists everything in that folder on launch.
 - `yaw` turns about the part's centre; `tilt` pitches roof panels.

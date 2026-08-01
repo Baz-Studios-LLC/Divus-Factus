@@ -626,6 +626,9 @@ pub struct Bed {
     /// Which end of that axis the PILLOW is at (-1.0 or 1.0): always the
     /// wall end, and the sleeper's head goes with it.
     pub head: f32,
+    /// A bed made for two: the wedded pair of the household claims it
+    /// together, each to their own side, and children never do.
+    pub double: bool,
 }
 
 /// A finished longhouse: a roof for everyone with no family to sleep beside.
@@ -995,6 +998,7 @@ pub(crate) fn raise_stage(
                 slot,
                 along_x,
                 head: head_sign,
+                double: false,
             },
             Mesh3d(cube.clone()),
             MeshMaterial3d(roof.clone()),
