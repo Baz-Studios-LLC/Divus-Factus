@@ -143,6 +143,10 @@ fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>) 
         ("[ ]", "repaint through the ramps"),
         ("- =", "darker and brighter"),
         ("esc", "empty the hand"),
+        (
+            "1 - 6",
+            "front, right, back, left,\noverhead, and the perch",
+        ),
         ("RMB drag", "swing the camera"),
         ("MMB drag", "pull the bench along"),
         ("wheel", "draw near, pull away"),

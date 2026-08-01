@@ -66,7 +66,24 @@ fn steer(
     // Orbit on right mouse, the game's way.
     if buttons.pressed(MouseButton::Right) {
         rig.yaw += motion.delta.x * 0.008;
-        rig.pitch = (rig.pitch + motion.delta.y * 0.008).clamp(0.12, 1.45);
+        rig.pitch = (rig.pitch + motion.delta.y * 0.008).clamp(0.12, 1.55);
+    }
+
+    // Snapped views on the number row: the drafting angles. Front is the
+    // door side - the gold sill - and overhead is the plan view.
+    let pi = std::f32::consts::PI;
+    for (key, yaw, pitch) in [
+        (KeyCode::Digit1, 0.0, 0.32),       // front, the door side
+        (KeyCode::Digit2, pi * 0.5, 0.32),  // right side
+        (KeyCode::Digit3, pi, 0.32),        // back
+        (KeyCode::Digit4, -pi * 0.5, 0.32), // left side
+        (KeyCode::Digit5, 0.0, 1.55),       // overhead, the plan
+        (KeyCode::Digit6, 0.6, 0.7),        // the working perch
+    ] {
+        if keys.just_pressed(key) {
+            rig.yaw = yaw;
+            rig.pitch = pitch;
+        }
     }
 
     // Pan on middle mouse: the bench moves with the pointer.
