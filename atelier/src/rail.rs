@@ -20,6 +20,10 @@ struct ModeButton(crate::gizmo::ToolMode);
 #[derive(Resource)]
 pub struct FileHome(pub Entity);
 
+/// The button on the top bar that lifts the roof off.
+#[derive(Component)]
+struct RoofButton;
+
 /// The gear at the rail's foot, and the settings panel it opens.
 #[derive(Component)]
 struct SettingsButton;
@@ -31,8 +35,10 @@ pub struct RailPlugin;
 
 impl Plugin for RailPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, raise_rail)
-            .add_systems(Update, (work_buttons, work_mode_bar, work_settings));
+        app.add_systems(Startup, raise_rail).add_systems(
+            Update,
+            (work_buttons, work_mode_bar, work_settings, work_roof_button),
+        );
     }
 }
 
@@ -92,6 +98,33 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
             ChildOf(button),
         ));
     }
+
+    // The roof toggle rides the bar's own right hand.
+    let roof = commands
+        .spawn((
+            RoofButton,
+            Interaction::default(),
+            Node {
+                margin: UiRect::left(Val::Px(12.0)),
+                padding: UiRect::axes(Val::Px(14.0), Val::Px(5.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.18)),
+            BorderColor::all(theme::panel_border(&palette)),
+            ChildOf(bar),
+        ))
+        .id();
+    commands.spawn((
+        Text::new("ROOF"),
+        TextFont {
+            font: fonts.display.clone().into(),
+            font_size: FontSize::Px(12.0),
+            ..default()
+        },
+        TextColor(theme::text_dim(&palette)),
+        ChildOf(roof),
+    ));
 
     let rail = commands
         .spawn((
@@ -280,6 +313,11 @@ of an L",
 1, 2, 4, 8, 16 units",
         ),
         ("F", "face snap on and off"),
+        (
+            "H",
+            "lift the roof off, and
+set it back",
+        ),
         ("tab", "normal, move, resize;\nclick selects, drag a handle"),
         ("D", "type exact dimensions\nof the resize selection"),
         ("RMB drag", "swing the camera"),
@@ -481,5 +519,48 @@ fn work_settings(
         } else {
             Visibility::Hidden
         };
+    }
+}
+
+/// The ROOF button lifts the roof off with the same hand H does, and
+/// wears the gold while it is up.
+fn work_roof_button(
+    palette: Res<Palette>,
+    mut lifted: ResMut<crate::builder::RoofsLifted>,
+    mut buttons: Query<(&Interaction, &mut BorderColor), With<RoofButton>>,
+    mut labels: Query<&mut TextColor>,
+    children: Query<&Children>,
+    marks: Query<Entity, With<RoofButton>>,
+) {
+    for (interaction, _) in &buttons {
+        if *interaction == Interaction::Pressed {
+            lifted.0 = !lifted.0;
+        }
+    }
+    for (_, mut border) in &mut buttons {
+        let dress = BorderColor::all(if lifted.0 {
+            theme::accent(&palette)
+        } else {
+            theme::panel_border(&palette)
+        });
+        if *border != dress {
+            *border = dress;
+        }
+    }
+    for button in &marks {
+        if let Ok(kids) = children.get(button) {
+            for &kid in kids {
+                if let Ok(mut colour) = labels.get_mut(kid) {
+                    let wanted = if lifted.0 {
+                        theme::accent(&palette)
+                    } else {
+                        theme::text_dim(&palette)
+                    };
+                    if colour.0 != wanted {
+                        colour.0 = wanted;
+                    }
+                }
+            }
+        }
     }
 }

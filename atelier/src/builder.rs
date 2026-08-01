@@ -976,7 +976,10 @@ impl Plugin for BuilderPlugin {
             .init_resource::<History>()
             .init_resource::<SnapGrid>()
             .init_resource::<Clipboard>()
+            .init_resource::<RoofsLifted>()
             .add_systems(Startup, raise_shelf.after(crate::rail::raise_rail))
+            // Two chains, because a tuple of systems stops at twenty:
+            // the hand's work, then the bench's bookkeeping after it.
             .add_systems(
                 Update,
                 (
@@ -988,11 +991,18 @@ impl Plugin for BuilderPlugin {
                     toggle_snap_mode,
                     disarm_on_mode,
                     reflow_openings,
+                    lift_roofs,
                     copy_and_paste,
                     mirror_part,
                     feel_ahead,
                     move_ghost,
                     place_grab_remove,
+                )
+                    .chain(),
+            )
+            .add_systems(
+                Update,
+                (
                     save_workbench,
                     take_the_name,
                     dims_panel,
@@ -1001,7 +1011,8 @@ impl Plugin for BuilderPlugin {
                     bury_saved_work,
                     settle_words,
                 )
-                    .chain(),
+                    .chain()
+                    .after(place_grab_remove),
             );
     }
 }
@@ -3946,5 +3957,41 @@ fn reflow_openings(
     if punched {
         // The punch set a fresh frame of its own in the new opening.
         commands.entity(frame).despawn();
+    }
+}
+
+/// Whether the roof stands lifted, so the rooms below can be worked on.
+#[derive(Resource, Default)]
+pub struct RoofsLifted(pub bool);
+
+/// H lifts the roof off and sets it back - everything raised at the
+/// roof stage goes with it, panels and ridge caps alike.
+pub(crate) fn lift_roofs(
+    keys: Res<ButtonInput<KeyCode>>,
+    bench: Res<Bench>,
+    naming: Res<Naming>,
+    dims: Res<DimsEntry>,
+    mut lifted: ResMut<RoofsLifted>,
+    mut parts: Query<(&Placed, &mut Visibility), Without<Ghost>>,
+) {
+    if *bench == Bench::Builder
+        && naming.0.is_none()
+        && dims.0.is_none()
+        && keys.just_pressed(KeyCode::KeyH)
+    {
+        lifted.0 = !lifted.0;
+    }
+    for (record, mut visibility) in &mut parts {
+        if record.stage != "roof" {
+            continue;
+        }
+        let wanted = if lifted.0 {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
+        if *visibility != wanted {
+            *visibility = wanted;
+        }
     }
 }
