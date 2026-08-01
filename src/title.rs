@@ -125,6 +125,10 @@ struct SplashScreen;
 #[derive(Component)]
 struct SplashArt;
 
+/// The studio's line at the foot of the mark, fading with it.
+#[derive(Component)]
+struct SplashMark;
+
 /// Seconds each fade takes, and seconds the mark holds at full strength.
 const SPLASH_FADE: f32 = 1.3;
 const SPLASH_HOLD: f32 = 1.8;
@@ -184,7 +188,27 @@ fn spawn_splash(
         },
         ChildOf(screen),
     ));
+
+    // The studio's line, at the foot of the dark, rising and leaving
+    // with the mark above it.
+    commands.spawn((
+        SplashMark,
+        ui::dim(format!(
+            "\u{00a9} {} Baz Studios, LLC. All rights reserved.",
+            STUDIO_YEAR
+        )),
+        TextColor(Color::srgba(1.0, 1.0, 1.0, 0.0)),
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: px(34),
+            ..default()
+        },
+        ChildOf(screen),
+    ));
 }
+
+/// The year on the studio's line.
+const STUDIO_YEAR: u32 = 2026;
 
 /// Runs the fade-in, hold, fade-out — and lets any key or click skip ahead.
 fn play_splash(
@@ -193,6 +217,7 @@ fn play_splash(
     buttons: Res<ButtonInput<MouseButton>>,
     clock: Option<ResMut<SplashClock>>,
     mut arts: Query<&mut ImageNode, With<SplashArt>>,
+    mut marks: Query<&mut TextColor, With<SplashMark>>,
     mut next: ResMut<NextState<GameState>>,
 ) {
     let Some(mut clock) = clock else {
@@ -221,6 +246,10 @@ fn play_splash(
 
     for mut art in &mut arts {
         art.color = Color::srgba(1.0, 1.0, 1.0, alpha);
+    }
+    // The studio's line keeps to a whisper of the mark's own light.
+    for mut mark in &mut marks {
+        mark.0 = Color::srgba(0.82, 0.8, 0.76, alpha * 0.62);
     }
 
     if clock.0 >= fade_out_at + SPLASH_FADE {

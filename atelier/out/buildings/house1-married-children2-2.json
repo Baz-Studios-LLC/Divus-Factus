@@ -1107,6 +1107,20 @@
       "shade": 0.7,
       "stage": "roof",
       "flip": true
+    },
+    {
+      "part": "wallseg-11.577336x0.375@2.125",
+      "at": [
+        -4.0,
+        4.5,
+        -1.4136674
+      ],
+      "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "walls",
+      "flip": false
     }
   ]
 }
