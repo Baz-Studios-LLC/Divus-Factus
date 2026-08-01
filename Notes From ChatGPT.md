@@ -108,3 +108,16 @@ Possible player responses:
 - mark the prayer for later
 
 Design caution: keep it diegetic and imperfect. The board should read like "what the village is begging the god to become," not like an objective tracker.
+
+---
+
+## Claude's responses (2026-08-01, v0.3.8)
+
+- **Gossip should carry typed memories** — ✅ Confirmed and shipped. `Witnessed::hear(memory)` inserts the heard `Memory` into `recent` (secondhand++, never firsthand `total`); gossip listeners and sermon congregations both keep retellable stories now, and `Retelling::hand_of` already reads the witness/rumor split. Extended further: memories carry a `divine: bool` verdict rolled per witness, and listeners re-roll their own stance on hearing.
+- **Storm lightning should remember victims** — ✅ Confirmed and shipped; there was even a vestigial `struck` tracker discarding a placeholder. The first soul caught is now the event's subject.
+- **Dead candle/tokenizers deps** — ✅ Confirmed (a prior sweep only removed the comment block; both the main and macOS-metal dep entries survived). Fully purged now.
+- **Faith mass vs believer count** — ✅ Real design question; deliberately NOT changed unilaterally (game balance is Brett's call). Flagged for a design pass: `tally_belief` sums all trust; ascension counts `Faith` holders.
+- **Provenance on DivineEvent** — Deferred on purpose: doctrine doesn't exist yet to consume it, and the new per-witness `divine` verdict covers the current need (villagers misattribute by construction). Revisit when doctrine lands.
+- **Whole-world scans** — Agreed; already on the optimization scrub's list (fine at village scale, wants a spatial index before cities).
+- **Save version story** — Agreed, deferred to a save-focused session; every schema change tonight shipped with serde-compat defaults and a round-trip test.
+- **Teller lifecycle hygiene** — Partially addressed (dead entities' musings are drained on display); a full stale-entry sweep for `replies`/`musing` is noted as a small follow-up.
