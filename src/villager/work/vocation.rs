@@ -329,16 +329,21 @@ pub(crate) fn retrain(
         wanted = Some(Vocation::Forester);
     } else if has_building(BuildingKind::Dock) && !has_vocation(Vocation::Fisher) {
         wanted = Some(Vocation::Fisher);
-    } else if !has_vocation(Vocation::Carpenter)
-        && (!sites.is_empty() || homeless.iter().count() > 2)
-    {
-        wanted = Some(Vocation::Carpenter);
     } else if !has_vocation(Vocation::Mason)
         && sites
             .iter()
             .any(|(cs, plan)| cs.stone_laid < cs.footing_stone(plan.kind))
     {
+        // BEFORE the carpenter: an unlaid foundation blocks every other
+        // trade on the site, and the ladder only fills one post per pass —
+        // ranked below the carpenter, churn kept refilling the carpenter's
+        // post while a finished-looking longhouse waited years on four
+        // stones nobody was allowed to carry.
         wanted = Some(Vocation::Mason);
+    } else if !has_vocation(Vocation::Carpenter)
+        && (!sites.is_empty() || homeless.iter().count() > 2)
+    {
+        wanted = Some(Vocation::Carpenter);
     } else if has_building(BuildingKind::Tavern) && !has_vocation(Vocation::Cook) {
         wanted = Some(Vocation::Cook);
     } else if has_building(BuildingKind::Shrine) && !has_vocation(Vocation::Priest) {
