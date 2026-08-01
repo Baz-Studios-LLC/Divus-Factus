@@ -187,6 +187,9 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
         ToolMode::Resize => {
             let sized = builder::kind_from_name(&record.part).and_then(|kind| match kind {
                 PartKind::Wall(long) => Some((long, 0.0, false)),
+                // The pieces a punch leaves are walls too, and stretch
+                // like them - only their height and lift stay put.
+                PartKind::Seg { long, .. } => Some((long, 0.0, false)),
                 PartKind::Trim { long, .. } => Some((long, 0.0, false)),
                 PartKind::Gable(long) => Some((long, 0.0, false)),
                 PartKind::Floor(w, d) => Some((w, d, true)),
@@ -463,6 +466,11 @@ fn work_gizmo(
             let grown = if on_x { w - w0 } else { d - d0 };
             let made = match kind {
                 PartKind::Wall(_) => PartKind::Wall(w),
+                PartKind::Seg { high, lift, .. } => PartKind::Seg {
+                    long: w,
+                    high,
+                    lift,
+                },
                 PartKind::Trim { stone, .. } => PartKind::Trim { long: w, stone },
                 PartKind::Gable(_) => PartKind::Gable(w),
                 PartKind::Floor(..) => PartKind::Floor(w, d),

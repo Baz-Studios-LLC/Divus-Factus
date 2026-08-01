@@ -3289,6 +3289,7 @@ pub(crate) fn dims_panel(
         let kind = kind_from_name(&record.part)?;
         match kind {
             PartKind::Wall(long) => Some((part, long, None)),
+            PartKind::Seg { long, .. } => Some((part, long, None)),
             PartKind::Trim { long, .. } => Some((part, long, None)),
             PartKind::Floor(w, d) | PartKind::Foundation(w, d) | PartKind::Roof(w, d) => {
                 Some((part, w, Some(d)))
@@ -3347,6 +3348,11 @@ pub(crate) fn dims_panel(
                     let d = d_in.map(lattice);
                     let made = match kind {
                         PartKind::Wall(_) => Some(PartKind::Wall(w)),
+                        PartKind::Seg { high, lift, .. } => Some(PartKind::Seg {
+                            long: w,
+                            high,
+                            lift,
+                        }),
                         PartKind::Trim { stone, .. } => Some(PartKind::Trim { long: w, stone }),
                         PartKind::Floor(_, old) => Some(PartKind::Floor(w, d.unwrap_or(old))),
                         PartKind::Foundation(_, old) => {
