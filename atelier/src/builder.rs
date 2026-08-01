@@ -2330,6 +2330,7 @@ fn place_grab_remove(
                     &mut materials,
                     &palette,
                     &placed,
+                    hovered.build.map(|hit| (hit.entity, hit.point)),
                     ghost_at.translation,
                     wide,
                     head,
@@ -2402,12 +2403,28 @@ fn place_grab_remove(
 /// Splits the nearest wall around an opening and sets the frame in it.
 /// Returns false when no wall stands close enough to take the punch.
 #[allow(clippy::too_many_arguments)]
+/// A wall the punch may part: pristine, or a full-height leaving from
+/// an earlier punch - a second window in the same run is honest work.
+fn punchable_length(record: &Placed) -> Option<f32> {
+    match kind_from_name(&record.part)? {
+        PartKind::Wall(long) => Some(long),
+        PartKind::Seg { long, high, lift }
+            if lift.abs() < 0.01 && (high - WALL_HIGH).abs() < 0.05 =>
+        {
+            Some(long)
+        }
+        _ => None,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 fn punch_wall(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     palette: &Palette,
     placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    aimed: Option<(Entity, Vec3)>,
     at: Vec3,
     wide: f32,
     head: f32,
@@ -2415,21 +2432,34 @@ fn punch_wall(
     is_door: bool,
     hand: &Hand,
 ) -> bool {
-    // The nearest plain wall whose line the point sits on.
+    // The wall the cursor's own ray touches wins outright; the search
+    // by proximity is the fallback for a blind click.
     let mut best: Option<(Entity, f32, Vec3, f32, f32, Placed)> = None;
-    for (entity, transform, record) in placed {
-        let Some(PartKind::Wall(length)) = kind_from_name(&record.part) else {
-            continue;
-        };
+    if let Some((touched, point)) = aimed
+        && let Ok((entity, transform, record)) = placed.get(touched)
+        && let Some(length) = punchable_length(record)
+    {
         let along = Quat::from_rotation_y(record.yaw) * Vec3::X;
-        let from_centre = at - transform.translation;
-        let t = from_centre.dot(along);
-        let sideways = (from_centre - along * t).length();
-        if sideways > 0.4 || t.abs() > length * 0.5 {
-            continue;
+        let t = (point - transform.translation).dot(along);
+        if t.abs() <= length * 0.5 {
+            best = Some((entity, 0.0, along, t, length, record.clone()));
         }
-        if best.as_ref().is_none_or(|(_, s, ..)| sideways < *s) {
-            best = Some((entity, sideways, along, t, length, record.clone()));
+    }
+    if best.is_none() {
+        for (entity, transform, record) in placed {
+            let Some(length) = punchable_length(record) else {
+                continue;
+            };
+            let along = Quat::from_rotation_y(record.yaw) * Vec3::X;
+            let from_centre = at - transform.translation;
+            let t = from_centre.dot(along);
+            let sideways = (from_centre - along * t).length();
+            if sideways > 0.5 || t.abs() > length * 0.5 {
+                continue;
+            }
+            if best.as_ref().is_none_or(|(_, s, ..)| sideways < *s) {
+                best = Some((entity, sideways, along, t, length, record.clone()));
+            }
         }
     }
     let Some((wall, _, along, t, length, record)) = best else {

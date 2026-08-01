@@ -20,12 +20,19 @@ struct ModeButton(crate::gizmo::ToolMode);
 #[derive(Resource)]
 pub struct FileHome(pub Entity);
 
+/// The gear at the rail's foot, and the settings panel it opens.
+#[derive(Component)]
+struct SettingsButton;
+
+#[derive(Component)]
+struct SettingsPanel;
+
 pub struct RailPlugin;
 
 impl Plugin for RailPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, raise_rail)
-            .add_systems(Update, (work_buttons, work_mode_bar));
+            .add_systems(Update, (work_buttons, work_mode_bar, work_settings));
     }
 }
 
@@ -202,6 +209,27 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
             ChildOf(rail),
         ))
         .id();
+    // The settings panel: hidden until the gear is pressed, carrying
+    // the keybinds so the rail itself stays short.
+    let panel = commands
+        .spawn((
+            SettingsPanel,
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(200.0),
+                bottom: Val::Px(10.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(3.0),
+                padding: UiRect::all(Val::Px(14.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(theme::panel_bg()),
+            BorderColor::all(theme::accent(&palette).with_alpha(0.5)),
+            Visibility::Hidden,
+            GlobalZIndex(40),
+        ))
+        .id();
     commands.spawn((
         Text::new("KEYBINDS"),
         TextFont {
@@ -214,7 +242,7 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
             margin: UiRect::bottom(Val::Px(2.0)),
             ..default()
         },
-        ChildOf(foot),
+        ChildOf(panel),
     ));
     for (cap, tale) in [
         ("click", "place, or pick back up"),
@@ -252,7 +280,7 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
                     column_gap: Val::Px(6.0),
                     ..default()
                 },
-                ChildOf(foot),
+                ChildOf(panel),
             ))
             .id();
         let chip = commands
@@ -291,6 +319,52 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
             ChildOf(row),
         ));
     }
+    // The gear: a drawn sliders glyph, since the fonts keep no gear.
+    let gear = commands
+        .spawn((
+            SettingsButton,
+            Interaction::default(),
+            Node {
+                width: Val::Px(34.0),
+                height: Val::Px(30.0),
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(4.0),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.18)),
+            BorderColor::all(theme::panel_border(&palette)),
+            ChildOf(foot),
+        ))
+        .id();
+    for offset in [-5.0f32, 3.0, -2.0] {
+        let bar = commands
+            .spawn((
+                Node {
+                    width: Val::Px(18.0),
+                    height: Val::Px(2.0),
+                    ..default()
+                },
+                BackgroundColor(theme::text_dim(&palette).with_alpha(0.8)),
+                ChildOf(gear),
+            ))
+            .id();
+        commands.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(9.0 + offset),
+                top: Val::Px(-1.5),
+                width: Val::Px(5.0),
+                height: Val::Px(5.0),
+                ..default()
+            },
+            BackgroundColor(theme::accent(&palette)),
+            ChildOf(bar),
+        ));
+    }
+
     commands.spawn((
         Text::new("what you save here, the god carries into the world by hand."),
         TextFont {
@@ -372,5 +446,25 @@ fn work_buttons(
         } else {
             Color::BLACK.with_alpha(0.18)
         });
+    }
+}
+
+/// The gear opens and closes the settings panel.
+fn work_settings(
+    gears: Query<&Interaction, (Changed<Interaction>, With<SettingsButton>)>,
+    mut panels: Query<&mut Visibility, With<SettingsPanel>>,
+) {
+    let pressed = gears
+        .iter()
+        .any(|interaction| *interaction == Interaction::Pressed);
+    if !pressed {
+        return;
+    }
+    for mut visibility in &mut panels {
+        *visibility = if *visibility == Visibility::Hidden {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
     }
 }
