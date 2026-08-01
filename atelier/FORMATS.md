@@ -56,7 +56,7 @@ game already understands, so the carrying-in is mechanical:
 }
 ```
 
-- `part`: `wall-<len>` (0.24 thick, 2.4 high — the game's cross-section),
+- `part`: `wall-<len>` (0.25 thick, 2.4 high — the Atelier's truth; the game conforms),
   `floor`, `roof`, `prop:<name>` (bed, table, stool, hearth, chair, bench,
   chest, barrel, crate, shelves, cupboard, pot, basket, rug, woodpile,
   candle, sack, trough — the shelf grows on request), or `widget:<kind>`.

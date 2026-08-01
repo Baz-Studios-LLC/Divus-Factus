@@ -13,8 +13,10 @@ use crate::Bench;
 use crate::look::{Fonts, Palette, theme};
 use crate::stage::BuilderFurniture;
 
-/// The game's wall cross-section, from buildings.rs.
-const WALL_THICK: f32 = 0.24;
+/// The Atelier's own measurements - the source of truth now; the game
+/// conforms to these when its buildings are replaced. A quarter-metre
+/// wall on a quarter-metre grid means centrelines always land on snaps.
+const WALL_THICK: f32 = 0.25;
 const WALL_HIGH: f32 = 2.4;
 
 /// One box of a part's body: offset from the part origin, size, ramp,
@@ -1336,6 +1338,45 @@ fn support_height(
     top
 }
 
+/// A platform's top rectangle: foundations and floors, the things walls
+/// stand on and line up against.
+struct PlatformRect {
+    at: Vec3,
+    yaw: f32,
+    half: Vec2,
+}
+
+fn platform_rects(
+    placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+) -> Vec<PlatformRect> {
+    let mut rects = Vec::new();
+    for (_, transform, record) in placed {
+        let Some(kind) = kind_from_name(&record.part) else {
+            continue;
+        };
+        if !matches!(kind, PartKind::Floor | PartKind::Prop("foundation")) {
+            continue;
+        }
+        let mut low = Vec3::splat(f32::INFINITY);
+        let mut high = Vec3::splat(f32::NEG_INFINITY);
+        for Slab(at, size, ..) in body_of(&kind, None) {
+            low = low.min(at - size * 0.5);
+            high = high.max(at + size * 0.5);
+        }
+        rects.push(PlatformRect {
+            at: transform.translation,
+            yaw: record.yaw,
+            half: Vec2::new((high.x - low.x) * 0.5, (high.z - low.z) * 0.5),
+        });
+    }
+    rects
+}
+
+/// The plinth reveal: wall centrelines sit this far inside a platform's
+/// edge, so the stone stays a little proud of the panel. A full grid
+/// step, so a snapped wall's centreline is always a grid point.
+const PLINTH_REVEAL: f32 = 0.25;
+
 /// The ends of every standing full-height wall piece, for the magnets.
 fn wall_ends(placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>) -> Vec<Vec3> {
     let mut ends = Vec::new();
@@ -1389,7 +1430,25 @@ fn move_ghost(
     // the corner pole magnetizes to the same points it exists to cover.
     let magnetic = matches!(kind, PartKind::Wall(_)) || kind == PartKind::Prop("pole");
     if magnetic {
-        let ends = wall_ends(&placed);
+        let mut ends = wall_ends(&placed);
+        // Platform corners pull on wall ends too, drawn in by the plinth
+        // reveal - a wall run started at a foundation corner begins
+        // exactly where the game's own houses begin theirs.
+        let platforms = platform_rects(&placed);
+        for platform in &platforms {
+            let spin = Quat::from_rotation_y(platform.yaw);
+            for (sx, sz) in [(-1.0f32, -1.0f32), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+                ends.push(
+                    platform.at
+                        + spin
+                            * Vec3::new(
+                                sx * (platform.half.x - PLINTH_REVEAL),
+                                0.0,
+                                sz * (platform.half.y - PLINTH_REVEAL),
+                            ),
+                );
+            }
+        }
         let my_ends: Vec<Vec3> = match kind {
             PartKind::Wall(long) => {
                 let along = Quat::from_rotation_y(hand.yaw) * Vec3::X;
@@ -1412,6 +1471,50 @@ fn move_ghost(
         }
         if let Some((_, gap)) = pull {
             snapped += gap;
+        } else if matches!(kind, PartKind::Wall(_)) {
+            // No end took hold: a wall running parallel to a platform edge
+            // still snaps flush onto it, inset by the same reveal, so the
+            // wall stands ON the stone with the stone a touch proud - the
+            // same way every time.
+            let my_dir = Quat::from_rotation_y(hand.yaw) * Vec3::X;
+            let mut best: Option<(f32, Vec3)> = None;
+            for platform in &platforms {
+                let spin = Quat::from_rotation_y(platform.yaw);
+                let faces = [
+                    (
+                        spin * Vec3::X,
+                        spin * Vec3::Z,
+                        platform.half.y,
+                        platform.half.x,
+                    ),
+                    (
+                        spin * Vec3::Z,
+                        spin * Vec3::X,
+                        platform.half.x,
+                        platform.half.y,
+                    ),
+                ];
+                for (along_edge, outward, half_out, half_along) in faces {
+                    if my_dir.dot(along_edge).abs() < 0.92 {
+                        continue;
+                    }
+                    for side in [-1.0f32, 1.0] {
+                        let line = platform.at + outward * side * (half_out - PLINTH_REVEAL);
+                        let offset = snapped - line;
+                        let across = offset.dot(outward);
+                        let along = offset.dot(along_edge);
+                        if across.abs() < 0.45
+                            && along.abs() < half_along + 0.3
+                            && best.as_ref().is_none_or(|(b, _)| across.abs() < *b)
+                        {
+                            best = Some((across.abs(), outward * -across));
+                        }
+                    }
+                }
+            }
+            if let Some((_, shift)) = best {
+                snapped += shift;
+            }
         }
     }
 
