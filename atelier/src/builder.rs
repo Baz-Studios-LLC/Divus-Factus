@@ -124,6 +124,12 @@ pub enum PartKind {
     TrimRun {
         stone: bool,
     },
+    /// A wall piece drawn at a fixed height and lift: the header that
+    /// spans above an opening, the sill that fills below one.
+    SegRun {
+        high: f32,
+        lift: f32,
+    },
     GableRun,
     FloorRun,
     FoundationRun,
@@ -136,7 +142,10 @@ impl PartKind {
     /// The runs stretch along one axis; the rect runs stretch two.
     pub fn run_axes(&self) -> Option<u8> {
         match self {
-            PartKind::WallRun | PartKind::TrimRun { .. } | PartKind::GableRun => Some(1),
+            PartKind::WallRun
+            | PartKind::TrimRun { .. }
+            | PartKind::SegRun { .. }
+            | PartKind::GableRun => Some(1),
             PartKind::FloorRun | PartKind::FoundationRun | PartKind::RoofRun => Some(2),
             _ => None,
         }
@@ -151,6 +160,11 @@ impl PartKind {
                 stone: *stone,
             },
             PartKind::GableRun => PartKind::Gable(w),
+            PartKind::SegRun { high, lift } => PartKind::Seg {
+                long: w,
+                high: *high,
+                lift: *lift,
+            },
             PartKind::FloorRun => PartKind::Floor(w, d),
             PartKind::FoundationRun => PartKind::Foundation(w, d),
             PartKind::RoofRun => PartKind::Roof(w, d),
@@ -198,6 +212,22 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     ),
     structure("DOOR", PartKind::Prop("door"), "walls"),
     structure("DOORWAY", PartKind::Prop("doorway"), "walls"),
+    structure(
+        "HEADER, STRETCH",
+        PartKind::SegRun {
+            high: 0.375,
+            lift: 2.125,
+        },
+        "walls",
+    ),
+    structure(
+        "SILL, STRETCH",
+        PartKind::SegRun {
+            high: 0.75,
+            lift: 0.0,
+        },
+        "walls",
+    ),
     structure("WINDOW", PartKind::Prop("window"), "walls"),
     structure("FOUNDATION, STRETCH", PartKind::FoundationRun, "footing"),
     structure("FOUNDATION, 2M", PartKind::Foundation(2.0, 2.0), "footing"),
@@ -309,6 +339,16 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             0.0,
             *length,
             WALL_HIGH,
+            WALL_THICK,
+            "wood",
+            0.7,
+        )],
+        PartKind::SegRun { high, lift } => vec![slab(
+            0.0,
+            lift + high * 0.5,
+            0.0,
+            0.25,
+            *high,
             WALL_THICK,
             "wood",
             0.7,
@@ -884,6 +924,7 @@ pub fn part_name(kind: &PartKind) -> String {
         PartKind::Roof(w, d) => format!("roof-{w}x{d}"),
         PartKind::WallRun
         | PartKind::TrimRun { .. }
+        | PartKind::SegRun { .. }
         | PartKind::GableRun
         | PartKind::FloorRun
         | PartKind::FoundationRun
@@ -1674,6 +1715,7 @@ fn is_structure(kind: &PartKind) -> bool {
             | PartKind::RoofRun
             | PartKind::Trim { .. }
             | PartKind::TrimRun { .. }
+            | PartKind::SegRun { .. }
             | PartKind::Gable(..)
             | PartKind::GableRun
             | PartKind::Prop("steps")
