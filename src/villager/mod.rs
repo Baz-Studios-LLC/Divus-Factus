@@ -2182,25 +2182,21 @@ fn choose_activity(
             // hungry villager used to march to the nearest fruiting bush
             // WHEREVER it was - four hundred strides past a full store -
             // and the march itself killed them. The rule now: eat from
-            // whichever is nearer, the bush or the banner, and never walk
-            // past food toward food.
-            let banner = site
-                .as_ref()
-                .map(|s| s.centre.distance(transform.translation));
-            if let Some((entity, bush_distance_sq)) = nearest {
-                let bush_distance = bush_distance_sq.sqrt();
-                let store_wins = larder >= 1.0
-                    && banner.is_some_and(|b| b < bush_distance || bush_distance > 80.0);
-                if store_wins {
-                    *activity = Activity::VisitingStore;
-                } else if *activity != Activity::SeekingFood(entity) {
-                    *activity = Activity::SeekingFood(entity);
-                }
-                continue;
-            }
-            // No fruiting bush anywhere: the store is the only table.
+            // The village eats from its own stores. Gatherers, fishers
+            // and hunters fill the larder; everyone else comes to the
+            // banner for a meal. A village that eats off the land one
+            // berry at a time never has to build anything.
             if larder >= 1.0 {
                 *activity = Activity::VisitingStore;
+                continue;
+            }
+            // An empty larder is the exception, and it looks like one:
+            // with nothing at the banner they go out to the bushes and
+            // eat where they stand, the way the desperate do.
+            if let Some((entity, _)) = nearest
+                && *activity != Activity::SeekingFood(entity)
+            {
+                *activity = Activity::SeekingFood(entity);
                 continue;
             }
         }

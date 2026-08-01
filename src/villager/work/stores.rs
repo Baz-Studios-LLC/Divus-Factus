@@ -510,6 +510,7 @@ pub(crate) fn famine_watch(
     members: Query<&crate::villager::MemberOf>,
     settlements: Query<&crate::villager::Settlement>,
     trends: Res<StoreTrends>,
+    bushes: Query<(&GlobalTransform, &FoodSource)>,
     folk: Query<
         (Entity, &Transform, Option<&Vocation>),
         (
@@ -518,7 +519,6 @@ pub(crate) fn famine_watch(
             Without<crate::creature::Held>,
         ),
     >,
-    bushes: Query<(&GlobalTransform, &FoodSource)>,
     mut notices: MessageWriter<crate::ui::Notice>,
 ) {
     *since_last += time.delta_secs();
@@ -696,7 +696,6 @@ pub(crate) fn eat_from_store(
     kitchen: Res<KitchenWarm>,
     members: Query<&crate::villager::MemberOf>,
     mut towns: Query<(&crate::villager::SettlementGround, &mut Stockpile)>,
-    bushes: Query<(&GlobalTransform, &FoodSource)>,
     mut hungry: Query<
         (
             Entity,
@@ -783,13 +782,11 @@ pub(crate) fn eat_from_store(
                 }
             }
             Activity::Idle | Activity::Wandering => {
-                // The store opens for anyone hungry with no fruiting bush
-                // in reasonable reach - a berry heath three ridges away is
-                // no reason to starve beside a full larder.
-                let bush_near = bushes.iter().any(|(at, bush)| {
-                    bush.amount > 0.2 && at.translation().distance(transform.translation) < 30.0
-                });
-                if !bush_near && needs.hunger > DOWN_TOOLS_HUNGER && store.food() >= 1.0 {
+                // The store is the table: anyone hungry enough to put
+                // their tools down comes to the banner, bushes or no
+                // bushes. Picking from the heath is the gatherer's work,
+                // not everybody's dinner.
+                if needs.hunger > DOWN_TOOLS_HUNGER && store.food() >= 1.0 {
                     *activity = Activity::VisitingStore;
                     target.0 = Some(centre);
                 }
