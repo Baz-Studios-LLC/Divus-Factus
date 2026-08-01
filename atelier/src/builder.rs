@@ -958,6 +958,23 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     slab(-0.5625, 0.125, 0.125, 0.625, 0.25, 0.1875, ramp, shade),
                 ];
             }
+            // A seat is shaped like the sitter: knees toward the facing,
+            // so a stool's height and a table's clearance can be judged
+            // by eye instead of by arithmetic.
+            if *name == "sit" {
+                return vec![
+                    // Head.
+                    slab(0.0, 1.1875, 0.0, 0.4375, 0.4375, 0.4375, ramp, shade),
+                    // Torso, upright from the seat.
+                    slab(0.0, 0.75, 0.0, 0.4375, 0.5625, 0.3125, ramp, shade),
+                    // Thighs, forward to the knees.
+                    slab(0.1875, 0.4375, -0.125, 0.5, 0.1875, 0.1875, ramp, shade),
+                    slab(0.1875, 0.4375, 0.125, 0.5, 0.1875, 0.1875, ramp, shade),
+                    // Shins, down to the floor.
+                    slab(0.375, 0.1875, -0.125, 0.1875, 0.375, 0.1875, ramp, shade),
+                    slab(0.375, 0.1875, 0.125, 0.1875, 0.375, 0.1875, ramp, shade),
+                ];
+            }
             vec![
                 slab(0.0, 0.2, 0.0, 0.4, 0.4, 0.4, ramp, shade),
                 // The nose: which way the widget faces.
