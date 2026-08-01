@@ -58,6 +58,7 @@ fn spawn_camera(mut commands: Commands, rig: Res<OrbitRig>) {
 fn steer(
     keys: Res<ButtonInput<KeyCode>>,
     naming: Res<crate::builder::Naming>,
+    dims: Res<crate::builder::DimsEntry>,
     buttons: Res<ButtonInput<MouseButton>>,
     motion: Res<AccumulatedMouseMotion>,
     scroll: Res<AccumulatedMouseScroll>,
@@ -70,8 +71,9 @@ fn steer(
         rig.pitch = (rig.pitch + motion.delta.y * 0.008).clamp(0.12, 1.55);
     }
 
-    // While a name is being typed, the keyboard belongs to the pen.
-    if naming.0.is_some() {
+    // While a name or a measure is being typed, the keyboard belongs
+    // to the pen.
+    if naming.0.is_some() || dims.0.is_some() {
         return;
     }
 

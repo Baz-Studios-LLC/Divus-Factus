@@ -232,6 +232,7 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
         ("shift", "fine snap, 1/16m"),
         ("F", "face snap on and off"),
         ("tab", "normal, move, resize;\nclick selects, drag a handle"),
+        ("D", "type exact dimensions\nof the resize selection"),
         ("RMB drag", "swing the camera"),
         ("MMB drag", "pull the bench along"),
         ("wheel", "draw near, pull away"),

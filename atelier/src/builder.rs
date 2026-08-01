@@ -680,6 +680,7 @@ impl Plugin for BuilderPlugin {
             .init_resource::<Hovered>()
             .init_resource::<WorkName>()
             .init_resource::<SnapMode>()
+            .init_resource::<DimsEntry>()
             .add_systems(Startup, raise_shelf.after(crate::rail::raise_rail))
             .add_systems(
                 Update,
@@ -695,6 +696,7 @@ impl Plugin for BuilderPlugin {
                     place_grab_remove,
                     save_workbench,
                     take_the_name,
+                    dims_panel,
                     bury_saved_work,
                     settle_words,
                 )
@@ -2045,6 +2047,18 @@ impl Default for SnapMode {
 #[derive(Component)]
 struct SnapModeText;
 
+/// Exact dimensions being typed for the selected part, while the card
+/// is up. Every other key on the bench holds its tongue.
+#[derive(Resource, Default)]
+pub struct DimsEntry(pub Option<String>);
+
+/// The dimensions card at the window's foot and the text inside it.
+#[derive(Component)]
+pub(crate) struct DimsCard;
+
+#[derive(Component)]
+pub(crate) struct DimsText;
+
 #[allow(clippy::type_complexity)]
 fn ray_scan(
     windows: &Query<&Window>,
@@ -2780,6 +2794,195 @@ fn settle_words(
         if time.elapsed_secs() >= word.until {
             *text = Text::new(word.back.to_string());
             commands.entity(entity).remove::<PassingWord>();
+        }
+    }
+}
+
+/// The dimensions card: raised once, shown when it has something to say.
+/// While stretch-drawing it reads the live size; with a sized part
+/// selected in RESIZE it shows the measure and D opens typed entry -
+/// "3.5" for a length, "3.5x6" for a slab - enter applies on the
+/// lattice, escape thinks better of it.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn dims_panel(
+    mut commands: Commands,
+    mut keystrokes: MessageReader<bevy::input::keyboard::KeyboardInput>,
+    keys: Res<ButtonInput<KeyCode>>,
+    fonts: Res<Fonts>,
+    palette: Res<Palette>,
+    tool: Res<crate::gizmo::ToolMode>,
+    selected: Res<crate::gizmo::Selected>,
+    mut entry: ResMut<DimsEntry>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut cards: Query<&mut Visibility, With<DimsCard>>,
+    mut readouts: Query<&mut Text, With<DimsText>>,
+    ghosts: Query<&Placed, With<Ghost>>,
+    mut parts: Query<(&mut Transform, &mut Placed), Without<Ghost>>,
+    mut raised: Local<bool>,
+) {
+    if !*raised {
+        *raised = true;
+        let card = commands
+            .spawn((
+                DimsCard,
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Percent(50.0),
+                    bottom: Val::Px(10.0),
+                    margin: UiRect::left(Val::Px(-110.0)),
+                    width: Val::Px(220.0),
+                    justify_content: JustifyContent::Center,
+                    padding: UiRect::axes(Val::Px(12.0), Val::Px(6.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(theme::panel_bg()),
+                BorderColor::all(theme::panel_border(&palette)),
+                Visibility::Hidden,
+            ))
+            .id();
+        commands.spawn((
+            DimsText,
+            Text::new(""),
+            TextFont {
+                font: fonts.text.clone().into(),
+                font_size: FontSize::Px(13.0),
+                ..default()
+            },
+            TextColor(theme::text(&palette)),
+            ChildOf(card),
+        ));
+        return;
+    }
+
+    // The selected sized part, if any, and its measure.
+    let sized = selected.0.and_then(|part| {
+        let (_, record) = parts.get(part).ok()?;
+        let kind = kind_from_name(&record.part)?;
+        match kind {
+            PartKind::Wall(long) => Some((part, long, None)),
+            PartKind::Trim { long, .. } => Some((part, long, None)),
+            PartKind::Floor(w, d) | PartKind::Foundation(w, d) | PartKind::Roof(w, d) => {
+                Some((part, w, Some(d)))
+            }
+            _ => None,
+        }
+    });
+
+    // Typing takes precedence; then the live stretch; then the measure.
+    let mut said: Option<String> = None;
+    if let Some(text) = entry.0.as_mut() {
+        use bevy::input::keyboard::Key;
+        let mut done: Option<bool> = None;
+        for stroke in keystrokes.read() {
+            if !stroke.state.is_pressed() {
+                continue;
+            }
+            match &stroke.logical_key {
+                Key::Character(typed) => {
+                    for letter in typed.chars() {
+                        let letter = letter.to_ascii_lowercase();
+                        if (letter.is_ascii_digit() || letter == '.' || letter == 'x')
+                            && text.len() < 12
+                        {
+                            text.push(letter);
+                        }
+                    }
+                }
+                Key::Backspace => {
+                    text.pop();
+                }
+                Key::Enter => done = Some(true),
+                Key::Escape => done = Some(false),
+                _ => {}
+            }
+        }
+        said = Some(format!("{text}_"));
+        if let Some(saving) = done {
+            if saving
+                && let Some((part, _, had_d)) = sized
+                && let Ok((mut transform, mut record)) = parts.get_mut(part)
+                && let Some(kind) = kind_from_name(&record.part)
+            {
+                // "3.5" or "3.5x6", snapped onto the lattice, no smaller
+                // than one coarse cell, resized around the centre.
+                let lattice = |value: f32| ((value * 16.0).round() / 16.0).max(0.25);
+                let (w_in, d_in) = match text.split_once('x') {
+                    Some((a, b)) => (a.parse::<f32>().ok(), b.parse::<f32>().ok()),
+                    None => (text.parse::<f32>().ok(), None),
+                };
+                if let Some(w) = w_in.map(lattice) {
+                    let d = d_in.map(lattice);
+                    let made = match kind {
+                        PartKind::Wall(_) => Some(PartKind::Wall(w)),
+                        PartKind::Trim { stone, .. } => Some(PartKind::Trim { long: w, stone }),
+                        PartKind::Floor(_, old) => Some(PartKind::Floor(w, d.unwrap_or(old))),
+                        PartKind::Foundation(_, old) => {
+                            Some(PartKind::Foundation(w, d.unwrap_or(old)))
+                        }
+                        PartKind::Roof(_, old) => Some(PartKind::Roof(w, d.unwrap_or(old))),
+                        _ => None,
+                    };
+                    if let Some(made) = made {
+                        record.part = part_name(&made);
+                        record.at = transform.translation.into();
+                        let _ = &mut transform;
+                        commands.entity(part).despawn_related::<Children>();
+                        dress_part(
+                            &mut commands,
+                            &mut meshes,
+                            &mut materials,
+                            &palette,
+                            &made,
+                            &record,
+                            part,
+                            false,
+                        );
+                        let _ = had_d;
+                    }
+                }
+            }
+            entry.0 = None;
+            said = None;
+        }
+    } else if let Some(drawn) = ghosts.iter().next().and_then(|g| kind_from_name(&g.part)) {
+        // Live measure while stretch-drawing.
+        said = match drawn {
+            PartKind::Wall(long) => Some(format!("wall - {long}m")),
+            PartKind::Trim { long, .. } => Some(format!("trim - {long}m")),
+            PartKind::Floor(w, d) => Some(format!("floor - {w} x {d}")),
+            PartKind::Foundation(w, d) => Some(format!("foundation - {w} x {d}")),
+            PartKind::Roof(w, d) => Some(format!("roof - {w} x {d}")),
+            _ => None,
+        };
+    } else if *tool == crate::gizmo::ToolMode::Resize
+        && let Some((_, w, d)) = sized
+    {
+        said = Some(match d {
+            Some(d) => format!("{w} x {d} - D to type"),
+            None => format!("{w}m - D to type"),
+        });
+        if keys.just_pressed(KeyCode::KeyD) {
+            entry.0 = Some(String::new());
+        }
+    }
+
+    for mut visibility in &mut cards {
+        let wanted = if said.is_some() || entry.0.is_some() {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+        if *visibility != wanted {
+            *visibility = wanted;
+        }
+    }
+    if let Some(word) = said {
+        for mut text in &mut readouts {
+            if text.0 != word {
+                *text = Text::new(word.clone());
+            }
         }
     }
 }

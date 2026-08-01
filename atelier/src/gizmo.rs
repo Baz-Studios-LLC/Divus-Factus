@@ -117,10 +117,11 @@ fn walk_modes(
     keys: Res<ButtonInput<KeyCode>>,
     bench: Res<Bench>,
     naming: Res<Naming>,
+    dims: Res<builder::DimsEntry>,
     mut mode: ResMut<ToolMode>,
     mut selected: ResMut<Selected>,
 ) {
-    if *bench != Bench::Builder || naming.0.is_some() {
+    if *bench != Bench::Builder || naming.0.is_some() || dims.0.is_some() {
         return;
     }
     if keys.just_pressed(KeyCode::Tab) {
@@ -145,10 +146,14 @@ fn select_part(
     hot: Res<GizmoHot>,
     bench: Res<Bench>,
     naming: Res<Naming>,
+    dims: Res<builder::DimsEntry>,
     hovered: Res<Hovered>,
     parts: Query<(), With<Placed>>,
     mut selected: ResMut<Selected>,
 ) {
+    if dims.0.is_some() {
+        return;
+    }
     if *bench != Bench::Builder || naming.0.is_some() || *mode == ToolMode::Normal {
         selected.0 = None;
         return;
@@ -345,6 +350,7 @@ fn ray_reach(ray: &Ray3d, point: Vec3) -> f32 {
 fn work_gizmo(
     mut commands: Commands,
     buttons: Res<ButtonInput<MouseButton>>,
+    keys: Res<ButtonInput<KeyCode>>,
     selected: Res<Selected>,
     mut drag: ResMut<GizmoDrag>,
     mut hot: ResMut<GizmoHot>,
@@ -444,7 +450,13 @@ fn work_gizmo(
         Grip::Size { on_x, w0, d0 } => {
             // Pulling outward along the handle grows the dimension; the
             // far end stands still, so the centre walks half the growth.
-            let pull = ((t - state.t0) * 4.0).round() / 4.0;
+            // A quarter-metre step, or a fine sixteenth with shift held.
+            let grid = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
+                16.0
+            } else {
+                4.0
+            };
+            let pull = ((t - state.t0) * grid).round() / grid;
             let Some(kind) = builder::kind_from_name(&record.part) else {
                 return;
             };
