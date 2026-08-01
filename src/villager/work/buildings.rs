@@ -598,6 +598,10 @@ pub struct Hut;
 #[derive(Component)]
 pub struct RoofPart;
 
+/// The family table, in the hearth room: supper gathers around it.
+#[derive(Component)]
+pub struct Table;
+
 /// The walls of a walkable interior: footprint half-extents in the
 /// building's own space, and the door gaps along the +X wall (as local Z
 /// offsets). The router steers any walk that crosses these walls through a
@@ -1531,20 +1535,92 @@ pub(crate) fn raise_stage(
             }
             roofing.set(false);
             if plan.kind == BuildingKind::House {
-                // The inside: floor and a bed to every berth — two to each
-                // side wall, the doorway lane left clear.
+                // A house has ROOMS now: the door opens into the hearth
+                // room — table, stools, a stone hearth — and a partition
+                // with a wide doorway leads back to the bedroom where the
+                // four beds stand. One family, one supper, one back room.
                 floor(w, d);
-                let length = (d * 0.8).clamp(1.1, 1.6);
+                // The partition: bedroom takes the back (local -Z) third-to-
+                // half; a generous doorway so nobody clips a wall.
+                let split = -d * 0.15;
+                let opening = 1.7;
+                let leaf = (w * 2.0 - opening) * 0.5;
+                for side in [-1.0_f32, 1.0] {
+                    part(
+                        Vec3::new(side * (opening * 0.5 + leaf * 0.5), h * 0.4, split),
+                        Vec3::new(leaf, h * 0.8, 0.14),
+                        0.0,
+                        &wall,
+                    );
+                }
+                // Lintel over the room door.
+                part(
+                    Vec3::new(0.0, h * 0.8, split),
+                    Vec3::new(opening + 0.3, 0.16, 0.14),
+                    0.0,
+                    &frame,
+                );
+
+                // The bedroom: two beds along each side wall, heads out.
+                let length = ((d * 0.85 + split) * 0.8).clamp(1.1, 1.6);
                 for slot in 0..crate::villager::home::HOUSE_CAPACITY as u8 {
                     let side = if slot % 2 == 0 { -1.0 } else { 1.0 };
-                    let rank = if slot < 2 { -1.0 } else { 1.0 };
+                    let rank = slot < 2;
+                    let z = if rank {
+                        -d + length * 0.5 + 0.3
+                    } else {
+                        split - length * 0.5 - 0.35
+                    };
                     bed(
                         slot,
-                        Vec3::new(w * 0.45 * rank - 0.2, 0.0, side * (d - length * 0.5 - 0.3)),
+                        Vec3::new(side * (w - 0.55), 0.0, z),
                         false,
-                        side,
+                        if rank { -1.0 } else { 1.0 },
                         length,
                     );
+                }
+
+                // The hearth room: a table mid-room, stools at its sides,
+                // and a stone hearth against the back-facing partition.
+                let table_at = Vec3::new(-w * 0.15, 0.0, (split + d) * 0.55);
+                {
+                    let mut cmd = cmd.borrow_mut();
+                    cmd.spawn((
+                        Table,
+                        Mesh3d(cube.clone()),
+                        MeshMaterial3d(frame.clone()),
+                        Transform::from_translation(table_at + Vec3::Y * (lift + 0.52))
+                            .with_scale(Vec3::new(1.5, 0.1, 0.9)),
+                        ChildOf(site),
+                    ));
+                    // Legs.
+                    for (lx, lz) in [(-0.6, -0.32), (0.6, -0.32), (-0.6, 0.32), (0.6, 0.32)] {
+                        cmd.spawn((
+                            Mesh3d(cube.clone()),
+                            MeshMaterial3d(frame.clone()),
+                            Transform::from_translation(table_at + Vec3::new(lx, lift + 0.24, lz))
+                                .with_scale(Vec3::new(0.12, 0.48, 0.12)),
+                            ChildOf(site),
+                        ));
+                    }
+                    // Stools.
+                    for (sx, sz) in [(-1.15, 0.0), (1.15, 0.0), (0.0, -0.95), (0.0, 0.95)] {
+                        cmd.spawn((
+                            Mesh3d(cube.clone()),
+                            MeshMaterial3d(frame.clone()),
+                            Transform::from_translation(table_at + Vec3::new(sx, lift + 0.18, sz))
+                                .with_scale(Vec3::new(0.42, 0.36, 0.42)),
+                            ChildOf(site),
+                        ));
+                    }
+                    // The hearth: dressed stone against the partition wall.
+                    cmd.spawn((
+                        Mesh3d(cube.clone()),
+                        MeshMaterial3d(stonework.clone()),
+                        Transform::from_translation(Vec3::new(w * 0.62, lift + 0.42, split + 0.45))
+                            .with_scale(Vec3::new(0.9, 0.84, 0.6)),
+                        ChildOf(site),
+                    ));
                 }
             }
             // The gilded finial: on the ridge for a gable, on the high wall

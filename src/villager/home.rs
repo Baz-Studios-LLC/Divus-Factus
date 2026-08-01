@@ -1042,8 +1042,9 @@ pub(super) fn midday_meal(
 pub(super) fn family_supper(
     clock: Res<crate::calendar::WorldClock>,
     homes: Query<&Transform, (With<Hut>, Without<Villager>)>,
+    tables: Query<(&ChildOf, &Transform), (With<super::work::Table>, Without<Villager>)>,
     mut families: Query<
-        (&Transform, &Home, &mut Activity, &mut MoveTarget),
+        (Entity, &Transform, &Home, &mut Activity, &mut MoveTarget),
         (
             With<Villager>,
             Without<Held>,
@@ -1055,7 +1056,7 @@ pub(super) fn family_supper(
     if !clock.is_evening() {
         return;
     }
-    for (at, home, mut activity, mut target) in &mut families {
+    for (entity, at, home, mut activity, mut target) in &mut families {
         // Only house-dwellers: the hearth is the family's.
         let Ok(hut) = homes.get(home.0) else {
             continue;
@@ -1064,11 +1065,26 @@ pub(super) fn family_supper(
             Activity::Idle | Activity::Wandering | Activity::Sheltering | Activity::Working => {}
             _ => continue,
         }
-        let indoors = hut.translation;
-        if at.translation.distance(indoors) > 1.6 {
+        // A seat at the family table, each their own side of it — falling
+        // back to the room itself for houses raised before tables were.
+        let seat = tables
+            .iter()
+            .find(|(parent, _)| parent.parent() == home.0)
+            .map(|(_, table)| {
+                let corner = match entity.index().index() % 4 {
+                    0 => Vec3::new(-1.15, 0.0, 0.0),
+                    1 => Vec3::new(1.15, 0.0, 0.0),
+                    2 => Vec3::new(0.0, 0.0, -0.95),
+                    _ => Vec3::new(0.0, 0.0, 0.95),
+                };
+                hut.transform_point(table.translation + corner)
+            })
+            .unwrap_or(hut.translation);
+        let seat = Vec3::new(seat.x, at.translation.y, seat.z);
+        if at.translation.distance(seat) > 0.8 {
             *activity = Activity::Sheltering;
-            target.0 = Some(indoors);
-        } else if *activity != Activity::Sheltering {
+            target.0 = Some(seat);
+        } else if *activity != Activity::Sheltering || target.0.is_some() {
             *activity = Activity::Sheltering;
             target.0 = None;
         }
