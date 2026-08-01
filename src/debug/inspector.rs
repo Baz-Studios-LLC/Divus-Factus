@@ -504,11 +504,21 @@ pub(crate) fn update_inspector(
                 )
             })
             .collect();
+        // A house is a FAMILY'S: it bears their name, not the town's. The
+        // longhouse, which belongs to no one family, keeps the village's.
+        let family = households
+            .iter()
+            .filter(|(_, home, _)| home.0 == entity)
+            .map(|(person, _, _)| person.surname.clone())
+            .find(|surname| !surname.is_empty());
         (
             if longhouse {
                 format!("The longhouse of {village}")
             } else {
-                format!("A house of {village}")
+                match family {
+                    Some(name) => format!("The house of {name}"),
+                    None => format!("An empty house of {village}"),
+                }
             },
             if residents.is_empty() {
                 if longhouse {
