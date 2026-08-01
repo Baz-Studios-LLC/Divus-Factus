@@ -222,12 +222,29 @@ pub(super) fn take_shelter(
                 }
             }
             None => {
-                // No roof: the fire circle is the next best thing.
-                if let Some(fire) = fire_pos
-                    && transform.translation.distance(fire) > 5.0
-                    && matches!(*activity, Activity::Idle | Activity::Wandering)
-                {
-                    target.0 = Some(fire);
+                // No roof: the fire circle is the next best thing — a spot
+                // in a loose RING around it, held as Sheltering. The first
+                // version left them Idle at the fire's exact centre, so the
+                // idle wander walked them ten feet off and this system
+                // marched them straight back, all day, in the rain, forever.
+                if let Some(fire) = fire_pos {
+                    let stand = fire
+                        + (transform.translation - fire)
+                            .with_y(0.0)
+                            .normalize_or(Vec3::X)
+                            * 3.2;
+                    if transform.translation.distance(stand) > 1.6
+                        && matches!(
+                            *activity,
+                            Activity::Idle | Activity::Wandering | Activity::Sheltering
+                        )
+                    {
+                        *activity = Activity::Sheltering;
+                        target.0 = Some(stand);
+                    } else if matches!(*activity, Activity::Idle | Activity::Wandering) {
+                        *activity = Activity::Sheltering;
+                        target.0 = None;
+                    }
                 }
             }
         }
