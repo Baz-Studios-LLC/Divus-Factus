@@ -66,6 +66,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     structure("WALL, 2M", PartKind::Wall(2.0), "walls"),
     structure("WALL, 4M", PartKind::Wall(4.0), "walls"),
     structure("CORNER POLE", PartKind::Prop("pole"), "frame"),
+    structure("TRIM, 2M", PartKind::Prop("trim"), "walls"),
     structure("DOOR", PartKind::Prop("door"), "walls"),
     structure("WINDOW", PartKind::Prop("window"), "walls"),
     structure("FOUNDATION, 2M", PartKind::Prop("foundation"), "footing"),
@@ -304,6 +305,11 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             glass(0.0, 1.35, 0.0, 0.92, 0.92, 0.05, "sky", 0.8),
             slab(0.0, 1.35, 0.02, 0.05, 0.92, 0.04, "wood", 0.5),
             slab(0.0, 1.35, 0.02, 0.92, 0.05, 0.04, "wood", 0.5),
+        ],
+        PartKind::Prop("trim") => vec![
+            // The fascia strip: half a wall thick - skirt a seam, dress an
+            // edge, or stack a course of them into a stepped footing.
+            slab(0.0, 0.15, 0.0, 2.0, 0.3, 0.125, "wood", 0.5),
         ],
         PartKind::Prop("foundation") => vec![
             // The game's plinth height exactly: houses stand on these, and
@@ -1367,12 +1373,12 @@ fn platform_rects(
     rects
 }
 
-/// Wall centrelines sit exactly ON a platform's edge: a 2m wall spans a
-/// 2m foundation corner to corner, wall ends land on the same grid
-/// points as platform corners, and perpendicular walls meet centreline
-/// to centreline. The timber's small uniform overhang past the stone is
-/// the drip edge. Zero, kept as a name so the rule reads as a choice.
-const PLINTH_REVEAL: f32 = 0.0;
+/// Wall centrelines sit half a wall inside the platform edge, which
+/// puts the timber's OUTER FACE flush with the stone's: fully seated,
+/// no gap, no overhang. Corners still meet cleanly because platform
+/// corners pull walls only along their own line - the flush snap owns
+/// the sideways part - and the pole caps the centreline crossing.
+const PLINTH_REVEAL: f32 = WALL_THICK * 0.5;
 
 /// The ends of every standing full-height wall piece, for the magnets.
 fn wall_ends(placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>) -> Vec<Vec3> {
@@ -1428,22 +1434,23 @@ fn move_ghost(
     let magnetic = matches!(kind, PartKind::Wall(_)) || kind == PartKind::Prop("pole");
     if magnetic {
         let mut ends = wall_ends(&placed);
-        // Platform corners pull on wall ends too, drawn in by the plinth
-        // reveal - a wall run started at a foundation corner begins
-        // exactly where the game's own houses begin theirs.
         let platforms = platform_rects(&placed);
-        for platform in &platforms {
-            let spin = Quat::from_rotation_y(platform.yaw);
-            for (sx, sz) in [(-1.0f32, -1.0f32), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
-                ends.push(
-                    platform.at
-                        + spin
-                            * Vec3::new(
-                                sx * (platform.half.x - PLINTH_REVEAL),
-                                0.0,
-                                sz * (platform.half.y - PLINTH_REVEAL),
-                            ),
-                );
+        // The pole magnetizes to centreline crossings at platform corners
+        // - the exact point two flush walls meet - alongside wall ends.
+        if kind == PartKind::Prop("pole") {
+            for platform in &platforms {
+                let spin = Quat::from_rotation_y(platform.yaw);
+                for (sx, sz) in [(-1.0f32, -1.0f32), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+                    ends.push(
+                        platform.at
+                            + spin
+                                * Vec3::new(
+                                    sx * (platform.half.x - PLINTH_REVEAL),
+                                    0.0,
+                                    sz * (platform.half.y - PLINTH_REVEAL),
+                                ),
+                    );
+                }
             }
         }
         let my_ends: Vec<Vec3> = match kind {
@@ -1468,11 +1475,11 @@ fn move_ghost(
         }
         if let Some((_, gap)) = pull {
             snapped += gap;
-        } else if matches!(kind, PartKind::Wall(_)) {
-            // No end took hold: a wall running parallel to a platform edge
-            // still snaps flush onto it, inset by the same reveal, so the
-            // wall stands ON the stone with the stone a touch proud - the
-            // same way every time.
+        } else if let PartKind::Wall(my_len) = kind {
+            // No wall end took hold. A wall running parallel to a platform
+            // edge seats flush onto it - outer face to the stone's face -
+            // and platform corners then slide it ALONG its line only, so
+            // the flush seat is never yanked sideways.
             let my_dir = Quat::from_rotation_y(hand.yaw) * Vec3::X;
             let mut best: Option<(f32, Vec3)> = None;
             for platform in &platforms {
@@ -1511,6 +1518,31 @@ fn move_ghost(
             }
             if let Some((_, shift)) = best {
                 snapped += shift;
+                // Corner slide: my nearest end walks along my line to the
+                // platform corner's projection, and no further than that.
+                let mut slide: Option<(f32, f32)> = None;
+                for platform in &platforms {
+                    let spin = Quat::from_rotation_y(platform.yaw);
+                    for (sx, sz) in [(-1.0f32, -1.0f32), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+                        let corner = platform.at
+                            + spin * Vec3::new(sx * platform.half.x, 0.0, sz * platform.half.y);
+                        for end_sign in [-1.0f32, 1.0] {
+                            let my_end = snapped + my_dir * (end_sign * my_len * 0.5);
+                            let to_corner = corner - my_end;
+                            let along = to_corner.dot(my_dir);
+                            let sideways = (to_corner - my_dir * along).length();
+                            if along.abs() < 0.4
+                                && sideways < 0.45
+                                && slide.as_ref().is_none_or(|(b, _)| along.abs() < *b)
+                            {
+                                slide = Some((along.abs(), along));
+                            }
+                        }
+                    }
+                }
+                if let Some((_, along)) = slide {
+                    snapped += my_dir * along;
+                }
             }
         }
     }
