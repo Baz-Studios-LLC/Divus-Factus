@@ -381,6 +381,7 @@ pub(super) fn faith_of_witnesses(
     witnesses: Query<&crate::witness::Witnessed>,
 ) {
     let god = name.as_ref().map_or("their god", |n| n.0.as_str());
+    let _ = god;
     for event in events.read() {
         for (entity, transform, mut faith, person, temperament, (chronicle, manner)) in
             &mut watchers
@@ -437,6 +438,35 @@ pub(super) fn faith_of_witnesses(
                         faith.shift(0.04 * conviction);
                     } else {
                         faith.shift(-0.04 * conviction);
+                    }
+                }
+                // The worldly turns, for the few who attributed them at all.
+                // A death read as the god's doing cuts both ways by grain:
+                // the bold call it the god's right hand, the timid feel the
+                // god turn away.
+                DivineEventKind::Perished => {
+                    if temperament.boldness >= 0.45 {
+                        faith.shift(0.06 * conviction);
+                        if let Some(mut chronicle) = chronicle {
+                            chronicle.record(clock.day(), "believed the god called one home");
+                        }
+                    } else {
+                        faith.shift(-0.09 * conviction);
+                        if let Some(mut chronicle) = chronicle {
+                            chronicle.record(clock.day(), "believed the god let one of us die");
+                        }
+                    }
+                }
+                DivineEventKind::Delivered => {
+                    faith.shift(0.06 * conviction);
+                    if let Some(mut chronicle) = chronicle {
+                        chronicle.record(clock.day(), "gave thanks for the newborn");
+                    }
+                }
+                DivineEventKind::Flourished => {
+                    faith.shift(0.05 * conviction);
+                    if let Some(mut chronicle) = chronicle {
+                        chronicle.record(clock.day(), "read the god's favor in the harvest");
                     }
                 }
                 _ => {}
@@ -523,6 +553,10 @@ pub(super) fn grow_legend(mut legend: ResMut<Legend>, mut events: MessageReader<
             DivineEventKind::Provided | DivineEventKind::Mended => legend.providence += 1.0,
             DivineEventKind::Smote | DivineEventKind::Quaked => legend.dread += 1.0,
             DivineEventKind::Uprooted => legend.dread += 0.4,
+            // The worldly turns weigh lighter on the legend than the hand's
+            // own acts: they happen to every village, whoever its god is.
+            DivineEventKind::Delivered | DivineEventKind::Flourished => legend.providence += 0.3,
+            DivineEventKind::Perished => legend.dread += 0.3,
             _ => {}
         }
     }

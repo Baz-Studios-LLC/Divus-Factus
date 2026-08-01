@@ -98,6 +98,9 @@ pub struct Corpse;
 /// Announcement of a death, for witnesses and, later, for history.
 #[derive(Message, Clone, Debug)]
 pub struct CreatureDied {
+    /// Who died. Kept valid past death — a corpse is still an entity — so
+    /// witnesses can name them and reckon kinship.
+    pub entity: Entity,
     pub position: Vec3,
     /// Read by the coming doctrine system; witnesses today only care where.
     #[allow(dead_code)]
@@ -808,6 +811,7 @@ fn succumb(
         }
 
         died.write(CreatureDied {
+            entity,
             position: transform.translation,
             name,
             violent: vitality.violent,

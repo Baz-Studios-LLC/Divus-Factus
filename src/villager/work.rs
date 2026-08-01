@@ -489,6 +489,7 @@ pub(super) fn do_work(
         Query<(&mut ConstructionSite, &Blueprint)>,
         Query<&super::Settlement>,
         MessageWriter<crate::ui::Notice>,
+        MessageWriter<crate::witness::DivineEvent>,
         // Which sites are holdings, and where each site stands — a homestead
         // breaks its own ground the moment its roof is on.
         Query<(), With<Homestead>>,
@@ -539,7 +540,7 @@ pub(super) fn do_work(
         mut deposits_mut,
         mut sacred_mut,
     ) = trades;
-    let (mut build_sites, settlements, mut notices, steadings, build_at) = civic;
+    let (mut build_sites, settlements, mut notices, mut witnessed, steadings, build_at) = civic;
     let (terrain, mut chunks, mut grass, weather, mut stripped, terrain_assets, mut dirty_groves) =
         ground;
     let (mut meshes, mut materials) = assets;
@@ -1361,6 +1362,14 @@ pub(super) fn do_work(
                             },
                         );
                         field.growth = 0.08;
+                        // The yield is an act of the world too: those who
+                        // read favor into a heavy harvest thank the god.
+                        witnessed.write(crate::witness::DivineEvent {
+                            kind: crate::witness::DivineEventKind::Flourished,
+                            position: job.site,
+                            subject: None,
+                            intensity: 0.5,
+                        });
                         info!("{} brought in a harvest", person.name);
                         notices.write(crate::ui::Notice::new(format!(
                             "{} brought in a harvest",

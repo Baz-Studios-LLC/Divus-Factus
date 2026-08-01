@@ -1837,6 +1837,11 @@ fn chronicle_divine_touch(
             crate::witness::DivineEventKind::Uprooted => "was torn from the earth",
             crate::witness::DivineEventKind::Mended => "was made whole by the hand of god",
             crate::witness::DivineEventKind::Quaked => "was thrown down when the earth buckled",
+            // The worldly turns write their own chronicle lines at their own
+            // sites (the death, the birth, the harvest); nothing to add here.
+            crate::witness::DivineEventKind::Perished
+            | crate::witness::DivineEventKind::Delivered
+            | crate::witness::DivineEventKind::Flourished => continue,
         };
         chronicle.record(clock.day(), text);
     }
@@ -1877,9 +1882,12 @@ fn births(
     culture: Option<Res<SettlementCulture>>,
     site: Option<Res<SettlementSite>>,
     mut chronicles: Query<&mut Chronicle>,
-    mut notices: MessageWriter<crate::ui::Notice>,
-    town_halls: Query<&work::Building>,
     // Bundled: this system sits at Bevy's parameter ceiling.
+    mut notices: (
+        MessageWriter<crate::ui::Notice>,
+        MessageWriter<crate::witness::DivineEvent>,
+    ),
+    town_halls: Query<&work::Building>,
     shelter: (
         Query<(), With<work::Hut>>,
         Query<(), With<work::Longhouse>>,
@@ -2014,7 +2022,7 @@ fn births(
         mother_p.full_name(),
         father_p.full_name()
     );
-    notices.write(crate::ui::Notice::new(format!(
+    notices.0.write(crate::ui::Notice::new(format!(
         "{name} was born to {} and {}",
         mother_p.name, father_p.name
     )));
@@ -2044,6 +2052,16 @@ fn births(
     if let Ok(mut record) = chronicles.get_mut(father) {
         record.record(day, format!("fathered {child}, {name}"));
     }
+
+    // A birth is an act of the world, witnessed like any other: most who
+    // stand near call it a family's good day; the few who read providence
+    // into it thank the god for the child — by name, kinship and all.
+    notices.1.write(crate::witness::DivineEvent {
+        kind: crate::witness::DivineEventKind::Delivered,
+        position,
+        subject: Some(entity),
+        intensity: 0.6,
+    });
 
     commands.entity(entity).insert((
         Villager,

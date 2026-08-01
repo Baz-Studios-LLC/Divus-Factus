@@ -31,6 +31,7 @@ impl Plugin for WitnessPlugin {
                 .chain()
                 .in_set(WitnessSet),
         );
+        app.add_systems(Update, mortal_events.before(WitnessSet));
         // Capture tooling: only the player's hand ever sets a subject on an
         // event, so an unattended soak can never exercise the "it happened to
         // Feitreh, your brother" path without this.
@@ -78,6 +79,27 @@ fn throw_test_harness(
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WitnessSet;
 
+/// A villager's death is an act of the world, witnessed like any other: the
+/// event enters the same attribution mill as lightning, and the few who read
+/// the god into it grieve at the god. Wildlife dies unremarked.
+fn mortal_events(
+    mut deaths: MessageReader<crate::creature::CreatureDied>,
+    mut events: MessageWriter<DivineEvent>,
+    villagers: Query<(), With<Villager>>,
+) {
+    for death in deaths.read() {
+        if villagers.get(death.entity).is_err() {
+            continue;
+        }
+        events.write(DivineEvent {
+            kind: DivineEventKind::Perished,
+            position: death.position,
+            subject: Some(death.entity),
+            intensity: if death.violent { 0.9 } else { 0.6 },
+        });
+    }
+}
+
 /// Something the god did, that people might have seen.
 #[derive(Message, Clone, Copy, Debug)]
 pub struct DivineEvent {
@@ -110,6 +132,12 @@ pub enum DivineEventKind {
     Mended,
     /// The ground itself, thrown like a blanket.
     Quaked,
+    /// One of the village died — before witnesses, of hunger or violence.
+    Perished,
+    /// A child came safe into the world.
+    Delivered,
+    /// The fields came in heavier than they promised.
+    Flourished,
 }
 
 impl DivineEventKind {
@@ -127,6 +155,9 @@ impl DivineEventKind {
             DivineEventKind::Uprooted => 45.0,
             DivineEventKind::Mended => 36.0,
             DivineEventKind::Quaked => 65.0,
+            DivineEventKind::Perished => 30.0,
+            DivineEventKind::Delivered => 24.0,
+            DivineEventKind::Flourished => 20.0,
         }
     }
 
@@ -142,6 +173,9 @@ impl DivineEventKind {
             DivineEventKind::Uprooted => 0.6,
             DivineEventKind::Mended => 0.03,
             DivineEventKind::Quaked => 0.9,
+            DivineEventKind::Perished => 0.7,
+            DivineEventKind::Delivered => 0.04,
+            DivineEventKind::Flourished => 0.03,
         }
     }
 
@@ -160,6 +194,12 @@ impl DivineEventKind {
             DivineEventKind::Uprooted => 0.45,
             DivineEventKind::Mended => 0.85,
             DivineEventKind::Quaked => 0.3,
+            // The ordinary turns of a life: death, birth, harvest. People
+            // die, children come, fields yield — almost nobody needs a god
+            // for any of it, and the few who do are the interesting ones.
+            DivineEventKind::Perished => 0.22,
+            DivineEventKind::Delivered => 0.3,
+            DivineEventKind::Flourished => 0.28,
         }
     }
 
@@ -178,6 +218,9 @@ impl DivineEventKind {
             DivineEventKind::Uprooted => "saw a tree torn living from the earth",
             DivineEventKind::Mended => "saw the broken made whole",
             DivineEventKind::Quaked => "felt the earth throw them down",
+            DivineEventKind::Perished => "saw one of their own die",
+            DivineEventKind::Delivered => "saw a child come safe into the world",
+            DivineEventKind::Flourished => "saw the fields come in heavy",
         }
     }
 
@@ -240,6 +283,24 @@ impl DivineEventKind {
                 "the ground itself buckled at the god's anger",
                 "the earth rolled like a shaken rug",
                 "cracks opened where the god's finger fell",
+            ],
+            DivineEventKind::Perished => &[
+                "we lost one of our own today",
+                "they were alive at dawn and gone by dusk",
+                "death walked through the village again",
+                "we will bury one of ours tomorrow",
+            ],
+            DivineEventKind::Delivered => &[
+                "a child came safe into the world",
+                "there is a new voice in the village",
+                "mother and child both came through well",
+                "a birth, and an easy one for once",
+            ],
+            DivineEventKind::Flourished => &[
+                "the fields gave more than they promised",
+                "the harvest filled every basket we had",
+                "the rows came in heavier than we hoped",
+                "a good harvest, better than last year",
             ],
         }
     }
@@ -757,6 +818,11 @@ mod tests {
         assert!(DivineEventKind::Quaked.unmistakably_divine() <= 0.35);
         assert!(DivineEventKind::Lifted.unmistakably_divine() >= 0.85);
         assert!(DivineEventKind::Mended.unmistakably_divine() >= 0.8);
+        // The ordinary turns of a life stay ordinary to most: death, birth
+        // and harvest all read as the world's doing three times in four.
+        assert!(DivineEventKind::Perished.unmistakably_divine() <= 0.25);
+        assert!(DivineEventKind::Delivered.unmistakably_divine() <= 0.35);
+        assert!(DivineEventKind::Flourished.unmistakably_divine() <= 0.35);
     }
 
     #[test]
