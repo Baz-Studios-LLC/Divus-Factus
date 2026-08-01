@@ -89,7 +89,7 @@ fn spawn_date_card(mut commands: Commands) {
             font_size: FontSize::Px(36.0),
             ..default()
         },
-        TextColor(Color::WHITE),
+        TextColor(Color::WHITE.with_alpha(0.78)),
         ChildOf(card),
     ));
     commands.spawn((
@@ -100,7 +100,7 @@ fn spawn_date_card(mut commands: Commands) {
             font_size: FontSize::Px(14.0),
             ..default()
         },
-        TextColor(Color::WHITE.with_alpha(0.92)),
+        TextColor(Color::WHITE.with_alpha(0.66)),
         Node {
             margin: UiRect::left(px(26)),
             ..default()
