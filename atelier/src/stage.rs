@@ -91,6 +91,17 @@ fn dress_stage(
         ));
     }
 
+    // The plot centre, marked with a gold cross: the origin every exported
+    // part is measured from. Buildings need not be centred perfectly - the
+    // god recentres on import - but the mark keeps the eye honest.
+    for (sx, sz) in [(1.4, 0.05), (0.05, 1.4)] {
+        commands.spawn((
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(gold_center(&mut materials, &palette)),
+            Transform::from_xyz(0.0, 0.02, 0.0).with_scale(Vec3::new(sx, 0.02, sz)),
+        ));
+    }
+
     // The door mark: buildings face the village with their local +X, so the
     // +X edge of the grid wears a gold sill. What you build toward the gold
     // is what the village sees first.
@@ -119,6 +130,18 @@ fn dress_stage(
         Transform::from_xyz(0.0, 0.34, 0.0).with_scale(Vec3::new(2.6, 0.24, 2.6)),
         Visibility::Hidden,
     ));
+}
+
+fn gold_center(
+    materials: &mut Assets<StandardMaterial>,
+    palette: &Palette,
+) -> Handle<StandardMaterial> {
+    materials.add(StandardMaterial {
+        base_color: palette.shade("cloth-gold", 0.7),
+        perceptual_roughness: 0.95,
+        reflectance: 0.03,
+        ..default()
+    })
 }
 
 /// Each bench keeps its own furniture on stage and the other's put away.

@@ -38,122 +38,50 @@ pub struct CatalogEntry {
     pub stage: &'static str,
 }
 
-pub const CATALOG: &[CatalogEntry] = &[
+const fn structure(label: &'static str, kind: PartKind, stage: &'static str) -> CatalogEntry {
+    CatalogEntry { label, kind, stage }
+}
+
+const fn prop(label: &'static str, name: &'static str) -> CatalogEntry {
     CatalogEntry {
-        label: "WALL, 1M",
-        kind: PartKind::Wall(1.0),
-        stage: "walls",
-    },
-    CatalogEntry {
-        label: "WALL, 2M",
-        kind: PartKind::Wall(2.0),
-        stage: "walls",
-    },
-    CatalogEntry {
-        label: "WALL, 4M",
-        kind: PartKind::Wall(4.0),
-        stage: "walls",
-    },
-    CatalogEntry {
-        label: "FLOOR, 2M",
-        kind: PartKind::Floor,
-        stage: "footing",
-    },
-    CatalogEntry {
-        label: "ROOF PANEL",
-        kind: PartKind::Roof,
-        stage: "roof",
-    },
-    CatalogEntry {
-        label: "BED",
-        kind: PartKind::Prop("bed"),
+        label,
+        kind: PartKind::Prop(name),
         stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "TABLE",
-        kind: PartKind::Prop("table"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "STOOL",
-        kind: PartKind::Prop("stool"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "HEARTH",
-        kind: PartKind::Prop("hearth"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "CHAIR",
-        kind: PartKind::Prop("chair"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "BENCH",
-        kind: PartKind::Prop("bench"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "CHEST",
-        kind: PartKind::Prop("chest"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "BARREL",
-        kind: PartKind::Prop("barrel"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "CRATE",
-        kind: PartKind::Prop("crate"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "SHELVES",
-        kind: PartKind::Prop("shelves"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "CUPBOARD",
-        kind: PartKind::Prop("cupboard"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "COOKING POT",
-        kind: PartKind::Prop("pot"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "BASKET",
-        kind: PartKind::Prop("basket"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "RUG",
-        kind: PartKind::Prop("rug"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "WOODPILE",
-        kind: PartKind::Prop("woodpile"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "CANDLE STAND",
-        kind: PartKind::Prop("candle"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "SACK",
-        kind: PartKind::Prop("sack"),
-        stage: "furnishing",
-    },
-    CatalogEntry {
-        label: "TROUGH",
-        kind: PartKind::Prop("trough"),
-        stage: "furnishing",
-    },
+    }
+}
+
+/// The shelf's drawers: each section opens and closes on its header.
+pub const STRUCTURE: &[CatalogEntry] = &[
+    structure("WALL, 1M", PartKind::Wall(1.0), "walls"),
+    structure("WALL, 2M", PartKind::Wall(2.0), "walls"),
+    structure("WALL, 4M", PartKind::Wall(4.0), "walls"),
+    structure("FLOOR, 2M", PartKind::Floor, "footing"),
+    structure("ROOF PANEL", PartKind::Roof, "roof"),
+];
+
+pub const FURNITURE: &[CatalogEntry] = &[
+    prop("BED", "bed"),
+    prop("TABLE", "table"),
+    prop("STOOL", "stool"),
+    prop("CHAIR", "chair"),
+    prop("BENCH", "bench"),
+    prop("HEARTH", "hearth"),
+    prop("CHEST", "chest"),
+    prop("SHELVES", "shelves"),
+    prop("CUPBOARD", "cupboard"),
+];
+
+pub const DECOR: &[CatalogEntry] = &[
+    prop("MANNEQUIN", "mannequin"),
+    prop("BARREL", "barrel"),
+    prop("CRATE", "crate"),
+    prop("COOKING POT", "pot"),
+    prop("BASKET", "basket"),
+    prop("RUG", "rug"),
+    prop("WOODPILE", "woodpile"),
+    prop("CANDLE STAND", "candle"),
+    prop("SACK", "sack"),
+    prop("TROUGH", "trough"),
 ];
 
 pub const WIDGETS: &[(&str, &str, f32)] = &[
@@ -168,354 +96,138 @@ pub const WIDGETS: &[(&str, &str, f32)] = &[
     ("light", "cloth-gold", 0.95),
 ];
 
+/// The bench's ready-made starts: authored files under templates/.
+pub const TEMPLATES: &[(&str, &str)] = &[("HOUSE", "house"), ("LONGHOUSE", "longhouse")];
+
 /// The boxes a part is made of, in its own local space, resting on y = 0.
-fn body_of(kind: &PartKind, palette_shift: Option<(&str, f32)>) -> Vec<Slab> {
+fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
+    let slab = |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32| {
+        Slab(
+            Vec3::new(x, y, z),
+            Vec3::new(sx, sy, sz),
+            ramp.to_string(),
+            shade,
+        )
+    };
     let mut slabs = match kind {
-        PartKind::Wall(length) => vec![Slab(
-            Vec3::new(0.0, WALL_HIGH * 0.5, 0.0),
-            Vec3::new(*length, WALL_HIGH, WALL_THICK),
-            "wood".to_string(),
+        PartKind::Wall(length) => vec![slab(
+            0.0,
+            WALL_HIGH * 0.5,
+            0.0,
+            *length,
+            WALL_HIGH,
+            WALL_THICK,
+            "wood",
             0.7,
         )],
-        PartKind::Floor => vec![Slab(
-            Vec3::new(0.0, 0.06, 0.0),
-            Vec3::new(2.0, 0.12, 2.0),
-            "wood".to_string(),
-            0.5,
-        )],
-        PartKind::Roof => vec![Slab(
-            Vec3::new(0.0, 0.07, 0.0),
-            Vec3::new(2.2, 0.14, 2.2),
-            "earth".to_string(),
-            0.4,
-        )],
+        PartKind::Floor => vec![slab(0.0, 0.06, 0.0, 2.0, 0.12, 2.0, "wood", 0.5)],
+        PartKind::Roof => vec![slab(0.0, 0.07, 0.0, 2.2, 0.14, 2.2, "earth", 0.4)],
         PartKind::Prop("bed") => vec![
             // The game's own bed: frame, mattress, pillow at +Z (the head).
-            Slab(
-                Vec3::new(0.0, 0.26, 0.0),
-                Vec3::new(0.76, 0.24, 1.64),
-                "wood".to_string(),
-                0.55,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.44, 0.0),
-                Vec3::new(0.62, 0.18, 1.5),
-                "bone".to_string(),
-                0.8,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.56, 0.55),
-                Vec3::new(0.46, 0.1, 0.32),
-                "bone".to_string(),
-                0.95,
-            ),
+            slab(0.0, 0.26, 0.0, 0.76, 0.24, 1.64, "wood", 0.55),
+            slab(0.0, 0.44, 0.0, 0.62, 0.18, 1.5, "bone", 0.8),
+            slab(0.0, 0.56, 0.55, 0.46, 0.1, 0.32, "bone", 0.95),
         ],
         PartKind::Prop("table") => {
-            let mut parts = vec![Slab(
-                Vec3::new(0.0, 0.72, 0.0),
-                Vec3::new(1.5, 0.1, 0.9),
-                "wood".to_string(),
-                0.65,
-            )];
+            let mut parts = vec![slab(0.0, 0.72, 0.0, 1.5, 0.1, 0.9, "wood", 0.65)];
             for (sx, sz) in [(-1.0f32, -1.0f32), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
-                parts.push(Slab(
-                    Vec3::new(sx * 0.62, 0.34, sz * 0.32),
-                    Vec3::new(0.1, 0.68, 0.1),
-                    "wood".to_string(),
+                parts.push(slab(
+                    sx * 0.62,
+                    0.34,
+                    sz * 0.32,
+                    0.1,
+                    0.68,
+                    0.1,
+                    "wood",
                     0.5,
                 ));
             }
             parts
         }
         PartKind::Prop("stool") => vec![
-            Slab(
-                Vec3::new(0.0, 0.4, 0.0),
-                Vec3::new(0.38, 0.07, 0.38),
-                "wood".to_string(),
-                0.6,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.18, 0.0),
-                Vec3::new(0.3, 0.36, 0.3),
-                "wood".to_string(),
-                0.45,
-            ),
+            slab(0.0, 0.4, 0.0, 0.38, 0.07, 0.38, "wood", 0.6),
+            slab(0.0, 0.18, 0.0, 0.3, 0.36, 0.3, "wood", 0.45),
         ],
         PartKind::Prop("hearth") => vec![
-            Slab(
-                Vec3::new(0.0, 0.42, 0.0),
-                Vec3::new(0.9, 0.84, 0.6),
-                "stone".to_string(),
-                0.6,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.55, 0.12),
-                Vec3::new(0.62, 0.5, 0.44),
-                "stone".to_string(),
-                0.25,
-            ),
+            slab(0.0, 0.42, 0.0, 0.9, 0.84, 0.6, "stone", 0.6),
+            slab(0.0, 0.55, 0.12, 0.62, 0.5, 0.44, "stone", 0.25),
         ],
         PartKind::Prop("chair") => vec![
-            Slab(
-                Vec3::new(0.0, 0.4, 0.0),
-                Vec3::new(0.4, 0.07, 0.4),
-                "wood".to_string(),
-                0.6,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.18, 0.0),
-                Vec3::new(0.32, 0.36, 0.32),
-                "wood".to_string(),
-                0.45,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.72, -0.17),
-                Vec3::new(0.4, 0.72, 0.07),
-                "wood".to_string(),
-                0.55,
-            ),
+            slab(0.0, 0.4, 0.0, 0.4, 0.07, 0.4, "wood", 0.6),
+            slab(0.0, 0.18, 0.0, 0.32, 0.36, 0.32, "wood", 0.45),
+            slab(0.0, 0.72, -0.17, 0.4, 0.72, 0.07, "wood", 0.55),
         ],
         PartKind::Prop("bench") => vec![
-            Slab(
-                Vec3::new(0.0, 0.4, 0.0),
-                Vec3::new(1.2, 0.08, 0.36),
-                "wood".to_string(),
-                0.6,
-            ),
-            Slab(
-                Vec3::new(-0.5, 0.18, 0.0),
-                Vec3::new(0.09, 0.36, 0.3),
-                "wood".to_string(),
-                0.45,
-            ),
-            Slab(
-                Vec3::new(0.5, 0.18, 0.0),
-                Vec3::new(0.09, 0.36, 0.3),
-                "wood".to_string(),
-                0.45,
-            ),
+            slab(0.0, 0.4, 0.0, 1.2, 0.08, 0.36, "wood", 0.6),
+            slab(-0.5, 0.18, 0.0, 0.09, 0.36, 0.3, "wood", 0.45),
+            slab(0.5, 0.18, 0.0, 0.09, 0.36, 0.3, "wood", 0.45),
         ],
         PartKind::Prop("chest") => vec![
-            Slab(
-                Vec3::new(0.0, 0.25, 0.0),
-                Vec3::new(0.8, 0.5, 0.5),
-                "wood".to_string(),
-                0.5,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.52, 0.0),
-                Vec3::new(0.84, 0.1, 0.54),
-                "wood".to_string(),
-                0.35,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.33, 0.26),
-                Vec3::new(0.1, 0.16, 0.04),
-                "cloth-gold".to_string(),
-                0.7,
-            ),
+            slab(0.0, 0.25, 0.0, 0.8, 0.5, 0.5, "wood", 0.5),
+            slab(0.0, 0.52, 0.0, 0.84, 0.1, 0.54, "wood", 0.35),
+            slab(0.0, 0.33, 0.26, 0.1, 0.16, 0.04, "cloth-gold", 0.7),
         ],
         PartKind::Prop("barrel") => vec![
-            Slab(
-                Vec3::new(0.0, 0.36, 0.0),
-                Vec3::new(0.55, 0.72, 0.55),
-                "wood".to_string(),
-                0.55,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.16, 0.0),
-                Vec3::new(0.59, 0.07, 0.59),
-                "stone".to_string(),
-                0.45,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.56, 0.0),
-                Vec3::new(0.59, 0.07, 0.59),
-                "stone".to_string(),
-                0.45,
-            ),
+            slab(0.0, 0.36, 0.0, 0.55, 0.72, 0.55, "wood", 0.55),
+            slab(0.0, 0.16, 0.0, 0.59, 0.07, 0.59, "stone", 0.45),
+            slab(0.0, 0.56, 0.0, 0.59, 0.07, 0.59, "stone", 0.45),
         ],
         PartKind::Prop("crate") => vec![
-            Slab(
-                Vec3::new(0.0, 0.3, 0.0),
-                Vec3::new(0.6, 0.6, 0.6),
-                "wood".to_string(),
-                0.6,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.61, 0.0),
-                Vec3::new(0.52, 0.03, 0.52),
-                "wood".to_string(),
-                0.4,
-            ),
+            slab(0.0, 0.3, 0.0, 0.6, 0.6, 0.6, "wood", 0.6),
+            slab(0.0, 0.61, 0.0, 0.52, 0.03, 0.52, "wood", 0.4),
         ],
         PartKind::Prop("shelves") => vec![
-            Slab(
-                Vec3::new(-0.42, 0.8, 0.0),
-                Vec3::new(0.06, 1.6, 0.3),
-                "wood".to_string(),
-                0.5,
-            ),
-            Slab(
-                Vec3::new(0.42, 0.8, 0.0),
-                Vec3::new(0.06, 1.6, 0.3),
-                "wood".to_string(),
-                0.5,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.5, 0.0),
-                Vec3::new(0.9, 0.05, 0.3),
-                "wood".to_string(),
-                0.65,
-            ),
-            Slab(
-                Vec3::new(0.0, 1.0, 0.0),
-                Vec3::new(0.9, 0.05, 0.3),
-                "wood".to_string(),
-                0.65,
-            ),
-            Slab(
-                Vec3::new(0.0, 1.5, 0.0),
-                Vec3::new(0.9, 0.05, 0.3),
-                "wood".to_string(),
-                0.65,
-            ),
+            slab(-0.42, 0.8, 0.0, 0.06, 1.6, 0.3, "wood", 0.5),
+            slab(0.42, 0.8, 0.0, 0.06, 1.6, 0.3, "wood", 0.5),
+            slab(0.0, 0.5, 0.0, 0.9, 0.05, 0.3, "wood", 0.65),
+            slab(0.0, 1.0, 0.0, 0.9, 0.05, 0.3, "wood", 0.65),
+            slab(0.0, 1.5, 0.0, 0.9, 0.05, 0.3, "wood", 0.65),
         ],
         PartKind::Prop("cupboard") => vec![
-            Slab(
-                Vec3::new(0.0, 0.75, 0.0),
-                Vec3::new(0.9, 1.5, 0.45),
-                "wood".to_string(),
-                0.5,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.75, 0.24),
-                Vec3::new(0.82, 1.34, 0.04),
-                "wood".to_string(),
-                0.65,
-            ),
-            Slab(
-                Vec3::new(0.12, 0.75, 0.27),
-                Vec3::new(0.05, 0.16, 0.03),
-                "cloth-gold".to_string(),
-                0.6,
-            ),
+            slab(0.0, 0.75, 0.0, 0.9, 1.5, 0.45, "wood", 0.5),
+            slab(0.0, 0.75, 0.24, 0.82, 1.34, 0.04, "wood", 0.65),
+            slab(0.12, 0.75, 0.27, 0.05, 0.16, 0.03, "cloth-gold", 0.6),
         ],
         PartKind::Prop("pot") => vec![
-            Slab(
-                Vec3::new(0.0, 0.2, 0.0),
-                Vec3::new(0.4, 0.4, 0.4),
-                "stone".to_string(),
-                0.3,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.42, 0.0),
-                Vec3::new(0.46, 0.06, 0.46),
-                "stone".to_string(),
-                0.45,
-            ),
+            slab(0.0, 0.2, 0.0, 0.4, 0.4, 0.4, "stone", 0.3),
+            slab(0.0, 0.42, 0.0, 0.46, 0.06, 0.46, "stone", 0.45),
         ],
         PartKind::Prop("basket") => vec![
-            Slab(
-                Vec3::new(0.0, 0.15, 0.0),
-                Vec3::new(0.45, 0.3, 0.45),
-                "sand".to_string(),
-                0.55,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.31, 0.0),
-                Vec3::new(0.5, 0.05, 0.5),
-                "sand".to_string(),
-                0.4,
-            ),
+            slab(0.0, 0.15, 0.0, 0.45, 0.3, 0.45, "sand", 0.55),
+            slab(0.0, 0.31, 0.0, 0.5, 0.05, 0.5, "sand", 0.4),
         ],
         PartKind::Prop("rug") => vec![
-            Slab(
-                Vec3::new(0.0, 0.015, 0.0),
-                Vec3::new(1.4, 0.03, 0.9),
-                "cloth-red".to_string(),
-                0.55,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.032, 0.0),
-                Vec3::new(1.1, 0.01, 0.62),
-                "cloth-red".to_string(),
-                0.75,
-            ),
+            slab(0.0, 0.015, 0.0, 1.4, 0.03, 0.9, "cloth-red", 0.55),
+            slab(0.0, 0.032, 0.0, 1.1, 0.01, 0.62, "cloth-red", 0.75),
         ],
         PartKind::Prop("woodpile") => vec![
-            Slab(
-                Vec3::new(0.0, 0.11, 0.0),
-                Vec3::new(1.0, 0.22, 0.66),
-                "wood".to_string(),
-                0.4,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.32, 0.0),
-                Vec3::new(1.0, 0.2, 0.5),
-                "wood".to_string(),
-                0.5,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.5, 0.0),
-                Vec3::new(1.0, 0.18, 0.32),
-                "wood".to_string(),
-                0.6,
-            ),
+            slab(0.0, 0.11, 0.0, 1.0, 0.22, 0.66, "wood", 0.4),
+            slab(0.0, 0.32, 0.0, 1.0, 0.2, 0.5, "wood", 0.5),
+            slab(0.0, 0.5, 0.0, 1.0, 0.18, 0.32, "wood", 0.6),
         ],
         PartKind::Prop("candle") => vec![
-            Slab(
-                Vec3::new(0.0, 0.02, 0.0),
-                Vec3::new(0.3, 0.05, 0.3),
-                "stone".to_string(),
-                0.5,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.6, 0.0),
-                Vec3::new(0.07, 1.1, 0.07),
-                "wood".to_string(),
-                0.4,
-            ),
-            Slab(
-                Vec3::new(0.0, 1.18, 0.0),
-                Vec3::new(0.12, 0.14, 0.12),
-                "bone".to_string(),
-                0.95,
-            ),
-            Slab(
-                Vec3::new(0.0, 1.3, 0.0),
-                Vec3::new(0.07, 0.1, 0.07),
-                "cloth-gold".to_string(),
-                0.95,
-            ),
+            slab(0.0, 0.02, 0.0, 0.3, 0.05, 0.3, "stone", 0.5),
+            slab(0.0, 0.6, 0.0, 0.07, 1.1, 0.07, "wood", 0.4),
+            slab(0.0, 1.18, 0.0, 0.12, 0.14, 0.12, "bone", 0.95),
+            slab(0.0, 1.3, 0.0, 0.07, 0.1, 0.07, "cloth-gold", 0.95),
         ],
         PartKind::Prop("sack") => vec![
-            Slab(
-                Vec3::new(0.0, 0.21, 0.0),
-                Vec3::new(0.42, 0.42, 0.42),
-                "bone".to_string(),
-                0.6,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.46, 0.0),
-                Vec3::new(0.18, 0.12, 0.18),
-                "bone".to_string(),
-                0.45,
-            ),
+            slab(0.0, 0.21, 0.0, 0.42, 0.42, 0.42, "bone", 0.6),
+            slab(0.0, 0.46, 0.0, 0.18, 0.12, 0.18, "bone", 0.45),
         ],
         PartKind::Prop("trough") => vec![
-            Slab(
-                Vec3::new(0.0, 0.15, 0.0),
-                Vec3::new(1.2, 0.3, 0.45),
-                "wood".to_string(),
-                0.45,
-            ),
-            Slab(
-                Vec3::new(0.0, 0.27, 0.0),
-                Vec3::new(1.08, 0.04, 0.33),
-                "water".to_string(),
-                0.7,
-            ),
+            slab(0.0, 0.15, 0.0, 1.2, 0.3, 0.45, "wood", 0.45),
+            slab(0.0, 0.27, 0.0, 1.08, 0.04, 0.33, "water", 0.7),
+        ],
+        PartKind::Prop("mannequin") => vec![
+            // The game's adult, boxed in bone: a measuring stick with a
+            // face. Skipped on import - reference, not furniture.
+            slab(-0.11, 0.31, 0.0, 0.14, 0.62, 0.14, "bone", 0.6),
+            slab(0.11, 0.31, 0.0, 0.14, 0.62, 0.14, "bone", 0.6),
+            slab(0.0, 0.9, 0.0, 0.43, 0.55, 0.25, "bone", 0.75),
+            slab(-0.27, 0.88, 0.0, 0.1, 0.52, 0.1, "bone", 0.6),
+            slab(0.27, 0.88, 0.0, 0.1, 0.52, 0.1, "bone", 0.6),
+            slab(0.0, 1.42, 0.0, 0.46, 0.46, 0.46, "bone", 0.85),
         ],
         PartKind::Prop(_) => vec![],
         PartKind::Widget(name) => {
@@ -525,28 +237,18 @@ fn body_of(kind: &PartKind, palette_shift: Option<(&str, f32)>) -> Vec<Slab> {
                 .copied()
                 .unwrap_or(("", "bone", 0.5));
             vec![
-                Slab(
-                    Vec3::new(0.0, 0.2, 0.0),
-                    Vec3::splat(0.4),
-                    ramp.to_string(),
-                    shade,
-                ),
+                slab(0.0, 0.2, 0.0, 0.4, 0.4, 0.4, ramp, shade),
                 // The nose: which way the widget faces.
-                Slab(
-                    Vec3::new(0.3, 0.2, 0.0),
-                    Vec3::new(0.2, 0.12, 0.12),
-                    ramp.to_string(),
-                    shade,
-                ),
+                slab(0.3, 0.2, 0.0, 0.2, 0.12, 0.12, ramp, shade),
             ]
         }
     };
-    // A repainted part carries its choice into every wooden slab.
-    if let Some((ramp, shade)) = palette_shift {
-        for slab in &mut slabs {
-            if slab.2 == "wood" || slab.2 == "earth" || slab.2.starts_with("cloth") {
-                slab.2 = ramp.to_string();
-                slab.3 = shade;
+    // A repainted part carries its choice into every structural slab.
+    if let Some((ramp, shade)) = repaint {
+        for piece in &mut slabs {
+            if piece.2 == "wood" || piece.2 == "earth" || piece.2.starts_with("cloth") {
+                piece.2 = ramp.to_string();
+                piece.3 = shade;
             }
         }
     }
@@ -568,17 +270,16 @@ pub struct Placed {
     pub stage: String,
 }
 
-/// What the hand holds, as an index into [`CATALOG`] + widgets beyond it.
-#[derive(Resource, Default)]
-pub struct Armed(pub Option<usize>);
-
-/// The ghost that follows the cursor while something is armed.
+/// The ghost that follows the cursor while the hand is full.
 #[derive(Component)]
 pub struct Ghost;
 
-/// The armed part's working state: turn, tilt, lift and paint.
-#[derive(Resource)]
+/// The maker's hand: what it holds and how it holds it. Filled from the
+/// shelf, or by picking a placed part back up with an empty hand.
+#[derive(Resource, Default)]
 pub struct Hand {
+    pub kind: Option<PartKind>,
+    pub stage: String,
     pub yaw: f32,
     pub tilt: f32,
     pub lift: f32,
@@ -586,21 +287,62 @@ pub struct Hand {
     pub shade: f32,
 }
 
-impl Default for Hand {
-    fn default() -> Self {
+impl Hand {
+    fn filled(kind: PartKind, stage: String) -> Self {
         Hand {
-            yaw: 0.0,
-            tilt: 0.0,
-            lift: 0.0,
-            ramp: None,
+            kind: Some(kind),
+            stage,
             shade: 0.7,
+            ..default()
         }
+    }
+
+    fn record(&self, at: Vec3) -> Option<Placed> {
+        let kind = self.kind.as_ref()?;
+        Some(Placed {
+            part: part_name(kind),
+            at: at.into(),
+            yaw: self.yaw,
+            tilt: self.tilt,
+            ramp: self.ramp.clone(),
+            shade: self.shade,
+            stage: self.stage.clone(),
+        })
     }
 }
 
-/// A shelf button arming catalog entry N.
+/// A shelf button holding one catalog entry.
 #[derive(Component)]
-struct ShelfButton(usize);
+struct ShelfButton(&'static CatalogEntry);
+
+/// A shelf button holding one widget.
+#[derive(Component)]
+struct WidgetButton(&'static str);
+
+/// A button that loads a ready-made start onto a cleared bench.
+#[derive(Component)]
+struct TemplateButton(&'static str);
+
+/// A button that loads a saved work file back onto a cleared bench.
+#[derive(Component)]
+struct LoadFileButton(std::path::PathBuf);
+
+/// The button that writes a numbered copy that nothing ever overwrites.
+#[derive(Component)]
+struct ExportButton;
+
+/// The button that sweeps the bench bare.
+#[derive(Component)]
+struct ClearButton;
+
+/// A drawer header: pressing it opens and closes the drawer body.
+#[derive(Component)]
+struct DrawerHeader {
+    body: Entity,
+    label: Entity,
+    name: &'static str,
+    open: bool,
+}
 
 /// The shelf panel itself, shown only at the Builder bench.
 #[derive(Component)]
@@ -614,33 +356,22 @@ pub struct BuilderPlugin;
 
 impl Plugin for BuilderPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Armed>()
-            .init_resource::<Hand>()
+        app.init_resource::<Hand>()
             .add_systems(Startup, (raise_shelf, load_workbench))
             .add_systems(
                 Update,
                 (
                     show_shelf,
+                    work_drawers,
                     work_shelf,
+                    work_templates,
                     steer_hand,
                     move_ghost,
-                    place_or_remove,
+                    place_grab_remove,
                     save_workbench,
                 )
                     .chain(),
             );
-    }
-}
-
-/// The full entry list: catalog parts, then widgets.
-pub fn entry_kind(index: usize) -> Option<(PartKind, &'static str)> {
-    if index < CATALOG.len() {
-        let entry = &CATALOG[index];
-        Some((entry.kind, entry.stage))
-    } else {
-        WIDGETS
-            .get(index - CATALOG.len())
-            .map(|(name, _, _)| (PartKind::Widget(name), "widget"))
     }
 }
 
@@ -658,9 +389,9 @@ fn kind_from_name(name: &str) -> Option<PartKind> {
     if let Some(rest) = name.strip_prefix("wall-") {
         return rest.parse::<f32>().ok().map(PartKind::Wall);
     }
-    if let Some(prop) = name.strip_prefix("prop:") {
-        return CATALOG.iter().find_map(|e| match e.kind {
-            PartKind::Prop(p) if p == prop => Some(e.kind),
+    if let Some(wanted) = name.strip_prefix("prop:") {
+        return FURNITURE.iter().chain(DECOR).find_map(|e| match e.kind {
+            PartKind::Prop(p) if p == wanted => Some(e.kind),
             _ => None,
         });
     }
@@ -727,6 +458,25 @@ fn spawn_part(
     root
 }
 
+/// Rebuilds the ghost from the hand's current state.
+fn dress_ghost(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    palette: &Palette,
+    hand: &Hand,
+    ghosts: &Query<Entity, With<Ghost>>,
+) {
+    for ghost in ghosts {
+        commands.entity(ghost).despawn();
+    }
+    if let Some(kind) = hand.kind
+        && let Some(record) = hand.record(Vec3::new(0.0, hand.lift, 0.0))
+    {
+        spawn_part(commands, meshes, materials, palette, &kind, &record, true);
+    }
+}
+
 // ---------------------------------------------------------------- the shelf
 
 fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>) {
@@ -738,10 +488,10 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
                 right: Val::Px(0.0),
                 top: Val::Px(0.0),
                 bottom: Val::Px(0.0),
-                width: Val::Px(170.0),
+                width: Val::Px(176.0),
                 flex_direction: FlexDirection::Column,
                 padding: UiRect::all(Val::Px(12.0)),
-                row_gap: Val::Px(4.0),
+                row_gap: Val::Px(3.0),
                 border: UiRect::left(Val::Px(1.0)),
                 overflow: Overflow::scroll_y(),
                 ..default()
@@ -751,35 +501,67 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
         ))
         .id();
 
-    let header = |commands: &mut Commands, label: &str, top: f32| {
-        commands.spawn((
-            Text::new(label),
-            TextFont {
-                font: fonts.display.clone().into(),
-                font_size: FontSize::Px(13.0),
-                ..default()
-            },
-            TextColor(theme::accent(&palette)),
-            Node {
-                margin: UiRect::top(Val::Px(top)),
-                ..default()
-            },
-            ChildOf(shelf),
-        ));
-    };
-
-    header(&mut commands, "THE SHELF", 0.0);
-    for (index, entry) in CATALOG.iter().enumerate() {
-        shelf_button(&mut commands, &fonts, &palette, shelf, index, entry.label);
+    // READY-MADE: templates and the broom.
+    let ready = drawer(&mut commands, &fonts, &palette, shelf, "READY-MADE", true);
+    for (label, name) in TEMPLATES {
+        let button = plain_button(&mut commands, &palette, ready);
+        commands.entity(button).insert(TemplateButton(name));
+        button_label(&mut commands, &fonts, &palette, button, label);
     }
-    header(&mut commands, "WIDGETS", 10.0);
-    for (offset, (name, _, _)) in WIDGETS.iter().enumerate() {
-        shelf_button(
+    let clear = plain_button(&mut commands, &palette, ready);
+    commands.entity(clear).insert(ClearButton);
+    button_label(&mut commands, &fonts, &palette, clear, "CLEAR THE BENCH");
+
+    // The drawers of parts.
+    for (name, entries, open) in [
+        ("STRUCTURE", STRUCTURE, true),
+        ("FURNITURE", FURNITURE, false),
+        ("DECOR", DECOR, false),
+    ] {
+        let body = drawer(&mut commands, &fonts, &palette, shelf, name, open);
+        for entry in entries {
+            let button = plain_button(&mut commands, &palette, body);
+            commands.entity(button).insert(ShelfButton(entry));
+            button_label(&mut commands, &fonts, &palette, button, entry.label);
+        }
+    }
+    // SAVED WORK: whatever exports already stand in out/buildings/.
+    let saved = drawer(&mut commands, &fonts, &palette, shelf, "SAVED WORK", false);
+    if let Some(dir) = bench_path().parent()
+        && let Ok(entries) = std::fs::read_dir(dir)
+    {
+        let mut names: Vec<std::path::PathBuf> = entries
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().is_some_and(|e| e == "json"))
+            .collect();
+        names.sort();
+        for path in names {
+            let label = path
+                .file_stem()
+                .map(|stem| stem.to_string_lossy().to_uppercase())
+                .unwrap_or_default();
+            let button = plain_button(&mut commands, &palette, saved);
+            commands.entity(button).insert(LoadFileButton(path));
+            button_label(
+                &mut commands,
+                &fonts,
+                &palette,
+                button,
+                Box::leak(label.into_boxed_str()),
+            );
+        }
+    }
+
+    let widgets = drawer(&mut commands, &fonts, &palette, shelf, "WIDGETS", false);
+    for (name, _, _) in WIDGETS {
+        let button = plain_button(&mut commands, &palette, widgets);
+        commands.entity(button).insert(WidgetButton(name));
+        button_label(
             &mut commands,
             &fonts,
             &palette,
-            shelf,
-            CATALOG.len() + offset,
+            button,
             Box::leak(name.to_uppercase().into_boxed_str()),
         );
     }
@@ -790,7 +572,7 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
             SaveButton,
             Interaction::default(),
             Node {
-                margin: UiRect::top(Val::Px(14.0)),
+                margin: UiRect::top(Val::Px(12.0)),
                 padding: UiRect::axes(Val::Px(10.0), Val::Px(7.0)),
                 border: UiRect::all(Val::Px(1.0)),
                 justify_content: JustifyContent::Center,
@@ -801,6 +583,32 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
             ChildOf(shelf),
         ))
         .id();
+    let export = commands
+        .spawn((
+            ExportButton,
+            Interaction::default(),
+            Node {
+                margin: UiRect::top(Val::Px(4.0)),
+                padding: UiRect::axes(Val::Px(10.0), Val::Px(7.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.18)),
+            BorderColor::all(theme::panel_border(&palette)),
+            ChildOf(shelf),
+        ))
+        .id();
+    commands.spawn((
+        Text::new("EXPORT A COPY"),
+        TextFont {
+            font: fonts.display.clone().into(),
+            font_size: FontSize::Px(12.0),
+            ..default()
+        },
+        TextColor(theme::text_dim(&palette)),
+        ChildOf(export),
+    ));
     commands.spawn((
         Text::new("SAVE THE WORK"),
         TextFont {
@@ -813,9 +621,9 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
     ));
     commands.spawn((
         Text::new(
-            "click places, X removes what the\ncursor touches. R turns, T tilts\n\
-             a roof, Q/E lift and lower.\n[ and ] repaint, - and = shade.\n\
-             esc empties the hand.",
+            "an empty hand picks a placed\npart back up. click places,\n\
+             X removes. R turns, T tilts,\nQ/E lift. [ ] repaint, - = shade.\n\
+             esc empties the hand. build\ntoward the gold: that is the\ndoor side.",
         ),
         TextFont {
             font: fonts.text.clone().into(),
@@ -831,17 +639,62 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
     ));
 }
 
-fn shelf_button(
+/// A drawer: a header that opens and closes, and the body under it.
+/// Returns the body, ready for buttons.
+fn drawer(
     commands: &mut Commands,
     fonts: &Fonts,
     palette: &Palette,
     shelf: Entity,
-    index: usize,
-    label: &'static str,
-) {
-    let button = commands
+    name: &'static str,
+    open: bool,
+) -> Entity {
+    let header = commands
         .spawn((
-            ShelfButton(index),
+            Interaction::default(),
+            Node {
+                margin: UiRect::top(Val::Px(8.0)),
+                padding: UiRect::axes(Val::Px(2.0), Val::Px(2.0)),
+                ..default()
+            },
+            ChildOf(shelf),
+        ))
+        .id();
+    let label = commands
+        .spawn((
+            Text::new(format!("{} {}", name, if open { "-" } else { "+" })),
+            TextFont {
+                font: fonts.display.clone().into(),
+                font_size: FontSize::Px(13.0),
+                ..default()
+            },
+            TextColor(theme::accent(palette)),
+            ChildOf(header),
+        ))
+        .id();
+    let body = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(3.0),
+                display: if open { Display::Flex } else { Display::None },
+                ..default()
+            },
+            ChildOf(shelf),
+        ))
+        .id();
+    commands.entity(header).insert(DrawerHeader {
+        body,
+        label,
+        name,
+        open,
+    });
+    body
+}
+
+fn plain_button(commands: &mut Commands, palette: &Palette, parent: Entity) -> Entity {
+    commands
+        .spawn((
             Interaction::default(),
             Node {
                 padding: UiRect::axes(Val::Px(9.0), Val::Px(4.0)),
@@ -850,9 +703,18 @@ fn shelf_button(
             },
             BackgroundColor(Color::BLACK.with_alpha(0.18)),
             BorderColor::all(theme::panel_border(palette)),
-            ChildOf(shelf),
+            ChildOf(parent),
         ))
-        .id();
+        .id()
+}
+
+fn button_label(
+    commands: &mut Commands,
+    fonts: &Fonts,
+    palette: &Palette,
+    button: Entity,
+    label: &'static str,
+) {
     commands.spawn((
         Text::new(label),
         TextFont {
@@ -879,63 +741,153 @@ fn show_shelf(bench: Res<Bench>, mut shelves: Query<&mut Visibility, With<Shelf>
     }
 }
 
-/// Shelf presses arm the hand; the armed entry wears the gold.
+/// Drawer headers open and close their bodies.
+fn work_drawers(
+    mut headers: Query<(&mut DrawerHeader, &Interaction), Changed<Interaction>>,
+    mut nodes: Query<&mut Node>,
+    mut labels: Query<&mut Text>,
+) {
+    for (mut header, interaction) in &mut headers {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        header.open = !header.open;
+        if let Ok(mut node) = nodes.get_mut(header.body) {
+            node.display = if header.open {
+                Display::Flex
+            } else {
+                Display::None
+            };
+        }
+        if let Ok(mut text) = labels.get_mut(header.label) {
+            *text = Text::new(format!(
+                "{} {}",
+                header.name,
+                if header.open { "-" } else { "+" }
+            ));
+        }
+    }
+}
+
+/// Shelf presses fill the hand; the armed entry wears the gold.
 #[allow(clippy::too_many_arguments)]
 fn work_shelf(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     palette: Res<Palette>,
-    mut armed: ResMut<Armed>,
     mut hand: ResMut<Hand>,
-    mut buttons: Query<(&Interaction, &ShelfButton, &mut BorderColor)>,
+    mut parts: Query<(&Interaction, &ShelfButton, &mut BorderColor), Without<WidgetButton>>,
+    mut widgets: Query<(&Interaction, &WidgetButton, &mut BorderColor), Without<ShelfButton>>,
     ghosts: Query<Entity, With<Ghost>>,
 ) {
     let mut rearmed = false;
-    for (interaction, button, _) in &buttons {
-        if *interaction == Interaction::Pressed && armed.0 != Some(button.0) {
-            armed.0 = Some(button.0);
-            *hand = Hand::default();
+    for (interaction, button, _) in &parts {
+        if *interaction == Interaction::Pressed && hand.kind != Some(button.0.kind) {
+            *hand = Hand::filled(button.0.kind, button.0.stage.to_string());
+            rearmed = true;
+        }
+    }
+    for (interaction, button, _) in &widgets {
+        let kind = PartKind::Widget(button.0);
+        if *interaction == Interaction::Pressed && hand.kind != Some(kind) {
+            *hand = Hand::filled(kind, "widget".to_string());
             rearmed = true;
         }
     }
     if rearmed {
-        for ghost in &ghosts {
-            commands.entity(ghost).despawn();
-        }
-        if let Some(index) = armed.0
-            && let Some((kind, stage)) = entry_kind(index)
-        {
-            let record = Placed {
-                part: part_name(&kind),
-                at: [0.0, 0.0, 0.0],
-                yaw: 0.0,
-                tilt: 0.0,
-                ramp: None,
-                shade: 0.7,
-                stage: stage.to_string(),
-            };
-            spawn_part(
-                &mut commands,
-                &mut meshes,
-                &mut materials,
-                &palette,
-                &kind,
-                &record,
-                true,
-            );
-        }
+        dress_ghost(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &palette,
+            &hand,
+            &ghosts,
+        );
     }
-    for (_, button, mut border) in &mut buttons {
-        let standing = armed.0 == Some(button.0);
-        let dress = BorderColor::all(if standing {
-            theme::accent(&palette)
-        } else {
-            theme::panel_border(&palette)
+    for (_, button, mut border) in &mut parts {
+        dress_shelf_border(&palette, hand.kind == Some(button.0.kind), &mut border);
+    }
+    for (_, button, mut border) in &mut widgets {
+        dress_shelf_border(
+            &palette,
+            hand.kind == Some(PartKind::Widget(button.0)),
+            &mut border,
+        );
+    }
+}
+
+fn dress_shelf_border(palette: &Palette, standing: bool, border: &mut BorderColor) {
+    let dress = BorderColor::all(if standing {
+        theme::accent(palette)
+    } else {
+        theme::panel_border(palette)
+    });
+    if *border != dress {
+        *border = dress;
+    }
+}
+
+/// Template presses sweep the bench and set out the ready-made start; the
+/// clear button just sweeps.
+#[allow(clippy::too_many_arguments)]
+fn work_templates(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    palette: Res<Palette>,
+    templates: Query<(&Interaction, &TemplateButton), Changed<Interaction>>,
+    files: Query<(&Interaction, &LoadFileButton), Changed<Interaction>>,
+    clears: Query<&Interaction, (Changed<Interaction>, With<ClearButton>)>,
+    standing: Query<Entity, (With<Placed>, Without<Ghost>)>,
+) {
+    let base = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let wanted = templates
+        .iter()
+        .find(|(interaction, _)| **interaction == Interaction::Pressed)
+        .map(|(_, template)| {
+            std::path::PathBuf::from(&base).join(format!("templates/{}.json", template.0))
+        })
+        .or_else(|| {
+            files
+                .iter()
+                .find(|(interaction, _)| **interaction == Interaction::Pressed)
+                .map(|(_, file)| file.0.clone())
         });
-        if *border != dress {
-            *border = dress;
+    let sweeping = clears
+        .iter()
+        .any(|interaction| *interaction == Interaction::Pressed);
+    if wanted.is_none() && !sweeping {
+        return;
+    }
+    for part in &standing {
+        commands.entity(part).despawn();
+    }
+    let Some(path) = wanted else {
+        return;
+    };
+    match std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|text| serde_json::from_str::<Workbench>(&text).ok())
+    {
+        Some(bench) => {
+            let count = bench.parts.len();
+            for record in bench.parts {
+                if let Some(kind) = kind_from_name(&record.part) {
+                    spawn_part(
+                        &mut commands,
+                        &mut meshes,
+                        &mut materials,
+                        &palette,
+                        &kind,
+                        &record,
+                        false,
+                    );
+                }
+            }
+            info!("set out {}: {count} parts", path.display());
         }
+        None => warn!("nothing readable at {}", path.display()),
     }
 }
 
@@ -947,17 +899,16 @@ fn steer_hand(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
     palette: Res<Palette>,
-    mut armed: ResMut<Armed>,
     mut hand: ResMut<Hand>,
     ghosts: Query<Entity, With<Ghost>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    if armed.0.is_none() {
+    if hand.kind.is_none() {
         return;
     }
     if keys.just_pressed(KeyCode::Escape) {
-        armed.0 = None;
+        *hand = Hand::default();
         for ghost in &ghosts {
             commands.entity(ghost).despawn();
         }
@@ -977,7 +928,7 @@ fn steer_hand(
         hand.lift = (hand.lift - 0.25).max(0.0);
     }
     let ramps: Vec<&str> = palette.names().collect();
-    if keys.just_pressed(KeyCode::BracketRight) {
+    if keys.just_pressed(KeyCode::BracketRight) && !ramps.is_empty() {
         let here = hand
             .ramp
             .as_deref()
@@ -986,7 +937,7 @@ fn steer_hand(
         hand.ramp = Some(ramps[(here + 1) % ramps.len()].to_string());
         redress = true;
     }
-    if keys.just_pressed(KeyCode::BracketLeft) {
+    if keys.just_pressed(KeyCode::BracketLeft) && !ramps.is_empty() {
         let here = hand
             .ramp
             .as_deref()
@@ -1003,31 +954,14 @@ fn steer_hand(
         hand.shade = (hand.shade + 0.25).min(1.0);
         redress = true;
     }
-    // A repaint rebuilds the ghost in its new cloth.
-    if redress
-        && let Some(index) = armed.0
-        && let Some((kind, stage)) = entry_kind(index)
-    {
-        for ghost in &ghosts {
-            commands.entity(ghost).despawn();
-        }
-        let record = Placed {
-            part: part_name(&kind),
-            at: [0.0, 0.0, 0.0],
-            yaw: hand.yaw,
-            tilt: hand.tilt,
-            ramp: hand.ramp.clone(),
-            shade: hand.shade,
-            stage: stage.to_string(),
-        };
-        spawn_part(
+    if redress {
+        dress_ghost(
             &mut commands,
             &mut meshes,
             &mut materials,
             &palette,
-            &kind,
-            &record,
-            true,
+            &hand,
+            &ghosts,
         );
     }
 }
@@ -1072,21 +1006,40 @@ fn move_ghost(
     }
 }
 
-/// Left click sets the part down; X removes the placed part nearest the
-/// cursor's touch.
+/// The nearest placed part within arm's reach of a ground point.
+fn nearest_part(
+    placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    point: Vec3,
+) -> Option<Entity> {
+    let mut nearest: Option<(Entity, f32)> = None;
+    for (entity, transform, _) in placed {
+        let flat = Vec2::new(
+            transform.translation.x - point.x,
+            transform.translation.z - point.z,
+        );
+        let distance = flat.length();
+        if distance < 1.2 && nearest.is_none_or(|(_, d)| distance < d) {
+            nearest = Some((entity, distance));
+        }
+    }
+    nearest.map(|(entity, _)| entity)
+}
+
+/// A full hand places on click. An empty hand picks a placed part back up.
+/// X removes what the cursor touches either way.
 #[allow(clippy::too_many_arguments)]
-fn place_or_remove(
+fn place_grab_remove(
     mut commands: Commands,
     buttons: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
     bench: Res<Bench>,
-    armed: Res<Armed>,
-    hand: Res<Hand>,
+    mut hand: ResMut<Hand>,
     palette: Res<Palette>,
     windows: Query<&Window>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    ghosts: Query<&Transform, With<Ghost>>,
-    placed: Query<(Entity, &Transform), (With<Placed>, Without<Ghost>)>,
+    ghosts: Query<Entity, With<Ghost>>,
+    ghost_spots: Query<&Transform, With<Ghost>>,
+    placed: Query<(Entity, &Transform, &Placed), Without<Ghost>>,
     hovers: Query<&Interaction>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -1099,50 +1052,55 @@ fn place_or_remove(
         .iter()
         .any(|interaction| *interaction != Interaction::None);
 
-    if buttons.just_pressed(MouseButton::Left)
-        && !over_ui
-        && let Some(index) = armed.0
-        && let Some((kind, stage)) = entry_kind(index)
-        && let Some(ghost_at) = ghosts.iter().next()
-    {
-        let record = Placed {
-            part: part_name(&kind),
-            at: ghost_at.translation.into(),
-            yaw: hand.yaw,
-            tilt: hand.tilt,
-            ramp: hand.ramp.clone(),
-            shade: hand.shade,
-            stage: stage.to_string(),
-        };
-        spawn_part(
-            &mut commands,
-            &mut meshes,
-            &mut materials,
-            &palette,
-            &kind,
-            &record,
-            false,
-        );
+    if buttons.just_pressed(MouseButton::Left) && !over_ui {
+        if let Some(kind) = hand.kind {
+            // Setting down.
+            if let Some(ghost_at) = ghost_spots.iter().next()
+                && let Some(record) = hand.record(ghost_at.translation)
+            {
+                spawn_part(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    &palette,
+                    &kind,
+                    &record,
+                    false,
+                );
+            }
+        } else if let Some(point) = cursor_point(&windows, &cameras, 0.0)
+            && let Some(grabbed) = nearest_part(&placed, point)
+            && let Ok((_, transform, record)) = placed.get(grabbed)
+            && let Some(kind) = kind_from_name(&record.part)
+        {
+            // Picking back up: the part leaves the floor and rides the
+            // cursor again with its paint, turn and height intact.
+            *hand = Hand {
+                kind: Some(kind),
+                stage: record.stage.clone(),
+                yaw: record.yaw,
+                tilt: record.tilt,
+                lift: transform.translation.y,
+                ramp: record.ramp.clone(),
+                shade: record.shade,
+            };
+            commands.entity(grabbed).despawn();
+            dress_ghost(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &palette,
+                &hand,
+                &ghosts,
+            );
+        }
     }
 
     if keys.just_pressed(KeyCode::KeyX)
         && let Some(point) = cursor_point(&windows, &cameras, 0.0)
+        && let Some(doomed) = nearest_part(&placed, point)
     {
-        // The nearest placed part within arm's reach of the touch.
-        let mut nearest: Option<(Entity, f32)> = None;
-        for (entity, transform) in &placed {
-            let flat = Vec2::new(
-                transform.translation.x - point.x,
-                transform.translation.z - point.z,
-            );
-            let distance = flat.length();
-            if distance < 1.4 && nearest.is_none_or(|(_, d)| distance < d) {
-                nearest = Some((entity, distance));
-            }
-        }
-        if let Some((entity, _)) = nearest {
-            commands.entity(entity).despawn();
-        }
+        commands.entity(doomed).despawn();
     }
 }
 
@@ -1162,10 +1120,36 @@ fn bench_path() -> std::path::PathBuf {
 
 /// The save button writes the whole bench down; the work survives the
 /// window closing, and the file is the thing the god carries into the game.
+/// The export button writes a numbered copy nothing ever overwrites.
 fn save_workbench(
     saves: Query<&Interaction, (Changed<Interaction>, With<SaveButton>)>,
+    exports: Query<&Interaction, (Changed<Interaction>, With<ExportButton>)>,
     placed: Query<&Placed, Without<Ghost>>,
 ) {
+    let exporting = exports
+        .iter()
+        .any(|interaction| *interaction == Interaction::Pressed);
+    if exporting {
+        let dir = bench_path().parent().map(|d| d.to_path_buf());
+        if let Some(dir) = dir {
+            let _ = std::fs::create_dir_all(&dir);
+            let mut n = 1;
+            let mut path = dir.join(format!("build-{n}.json"));
+            while path.exists() {
+                n += 1;
+                path = dir.join(format!("build-{n}.json"));
+            }
+            let bench = Workbench {
+                format: 1,
+                name: format!("build-{n}"),
+                parts: placed.iter().cloned().collect(),
+            };
+            if let Ok(json) = serde_json::to_string_pretty(&bench) {
+                let _ = std::fs::write(&path, json);
+                info!("exported {} parts to {}", bench.parts.len(), path.display());
+            }
+        }
+    }
     let pressed = saves
         .iter()
         .any(|interaction| *interaction == Interaction::Pressed);
