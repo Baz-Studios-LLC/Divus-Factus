@@ -231,6 +231,11 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
             "front, right, back, left,\noverhead, and the perch",
         ),
         ("shift", "fine snap, 1 unit"),
+        (
+            "G",
+            "cycle the grid interval:
+1, 2, 4, 8, 16 units",
+        ),
         ("F", "face snap on and off"),
         ("tab", "normal, move, resize;\nclick selects, drag a handle"),
         ("D", "type exact dimensions\nof the resize selection"),

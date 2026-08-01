@@ -648,25 +648,39 @@ struct NamingCard;
 #[derive(Component)]
 struct NameText;
 
-/// F walks between face snapping and plain ground placement.
+/// F walks between face snapping and plain ground placement; G cycles
+/// the grid interval through the powers of the atom.
 fn toggle_snap_mode(
     keys: Res<ButtonInput<KeyCode>>,
     bench: Res<Bench>,
     naming: Res<Naming>,
+    dims: Res<DimsEntry>,
     mut mode: ResMut<SnapMode>,
+    mut grid: ResMut<SnapGrid>,
     mut labels: Query<&mut Text, With<SnapModeText>>,
 ) {
-    if *bench == Bench::Builder && naming.0.is_none() && keys.just_pressed(KeyCode::KeyF) {
-        mode.face = !mode.face;
+    if *bench == Bench::Builder && naming.0.is_none() && dims.0.is_none() {
+        if keys.just_pressed(KeyCode::KeyF) {
+            mode.face = !mode.face;
+        }
+        if keys.just_pressed(KeyCode::KeyG) {
+            grid.0 = match grid.0 {
+                1 => 2,
+                2 => 4,
+                4 => 8,
+                8 => 16,
+                _ => 1,
+            };
+        }
     }
-    let word = if mode.face {
-        "face snap - on (F)"
-    } else {
-        "face snap - off (F)"
-    };
+    let word = format!(
+        "face snap - {} (F) / grid - {} (G)",
+        if mode.face { "on" } else { "off" },
+        grid.0
+    );
     for mut label in &mut labels {
         if label.0 != word {
-            *label = Text::new(word);
+            *label = Text::new(word.clone());
         }
     }
 }
@@ -682,6 +696,7 @@ impl Plugin for BuilderPlugin {
             .init_resource::<SnapMode>()
             .init_resource::<DimsEntry>()
             .init_resource::<History>()
+            .init_resource::<SnapGrid>()
             .add_systems(Startup, raise_shelf.after(crate::rail::raise_rail))
             .add_systems(
                 Update,
@@ -1638,6 +1653,7 @@ fn move_ghost(
     bench: Res<Bench>,
     hand: Res<Hand>,
     mode: Res<SnapMode>,
+    snap_grid: Res<SnapGrid>,
     hovered: Res<Hovered>,
     selected: Res<crate::gizmo::Selected>,
     mut ghost_shapes: Query<&mut Visibility, With<Ghost>>,
@@ -1684,7 +1700,7 @@ fn move_ghost(
         let grid = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
             16.0
         } else {
-            4.0
+            16.0 / snap_grid.0 as f32
         };
         let mut to = Vec3::new(
             (point.x * grid).round() / grid,
@@ -1796,10 +1812,11 @@ fn move_ghost(
         && let Some(hit) = hovered.build
     {
         if hit.normal.y > 0.7 {
+            let per = 16.0 / snap_grid.0 as f32;
             seeded = Some(Vec3::new(
-                (hit.point.x * 4.0).round() / 4.0,
+                (hit.point.x * per).round() / per,
                 0.0,
-                (hit.point.z * 4.0).round() / 4.0,
+                (hit.point.z * per).round() / per,
             ));
         } else if hit.normal.y.abs() < 0.3 {
             // My reach along the face's normal: how far my centre must
@@ -1823,9 +1840,10 @@ fn move_ghost(
             }
             // Along the face: quarter-metre order. Up the face: courses
             // measured from the part's own base, so trim stacks in rings.
+            let per = 16.0 / snap_grid.0 as f32;
             let tangent = Vec3::Y.cross(hit.normal).normalize_or_zero();
-            let along = (hit.point.dot(tangent) * 4.0).round() / 4.0;
-            let course = ((hit.point.y - hit.base_y).max(0.0) * 4.0).round() / 4.0 + hit.base_y;
+            let along = (hit.point.dot(tangent) * per).round() / per;
+            let course = ((hit.point.y - hit.base_y).max(0.0) * per).round() / per + hit.base_y;
             let anchor = hit.point - tangent * hit.point.dot(tangent) + tangent * along;
             let snapped = Vec3::new(
                 (anchor + hit.normal * reach).x,
@@ -1856,7 +1874,7 @@ fn move_ghost(
         let grid = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
             16.0
         } else {
-            4.0
+            16.0 / snap_grid.0 as f32
         };
         snapped = Vec3::new(
             (snapped.x * grid).round() / grid,
@@ -2043,6 +2061,17 @@ pub struct SnapMode {
 impl Default for SnapMode {
     fn default() -> Self {
         SnapMode { face: true }
+    }
+}
+
+/// The placement grid's step, in atoms. G cycles it; shift always
+/// drops to a single atom while held.
+#[derive(Resource)]
+pub struct SnapGrid(pub i32);
+
+impl Default for SnapGrid {
+    fn default() -> Self {
+        SnapGrid(4)
     }
 }
 
