@@ -83,9 +83,10 @@ fn spawn_date_card(mut commands: Commands) {
         .id();
     commands.spawn((
         DateBig,
+        DisplayFace,
         Text::new(""),
         TextFont {
-            font_size: FontSize::Px(30.0),
+            font_size: FontSize::Px(34.0),
             ..default()
         },
         TextColor(theme::accent().with_alpha(0.95)),
@@ -93,9 +94,10 @@ fn spawn_date_card(mut commands: Commands) {
     ));
     commands.spawn((
         DateSmall,
+        SerifFace,
         Text::new(""),
         TextFont {
-            font_size: FontSize::Px(13.0),
+            font_size: FontSize::Px(14.0),
             ..default()
         },
         TextColor(theme::text_dim().with_alpha(0.85)),
