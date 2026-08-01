@@ -390,10 +390,6 @@ struct DeleteFileButton {
     armed_until: f32,
 }
 
-/// The button that writes a numbered copy that nothing ever overwrites.
-#[derive(Component)]
-struct ExportButton;
-
 /// The button that sweeps the bench bare.
 #[derive(Component)]
 struct ClearButton;
@@ -419,9 +415,10 @@ struct SaveButton;
 #[derive(Component)]
 struct SaveLabel;
 
-/// The export button's label, likewise.
-#[derive(Component)]
-struct ExportLabel;
+/// The name this work goes by, once it has been given one. Saving again
+/// updates the same file instead of scattering copies.
+#[derive(Resource, Default)]
+pub struct WorkName(pub Option<String>);
 
 /// A label speaking a passing word; it returns to its old text at `until`.
 #[derive(Component)]
@@ -454,6 +451,7 @@ impl Plugin for BuilderPlugin {
         app.init_resource::<Hand>()
             .init_resource::<Naming>()
             .init_resource::<Hovered>()
+            .init_resource::<WorkName>()
             .add_systems(Startup, (raise_shelf, load_workbench))
             .add_systems(
                 Update,
@@ -698,33 +696,6 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
             ChildOf(shelf),
         ))
         .id();
-    let export = commands
-        .spawn((
-            ExportButton,
-            Interaction::default(),
-            Node {
-                margin: UiRect::top(Val::Px(4.0)),
-                padding: UiRect::axes(Val::Px(10.0), Val::Px(7.0)),
-                border: UiRect::all(Val::Px(1.0)),
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            BackgroundColor(Color::BLACK.with_alpha(0.18)),
-            BorderColor::all(theme::panel_border(&palette)),
-            ChildOf(shelf),
-        ))
-        .id();
-    commands.spawn((
-        ExportLabel,
-        Text::new("EXPORT A COPY"),
-        TextFont {
-            font: fonts.display.clone().into(),
-            font_size: FontSize::Px(12.0),
-            ..default()
-        },
-        TextColor(theme::text_dim(&palette)),
-        ChildOf(export),
-    ));
     commands.spawn((
         SaveLabel,
         Text::new("SAVE THE WORK"),
@@ -1019,8 +990,10 @@ fn work_templates(
     files: Query<(&Interaction, &LoadFileButton), Changed<Interaction>>,
     clears: Query<&Interaction, (Changed<Interaction>, With<ClearButton>)>,
     standing: Query<Entity, (With<Placed>, Without<Ghost>)>,
+    mut work_name: ResMut<WorkName>,
 ) {
     let base = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let mut from_file = false;
     let wanted = templates
         .iter()
         .find(|(interaction, _)| **interaction == Interaction::Pressed)
@@ -1031,7 +1004,10 @@ fn work_templates(
             files
                 .iter()
                 .find(|(interaction, _)| **interaction == Interaction::Pressed)
-                .map(|(_, file)| file.0.clone())
+                .map(|(_, file)| {
+                    from_file = true;
+                    file.0.clone()
+                })
         });
     let sweeping = clears
         .iter()
@@ -1043,7 +1019,20 @@ fn work_templates(
         commands.entity(part).despawn();
     }
     let Some(path) = wanted else {
+        work_name.0 = None;
         return;
+    };
+    // A loaded work carries its name; a template starts nameless.
+    work_name.0 = if from_file {
+        let stem = path
+            .file_stem()
+            .map(|stem| stem.to_string_lossy().to_string());
+        if let (Some(stem), Some(dir)) = (stem.as_ref(), bench_path().parent()) {
+            let _ = std::fs::write(dir.join(".last"), stem);
+        }
+        stem
+    } else {
+        None
     };
     match std::fs::read_to_string(&path)
         .ok()
@@ -1703,69 +1692,22 @@ fn bench_path() -> std::path::PathBuf {
     std::path::PathBuf::from(base).join("out/buildings/workbench.json")
 }
 
-/// The save button writes the whole bench down; the work survives the
-/// window closing, and the file is the thing the god carries into the game.
-/// The export button writes a numbered copy nothing ever overwrites.
-#[allow(clippy::too_many_arguments)]
+/// The save button asks the work its name; the writing happens when the
+/// name is given, in [`take_the_name`].
 fn save_workbench(
     mut commands: Commands,
-    time: Res<Time>,
     fonts: Res<Fonts>,
     palette: Res<Palette>,
+    work_name: Res<WorkName>,
     mut naming: ResMut<Naming>,
     saves: Query<&Interaction, (Changed<Interaction>, With<SaveButton>)>,
-    exports: Query<&Interaction, (Changed<Interaction>, With<ExportButton>)>,
-    placed: Query<&Placed, Without<Ghost>>,
-    mut save_labels: Query<(Entity, &mut Text), (With<SaveLabel>, Without<ExportLabel>)>,
 ) {
-    let speak = |commands: &mut Commands,
-                 labels: &mut dyn Iterator<Item = (Entity, Mut<Text>)>,
-                 word: String,
-                 back: &'static str| {
-        for (entity, mut text) in labels {
-            *text = Text::new(word.clone());
-            commands.entity(entity).insert(PassingWord {
-                back,
-                until: time.elapsed_secs() + 2.5,
-            });
-        }
-    };
-
-    let exporting = exports
-        .iter()
-        .any(|interaction| *interaction == Interaction::Pressed);
-    if exporting && naming.0.is_none() {
-        naming.0 = Some(String::new());
-        raise_naming_card(&mut commands, &fonts, &palette);
-    }
     let pressed = saves
         .iter()
         .any(|interaction| *interaction == Interaction::Pressed);
-    if !pressed {
-        return;
-    }
-    let bench = Workbench {
-        format: 1,
-        name: "workbench".to_string(),
-        parts: placed.iter().cloned().collect(),
-    };
-    let count = bench.parts.len();
-    let path = bench_path();
-    if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    match serde_json::to_string_pretty(&bench) {
-        Ok(json) => {
-            let _ = std::fs::write(&path, json);
-            info!("saved {count} parts to {}", path.display());
-            speak(
-                &mut commands,
-                &mut save_labels.iter_mut(),
-                format!("SAVED - {count} PARTS"),
-                "SAVE THE WORK",
-            );
-        }
-        Err(e) => warn!("could not write the bench: {e}"),
+    if pressed && naming.0.is_none() {
+        naming.0 = Some(work_name.0.clone().unwrap_or_default());
+        raise_naming_card(&mut commands, &fonts, &palette);
     }
 }
 
@@ -1847,10 +1789,12 @@ fn take_the_name(
     fonts: Res<Fonts>,
     palette: Res<Palette>,
     saved_drawer: Option<Res<SavedWorkDrawer>>,
+    mut work_name: ResMut<WorkName>,
     placed: Query<&Placed, Without<Ghost>>,
     cards: Query<Entity, With<NamingCard>>,
+    rows: Query<&LoadFileButton>,
     mut shown: Query<&mut Text, With<NameText>>,
-    mut export_labels: Query<(Entity, &mut Text), (With<ExportLabel>, Without<NameText>)>,
+    mut save_labels: Query<(Entity, &mut Text), (With<SaveLabel>, Without<NameText>)>,
 ) {
     let Some(name) = naming.0.as_mut() else {
         return;
@@ -1900,14 +1844,19 @@ fn take_the_name(
         };
         if let Some(dir) = bench_path().parent().map(|d| d.to_path_buf()) {
             let _ = std::fs::create_dir_all(&dir);
-            // A taken name steps aside rather than overwriting silently.
+            // The work's own name is overwritten freely - that is what
+            // saving means - but a name some OTHER work holds steps aside
+            // rather than clobbering it in silence.
+            let ours = work_name.0.as_deref() == Some(written);
             let mut stem = written.to_string();
             let mut path = dir.join(format!("{stem}.json"));
-            let mut n = 2;
-            while path.exists() {
-                stem = format!("{written}-{n}");
-                path = dir.join(format!("{stem}.json"));
-                n += 1;
+            if !ours {
+                let mut n = 2;
+                while path.exists() {
+                    stem = format!("{written}-{n}");
+                    path = dir.join(format!("{stem}.json"));
+                    n += 1;
+                }
             }
             let bench = Workbench {
                 format: 1,
@@ -1915,16 +1864,21 @@ fn take_the_name(
                 parts: placed.iter().cloned().collect(),
             };
             if let Ok(json) = serde_json::to_string_pretty(&bench) {
+                let count = bench.parts.len();
                 let _ = std::fs::write(&path, json);
-                info!("exported {} parts to {}", bench.parts.len(), path.display());
-                for (entity, mut text) in &mut export_labels {
-                    *text = Text::new(format!("EXPORTED {}", stem.to_uppercase()));
+                let _ = std::fs::write(dir.join(".last"), &stem);
+                info!("saved {count} parts to {}", path.display());
+                work_name.0 = Some(stem.clone());
+                for (entity, mut text) in &mut save_labels {
+                    *text = Text::new(format!("SAVED {} - {count} PARTS", stem.to_uppercase()));
                     commands.entity(entity).insert(PassingWord {
-                        back: "EXPORT A COPY",
+                        back: "SAVE THE WORK",
                         until: time.elapsed_secs() + 2.5,
                     });
                 }
-                if let Some(saved_drawer) = saved_drawer.as_deref() {
+                // The row appears at once - unless it already stands.
+                let standing = rows.iter().any(|row| row.0 == path);
+                if !standing && let Some(saved_drawer) = saved_drawer.as_deref() {
                     saved_work_row(
                         &mut commands,
                         &fonts,
@@ -2004,14 +1958,29 @@ fn settle_words(
     }
 }
 
-/// Whatever was on the bench when it was last saved comes back on launch.
+/// Whatever was saved last comes back on launch: the pointer file names
+/// it, with the old workbench.json as the fallback for benches from
+/// before works had names.
 fn load_workbench(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     palette: Res<Palette>,
+    mut work_name: ResMut<WorkName>,
 ) {
-    let Ok(text) = std::fs::read_to_string(bench_path()) else {
+    let dir = bench_path().parent().map(|d| d.to_path_buf());
+    let last = dir.as_ref().and_then(|dir| {
+        let stem = std::fs::read_to_string(dir.join(".last")).ok()?;
+        let stem = stem.trim().to_string();
+        let path = dir.join(format!("{stem}.json"));
+        path.exists().then_some((stem, path))
+    });
+    let (found_name, path) = match last {
+        Some((stem, path)) => (Some(stem), path),
+        None => (None, bench_path()),
+    };
+    work_name.0 = found_name;
+    let Ok(text) = std::fs::read_to_string(path) else {
         return;
     };
     let Ok(bench) = serde_json::from_str::<Workbench>(&text) else {
