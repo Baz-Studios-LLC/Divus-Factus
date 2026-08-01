@@ -66,6 +66,8 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     structure("CORNER POLE", PartKind::Prop("pole"), "frame"),
     structure("DOOR", PartKind::Prop("door"), "walls"),
     structure("WINDOW", PartKind::Prop("window"), "walls"),
+    structure("FOUNDATION, 2M", PartKind::Prop("foundation"), "footing"),
+    structure("STONE STEPS", PartKind::Prop("steps"), "footing"),
     structure("FLOOR, 2M", PartKind::Floor, "footing"),
     structure("ROOF PANEL", PartKind::Roof, "roof"),
 ];
@@ -73,6 +75,9 @@ pub const STRUCTURE: &[CatalogEntry] = &[
 pub const FURNITURE: &[CatalogEntry] = &[
     prop("BED", "bed"),
     prop("BED, DOUBLE", "bed-double"),
+    prop("CRADLE", "cradle"),
+    prop("WARDROBE", "wardrobe"),
+    prop("SIDE TABLE", "side-table"),
     prop("TABLE", "table"),
     prop("STOOL", "stool"),
     prop("CHAIR", "chair"),
@@ -85,6 +90,11 @@ pub const FURNITURE: &[CatalogEntry] = &[
 
 pub const DECOR: &[CatalogEntry] = &[
     prop("MANNEQUIN", "mannequin"),
+    prop("ANVIL", "anvil"),
+    prop("LOOM", "loom"),
+    prop("PLANTER", "planter"),
+    prop("FENCE", "fence"),
+    prop("LADDER", "ladder"),
     prop("BARREL", "barrel"),
     prop("CRATE", "crate"),
     prop("COOKING POT", "pot"),
@@ -292,6 +302,69 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             glass(0.0, 1.35, 0.0, 0.92, 0.92, 0.05, "sky", 0.8),
             slab(0.0, 1.35, 0.02, 0.05, 0.92, 0.04, "wood", 0.5),
             slab(0.0, 1.35, 0.02, 0.92, 0.05, 0.04, "wood", 0.5),
+        ],
+        PartKind::Prop("foundation") => vec![
+            // The game's plinth height exactly: houses stand on these, and
+            // the stone steps below reach their top in one flight.
+            slab(0.0, 0.175, 0.0, 2.0, 0.35, 2.0, "stone", 0.55),
+        ],
+        PartKind::Prop("steps") => vec![
+            // Three treads rising the plinth's 0.35, approached from +X.
+            slab(0.4, 0.06, 0.0, 0.4, 0.12, 1.2, "stone", 0.6),
+            slab(0.05, 0.175, 0.0, 0.35, 0.35, 1.2, "stone", 0.55),
+            slab(-0.28, 0.29, 0.0, 0.32, 0.58, 1.2, "stone", 0.5),
+        ],
+        PartKind::Prop("cradle") => vec![
+            slab(0.0, 0.3, 0.0, 0.55, 0.3, 0.9, "wood", 0.55),
+            slab(0.0, 0.42, 0.3, 0.45, 0.1, 0.25, "bone", 0.9),
+            slab(0.0, 0.08, -0.38, 0.6, 0.06, 0.12, "wood", 0.4),
+            slab(0.0, 0.08, 0.38, 0.6, 0.06, 0.12, "wood", 0.4),
+        ],
+        PartKind::Prop("wardrobe") => vec![
+            slab(0.0, 0.95, 0.0, 1.1, 1.9, 0.5, "wood", 0.5),
+            slab(-0.26, 0.95, 0.26, 0.48, 1.7, 0.04, "wood", 0.62),
+            slab(0.26, 0.95, 0.26, 0.48, 1.7, 0.04, "wood", 0.62),
+            slab(0.0, 0.95, 0.28, 0.04, 0.3, 0.04, "cloth-gold", 0.7),
+        ],
+        PartKind::Prop("side-table") => vec![
+            slab(0.0, 0.55, 0.0, 0.6, 0.08, 0.6, "wood", 0.65),
+            slab(-0.24, 0.26, -0.24, 0.08, 0.52, 0.08, "wood", 0.5),
+            slab(0.24, 0.26, -0.24, 0.08, 0.52, 0.08, "wood", 0.5),
+            slab(-0.24, 0.26, 0.24, 0.08, 0.52, 0.08, "wood", 0.5),
+            slab(0.24, 0.26, 0.24, 0.08, 0.52, 0.08, "wood", 0.5),
+        ],
+        PartKind::Prop("anvil") => vec![
+            slab(0.0, 0.15, 0.0, 0.45, 0.3, 0.35, "wood", 0.4),
+            slab(0.0, 0.38, 0.0, 0.22, 0.16, 0.22, "stone", 0.3),
+            slab(0.0, 0.53, 0.0, 0.7, 0.14, 0.26, "stone", 0.45),
+        ],
+        PartKind::Prop("loom") => vec![
+            slab(-0.5, 0.7, 0.0, 0.08, 1.4, 0.08, "wood", 0.5),
+            slab(0.5, 0.7, 0.0, 0.08, 1.4, 0.08, "wood", 0.5),
+            slab(0.0, 1.32, 0.0, 1.08, 0.08, 0.08, "wood", 0.6),
+            slab(0.0, 0.35, 0.0, 1.08, 0.08, 0.08, "wood", 0.6),
+            slab(0.0, 0.82, 0.0, 0.9, 0.9, 0.03, "cloth-red", 0.6),
+        ],
+        PartKind::Prop("planter") => vec![
+            slab(0.0, 0.15, 0.0, 0.9, 0.3, 0.35, "earth", 0.4),
+            slab(-0.22, 0.38, 0.0, 0.2, 0.18, 0.2, "grass", 0.6),
+            slab(0.1, 0.42, 0.05, 0.24, 0.26, 0.22, "grass", 0.5),
+            slab(0.32, 0.36, -0.04, 0.16, 0.14, 0.16, "grass", 0.7),
+        ],
+        PartKind::Prop("fence") => vec![
+            slab(-0.65, 0.45, 0.0, 0.09, 0.9, 0.09, "wood", 0.45),
+            slab(0.65, 0.45, 0.0, 0.09, 0.9, 0.09, "wood", 0.45),
+            slab(0.0, 0.7, 0.0, 1.5, 0.08, 0.06, "wood", 0.55),
+            slab(0.0, 0.38, 0.0, 1.5, 0.08, 0.06, "wood", 0.55),
+        ],
+        PartKind::Prop("ladder") => vec![
+            slab(-0.16, 1.2, 0.0, 0.07, 2.4, 0.07, "wood", 0.5),
+            slab(0.16, 1.2, 0.0, 0.07, 2.4, 0.07, "wood", 0.5),
+            slab(0.0, 0.4, 0.0, 0.36, 0.06, 0.06, "wood", 0.6),
+            slab(0.0, 0.85, 0.0, 0.36, 0.06, 0.06, "wood", 0.6),
+            slab(0.0, 1.3, 0.0, 0.36, 0.06, 0.06, "wood", 0.6),
+            slab(0.0, 1.75, 0.0, 0.36, 0.06, 0.06, "wood", 0.6),
+            slab(0.0, 2.2, 0.0, 0.36, 0.06, 0.06, "wood", 0.6),
         ],
         PartKind::Prop("mannequin") => vec![
             // The game's adult, boxed in bone: a measuring stick with a
@@ -1177,13 +1250,45 @@ fn cursor_point(
     Some(ray.get_point(reach))
 }
 
-/// Whether this kind counts as structure - walls, their leavings, floors
-/// and roofs. Structure rests only on structure; props rest on anything.
+/// Whether this kind counts as structure - walls, their leavings, floors,
+/// roofs, foundations and steps. Structure rests only on structure; props
+/// rest on anything.
 fn is_structure(kind: &PartKind) -> bool {
     matches!(
         kind,
-        PartKind::Wall(_) | PartKind::Seg { .. } | PartKind::Floor | PartKind::Roof
+        PartKind::Wall(_)
+            | PartKind::Seg { .. }
+            | PartKind::Floor
+            | PartKind::Roof
+            | PartKind::Prop("foundation")
+            | PartKind::Prop("steps")
+            | PartKind::Prop("pole")
     )
+}
+
+/// The carried part's footprint, spoken as sample points: its centre and
+/// four corners, drawn in slightly so edge-kisses do not flicker.
+fn footprint_samples(kind: &PartKind, at: Vec3, yaw: f32) -> Vec<Vec3> {
+    let mut low = Vec3::splat(f32::INFINITY);
+    let mut high = Vec3::splat(f32::NEG_INFINITY);
+    for Slab(slab_at, size, ..) in body_of(kind, None) {
+        low = low.min(slab_at - size * 0.5);
+        high = high.max(slab_at + size * 0.5);
+    }
+    if !low.x.is_finite() {
+        return vec![at];
+    }
+    let spin = Quat::from_rotation_y(yaw);
+    let mut samples = vec![at];
+    for (cx, cz) in [(-1.0f32, -1.0f32), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+        let corner = Vec3::new(
+            if cx < 0.0 { low.x } else { high.x } * 0.9,
+            0.0,
+            if cz < 0.0 { low.z } else { high.z } * 0.9,
+        );
+        samples.push(at + spin * corner);
+    }
+    samples
 }
 
 /// The height of whatever stands beneath a point: the highest slab top
@@ -1191,8 +1296,7 @@ fn is_structure(kind: &PartKind) -> bool {
 /// about what it stands on.
 fn support_height(
     placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
-    x: f32,
-    z: f32,
+    samples: &[Vec3],
     carrying_structure: bool,
     except: Option<Entity>,
 ) -> f32 {
@@ -1214,13 +1318,18 @@ fn support_height(
         if record.tilt.abs() > 0.01 {
             continue;
         }
-        let local = Quat::from_rotation_y(-record.yaw)
-            * (Vec3::new(x, 0.0, z)
-                - Vec3::new(transform.translation.x, 0.0, transform.translation.z));
+        let unspin = Quat::from_rotation_y(-record.yaw);
         let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
         for Slab(at, size, ..) in body_of(&kind, repaint) {
-            if (local.x - at.x).abs() <= size.x * 0.5 && (local.z - at.z).abs() <= size.z * 0.5 {
-                top = top.max(transform.translation.y + at.y + size.y * 0.5);
+            for sample in samples {
+                let local = unspin
+                    * (Vec3::new(sample.x, 0.0, sample.z)
+                        - Vec3::new(transform.translation.x, 0.0, transform.translation.z));
+                if (local.x - at.x).abs() <= size.x * 0.5 && (local.z - at.z).abs() <= size.z * 0.5
+                {
+                    top = top.max(transform.translation.y + at.y + size.y * 0.5);
+                    break;
+                }
             }
         }
     }
@@ -1308,7 +1417,8 @@ fn move_ghost(
 
     // Whatever lies beneath carries the part; Q and E add height on top
     // of that, so a roof panel rides the wall tops on its own.
-    let support = support_height(&placed, snapped.x, snapped.z, is_structure(&kind), None);
+    let samples = footprint_samples(&kind, snapped, hand.yaw);
+    let support = support_height(&placed, &samples, is_structure(&kind), None);
     snapped.y = support + hand.lift;
 
     for mut transform in &mut ghosts {
@@ -1519,8 +1629,7 @@ fn place_grab_remove(
             // supplies its own.
             let beneath = support_height(
                 &placed,
-                transform.translation.x,
-                transform.translation.z,
+                &footprint_samples(&kind, transform.translation, record.yaw),
                 is_structure(&kind),
                 Some(grabbed),
             );
