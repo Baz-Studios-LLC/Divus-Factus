@@ -939,6 +939,7 @@ impl Plugin for BuilderPlugin {
                     steer_hand,
                     toggle_snap_mode,
                     disarm_on_mode,
+                    reflow_openings,
                     copy_and_paste,
                     mirror_part,
                     feel_ahead,
@@ -2698,7 +2699,26 @@ fn heal_wall(
     placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
     frame: Entity,
 ) -> bool {
-    let Ok((_, frame_at, frame_record)) = placed.get(frame) else {
+    let Ok((_, frame_at, _)) = placed.get(frame) else {
+        return false;
+    };
+    let spot = frame_at.translation;
+    heal_wall_at(commands, meshes, materials, palette, placed, frame, spot)
+}
+
+/// The same closing, at a spot the frame may since have left - a door
+/// dragged along its wall heals the hole it came from.
+#[allow(clippy::too_many_arguments)]
+fn heal_wall_at(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    palette: &Palette,
+    placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    frame: Entity,
+    spot: Vec3,
+) -> bool {
+    let Ok((_, _, frame_record)) = placed.get(frame) else {
         return false;
     };
     let width = match kind_from_name(&frame_record.part) {
@@ -2706,7 +2726,7 @@ fn heal_wall(
         _ => return false,
     };
     let along = Quat::from_rotation_y(frame_record.yaw) * Vec3::X;
-    let base = frame_at.translation;
+    let base = spot;
 
     // Everything standing on this wall's own line, measured along it.
     let mut doomed: Vec<Entity> = Vec::new();
@@ -3783,5 +3803,93 @@ fn mirror_part(
             &hand,
             &ghosts,
         );
+    }
+}
+
+/// The opening a frame stands in follows it. Sliding a door or window
+/// with the arrows closes the wall it came from and parts the wall it
+/// lands in, when the drag lets go.
+#[allow(clippy::too_many_arguments)]
+fn reflow_openings(
+    mut commands: Commands,
+    buttons: Res<ButtonInput<MouseButton>>,
+    selected: Res<crate::gizmo::Selected>,
+    mut came_from: Local<Option<(Entity, Vec3)>>,
+    placed: Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    palette: Res<Palette>,
+) {
+    let opening_of = |record: &Placed| match kind_from_name(&record.part) {
+        Some(PartKind::Prop("door")) => Some((1.25, 2.125, 0.0_f32, true)),
+        Some(PartKind::Prop("doorway")) => Some((1.25, 2.125, 0.0, false)),
+        Some(PartKind::Prop("window")) => Some((1.25, 2.0, 0.75, false)),
+        _ => None,
+    };
+
+    if buttons.just_pressed(MouseButton::Left) {
+        *came_from = selected
+            .0
+            .and_then(|part| placed.get(part).ok())
+            .filter(|(_, _, record)| opening_of(record).is_some())
+            .map(|(entity, at, _)| (entity, at.translation));
+        return;
+    }
+    if !buttons.just_released(MouseButton::Left) {
+        return;
+    }
+    let Some((frame, old_spot)) = came_from.take() else {
+        return;
+    };
+    let Ok((_, at, record)) = placed.get(frame) else {
+        return;
+    };
+    let now = at.translation;
+    if now.distance(old_spot) < 0.03 {
+        return;
+    }
+    let Some((wide, head, sill, is_door)) = opening_of(record) else {
+        return;
+    };
+
+    // Close the wall it came from, then part the one it landed in. If
+    // nothing stands where it landed, the frame simply keeps its place.
+    heal_wall_at(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &palette,
+        &placed,
+        frame,
+        old_spot,
+    );
+    let carried = Hand {
+        kind: kind_from_name(&record.part),
+        anchor: None,
+        flip: record.flip,
+        stage: record.stage.clone(),
+        yaw: record.yaw,
+        tilt: 0.0,
+        lift: 0.0,
+        ramp: record.ramp.clone(),
+        shade: record.shade,
+    };
+    let punched = punch_wall(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &palette,
+        &placed,
+        None,
+        now,
+        wide,
+        head,
+        sill,
+        is_door,
+        &carried,
+    );
+    if punched {
+        // The punch set a fresh frame of its own in the new opening.
+        commands.entity(frame).despawn();
     }
 }
