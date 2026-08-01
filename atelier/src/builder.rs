@@ -24,9 +24,77 @@ const ROOF_PITCH: f32 = std::f32::consts::FRAC_PI_4;
 const WALL_THICK: f32 = 0.25;
 const WALL_HIGH: f32 = 2.5;
 
-/// One box of a part's body: offset from the part origin, size, ramp,
-/// shade, and how much of the world shows through it (1.0 = none).
-struct Slab(Vec3, Vec3, String, f32, f32);
+/// One piece of a part's body: offset from the part origin, size, ramp,
+/// shade, how much of the world shows through it (1.0 = none), and
+/// whether it is a wedge rather than a box - a triangular prism, for
+/// the honest slopes a gable wants.
+struct Slab(Vec3, Vec3, String, f32, f32, bool);
+
+/// A triangular prism: an isosceles gable end, base to apex, extruded
+/// across its thickness. Unit-sized, so a part scales it like any box.
+fn wedge_mesh() -> Mesh {
+    let mut positions: Vec<[f32; 3]> = Vec::new();
+    let mut normals: Vec<[f32; 3]> = Vec::new();
+    let mut indices: Vec<u32> = Vec::new();
+    let mut face = |corners: &[[f32; 3]], normal: [f32; 3]| {
+        let first = positions.len() as u32;
+        for corner in corners {
+            positions.push(*corner);
+            normals.push(normal);
+        }
+        for step in 1..(corners.len() as u32 - 1) {
+            indices.extend_from_slice(&[first, first + step, first + step + 1]);
+        }
+    };
+    let slope = (2.0f32 / 5.0f32.sqrt(), 1.0 / 5.0f32.sqrt());
+    // The two triangular faces.
+    face(
+        &[[-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [0.0, 0.5, 0.5]],
+        [0.0, 0.0, 1.0],
+    );
+    face(
+        &[[0.5, -0.5, -0.5], [-0.5, -0.5, -0.5], [0.0, 0.5, -0.5]],
+        [0.0, 0.0, -1.0],
+    );
+    // The floor.
+    face(
+        &[
+            [-0.5, -0.5, 0.5],
+            [0.5, -0.5, 0.5],
+            [0.5, -0.5, -0.5],
+            [-0.5, -0.5, -0.5],
+        ],
+        [0.0, -1.0, 0.0],
+    );
+    // The two slopes.
+    face(
+        &[
+            [-0.5, -0.5, -0.5],
+            [-0.5, -0.5, 0.5],
+            [0.0, 0.5, 0.5],
+            [0.0, 0.5, -0.5],
+        ],
+        [-slope.0, slope.1, 0.0],
+    );
+    face(
+        &[
+            [0.5, -0.5, 0.5],
+            [0.5, -0.5, -0.5],
+            [0.0, 0.5, -0.5],
+            [0.0, 0.5, 0.5],
+        ],
+        [slope.0, slope.1, 0.0],
+    );
+    let uvs: Vec<[f32; 2]> = positions.iter().map(|_| [0.0, 0.0]).collect();
+    Mesh::new(
+        bevy::render::mesh::PrimitiveTopology::TriangleList,
+        bevy::asset::RenderAssetUsages::default(),
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+    .with_inserted_indices(bevy::render::mesh::Indices::U32(indices))
+}
 
 /// What a shelf entry stands for.
 #[derive(Clone, Copy, PartialEq)]
@@ -199,6 +267,18 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             ramp.to_string(),
             shade,
             1.0,
+            false,
+        )
+    };
+    // A wedge: the gable's own shape.
+    let wedge = |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32| {
+        Slab(
+            Vec3::new(x, y, z),
+            Vec3::new(sx, sy, sz),
+            ramp.to_string(),
+            shade,
+            1.0,
+            true,
         )
     };
     // Glass: the world shows through it.
@@ -209,6 +289,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             ramp.to_string(),
             shade,
             0.35,
+            false,
         )
     };
     let mut slabs = match kind {
@@ -253,35 +334,24 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         PartKind::Roof(w, d) => vec![slab(0.0, 0.0625, 0.0, *w, 0.125, *d, "earth", 0.4)],
         PartKind::RoofRun => vec![slab(0.0, 0.0625, 0.0, 0.25, 0.125, 0.25, "earth", 0.4)],
         PartKind::Gable(long) => {
-            // Courses of wall narrowing to a peak: the roof's own pitch,
-            // stepped, because everything here is a box.
-            // The standard pitch: rise equals run, so the peak sits at
-            // half the width.
-            let pitch = ROOF_PITCH.tan();
-            let course = 0.25_f32;
-            let half = long * 0.5;
-            let mut steps = Vec::new();
-            let mut y = 0.0_f32;
-            while y < half * pitch {
-                let reach = (half - y / pitch).max(0.0);
-                if reach * 2.0 < 0.25 {
-                    break;
-                }
-                steps.push(slab(
-                    0.0,
-                    y + course * 0.5,
-                    0.0,
-                    reach * 2.0,
-                    course,
-                    WALL_THICK,
-                    "wood",
-                    0.65,
-                ));
-                y += course;
-            }
-            steps
+            // One clean slope each way: the peak rises at the bench's own
+            // pitch, so a 45 degree gable stands half as tall as it is
+            // wide and meets the roof panels exactly.
+            let high = ((long * 0.5 * ROOF_PITCH.tan()) * 16.0).round() / 16.0;
+            vec![wedge(
+                0.0,
+                high * 0.5,
+                0.0,
+                *long,
+                high,
+                WALL_THICK,
+                "wood",
+                0.65,
+            )]
         }
-        PartKind::GableRun => vec![slab(0.0, 0.125, 0.0, 0.25, 0.25, WALL_THICK, "wood", 0.65)],
+        PartKind::GableRun => vec![wedge(
+            0.0, 0.0625, 0.0, 0.25, 0.125, WALL_THICK, "wood", 0.65,
+        )],
         PartKind::Trim { long, stone } => {
             let (ramp, shade) = if *stone {
                 ("stone", 0.55)
@@ -954,7 +1024,7 @@ pub fn dress_part(
 ) {
     let translucent = ghostly || matches!(kind, PartKind::Widget(_));
     let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-    for Slab(mut at, size, ramp, shade, clarity) in body_of(kind, repaint) {
+    for Slab(mut at, size, ramp, shade, clarity, is_wedge) in body_of(kind, repaint) {
         // Mirrored: the body reflects across its own length.
         if record.flip {
             at.x = -at.x;
@@ -971,7 +1041,11 @@ pub fn dress_part(
             });
         }
         commands.spawn((
-            Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+            Mesh3d(if is_wedge {
+                meshes.add(wedge_mesh())
+            } else {
+                meshes.add(Cuboid::new(1.0, 1.0, 1.0))
+            }),
             MeshMaterial3d(materials.add(StandardMaterial {
                 base_color: color,
                 perceptual_roughness: 0.95,

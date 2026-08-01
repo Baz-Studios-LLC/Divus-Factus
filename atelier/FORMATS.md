@@ -70,6 +70,8 @@ game already understands, so the carrying-in is mechanical:
 ```
 
 - `part`: `wall-<len>` (0.25 thick, 2.4 high — the Atelier's truth; the game conforms),
+  `gable-<len>` (a wedge - a real triangular prism, peak at the
+  bench's 45 degree pitch, so it stands half as tall as it is wide),
   `floor`, `roof`, `prop:<name>` (bed, table, stool, hearth, chair, bench,
   chest, barrel, crate, shelves, cupboard, pot, basket, rug, woodpile,
   candle, sack, trough — the shelf grows on request), or `widget:<kind>`.
