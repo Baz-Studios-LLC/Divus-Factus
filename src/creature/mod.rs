@@ -590,6 +590,7 @@ fn drowning(
                     place: Vec::new(),
                     mind: "you are in deep water and cannot swim — cry for help".into(),
                     heard: None,
+                    aloud: true,
                     known: Vec::new(),
                 });
             }

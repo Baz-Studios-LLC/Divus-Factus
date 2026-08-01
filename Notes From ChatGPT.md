@@ -72,3 +72,39 @@ The architecture doc also appears stale: it still says "Only bevy" and lists `be
 
 The teller caches musings/replies by `Entity`. UI/speech paths drain stale entries when entities disappear, which is probably fine at current scale. Still, as deaths/despawns increase, consider a cleanup path for stale `mused`, `replies`, and `musing` entries keyed to removed villagers.
 
+### Prayer board / divine inbox idea
+
+Brett is interested in a "prayer board" in the Codex: when an NPC prays, the prayer can be recorded somewhere the player can review and choose whether/how to answer.
+
+This feels highly aligned with the game's premise because it exposes simulation state as human desire rather than as stats. The board should not be a clean quest log. It should be a divine inbox full of villagers' needs, fears, grudges, misunderstandings, and doctrine.
+
+Possible prayer examples:
+
+- a hungry parent praying for food for their child
+- a farmer praying for rain before the fields actually need it
+- a widower praying for the dead to return
+- someone praying for the god to smite a neighbor
+- a victim praying for protection from someone who may or may not be guilty
+
+The important part is moral ambiguity. Not all prayers are good. Answering a vengeful prayer might deepen one person's faith while teaching the village that this god grants revenge. Silence might cost trust but prevent doctrine from curdling around cruelty.
+
+Each board entry could expose:
+
+- who is praying
+- what they ask for, in their own terms
+- why they think they deserve it
+- who or what would be affected
+- how long hope lasts before the prayer expires
+- who would notice if it were answered
+- what answering might teach doctrine
+
+Possible player responses:
+
+- answer directly
+- answer indirectly
+- investigate / jump to petitioner or target
+- send a small omen instead of a full miracle
+- refuse through silence
+- mark the prayer for later
+
+Design caution: keep it diegetic and imperfect. The board should read like "what the village is begging the god to become," not like an objective tracker.

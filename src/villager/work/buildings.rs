@@ -2196,7 +2196,13 @@ pub(crate) fn sermons(
         if at.translation.distance(shrine) > reach {
             continue;
         }
-        witnessed.secondhand = witnessed.secondhand.saturating_add(1);
+        // The first hearing plants the story itself; every hearing after
+        // deepens only the count and the faith.
+        if witnessed.remembers(sermon) {
+            witnessed.secondhand = witnessed.secondhand.saturating_add(1);
+        } else {
+            witnessed.hear(memory.clone());
+        }
         faith.trust = (faith.trust + sway).min(0.8);
         if let Some(mut chronicle) = chronicle {
             chronicle.record(

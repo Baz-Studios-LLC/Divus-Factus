@@ -422,6 +422,7 @@ pub(crate) fn hold_conversations(
                         "whether to believe a word of it".into()
                     },
                     heard: Some(told_plain.clone()),
+                    aloud: true,
                     known,
                 });
             }
@@ -442,11 +443,30 @@ pub(crate) fn hold_conversations(
                 minds.get_mut(talk.partner)
             {
                 if !witnessed.remembers(kind) {
-                    witnessed.secondhand = witnessed.secondhand.saturating_add(1);
+                    // Whether the listener BUYS the god in it is their own
+                    // grain's business: a skeptic pockets the story and none
+                    // of the awe, the devout swallow it whole — and what
+                    // they retell later carries their verdict, not the
+                    // teller's.
+                    let conviction = voices
+                        .get(talk.partner)
+                        .ok()
+                        .and_then(|(_, _, manner)| manner.map(|m| m.conviction()))
+                        .unwrap_or(1.0);
+                    let believed = memory.divine
+                        && rng.0.chance(
+                            (0.35 * conviction * kind.unmistakably_divine().max(0.4)).min(0.9),
+                        );
+                    let mut heard = memory.clone();
+                    heard.divine = believed;
+                    // The story itself changes hands either way: the listener
+                    // can now retell it — as something told to them, never
+                    // seen, and in their own stance.
+                    witnessed.hear(heard);
                     if let Some(mut chronicle) = chronicle {
                         chronicle.hear(clock.day(), &teller_name, &told);
                     }
-                    if let Some(mut faith) = faith {
+                    if believed && let Some(mut faith) = faith {
                         faith.trust = (faith.trust + 0.02).min(0.8);
                     }
                 }

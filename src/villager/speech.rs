@@ -13,7 +13,7 @@ use crate::creature::{Corpse, Held, Vitality};
 use crate::rng::Rng;
 use crate::weather::WeatherKind;
 
-use super::{Activity, EARSHOT, Morale, Needs, SimRng, Villager, home, work};
+use super::{Activity, Morale, Needs, SimRng, Villager, home, work};
 
 /// The one thing pressing on someone right now, for a thought to circle.
 ///
@@ -204,15 +204,17 @@ pub(super) fn muse_the_watched(
         place,
         mind,
         heard: None,
+        aloud: false,
         known,
     });
 }
 
 /// Shows the words that have come back, over the heads they belong to.
 ///
-/// The same rule the written murmur has always kept: a thought if alone, said
-/// aloud if anyone stands close enough to hear — the composed line does not
-/// know or care which it will be.
+/// A musing is a THOUGHT and shows as one, however crowded the square:
+/// standing near someone is not talking to them, and a village of people
+/// announcing their inner lives to the wind read as exactly that. The voice
+/// belongs to conversations and to true cries, which arrive marked aloud.
 #[allow(clippy::type_complexity)]
 pub(super) fn show_musings(
     tongue: Option<ResMut<crate::telling::Tongue>>,
@@ -241,17 +243,15 @@ pub(super) fn show_musings(
         let Some(line) = tongue.take_musing(who) else {
             continue;
         };
-        let heard = thinkers.iter().any(|(other, other_at)| {
-            other != who && other_at.translation.distance(at.translation) < EARSHOT
-        });
+        let (line, aloud) = line;
         info!(
             "a watched head finds its own words{}: {line}",
-            if heard { ", aloud" } else { "" }
+            if aloud { ", aloud" } else { "" }
         );
         say.write(crate::ui::Say {
             speaker: who,
             text: line.replace("the god", god),
-            thought: !heard,
+            thought: !aloud,
             own_words: true,
         });
         showed += 1;

@@ -260,6 +260,7 @@ pub(super) fn expeditions(
                         place: Vec::new(),
                         mind: format!("you walked far past the cairns and found {what}"),
                         heard: None,
+                        aloud: true,
                         known: Vec::new(),
                     })
                 })

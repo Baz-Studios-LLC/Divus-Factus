@@ -171,7 +171,7 @@ impl Plugin for VillagerPlugin {
                         belief::kneel,
                         belief::answer_prayers,
                         belief::despair,
-                        belief::faith_of_witnesses,
+                        belief::faith_of_witnesses.after(crate::witness::WitnessSet),
                         belief::tally_belief,
                         belief::grow_legend,
                         belief::ascend,
@@ -2351,6 +2351,7 @@ mod tests {
                 recent: vec![crate::witness::Memory {
                     kind: crate::witness::DivineEventKind::Thrown,
                     whom: None,
+                    divine: true,
                 }],
                 total: 1,
                 secondhand: 0,
@@ -2416,6 +2417,7 @@ mod tests {
                 recent: vec![crate::witness::Memory {
                     kind: crate::witness::DivineEventKind::Thrown,
                     whom: None,
+                    divine: true,
                 }],
                 total: 1,
                 secondhand: 0,

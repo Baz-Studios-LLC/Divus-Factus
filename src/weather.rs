@@ -254,7 +254,7 @@ fn storm_strikes(
     mut notices: MessageWriter<crate::ui::Notice>,
     mut witnessed: MessageWriter<DivineEvent>,
     mut victims: Query<
-        (&Transform, &mut Vitality, &mut CreatureMotion),
+        (Entity, &Transform, &mut Vitality, &mut CreatureMotion),
         (With<Creature>, Without<Corpse>),
     >,
     trees: Query<
@@ -289,17 +289,19 @@ fn storm_strikes(
 
     crate::miracles::lightning_bolt(&mut commands, &mut meshes, &mut materials, at);
 
+    // The first soul the bolt catches is the event's subject, exactly as a
+    // Smite's would be: witnesses remember WHO the sky took, by name and by
+    // kinship, and the storm becomes doctrine fodder like any miracle.
     let mut struck: Option<Entity> = None;
-    for (transform, mut vitality, mut motion) in &mut victims {
+    for (entity, transform, mut vitality, mut motion) in &mut victims {
         if transform.translation.distance(at) > 4.5 {
             continue;
         }
         vitality.harm += 1.2;
         vitality.violent = true;
         motion.flail = 1.0;
-        let _ = struck.get_or_insert(Entity::PLACEHOLDER);
+        struck.get_or_insert(entity);
     }
-    let _ = struck;
 
     // Anything wooden at the strike point catches — and steps out of its
     // grove to burn where everyone can see it.
@@ -327,7 +329,7 @@ fn storm_strikes(
     witnessed.write(DivineEvent {
         kind: DivineEventKind::Smote,
         position: at,
-        subject: None,
+        subject: struck,
         intensity: 1.0,
     });
 }

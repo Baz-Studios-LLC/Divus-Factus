@@ -216,6 +216,7 @@ pub(super) fn kneel(
                     place: Vec::new(),
                     mind: "you kneel and beg the god for food".into(),
                     heard: None,
+                    aloud: false,
                     known: Vec::new(),
                 })
             })
@@ -376,6 +377,7 @@ pub(super) fn faith_of_witnesses(
         ),
         (With<Villager>, Without<Corpse>),
     >,
+    witnesses: Query<&crate::witness::Witnessed>,
 ) {
     let god = name.as_ref().map_or("their god", |n| n.0.as_str());
     for event in events.read() {
@@ -387,6 +389,18 @@ pub(super) fn faith_of_witnesses(
                 continue;
             }
             if transform.translation.distance(event.position) > event.kind.carry() {
+                continue;
+            }
+            // Faith moves only for witnesses who read the god into it at
+            // all. The verdict lives on the memory the witness system just
+            // recorded (this system is ordered after it); most people watch
+            // lightning and see weather, and their faith holds still.
+            let attributed = witnesses
+                .get(entity)
+                .ok()
+                .and_then(|w| w.recent.first().map(|m| m.divine))
+                .unwrap_or(true);
+            if !attributed {
                 continue;
             }
             let believed_before = faith.is_believer();

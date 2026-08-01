@@ -145,6 +145,24 @@ impl DivineEventKind {
         }
     }
 
+    /// The odds an ordinary witness reads the god into this, before their
+    /// grain bends it. Anything nature could have done, nature mostly gets
+    /// credit for — lightning is weather to almost everyone who sees it.
+    /// The impossible things are impossible to explain away.
+    pub fn unmistakably_divine(self) -> f32 {
+        match self {
+            DivineEventKind::Lifted => 0.9,
+            DivineEventKind::Thrown => 0.85,
+            DivineEventKind::SetDown => 0.9,
+            DivineEventKind::Impact => 0.5,
+            DivineEventKind::Provided => 0.6,
+            DivineEventKind::Smote => 0.15,
+            DivineEventKind::Uprooted => 0.45,
+            DivineEventKind::Mended => 0.85,
+            DivineEventKind::Quaked => 0.3,
+        }
+    }
+
     /// How a villager would put it.
     ///
     /// Memories are phrased from the villager's side, not the system's. They did not
@@ -316,6 +334,17 @@ pub struct Memory {
     /// Who it happened to, if it happened to anyone the witness could name.
     #[serde(default)]
     pub whom: Option<Whom>,
+    /// Whether THIS witness read the god into it. Most people, most of the
+    /// time, do not: lightning is weather, a stumble is a stumble. The devout
+    /// see hands everywhere, the skeptics almost nowhere, and what spreads
+    /// through gossip is the stance as much as the story.
+    #[serde(default = "always")]
+    pub divine: bool,
+}
+
+/// Old saves predate doubt: their memories load as believed.
+fn always() -> bool {
+    true
 }
 
 /// A memory as older saves wrote it: the bare kind, no subject. Deserializing
@@ -328,6 +357,8 @@ enum MemoryOnDisk {
         kind: DivineEventKind,
         #[serde(default)]
         whom: Option<Whom>,
+        #[serde(default = "always")]
+        divine: bool,
     },
     Bare(DivineEventKind),
 }
@@ -335,8 +366,12 @@ enum MemoryOnDisk {
 impl From<MemoryOnDisk> for Memory {
     fn from(disk: MemoryOnDisk) -> Memory {
         match disk {
-            MemoryOnDisk::Whole { kind, whom } => Memory { kind, whom },
-            MemoryOnDisk::Bare(kind) => Memory { kind, whom: None },
+            MemoryOnDisk::Whole { kind, whom, divine } => Memory { kind, whom, divine },
+            MemoryOnDisk::Bare(kind) => Memory {
+                kind,
+                whom: None,
+                divine: true,
+            },
         }
     }
 }
@@ -363,12 +398,24 @@ impl Witnessed {
     /// How many memories a villager keeps.
     pub const CAPACITY: usize = 8;
 
-    fn record(&mut self, kind: DivineEventKind, whom: Option<Whom>) {
-        self.recent.insert(0, Memory { kind, whom });
+    fn record(&mut self, kind: DivineEventKind, whom: Option<Whom>, divine: bool) {
+        self.recent.insert(0, Memory { kind, whom, divine });
         self.recent.truncate(Self::CAPACITY);
         self.total = self.total.saturating_add(1);
         // A fresh sight rekindles the urge to tell it.
         self.told = 0;
+    }
+
+    /// Takes in a story HEARD rather than seen: it joins the memories they
+    /// can retell — belief travels through people, and a rumor that could
+    /// not be passed on died one hop from its witness — but it counts as
+    /// secondhand, never as witness. [`Retelling::hand_of`] reads exactly
+    /// that split, so a rumor's reteller says "I was told" without any
+    /// further bookkeeping.
+    pub fn hear(&mut self, memory: Memory) {
+        self.recent.insert(0, memory);
+        self.recent.truncate(Self::CAPACITY);
+        self.secondhand = self.secondhand.saturating_add(1);
     }
 
     /// Whether they carry a memory of this kind of act, whoever it befell.
@@ -420,6 +467,8 @@ fn perceive_events(
         Option<&crate::villager::Parentage>,
         Option<&crate::creature::genome::CreatureGenome>,
     )>,
+    manners: Query<&crate::villager::traits::Traits>,
+    mut rng: Option<ResMut<crate::villager::SimRng>>,
 ) {
     // Gathers what one entity's threads are, for the kinship question.
     let threads_of = |entity: Entity| -> crate::villager::kin::Threads<'_> {
@@ -482,7 +531,17 @@ fn perceive_events(
                 }),
                 _ => None,
             };
-            witnessed.record(event.kind, whom);
+            // The verdict: did the god do this, or did the world? Rolled per
+            // witness, bent by their grain — a skeptic shrugs off all but the
+            // impossible, the devout see hands in half the weather. The roll
+            // is the memory's for life, and it is what the faith systems and
+            // the gossip mill read instead of assuming belief.
+            let conviction = manners.get(entity).map_or(1.0, |m| m.conviction());
+            let divine = rng.as_mut().is_none_or(|rng| {
+                rng.0
+                    .chance((event.kind.unmistakably_divine() * conviction).min(0.97))
+            });
+            witnessed.record(event.kind, whom, divine);
 
             // A visible start, so it reads as a reaction rather than a decision.
             motion.flail = motion.flail.max(match kind {
@@ -661,7 +720,7 @@ mod tests {
         let mut w = Witnessed::default();
         assert!(w.is_innocent());
         for _ in 0..50 {
-            w.record(DivineEventKind::Lifted, None);
+            w.record(DivineEventKind::Lifted, None, true);
         }
         assert_eq!(w.recent.len(), Witnessed::CAPACITY);
         assert_eq!(w.total, 50);
@@ -671,13 +730,14 @@ mod tests {
     #[test]
     fn the_newest_memory_comes_first() {
         let mut w = Witnessed::default();
-        w.record(DivineEventKind::Lifted, None);
+        w.record(DivineEventKind::Lifted, None, true);
         w.record(
             DivineEventKind::Thrown,
             Some(Whom {
                 name: "Feitreh".into(),
                 tie: "your neighbour".into(),
             }),
+            true,
         );
         assert_eq!(w.recent[0].kind, DivineEventKind::Thrown);
         assert_eq!(
@@ -685,6 +745,18 @@ mod tests {
             Some("Feitreh, your neighbour"),
             "a memory keeps who it happened to",
         );
+    }
+
+    #[test]
+    fn lightning_is_weather_to_almost_everyone() {
+        // The design's centre: the impossible compels, the natural excuses.
+        // A skeptic (conviction 0.5) attributes a bolt ~7% of the time; even
+        // the devout (1.5) stay under a quarter. Nobody explains away a man
+        // hanging in the empty air.
+        assert!(DivineEventKind::Smote.unmistakably_divine() <= 0.2);
+        assert!(DivineEventKind::Quaked.unmistakably_divine() <= 0.35);
+        assert!(DivineEventKind::Lifted.unmistakably_divine() >= 0.85);
+        assert!(DivineEventKind::Mended.unmistakably_divine() >= 0.8);
     }
 
     #[test]
@@ -706,6 +778,7 @@ mod tests {
                 name: "Feitreh".into(),
                 tie: "your brother".into(),
             }),
+            false,
         );
         let round: Witnessed =
             serde_json::from_str(&serde_json::to_string(&fresh).unwrap()).unwrap();
