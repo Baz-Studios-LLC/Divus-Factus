@@ -51,7 +51,10 @@ fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>) 
         ChildOf(rail),
     ));
     commands.spawn((
-        Text::new("the maker's own bench"),
+        Text::new(concat!(
+            "the maker's own bench - v",
+            env!("CARGO_PKG_VERSION")
+        )),
         TextFont {
             font: fonts.text.clone().into(),
             font_size: FontSize::Px(12.0),

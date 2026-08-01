@@ -548,7 +548,7 @@ impl Plugin for BuilderPlugin {
             .init_resource::<Naming>()
             .init_resource::<Hovered>()
             .init_resource::<WorkName>()
-            .add_systems(Startup, (raise_shelf, load_workbench))
+            .add_systems(Startup, raise_shelf)
             .add_systems(
                 Update,
                 (
@@ -1127,13 +1127,8 @@ fn work_templates(
     };
     // A loaded work carries its name; a template starts nameless.
     work_name.0 = if from_file {
-        let stem = path
-            .file_stem()
-            .map(|stem| stem.to_string_lossy().to_string());
-        if let (Some(stem), Some(dir)) = (stem.as_ref(), bench_path().parent()) {
-            let _ = std::fs::write(dir.join(".last"), stem);
-        }
-        stem
+        path.file_stem()
+            .map(|stem| stem.to_string_lossy().to_string())
     } else {
         None
     };
@@ -2108,7 +2103,6 @@ fn take_the_name(
             if let Ok(json) = serde_json::to_string_pretty(&bench) {
                 let count = bench.parts.len();
                 let _ = std::fs::write(&path, json);
-                let _ = std::fs::write(dir.join(".last"), &stem);
                 info!("saved {count} parts to {}", path.display());
                 work_name.0 = Some(stem.clone());
                 for (entity, mut text) in &mut save_labels {
@@ -2198,50 +2192,4 @@ fn settle_words(
             commands.entity(entity).remove::<PassingWord>();
         }
     }
-}
-
-/// Whatever was saved last comes back on launch: the pointer file names
-/// it, with the old workbench.json as the fallback for benches from
-/// before works had names.
-fn load_workbench(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    palette: Res<Palette>,
-    mut work_name: ResMut<WorkName>,
-) {
-    let dir = bench_path().parent().map(|d| d.to_path_buf());
-    let last = dir.as_ref().and_then(|dir| {
-        let stem = std::fs::read_to_string(dir.join(".last")).ok()?;
-        let stem = stem.trim().to_string();
-        let path = dir.join(format!("{stem}.json"));
-        path.exists().then_some((stem, path))
-    });
-    let (found_name, path) = match last {
-        Some((stem, path)) => (Some(stem), path),
-        None => (None, bench_path()),
-    };
-    work_name.0 = found_name;
-    let Ok(text) = std::fs::read_to_string(path) else {
-        return;
-    };
-    let Ok(bench) = serde_json::from_str::<Workbench>(&text) else {
-        warn!("the saved bench would not parse; starting clean");
-        return;
-    };
-    let count = bench.parts.len();
-    for record in bench.parts {
-        if let Some(kind) = kind_from_name(&record.part) {
-            spawn_part(
-                &mut commands,
-                &mut meshes,
-                &mut materials,
-                &palette,
-                &kind,
-                &record,
-                false,
-            );
-        }
-    }
-    info!("the bench remembers {count} parts");
 }
