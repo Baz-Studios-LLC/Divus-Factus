@@ -8,6 +8,7 @@
 
 use bevy::prelude::*;
 
+mod builder;
 mod camera;
 mod look;
 mod rail;
@@ -35,6 +36,6 @@ fn main() {
         }))
         .init_resource::<Bench>()
         .add_plugins((look::LookPlugin, camera::CameraPlugin, stage::StagePlugin))
-        .add_plugins(rail::RailPlugin)
+        .add_plugins((rail::RailPlugin, builder::BuilderPlugin))
         .run();
 }

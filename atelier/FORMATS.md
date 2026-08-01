@@ -34,51 +34,36 @@ local X: positive carries the free end forward).
 ### Blueprints: `out/buildings/<name>.json`
 
 Local space: origin at the plot centre on the ground, **+X faces the
-village** (the door side), +Y up. Metres.
+village** (the door side — the gold sill on the bench grid), +Y up. Metres.
+The bench saves to `out/buildings/workbench.json` and reloads it on launch;
+rename a finished piece in Finder to keep it.
+
+The file is a list of PARTS, not raw boxes — every entry is something the
+game already understands, so the carrying-in is mechanical:
 
 ```json
 {
   "format": 1,
-  "name": "house-of-the-long-hearth",
-  "kind": "house",
-  "boxes": [
-    {
-      "at": [0.0, 1.25, 0.0],
-      "size": [0.24, 2.5, 6.4],
-      "ramp": "wood", "shade": 0.7,
-      "stage": "walls",
-      "roof": false,
-      "yaw": 0.0
-    }
-  ],
-  "widgets": [
-    { "kind": "sleep", "at": [-2.1, 0.3, 1.4], "yaw": 0.0 },
-    { "kind": "door",  "at": [3.0, 0.0, 0.0],  "yaw": 0.0 }
+  "name": "workbench",
+  "parts": [
+    { "part": "wall-2",       "at": [3.0, 0.0, 1.0], "yaw": 0.0, "tilt": 0.0,
+      "ramp": null, "shade": 0.7, "stage": "walls" },
+    { "part": "prop:bed",     "at": [-2.1, 0.0, 1.4], "yaw": 1.5708, "tilt": 0.0,
+      "ramp": null, "shade": 0.7, "stage": "furnishing" },
+    { "part": "widget:sleep", "at": [-2.1, 0.0, 1.4], "yaw": 1.5708, "tilt": 0.0,
+      "ramp": null, "shade": 0.7, "stage": "widget" }
   ]
 }
 ```
 
-- `stage`: `"footing" | "frame" | "walls" | "roof" | "furnishing"` — the
-  order villagers raise it. The game maps footing to the mason's stone
-  stage and the rest to the carpenter's thirds; `roof: true` marks boxes
-  the H-key cutaway lifts (usually everything staged `"roof"`).
-- `yaw` on a box turns it about its own centre (radians).
-
-**Widgets** are invisible in the game; each is a place plus a facing
-(`yaw`, radians, 0 = facing +X):
-
-| kind    | colour on the bench | the game makes of it                       |
-|---------|---------------------|--------------------------------------------|
-| `sleep` | blue                | a bed slot; yaw points where the HEAD lies |
-| `sit`   | amber               | a seat; yaw is the way the sitter faces    |
-| `fire`  | red                 | hearth/camp: light, warmth, shelter draw   |
-| `smoke` | grey                | a wisp source (chimneys, roof holes)       |
-| `door`  | green               | a doorway in the shell for routing         |
-| `work`  | purple              | where a craftsman stands to do the trade   |
-| `store` | brown               | where goods pile                           |
-| `light` | gold                | a small lamp                               |
-
-Optional `"size"` on `fire`/`light` scales the effect (default 1.0).
+- `part`: `wall-<len>` (0.24 thick, 2.4 high — the game's cross-section),
+  `floor`, `roof`, `prop:<name>` (bed, table, stool, hearth, chair, bench,
+  chest, barrel, crate, shelves, cupboard, pot, basket, rug, woodpile,
+  candle, sack, trough — the shelf grows on request), or `widget:<kind>`.
+- `yaw` turns about the part's centre; `tilt` pitches roof panels.
+- `ramp`/`shade`: a repaint, or `null` for the part's authored colours.
+- `stage`: `footing | frame | walls | roof | furnishing` — the order the
+  village raises it; `widget` entries never become boxes at all.
 
 ### Clips: `out/anim/<name>.json`
 
