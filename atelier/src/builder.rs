@@ -28,11 +28,23 @@ const WALL_HIGH: f32 = 2.5;
 /// shade, how much of the world shows through it (1.0 = none), and
 /// whether it is a wedge rather than a box - a triangular prism, for
 /// the honest slopes a gable wants.
-struct Slab(Vec3, Vec3, String, f32, f32, bool);
+struct Slab(Vec3, Vec3, String, f32, f32, Shape);
+
+/// What a piece of a body is cut from.
+#[derive(Clone, Copy, PartialEq)]
+enum Shape {
+    /// The plain box, which is most of everything.
+    Box,
+    /// A gable's prism: the triangle stands across the part's length.
+    Wedge,
+    /// A ridge cap's prism: the triangle stands ACROSS the part, which
+    /// runs lengthwise under it, apex up.
+    Ridge,
+}
 
 /// A triangular prism: an isosceles gable end, base to apex, extruded
 /// across its thickness. Unit-sized, so a part scales it like any box.
-fn wedge_mesh() -> Mesh {
+fn wedge_mesh(lengthwise: bool) -> Mesh {
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut normals: Vec<[f32; 3]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
@@ -85,6 +97,19 @@ fn wedge_mesh() -> Mesh {
         ],
         [slope.0, slope.1, 0.0],
     );
+    // A ridge cap is the same prism turned a quarter: the triangle
+    // stands across the part and the length runs under the apex.
+    if lengthwise {
+        for corner in &mut positions {
+            *corner = [corner[2], corner[1], corner[0]];
+        }
+        for normal in &mut normals {
+            *normal = [normal[2], normal[1], normal[0]];
+        }
+        for triangle in indices.chunks_mut(3) {
+            triangle.swap(1, 2);
+        }
+    }
     let uvs: Vec<[f32; 2]> = positions.iter().map(|_| [0.0, 0.0]).collect();
     Mesh::new(
         bevy::render::mesh::PrimitiveTopology::TriangleList,
@@ -114,6 +139,8 @@ pub enum PartKind {
     /// The stepped triangle that closes a pitched roof's end: courses of
     /// wall narrowing to a peak at the roof's own thirty degrees.
     Gable(f32),
+    /// The cap that hides the seam where two slopes meet.
+    Ridge(f32),
     Floor(f32, f32),
     Foundation(f32, f32),
     Roof(f32, f32),
@@ -131,6 +158,7 @@ pub enum PartKind {
         lift: f32,
     },
     GableRun,
+    RidgeRun,
     FloorRun,
     FoundationRun,
     RoofRun,
@@ -145,7 +173,8 @@ impl PartKind {
             PartKind::WallRun
             | PartKind::TrimRun { .. }
             | PartKind::SegRun { .. }
-            | PartKind::GableRun => Some(1),
+            | PartKind::GableRun
+            | PartKind::RidgeRun => Some(1),
             PartKind::FloorRun | PartKind::FoundationRun | PartKind::RoofRun => Some(2),
             _ => None,
         }
@@ -160,6 +189,7 @@ impl PartKind {
                 stone: *stone,
             },
             PartKind::GableRun => PartKind::Gable(w),
+            PartKind::RidgeRun => PartKind::Ridge(w),
             PartKind::SegRun { high, lift } => PartKind::Seg {
                 long: w,
                 high: *high,
@@ -236,6 +266,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     structure("FLOOR, 2M", PartKind::Floor(2.0, 2.0), "footing"),
     structure("GABLE, STRETCH", PartKind::GableRun, "walls"),
     structure("ROOF, STRETCH", PartKind::RoofRun, "roof"),
+    structure("RIDGE, STRETCH", PartKind::RidgeRun, "roof"),
     structure("ROOF PANEL", PartKind::Roof(2.2, 2.2), "roof"),
 ];
 
@@ -298,7 +329,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             ramp.to_string(),
             shade,
             1.0,
-            false,
+            Shape::Box,
         )
     };
     // A wedge: the gable's own shape.
@@ -309,7 +340,18 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             ramp.to_string(),
             shade,
             1.0,
-            true,
+            Shape::Wedge,
+        )
+    };
+    // A ridge cap: the same triangle, laid along the part's length.
+    let ridge = |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32| {
+        Slab(
+            Vec3::new(x, y, z),
+            Vec3::new(sx, sy, sz),
+            ramp.to_string(),
+            shade,
+            1.0,
+            Shape::Ridge,
         )
     };
     // Glass: the world shows through it.
@@ -320,7 +362,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             ramp.to_string(),
             shade,
             0.35,
-            false,
+            Shape::Box,
         )
     };
     let mut slabs = match kind {
@@ -393,6 +435,12 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         PartKind::GableRun => vec![wedge(
             0.0, 0.0625, 0.0, 0.25, 0.125, WALL_THICK, "wood", 0.65,
         )],
+        PartKind::Ridge(long) => {
+            // Half a metre across, a quarter tall: the bench's own pitch
+            // again, so it sits down onto two 45 degree slopes.
+            vec![ridge(0.0, 0.125, 0.0, *long, 0.25, 0.5, "earth", 0.35)]
+        }
+        PartKind::RidgeRun => vec![ridge(0.0, 0.125, 0.0, 0.25, 0.25, 0.5, "earth", 0.35)],
         PartKind::Trim { long, stone } => {
             let (ramp, shade) = if *stone {
                 ("stone", 0.55)
@@ -970,6 +1018,7 @@ pub fn part_name(kind: &PartKind) -> String {
             }
         }
         PartKind::Gable(long) => format!("gable-{long}"),
+        PartKind::Ridge(long) => format!("ridge-{long}"),
         PartKind::Floor(w, d) => format!("floor-{w}x{d}"),
         PartKind::Foundation(w, d) => format!("foundation-{w}x{d}"),
         PartKind::Roof(w, d) => format!("roof-{w}x{d}"),
@@ -977,6 +1026,7 @@ pub fn part_name(kind: &PartKind) -> String {
         | PartKind::TrimRun { .. }
         | PartKind::SegRun { .. }
         | PartKind::GableRun
+        | PartKind::RidgeRun
         | PartKind::FloorRun
         | PartKind::FoundationRun
         | PartKind::RoofRun => "run".to_string(),
@@ -988,6 +1038,9 @@ pub fn part_name(kind: &PartKind) -> String {
 pub fn kind_from_name(name: &str) -> Option<PartKind> {
     if let Some(rest) = name.strip_prefix("wall-") {
         return rest.parse::<f32>().ok().map(PartKind::Wall);
+    }
+    if let Some(rest) = name.strip_prefix("ridge-") {
+        return rest.parse::<f32>().ok().map(PartKind::Ridge);
     }
     if let Some(rest) = name.strip_prefix("gable-") {
         return rest.parse::<f32>().ok().map(PartKind::Gable);
@@ -1107,7 +1160,7 @@ pub fn dress_part(
 ) {
     let translucent = ghostly || matches!(kind, PartKind::Widget(_));
     let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-    for Slab(mut at, size, ramp, shade, clarity, is_wedge) in body_of(kind, repaint) {
+    for Slab(mut at, size, ramp, shade, clarity, shape) in body_of(kind, repaint) {
         // Mirrored: the body reflects across its own length.
         if record.flip {
             at.x = -at.x;
@@ -1124,10 +1177,10 @@ pub fn dress_part(
             });
         }
         commands.spawn((
-            Mesh3d(if is_wedge {
-                meshes.add(wedge_mesh())
-            } else {
-                meshes.add(Cuboid::new(1.0, 1.0, 1.0))
+            Mesh3d(match shape {
+                Shape::Wedge => meshes.add(wedge_mesh(false)),
+                Shape::Ridge => meshes.add(wedge_mesh(true)),
+                Shape::Box => meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
             }),
             MeshMaterial3d(materials.add(StandardMaterial {
                 base_color: color,
@@ -1769,6 +1822,8 @@ fn is_structure(kind: &PartKind) -> bool {
             | PartKind::SegRun { .. }
             | PartKind::Gable(..)
             | PartKind::GableRun
+            | PartKind::Ridge(..)
+            | PartKind::RidgeRun
             | PartKind::Prop("steps")
             | PartKind::Prop("pole")
     )
