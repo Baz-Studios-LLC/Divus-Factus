@@ -214,6 +214,9 @@ pub struct Musing {
     /// musing is a thought and shows as one: people who talk to the wind
     /// unsettle their neighbours.
     pub aloud: bool,
+    /// Whether these words are addressed to the god — a prayer wears its
+    /// own colour, because it is the one channel aimed at the player.
+    pub prayer: bool,
     /// Every proper noun the thought is allowed to contain: their own name,
     /// their place, their people. The truth gate holds the words to this.
     pub known: Vec<String>,
@@ -283,7 +286,7 @@ enum Answer {
     /// The bool says whether it was a reply, so an answer composed for a
     /// conversation is never shown as a stray idle thought. The inner bool
     /// carries `aloud` — a cry keeps its voice all the way to the bubble.
-    Mused(Entity, bool, Option<(String, bool)>),
+    Mused(Entity, bool, Option<(String, bool, bool)>),
     /// The switch happened (the new voice's name), or it did not (None) and
     /// the old voice carries on.
     Switched(Option<String>),
@@ -296,7 +299,7 @@ pub struct Tongue {
     /// again every time two people meet.
     asked: HashSet<TellingKey>,
     /// Thoughts that have come back, waiting to be shown.
-    mused: HashMap<Entity, (String, bool)>,
+    mused: HashMap<Entity, (String, bool, bool)>,
     /// Replies that have come back, waiting for the conversation's beat.
     replies: HashMap<Entity, String>,
     /// Whose words are being composed right now, and of which kind — a
@@ -389,7 +392,7 @@ impl Tongue {
 
     /// The composed thought waiting for this person, if any. Taking it makes
     /// room for their next.
-    pub fn take_musing(&mut self, who: Entity) -> Option<(String, bool)> {
+    pub fn take_musing(&mut self, who: Entity) -> Option<(String, bool, bool)> {
         self.collect();
         self.mused.remove(&who)
     }
@@ -476,11 +479,11 @@ impl Tongue {
                 }
                 Answer::Mused(who, reply, line) => {
                     self.musing.remove(&(who, reply));
-                    if let Some((line, aloud)) = line {
+                    if let Some((line, aloud, prayer)) = line {
                         if reply {
                             self.replies.insert(who, line.clone());
                         } else {
-                            self.mused.insert(who, (line.clone(), aloud));
+                            self.mused.insert(who, (line.clone(), aloud, prayer));
                         }
                         Some(line)
                     } else {
@@ -668,7 +671,7 @@ impl Plugin for TellingPlugin {
                                 draws += 1;
                                 let line = voice
                                     .muse(&mut ctx, &of, draws)
-                                    .map(|line| (line, of.aloud));
+                                    .map(|line| (line, of.aloud, of.prayer));
                                 worker_inflight.fetch_sub(1, Ordering::Relaxed);
                                 Answer::Mused(of.who, of.is_reply(), line)
                             }
@@ -1158,6 +1161,7 @@ fn muse_shots() -> Vec<(Musing, &'static str)> {
                 mind: "the empty larder".into(),
                 heard: None,
                 aloud: false,
+                prayer: false,
                 known: vec!["Harrowfen".into()],
             },
             // Hand-written whole sentences, no longer lifted from the corpus:
@@ -1181,6 +1185,7 @@ fn muse_shots() -> Vec<(Musing, &'static str)> {
                 mind: "no roof of your own yet".into(),
                 heard: None,
                 aloud: false,
+                prayer: false,
                 known: vec!["Harrowfen".into()],
             },
             "I want a roof of my own before the cold comes",
@@ -1200,6 +1205,7 @@ fn muse_shots() -> Vec<(Musing, &'static str)> {
                 mind: "a fine day at the water".into(),
                 heard: None,
                 aloud: false,
+                prayer: false,
                 known: vec!["Harrowfen".into()],
             },
             "the water was kind to me today, and that is enough",
@@ -1225,6 +1231,7 @@ fn reply_shots() -> Vec<(Musing, &'static str)> {
         mind: mind.into(),
         heard: Some(told.into()),
         aloud: true,
+        prayer: false,
         known: vec!["Harrowfen".into()],
     };
     vec![

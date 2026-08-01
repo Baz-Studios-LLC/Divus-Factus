@@ -516,6 +516,7 @@ pub(super) fn wolves_stalk(
                         mind: "a wolf is upon you, teeth in your leg — scream".into(),
                         heard: None,
                         aloud: true,
+                        prayer: false,
                         known: Vec::new(),
                     });
                 }

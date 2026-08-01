@@ -2168,6 +2168,7 @@ pub(crate) fn sermons(
             speaker: preacher,
             text: format!("hear how {}", line.replace("the god", god)),
             thought: false,
+            prayer: false,
             own_words,
         });
     }

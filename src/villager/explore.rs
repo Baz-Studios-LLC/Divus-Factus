@@ -261,6 +261,7 @@ pub(super) fn expeditions(
                         mind: format!("you walked far past the cairns and found {what}"),
                         heard: None,
                         aloud: true,
+                        prayer: false,
                         known: Vec::new(),
                     })
                 })

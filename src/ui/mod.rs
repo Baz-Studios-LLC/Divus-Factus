@@ -61,6 +61,9 @@ pub struct Say {
     pub speaker: Entity,
     pub text: String,
     pub thought: bool,
+    /// Addressed to the god: a prayer's bubble wears pink — the one channel
+    /// aimed at the player, worth catching from the corner of an eye.
+    pub prayer: bool,
     /// Whether these are the villager's OWN words, put together for this
     /// telling, rather than one of the written phrasings.
     ///
@@ -146,15 +149,13 @@ fn speak(
             continue;
         }
         // Speech wears the gold border everything divine-adjacent wears;
-        // thoughts wear a soft blue and dimmer text — readable as "inner"
-        // at a glance, with no punctuation dressing.
-        let border = if say.own_words {
-            // Their OWN words wear green whether spoken or thought — the
-            // marker is about authorship, and a composed thought deserves
-            // the same flag as composed speech.
-            palette::shade(&palette::GRASS, 0.85).with_alpha(0.95)
+        // thoughts wear blue — readable as "inner" at a glance. The green
+        // authorship marker served while written and composed lines shared
+        // the screen; with every bubble composed, it retired.
+        let border = if say.prayer {
+            palette::shade(&palette::CLOTH_PINK, 1.0).with_alpha(0.95)
         } else if say.thought {
-            palette::shade(&palette::CLOTH_BLUE, 0.7).with_alpha(0.9)
+            palette::shade(&palette::CLOTH_BLUE, 0.75).with_alpha(0.95)
         } else {
             theme::panel_border()
         };
@@ -174,127 +175,35 @@ fn speak(
                     top: px(-1000),
                     flex_direction: FlexDirection::Column,
                     row_gap: px(1),
-                    // Thoughts breathe: the billowed rim eats into the box,
-                    // so the words stand further from the edge than in a
-                    // straight-walled speech bubble.
-                    padding: if say.thought {
-                        UiRect::axes(px(15), px(9))
-                    } else {
-                        UiRect::axes(px(8), px(4))
-                    },
-                    // A thought's rim is drawn entirely by its lobes: the
-                    // box itself has no border, so no straight line can
-                    // ever show between the round parts.
-                    border: UiRect::all(if say.thought { px(0) } else { px(1) }),
-                    border_radius: BorderRadius::all(if say.thought { px(14) } else { px(8) }),
+                    padding: UiRect::axes(px(8), px(4)),
+                    border: UiRect::all(px(1)),
+                    // A thought's box rounds a little softer than speech.
+                    border_radius: BorderRadius::all(if say.thought { px(12) } else { px(8) }),
                     max_width: px(230),
                     ..default()
                 },
-                // Opaque, so the trimmings below can weld on seamlessly -
-                // and for thoughts, FULLY opaque: the cloud is layered
-                // discs, and any alpha darkens every overlap.
-                BackgroundColor(if say.thought {
-                    theme::panel_bg().with_alpha(1.0)
-                } else {
-                    theme::panel_bg()
-                }),
+                BackgroundColor(theme::panel_bg()),
                 BorderColor::all(border),
             ))
             .id();
         if say.thought {
-            // A thought is a cloud: big soft lobes touching the whole way
-            // round. The outline is built in two layers - first every lobe
-            // as a solid border-colour disc a ring wider, all beneath,
-            // then every lobe again in the bubble's own fill. Where bumps
-            // overlap, the fill covers the neighbour's ring, so the line
-            // survives only on the OUTSIDE silhouette and never breaks
-            // into the cloud.
-            let auto = Val::Auto;
-            // A modest count of lobes, sizes JITTERED neighbour to
-            // neighbour - a billow beside a bump beside a billow, the way
-            // a cloud actually piles up. A smooth size ramp reads as
-            // uniform; only real jumps read as cloud.
-            const TOP: [f32; 7] = [30.0, 22.0, 34.0, 24.0, 28.0, 21.0, 32.0];
-            const UNDER: [f32; 7] = [24.0, 32.0, 22.0, 30.0, 21.0, 33.0, 26.0];
-            let mut rim: Vec<(Val, Val, Val, Val, f32)> = Vec::new();
-            for (i, (&size, &under)) in TOP.iter().zip(UNDER.iter()).enumerate() {
-                let pc = i as f32 * 14.4 - 2.0;
-                rim.push((percent(pc), px(-size * 0.40), auto, auto, size));
-                rim.push((percent(pc + 7.0), auto, auto, px(-under * 0.40), under));
-            }
-            for (pc, size) in [(12.0, 24.0), (52.0, 27.0)] {
-                rim.push((px(-size * 0.40), percent(pc), auto, auto, size));
-                rim.push((auto, percent(pc + 14.0), px(-size * 0.40), auto, size - 4.0));
-            }
-            for pass in 0..2 {
-                for (left, top, right, bottom, size) in &rim {
-                    let grow = if pass == 0 { 2.6 } else { 0.0 };
-                    // The bigger under-disc stays concentric with its
-                    // fill: nudged back toward whichever edges anchor it.
-                    let dx = if *left != Val::Auto {
-                        -grow * 0.5
-                    } else {
-                        grow * 0.5
-                    };
-                    let dy = if *top != Val::Auto {
-                        -grow * 0.5
-                    } else {
-                        grow * 0.5
-                    };
-                    commands.spawn((
-                        Node {
-                            position_type: PositionType::Absolute,
-                            left: *left,
-                            top: *top,
-                            right: *right,
-                            bottom: *bottom,
-                            width: px(size + grow),
-                            height: px(size + grow),
-                            border_radius: BorderRadius::all(percent(50)),
-                            ..default()
-                        },
-                        UiTransform {
-                            translation: Val2::new(px(dx), px(dy)),
-                            ..default()
-                        },
-                        // Fully opaque, both layers: any alpha at all and
-                        // every overlap darkens like a Venn diagram.
-                        BackgroundColor(if pass == 0 {
-                            border.with_alpha(1.0)
-                        } else {
-                            theme::panel_bg().with_alpha(1.0)
-                        }),
-                        ChildOf(bubble),
-                    ));
-                }
-            }
-            // The cover: the box's own fill, laid over every lobe's
-            // inner half. Spawned after the lobes, before the words.
-            commands.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: px(1),
-                    top: px(1),
-                    right: px(1),
-                    bottom: px(1),
-                    border_radius: BorderRadius::all(px(13)),
-                    ..default()
-                },
-                BackgroundColor(theme::panel_bg().with_alpha(1.0)),
-                ChildOf(bubble),
-            ));
-            // The trail: detached circles shrinking down toward whoever
-            // is thinking it. These keep their full rings.
-            for (pc, hang, size) in [(46.0, 12.0, 10.0), (43.0, 22.0, 6.0)] {
+            // The classic trail: two shrinking discs stepping down toward
+            // the head — the comic-strip mark for "inner", one glance, four
+            // nodes where the old cloud spent ninety.
+            for (drop, size) in [(7.0_f32, 9.0_f32), (17.0, 6.0)] {
                 commands.spawn((
                     Node {
                         position_type: PositionType::Absolute,
-                        left: percent(pc),
-                        bottom: px(-hang),
+                        left: percent(50),
+                        bottom: px(-drop - size),
                         width: px(size),
                         height: px(size),
                         border: UiRect::all(px(1)),
                         border_radius: BorderRadius::all(percent(50)),
+                        ..default()
+                    },
+                    UiTransform {
+                        translation: Val2::new(percent(-50), px(0)),
                         ..default()
                     },
                     BackgroundColor(theme::panel_bg()),

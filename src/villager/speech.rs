@@ -205,6 +205,7 @@ pub(super) fn muse_the_watched(
         mind,
         heard: None,
         aloud: false,
+        prayer: false,
         known,
     });
 }
@@ -243,7 +244,7 @@ pub(super) fn show_musings(
         let Some(line) = tongue.take_musing(who) else {
             continue;
         };
-        let (line, aloud) = line;
+        let (line, aloud, prayer) = line;
         info!(
             "a watched head finds its own words{}: {line}",
             if aloud { ", aloud" } else { "" }
@@ -252,6 +253,7 @@ pub(super) fn show_musings(
             speaker: who,
             text: line.replace("the god", god),
             thought: !aloud,
+            prayer,
             own_words: true,
         });
         showed += 1;

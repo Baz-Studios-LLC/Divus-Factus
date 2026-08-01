@@ -423,6 +423,7 @@ pub(crate) fn hold_conversations(
                     },
                     heard: Some(told_plain.clone()),
                     aloud: true,
+                    prayer: false,
                     known,
                 });
             }
@@ -436,6 +437,7 @@ pub(crate) fn hold_conversations(
                     speaker: entity,
                     text: line.replace("the god", god),
                     thought: false,
+                    prayer: false,
                     own_words: true,
                 });
             }
@@ -492,6 +494,7 @@ pub(crate) fn hold_conversations(
                         speaker: entity,
                         text: line.replace("the god", god),
                         thought: false,
+                        prayer: false,
                         own_words: true,
                     });
                 }

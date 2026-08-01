@@ -217,6 +217,7 @@ pub(super) fn kneel(
                     mind: "you kneel and beg the god for food".into(),
                     heard: None,
                     aloud: false,
+                    prayer: true,
                     known: Vec::new(),
                 })
             })

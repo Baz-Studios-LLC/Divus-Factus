@@ -146,6 +146,7 @@ pub(super) fn mark_the_dead(
                             ),
                             heard: None,
                             aloud: false,
+                            prayer: false,
                             known: vec![person.name.clone()],
                         })
                     })

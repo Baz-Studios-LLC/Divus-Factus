@@ -591,6 +591,7 @@ fn drowning(
                     mind: "you are in deep water and cannot swim — cry for help".into(),
                     heard: None,
                     aloud: true,
+                    prayer: false,
                     known: Vec::new(),
                 });
             }
