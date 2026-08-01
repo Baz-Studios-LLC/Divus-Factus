@@ -34,10 +34,51 @@ pub enum PartKind {
         high: f32,
         lift: f32,
     },
-    Floor,
-    Roof,
+    Trim {
+        long: f32,
+        stone: bool,
+    },
+    Floor(f32, f32),
+    Foundation(f32, f32),
+    Roof(f32, f32),
+    /// The stretch tools: anchored with one click, drawn to size, set
+    /// with the next. They exist only in the hand - what they place are
+    /// the plain kinds above at the drawn size.
+    WallRun,
+    TrimRun {
+        stone: bool,
+    },
+    FloorRun,
+    FoundationRun,
+    RoofRun,
     Prop(&'static str),
     Widget(&'static str),
+}
+
+impl PartKind {
+    /// The runs stretch along one axis; the rect runs stretch two.
+    pub fn run_axes(&self) -> Option<u8> {
+        match self {
+            PartKind::WallRun | PartKind::TrimRun { .. } => Some(1),
+            PartKind::FloorRun | PartKind::FoundationRun | PartKind::RoofRun => Some(2),
+            _ => None,
+        }
+    }
+
+    /// What a run becomes at the drawn size.
+    pub fn run_made(&self, w: f32, d: f32) -> PartKind {
+        match self {
+            PartKind::WallRun => PartKind::Wall(w),
+            PartKind::TrimRun { stone } => PartKind::Trim {
+                long: w,
+                stone: *stone,
+            },
+            PartKind::FloorRun => PartKind::Floor(w, d),
+            PartKind::FoundationRun => PartKind::Foundation(w, d),
+            PartKind::RoofRun => PartKind::Roof(w, d),
+            other => *other,
+        }
+    }
 }
 
 /// A shelf entry: the name it wears, what it places, and the stage the
@@ -62,12 +103,15 @@ const fn prop(label: &'static str, name: &'static str) -> CatalogEntry {
 
 /// The shelf's drawers: each section opens and closes on its header.
 pub const STRUCTURE: &[CatalogEntry] = &[
-    structure("WALL, 1M", PartKind::Wall(1.0), "walls"),
+    structure("WALL, STRETCH", PartKind::WallRun, "walls"),
     structure("WALL, 2M", PartKind::Wall(2.0), "walls"),
-    structure("WALL, 4M", PartKind::Wall(4.0), "walls"),
     structure("CORNER POLE", PartKind::Prop("pole"), "frame"),
-    structure("TRIM, 2M", PartKind::Prop("trim"), "walls"),
-    structure("TRIM, STONE", PartKind::Prop("trim-stone"), "walls"),
+    structure("TRIM, STRETCH", PartKind::TrimRun { stone: false }, "walls"),
+    structure(
+        "TRIM STONE, STRETCH",
+        PartKind::TrimRun { stone: true },
+        "walls",
+    ),
     structure("TRIM CORNER", PartKind::Prop("trim-corner"), "walls"),
     structure(
         "TRIM CORNER, STONE",
@@ -76,10 +120,13 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     ),
     structure("DOOR", PartKind::Prop("door"), "walls"),
     structure("WINDOW", PartKind::Prop("window"), "walls"),
-    structure("FOUNDATION, 2M", PartKind::Prop("foundation"), "footing"),
+    structure("FOUNDATION, STRETCH", PartKind::FoundationRun, "footing"),
+    structure("FOUNDATION, 2M", PartKind::Foundation(2.0, 2.0), "footing"),
     structure("STONE STEPS", PartKind::Prop("steps"), "footing"),
-    structure("FLOOR, 2M", PartKind::Floor, "footing"),
-    structure("ROOF PANEL", PartKind::Roof, "roof"),
+    structure("FLOOR, STRETCH", PartKind::FloorRun, "footing"),
+    structure("FLOOR, 2M", PartKind::Floor(2.0, 2.0), "footing"),
+    structure("ROOF, STRETCH", PartKind::RoofRun, "roof"),
+    structure("ROOF PANEL", PartKind::Roof(2.2, 2.2), "roof"),
 ];
 
 pub const FURNITURE: &[CatalogEntry] = &[
@@ -153,6 +200,16 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         )
     };
     let mut slabs = match kind {
+        PartKind::WallRun => vec![slab(
+            0.0,
+            WALL_HIGH * 0.5,
+            0.0,
+            0.25,
+            WALL_HIGH,
+            WALL_THICK,
+            "wood",
+            0.7,
+        )],
         PartKind::Wall(length) => vec![slab(
             0.0,
             WALL_HIGH * 0.5,
@@ -173,8 +230,32 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             "wood",
             0.7,
         )],
-        PartKind::Floor => vec![slab(0.0, 0.06, 0.0, 2.0, 0.12, 2.0, "wood", 0.5)],
-        PartKind::Roof => vec![slab(0.0, 0.07, 0.0, 2.2, 0.14, 2.2, "earth", 0.4)],
+        PartKind::Floor(w, d) => vec![slab(0.0, 0.06, 0.0, *w, 0.12, *d, "wood", 0.5)],
+        PartKind::FloorRun => vec![slab(0.0, 0.06, 0.0, 0.25, 0.12, 0.25, "wood", 0.5)],
+        PartKind::Foundation(w, d) => {
+            vec![slab(0.0, 0.175, 0.0, *w, 0.35, *d, "stone", 0.55)]
+        }
+        PartKind::FoundationRun => {
+            vec![slab(0.0, 0.175, 0.0, 0.25, 0.35, 0.25, "stone", 0.55)]
+        }
+        PartKind::Roof(w, d) => vec![slab(0.0, 0.07, 0.0, *w, 0.14, *d, "earth", 0.4)],
+        PartKind::RoofRun => vec![slab(0.0, 0.07, 0.0, 0.25, 0.14, 0.25, "earth", 0.4)],
+        PartKind::Trim { long, stone } => {
+            let (ramp, shade) = if *stone {
+                ("stone", 0.55)
+            } else {
+                ("wood", 0.5)
+            };
+            vec![slab(0.0, 0.15, 0.0, *long, 0.3, 0.125, ramp, shade)]
+        }
+        PartKind::TrimRun { stone } => {
+            let (ramp, shade) = if *stone {
+                ("stone", 0.55)
+            } else {
+                ("wood", 0.5)
+            };
+            vec![slab(0.0, 0.15, 0.0, 0.25, 0.3, 0.125, ramp, shade)]
+        }
         PartKind::Prop("bed") => vec![
             // The game's own bed: frame, mattress, pillow at +Z (the head).
             slab(0.0, 0.26, 0.0, 0.76, 0.24, 1.64, "wood", 0.55),
@@ -313,16 +394,6 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(0.0, 1.35, 0.02, 0.05, 0.92, 0.04, "wood", 0.5),
             slab(0.0, 1.35, 0.02, 0.92, 0.05, 0.04, "wood", 0.5),
         ],
-        PartKind::Prop("trim") => vec![
-            // The fascia strip: half a wall thick - skirt a seam, dress an
-            // edge, or stack a course of them into a stepped footing.
-            slab(0.0, 0.15, 0.0, 2.0, 0.3, 0.125, "wood", 0.5),
-        ],
-        PartKind::Prop("trim-stone") => vec![
-            // The mason's fascia: the same strip cut in stone, for water
-            // tables, footing courses and dressed edges.
-            slab(0.0, 0.15, 0.0, 2.0, 0.3, 0.125, "stone", 0.55),
-        ],
         PartKind::Prop("trim-corner") => vec![
             // An L that wraps an outside corner: two legs meeting at the
             // origin, turned to face with R. Runs of straight trim meet
@@ -333,11 +404,6 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         PartKind::Prop("trim-corner-stone") => vec![
             slab(0.1875, 0.15, 0.0, 0.375, 0.3, 0.125, "stone", 0.55),
             slab(0.0, 0.15, 0.1875, 0.125, 0.3, 0.375, "stone", 0.55),
-        ],
-        PartKind::Prop("foundation") => vec![
-            // The game's plinth height exactly: houses stand on these, and
-            // the stone steps below reach their top in one flight.
-            slab(0.0, 0.175, 0.0, 2.0, 0.35, 2.0, "stone", 0.55),
         ],
         PartKind::Prop("steps") => vec![
             // Three treads rising the plinth's 0.35, approached from +X.
@@ -457,6 +523,8 @@ pub struct Ghost;
 #[derive(Resource, Default)]
 pub struct Hand {
     pub kind: Option<PartKind>,
+    /// A stretch wall's anchored start, once the first click lands.
+    pub anchor: Option<Vec3>,
     pub stage: String,
     pub yaw: f32,
     pub tilt: f32,
@@ -469,6 +537,7 @@ impl Hand {
     fn filled(kind: PartKind, stage: String) -> Self {
         Hand {
             kind: Some(kind),
+            anchor: None,
             stage,
             shade: 0.7,
             ..default()
@@ -628,8 +697,21 @@ fn part_name(kind: &PartKind) -> String {
     match kind {
         PartKind::Wall(len) => format!("wall-{len}"),
         PartKind::Seg { long, high, lift } => format!("wallseg-{long}x{high}@{lift}"),
-        PartKind::Floor => "floor".to_string(),
-        PartKind::Roof => "roof".to_string(),
+        PartKind::Trim { long, stone } => {
+            if *stone {
+                format!("trimstone-{long}")
+            } else {
+                format!("trim-{long}")
+            }
+        }
+        PartKind::Floor(w, d) => format!("floor-{w}x{d}"),
+        PartKind::Foundation(w, d) => format!("foundation-{w}x{d}"),
+        PartKind::Roof(w, d) => format!("roof-{w}x{d}"),
+        PartKind::WallRun
+        | PartKind::TrimRun { .. }
+        | PartKind::FloorRun
+        | PartKind::FoundationRun
+        | PartKind::RoofRun => "run".to_string(),
         PartKind::Prop(name) => format!("prop:{name}"),
         PartKind::Widget(name) => format!("widget:{name}"),
     }
@@ -638,6 +720,27 @@ fn part_name(kind: &PartKind) -> String {
 fn kind_from_name(name: &str) -> Option<PartKind> {
     if let Some(rest) = name.strip_prefix("wall-") {
         return rest.parse::<f32>().ok().map(PartKind::Wall);
+    }
+    if let Some(rest) = name.strip_prefix("trimstone-") {
+        return rest
+            .parse::<f32>()
+            .ok()
+            .map(|long| PartKind::Trim { long, stone: true });
+    }
+    if let Some(rest) = name.strip_prefix("trim-") {
+        return rest
+            .parse::<f32>()
+            .ok()
+            .map(|long| PartKind::Trim { long, stone: false });
+    }
+    if let Some(rest) = name.strip_prefix("floor-") {
+        return sides_of(rest).map(|(w, d)| PartKind::Floor(w, d));
+    }
+    if let Some(rest) = name.strip_prefix("foundation-") {
+        return sides_of(rest).map(|(w, d)| PartKind::Foundation(w, d));
+    }
+    if let Some(rest) = name.strip_prefix("roof-") {
+        return sides_of(rest).map(|(w, d)| PartKind::Roof(w, d));
     }
     if let Some(rest) = name.strip_prefix("wallseg-") {
         let (long, rest) = rest.split_once('x')?;
@@ -665,10 +768,26 @@ fn kind_from_name(name: &str) -> Option<PartKind> {
             .map(|(w, _, _)| PartKind::Widget(w));
     }
     match name {
-        "floor" => Some(PartKind::Floor),
-        "roof" => Some(PartKind::Roof),
+        // Legacy names from before the primitives learned their sizes.
+        "floor" => Some(PartKind::Floor(2.0, 2.0)),
+        "roof" => Some(PartKind::Roof(2.2, 2.2)),
+        "prop:foundation" => Some(PartKind::Foundation(2.0, 2.0)),
+        "prop:trim" => Some(PartKind::Trim {
+            long: 2.0,
+            stone: false,
+        }),
+        "prop:trim-stone" => Some(PartKind::Trim {
+            long: 2.0,
+            stone: true,
+        }),
         _ => None,
     }
+}
+
+/// Splits "3x4.5" into its two sides.
+fn sides_of(text: &str) -> Option<(f32, f32)> {
+    let (w, d) = text.split_once('x')?;
+    Some((w.parse().ok()?, d.parse().ok()?))
 }
 
 /// Spawns a part's boxes under one root. Widgets go translucent.
@@ -1241,9 +1360,13 @@ fn steer_hand(
         return;
     }
     if keys.just_pressed(KeyCode::Escape) {
-        *hand = Hand::default();
-        for ghost in &ghosts {
-            commands.entity(ghost).despawn();
+        if hand.anchor.is_some() {
+            hand.anchor = None;
+        } else {
+            *hand = Hand::default();
+            for ghost in &ghosts {
+                commands.entity(ghost).despawn();
+            }
         }
         return;
     }
@@ -1321,9 +1444,14 @@ fn is_structure(kind: &PartKind) -> bool {
         kind,
         PartKind::Wall(_)
             | PartKind::Seg { .. }
-            | PartKind::Floor
-            | PartKind::Roof
-            | PartKind::Prop("foundation")
+            | PartKind::Floor(..)
+            | PartKind::FloorRun
+            | PartKind::Foundation(..)
+            | PartKind::FoundationRun
+            | PartKind::Roof(..)
+            | PartKind::RoofRun
+            | PartKind::Trim { .. }
+            | PartKind::TrimRun { .. }
             | PartKind::Prop("steps")
             | PartKind::Prop("pole")
     )
@@ -1415,7 +1543,7 @@ fn platform_rects(
         let Some(kind) = kind_from_name(&record.part) else {
             continue;
         };
-        if !matches!(kind, PartKind::Floor | PartKind::Prop("foundation")) {
+        if !matches!(kind, PartKind::Floor(..) | PartKind::Foundation(..)) {
             continue;
         }
         let mut low = Vec3::splat(f32::INFINITY);
@@ -1460,6 +1588,7 @@ fn wall_ends(placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>) -> V
 
 #[allow(clippy::too_many_arguments)]
 fn move_ghost(
+    mut commands: Commands,
     bench: Res<Bench>,
     hand: Res<Hand>,
     mode: Res<SnapMode>,
@@ -1470,7 +1599,10 @@ fn move_ghost(
     windows: Query<&Window>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     placed: Query<(Entity, &Transform, &Placed), Without<Ghost>>,
-    mut ghosts: Query<&mut Transform, With<Ghost>>,
+    mut ghosts: Query<(Entity, &mut Transform, &Placed), With<Ghost>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    palette: Res<Palette>,
 ) {
     if *bench != Bench::Builder {
         return;
@@ -1494,6 +1626,90 @@ fn move_ghost(
     let Some(kind_now) = hand.kind else {
         return;
     };
+
+    // A stretch tool with its anchor down draws itself from the anchor
+    // to the cursor and listens to nothing else.
+    if let Some(axes) = kind_now.run_axes()
+        && let Some(anchor) = hand.anchor
+    {
+        let Some(point) = cursor_point(&windows, &cameras, anchor.y) else {
+            return;
+        };
+        let grid = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
+            20.0
+        } else {
+            4.0
+        };
+        let to = Vec3::new(
+            (point.x * grid).round() / grid,
+            anchor.y,
+            (point.z * grid).round() / grid,
+        );
+        let reach = to - anchor;
+        let (made, centre, yaw) = if axes == 1 {
+            let on_x = reach.x.abs() >= reach.z.abs();
+            let signed = if on_x { reach.x } else { reach.z };
+            let long = signed.abs().max(0.25);
+            let dir = if on_x {
+                Vec3::X * signed.signum()
+            } else {
+                Vec3::Z * signed.signum()
+            };
+            (
+                kind_now.run_made(long, 0.0),
+                anchor + dir * (long * 0.5),
+                if on_x {
+                    0.0
+                } else {
+                    std::f32::consts::FRAC_PI_2
+                },
+            )
+        } else {
+            let w = reach.x.abs().max(0.25);
+            let d = reach.z.abs().max(0.25);
+            (
+                kind_now.run_made(w, d),
+                anchor + Vec3::new(w * 0.5 * reach.x.signum(), 0.0, d * 0.5 * reach.z.signum()),
+                0.0,
+            )
+        };
+        let record = Placed {
+            part: part_name(&made),
+            at: centre.into(),
+            yaw,
+            tilt: 0.0,
+            ramp: hand.ramp.clone(),
+            shade: hand.shade,
+            stage: hand.stage.clone(),
+        };
+        // Redraw only when the drawn size changed; otherwise carry the
+        // ghost along.
+        let stale = ghosts
+            .iter()
+            .next()
+            .map(|(_, _, held)| held.part != record.part)
+            .unwrap_or(true);
+        if stale {
+            for (ghost, _, _) in &ghosts {
+                commands.entity(ghost).despawn();
+            }
+            spawn_part(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &palette,
+                &made,
+                &record,
+                true,
+            );
+        } else {
+            for (_, mut transform, _) in &mut ghosts {
+                transform.translation = centre;
+                transform.rotation = Quat::from_rotation_y(yaw);
+            }
+        }
+        return;
+    }
 
     // Face-aware placement: the part clings to the face the cursor
     // points at. A side is clung to flush at the aimed course and is
@@ -1541,7 +1757,7 @@ fn move_ghost(
                 course + hand.lift,
                 (anchor + hit.normal * reach).z,
             );
-            for mut transform in &mut ghosts {
+            for (_, mut transform, _) in &mut ghosts {
                 transform.translation = snapped;
                 transform.rotation =
                     Quat::from_rotation_y(hand.yaw) * Quat::from_rotation_x(hand.tilt);
@@ -1712,7 +1928,7 @@ fn move_ghost(
     let support = support_height(&placed, &samples, is_structure(&kind), None);
     snapped.y = support + hand.lift;
 
-    for mut transform in &mut ghosts {
+    for (_, mut transform, _) in &mut ghosts {
         transform.translation = snapped;
         transform.rotation = Quat::from_rotation_y(hand.yaw) * Quat::from_rotation_x(hand.tilt);
     }
@@ -1920,7 +2136,7 @@ fn place_grab_remove(
     mut hand: ResMut<Hand>,
     palette: Res<Palette>,
     ghosts: Query<Entity, With<Ghost>>,
-    ghost_spots: Query<&Transform, With<Ghost>>,
+    ghost_spots: Query<(&Transform, &Placed), With<Ghost>>,
     placed: Query<(Entity, &Transform, &Placed), Without<Ghost>>,
     hovers: Query<&Interaction>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -1936,6 +2152,36 @@ fn place_grab_remove(
 
     if buttons.just_pressed(MouseButton::Left) && !over_ui {
         if let Some(kind) = hand.kind {
+            // A stretch tool: the first click sets the anchor where the
+            // stub stands; the next makes the drawn part real. A wall run
+            // chains - the far end becomes the next anchor - while rects
+            // rest after each one.
+            if kind.run_axes().is_some() {
+                if hand.anchor.is_none() {
+                    if let Some((ghost_at, _)) = ghost_spots.iter().next() {
+                        hand.anchor = Some(ghost_at.translation);
+                    }
+                } else if let Some((ghost_at, drawn)) = ghost_spots.iter().next()
+                    && let Some(made) = kind_from_name(&drawn.part)
+                {
+                    spawn_part(
+                        &mut commands,
+                        &mut meshes,
+                        &mut materials,
+                        &palette,
+                        &made,
+                        drawn,
+                        false,
+                    );
+                    hand.anchor = if kind.run_axes() == Some(1) {
+                        hand.anchor
+                            .map(|anchor| ghost_at.translation * 2.0 - anchor)
+                    } else {
+                        None
+                    };
+                }
+                return;
+            }
             // Doors and windows would rather punch through a wall than
             // stand alone: if one lands on a wall, the wall parts around
             // the opening and the frame settles in.
@@ -1945,7 +2191,7 @@ fn place_grab_remove(
                 _ => None,
             };
             let punched = if let Some((wide, head, sill, is_door)) = opening
-                && let Some(ghost_at) = ghost_spots.iter().next()
+                && let Some((ghost_at, _)) = ghost_spots.iter().next()
             {
                 punch_wall(
                     &mut commands,
@@ -1965,7 +2211,7 @@ fn place_grab_remove(
             };
             // Setting down (a punch already set the frame itself).
             if !punched
-                && let Some(ghost_at) = ghost_spots.iter().next()
+                && let Some((ghost_at, _)) = ghost_spots.iter().next()
                 && let Some(record) = hand.record(ghost_at.translation)
             {
                 spawn_part(
@@ -1994,6 +2240,7 @@ fn place_grab_remove(
             );
             *hand = Hand {
                 kind: Some(kind),
+                anchor: None,
                 stage: record.stage.clone(),
                 yaw: record.yaw,
                 tilt: record.tilt,
