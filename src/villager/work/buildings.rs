@@ -598,6 +598,17 @@ pub struct Hut;
 #[derive(Component)]
 pub struct RoofPart;
 
+/// The walls of a walkable interior: footprint half-extents in the
+/// building's own space, and the door gaps along the +X wall (as local Z
+/// offsets). The router steers any walk that crosses these walls through a
+/// door instead — villagers use doors now that insides are real places.
+#[derive(Component)]
+pub struct Shell {
+    pub half_w: f32,
+    pub half_d: f32,
+    pub doors_z: Vec<f32>,
+}
+
 /// One bed inside a home, numbered so each occupant owns theirs. The count
 /// is the capacity constant made physical: a house sleeps HOUSE_CAPACITY,
 /// a longhouse LONGHOUSE_CAPACITY, and the furniture cannot drift from the

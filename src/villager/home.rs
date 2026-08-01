@@ -99,6 +99,64 @@ pub struct Abed {
     pub facing: Quat,
 }
 
+/// Bends any walk that crosses a home's walls through its doorway.
+///
+/// No collision, no navmesh: the only solid architecture a villager enters
+/// is a home, and a home has one wall of doors. A walker whose goal is on
+/// the other side of the shell aims first for the outside of the nearest
+/// door, then the inside of it, then their true goal — and because every
+/// target-setter runs each frame, this runs after them and quietly rewrites
+/// the leg without any of them knowing.
+pub(super) fn use_doors(
+    shells: Query<(&Transform, &super::work::Shell), Without<Villager>>,
+    mut walkers: Query<
+        (&Transform, &mut MoveTarget),
+        (
+            With<Villager>,
+            Without<Held>,
+            Without<Airborne>,
+            Without<Corpse>,
+            Without<Abed>,
+        ),
+    >,
+) {
+    for (at, mut target) in &mut walkers {
+        let Some(goal) = target.0 else {
+            continue;
+        };
+        for (site, shell) in &shells {
+            let inv = site.rotation.inverse();
+            let me = inv * (at.translation - site.translation);
+            let to = inv * (goal - site.translation);
+            let inside =
+                |p: Vec3| p.x.abs() < shell.half_w + 0.15 && p.z.abs() < shell.half_d + 0.15;
+            let (im, it) = (inside(me), inside(to));
+            if im == it {
+                continue;
+            }
+            // The nearest door along the +X wall.
+            let door_z = shell
+                .doors_z
+                .iter()
+                .copied()
+                .min_by(|a, b| (a - me.z).abs().total_cmp(&(b - me.z).abs()))
+                .unwrap_or(0.0);
+            let outer = Vec3::new(shell.half_w + 0.9, 0.0, door_z);
+            let inner = Vec3::new(shell.half_w - 0.9, 0.0, door_z);
+            let near = if im { inner } else { outer };
+            let far = if im { outer } else { inner };
+            let leg = if (me - near).with_y(0.0).length() < 0.9 {
+                far
+            } else {
+                near
+            };
+            let world = site.translation + site.rotation * leg;
+            target.0 = Some(Vec3::new(world.x, goal.y, world.z));
+            break;
+        }
+    }
+}
+
 /// Deals every housed villager a numbered berth, lowest free first.
 /// Runs on anyone whose home just changed, so a rehoming re-deals.
 pub(super) fn assign_beds(

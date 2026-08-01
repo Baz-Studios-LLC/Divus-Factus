@@ -198,6 +198,7 @@ impl Plugin for VillagerPlugin {
                         home::tavern_cheer,
                         home::tend_fire,
                         home::night_routine,
+                        home::use_doors,
                         home::weariness,
                         home::burn,
                         home::rouse_the_taken,
