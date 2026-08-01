@@ -1099,6 +1099,8 @@ fn raise_shelf(
             },
             BackgroundColor(theme::panel_bg()),
             BorderColor::all(theme::panel_border(&palette)),
+            crate::look::Scrollable,
+            bevy::ui::ScrollPosition::default(),
         ))
         .id();
 

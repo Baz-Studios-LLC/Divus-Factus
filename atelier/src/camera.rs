@@ -61,6 +61,7 @@ fn steer(
     keys: Res<ButtonInput<KeyCode>>,
     naming: Res<crate::builder::Naming>,
     dims: Res<crate::builder::DimsEntry>,
+    over_pane: Res<crate::look::OverPane>,
     buttons: Res<ButtonInput<MouseButton>>,
     motion: Res<AccumulatedMouseMotion>,
     scroll: Res<AccumulatedMouseScroll>,
@@ -124,8 +125,9 @@ fn steer(
         rig.focus += pan.normalize() * speed;
     }
 
-    // The wheel draws near and pulls away.
-    if scroll.delta.y != 0.0 {
+    // The wheel draws near and pulls away - unless the cursor is over a
+    // pane, where the wheel belongs to the list.
+    if scroll.delta.y != 0.0 && !over_pane.0 {
         rig.distance = (rig.distance * (1.0 - scroll.delta.y * 0.08)).clamp(3.0, 60.0);
     }
 }

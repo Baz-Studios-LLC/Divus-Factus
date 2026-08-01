@@ -77,6 +77,57 @@ pub mod theme {
     }
 }
 
+/// A pane the wheel scrolls when the cursor is over it.
+#[derive(Component)]
+pub struct Scrollable;
+
+/// Wheel over a scrollable pane walks it, and says so, so the camera
+/// knows to keep its hands off the zoom.
+pub fn scroll_panes(
+    wheel: Res<bevy::input::mouse::AccumulatedMouseScroll>,
+    windows: Query<&Window>,
+    mut panes: Query<
+        (
+            &ComputedNode,
+            &UiGlobalTransform,
+            &InheritedVisibility,
+            &mut ScrollPosition,
+        ),
+        With<Scrollable>,
+    >,
+    mut over_pane: ResMut<OverPane>,
+) {
+    let cursor = windows
+        .iter()
+        .next()
+        .and_then(|window| window.cursor_position());
+    over_pane.0 = false;
+    let Some(cursor) = cursor else {
+        return;
+    };
+    // Hit-tested by geometry, not by hover: a button inside the pane
+    // would otherwise swallow the wheel.
+    for (computed, transform, visibility, mut scroll) in &mut panes {
+        if !visibility.get() {
+            continue;
+        }
+        let scale = computed.inverse_scale_factor();
+        let centre = Vec2::new(transform.translation.x, transform.translation.y) * scale;
+        let half = computed.size() * scale * 0.5;
+        if (cursor.x - centre.x).abs() <= half.x && (cursor.y - centre.y).abs() <= half.y {
+            over_pane.0 = true;
+            if wheel.delta.y != 0.0 {
+                scroll.0.y -= wheel.delta.y * 22.0;
+            }
+        }
+    }
+}
+
+/// Whether the cursor rests over a scrollable pane - the camera reads
+/// this and leaves the wheel alone.
+#[derive(Resource, Default)]
+pub struct OverPane(pub bool);
+
 /// Display and body faces, the game's own.
 #[derive(Resource)]
 pub struct Fonts {
@@ -90,7 +141,9 @@ impl Plugin for LookPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(load_palette())
             .insert_resource(ClearColor(Color::srgb(0.035, 0.04, 0.05)))
-            .add_systems(PreStartup, load_fonts);
+            .init_resource::<OverPane>()
+            .add_systems(PreStartup, load_fonts)
+            .add_systems(Update, scroll_panes);
     }
 }
 

@@ -1037,6 +1037,104 @@
       "shade": 0.7,
       "stage": "walls",
       "flip": false
+    },
+    {
+      "part": "prop:pole",
+      "at": [
+        -0.062499523,
+        0.375,
+        4.8125
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false
+    },
+    {
+      "part": "prop:pole",
+      "at": [
+        -3.9375,
+        0.375,
+        4.8125
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false
+    },
+    {
+      "part": "prop:pole",
+      "at": [
+        -0.125,
+        0.375,
+        -0.25
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false
+    },
+    {
+      "part": "prop:pole",
+      "at": [
+        -0.125,
+        0.375,
+        1.625
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false
+    },
+    {
+      "part": "prop:pole",
+      "at": [
+        -0.0625,
+        0.375,
+        -4.9375
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false
+    },
+    {
+      "part": "prop:pole",
+      "at": [
+        -7.3124995,
+        0.375,
+        -0.0625
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false
+    },
+    {
+      "part": "prop:pole",
+      "at": [
+        -7.3125,
+        0.375,
+        -4.9375
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false
     }
   ]
 }

@@ -109,6 +109,8 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
             },
             BackgroundColor(theme::panel_bg()),
             BorderColor::all(theme::panel_border(&palette)),
+            crate::look::Scrollable,
+            bevy::ui::ScrollPosition::default(),
         ))
         .id();
 
