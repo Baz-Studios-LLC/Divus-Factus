@@ -380,6 +380,16 @@ struct TemplateButton(&'static str);
 #[derive(Component)]
 struct LoadFileButton(std::path::PathBuf);
 
+/// The small x beside a saved work: pressed once it asks, pressed again
+/// while asking it deletes the file and the row.
+#[derive(Component)]
+struct DeleteFileButton {
+    path: std::path::PathBuf,
+    row: Entity,
+    /// Pressed once, the button stays armed until this moment passes.
+    armed_until: f32,
+}
+
 /// The button that writes a numbered copy that nothing ever overwrites.
 #[derive(Component)]
 struct ExportButton;
@@ -456,6 +466,7 @@ impl Plugin for BuilderPlugin {
                     place_grab_remove,
                     save_workbench,
                     take_the_name,
+                    bury_saved_work,
                     settle_words,
                 )
                     .chain(),
@@ -644,13 +655,12 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
                 .file_stem()
                 .map(|stem| stem.to_string_lossy().to_uppercase())
                 .unwrap_or_default();
-            let button = plain_button(&mut commands, &palette, saved);
-            commands.entity(button).insert(LoadFileButton(path));
-            button_label(
+            saved_work_row(
                 &mut commands,
                 &fonts,
                 &palette,
-                button,
+                saved,
+                path,
                 Box::leak(label.into_boxed_str()),
             );
         }
@@ -791,6 +801,72 @@ fn drawer(
         open,
     });
     body
+}
+
+/// A saved-work row: the load button, and the small x that buries it.
+fn saved_work_row(
+    commands: &mut Commands,
+    fonts: &Fonts,
+    palette: &Palette,
+    drawer_body: Entity,
+    path: std::path::PathBuf,
+    label: &'static str,
+) {
+    let row = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(3.0),
+                align_items: AlignItems::Stretch,
+                ..default()
+            },
+            ChildOf(drawer_body),
+        ))
+        .id();
+    let load = commands
+        .spawn((
+            LoadFileButton(path.clone()),
+            Interaction::default(),
+            Node {
+                flex_grow: 1.0,
+                padding: UiRect::axes(Val::Px(9.0), Val::Px(4.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.18)),
+            BorderColor::all(theme::panel_border(palette)),
+            ChildOf(row),
+        ))
+        .id();
+    button_label(commands, fonts, palette, load, label);
+    let bury = commands
+        .spawn((
+            DeleteFileButton {
+                path,
+                row,
+                armed_until: 0.0,
+            },
+            Interaction::default(),
+            Node {
+                padding: UiRect::axes(Val::Px(7.0), Val::Px(4.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.18)),
+            BorderColor::all(theme::panel_border(palette).with_alpha(0.25)),
+            ChildOf(row),
+        ))
+        .id();
+    commands.spawn((
+        Text::new("x"),
+        TextFont {
+            font_size: FontSize::Px(10.0),
+            ..default()
+        },
+        TextColor(theme::text_dim(palette).with_alpha(0.7)),
+        ChildOf(bury),
+    ));
 }
 
 fn plain_button(commands: &mut Commands, palette: &Palette, parent: Entity) -> Entity {
@@ -1632,13 +1708,12 @@ fn take_the_name(
                     });
                 }
                 if let Some(saved_drawer) = saved_drawer.as_deref() {
-                    let button = plain_button(&mut commands, &palette, saved_drawer.0);
-                    commands.entity(button).insert(LoadFileButton(path));
-                    button_label(
+                    saved_work_row(
                         &mut commands,
                         &fonts,
                         &palette,
-                        button,
+                        saved_drawer.0,
+                        path,
                         Box::leak(stem.to_uppercase().into_boxed_str()),
                     );
                 }
@@ -1648,6 +1723,53 @@ fn take_the_name(
     naming.0 = None;
     for card in &cards {
         commands.entity(card).despawn();
+    }
+}
+
+/// The x beside a saved work: the first press asks, the second buries.
+/// An unanswered question calms back down on its own.
+fn bury_saved_work(
+    mut commands: Commands,
+    time: Res<Time>,
+    palette: Res<Palette>,
+    mut buttons: Query<(
+        &mut DeleteFileButton,
+        &Interaction,
+        &mut BorderColor,
+        &Children,
+    )>,
+    mut labels: Query<&mut Text>,
+) {
+    let now = time.elapsed_secs();
+    for (mut bury, interaction, mut border, children) in &mut buttons {
+        let armed = now < bury.armed_until;
+        let pressed = *interaction == Interaction::Pressed;
+        if pressed && armed {
+            let _ = std::fs::remove_file(&bury.path);
+            info!("buried {}", bury.path.display());
+            commands.entity(bury.row).despawn();
+            continue;
+        }
+        if pressed && !armed {
+            bury.armed_until = now + 2.5;
+        }
+        let asking = now < bury.armed_until;
+        let (word, dress) = if asking {
+            ("sure?", theme::accent(&palette))
+        } else {
+            ("x", theme::panel_border(&palette).with_alpha(0.25))
+        };
+        let fresh = BorderColor::all(dress);
+        if *border != fresh {
+            *border = fresh;
+        }
+        for &child in children {
+            if let Ok(mut text) = labels.get_mut(child)
+                && text.0 != word
+            {
+                *text = Text::new(word);
+            }
+        }
     }
 }
 
