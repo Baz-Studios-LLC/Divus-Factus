@@ -83,7 +83,7 @@ fn spawn_date_card(mut commands: Commands) {
         .id();
     commands.spawn((
         DateBig,
-        DisplayFace,
+        DisplayBoldFace,
         Text::new(""),
         TextFont {
             font_size: FontSize::Px(36.0),
@@ -1848,6 +1848,10 @@ pub fn title_sized(text: impl Into<String>, size: f32) -> impl Bundle {
 #[derive(Component)]
 pub struct DisplayFace;
 
+/// The flourished bold display face — Cinzel Decorative.
+#[derive(Component)]
+pub struct DisplayBoldFace;
+
 /// Marks text that speaks in the reading face - EB Garamond, the warm
 /// serif - for labels, values and running words on the panels.
 #[derive(Component)]
@@ -1857,12 +1861,16 @@ pub struct SerifFace;
 #[derive(Resource)]
 pub struct Fonts {
     pub display: Handle<Font>,
+    /// Cinzel Decorative Bold: the flourished capitals, for the few places
+    /// that carry a heading alone — the date plaque wears it.
+    pub display_bold: Handle<Font>,
     pub text: Handle<Font>,
 }
 
 pub(crate) fn load_fonts(mut commands: Commands, assets: Res<AssetServer>) {
     commands.insert_resource(Fonts {
         display: assets.load("fonts/Cinzel.ttf"),
+        display_bold: assets.load("fonts/CinzelDecorative-Bold.ttf"),
         text: assets.load("fonts/EBGaramond.ttf"),
     });
 }
@@ -1873,13 +1881,24 @@ pub(crate) fn load_fonts(mut commands: Commands, assets: Res<AssetServer>) {
 pub(crate) fn dress_display_text(
     fonts: Option<Res<Fonts>>,
     mut fresh: Query<&mut TextFont, Added<DisplayFace>>,
-    mut prose: Query<&mut TextFont, (Added<SerifFace>, Without<DisplayFace>)>,
+    mut bold: Query<&mut TextFont, (Added<DisplayBoldFace>, Without<DisplayFace>)>,
+    mut prose: Query<
+        &mut TextFont,
+        (
+            Added<SerifFace>,
+            Without<DisplayFace>,
+            Without<DisplayBoldFace>,
+        ),
+    >,
 ) {
     let Some(fonts) = fonts else {
         return;
     };
     for mut font in &mut fresh {
         font.font = fonts.display.clone().into();
+    }
+    for mut font in &mut bold {
+        font.font = fonts.display_bold.clone().into();
     }
     for mut font in &mut prose {
         font.font = fonts.text.clone().into();
