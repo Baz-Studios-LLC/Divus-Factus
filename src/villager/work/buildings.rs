@@ -762,10 +762,26 @@ pub(crate) fn open_boardwalks(
     }
 }
 
+/// How many visible steps a building rises through. Three for the
+/// village's own hand - footing, walls, roof - and four for a carried-in
+/// house that was drawn with a frame, so its posts stand alone on the
+/// footing for a while, the way a real house is raised.
+pub fn steps_for(plan: &Blueprint) -> u8 {
+    if plan.kind == BuildingKind::House
+        && let Some(work) = super::baked::house()
+        && super::baked::has_frame(work)
+    {
+        4
+    } else {
+        3
+    }
+}
+
 /// Which visual stage a build should show, at `progress` timber toward a
-/// total `cost`: frame, walls, roof, at thirds of the way.
-pub fn stage_for(progress: f32, cost: f32) -> u8 {
-    ((progress / cost.max(1.0) * 3.0) as u8).min(2)
+/// total `cost`, over `steps` steps: the stages land at even shares of
+/// the whole, whatever the kind's cost and however many steps it has.
+pub fn stage_for(progress: f32, cost: f32, steps: u8) -> u8 {
+    ((progress / cost.max(1.0) * steps as f32) as u8).min(steps - 1)
 }
 
 /// The pitch every gabled roof in the world is cut to, in radians.

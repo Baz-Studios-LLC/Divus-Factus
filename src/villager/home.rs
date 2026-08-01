@@ -91,10 +91,6 @@ pub struct Firelight;
 #[derive(Component, Debug, Clone, Copy)]
 pub struct BedSlot(pub u8);
 
-/// Which half of a double bed is theirs: -1 or +1 across the mattress.
-#[derive(Component)]
-pub struct BedSide(pub f32);
-
 /// Lying in bed: the pose held until morning. Enforced every frame, because
 /// the idle animation would otherwise stand the sleeper back up.
 #[derive(Component)]
@@ -178,7 +174,7 @@ pub(super) fn assign_beds(
         ),
         (With<Villager>, Changed<Home>),
     >,
-    held: Query<(Entity, &Home, &BedSlot, Option<&BedSide>), With<Villager>>,
+    held: Query<(Entity, &Home, &BedSlot), With<Villager>>,
     kinds: Query<Has<Longhouse>, Or<(With<Hut>, With<Longhouse>)>>,
     beds: Query<(&ChildOf, &Bed)>,
 ) {
@@ -186,77 +182,61 @@ pub(super) fn assign_beds(
     // command-inserted slots are not visible until the next — so the deals
     // made THIS run must be remembered here, or everyone sees an empty
     // house and takes bed zero together.
-    let mut dealt: std::collections::HashMap<Entity, Vec<(u8, f32)>> =
-        std::collections::HashMap::new();
+    let mut dealt: std::collections::HashMap<Entity, Vec<u8>> = std::collections::HashMap::new();
     // The wedded go first, so the pair has claimed the marriage bed
     // before the household's singles spread across the room.
     let mut queue: Vec<_> = movers.iter().collect();
     queue.sort_by_key(|(_, _, _, spouse)| spouse.is_none());
     for (mover, home, child, spouse) in queue {
-        let capacity = match kinds.get(home.0) {
-            Ok(true) => LONGHOUSE_CAPACITY,
-            Ok(false) => HOUSE_CAPACITY,
-            Err(_) => continue,
-        } as u8;
-        // The doubles under this roof, by slot number.
-        let doubles: Vec<u8> = beds
-            .iter()
-            .filter(|(parent, bed)| parent.parent() == home.0 && bed.double)
-            .map(|(_, bed)| bed.slot)
-            .collect();
-        let mut taken: Vec<(u8, f32)> = held
-            .iter()
-            .filter(|(other, theirs, _, _)| *other != mover && theirs.0 == home.0)
-            .map(|(_, _, slot, side)| (slot.0, side.map(|s| s.0).unwrap_or(0.0)))
-            .collect();
-        taken.extend(dealt.get(&home.0).into_iter().flatten().copied());
-        let count =
-            |slot: u8, taken: &[(u8, f32)]| taken.iter().filter(|(held, _)| *held == slot).count();
-
-        // A married grown-up joins their spouse in the double, or opens
-        // one for the two of them.
-        if !child && let Some(super::Spouse(partner)) = spouse {
-            let partners = held
-                .iter()
-                .find(|(who, theirs, _, _)| *who == *partner && theirs.0 == home.0);
-            if let Some((_, _, slot, side)) = partners
-                && doubles.contains(&slot.0)
-                && count(slot.0, &taken) < 2
-            {
-                let side = -side.map(|s| s.0).unwrap_or(1.0);
-                dealt.entry(home.0).or_default().push((slot.0, side));
-                commands
-                    .entity(mover)
-                    .insert((BedSlot(slot.0), BedSide(side)));
-                continue;
-            }
-            if let Some(&open) = doubles.iter().find(|d| count(**d, &taken) == 0) {
-                dealt.entry(home.0).or_default().push((open, -1.0));
-                commands
-                    .entity(mover)
-                    .insert((BedSlot(open), BedSide(-1.0)));
-                continue;
-            }
-        }
-
-        // Everyone else: the lowest free bed that is NOT the marriage bed.
-        let single = (0..capacity).find(|s| !doubles.contains(s) && count(*s, &taken) == 0);
-        if let Some(slot) = single {
-            dealt.entry(home.0).or_default().push((slot, 0.0));
-            commands
-                .entity(mover)
-                .insert(BedSlot(slot))
-                .remove::<BedSide>();
+        if kinds.get(home.0).is_err() {
             continue;
         }
-        // Overflow: a grown-up alone may still take an empty double. A
-        // child may not - the marriage bed is not theirs whatever the
-        // shortage, and the hearth is warm enough.
-        if !child && let Some(&open) = doubles.iter().find(|d| count(**d, &taken) == 0) {
-            dealt.entry(home.0).or_default().push((open, -1.0));
-            commands
-                .entity(mover)
-                .insert((BedSlot(open), BedSide(-1.0)));
+        // Every sleeping place under this roof. A marriage bed is two of
+        // them lying alongside each other, so each half is a place of its
+        // own and the pair simply takes both.
+        let slots: Vec<(u8, bool)> = beds
+            .iter()
+            .filter(|(parent, _)| parent.parent() == home.0)
+            .map(|(_, bed)| (bed.slot, bed.double))
+            .collect();
+        let mut taken: Vec<u8> = held
+            .iter()
+            .filter(|(other, theirs, _)| *other != mover && theirs.0 == home.0)
+            .map(|(_, _, slot)| slot.0)
+            .collect();
+        taken.extend(dealt.get(&home.0).into_iter().flatten().copied());
+        let free = |wedded: bool, taken: &[u8]| {
+            slots
+                .iter()
+                .filter(|(slot, double)| *double == wedded && !taken.contains(slot))
+                .map(|(slot, _)| *slot)
+                .min()
+        };
+        let mut deal = |slot: u8, taken: &mut Vec<u8>| {
+            taken.push(slot);
+            dealt.entry(home.0).or_default().push(slot);
+            commands.entity(mover).insert(BedSlot(slot));
+        };
+
+        // A married grown-up takes a half of the marriage bed; the wedded
+        // are dealt first, so their spouse finds the other half waiting.
+        if !child
+            && spouse.is_some()
+            && let Some(slot) = free(true, &taken)
+        {
+            deal(slot, &mut taken);
+            continue;
+        }
+        // Everyone else: the lowest free bed that is NOT a marriage bed.
+        if let Some(slot) = free(false, &taken) {
+            deal(slot, &mut taken);
+            continue;
+        }
+        // Overflow: a grown-up alone may still take half a marriage bed.
+        // A child may not — that bed is not theirs whatever the shortage,
+        // and the hearth is warm enough.
+        if !child && let Some(slot) = free(true, &taken) {
+            deal(slot, &mut taken);
         }
     }
 }
@@ -919,7 +899,6 @@ pub(super) fn night_routine(
             &Transform,
             Option<&Home>,
             Option<&BedSlot>,
-            Option<&BedSide>,
             &Needs,
             &mut Activity,
             &mut MoveTarget,
@@ -947,12 +926,11 @@ pub(super) fn night_routine(
                     bed.along_x,
                     bed.head,
                     site.rotation,
-                    bed.double,
                 )
             })
     };
 
-    for (entity, transform, home, berth, my_side, needs, mut activity, mut target, mut motion) in
+    for (entity, transform, home, berth, needs, mut activity, mut target, mut motion) in
         &mut villagers
     {
         if !night {
@@ -994,7 +972,7 @@ pub(super) fn night_routine(
                 // Their OWN bed, by claimed number. No claim yet (or no
                 // such bed in an old save's home): the door will do.
                 let berth = berth.and_then(|slot| bed_of(building, slot.0, site));
-                let Some((bed_at, along_x, head, site_spin, double)) = berth else {
+                let Some((bed_at, along_x, head, site_spin)) = berth else {
                     if transform.translation.distance(site.translation) > 2.2 {
                         *activity = Activity::Sleeping;
                         target.0 = Some(site.translation);
@@ -1004,14 +982,6 @@ pub(super) fn night_routine(
                         motion.speed = 0.0;
                     }
                     continue;
-                };
-                // On a double, each of the pair keeps to their own half.
-                let bed_at = if double {
-                    let across = if along_x { Vec3::Z } else { Vec3::X };
-                    let side = my_side.map(|s| s.0).unwrap_or(0.0);
-                    bed_at + site_spin * (across * side * 0.29)
-                } else {
-                    bed_at
                 };
                 let walk_goal = Vec3::new(bed_at.x, transform.translation.y, bed_at.z);
                 if transform.translation.distance(walk_goal) > 0.9 {

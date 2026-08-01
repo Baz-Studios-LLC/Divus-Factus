@@ -221,7 +221,7 @@ pub(super) fn lend_a_hand(
                 .min(cost - 0.5)
                 .max(construction.progress);
             // Helped work shows: the frame rises under many hands too.
-            let target_stage = stage_for(construction.progress, cost);
+            let target_stage = stage_for(construction.progress, cost, steps_for(plan));
             while construction.stage < target_stage {
                 construction.stage += 1;
                 raise_stage(
@@ -783,7 +783,7 @@ pub(super) fn do_work(
             construction.progress += 1.0;
             // Stages land at thirds of the build, whatever the kind's cost.
             let cost = plan.kind.timber_cost();
-            let target_stage = stage_for(construction.progress, cost);
+            let target_stage = stage_for(construction.progress, cost, steps_for(plan));
             while construction.stage < target_stage {
                 construction.stage += 1;
                 raise_stage(
@@ -1531,10 +1531,17 @@ mod tests {
     fn houses_scale_with_population_and_stages_with_timber() {
         // Ground broken, walls at a third, roof from two-thirds on — for any
         // building, whatever its cost.
-        assert_eq!(stage_for(0.0, HOUSE_TIMBER), 0);
-        assert_eq!(stage_for(2.0, HOUSE_TIMBER), 1);
-        assert_eq!(stage_for(4.0, HOUSE_TIMBER), 2);
-        assert_eq!(stage_for(5.0, 14.0), 1);
+        assert_eq!(stage_for(0.0, HOUSE_TIMBER, 3), 0);
+        assert_eq!(stage_for(2.0, HOUSE_TIMBER, 3), 1);
+        assert_eq!(stage_for(4.0, HOUSE_TIMBER, 3), 2);
+        assert_eq!(stage_for(5.0, 14.0, 3), 1);
+        // A framed house takes four: footing, posts, walls, roof, at
+        // quarters of the way — and never runs past its last step.
+        assert_eq!(stage_for(0.0, 8.0, 4), 0);
+        assert_eq!(stage_for(2.0, 8.0, 4), 1);
+        assert_eq!(stage_for(4.0, 8.0, 4), 2);
+        assert_eq!(stage_for(6.0, 8.0, 4), 3);
+        assert_eq!(stage_for(99.0, 8.0, 4), 3);
     }
 
     #[test]

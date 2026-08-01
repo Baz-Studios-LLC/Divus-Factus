@@ -209,10 +209,17 @@ fn prism(lengthwise: bool) -> Mesh {
 /// Which of the game's three build stages a baked stage belongs to.
 fn stage_of(stage: &str) -> u8 {
     match stage {
-        "footing" | "frame" => 0,
-        "walls" => 1,
-        _ => 2,
+        "footing" => 0,
+        "frame" => 1,
+        "walls" => 2,
+        _ => 3,
     }
+}
+
+/// Whether a carried-in building has a frame worth showing on its own -
+/// posts standing on the footing before a single wall goes up.
+pub fn has_frame(work: &Baked) -> bool {
+    work.boxes.iter().any(|piece| piece.stage == "frame")
 }
 
 /// Raises one stage of a carried-in building under its site.
@@ -269,7 +276,7 @@ pub fn raise_baked(
         // are set in the walls.
         if piece.stage == "roof" {
             raised.insert(RoofPart);
-        } else if piece.stage == "walls" {
+        } else if piece.stage == "walls" || piece.stage == "frame" {
             raised.insert(WallPart);
         }
     }
@@ -281,15 +288,17 @@ pub fn furnish_baked(commands: &mut Commands, site: Entity, work: &Baked) {
     let mut slot = 0u8;
     let sleeps: Vec<&Mark> = work.marks.iter().filter(|m| m.mark == "sleep").collect();
     for (index, mark) in sleeps.iter().enumerate() {
-        // Two sleeping places within arm's reach of each other are one
-        // bed made for two - the marriage bed, whoever placed it.
+        // Two sleeping places lying alongside each other are the two
+        // halves of one marriage bed - the pair sleeps there and the
+        // children do not, whoever set them down.
         let at = Vec3::from(mark.at);
         let double = sleeps
             .iter()
             .enumerate()
-            .any(|(other, twin)| other != index && Vec3::from(twin.at).distance(at) < 0.8);
-        // A sleeper's head lies toward the bed's own +Z.
-        let head_way = Quat::from_rotation_y(mark.yaw) * Vec3::Z;
+            .any(|(other, twin)| other != index && Vec3::from(twin.at).distance(at) < 1.4);
+        // A mark faces its own +X, the way every mark does: for a
+        // sleeper that is the way their head lies.
+        let head_way = Quat::from_rotation_y(mark.yaw) * Vec3::X;
         let along_x = head_way.x.abs() > head_way.z.abs();
         let head = if along_x {
             head_way.x.signum()

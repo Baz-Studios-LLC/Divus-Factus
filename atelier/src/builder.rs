@@ -1450,6 +1450,70 @@ fn spawn_part(
     root
 }
 
+/// The figures a piece of furniture comes with: where a body will lie
+/// or sit on it, and which way round. They arrive as REAL widgets set
+/// down beside the furniture, not as decoration - so an unwanted one is
+/// picked up and thrown away like anything else, and a bed with no
+/// sleeper on it means exactly that.
+///
+/// Every one of these pieces faces its own +Z - the back of a chair, the
+/// pillow of a bed - and a widget's nose is its +X, so the figure always
+/// turns a quarter behind the furniture that carries it.
+pub fn companions(kind: &PartKind) -> Vec<(&'static str, Vec3)> {
+    // Mattress top: where a sleeper's back actually rests.
+    const LIE: f32 = 0.53125;
+    match kind {
+        PartKind::Prop("bed") => vec![("sleep", Vec3::new(0.0, LIE, 0.0))],
+        PartKind::Prop("bed-double") => vec![
+            ("sleep", Vec3::new(-0.5, LIE, 0.0)),
+            ("sleep", Vec3::new(0.5, LIE, 0.0)),
+        ],
+        PartKind::Prop("chair" | "stool") => vec![("sit", Vec3::ZERO)],
+        PartKind::Prop("bench") => vec![
+            ("sit", Vec3::new(-0.35, 0.0, 0.0)),
+            ("sit", Vec3::new(0.35, 0.0, 0.0)),
+        ],
+        PartKind::Prop("couch") => vec![
+            ("sit", Vec3::new(-0.4375, 0.0, 0.0)),
+            ("sit", Vec3::new(0.4375, 0.0, 0.0)),
+        ],
+        _ => vec![],
+    }
+}
+
+/// Sets down the figures a piece of furniture implies, alongside it.
+#[allow(clippy::too_many_arguments)]
+pub fn seat_the_figures(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    palette: &Palette,
+    kind: &PartKind,
+    record: &Placed,
+) {
+    let turn = pose(record.yaw, record.tilt, record.flip);
+    for (what, offset) in companions(kind) {
+        let widget = PartKind::Widget(what);
+        let offset = if record.flip {
+            Vec3::new(-offset.x, offset.y, offset.z)
+        } else {
+            offset
+        };
+        let at = Vec3::from(record.at) + turn * offset;
+        let mark = Placed {
+            part: part_name(&widget),
+            at: at.into(),
+            yaw: record.yaw - std::f32::consts::FRAC_PI_2,
+            tilt: 0.0,
+            ramp: None,
+            shade: 0.7,
+            stage: "widget".to_string(),
+            flip: false,
+        };
+        spawn_part(commands, meshes, materials, palette, &widget, &mark, false);
+    }
+}
+
 /// Dresses an existing root in a part's boxes - the resize handles use
 /// this to rebuild a body in place without disturbing the entity.
 #[allow(clippy::too_many_arguments)]
@@ -3047,6 +3111,14 @@ fn place_grab_remove(
                     &record,
                     false,
                 );
+                seat_the_figures(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    &palette,
+                    &kind,
+                    &record,
+                );
             }
         } else if let Some(grabbed) = hovered.grab
             && let Ok((_, transform, record, _)) = placed.get(grabbed)
@@ -4467,7 +4539,8 @@ mod bake {
             let middle = Vec3::new((low.x + high.x) * 0.5, 0.0, (low.z + high.z) * 0.5);
 
             let mut boxes: Vec<String> = Vec::new();
-            let mut marks: Vec<String> = Vec::new();
+            // What, where, which way - and whether a hand put it there.
+            let mut marks: Vec<(String, Vec3, f32, bool)> = Vec::new();
             let say = |v: Vec3| format!("[{:.4}, {:.4}, {:.4}]", v.x, v.y, v.z);
 
             for record in &work.parts {
@@ -4482,50 +4555,18 @@ mod bake {
 
                 // What the place is for, read from the widgets that say
                 // so and from the furniture that means it.
-                let mark = |what: &str, at: Vec3, yaw: f32| {
-                    format!(
-                        "    {{\"mark\": \"{what}\", \"at\": {}, \"yaw\": {:.4}}}",
-                        say(at),
-                        yaw
-                    )
-                };
+                let mark = |what: &str, at: Vec3, yaw: f32| (what.to_string(), at, yaw, false);
                 match kind {
                     PartKind::Widget(what) => {
-                        marks.push(mark(what, anchor, record.yaw));
+                        marks.push((what.to_string(), anchor, record.yaw, true));
                         continue;
                     }
-                    PartKind::Prop("bed") => marks.push(mark("sleep", anchor, record.yaw)),
-                    PartKind::Prop("bed-double") => {
-                        for side in [-0.4375_f32, 0.4375] {
-                            marks.push(mark(
-                                "sleep",
-                                anchor + turn * Vec3::new(side, 0.0, 0.0),
-                                record.yaw,
-                            ));
-                        }
-                    }
+                    // Beds and seats say nothing on their own: their
+                    // figures are set down WITH them and can be taken
+                    // away, so a chair with no sitter on it is a chair
+                    // nobody sits in. Only furniture with no figure to
+                    // show still speaks for itself.
                     PartKind::Prop("cradle") => marks.push(mark("sleep", anchor, record.yaw)),
-                    PartKind::Prop("chair" | "stool") => {
-                        marks.push(mark("sit", anchor, record.yaw))
-                    }
-                    PartKind::Prop("bench") => {
-                        for side in [-0.35_f32, 0.35] {
-                            marks.push(mark(
-                                "sit",
-                                anchor + turn * Vec3::new(side, 0.0, 0.0),
-                                record.yaw,
-                            ));
-                        }
-                    }
-                    PartKind::Prop("couch") => {
-                        for side in [-0.44_f32, 0.44] {
-                            marks.push(mark(
-                                "sit",
-                                anchor + turn * Vec3::new(side, 0.0, 0.0),
-                                record.yaw,
-                            ));
-                        }
-                    }
                     PartKind::Prop("hearth") => {
                         marks.push(mark("fire", anchor, record.yaw));
                         marks.push(mark("smoke", anchor, record.yaw));
@@ -4592,6 +4633,31 @@ mod bake {
                     ));
                 }
             }
+
+            // A widget laid by hand overrules the same meaning derived
+            // from the furniture under it: a sleeping figure set on a bed
+            // to check the fit is that bed's sleeping place, not a second
+            // one beside it.
+            let by_hand: Vec<(String, Vec3)> = marks
+                .iter()
+                .filter(|(.., hand)| *hand)
+                .map(|(what, at, ..)| (what.clone(), *at))
+                .collect();
+            marks.retain(|(what, at, _, hand)| {
+                *hand
+                    || !by_hand.iter().any(|(other, spot)| {
+                        other == what && (spot.x - at.x).hypot(spot.z - at.z) < 0.8
+                    })
+            });
+            let marks: Vec<String> = marks
+                .iter()
+                .map(|(what, at, yaw, _)| {
+                    format!(
+                        "    {{\"mark\": \"{what}\", \"at\": {}, \"yaw\": {yaw:.4}}}",
+                        say(*at)
+                    )
+                })
+                .collect();
 
             let span = high - low;
             let json = format!(

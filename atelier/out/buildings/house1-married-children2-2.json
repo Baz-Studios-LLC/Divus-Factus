@@ -21,7 +21,7 @@
       "at": [
         -0.125,
         0.375,
-        1.4954592
+        1.4329592
       ],
       "yaw": -0.0,
       "tilt": 0.0,
@@ -689,17 +689,17 @@
       "flip": false
     },
     {
-      "part": "prop:bed-double",
+      "part": "widget:sit",
       "at": [
         -6.0,
-        0.375,
-        -5.6875
+        0.4375,
+        0.27124983
       ],
-      "yaw": 9.424778,
+      "yaw": 4.712389,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
-      "stage": "furnishing",
+      "stage": "widget",
       "flip": false
     },
     {
@@ -899,31 +899,31 @@
       "flip": false
     },
     {
-      "part": "prop:side-table",
+      "part": "widget:sit",
       "at": [
-        -5.0,
-        0.375,
-        -6.125
+        -6.875,
+        0.39250004,
+        1.375
       ],
       "yaw": 0.0,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
-      "stage": "furnishing",
+      "stage": "widget",
       "flip": false
     },
     {
-      "part": "prop:side-table",
+      "part": "widget:sit",
       "at": [
-        -7.0,
-        0.375,
-        -6.125
+        -5.1875005,
+        0.3125,
+        1.35625
       ],
-      "yaw": 0.0,
+      "yaw": 3.1415927,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
-      "stage": "furnishing",
+      "stage": "widget",
       "flip": false
     },
     {
@@ -1081,13 +1081,13 @@
       "flip": false
     },
     {
-      "part": "widget:sleep",
+      "part": "widget:sit",
       "at": [
-        -6.25,
-        0.905,
-        -5.5
+        -6.0,
+        0.39499998,
+        2.5
       ],
-      "yaw": 1.5707964,
+      "yaw": 7.853982,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
@@ -1095,17 +1095,17 @@
       "flip": false
     },
     {
-      "part": "widget:sleep",
+      "part": "chimney-3.1875",
       "at": [
-        -5.75,
-        0.905,
-        -5.5
+        -1.96875,
+        3.215,
+        4.125
       ],
-      "yaw": 1.5707964,
+      "yaw": 0.0,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
-      "stage": "widget",
+      "stage": "furnishing",
       "flip": false
     },
     {
@@ -1137,53 +1137,25 @@
       "flip": false
     },
     {
-      "part": "widget:sit",
+      "part": "prop:bed-double",
       "at": [
-        -6.875,
-        0.39250004,
-        1.375
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "widget",
-      "flip": false
-    },
-    {
-      "part": "widget:sit",
-      "at": [
-        -5.1875005,
-        0.3125,
-        1.35625
+        -6.0,
+        0.375,
+        -5.5
       ],
       "yaw": 3.1415927,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
-      "stage": "widget",
+      "stage": "furnishing",
       "flip": false
     },
     {
-      "part": "widget:sit",
+      "part": "widget:sleep",
       "at": [
-        -6.0,
-        0.4375,
-        0.27124983
-      ],
-      "yaw": 4.712389,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "widget",
-      "flip": false
-    },
-    {
-      "part": "widget:sit",
-      "at": [
-        -6.0,
-        0.39499998,
-        2.5
+        -6.5,
+        0.90625,
+        -5.5
       ],
       "yaw": 7.853982,
       "tilt": 0.0,
@@ -1193,11 +1165,53 @@
       "flip": false
     },
     {
-      "part": "prop:chimney",
+      "part": "widget:sleep",
       "at": [
-        -2.0,
-        3.215,
-        4.125
+        -5.5,
+        0.90625,
+        -5.5
+      ],
+      "yaw": 7.853982,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "widget",
+      "flip": false
+    },
+    {
+      "part": "prop:side-table",
+      "at": [
+        -4.75,
+        0.375,
+        -6.1875
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "furnishing",
+      "flip": false
+    },
+    {
+      "part": "prop:side-table",
+      "at": [
+        -7.25,
+        0.375,
+        -6.1875
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "furnishing",
+      "flip": false
+    },
+    {
+      "part": "prop:couch",
+      "at": [
+        -2.5,
+        0.375,
+        1.5
       ],
       "yaw": 0.0,
       "tilt": 0.0,
