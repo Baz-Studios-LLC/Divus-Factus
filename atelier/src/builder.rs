@@ -13,10 +13,10 @@ use crate::Bench;
 use crate::look::{Fonts, Palette, theme};
 use crate::stage::BuilderFurniture;
 
-/// The bench's standard roof pitch: forty-five degrees, where the rise
-/// equals the run and the gable's peak is half its width. Roofs arm
-/// already pitched; T walks away from it in fifteens.
-const ROOF_PITCH: f32 = std::f32::consts::FRAC_PI_4;
+/// The bench's standard roof pitch: thirty degrees. Forty-five stood
+/// too tall over a village of this scale - the houses read as steeples.
+/// Roofs arm already pitched; T walks away from it in fifteens.
+const ROOF_PITCH: f32 = std::f32::consts::FRAC_PI_6;
 
 /// The Atelier's own measurements - the source of truth now; the game
 /// conforms to these when its buildings are replaced. A quarter-metre
@@ -28,7 +28,7 @@ const WALL_HIGH: f32 = 2.5;
 /// shade, how much of the world shows through it (1.0 = none), and
 /// whether it is a wedge rather than a box - a triangular prism, for
 /// the honest slopes a gable wants.
-struct Slab(Vec3, Vec3, String, f32, f32, Shape);
+struct Slab(Vec3, Vec3, String, f32, f32, Shape, f32);
 
 /// What a piece of a body is cut from.
 #[derive(Clone, Copy, PartialEq)]
@@ -40,10 +40,64 @@ enum Shape {
     /// A ridge cap's prism: the triangle stands ACROSS the part, which
     /// runs lengthwise under it, apex up.
     Ridge,
+    /// A round pole running the part's length: the ridge log, and
+    /// whatever else wants to be a log.
+    Log,
 }
 
 /// A triangular prism: an isosceles gable end, base to apex, extruded
 /// across its thickness. Unit-sized, so a part scales it like any box.
+fn log_mesh() -> Mesh {
+    // An eight-sided pole along X: round enough to read as a log at this
+    // scale, cheap enough to lay a hundred of.
+    let sides = 8usize;
+    let mut positions: Vec<[f32; 3]> = Vec::new();
+    let mut normals: Vec<[f32; 3]> = Vec::new();
+    let mut indices: Vec<u32> = Vec::new();
+    let ring: Vec<(f32, f32)> = (0..sides)
+        .map(|i| {
+            let angle = i as f32 / sides as f32 * std::f32::consts::TAU;
+            (angle.cos() * 0.5, angle.sin() * 0.5)
+        })
+        .collect();
+    for i in 0..sides {
+        let (y0, z0) = ring[i];
+        let (y1, z1) = ring[(i + 1) % sides];
+        let (my, mz) = ((y0 + y1) * 0.5, (z0 + z1) * 0.5);
+        let len = (my * my + mz * mz).sqrt().max(1e-5);
+        let normal = [0.0, my / len, mz / len];
+        let first = positions.len() as u32;
+        for corner in [[-0.5, y0, z0], [0.5, y0, z0], [0.5, y1, z1], [-0.5, y1, z1]] {
+            positions.push(corner);
+            normals.push(normal);
+        }
+        indices.extend_from_slice(&[first, first + 1, first + 2, first, first + 2, first + 3]);
+    }
+    for (end, facing) in [(-0.5_f32, [-1.0, 0.0, 0.0]), (0.5, [1.0, 0.0, 0.0])] {
+        let first = positions.len() as u32;
+        for (y, z) in &ring {
+            positions.push([end, *y, *z]);
+            normals.push(facing);
+        }
+        for step in 1..(sides as u32 - 1) {
+            if end < 0.0 {
+                indices.extend_from_slice(&[first, first + step + 1, first + step]);
+            } else {
+                indices.extend_from_slice(&[first, first + step, first + step + 1]);
+            }
+        }
+    }
+    let uvs: Vec<[f32; 2]> = positions.iter().map(|_| [0.0, 0.0]).collect();
+    Mesh::new(
+        bevy::render::mesh::PrimitiveTopology::TriangleList,
+        bevy::asset::RenderAssetUsages::default(),
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+    .with_inserted_indices(bevy::render::mesh::Indices::U32(indices))
+}
+
 fn wedge_mesh(lengthwise: bool) -> Mesh {
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut normals: Vec<[f32; 3]> = Vec::new();
@@ -141,6 +195,12 @@ pub enum PartKind {
     Gable(f32),
     /// The cap that hides the seam where two slopes meet.
     Ridge(f32),
+    /// A ridge pole: a round log along the spine, the older way of
+    /// closing a roof.
+    RidgeLog(f32),
+    /// A whole gable roof: both slopes and the ridge between them, drawn
+    /// once over the walls instead of lined up slope by slope.
+    GableRoof(f32, f32),
     Floor(f32, f32),
     Foundation(f32, f32),
     Roof(f32, f32),
@@ -159,6 +219,8 @@ pub enum PartKind {
     },
     GableRun,
     RidgeRun,
+    RidgeLogRun,
+    GableRoofRun,
     FloorRun,
     FoundationRun,
     RoofRun,
@@ -174,8 +236,12 @@ impl PartKind {
             | PartKind::TrimRun { .. }
             | PartKind::SegRun { .. }
             | PartKind::GableRun
-            | PartKind::RidgeRun => Some(1),
-            PartKind::FloorRun | PartKind::FoundationRun | PartKind::RoofRun => Some(2),
+            | PartKind::RidgeRun
+            | PartKind::RidgeLogRun => Some(1),
+            PartKind::FloorRun
+            | PartKind::FoundationRun
+            | PartKind::RoofRun
+            | PartKind::GableRoofRun => Some(2),
             _ => None,
         }
     }
@@ -190,6 +256,8 @@ impl PartKind {
             },
             PartKind::GableRun => PartKind::Gable(w),
             PartKind::RidgeRun => PartKind::Ridge(w),
+            PartKind::RidgeLogRun => PartKind::RidgeLog(w),
+            PartKind::GableRoofRun => PartKind::GableRoof(w, d),
             PartKind::SegRun { high, lift } => PartKind::Seg {
                 long: w,
                 high: *high,
@@ -265,8 +333,10 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     structure("FLOOR, STRETCH", PartKind::FloorRun, "footing"),
     structure("FLOOR, 2M", PartKind::Floor(2.0, 2.0), "footing"),
     structure("GABLE, STRETCH", PartKind::GableRun, "roof"),
+    structure("ROOF GABLE, STRETCH", PartKind::GableRoofRun, "roof"),
     structure("ROOF, STRETCH", PartKind::RoofRun, "roof"),
     structure("RIDGE, STRETCH", PartKind::RidgeRun, "roof"),
+    structure("RIDGE LOG, STRETCH", PartKind::RidgeLogRun, "roof"),
     structure("ROOF PANEL", PartKind::Roof(2.2, 2.2), "roof"),
 ];
 
@@ -330,6 +400,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             shade,
             1.0,
             Shape::Box,
+            0.0,
         )
     };
     // A wedge: the gable's own shape.
@@ -341,8 +412,36 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             shade,
             1.0,
             Shape::Wedge,
+            0.0,
         )
     };
+    // A log: a round pole running the part's length.
+    let log = |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32| {
+        Slab(
+            Vec3::new(x, y, z),
+            Vec3::new(sx, sy, sz),
+            ramp.to_string(),
+            shade,
+            1.0,
+            Shape::Log,
+            0.0,
+        )
+    };
+    // A piece that leans on its own, about its length: the two slopes of
+    // a whole roof, and whatever else wants an angle inside a part.
+    #[allow(clippy::too_many_arguments)]
+    let leaning =
+        |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32, lean: f32| {
+            Slab(
+                Vec3::new(x, y, z),
+                Vec3::new(sx, sy, sz),
+                ramp.to_string(),
+                shade,
+                1.0,
+                Shape::Box,
+                lean,
+            )
+        };
     // A ridge cap: the same triangle, laid along the part's length.
     let ridge = |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32| {
         Slab(
@@ -352,6 +451,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             shade,
             1.0,
             Shape::Ridge,
+            0.0,
         )
     };
     // Glass: the world shows through it.
@@ -363,6 +463,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             shade,
             0.35,
             Shape::Box,
+            0.0,
         )
     };
     let mut slabs = match kind {
@@ -438,9 +539,48 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         PartKind::Ridge(long) => {
             // Half a metre across, a quarter tall: the bench's own pitch
             // again, so it sits down onto two 45 degree slopes.
-            vec![ridge(0.0, 0.125, 0.0, *long, 0.25, 0.5, "earth", 0.35)]
+            vec![ridge(0.0, 0.0625, 0.0, *long, 0.125, 0.5, "earth", 0.35)]
         }
-        PartKind::RidgeRun => vec![ridge(0.0, 0.125, 0.0, 0.25, 0.25, 0.5, "earth", 0.35)],
+        PartKind::RidgeRun => vec![ridge(0.0, 0.0625, 0.0, 0.25, 0.125, 0.5, "earth", 0.35)],
+        PartKind::GableRoof(long, span) => {
+            // Both slopes at once, meeting over the middle: no lining up
+            // two panels and hoping. The eaves rest at y=0, so the part
+            // seats straight onto the wall tops.
+            let pitch = ROOF_PITCH;
+            let half = span * 0.5;
+            let rise = half * pitch.tan();
+            let slope = (half * half + rise * rise).sqrt();
+            let thick = 0.125;
+            let over = 0.25; // a little overhang past the eaves
+            let mut sides = Vec::new();
+            for way in [-1.0_f32, 1.0] {
+                sides.push(leaning(
+                    0.0,
+                    rise * 0.5 + thick * 0.5,
+                    way * half * 0.5,
+                    *long,
+                    thick,
+                    slope + over,
+                    "earth",
+                    0.4,
+                    way * pitch,
+                ));
+            }
+            sides
+        }
+        PartKind::GableRoofRun => {
+            vec![leaning(
+                0.0, 0.0625, 0.0, 0.25, 0.125, 0.25, "earth", 0.4, 0.0,
+            )]
+        }
+        PartKind::RidgeLog(long) => {
+            // A pole a quarter-metre through, sitting in the V where the
+            // slopes meet, so its belly is a touch below the apex.
+            vec![log(0.0, -0.0625, 0.0, *long, 0.375, 0.375, "wood", 0.45)]
+        }
+        PartKind::RidgeLogRun => {
+            vec![log(0.0, -0.0625, 0.0, 0.25, 0.375, 0.375, "wood", 0.45)]
+        }
         PartKind::Trim { long, stone } => {
             let (ramp, shade) = if *stone {
                 ("stone", 0.55)
@@ -1030,6 +1170,8 @@ pub fn part_name(kind: &PartKind) -> String {
         }
         PartKind::Gable(long) => format!("gable-{long}"),
         PartKind::Ridge(long) => format!("ridge-{long}"),
+        PartKind::RidgeLog(long) => format!("ridgelog-{long}"),
+        PartKind::GableRoof(long, span) => format!("gableroof-{long}x{span}"),
         PartKind::Floor(w, d) => format!("floor-{w}x{d}"),
         PartKind::Foundation(w, d) => format!("foundation-{w}x{d}"),
         PartKind::Roof(w, d) => format!("roof-{w}x{d}"),
@@ -1038,6 +1180,8 @@ pub fn part_name(kind: &PartKind) -> String {
         | PartKind::SegRun { .. }
         | PartKind::GableRun
         | PartKind::RidgeRun
+        | PartKind::RidgeLogRun
+        | PartKind::GableRoofRun
         | PartKind::FloorRun
         | PartKind::FoundationRun
         | PartKind::RoofRun => "run".to_string(),
@@ -1049,6 +1193,12 @@ pub fn part_name(kind: &PartKind) -> String {
 pub fn kind_from_name(name: &str) -> Option<PartKind> {
     if let Some(rest) = name.strip_prefix("wall-") {
         return rest.parse::<f32>().ok().map(PartKind::Wall);
+    }
+    if let Some(rest) = name.strip_prefix("gableroof-") {
+        return sides_of(rest).map(|(w, d)| PartKind::GableRoof(w, d));
+    }
+    if let Some(rest) = name.strip_prefix("ridgelog-") {
+        return rest.parse::<f32>().ok().map(PartKind::RidgeLog);
     }
     if let Some(rest) = name.strip_prefix("ridge-") {
         return rest.parse::<f32>().ok().map(PartKind::Ridge);
@@ -1171,10 +1321,12 @@ pub fn dress_part(
 ) {
     let translucent = ghostly || matches!(kind, PartKind::Widget(_));
     let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-    for Slab(mut at, size, ramp, shade, clarity, shape) in body_of(kind, repaint) {
-        // Mirrored: the body reflects across its own length.
+    for Slab(mut at, size, ramp, shade, clarity, shape, mut lean) in body_of(kind, repaint) {
+        // Mirrored: the body reflects across its own length, and any
+        // lean of its own leans the other way.
         if record.flip {
             at.x = -at.x;
+            lean = -lean;
         }
         let mut color = palette.shade(&ramp, shade);
         let see_through = translucent || clarity < 1.0;
@@ -1191,6 +1343,7 @@ pub fn dress_part(
             Mesh3d(match shape {
                 Shape::Wedge => meshes.add(wedge_mesh(false)),
                 Shape::Ridge => meshes.add(wedge_mesh(true)),
+                Shape::Log => meshes.add(log_mesh()),
                 Shape::Box => meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
             }),
             MeshMaterial3d(materials.add(StandardMaterial {
@@ -1204,7 +1357,9 @@ pub fn dress_part(
                 },
                 ..default()
             })),
-            Transform::from_translation(at).with_scale(size),
+            Transform::from_translation(at)
+                .with_rotation(Quat::from_rotation_x(lean))
+                .with_scale(size),
             ChildOf(root),
         ));
     }
@@ -1835,6 +1990,10 @@ fn is_structure(kind: &PartKind) -> bool {
             | PartKind::GableRun
             | PartKind::Ridge(..)
             | PartKind::RidgeRun
+            | PartKind::RidgeLog(..)
+            | PartKind::RidgeLogRun
+            | PartKind::GableRoof(..)
+            | PartKind::GableRoofRun
             | PartKind::Prop("steps")
             | PartKind::Prop("pole")
     )
@@ -1888,20 +2047,34 @@ fn support_height(
         if carrying_structure && !is_structure(&kind) {
             continue;
         }
-        // Tilted panels make poor tables; let them pass.
-        if record.tilt.abs() > 0.01 {
-            continue;
-        }
-        let unspin = Quat::from_rotation_y(-record.yaw);
+        let turn = pose(record.yaw, record.tilt, record.flip);
         let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-        for Slab(at, size, ..) in body_of(&kind, repaint) {
+        for Slab(mut at, size, ..) in body_of(&kind, repaint) {
+            if record.flip {
+                at.x = -at.x;
+            }
+            let face_y = at.y + size.y * 0.5;
             for sample in samples {
-                let local = unspin
-                    * (Vec3::new(sample.x, 0.0, sample.z)
-                        - Vec3::new(transform.translation.x, 0.0, transform.translation.z));
-                if (local.x - at.x).abs() <= size.x * 0.5 && (local.z - at.z).abs() <= size.z * 0.5
-                {
-                    top = top.max(transform.translation.y + at.y + size.y * 0.5);
+                // Where the sample's own column meets this piece's top
+                // face. The turn carries (lx, face_y, lz) into the world,
+                // so its x and z rows are two equations in lx and lz -
+                // which is how a ridge finds the top of a SLOPING roof
+                // instead of sliding off to the wall beneath it.
+                let base = Vec3::new(sample.x, 0.0, sample.z) - transform.translation;
+                let cx = turn * Vec3::X;
+                let cy = turn * Vec3::Y;
+                let cz = turn * Vec3::Z;
+                let det = cx.x * cz.z - cz.x * cx.z;
+                if det.abs() < 1e-5 {
+                    continue;
+                }
+                let rx = base.x - cy.x * face_y;
+                let rz = base.z - cy.z * face_y;
+                let lx = (rx * cz.z - cz.x * rz) / det;
+                let lz = (cx.x * rz - rx * cx.z) / det;
+                if (lx - at.x).abs() <= size.x * 0.5 && (lz - at.z).abs() <= size.z * 0.5 {
+                    let world_y = transform.translation.y + (turn * Vec3::new(lx, face_y, lz)).y;
+                    top = top.max(world_y);
                     break;
                 }
             }
@@ -3469,6 +3642,7 @@ pub(crate) fn dims_panel(
             PartKind::Wall(long) => Some((part, long, None)),
             PartKind::Seg { long, .. } => Some((part, long, None)),
             PartKind::Trim { long, .. } => Some((part, long, None)),
+            PartKind::GableRoof(w, d) => Some((part, w, Some(d))),
             PartKind::Floor(w, d) | PartKind::Foundation(w, d) | PartKind::Roof(w, d) => {
                 Some((part, w, Some(d)))
             }
@@ -3537,6 +3711,9 @@ pub(crate) fn dims_panel(
                             Some(PartKind::Foundation(w, d.unwrap_or(old)))
                         }
                         PartKind::Roof(_, old) => Some(PartKind::Roof(w, d.unwrap_or(old))),
+                        PartKind::GableRoof(_, old) => {
+                            Some(PartKind::GableRoof(w, d.unwrap_or(old)))
+                        }
                         _ => None,
                     };
                     if let Some(made) = made {
@@ -3985,7 +4162,13 @@ pub(crate) fn lift_roofs(
         let roofish = record.stage == "roof"
             || matches!(
                 kind_from_name(&record.part),
-                Some(PartKind::Gable(..) | PartKind::Ridge(..) | PartKind::Roof(..))
+                Some(
+                    PartKind::Gable(..)
+                        | PartKind::Ridge(..)
+                        | PartKind::RidgeLog(..)
+                        | PartKind::GableRoof(..)
+                        | PartKind::Roof(..)
+                )
             );
         if !roofish {
             continue;
@@ -4134,19 +4317,30 @@ mod bake {
 
                 // The body itself, as boxes the game can simply draw.
                 let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-                for Slab(mut at, size, ramp, shade, clarity, shape) in body_of(&kind, repaint) {
+                for Slab(mut at, size, ramp, shade, clarity, shape, mut lean) in
+                    body_of(&kind, repaint)
+                {
                     if record.flip {
                         at.x = -at.x;
+                        lean = -lean;
                     }
                     let centre = anchor + turn * at;
+                    // A piece that leans carries its own angle into the
+                    // turn the game will draw it with.
+                    let turn = turn * Quat::from_rotation_x(lean);
                     let colour = palette.shade(&ramp, shade).to_srgba();
                     let form = match shape {
                         Shape::Box => "box",
                         Shape::Wedge => "wedge",
                         Shape::Ridge => "ridge",
+                        Shape::Log => "log",
                     };
                     let stage = match kind {
-                        PartKind::Gable(..) | PartKind::Ridge(..) | PartKind::Roof(..) => "roof",
+                        PartKind::Gable(..)
+                        | PartKind::Ridge(..)
+                        | PartKind::RidgeLog(..)
+                        | PartKind::GableRoof(..)
+                        | PartKind::Roof(..) => "roof",
                         _ => record.stage.as_str(),
                     };
                     boxes.push(format!(

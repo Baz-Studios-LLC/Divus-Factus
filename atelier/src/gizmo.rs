@@ -196,9 +196,11 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                 PartKind::Trim { long, .. } => Some((long, 0.0, false)),
                 PartKind::Gable(long) => Some((long, 0.0, false)),
                 PartKind::Ridge(long) => Some((long, 0.0, false)),
+                PartKind::RidgeLog(long) => Some((long, 0.0, false)),
                 PartKind::Floor(w, d) => Some((w, d, true)),
                 PartKind::Foundation(w, d) => Some((w, d, true)),
                 PartKind::Roof(w, d) => Some((w, d, true)),
+                PartKind::GableRoof(w, d) => Some((w, d, true)),
                 _ => None,
             });
             let Some((w, d, both)) = sized else {
@@ -478,9 +480,11 @@ fn work_gizmo(
                 PartKind::Trim { stone, .. } => PartKind::Trim { long: w, stone },
                 PartKind::Gable(_) => PartKind::Gable(w),
                 PartKind::Ridge(_) => PartKind::Ridge(w),
+                PartKind::RidgeLog(_) => PartKind::RidgeLog(w),
                 PartKind::Floor(..) => PartKind::Floor(w, d),
                 PartKind::Foundation(..) => PartKind::Foundation(w, d),
                 PartKind::Roof(..) => PartKind::Roof(w, d),
+                PartKind::GableRoof(..) => PartKind::GableRoof(w, d),
                 _ => return,
             };
             let fresh = builder::part_name(&made);

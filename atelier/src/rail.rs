@@ -527,17 +527,21 @@ fn work_settings(
 fn work_roof_button(
     palette: Res<Palette>,
     mut lifted: ResMut<crate::builder::RoofsLifted>,
-    mut buttons: Query<(&Interaction, &mut BorderColor), With<RoofButton>>,
+    // Only the MOMENT of pressing: a plain Pressed lingers while the
+    // button is held, and a toggle read that way flips every frame.
+    pressed: Query<&Interaction, (Changed<Interaction>, With<RoofButton>)>,
+    mut buttons: Query<&mut BorderColor, With<RoofButton>>,
     mut labels: Query<&mut TextColor>,
     children: Query<&Children>,
     marks: Query<Entity, With<RoofButton>>,
 ) {
-    for (interaction, _) in &buttons {
-        if *interaction == Interaction::Pressed {
-            lifted.0 = !lifted.0;
-        }
+    if pressed
+        .iter()
+        .any(|interaction| *interaction == Interaction::Pressed)
+    {
+        lifted.0 = !lifted.0;
     }
-    for (_, mut border) in &mut buttons {
+    for mut border in &mut buttons {
         let dress = BorderColor::all(if lifted.0 {
             theme::accent(&palette)
         } else {
