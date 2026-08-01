@@ -195,6 +195,10 @@ pub enum PartKind {
     Gable(f32),
     /// The cap that hides the seam where two slopes meet.
     Ridge(f32),
+    /// A chimney stack: the number is how far its shaft reaches DOWN
+    /// from where it stands, so it can be buried in a roof's slope or
+    /// run all the way to the hearth below.
+    Chimney(f32),
     /// A ridge pole: a round log along the spine, the older way of
     /// closing a roof.
     RidgeLog(f32),
@@ -358,7 +362,11 @@ pub const FURNITURE: &[CatalogEntry] = &[
     prop("BENCH", "bench"),
     prop("COUCH", "couch"),
     prop("HEARTH", "hearth"),
-    prop("CHIMNEY", "chimney"),
+    CatalogEntry {
+        label: "CHIMNEY",
+        kind: PartKind::Chimney(1.75),
+        stage: "roof",
+    },
     prop("CHEST", "chest"),
     prop("SHELVES", "shelves"),
     prop("CUPBOARD", "cupboard"),
@@ -693,10 +701,21 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(0.0, 0.42, 0.0, 0.9, 0.84, 0.6, "stone", 0.6),
             slab(0.0, 0.55, 0.12, 0.62, 0.5, 0.44, "stone", 0.25),
         ],
-        PartKind::Prop("chimney") => vec![
-            // A stack of dressed stone with a capped throat: set it on
-            // the roof over a hearth, or run it up an outside wall.
-            slab(0.0, 1.0, 0.0, 0.875, 2.0, 0.875, "stone", 0.5),
+        PartKind::Chimney(drop) => vec![
+            // A stack of dressed stone with a capped throat, and a shaft
+            // that reaches down as far as it is told: set on a roof it
+            // buries itself in the slope instead of perching on it, and
+            // pulled further it runs to the hearth below.
+            slab(
+                0.0,
+                (2.0 - drop) * 0.5,
+                0.0,
+                0.875,
+                2.0 + drop,
+                0.875,
+                "stone",
+                0.5,
+            ),
             slab(0.0, 2.0625, 0.0, 1.0, 0.125, 1.0, "stone", 0.6),
             slab(0.0, 2.25, 0.0, 0.75, 0.25, 0.75, "stone", 0.45),
             slab(0.0, 2.4375, 0.0, 0.875, 0.125, 0.875, "stone", 0.6),
@@ -1280,6 +1299,7 @@ pub fn part_name(kind: &PartKind) -> String {
         }
         PartKind::Gable(long) => format!("gable-{long}"),
         PartKind::Ridge(long) => format!("ridge-{long}"),
+        PartKind::Chimney(drop) => format!("chimney-{drop}"),
         PartKind::RidgeLog(long) => format!("ridgelog-{long}"),
         PartKind::GableRoof(long, span, over) => format!("gableroof-{long}x{span}x{over}"),
         PartKind::RoofPlan(w, d) => format!("roofplan-{w}x{d}"),
@@ -1313,6 +1333,13 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
         let span = parts.next()?.parse().ok()?;
         let over = parts.next().and_then(|o| o.parse().ok()).unwrap_or(0.25);
         return Some(PartKind::GableRoof(long, span, over));
+    }
+    if let Some(rest) = name.strip_prefix("chimney-") {
+        return rest.parse::<f32>().ok().map(PartKind::Chimney);
+    }
+    if name == "prop:chimney" {
+        // The first chimneys, from before the shaft could reach.
+        return Some(PartKind::Chimney(0.0));
     }
     if let Some(rest) = name.strip_prefix("ridgelog-") {
         return rest.parse::<f32>().ok().map(PartKind::RidgeLog);
@@ -2106,6 +2133,7 @@ fn is_structure(kind: &PartKind) -> bool {
             | PartKind::Gable(..)
             | PartKind::GableRun
             | PartKind::Ridge(..)
+            | PartKind::Chimney(..)
             | PartKind::RidgeRun
             | PartKind::RidgeLog(..)
             | PartKind::RidgeLogRun

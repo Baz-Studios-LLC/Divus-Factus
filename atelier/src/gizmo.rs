@@ -198,6 +198,8 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                 PartKind::Seg { long, .. } => Some((long, 0.0, false)),
                 PartKind::Trim { long, .. } => Some((long, 0.0, false)),
                 PartKind::Gable(long) => Some((long, 0.0, false)),
+                // The chimney sizes its own reach downward.
+                PartKind::Chimney(drop) => Some((drop, 0.0, false)),
                 PartKind::Ridge(long) => Some((long, 0.0, false)),
                 PartKind::RidgeLog(long) => Some((long, 0.0, false)),
                 PartKind::Floor(w, d) => Some((w, d, true)),
@@ -523,6 +525,7 @@ fn work_gizmo(
                 },
                 PartKind::Trim { stone, .. } => PartKind::Trim { long: w, stone },
                 PartKind::Gable(_) => PartKind::Gable(w),
+                PartKind::Chimney(_) => PartKind::Chimney(w.max(0.0)),
                 PartKind::Ridge(_) => PartKind::Ridge(w),
                 PartKind::RidgeLog(_) => PartKind::RidgeLog(w),
                 PartKind::Floor(..) => PartKind::Floor(w, d),
