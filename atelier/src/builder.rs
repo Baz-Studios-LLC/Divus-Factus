@@ -1023,7 +1023,9 @@ fn raise_shelf(
         ChildOf(save),
     ));
     commands.spawn((
-        Text::new("build toward the gold:\nthat is the door side."),
+        Text::new(
+            "build anywhere: the door\nwidget decides the front.\nthe gold marks +X if you\nlike to work oriented.",
+        ),
         TextFont {
             font: fonts.text.clone().into(),
             font_size: FontSize::Px(10.0),

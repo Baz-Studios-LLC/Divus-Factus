@@ -33,8 +33,10 @@ local X: positive carries the free end forward).
 
 ### Blueprints: `out/buildings/<name>.json`
 
-Local space: origin at the plot centre on the ground, **+X faces the
-village** (the door side — the gold sill on the bench grid), +Y up. Metres.
+Local space: +Y up, metres. Position and orientation on the bench are
+FREE: the import rebases the building on its own bounds, and the door
+widget defines the front - the whole blueprint is turned so the (first)
+door faces the village. The gold sill (+X) is a working aid, not a law.
 The bench saves to `out/buildings/workbench.json` and reloads it on launch;
 rename a finished piece in Finder to keep it.
 
