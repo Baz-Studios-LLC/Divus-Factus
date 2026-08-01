@@ -74,10 +74,10 @@ game already understands, so the carrying-in is mechanical:
   chest, barrel, crate, shelves, cupboard, pot, basket, rug, woodpile,
   candle, sack, trough — the shelf grows on request), or `widget:<kind>`.
   `prop:mannequin` is the scale reference and is SKIPPED on import.
-  `prop:doorway` is an opening with no leaf, for interior walls; like
-  a door it carries a door widget. Door widgets on the building's outer
-  boundary are entrances (the first defines the front); those inside the
-  footprint are interior ways for room-to-room routing.
+  `prop:doorway` is an opening with no leaf, for interior walls, and it
+  carries NO widget: a gap in a wall run is a portal by itself, found by
+  walking the segments. A door widget means a real door - an entrance -
+  and the first one defines the building's front.
   `prop:bed` and `prop:bed-double` carry their own sleep semantics when
   imported: a double becomes the household's marriage bed - the wedded
   pair claims it together, each to their own side, and children never

@@ -2333,7 +2333,9 @@ fn place_grab_remove(
             // the opening and the frame settles in.
             let opening = match kind {
                 PartKind::Prop("door") => Some((1.25, 2.125, 0.0_f32, true)),
-                PartKind::Prop("doorway") => Some((1.25, 2.125, 0.0, true)),
+                // A bare doorway needs no widget: the gap itself is the
+                // portal, and a widget would only say it twice.
+                PartKind::Prop("doorway") => Some((1.25, 2.125, 0.0, false)),
                 PartKind::Prop("window") => Some((1.25, 2.0, 0.75, false)),
                 _ => None,
             };
@@ -2667,11 +2669,9 @@ fn punch_wall(
     }
 
     // The frame takes the wall's own line and turn.
-    let frame_kind = if is_door {
-        hand.kind.unwrap_or(PartKind::Prop("door"))
-    } else {
-        PartKind::Prop("window")
-    };
+    // The hand knows which opening it holds; `is_door` only decides
+    // whether a routing widget rides along.
+    let frame_kind = hand.kind.unwrap_or(PartKind::Prop("window"));
     // The frame keeps the wall's own footing - a door in a wall on a
     // foundation stands on the foundation, not sunk to the ground.
     let frame_at = base + along * middle;
