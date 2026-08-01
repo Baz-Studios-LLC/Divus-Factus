@@ -201,6 +201,10 @@ pub enum PartKind {
     /// A whole gable roof: both slopes and the ridge between them, drawn
     /// once over the walls instead of lined up slope by slope.
     GableRoof(f32, f32),
+    /// What a whole roof looks like while it is being sized: the ground
+    /// it will cover, with a gold line down the way the ridge will run.
+    /// It is never placed - the record beneath it names the roof.
+    RoofPlan(f32, f32),
     Floor(f32, f32),
     Foundation(f32, f32),
     Roof(f32, f32),
@@ -583,6 +587,33 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             }
             sides
         }
+        PartKind::RoofPlan(w, d) => vec![
+            slab(0.0, 0.0625, 0.0, *w, 0.125, *d, "earth", 0.4),
+            // The ridge line: gold down the way the ridge will run, so
+            // the roof can be turned with R before it is set down.
+            slab(0.0, 0.1875, 0.0, *w, 0.125, 0.25, "cloth-gold", 0.85),
+            // And the two eaves it will come down to.
+            slab(
+                0.0,
+                0.1875,
+                -*d * 0.5 + 0.0625,
+                *w,
+                0.125,
+                0.125,
+                "cloth-gold",
+                0.5,
+            ),
+            slab(
+                0.0,
+                0.1875,
+                *d * 0.5 - 0.0625,
+                *w,
+                0.125,
+                0.125,
+                "cloth-gold",
+                0.5,
+            ),
+        ],
         PartKind::GableRoofRun => {
             vec![leaning(
                 0.0, 0.0625, 0.0, 0.25, 0.125, 0.25, "earth", 0.4, 0.0,
@@ -1187,6 +1218,7 @@ pub fn part_name(kind: &PartKind) -> String {
         PartKind::Ridge(long) => format!("ridge-{long}"),
         PartKind::RidgeLog(long) => format!("ridgelog-{long}"),
         PartKind::GableRoof(long, span) => format!("gableroof-{long}x{span}"),
+        PartKind::RoofPlan(w, d) => format!("roofplan-{w}x{d}"),
         PartKind::Floor(w, d) => format!("floor-{w}x{d}"),
         PartKind::Foundation(w, d) => format!("foundation-{w}x{d}"),
         PartKind::Roof(w, d) => format!("roof-{w}x{d}"),
@@ -2268,10 +2300,23 @@ fn move_ghost(
         } else {
             let w = reach.x.abs().max(0.25);
             let d = reach.z.abs().max(0.25);
+            // R turns a whole roof a quarter, so the ridge can run the
+            // other way over the same rectangle: the part is laid
+            // crosswise and its two sides swap.
+            let crossed = hand.yaw.rem_euclid(std::f32::consts::PI) > 0.7;
+            let made = if crossed {
+                kind_now.run_made(d, w)
+            } else {
+                kind_now.run_made(w, d)
+            };
             (
-                kind_now.run_made(w, d),
+                made,
                 anchor + Vec3::new(w * 0.5 * reach.x.signum(), 0.0, d * 0.5 * reach.z.signum()),
-                0.0,
+                if crossed {
+                    std::f32::consts::FRAC_PI_2
+                } else {
+                    0.0
+                },
             )
         };
         let record = Placed {
@@ -2289,7 +2334,7 @@ fn move_ghost(
         // second click lands. Far easier to judge than two slopes
         // swinging about in the air.
         let shown = match made {
-            PartKind::GableRoof(w, d) => PartKind::Floor(w, d),
+            PartKind::GableRoof(w, d) => PartKind::RoofPlan(w, d),
             other => other,
         };
         // Redraw only when the drawn size changed; otherwise carry the
