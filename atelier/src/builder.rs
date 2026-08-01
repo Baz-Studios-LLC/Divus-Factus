@@ -264,7 +264,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     structure("STONE STEPS", PartKind::Prop("steps"), "footing"),
     structure("FLOOR, STRETCH", PartKind::FloorRun, "footing"),
     structure("FLOOR, 2M", PartKind::Floor(2.0, 2.0), "footing"),
-    structure("GABLE, STRETCH", PartKind::GableRun, "walls"),
+    structure("GABLE, STRETCH", PartKind::GableRun, "roof"),
     structure("ROOF, STRETCH", PartKind::RoofRun, "roof"),
     structure("RIDGE, STRETCH", PartKind::RidgeRun, "roof"),
     structure("ROOF PANEL", PartKind::Roof(2.2, 2.2), "roof"),
@@ -3982,7 +3982,12 @@ pub(crate) fn lift_roofs(
         lifted.0 = !lifted.0;
     }
     for (record, mut visibility) in &mut parts {
-        if record.stage != "roof" {
+        let roofish = record.stage == "roof"
+            || matches!(
+                kind_from_name(&record.part),
+                Some(PartKind::Gable(..) | PartKind::Ridge(..) | PartKind::Roof(..))
+            );
+        if !roofish {
             continue;
         }
         let wanted = if lifted.0 {
@@ -4140,6 +4145,10 @@ mod bake {
                         Shape::Wedge => "wedge",
                         Shape::Ridge => "ridge",
                     };
+                    let stage = match kind {
+                        PartKind::Gable(..) | PartKind::Ridge(..) | PartKind::Roof(..) => "roof",
+                        _ => record.stage.as_str(),
+                    };
                     boxes.push(format!(
                         "    {{\"at\": {}, \"size\": {}, \"turn\": [{:.5}, {:.5}, {:.5}, {:.5}], \
                          \"rgb\": [{}, {}, {}], \"alpha\": {:.2}, \"form\": \"{form}\", \
@@ -4154,7 +4163,7 @@ mod bake {
                         (colour.green * 255.0).round() as u8,
                         (colour.blue * 255.0).round() as u8,
                         clarity,
-                        record.stage,
+                        stage,
                     ));
                 }
             }

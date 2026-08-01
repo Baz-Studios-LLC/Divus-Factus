@@ -4579,7 +4579,7 @@
    ],
    "alpha": 1.0,
    "form": "wedge",
-   "stage": "walls"
+   "stage": "roof"
   },
   {
    "at": [
@@ -4605,7 +4605,7 @@
    ],
    "alpha": 1.0,
    "form": "wedge",
-   "stage": "walls"
+   "stage": "roof"
   },
   {
    "at": [

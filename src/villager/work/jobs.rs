@@ -584,7 +584,7 @@ pub(crate) fn take_up_work(
                         // falls back to the open ring slots.
                         gridded
                             .or_else(|| {
-                                village_slots(centre, 5..7)
+                                village_slots(centre, 5..7, 12.0)
                                     .into_iter()
                                     .map(|(x, z, _)| Vec3::new(x, terrain.height_at(x, z), z))
                                     .find(|at| {

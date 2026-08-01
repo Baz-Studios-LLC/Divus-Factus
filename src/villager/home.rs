@@ -138,15 +138,19 @@ pub(super) fn use_doors(
             if im == it {
                 continue;
             }
-            // The nearest door along the +X wall.
-            let door_z = shell
-                .doors_z
+            // The nearest doorway, wherever the maker put it, and the
+            // two standing places either side of it.
+            let here = Vec2::new(me.x, me.z);
+            let Some(door) = shell
+                .doors
                 .iter()
-                .copied()
-                .min_by(|a, b| (a - me.z).abs().total_cmp(&(b - me.z).abs()))
-                .unwrap_or(0.0);
-            let outer = Vec3::new(shell.half_w + 0.9, 0.0, door_z);
-            let inner = Vec3::new(shell.half_w - 0.9, 0.0, door_z);
+                .min_by(|a, b| a.at.distance(here).total_cmp(&b.at.distance(here)))
+            else {
+                continue;
+            };
+            let step = door.out * 0.9;
+            let outer = Vec3::new(door.at.x + step.x, 0.0, door.at.y + step.y);
+            let inner = Vec3::new(door.at.x - step.x, 0.0, door.at.y - step.y);
             let near = if im { inner } else { outer };
             let far = if im { outer } else { inner };
             let leg = if (me - near).with_y(0.0).length() < 0.9 {

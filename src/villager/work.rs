@@ -812,7 +812,7 @@ pub(super) fn do_work(
                             done.insert(Shell {
                                 half_w: plan.half_w,
                                 half_d: plan.half_d,
-                                doors_z: vec![0.0],
+                                doors: vec![Doorway::on_x_wall(plan.half_w, 0.0)],
                             });
                         }
                     }
@@ -821,14 +821,19 @@ pub(super) fn do_work(
                         let d = plan.half_d;
                         let bays = ((d * 2.0 / 3.4).round() as i32).clamp(3, 4);
                         let doors = (0..bays)
-                            .map(|i| -d + (i as f32 + 0.5) * (d * 2.0 / bays as f32))
+                            .map(|i| {
+                                Doorway::on_x_wall(
+                                    plan.half_w,
+                                    -d + (i as f32 + 0.5) * (d * 2.0 / bays as f32),
+                                )
+                            })
                             .collect();
                         done.insert((
                             Longhouse,
                             Shell {
                                 half_w: plan.half_w,
                                 half_d: plan.half_d,
-                                doors_z: doors,
+                                doors,
                             },
                         ));
                     }

@@ -267,7 +267,7 @@ pub(super) fn burials(
             if ground.0.contains_key(&town) {
                 continue;
             }
-            let spot = work::village_slots(home_ground.centre, 7..10)
+            let spot = work::village_slots(home_ground.centre, 7..10, 12.0)
                 .into_iter()
                 .map(|(x, z, _)| Vec3::new(x, terrain.height_at(x, z), z))
                 .find(|at| terrain.is_walkable(at.x, at.z) && at.y > WATER_LEVEL + 2.0);

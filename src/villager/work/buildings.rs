@@ -607,15 +607,38 @@ pub struct RoofPart;
 #[derive(Component)]
 pub struct Table;
 
+/// One doorway: where it stands in the building's own space, and which
+/// way leads out of it.
+#[derive(Clone, Copy)]
+pub struct Doorway {
+    pub at: Vec2,
+    pub out: Vec2,
+}
+
+impl Doorway {
+    /// A door on the +X wall, the way the village's own buildings put
+    /// them: at the wall's edge, opening outward.
+    pub fn on_x_wall(half_w: f32, z: f32) -> Self {
+        Doorway {
+            at: Vec2::new(half_w, z),
+            out: Vec2::X,
+        }
+    }
+}
+
 /// The walls of a walkable interior: footprint half-extents in the
-/// building's own space, and the door gaps along the +X wall (as local Z
-/// offsets). The router steers any walk that crosses these walls through a
-/// door instead — villagers use doors now that insides are real places.
+/// building's own space, and every doorway through them. The router
+/// steers any walk that crosses these walls through a door instead —
+/// villagers use doors now that insides are real places.
 #[derive(Component)]
 pub struct Shell {
     pub half_w: f32,
     pub half_d: f32,
-    pub doors_z: Vec<f32>,
+    /// Every doorway, in the building's own space: where it stands and
+    /// which way leads out. A door is no longer assumed to sit on the
+    /// +X wall at the shell's own edge - a carried-in house puts its
+    /// door where the maker put it.
+    pub doors: Vec<Doorway>,
 }
 
 /// One bed inside a home, numbered so each occupant owns theirs. The count
@@ -1669,11 +1692,24 @@ pub(crate) fn raise_stage(
 ///
 /// Returns (x, z, yaw) per plot, innermost first. Yaw turns the door
 /// (local +X) toward the centre.
-pub(crate) fn village_slots(centre: Vec3, rings: std::ops::Range<u32>) -> Vec<(f32, f32, f32)> {
+pub(crate) fn village_slots(
+    centre: Vec3,
+    rings: std::ops::Range<u32>,
+    span: f32,
+) -> Vec<(f32, f32, f32)> {
+    // The lanes are cut to the buildings that will stand in them: rings
+    // a building's width apart, and slots along each ring the same. The
+    // old fixed nine and twelve were measured for houses half this size,
+    // and packed the new ones wall into wall.
+    // A neighbourhood, not a barracks. The world is enormous and the
+    // village is the only thing in it: gardens between the houses, a
+    // lane wide enough to walk two abreast, and room for a roof to
+    // overhang without touching the neighbour's.
+    let apart = (span + 12.0).max(20.0);
     let mut slots = Vec::new();
     for ring in rings {
-        let radius = 14.0 + ring as f32 * 9.0;
-        let count = ((std::f32::consts::TAU * radius) / 12.0).floor().max(4.0) as u32;
+        let radius = 14.0 + ring as f32 * apart;
+        let count = ((std::f32::consts::TAU * radius) / apart).floor().max(4.0) as u32;
         // The golden angle staggers each ring so lanes never align.
         let offset = ring as f32 * 2.399_963;
         for i in 0..count {
@@ -2143,16 +2179,32 @@ pub(crate) fn plan_houses(
         // family takes a plot in the rings after all.
         homestead = false;
     }
+    // The plot is measured against the building that will stand in it,
+    // not against a remembered size: a carried-in house is half again as
+    // long as the village's own were, and the old numbers packed them
+    // wall into wall. The probe reaches the building's LONGEST extent,
+    // since the plot test runs on world axes while the house is turned
+    // to face the centre; the clearance is two of those and a lane.
+    // The size this KIND will be, known before a plan is rolled: a
+    // carried-in house brings its own footprint, and the rolled ones
+    // stay within their own range.
+    let reach = match kind {
+        BuildingKind::House => super::baked::house()
+            .map(|work| work.half_w.max(work.half_d))
+            .unwrap_or(3.2),
+        BuildingKind::Longhouse => 7.2,
+        _ => 3.0,
+    };
     let (probe, clearance) = if kind == BuildingKind::Longhouse {
-        (6.4, 17.0)
+        (reach + 0.9, reach * 2.0 + 12.0)
     } else if homestead {
         // A wider probe, because the plot needs flat ground beside the house.
-        (4.2, HOMESTEAD_CLEARANCE)
+        (reach + 1.4, HOMESTEAD_CLEARANCE.max(reach * 2.0 + 20.0))
     } else {
-        (1.9, 10.0)
+        (reach * 0.6, reach * 2.0 + 12.0)
     };
     if !homestead {
-        plots = village_slots(site.centre, rings);
+        plots = village_slots(site.centre, rings, reach * 2.0);
     }
     'darts: for (x, z, yaw) in plots {
         if !terrain.is_walkable(x, z) {

@@ -9,7 +9,7 @@
 
 use bevy::prelude::*;
 
-use super::buildings::{Bed, RoofPart, Shell, Table};
+use super::buildings::{Bed, Doorway, RoofPart, Shell, Table};
 
 /// One box of a baked building, in the building's own space.
 #[derive(serde::Deserialize, Clone)]
@@ -273,15 +273,27 @@ pub fn furnish_baked(commands: &mut Commands, site: Entity, work: &Baked) {
             ChildOf(site),
         ));
     }
-    let doors: Vec<f32> = work
+    // Every door the maker marked, where they marked it, facing the way
+    // its nose points - out of the building.
+    let doors: Vec<Doorway> = work
         .marks
         .iter()
         .filter(|m| m.mark == "door")
-        .map(|m| m.at[2])
+        .map(|m| {
+            let out = Quat::from_rotation_y(m.yaw) * Vec3::X;
+            Doorway {
+                at: Vec2::new(m.at[0], m.at[2]),
+                out: Vec2::new(out.x, out.z).normalize_or(Vec2::X),
+            }
+        })
         .collect();
     commands.entity(site).insert(Shell {
         half_w: work.half_w,
         half_d: work.half_d,
-        doors_z: if doors.is_empty() { vec![0.0] } else { doors },
+        doors: if doors.is_empty() {
+            vec![Doorway::on_x_wall(work.half_w, 0.0)]
+        } else {
+            doors
+        },
     });
 }

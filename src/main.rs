@@ -6,6 +6,7 @@ mod calendar;
 mod camera;
 mod creature;
 mod debug;
+mod doings;
 mod grass;
 mod hand;
 mod keymap;
@@ -169,7 +170,11 @@ fn main() {
             now::NowPlugin,
             telling::TellingPlugin,
         ))
-        .add_plugins((keymap::KeymapPlugin, music::MusicPlugin))
+        .add_plugins((
+            keymap::KeymapPlugin,
+            music::MusicPlugin,
+            doings::DoingsPlugin,
+        ))
         .add_systems(Startup, spawn_lighting)
         .run();
 }
