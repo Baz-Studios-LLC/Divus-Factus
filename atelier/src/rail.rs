@@ -114,24 +114,99 @@ fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>) 
                 flex_grow: 1.0,
                 flex_direction: FlexDirection::Column,
                 justify_content: JustifyContent::FlexEnd,
-                row_gap: Val::Px(4.0),
+                row_gap: Val::Px(3.0),
                 ..default()
             },
             ChildOf(rail),
         ))
         .id();
     commands.spawn((
-        Text::new(
-            "right drag swings, middle drag pulls, \
-             the wheel draws near.\n\nwhat you save here, the god \
-             carries into the world by hand.",
-        ),
+        Text::new("KEYBINDS"),
+        TextFont {
+            font: fonts.display.clone().into(),
+            font_size: FontSize::Px(13.0),
+            ..default()
+        },
+        TextColor(theme::accent(&palette)),
+        Node {
+            margin: UiRect::bottom(Val::Px(2.0)),
+            ..default()
+        },
+        ChildOf(foot),
+    ));
+    for (cap, tale) in [
+        ("click", "place, or pick back up"),
+        ("X", "remove at the cursor"),
+        ("R", "turn a quarter"),
+        ("T", "tilt a roof panel"),
+        ("Q / E", "lift and lower"),
+        ("[ ]", "repaint through the ramps"),
+        ("- =", "darker and brighter"),
+        ("esc", "empty the hand"),
+        ("RMB drag", "swing the camera"),
+        ("MMB drag", "pull the bench along"),
+        ("wheel", "draw near, pull away"),
+        ("WASD", "glide over the bench"),
+    ] {
+        let row = commands
+            .spawn((
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(6.0),
+                    ..default()
+                },
+                ChildOf(foot),
+            ))
+            .id();
+        let chip = commands
+            .spawn((
+                Node {
+                    min_width: Val::Px(52.0),
+                    padding: UiRect::axes(Val::Px(5.0), Val::Px(1.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    justify_content: JustifyContent::Center,
+                    flex_shrink: 0.0,
+                    ..default()
+                },
+                BackgroundColor(Color::BLACK.with_alpha(0.35)),
+                BorderColor::all(theme::panel_border(&palette)),
+                ChildOf(row),
+            ))
+            .id();
+        // The machine's own face on the caps, the way manuals do it.
+        commands.spawn((
+            Text::new(cap),
+            TextFont {
+                font_size: FontSize::Px(10.0),
+                ..default()
+            },
+            TextColor(theme::accent(&palette).with_alpha(0.95)),
+            ChildOf(chip),
+        ));
+        commands.spawn((
+            Text::new(tale),
+            TextFont {
+                font: fonts.text.clone().into(),
+                font_size: FontSize::Px(11.0),
+                ..default()
+            },
+            TextColor(theme::text_dim(&palette).with_alpha(0.85)),
+            ChildOf(row),
+        ));
+    }
+    commands.spawn((
+        Text::new("what you save here, the god carries into the world by hand."),
         TextFont {
             font: fonts.text.clone().into(),
             font_size: FontSize::Px(11.0),
             ..default()
         },
-        TextColor(theme::text_dim(&palette).with_alpha(0.7)),
+        TextColor(theme::text_dim(&palette).with_alpha(0.6)),
+        Node {
+            margin: UiRect::top(Val::Px(8.0)),
+            ..default()
+        },
         ChildOf(foot),
     ));
 }

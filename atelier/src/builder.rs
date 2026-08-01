@@ -620,11 +620,7 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
         ChildOf(save),
     ));
     commands.spawn((
-        Text::new(
-            "an empty hand picks a placed\npart back up. click places,\n\
-             X removes. R turns, T tilts,\nQ/E lift. [ ] repaint, - = shade.\n\
-             esc empties the hand. build\ntoward the gold: that is the\ndoor side.",
-        ),
+        Text::new("build toward the gold:\nthat is the door side."),
         TextFont {
             font: fonts.text.clone().into(),
             font_size: FontSize::Px(10.0),
