@@ -1455,25 +1455,21 @@ fn move_ghost(
     };
 
     // Face-aware placement: the part clings to the face the cursor
-    // points at. The top of a thing stacks; a side is clung to flush,
-    // at the aimed height snapped to clean quarter-metre courses.
+    // points at. A side is clung to flush at the aimed course and is
+    // final; the top of a thing seeds the position and then passes
+    // through the magnets like any other placement, so a wall set down
+    // on a foundation's top still seats flush to its edges.
+    let mut seeded: Option<Vec3> = None;
     if mode.face
         && let Some(hit) = hovered.build
     {
         if hit.normal.y > 0.7 {
-            let snapped = Vec3::new(
+            seeded = Some(Vec3::new(
                 (hit.point.x * 4.0).round() / 4.0,
-                hit.point.y + hand.lift,
+                0.0,
                 (hit.point.z * 4.0).round() / 4.0,
-            );
-            for mut transform in &mut ghosts {
-                transform.translation = snapped;
-                transform.rotation =
-                    Quat::from_rotation_y(hand.yaw) * Quat::from_rotation_x(hand.tilt);
-            }
-            return;
-        }
-        if hit.normal.y.abs() < 0.3 {
+            ));
+        } else if hit.normal.y.abs() < 0.3 {
             // My reach along the face's normal: how far my centre must
             // stand off so my body kisses the face.
             let mut low = Vec3::splat(f32::INFINITY);
@@ -1513,21 +1509,29 @@ fn move_ghost(
         }
     }
 
-    let Some(point) = cursor_point(&windows, &cameras, hand.lift) else {
-        return;
+    let mut snapped = match seeded {
+        Some(seed) => seed,
+        None => {
+            let Some(point) = cursor_point(&windows, &cameras, hand.lift) else {
+                return;
+            };
+            Vec3::ZERO + point
+        }
     };
     // Quarter-metre snap by default; holding shift tightens the grid to
     // five centimetres for the odd exact nestling.
-    let grid = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
-        20.0
-    } else {
-        4.0
-    };
-    let mut snapped = Vec3::new(
-        (point.x * grid).round() / grid,
-        0.0,
-        (point.z * grid).round() / grid,
-    );
+    if seeded.is_none() {
+        let grid = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
+            20.0
+        } else {
+            4.0
+        };
+        snapped = Vec3::new(
+            (snapped.x * grid).round() / grid,
+            0.0,
+            (snapped.z * grid).round() / grid,
+        );
+    }
 
     let kind = kind_now;
 
