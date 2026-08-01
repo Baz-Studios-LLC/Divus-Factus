@@ -461,6 +461,10 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         )
     };
     // Glass: the world shows through it.
+    #[allow(unused_variables)]
+    // Kept for whatever wants to be seen through next - a lantern's
+    // horn pane, water in a trough.
+    #[allow(unused_variables)]
     let glass = |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32| {
         Slab(
             Vec3::new(x, y, z),
@@ -831,15 +835,15 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(0.0, 2.0625, 0.0, 1.25, 0.125, 0.375, "wood", 0.45),
         ],
         PartKind::Prop("window") => vec![
-            // Frame boards around the opening and a pale pane within it,
-            // all on the lattice.
+            // An opening in a timber frame with its bars across it, and
+            // no glass in it at all: glass is a later century than this
+            // village. Jambs, sill, lintel, and the two muntins.
             slab(-0.5625, 1.375, 0.0, 0.125, 1.125, 0.375, "wood", 0.45),
             slab(0.5625, 1.375, 0.0, 0.125, 1.125, 0.375, "wood", 0.45),
             slab(0.0, 0.8125, 0.0, 1.25, 0.125, 0.375, "wood", 0.45),
             slab(0.0, 1.9375, 0.0, 1.25, 0.125, 0.375, "wood", 0.45),
-            glass(0.0, 1.375, 0.0, 1.0, 1.0, 0.125, "sky", 0.8),
-            slab(0.0, 1.375, 0.0625, 0.125, 1.0, 0.125, "wood", 0.5),
-            slab(0.0, 1.375, 0.0625, 1.0, 0.125, 0.125, "wood", 0.5),
+            slab(0.0, 1.375, 0.0, 0.125, 1.0, 0.1875, "wood", 0.4),
+            slab(0.0, 1.375, 0.0, 1.0, 0.125, 0.1875, "wood", 0.4),
         ],
         PartKind::Prop("trim-corner") => vec![
             // An L that wraps an outside corner: two legs meeting at the
