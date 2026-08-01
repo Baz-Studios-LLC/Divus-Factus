@@ -84,3 +84,35 @@ pub(crate) fn shed_wood(
         .entity(carrier)
         .try_remove::<crate::creature::Laden>();
 }
+
+/// Burdens survive a body rebuild. Coming of age and growing old tear down
+/// every child - the carried prop included - while `Laden` and the carrying
+/// components live on the root and keep the ledger true. This system
+/// notices a laden carrier with empty hands and puts the prop back,
+/// whoever despawned it and for whatever reason.
+pub(crate) fn redress_carriers(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    carriers: Query<
+        (Entity, Option<&Children>, Has<CarryingStone>),
+        (
+            With<crate::creature::Laden>,
+            Or<(With<CarryingWood>, With<CarryingStone>)>,
+            Without<crate::creature::Corpse>,
+        ),
+    >,
+    loads: Query<(), With<WoodLoad>>,
+) {
+    for (carrier, children, stone) in &carriers {
+        let empty_handed = !children.is_some_and(|kids| kids.iter().any(|kid| loads.contains(kid)));
+        if !empty_handed {
+            continue;
+        }
+        if stone {
+            shoulder_stone(&mut commands, &mut meshes, &mut materials, carrier);
+        } else {
+            shoulder_wood(&mut commands, &mut meshes, &mut materials, carrier);
+        }
+    }
+}

@@ -773,6 +773,7 @@ fn succumb(
             &mut Transform,
             &Vitality,
             Option<&crate::villager::Person>,
+            Option<&body::CreatureRig>,
         ),
         (
             With<Creature>,
@@ -781,8 +782,11 @@ fn succumb(
             Without<Airborne>,
         ),
     >,
+    // Body nodes carry no Creature of their own, which keeps this second
+    // transform query disjoint from the one above.
+    mut parts: Query<&mut Transform, Without<Creature>>,
 ) {
-    for (entity, mut transform, vitality, person) in &mut creatures {
+    for (entity, mut transform, vitality, person, rig) in &mut creatures {
         if vitality.harm < 1.0 {
             continue;
         }
@@ -796,12 +800,24 @@ fn succumb(
             .remove::<MoveTarget>()
             .remove::<Route>()
             .remove::<CreatureMotion>()
+            .remove::<Laden>()
             .insert(Corpse);
 
         // Laid on their side, keeping the way they were facing.
         let (yaw, _, _) = transform.rotation.to_euler(EulerRot::YXZ);
         transform.rotation =
             Quat::from_rotation_y(yaw) * Quat::from_rotation_z(std::f32::consts::FRAC_PI_2);
+
+        // The animator stops with CreatureMotion gone, so whatever it last
+        // wrote to the body node freezes in. Frozen limbs are the charm of a
+        // death mid-stride; a frozen KNEEL SINK is a corpse lying a third of
+        // a metre from its own root, where the hand, the bearers and the
+        // grave all reach. The body node stands back up before the fall.
+        if let Some(rig) = rig
+            && let Ok(mut body) = parts.get_mut(rig.body)
+        {
+            *body = Transform::default();
+        }
 
         let name = person.map(|p| p.name.clone());
         match &name {

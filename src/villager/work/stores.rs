@@ -265,6 +265,7 @@ pub(crate) fn shoulder_sack(
         Transform::from_xyz(0.0, 1.5, 0.1),
         ChildOf(carrier),
     ));
+    commands.entity(carrier).insert(crate::creature::Laden);
 }
 
 /// When the storehouse rises, the village carries its piles in under the

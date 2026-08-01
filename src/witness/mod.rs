@@ -720,7 +720,12 @@ fn express_reactions(
             }
         }
 
-        *activity = Activity::Idle;
+        // Watching does not interrupt a prayer - the kneeler lifts their
+        // eyes and keeps kneeling. Fear and awe still do: a recoiling or
+        // approaching pray-er has, honestly, stopped praying.
+        if !(matches!(*activity, Activity::Praying) && reaction.kind == ReactionKind::Watch) {
+            *activity = Activity::Idle;
+        }
     }
 }
 

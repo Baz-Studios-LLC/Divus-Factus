@@ -117,7 +117,8 @@ pub fn animate_creatures(
             let sway = sin_phase * gait.sway * walk;
             // Forward is negative-X in this rig: lean INTO the stride.
             // Kneeling bows the body forward a little over the folded legs.
-            let lean = -(gait.lean + walk * 0.09) - kneel * 0.18 + motion.flail * 0.25;
+            let lean =
+                -(gait.lean + walk * 0.09) - kneel * 0.18 + motion.flail * 0.25 * (1.0 - kneel);
 
             // Folded legs sink the body: the shins lie along the ground and
             // the weight rests just above the heels.
@@ -175,7 +176,9 @@ pub fn animate_creatures(
             // A long robe does not allow a long stride: robed legs take
             // shorter, straighter steps, which also keeps the knees inside
             // the skirt.
-            let robed = !limb.is_arm && matches!(genome.garment, Garment::Robe);
+            let robed = !limb.is_arm
+                && genome.species.is_biped()
+                && matches!(genome.garment, Garment::Robe);
             let amplitude = if limb.is_arm {
                 gait.stride_swing * 0.55
             } else if robed {
@@ -239,7 +242,11 @@ pub fn animate_creatures(
                 let rest = 0.18;
                 let stride = swing.max(0.0) * 0.8;
                 let work = if working {
-                    (0.9 + ((t * 13.0 + limb.phase).sin()) * 0.35) * motion.flail.min(1.0)
+                    // Damped by the kneel like every stride term: a pray-er
+                    // brushed by a nearby commotion must not hammer the air.
+                    (0.9 + ((t * 13.0 + limb.phase).sin()) * 0.35)
+                        * motion.flail.min(1.0)
+                        * (1.0 - kneel)
                 } else if off_ground && motion.flail > 0.0 {
                     ((t * 11.0 + limb.phase * 3.0).sin()) * motion.flail * 0.7
                 } else {
@@ -254,7 +261,12 @@ pub fn animate_creatures(
                 // kneeling, kicking when carried off.
                 let rest = -0.06;
                 let knee_room = if robed { 0.3 } else { 1.15 };
-                let stride = -(motion.phase + limb.phase - 0.9).sin().max(0.0)
+                // The cosine is positive exactly while this leg sweeps from
+                // back to front - the recovery - so the knee folds through
+                // the swing and lands straight for the plant. The first cut
+                // used a lagged sine, and the review caught it bending knees
+                // while the leg stood planted.
+                let stride = -(motion.phase + limb.phase).cos().max(0.0)
                     * gait.stride_swing
                     * knee_room
                     * walk;

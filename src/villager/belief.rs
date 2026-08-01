@@ -119,15 +119,22 @@ impl Belief {
 /// for the posture, so there are no cleanup edges to miss.
 pub(super) fn take_a_knee(
     mut folk: Query<
-        (&Activity, &mut crate::creature::anim::CreatureMotion),
+        (
+            &Activity,
+            &mut crate::creature::anim::CreatureMotion,
+            Has<crate::creature::Held>,
+            Has<crate::creature::Airborne>,
+        ),
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
 ) {
     // The dial forces the whole village to its knees, so the pose can be
     // photographed without waiting for someone to feel like praying.
     let staged = std::env::var("DIVUS_FACTUS_KNEEL_TEST").is_ok();
-    for (activity, mut motion) in &mut folk {
-        let kneeling = staged || matches!(activity, Activity::Praying);
+    for (activity, mut motion, held, airborne) in &mut folk {
+        // The god's grip outranks the prayer: a body plucked mid-devotion
+        // unfolds to dangle and kick, and kneels again when set down.
+        let kneeling = !held && !airborne && (staged || matches!(activity, Activity::Praying));
         if motion.kneeling != kneeling {
             motion.kneeling = kneeling;
         }
