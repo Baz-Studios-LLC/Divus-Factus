@@ -566,6 +566,21 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     way * pitch,
                 ));
             }
+            // And the two ends closed: a gable apiece, standing just
+            // inside the slopes so the roof laps over them.
+            let end = 0.25;
+            for way in [-1.0_f32, 1.0] {
+                sides.push(ridge(
+                    way * (long * 0.5 - end * 0.5),
+                    rise * 0.5,
+                    0.0,
+                    end,
+                    rise,
+                    span * 0.995,
+                    "wood",
+                    0.65,
+                ));
+            }
             sides
         }
         PartKind::GableRoofRun => {
@@ -2269,6 +2284,14 @@ fn move_ghost(
             stage: hand.stage.clone(),
             flip: hand.flip,
         };
+        // A whole roof draws as a flat plane while it is being sized -
+        // the footprint it will cover - and becomes a roof when the
+        // second click lands. Far easier to judge than two slopes
+        // swinging about in the air.
+        let shown = match made {
+            PartKind::GableRoof(w, d) => PartKind::Floor(w, d),
+            other => other,
+        };
         // Redraw only when the drawn size changed; otherwise carry the
         // ghost along.
         let stale = ghosts
@@ -2285,7 +2308,7 @@ fn move_ghost(
                 &mut meshes,
                 &mut materials,
                 &palette,
-                &made,
+                &shown,
                 &record,
                 true,
             );
