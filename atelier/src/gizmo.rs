@@ -69,6 +69,9 @@ fn raise_gizmo_camera(mut commands: Commands) {
             clear_color: bevy::camera::ClearColorConfig::None,
             ..default()
         },
+        // The UI rides the topmost camera, so panels stay above the
+        // arrows: world, then arrows, then the shelf and rail.
+        IsDefaultUiCamera,
         RenderLayers::layer(ARROW_LAYER),
         Transform::default(),
     ));

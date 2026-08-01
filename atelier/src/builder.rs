@@ -67,6 +67,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     structure("WALL, 4M", PartKind::Wall(4.0), "walls"),
     structure("CORNER POLE", PartKind::Prop("pole"), "frame"),
     structure("TRIM, 2M", PartKind::Prop("trim"), "walls"),
+    structure("TRIM, STONE", PartKind::Prop("trim-stone"), "walls"),
     structure("DOOR", PartKind::Prop("door"), "walls"),
     structure("WINDOW", PartKind::Prop("window"), "walls"),
     structure("FOUNDATION, 2M", PartKind::Prop("foundation"), "footing"),
@@ -310,6 +311,11 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // The fascia strip: half a wall thick - skirt a seam, dress an
             // edge, or stack a course of them into a stepped footing.
             slab(0.0, 0.15, 0.0, 2.0, 0.3, 0.125, "wood", 0.5),
+        ],
+        PartKind::Prop("trim-stone") => vec![
+            // The mason's fascia: the same strip cut in stone, for water
+            // tables, footing courses and dressed edges.
+            slab(0.0, 0.15, 0.0, 2.0, 0.3, 0.125, "stone", 0.55),
         ],
         PartKind::Prop("foundation") => vec![
             // The game's plinth height exactly: houses stand on these, and
