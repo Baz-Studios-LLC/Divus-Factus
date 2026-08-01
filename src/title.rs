@@ -191,12 +191,18 @@ fn spawn_splash(
 
     // The studio's line, at the foot of the dark, rising and leaving
     // with the mark above it.
+    // Built by hand rather than through `ui::dim`: this line owns its
+    // own colour, and a bundle may not carry two.
     commands.spawn((
         SplashMark,
-        ui::dim(format!(
-            "\u{00a9} {} Baz Studios, LLC. All rights reserved.",
-            STUDIO_YEAR
+        Text::new(format!(
+            "\u{00a9} {STUDIO_YEAR} Baz Studios, LLC. All rights reserved."
         )),
+        ui::SerifFace,
+        TextFont {
+            font_size: FontSize::Px(12.0),
+            ..default()
+        },
         TextColor(Color::srgba(1.0, 1.0, 1.0, 0.0)),
         Node {
             position_type: PositionType::Absolute,
