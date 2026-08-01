@@ -2439,7 +2439,7 @@ fn place_grab_remove(
                     &mut materials,
                     &palette,
                     &placed,
-                    hovered.build.map(|hit| (hit.entity, hit.point)),
+                    hovered.build.map(|hit| (hit.entity, hit.point, hit.normal)),
                     ghost_at.translation,
                     wide,
                     head,
@@ -2646,7 +2646,7 @@ fn punch_wall(
     materials: &mut Assets<StandardMaterial>,
     palette: &Palette,
     placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
-    aimed: Option<(Entity, Vec3)>,
+    aimed: Option<(Entity, Vec3, Vec3)>,
     at: Vec3,
     wide: f32,
     head: f32,
@@ -2657,7 +2657,7 @@ fn punch_wall(
     // The wall the cursor's own ray touches wins outright; the search
     // by proximity is the fallback for a blind click.
     let mut best: Option<(Entity, f32, Vec3, f32, f32, Placed)> = None;
-    if let Some((touched, point)) = aimed
+    if let Some((touched, point, _)) = aimed
         && let Ok((entity, transform, record)) = placed.get(touched)
         && let Some(length) = punchable_length(record)
     {
@@ -2789,13 +2789,22 @@ fn punch_wall(
         false,
     );
 
-    // A door is a doorway: the routing widget arrives with it.
+    // A door is a doorway: the routing widget arrives with it, its nose
+    // pointing OUT through the opening - the way you were looking when
+    // you punched it, since that is the side you were standing on.
     if is_door {
         let widget = PartKind::Widget("door");
+        let outward = aimed
+            .map(|(_, _, normal)| Vec3::new(normal.x, 0.0, normal.z))
+            .filter(|flat| flat.length() > 0.1)
+            .map(|flat| flat.normalize())
+            .unwrap_or_else(|| Vec3::Y.cross(along).normalize_or_zero());
+        // A widget's nose is its local +X.
+        let facing = (-outward.z).atan2(outward.x);
         let mark = Placed {
             part: part_name(&widget),
             at: [frame_at.x, base.y, frame_at.z],
-            yaw: record.yaw,
+            yaw: facing,
             tilt: 0.0,
             ramp: None,
             shade: 0.7,
