@@ -731,7 +731,7 @@ pub struct Placed {
 
 /// A part's turn: yaw, then tilt - which leans the other way when the
 /// part is mirrored, so a pitched panel's twin completes the gable.
-fn pose(yaw: f32, tilt: f32, flip: bool) -> Quat {
+pub fn pose(yaw: f32, tilt: f32, flip: bool) -> Quat {
     Quat::from_rotation_y(yaw) * Quat::from_rotation_x(if flip { -tilt } else { tilt })
 }
 

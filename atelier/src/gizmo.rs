@@ -177,7 +177,10 @@ fn select_part(
 /// The handles a part deserves in the standing mode: direction, offset
 /// of the handle's FOOT from the part's origin, dye, grip.
 fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str, Grip)> {
-    let spin = Quat::from_rotation_y(record.yaw);
+    // The part's TRUE pose, tilt and mirror included: a pitched panel's
+    // handles must run up its own slope, or dragging one swings the far
+    // edge instead of lengthening the roof, and a 45 looks like it bends.
+    let spin = builder::pose(record.yaw, record.tilt, record.flip);
     match mode {
         ToolMode::Move => vec![
             (Vec3::X, Vec3::ZERO, "cloth-red", Grip::Slide),
