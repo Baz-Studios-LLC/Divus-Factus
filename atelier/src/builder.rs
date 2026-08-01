@@ -1441,6 +1441,8 @@ fn move_ghost(
     hand: Res<Hand>,
     mode: Res<SnapMode>,
     hovered: Res<Hovered>,
+    selected: Res<crate::gizmo::Selected>,
+    mut ghost_shapes: Query<&mut Visibility, With<Ghost>>,
     keys: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
@@ -1448,6 +1450,22 @@ fn move_ghost(
     mut ghosts: Query<&mut Transform, With<Ghost>>,
 ) {
     if *bench != Bench::Builder {
+        return;
+    }
+    // While the arrows are out, the ghost stands aside entirely - fine
+    // tuning wants a clear view and no accidental placements.
+    let tuning = selected.0.is_some();
+    for mut visibility in &mut ghost_shapes {
+        let wanted = if tuning {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
+        if *visibility != wanted {
+            *visibility = wanted;
+        }
+    }
+    if tuning {
         return;
     }
     let Some(kind_now) = hand.kind else {
@@ -1875,6 +1893,7 @@ fn place_grab_remove(
     naming: Res<Naming>,
     hovered: Res<Hovered>,
     gizmo_hot: Res<crate::gizmo::GizmoHot>,
+    selected: Res<crate::gizmo::Selected>,
     mut hand: ResMut<Hand>,
     palette: Res<Palette>,
     ghosts: Query<Entity, With<Ghost>>,
@@ -1884,7 +1903,7 @@ fn place_grab_remove(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    if *bench != Bench::Builder || naming.0.is_some() || gizmo_hot.0 {
+    if *bench != Bench::Builder || naming.0.is_some() || gizmo_hot.0 || selected.0.is_some() {
         return;
     }
     // A click that lands on UI is the UI's business.

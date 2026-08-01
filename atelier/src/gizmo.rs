@@ -5,8 +5,8 @@
 //! slides the part along that axis alone in clean five-centimetre steps -
 //! every snap deliberately silent while the arrows are in charge.
 
-use bevy::prelude::*;
 use bevy::camera::visibility::RenderLayers;
+use bevy::prelude::*;
 
 use crate::Bench;
 use crate::builder::{Hovered, Naming, Placed};
@@ -30,9 +30,10 @@ pub struct GizmoHot(pub bool);
 #[derive(Component)]
 struct GizmoRoot;
 
-/// One arrow, knowing its world axis.
+/// One arrow, knowing its world axis and the ramp it wears - the hover
+/// brightening needs to redye it.
 #[derive(Component)]
-struct GizmoArrow(Vec3);
+struct GizmoArrow(Vec3, &'static str);
 
 /// The camera that draws the arrows over everything: it runs after the
 /// main camera with a fresh depth buffer, so no wall can bury them.
@@ -168,7 +169,7 @@ fn dress_gizmo(
                 });
                 let arrow = commands
                     .spawn((
-                        GizmoArrow(axis),
+                        GizmoArrow(axis, ramp),
                         Transform::from_translation(axis * 0.7),
                         Visibility::default(),
                         ChildOf(root),
@@ -219,7 +220,8 @@ fn along_axis(ray: &Ray3d, origin: Vec3, axis: Vec3) -> Option<f32> {
         return None;
     }
     let w = ray.origin - origin;
-    Some((w.dot(axis) - b * w.dot(toward)) / -denominator)
+    // Least-squares meeting point of ray and axis: t = (e - b·f)/(1 - b²).
+    Some((w.dot(axis) - b * w.dot(toward)) / denominator)
 }
 
 /// Dragging an arrow slides the part along that axis in 0.05 steps, and
@@ -232,8 +234,12 @@ fn work_gizmo(
     mut hot: ResMut<GizmoHot>,
     windows: Query<&Window>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    arrows: Query<(&GizmoArrow, &GlobalTransform)>,
-    mut parts: Query<(&mut Transform, &mut Placed)>,
+    arrows: Query<(Entity, &GizmoArrow, &GlobalTransform)>,
+    children: Query<&Children>,
+    handles: Query<&MeshMaterial3d<StandardMaterial>>,
+    palette: Res<Palette>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut parts: Query<(&mut Transform, &mut Placed), Without<GizmoArrow>>,
 ) {
     let Some(part) = selected.0 else {
         drag.0 = None;
@@ -246,22 +252,41 @@ fn work_gizmo(
 
     // Which arrow the cursor rides, tested against a generous sleeve.
     let mut touched: Option<Vec3> = None;
-    for (arrow, at) in &arrows {
+    for (_, arrow, at) in &arrows {
         let origin = at.translation() - arrow.0 * 0.7;
         let Some(t) = along_axis(&ray, origin, arrow.0) else {
             continue;
         };
-        if !(0.0..=1.45).contains(&t) {
+        if !(-0.1..=1.5).contains(&t) {
             continue;
         }
         let on_axis = origin + arrow.0 * t;
         let miss =
             (ray.origin + Vec3::from(ray.direction) * ray_reach(&ray, on_axis) - on_axis).length();
-        if miss < 0.14 {
+        if miss < 0.18 {
             touched = Some(arrow.0);
         }
     }
     hot.0 = touched.is_some() || drag.0.is_some();
+
+    // The ridden arrow brightens; the others keep their working dye. A
+    // live drag keeps its arrow lit however far the cursor strays.
+    let lit_axis = drag.0.map(|(axis, ..)| axis).or(touched);
+    for (entity, arrow, _) in &arrows {
+        let lit = lit_axis == Some(arrow.0);
+        if let Ok(kids) = children.get(entity) {
+            for &kid in kids {
+                if let Ok(handle) = handles.get(kid)
+                    && let Some(mut material) = materials.get_mut(&handle.0)
+                {
+                    let dye = palette.shade(arrow.1, if lit { 1.0 } else { 0.85 });
+                    if material.base_color != dye {
+                        material.base_color = dye;
+                    }
+                }
+            }
+        }
+    }
 
     if buttons.just_pressed(MouseButton::Left)
         && let Some(axis) = touched
