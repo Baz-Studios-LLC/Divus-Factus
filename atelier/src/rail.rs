@@ -248,6 +248,11 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
         ("click", "place, or pick back up"),
         ("X", "remove at the cursor"),
         ("cmd Z / Y", "undo and redo"),
+        (
+            "cmd C / V",
+            "copy what you point at,
+paste it into the hand",
+        ),
         ("R", "turn a quarter"),
         ("T", "tilt a roof panel"),
         ("Q / E", "lift and lower"),

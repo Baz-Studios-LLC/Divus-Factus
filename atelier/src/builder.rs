@@ -712,6 +712,7 @@ impl Plugin for BuilderPlugin {
             .init_resource::<DimsEntry>()
             .init_resource::<History>()
             .init_resource::<SnapGrid>()
+            .init_resource::<Clipboard>()
             .add_systems(Startup, raise_shelf.after(crate::rail::raise_rail))
             .add_systems(
                 Update,
@@ -723,6 +724,7 @@ impl Plugin for BuilderPlugin {
                     steer_hand,
                     toggle_snap_mode,
                     disarm_on_mode,
+                    copy_and_paste,
                     feel_ahead,
                     move_ghost,
                     place_grab_remove,
@@ -3381,5 +3383,76 @@ fn disarm_on_mode(
         for ghost in &ghosts {
             commands.entity(ghost).despawn();
         }
+    }
+}
+
+/// The last part copied, kept whole - its kind, size, turn and paint.
+#[derive(Resource, Default)]
+pub struct Clipboard(pub Option<Placed>);
+
+/// Cmd or ctrl with C copies what the cursor touches (or what is
+/// selected); with V it loads that copy into the hand, ghost and all,
+/// so it lands with every snap the bench offers and can be stamped as
+/// often as you like.
+#[allow(clippy::too_many_arguments)]
+fn copy_and_paste(
+    mut commands: Commands,
+    keys: Res<ButtonInput<KeyCode>>,
+    bench: Res<Bench>,
+    naming: Res<Naming>,
+    dims: Res<DimsEntry>,
+    hovered: Res<Hovered>,
+    gizmo: (Res<crate::gizmo::Selected>, ResMut<crate::gizmo::ToolMode>),
+    mut clipboard: ResMut<Clipboard>,
+    mut hand: ResMut<Hand>,
+    placed: Query<&Placed, Without<Ghost>>,
+    ghosts: Query<Entity, With<Ghost>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    palette: Res<Palette>,
+) {
+    let (selected, mut tool) = gizmo;
+    if *bench != Bench::Builder || naming.0.is_some() || dims.0.is_some() {
+        return;
+    }
+    let held = keys.pressed(KeyCode::ControlLeft)
+        || keys.pressed(KeyCode::ControlRight)
+        || keys.pressed(KeyCode::SuperLeft)
+        || keys.pressed(KeyCode::SuperRight);
+    if !held {
+        return;
+    }
+    if keys.just_pressed(KeyCode::KeyC)
+        && let Some(source) = selected.0.or(hovered.grab)
+        && let Ok(record) = placed.get(source)
+    {
+        clipboard.0 = Some(record.clone());
+        info!("copied {}", record.part);
+    }
+    if keys.just_pressed(KeyCode::KeyV)
+        && let Some(record) = clipboard.0.clone()
+        && let Some(kind) = kind_from_name(&record.part)
+    {
+        // Pasting is placing: the hand takes the copy and the modes step
+        // back to NORMAL, where placement lives.
+        *tool = crate::gizmo::ToolMode::Normal;
+        *hand = Hand {
+            kind: Some(kind),
+            anchor: None,
+            stage: record.stage.clone(),
+            yaw: record.yaw,
+            tilt: record.tilt,
+            lift: 0.0,
+            ramp: record.ramp.clone(),
+            shade: record.shade,
+        };
+        dress_ghost(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &palette,
+            &hand,
+            &ghosts,
+        );
     }
 }
