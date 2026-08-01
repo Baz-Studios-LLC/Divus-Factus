@@ -123,6 +123,7 @@ impl Plugin for HandPlugin {
                 apply_hand_style.run_if(resource_changed::<HandStyle>),
             )
             .add_systems(Startup, spawn_hand_cursor)
+            .add_systems(Update, breathe_hand_glow)
             .add_systems(
                 Update,
                 (
@@ -652,6 +653,47 @@ fn carry_held_object(
     }
 }
 
+/// The light the hand sheds on the world at night.
+#[derive(Component)]
+struct HandGlow;
+
+/// Swells the hand's radiance as the light goes, and breathes it.
+///
+/// The glow is for SEEING at night — the god's lantern — so it follows the
+/// dark: nothing at noon, full past dusk. The slow breath is what makes it
+/// read as presence rather than a lamp; the hand's own emissive skin swells
+/// on the same rhythm, so the glow visibly comes FROM it.
+fn breathe_hand_glow(
+    time: Res<Time<Real>>,
+    clock: Option<Res<crate::calendar::WorldClock>>,
+    hand_materials: Option<Res<HandMaterials>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut glows: Query<&mut PointLight, With<HandGlow>>,
+) {
+    let Some(clock) = clock else {
+        return;
+    };
+    let t = clock.time_of_day();
+    // Dusk ramps in just before true night; the wrap back to 0.0 is dawn.
+    let nightness = ((t - 0.68) / 0.08).clamp(0.0, 1.0);
+    // A slow breath, about six seconds to the cycle: presence, not strobe.
+    let breath = 1.0 + 0.18 * (time.elapsed_secs() * 1.05).sin();
+    for mut light in &mut glows {
+        light.intensity = 900_000.0 * nightness * breath;
+    }
+    // The skin itself brightens with the light it sheds.
+    if let Some(hands) = hand_materials {
+        let glow = 0.25 + nightness * breath * 1.3;
+        if let Some(mut skin) = materials.get_mut(&hands.skin) {
+            skin.emissive = LinearRgba::from(palette::shade(&palette::CLOTH_GOLD, 0.9)) * glow;
+        }
+        if let Some(mut knuckle) = materials.get_mut(&hands.knuckle) {
+            knuckle.emissive =
+                LinearRgba::from(palette::shade(&palette::CLOTH_GOLD, 0.9)) * (glow * 0.6);
+        }
+    }
+}
+
 fn spawn_hand_cursor(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -689,6 +731,23 @@ fn spawn_hand_cursor(
             Visibility::Hidden,
         ))
         .id();
+
+    // The god's own radiance: a soft pale-gold light the hand sheds on the
+    // WORLD (not the overlay — no hand layer, so it lights the ground and
+    // the sleepers, never the cursor model itself). By day it is nothing;
+    // by night it swells and breathes, and the hand becomes a lantern.
+    commands.spawn((
+        HandGlow,
+        PointLight {
+            color: Color::srgb(1.0, 0.93, 0.72),
+            intensity: 0.0,
+            range: 30.0,
+            shadow_maps_enabled: false,
+            ..default()
+        },
+        Transform::from_xyz(0.0, 1.4, 0.0),
+        ChildOf(root),
+    ));
 
     // Palm. Fingers hang from its leading edge; forward is -Z, the same convention
     // as every creature. Every mesh goes on the hand's own render layer, drawn by

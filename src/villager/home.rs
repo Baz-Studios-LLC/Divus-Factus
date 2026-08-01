@@ -844,6 +844,7 @@ pub(super) fn night_routine(
                     let facing = site_spin
                         * Quat::from_rotation_y(body_yaw)
                         * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2 * 0.94);
+                    info!("a sleeper settles into their bed");
                     commands.entity(entity).insert(Abed {
                         at: bed_at + Vec3::Y * 0.34,
                         facing,
