@@ -1661,6 +1661,43 @@ pub(crate) fn update_dossier(
 }
 
 /// A click on a roster row flies the camera to that person and follows them.
+/// The page never opens onto nobody: with the codex on THE PEOPLE and no
+/// one chosen, someone gets chosen — different each time, off the clock so
+/// the simulation's own dice are never touched for a page turn.
+pub(crate) fn meet_someone(
+    time: Res<Time<Real>>,
+    codex: Option<Res<super::village::Codex>>,
+    mut selected: ResMut<SelectedPerson>,
+    everyone: Query<
+        Entity,
+        (
+            With<crate::villager::Villager>,
+            Without<crate::creature::Corpse>,
+        ),
+    >,
+) {
+    let Some(codex) = codex else {
+        return;
+    };
+    if codex.page != super::village::CodexPage::People {
+        return;
+    }
+    // Gone (or never set): the seat must not sit empty while people live.
+    let vacant = match selected.0 {
+        None => true,
+        Some(who) => everyone.get(who).is_err(),
+    };
+    if !vacant {
+        return;
+    }
+    let count = everyone.iter().count();
+    if count == 0 {
+        return;
+    }
+    let pick = (time.elapsed_secs() * 997.0) as usize % count;
+    selected.0 = everyone.iter().nth(pick);
+}
+
 pub(crate) fn handle_people_rows(
     rows: Query<(&Interaction, &PersonRow), Changed<Interaction>>,
     followers: Query<(&Interaction, &FollowButton), Changed<Interaction>>,

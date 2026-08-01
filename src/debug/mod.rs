@@ -104,6 +104,7 @@ impl Plugin for DebugPlugin {
                     update_faith_roster,
                     update_ledger_details,
                     handle_codex_tabs,
+                    people::meet_someone,
                     village::settings_panel,
                     apply_codex_page,
                     dress_ledger_banner,
