@@ -530,6 +530,17 @@ pub struct Placed {
     /// furnishing - or "widget", which never becomes a box at all.
     #[serde(default)]
     pub stage: String,
+    /// Mirrored: the body reflected across its own length, and any tilt
+    /// leaning the other way - the far half of a gable, the other hand
+    /// of an L.
+    #[serde(default)]
+    pub flip: bool,
+}
+
+/// A part's turn: yaw, then tilt - which leans the other way when the
+/// part is mirrored, so a pitched panel's twin completes the gable.
+fn pose(yaw: f32, tilt: f32, flip: bool) -> Quat {
+    Quat::from_rotation_y(yaw) * Quat::from_rotation_x(if flip { -tilt } else { tilt })
 }
 
 /// The ghost that follows the cursor while the hand is full.
@@ -543,6 +554,8 @@ pub struct Hand {
     pub kind: Option<PartKind>,
     /// A stretch wall's anchored start, once the first click lands.
     pub anchor: Option<Vec3>,
+    /// Whether the held part is mirrored.
+    pub flip: bool,
     pub stage: String,
     pub yaw: f32,
     pub tilt: f32,
@@ -556,6 +569,7 @@ impl Hand {
         Hand {
             kind: Some(kind),
             anchor: None,
+            flip: false,
             stage,
             shade: 0.7,
             ..default()
@@ -572,6 +586,7 @@ impl Hand {
             ramp: self.ramp.clone(),
             shade: self.shade,
             stage: self.stage.clone(),
+            flip: self.flip,
         })
     }
 }
@@ -725,6 +740,7 @@ impl Plugin for BuilderPlugin {
                     toggle_snap_mode,
                     disarm_on_mode,
                     copy_and_paste,
+                    mirror_part,
                     feel_ahead,
                     move_ghost,
                     place_grab_remove,
@@ -851,9 +867,11 @@ fn spawn_part(
     let root = commands
         .spawn((
             record.clone(),
-            Transform::from_translation(Vec3::from(record.at)).with_rotation(
-                Quat::from_rotation_y(record.yaw) * Quat::from_rotation_x(record.tilt),
-            ),
+            Transform::from_translation(Vec3::from(record.at)).with_rotation(pose(
+                record.yaw,
+                record.tilt,
+                record.flip,
+            )),
             Visibility::default(),
             BuilderFurniture,
         ))
@@ -882,7 +900,11 @@ pub fn dress_part(
 ) {
     let translucent = ghostly || matches!(kind, PartKind::Widget(_));
     let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-    for Slab(at, size, ramp, shade, clarity) in body_of(kind, repaint) {
+    for Slab(mut at, size, ramp, shade, clarity) in body_of(kind, repaint) {
+        // Mirrored: the body reflects across its own length.
+        if record.flip {
+            at.x = -at.x;
+        }
         let mut color = palette.shade(&ramp, shade);
         let see_through = translucent || clarity < 1.0;
         if see_through {
@@ -1790,6 +1812,7 @@ fn move_ghost(
             ramp: hand.ramp.clone(),
             shade: hand.shade,
             stage: hand.stage.clone(),
+            flip: hand.flip,
         };
         // Redraw only when the drawn size changed; otherwise carry the
         // ghost along.
@@ -1870,8 +1893,7 @@ fn move_ghost(
             );
             for (_, mut transform, _) in &mut ghosts {
                 transform.translation = snapped;
-                transform.rotation =
-                    Quat::from_rotation_y(hand.yaw) * Quat::from_rotation_x(hand.tilt);
+                transform.rotation = pose(hand.yaw, hand.tilt, hand.flip);
             }
             return;
         }
@@ -2043,7 +2065,7 @@ fn move_ghost(
 
     for (_, mut transform, _) in &mut ghosts {
         transform.translation = snapped;
-        transform.rotation = Quat::from_rotation_y(hand.yaw) * Quat::from_rotation_x(hand.tilt);
+        transform.rotation = pose(hand.yaw, hand.tilt, hand.flip);
     }
 }
 
@@ -2402,6 +2424,7 @@ fn place_grab_remove(
             *hand = Hand {
                 kind: Some(kind),
                 anchor: None,
+                flip: record.flip,
                 stage: record.stage.clone(),
                 yaw: record.yaw,
                 tilt: record.tilt,
@@ -2523,6 +2546,7 @@ fn heal_wall(
         ramp: dressed.ramp.clone(),
         shade: dressed.shade,
         stage: "walls".to_string(),
+        flip: false,
     };
     for piece in doomed {
         commands.entity(piece).despawn();
@@ -2666,6 +2690,7 @@ fn punch_wall(
             ramp: record.ramp.clone(),
             shade: record.shade,
             stage: record.stage.clone(),
+            flip: false,
         };
         spawn_part(commands, meshes, materials, palette, &kind, &piece, false);
     }
@@ -2685,6 +2710,7 @@ fn punch_wall(
         ramp: hand.ramp.clone(),
         shade: hand.shade,
         stage: "walls".to_string(),
+        flip: hand.flip,
     };
     spawn_part(
         commands,
@@ -2707,6 +2733,7 @@ fn punch_wall(
             ramp: None,
             shade: 0.7,
             stage: "widget".to_string(),
+            flip: false,
         };
         spawn_part(commands, meshes, materials, palette, &widget, &mark, false);
     }
@@ -3439,6 +3466,7 @@ fn copy_and_paste(
         *hand = Hand {
             kind: Some(kind),
             anchor: None,
+            flip: record.flip,
             stage: record.stage.clone(),
             yaw: record.yaw,
             tilt: record.tilt,
@@ -3446,6 +3474,66 @@ fn copy_and_paste(
             ramp: record.ramp.clone(),
             shade: record.shade,
         };
+        dress_ghost(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &palette,
+            &hand,
+            &ghosts,
+        );
+    }
+}
+
+/// M mirrors what the hand holds, or what the arrows hold: the body
+/// reflects across its own length and any tilt leans the other way, so
+/// a pitched panel's twin completes the gable and an L-corner becomes
+/// the other hand.
+#[allow(clippy::too_many_arguments)]
+fn mirror_part(
+    mut commands: Commands,
+    keys: Res<ButtonInput<KeyCode>>,
+    bench: Res<Bench>,
+    naming: Res<Naming>,
+    dims: Res<DimsEntry>,
+    selected: Res<crate::gizmo::Selected>,
+    mut hand: ResMut<Hand>,
+    ghosts: Query<Entity, With<Ghost>>,
+    mut parts: Query<(&mut Transform, &mut Placed), Without<Ghost>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    palette: Res<Palette>,
+) {
+    if *bench != Bench::Builder
+        || naming.0.is_some()
+        || dims.0.is_some()
+        || !keys.just_pressed(KeyCode::KeyM)
+    {
+        return;
+    }
+    // A standing part first: mirroring what you can see beats mirroring
+    // what you are about to place.
+    if let Some(part) = selected.0
+        && let Ok((mut transform, mut record)) = parts.get_mut(part)
+        && let Some(kind) = kind_from_name(&record.part)
+    {
+        record.flip = !record.flip;
+        transform.rotation = pose(record.yaw, record.tilt, record.flip);
+        commands.entity(part).despawn_related::<Children>();
+        dress_part(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &palette,
+            &kind,
+            &record,
+            part,
+            false,
+        );
+        return;
+    }
+    if hand.kind.is_some() {
+        hand.flip = !hand.flip;
         dress_ghost(
             &mut commands,
             &mut meshes,

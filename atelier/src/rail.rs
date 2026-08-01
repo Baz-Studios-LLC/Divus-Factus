@@ -255,6 +255,12 @@ paste it into the hand",
         ),
         ("R", "turn a quarter"),
         ("T", "tilt a roof panel"),
+        (
+            "M",
+            "mirror it - the far half
+of a gable, the other hand
+of an L",
+        ),
         ("Q / E", "lift and lower"),
         ("[ ]", "repaint through the ramps"),
         ("- =", "darker and brighter"),

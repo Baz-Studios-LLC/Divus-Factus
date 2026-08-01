@@ -85,6 +85,8 @@ game already understands, so the carrying-in is mechanical:
 - EXPORT A COPY writes `out/buildings/build-<n>.json`, never overwriting;
   the SAVED WORK drawer lists everything in that folder on launch.
 - `yaw` turns about the part's centre; `tilt` pitches roof panels.
+- `flip`: mirrored - the body reflected across its own length and the
+  tilt leaning the other way (the far half of a gable).
 - `ramp`/`shade`: a repaint, or `null` for the part's authored colours.
 - `stage`: `footing | frame | walls | roof | furnishing` — the order the
   village raises it; `widget` entries never become boxes at all.
