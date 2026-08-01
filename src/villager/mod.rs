@@ -193,6 +193,8 @@ impl Plugin for VillagerPlugin {
                         colony::walk_to_the_new_ground,
                         home::burn_weathered,
                         home::take_shelter,
+                        home::midday_meal,
+                        home::family_supper,
                         home::tavern_evenings,
                         home::well_gatherings,
                         home::tavern_cheer,

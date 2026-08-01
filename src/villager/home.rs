@@ -987,6 +987,94 @@ pub(super) fn night_routine(
     }
 }
 
+/// The midday bell: tools down, and the square fills for the meal.
+///
+/// Workers are released a few at a time (the chance staggers them, so the
+/// square fills like a square and not like a fire drill), drift to their
+/// town's centre, eat if they are hungry, and fall into the gossip mill by
+/// sheer proximity — which is the point of a midday meal.
+#[allow(clippy::type_complexity)]
+pub(super) fn midday_meal(
+    mut commands: Commands,
+    clock: Res<crate::calendar::WorldClock>,
+    grounds: Query<&super::SettlementGround>,
+    mut rng: ResMut<SimRng>,
+    mut workers: Query<
+        (
+            Entity,
+            &Transform,
+            Option<&super::MemberOf>,
+            &mut Activity,
+            &mut MoveTarget,
+        ),
+        (
+            With<Villager>,
+            Without<Held>,
+            Without<Airborne>,
+            Without<Corpse>,
+        ),
+    >,
+) {
+    if !clock.midday_meal() {
+        return;
+    }
+    for (entity, at, member, mut activity, mut target) in &mut workers {
+        if *activity != Activity::Working || !rng.0.chance(0.05) {
+            continue;
+        }
+        let Some(centre) = member.and_then(|m| grounds.get(m.0).ok()).map(|g| g.centre) else {
+            continue;
+        };
+        commands.entity(entity).remove::<super::work::Job>();
+        *activity = Activity::Wandering;
+        target.0 = Some(centre + Vec3::new(rng.0.range(-4.0, 4.0), 0.0, rng.0.range(-4.0, 4.0)));
+        let _ = at;
+    }
+}
+
+/// The evening bell: families sup at their own hearth.
+///
+/// A house-dweller heads home at dusk and stays under their roof until the
+/// night hands them to bed — through the door, visibly, together. Ten
+/// seconds of theatre a day that makes a house a household. The unwed keep
+/// their evening: the tavern claims the low, the fire the rest.
+#[allow(clippy::type_complexity)]
+pub(super) fn family_supper(
+    clock: Res<crate::calendar::WorldClock>,
+    homes: Query<&Transform, (With<Hut>, Without<Villager>)>,
+    mut families: Query<
+        (&Transform, &Home, &mut Activity, &mut MoveTarget),
+        (
+            With<Villager>,
+            Without<Held>,
+            Without<Airborne>,
+            Without<Corpse>,
+        ),
+    >,
+) {
+    if !clock.is_evening() {
+        return;
+    }
+    for (at, home, mut activity, mut target) in &mut families {
+        // Only house-dwellers: the hearth is the family's.
+        let Ok(hut) = homes.get(home.0) else {
+            continue;
+        };
+        match *activity {
+            Activity::Idle | Activity::Wandering | Activity::Sheltering | Activity::Working => {}
+            _ => continue,
+        }
+        let indoors = hut.translation;
+        if at.translation.distance(indoors) > 1.6 {
+            *activity = Activity::Sheltering;
+            target.0 = Some(indoors);
+        } else if *activity != Activity::Sheltering {
+            *activity = Activity::Sheltering;
+            target.0 = None;
+        }
+    }
+}
+
 /// Evenings belong to the tavern, once the village has one.
 ///
 /// Between the workday's end and sleep, anyone whose spirits could use it

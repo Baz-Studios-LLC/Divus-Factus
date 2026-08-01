@@ -161,6 +161,27 @@ impl WorldClock {
         t >= 0.74 || t < 0.03
     }
 
+    /// The bells a day rings for its people: when work may start, when the
+    /// square fills for the midday meal, when evening claims everyone home.
+    /// One authority, so every system keeps the same hours.
+    pub fn work_hours(&self) -> bool {
+        let t = self.time_of_day();
+        // Morning shift and afternoon shift, split by the midday meal.
+        (0.06..0.34).contains(&t) || (0.40..0.62).contains(&t)
+    }
+
+    /// The midday meal: tools down, everyone drifts to the square.
+    pub fn midday_meal(&self) -> bool {
+        let t = self.time_of_day();
+        (0.34..0.40).contains(&t)
+    }
+
+    /// The evening: supper at the hearth, the tavern, the fire.
+    pub fn is_evening(&self) -> bool {
+        let t = self.time_of_day();
+        (0.62..0.74).contains(&t)
+    }
+
     /// The part of the day, as a villager would name it.
     pub fn phase_name(&self) -> &'static str {
         let t = self.time_of_day();

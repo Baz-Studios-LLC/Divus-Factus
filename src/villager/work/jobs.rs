@@ -258,6 +258,13 @@ pub(crate) fn take_up_work(
                 vocation,
                 Vocation::Fisher | Vocation::Gatherer | Vocation::Hunter
             );
+        // The day has hours now: no new work at the midday meal or in the
+        // evening, so a followed villager's day has a SHAPE — shift, meal,
+        // shift, supper, bed — instead of labor scattered like static.
+        // (A thin larder still overrides: hunger keeps no schedule.)
+        if !(clock.work_hours() || night_shift || larder_thin) {
+            continue;
+        }
         if !daylight && !night_shift {
             continue;
         }
