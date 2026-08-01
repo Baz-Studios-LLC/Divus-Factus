@@ -1372,10 +1372,12 @@ fn platform_rects(
     rects
 }
 
-/// The plinth reveal: wall centrelines sit this far inside a platform's
-/// edge, so the stone stays a little proud of the panel. A full grid
-/// step, so a snapped wall's centreline is always a grid point.
-const PLINTH_REVEAL: f32 = 0.25;
+/// Wall centrelines sit exactly ON a platform's edge: a 2m wall spans a
+/// 2m foundation corner to corner, wall ends land on the same grid
+/// points as platform corners, and perpendicular walls meet centreline
+/// to centreline. The timber's small uniform overhang past the stone is
+/// the drip edge. Zero, kept as a name so the rule reads as a choice.
+const PLINTH_REVEAL: f32 = 0.0;
 
 /// The ends of every standing full-height wall piece, for the magnets.
 fn wall_ends(placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>) -> Vec<Vec3> {
