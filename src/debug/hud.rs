@@ -255,14 +255,16 @@ pub(crate) fn handle_tuning_input(
         changed |= nudge(&mut look.exposure, 0.1, -3.0, 3.0);
     }
 
+    // Both hands of saturation live on F11 - richer plain, paler shifted.
+    // It rode the backquote once (every overlay toggle drained the world's
+    // colour), then F12, where every press also tripped the screenshot key.
     if keys.just_pressed(KeyCode::F11) {
-        changed |= nudge(&mut look.saturation, 0.05, 0.0, 3.0);
-    }
-    // F12 down, F11 up. This WAS the backquote, until the backquote became
-    // the dev overlay's toggle and every press quietly drained the world's
-    // colour on the way.
-    if keys.just_pressed(KeyCode::F12) {
-        changed |= nudge(&mut look.saturation, -0.05, 0.0, 3.0);
+        let step = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
+            -0.05
+        } else {
+            0.05
+        };
+        changed |= nudge(&mut look.saturation, step, 0.0, 3.0);
     }
 
     // Toggle depth of field off and back, which is the fastest way to see what it

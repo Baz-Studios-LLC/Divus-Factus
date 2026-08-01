@@ -1645,158 +1645,318 @@ pub(crate) fn update_faith_roster(
     }
 }
 
-/// The value text showing which model the teller speaks with.
+/// A swatch on the settings page, holding its place in
+/// [`crate::hand::HAND_STYLES`].
 #[derive(Component)]
-pub(crate) struct TellerModelText;
+pub(crate) struct HandSwatch(pub usize);
 
-/// A button that steps the teller to the previous (-1) or next (+1) model.
+/// The line naming the style the hand wears now.
 #[derive(Component)]
-pub(crate) struct SwitchModel(pub i8);
+pub(crate) struct HandStyleName;
 
-/// Lays out the settings page: the teller's voice now, everything else as
-/// the sections arrive (hotkeys, video, sound — the hand's colour still
-/// lives on the title's Settings until it moves in here).
+/// Every key the game answers to, in the player's tongue. One table, so the
+/// page never drifts from the truth and a future rebinding screen has a
+/// single place to read from.
+const KEYBINDS: &[(&str, &[(&[&str], &str)])] = &[
+    (
+        "THE CAMERA",
+        &[
+            (
+                &["W", "A", "S", "D"],
+                "glide over the land; the arrows serve too",
+            ),
+            (&["Q", "E"], "swing around the place you watch"),
+            (&["right drag"], "swing and tilt by hand"),
+            (&["middle drag"], "pull the map beneath you"),
+            (&["scroll"], "draw near, or pull away"),
+        ],
+    ),
+    (
+        "TIME",
+        &[
+            (&["Space"], "hold the world still; let it go again"),
+            (&["-", ","], "let the days walk"),
+            (&["+", "."], "make the days run"),
+        ],
+    ),
+    (
+        "MIRACLES",
+        &[
+            (&["1"], "flourish: life where you point"),
+            (&["2"], "smite: the storm answers"),
+            (&["3"], "bounty: food for the stores"),
+            (&["4"], "mend or quake, once legend unlocks them"),
+            (&["click"], "work the chosen miracle"),
+            (&["right click", "Esc"], "set the miracle aside"),
+        ],
+    ),
+    (
+        "THE GOD'S SIGHT",
+        &[
+            (&["Tab"], "open and shut this codex"),
+            (&["P"], "mark every soul"),
+            (
+                &["R"],
+                "the surveyor's sight: woods, stone, clay, iron, wild food",
+            ),
+            (&["H"], "lift the roofs and look inside"),
+        ],
+    ),
+    (
+        "THE WORKBENCH",
+        &[
+            (&["`"], "the frame counter"),
+            (&["F1"], "the tuner's panel"),
+            (&["F2", "F3"], "open and close the lens"),
+            (&["F4", "F5"], "pull the focus near and far"),
+            (&["F6", "F7"], "thicken and thin the haze"),
+            (&["F8", "F9"], "darken and brighten the light"),
+            (&["F10"], "the miniature look, on and off"),
+            (&["F11", "shift F11"], "richer and paler colour"),
+            (&["F12"], "a photograph, saved beside the game"),
+        ],
+    ),
+];
+
+/// Lays out the settings page in the codex's own manner: a tab bar like the
+/// People page wears, and card wells like the ledger's grid. Keybinds stand
+/// first — the page a player actually comes here for — then the hand's
+/// colour, brought in from the title screen, then what little video and
+/// sound there is to speak of. The model picker is gone; the teller keeps
+/// its voice from the models folder without asking.
 fn build_settings_page(commands: &mut Commands, page: Entity) {
-    let heading = |commands: &mut Commands, label: &str| {
-        commands.spawn((
-            Text::new(label.to_string()),
-            TextFont {
-                font_size: FontSize::Px(12.0),
-                ..default()
-            },
-            TextColor(ui::theme::accent().with_alpha(0.9)),
+    let tabs = ui::tab_bar(commands, page, &["KEYBINDS", "THE HAND", "VIDEO & SOUND"]);
+    for (index, tab_page) in tabs.iter().copied().enumerate() {
+        commands.entity(tab_page).insert((
             Node {
-                margin: UiRect::top(px(14)),
+                width: percent(100),
+                flex_grow: 1.0,
+                min_height: px(0),
+                flex_direction: FlexDirection::Column,
+                row_gap: px(10),
+                overflow: Overflow::scroll_y(),
                 ..default()
             },
-            ChildOf(page),
+            ui::Scrollable,
+            bevy::ui::ScrollPosition::default(),
+        ));
+        if index != 0 {
+            commands
+                .entity(tab_page)
+                .entry::<Node>()
+                .and_modify(|mut node| {
+                    node.display = Display::None;
+                });
+        }
+    }
+
+    let row_of = |commands: &mut Commands, parent: Entity| -> Entity {
+        commands
+            .spawn((
+                Node {
+                    width: percent(100),
+                    flex_direction: FlexDirection::Row,
+                    column_gap: px(10),
+                    align_items: AlignItems::Stretch,
+                    ..default()
+                },
+                ChildOf(parent),
+            ))
+            .id()
+    };
+
+    // KEYBINDS: the table above, dealt into two rows of card wells.
+    let keycap = |commands: &mut Commands, parent: Entity, cap: &str| {
+        let key = commands
+            .spawn((
+                Node {
+                    min_width: px(26),
+                    padding: UiRect::axes(px(7), px(2)),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::all(px(4)),
+                    flex_shrink: 0.0,
+                    ..default()
+                },
+                BackgroundColor(Color::BLACK.with_alpha(0.35)),
+                BorderColor::all(ui::theme::panel_border().with_alpha(0.8)),
+                ChildOf(parent),
+            ))
+            .id();
+        // The machine's own face, kept deliberately: keycaps set in plain
+        // type read as keys, the way manuals have always done it.
+        commands.spawn((
+            Text::new(cap.to_string()),
+            TextFont {
+                font_size: FontSize::Px(11.0),
+                ..default()
+            },
+            TextColor(ui::theme::accent().with_alpha(0.95)),
+            ChildOf(key),
         ));
     };
-    heading(commands, "THE TELLER");
-    let row = commands
+    let top = row_of(commands, tabs[0]);
+    let bottom = row_of(commands, tabs[0]);
+    for (index, (title, binds)) in KEYBINDS.iter().enumerate() {
+        let card = ui::card_well(commands, if index < 3 { top } else { bottom }, title);
+        for (caps, tale) in binds.iter() {
+            let bind = commands
+                .spawn((
+                    Node {
+                        width: percent(100),
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: px(8),
+                        ..default()
+                    },
+                    ChildOf(card),
+                ))
+                .id();
+            let hands = commands
+                .spawn((
+                    Node {
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: px(4),
+                        flex_shrink: 0.0,
+                        min_width: px(96),
+                        ..default()
+                    },
+                    ChildOf(bind),
+                ))
+                .id();
+            for cap in caps.iter() {
+                keycap(commands, hands, cap);
+            }
+            commands.spawn((
+                ui::dim(*tale),
+                Node {
+                    flex_grow: 1.0,
+                    ..default()
+                },
+                ChildOf(bind),
+            ));
+        }
+    }
+
+    // THE HAND: the swatches from the title's settings, now also living in
+    // the book. The hand itself previews every press.
+    let hand_row = row_of(commands, tabs[1]);
+    let hand_card = ui::card_well(commands, hand_row, "THE HAND");
+    commands.spawn((
+        ui::dim("the colour of the hand that works your will."),
+        ChildOf(hand_card),
+    ));
+    let swatches = commands
         .spawn((
             Node {
                 flex_direction: FlexDirection::Row,
-                align_items: AlignItems::Center,
                 column_gap: px(10),
-                margin: UiRect::top(px(6)),
+                margin: UiRect::top(px(4)),
                 ..default()
             },
-            ChildOf(page),
+            ChildOf(hand_card),
         ))
         .id();
-    let arrow = |commands: &mut Commands, glyph: &str, step: i8| {
-        let button = commands
-            .spawn((
-                SwitchModel(step),
-                Interaction::default(),
-                Node {
-                    padding: UiRect::axes(px(10), px(4)),
-                    border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(px(7)),
-                    ..default()
-                },
-                BackgroundColor(Color::BLACK.with_alpha(0.18)),
-                BorderColor::all(ui::theme::panel_border().with_alpha(0.5)),
-                ChildOf(row),
-            ))
-            .id();
+    for (index, (name, ramp)) in crate::hand::HAND_STYLES.iter().enumerate() {
         commands.spawn((
-            Text::new(glyph.to_string()),
-            TextFont {
-                font_size: FontSize::Px(13.0),
+            HandSwatch(index),
+            ui::UiButton,
+            ui::KeepFace,
+            ui::HoverHint::new(*name, "the hand, restyled"),
+            Node {
+                width: px(40),
+                height: px(40),
+                border: UiRect::all(px(2)),
+                border_radius: BorderRadius::all(px(6)),
                 ..default()
             },
-            TextColor(ui::theme::text()),
-            ChildOf(button),
+            BackgroundColor(crate::palette::shade(ramp, 0.9)),
+            BorderColor::all(ui::theme::panel_border()),
+            Interaction::default(),
+            ChildOf(swatches),
         ));
-    };
-    arrow(commands, "<", -1);
+    }
     commands.spawn((
-        TellerModelText,
-        Text::new("..."),
-        TextFont {
-            font_size: FontSize::Px(13.0),
+        HandStyleName,
+        ui::body(""),
+        Node {
+            margin: UiRect::top(px(2)),
             ..default()
         },
-        TextColor(ui::theme::text()),
-        ChildOf(row),
+        ChildOf(hand_card),
     ));
-    arrow(commands, ">", 1);
+
+    // VIDEO & SOUND: spoken for honestly, small as they are.
+    let av_row = row_of(commands, tabs[2]);
+    let video = ui::card_well(commands, av_row, "VIDEO");
     commands.spawn((
-        Text::new(
-            "the voice the villagers borrow. larger models speak better and \
-             cost more of the machine; a change takes hold in a few seconds. \
-             drop any .gguf into the models folder beside your saves to add it \
-             here.",
+        ui::dim(
+            "the world draws as fast as your glass allows. the lens is tuned \
+             from the workbench keys, and a photograph falls from F12.",
         ),
-        TextFont {
-            font_size: FontSize::Px(11.0),
-            ..default()
-        },
-        TextColor(ui::theme::text_dim()),
         Node {
             max_width: px(430),
-            margin: UiRect::top(px(6)),
             ..default()
         },
-        ChildOf(page),
+        ChildOf(video),
     ));
-    heading(commands, "HOT KEYS / VIDEO / SOUND");
+    let sound = ui::card_well(commands, av_row, "SOUND");
     commands.spawn((
-        Text::new("to come, as the game grows into them."),
-        TextFont {
-            font_size: FontSize::Px(11.0),
-            ..default()
-        },
-        TextColor(ui::theme::text_dim().with_alpha(0.7)),
+        ui::dim(
+            "the world is still silent. wind, rain and the sounds of work \
+             will find their voices in a later age.",
+        ),
         Node {
-            margin: UiRect::top(px(4)),
+            max_width: px(430),
             ..default()
         },
-        ChildOf(page),
+        ChildOf(sound),
     ));
 }
 
-/// Keeps the teller row true and turns the arrows into switches.
+/// Presses on the hand swatches restyle the hand, mid-game; the chosen
+/// swatch wears the gold border, and the style's name stands beneath the
+/// row. The same cloth as the title's settings, cut for the codex.
 pub(crate) fn settings_panel(
-    codex: Option<Res<Codex>>,
-    mut tongue: Option<ResMut<crate::telling::Tongue>>,
-    mut labels: Query<&mut Text, With<TellerModelText>>,
-    buttons: Query<(&Interaction, &SwitchModel), Changed<Interaction>>,
+    style: Option<ResMut<crate::hand::HandStyle>>,
+    mut swatches: Query<(&Interaction, &HandSwatch, &mut BorderColor)>,
+    mut names: Query<&mut Text, With<HandStyleName>>,
 ) {
-    let Some(codex) = codex else {
+    let Some(mut style) = style else {
         return;
     };
-    if codex.page != CodexPage::Settings {
-        return;
-    }
-    let current = match tongue.as_mut() {
-        Some(tongue) => tongue.speaking_with(),
-        None => "no model installed — the village keeps its written lines".to_string(),
-    };
-    for mut label in &mut labels {
-        if label.0 != current {
-            *label = Text::new(current.clone());
+    for (interaction, swatch, _) in &swatches {
+        if *interaction == Interaction::Pressed
+            && let Some((_, ramp)) = crate::hand::HAND_STYLES.get(swatch.0)
+            && style.ramp != *ramp
+        {
+            style.ramp = ramp;
         }
     }
-    let Some(tongue) = tongue.as_mut() else {
-        return;
-    };
-    for (interaction, step) in &buttons {
-        if *interaction != Interaction::Pressed {
-            continue;
+    for (_, swatch, mut border) in &mut swatches {
+        let chosen = crate::hand::HAND_STYLES
+            .get(swatch.0)
+            .is_some_and(|(_, ramp)| style.ramp == *ramp);
+        let dress = BorderColor::all(if chosen {
+            ui::theme::accent()
+        } else {
+            ui::theme::panel_border()
+        });
+        if *border != dress {
+            *border = dress;
         }
-        let models = crate::telling::list_models();
-        if models.len() < 2 {
-            continue;
+    }
+    if let Some((name, _)) = crate::hand::HAND_STYLES
+        .iter()
+        .find(|(_, ramp)| style.ramp == *ramp)
+    {
+        let fresh = format!("the hand wears {name}.");
+        for mut text in &mut names {
+            if text.0 != fresh {
+                *text = Text::new(fresh.clone());
+            }
         }
-        let now = tongue.speaking_with();
-        let here = models
-            .iter()
-            .position(|m| m.file_name().is_some_and(|n| n.to_string_lossy() == now))
-            .unwrap_or(0);
-        let next = (here as i64 + step.0 as i64).rem_euclid(models.len() as i64) as usize;
-        tongue.switch_to(models[next].clone());
     }
 }

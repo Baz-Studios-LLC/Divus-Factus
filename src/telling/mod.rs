@@ -276,7 +276,10 @@ impl Retelling {
 enum Ask {
     Retell(Retelling),
     Muse(Box<Musing>),
-    /// Put down one voice and take up another, mid-session.
+    /// Put down one voice and take up another, mid-session. The settings
+    /// page put down its picker, but the switch stays strung: the cloud
+    /// voices to come will pull on it again.
+    #[allow(dead_code)]
     Switch(std::path::PathBuf),
 }
 
@@ -410,6 +413,7 @@ impl Tongue {
     }
 
     /// The model the teller speaks with, by file name.
+    #[allow(dead_code)] // waits, with switch_to, for the voice picker's return
     pub fn speaking_with(&mut self) -> String {
         self.collect();
         self.current.clone()
@@ -422,6 +426,7 @@ impl Tongue {
     /// answers on the next launch. Every cached line is dropped: they were
     /// the OLD voice's words, and serving them from the new one would make
     /// the switch look like it did nothing.
+    #[allow(dead_code)] // waits for the voice picker's return
     pub fn switch_to(&mut self, weights: std::path::PathBuf) {
         if let (Some(dir), Some(name)) = (model_dir(), weights.file_name()) {
             let _ = std::fs::write(dir.join("chosen"), name.to_string_lossy().as_bytes());
