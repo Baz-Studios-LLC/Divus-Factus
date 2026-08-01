@@ -176,7 +176,7 @@ fn speak(
                     flex_direction: FlexDirection::Column,
                     row_gap: px(1),
                     padding: UiRect::axes(px(8), px(4)),
-                    border: UiRect::all(px(1)),
+                    border: UiRect::all(px(2)),
                     // A thought's box rounds a little softer than speech.
                     border_radius: BorderRadius::all(if say.thought { px(12) } else { px(8) }),
                     max_width: px(230),
@@ -198,7 +198,7 @@ fn speak(
                         bottom: px(-drop - size),
                         width: px(size),
                         height: px(size),
-                        border: UiRect::all(px(1)),
+                        border: UiRect::all(px(2)),
                         border_radius: BorderRadius::all(percent(50)),
                         ..default()
                     },
@@ -224,8 +224,8 @@ fn speak(
                     width: px(10),
                     height: px(10),
                     border: UiRect {
-                        right: px(1),
-                        bottom: px(1),
+                        right: px(2),
+                        bottom: px(2),
                         ..default()
                     },
                     ..default()
