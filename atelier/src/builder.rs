@@ -681,6 +681,7 @@ impl Plugin for BuilderPlugin {
             .init_resource::<WorkName>()
             .init_resource::<SnapMode>()
             .init_resource::<DimsEntry>()
+            .init_resource::<History>()
             .add_systems(Startup, raise_shelf.after(crate::rail::raise_rail))
             .add_systems(
                 Update,
@@ -697,6 +698,8 @@ impl Plugin for BuilderPlugin {
                     save_workbench,
                     take_the_name,
                     dims_panel,
+                    recall,
+                    remember,
                     bury_saved_work,
                     settle_words,
                 )
@@ -2991,4 +2994,124 @@ pub(crate) fn dims_panel(
             }
         }
     }
+}
+
+/// The bench's memory: whole-state snapshots, since a build is nothing
+/// but its list of records. Undo therefore covers everything the same
+/// way - placements, punches, stretches, moves, typed sizes, even a
+/// template load or a cleared bench.
+#[derive(Resource, Default)]
+pub struct History {
+    past: Vec<Vec<Placed>>,
+    future: Vec<Vec<Placed>>,
+    current: Vec<Placed>,
+    primed: bool,
+}
+
+fn state_signature(list: &[Placed]) -> String {
+    let mut lines: Vec<String> = list
+        .iter()
+        .map(|record| serde_json::to_string(record).unwrap_or_default())
+        .collect();
+    lines.sort();
+    lines.join("|")
+}
+
+/// Notices settled changes and remembers the state they replaced. While
+/// the mouse button is down nothing commits, so a whole drag lands as
+/// one step.
+fn remember(
+    buttons: Res<ButtonInput<MouseButton>>,
+    mut history: ResMut<History>,
+    placed: Query<&Placed, Without<Ghost>>,
+) {
+    if buttons.pressed(MouseButton::Left) {
+        return;
+    }
+    let now: Vec<Placed> = placed.iter().cloned().collect();
+    if !history.primed {
+        history.current = now;
+        history.primed = true;
+        return;
+    }
+    if state_signature(&now) != state_signature(&history.current) {
+        let old = std::mem::replace(&mut history.current, now);
+        history.past.push(old);
+        if history.past.len() > 50 {
+            history.past.remove(0);
+        }
+        history.future.clear();
+    }
+}
+
+/// Ctrl or cmd with Z walks back; with Y - or shift-Z - walks forward.
+#[allow(clippy::too_many_arguments)]
+fn recall(
+    mut commands: Commands,
+    keys: Res<ButtonInput<KeyCode>>,
+    bench: Res<Bench>,
+    naming: Res<Naming>,
+    dims: Res<DimsEntry>,
+    mut history: ResMut<History>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    palette: Res<Palette>,
+    standing: Query<Entity, (With<Placed>, Without<Ghost>)>,
+) {
+    if *bench != Bench::Builder || naming.0.is_some() || dims.0.is_some() {
+        return;
+    }
+    let held = keys.pressed(KeyCode::ControlLeft)
+        || keys.pressed(KeyCode::ControlRight)
+        || keys.pressed(KeyCode::SuperLeft)
+        || keys.pressed(KeyCode::SuperRight);
+    if !held {
+        return;
+    }
+    let shifted = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+    let back = keys.just_pressed(KeyCode::KeyZ) && !shifted;
+    let forward = keys.just_pressed(KeyCode::KeyY) || (keys.just_pressed(KeyCode::KeyZ) && shifted);
+    if !back && !forward {
+        return;
+    }
+    let restored = if back {
+        let Some(older) = history.past.pop() else {
+            return;
+        };
+        let now = std::mem::replace(&mut history.current, older.clone());
+        history.future.push(now);
+        older
+    } else {
+        let Some(newer) = history.future.pop() else {
+            return;
+        };
+        let now = std::mem::replace(&mut history.current, newer.clone());
+        history.past.push(now);
+        newer
+    };
+    for part in &standing {
+        commands.entity(part).despawn();
+    }
+    for record in &restored {
+        if let Some(kind) = kind_from_name(&record.part) {
+            spawn_part(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &palette,
+                &kind,
+                record,
+                false,
+            );
+        }
+    }
+    info!(
+        "{} to a bench of {} parts",
+        if back {
+            "walked back"
+        } else {
+            "walked forward"
+        },
+        restored.len()
+    );
 }
