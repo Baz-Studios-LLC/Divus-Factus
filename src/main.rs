@@ -8,6 +8,7 @@ mod creature;
 mod debug;
 mod grass;
 mod hand;
+mod keymap;
 mod loading;
 mod markers;
 mod matter;
@@ -167,6 +168,7 @@ fn main() {
             now::NowPlugin,
             telling::TellingPlugin,
         ))
+        .add_plugins(keymap::KeymapPlugin)
         .add_systems(Startup, spawn_lighting)
         .run();
 }

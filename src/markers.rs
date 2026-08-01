@@ -37,17 +37,20 @@ struct PeopleMarker;
 
 fn toggle_markers(
     keys: Res<ButtonInput<KeyCode>>,
+    keymap: Res<crate::keymap::Keymap>,
     mut mode: ResMut<MarkerMode>,
     mut notices: MessageWriter<crate::ui::Notice>,
 ) {
-    if !keys.just_pressed(KeyCode::KeyP) {
+    if !keymap.just_pressed(&keys, crate::keymap::Deed::Markers) {
         return;
     }
     mode.0 = !mode.0;
     if mode.0 {
-        notices.write(crate::ui::Notice::new(
-            "The god marks every soul - press P again to look away".to_string(),
-        ));
+        let cap =
+            crate::keymap::key_name(keymap.key(crate::keymap::Deed::Markers)).unwrap_or("the key");
+        notices.write(crate::ui::Notice::new(format!(
+            "The god marks every soul - press {cap} again to look away"
+        )));
     }
 }
 

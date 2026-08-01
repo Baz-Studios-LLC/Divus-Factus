@@ -61,6 +61,11 @@ impl Plugin for DebugPlugin {
                     spawn_god_panel.after(spawn_village_panel),
                 ),
             )
+            .init_resource::<village::Rebinding>()
+            .add_systems(
+                PreUpdate,
+                village::catch_rebind.after(bevy::input::InputSystems),
+            )
             .add_systems(
                 Update,
                 (
@@ -106,6 +111,7 @@ impl Plugin for DebugPlugin {
                     handle_codex_tabs,
                     people::meet_someone,
                     village::settings_panel,
+                    village::keybind_panel,
                     apply_codex_page,
                     dress_ledger_banner,
                     update_dossier,

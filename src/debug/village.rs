@@ -9,6 +9,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::keymap::Deed;
 use crate::ui;
 use crate::villager::Activity;
 use crate::villager::Chronicle;
@@ -1654,69 +1655,93 @@ pub(crate) struct HandSwatch(pub usize);
 #[derive(Component)]
 pub(crate) struct HandStyleName;
 
-/// Every key the game answers to, in the player's tongue. One table, so the
-/// page never drifts from the truth and a future rebinding screen has a
-/// single place to read from.
-const KEYBINDS: &[(&str, &[(&[&str], &str)])] = &[
+/// One row on the keybinds page: a deed whose key the player may change,
+/// or a fitting that stays where it is (the mouse, escape, the workbench).
+enum Bind {
+    Deed(Deed, &'static str),
+    Fixed(&'static [&'static str], &'static str),
+}
+
+/// Every key the game answers to, in the player's tongue. One table, so
+/// the page never drifts from the truth; the keys themselves live in the
+/// [`crate::keymap::Keymap`], which is the single word on what does what.
+const KEYBINDS: &[(&str, &[Bind])] = &[
     (
         "THE CAMERA",
         &[
-            (
-                &["W", "A", "S", "D"],
-                "glide over the land; the arrows serve too",
-            ),
-            (&["Q", "E"], "swing around the place you watch"),
-            (&["right drag"], "swing and tilt by hand"),
-            (&["middle drag"], "pull the map beneath you"),
-            (&["scroll"], "draw near, or pull away"),
+            Bind::Deed(Deed::PanNorth, "glide north; the arrows serve too"),
+            Bind::Deed(Deed::PanSouth, "glide south"),
+            Bind::Deed(Deed::PanWest, "glide west"),
+            Bind::Deed(Deed::PanEast, "glide east"),
+            Bind::Deed(Deed::TurnLeft, "swing left around the place you watch"),
+            Bind::Deed(Deed::TurnRight, "swing right"),
+            Bind::Fixed(&["right drag"], "swing and tilt by hand"),
+            Bind::Fixed(&["middle drag"], "pull the map beneath you"),
+            Bind::Fixed(&["scroll"], "draw near, or pull away"),
         ],
     ),
     (
         "TIME",
         &[
-            (&["Space"], "hold the world still; let it go again"),
-            (&["-", ","], "let the days walk"),
-            (&["+", "."], "make the days run"),
+            Bind::Deed(Deed::Pause, "hold the world still; let it go again"),
+            Bind::Deed(Deed::Slower, "let the days walk"),
+            Bind::Deed(Deed::Faster, "make the days run"),
         ],
     ),
     (
         "MIRACLES",
         &[
-            (&["1"], "flourish: life where you point"),
-            (&["2"], "smite: the storm answers"),
-            (&["3"], "bounty: food for the stores"),
-            (&["4"], "mend or quake, once legend unlocks them"),
-            (&["click"], "work the chosen miracle"),
-            (&["right click", "Esc"], "set the miracle aside"),
+            Bind::Deed(Deed::Flourish, "flourish: life where you point"),
+            Bind::Deed(Deed::Smite, "smite: the storm answers"),
+            Bind::Deed(Deed::Bounty, "bounty: food for the stores"),
+            Bind::Deed(Deed::MendOrQuake, "mend or quake, once legend unlocks them"),
+            Bind::Fixed(&["click"], "work the chosen miracle"),
+            Bind::Fixed(&["right click", "Esc"], "set the miracle aside"),
         ],
     ),
     (
         "THE GOD'S SIGHT",
         &[
-            (&["Tab"], "open and shut this codex"),
-            (&["P"], "mark every soul"),
-            (
-                &["R"],
+            Bind::Deed(Deed::Codex, "open and shut this codex"),
+            Bind::Deed(Deed::Markers, "mark every soul"),
+            Bind::Deed(
+                Deed::Survey,
                 "the surveyor's sight: woods, stone, clay, iron, wild food",
             ),
-            (&["H"], "lift the roofs and look inside"),
+            Bind::Deed(Deed::Roofs, "lift the roofs and look inside"),
         ],
     ),
     (
         "THE WORKBENCH",
         &[
-            (&["`"], "the frame counter"),
-            (&["F1"], "the tuner's panel"),
-            (&["F2", "F3"], "open and close the lens"),
-            (&["F4", "F5"], "pull the focus near and far"),
-            (&["F6", "F7"], "thicken and thin the haze"),
-            (&["F8", "F9"], "darken and brighten the light"),
-            (&["F10"], "the miniature look, on and off"),
-            (&["F11", "shift F11"], "richer and paler colour"),
-            (&["F12"], "a photograph, saved beside the game"),
+            Bind::Fixed(&["`"], "the frame counter"),
+            Bind::Fixed(&["F1"], "the tuner's panel"),
+            Bind::Fixed(&["F2", "F3"], "open and close the lens"),
+            Bind::Fixed(&["F4", "F5"], "pull the focus near and far"),
+            Bind::Fixed(&["F6", "F7"], "thicken and thin the haze"),
+            Bind::Fixed(&["F8", "F9"], "darken and brighten the light"),
+            Bind::Fixed(&["F10"], "the miniature look, on and off"),
+            Bind::Fixed(&["F11", "shift F11"], "richer and paler colour"),
+            Bind::Fixed(&["F12"], "a photograph, saved beside the game"),
         ],
     ),
 ];
+
+/// The keycap button of a rebindable deed on the settings page.
+#[derive(Component)]
+pub(crate) struct BindButton(pub Deed);
+
+/// The text inside a bind button's cap, kept true to the keymap.
+#[derive(Component)]
+pub(crate) struct BindCap(pub Deed);
+
+/// The button that puts every key back where it started.
+#[derive(Component)]
+pub(crate) struct ResetBinds;
+
+/// Which deed, if any, is waiting for its new key.
+#[derive(Resource, Default)]
+pub(crate) struct Rebinding(pub Option<Deed>);
 
 /// Lays out the settings page in the codex's own manner: a tab bar like the
 /// People page wears, and card wells like the ledger's grid. Keybinds stand
@@ -1796,12 +1821,19 @@ fn build_settings_page(commands: &mut Commands, page: Entity) {
             ChildOf(key),
         ));
     };
+    commands.spawn((
+        ui::dim(
+            "press a cap, then the key you would rather use; a key already \
+             spoken for trades places. escape thinks better of it.",
+        ),
+        ChildOf(tabs[0]),
+    ));
     let top = row_of(commands, tabs[0]);
     let bottom = row_of(commands, tabs[0]);
     for (index, (title, binds)) in KEYBINDS.iter().enumerate() {
         let card = ui::card_well(commands, if index < 3 { top } else { bottom }, title);
-        for (caps, tale) in binds.iter() {
-            let bind = commands
+        for bind in binds.iter() {
+            let row = commands
                 .spawn((
                     Node {
                         width: percent(100),
@@ -1823,22 +1855,93 @@ fn build_settings_page(commands: &mut Commands, page: Entity) {
                         min_width: px(96),
                         ..default()
                     },
-                    ChildOf(bind),
+                    ChildOf(row),
                 ))
                 .id();
-            for cap in caps.iter() {
-                keycap(commands, hands, cap);
-            }
+            let tale = match bind {
+                Bind::Deed(deed, tale) => {
+                    let cap = commands
+                        .spawn((
+                            BindButton(*deed),
+                            ui::UiButton,
+                            ui::KeepFace,
+                            ui::HoverHint::new(
+                                "rebind",
+                                "press the cap, then the key you would rather use",
+                            ),
+                            Interaction::default(),
+                            Node {
+                                min_width: px(34),
+                                padding: UiRect::axes(px(7), px(2)),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                border: UiRect::all(px(1)),
+                                border_radius: BorderRadius::all(px(4)),
+                                flex_shrink: 0.0,
+                                ..default()
+                            },
+                            BackgroundColor(Color::BLACK.with_alpha(0.35)),
+                            BorderColor::all(ui::theme::panel_border().with_alpha(0.8)),
+                            ChildOf(hands),
+                        ))
+                        .id();
+                    commands.spawn((
+                        BindCap(*deed),
+                        Text::new(String::new()),
+                        TextFont {
+                            font_size: FontSize::Px(11.0),
+                            ..default()
+                        },
+                        TextColor(ui::theme::accent().with_alpha(0.95)),
+                        ChildOf(cap),
+                    ));
+                    tale
+                }
+                Bind::Fixed(caps, tale) => {
+                    for cap in caps.iter() {
+                        keycap(commands, hands, cap);
+                    }
+                    tale
+                }
+            };
             commands.spawn((
                 ui::dim(*tale),
                 Node {
                     flex_grow: 1.0,
                     ..default()
                 },
-                ChildOf(bind),
+                ChildOf(row),
             ));
         }
     }
+    // The foot of the page: every key back where it started.
+    let reset = commands
+        .spawn((
+            ResetBinds,
+            ui::UiButton,
+            Interaction::default(),
+            Node {
+                align_self: AlignSelf::FlexStart,
+                padding: UiRect::axes(px(14), px(6)),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(0)),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.18)),
+            BorderColor::all(ui::theme::panel_border().with_alpha(0.4)),
+            ChildOf(tabs[0]),
+        ))
+        .id();
+    commands.spawn((
+        Text::new("RESTORE THE OLD WAYS"),
+        ui::DisplayFace,
+        TextFont {
+            font_size: FontSize::Px(ui::theme::SMALL_SIZE),
+            ..default()
+        },
+        TextColor(ui::theme::accent()),
+        ChildOf(reset),
+    ));
 
     // THE HAND: the swatches from the title's settings, now also living in
     // the book. The hand itself previews every press.
@@ -1959,4 +2062,93 @@ pub(crate) fn settings_panel(
             }
         }
     }
+}
+
+/// The keybinds page at work: cap presses arm a rebind, the reset button
+/// restores the defaults, and every cap and border is kept true.
+pub(crate) fn keybind_panel(
+    mut arming: ResMut<Rebinding>,
+    mut keymap: ResMut<crate::keymap::Keymap>,
+    clicked: Query<(&Interaction, &BindButton), Changed<Interaction>>,
+    reset: Query<&Interaction, (Changed<Interaction>, With<ResetBinds>)>,
+    mut caps: Query<(&BindCap, &mut Text)>,
+    mut borders: Query<(&BindButton, &mut BorderColor)>,
+) {
+    for (interaction, bind) in &clicked {
+        if *interaction == Interaction::Pressed {
+            // Pressing the cap that is already listening stands it down.
+            arming.0 = if arming.0 == Some(bind.0) {
+                None
+            } else {
+                Some(bind.0)
+            };
+        }
+    }
+    for interaction in &reset {
+        if *interaction == Interaction::Pressed {
+            keymap.restore_defaults();
+            crate::keymap::save(&keymap);
+            arming.0 = None;
+        }
+    }
+    for (cap, mut text) in &mut caps {
+        let fresh = if arming.0 == Some(cap.0) {
+            "...".to_string()
+        } else {
+            crate::keymap::key_name(keymap.key(cap.0))
+                .unwrap_or("?")
+                .to_string()
+        };
+        if text.0 != fresh {
+            *text = Text::new(fresh);
+        }
+    }
+    for (bind, mut border) in &mut borders {
+        let dress = BorderColor::all(if arming.0 == Some(bind.0) {
+            ui::theme::accent()
+        } else {
+            ui::theme::panel_border().with_alpha(0.8)
+        });
+        if *border != dress {
+            *border = dress;
+        }
+    }
+}
+
+/// Catches the new key while a rebind is armed. Runs in `PreUpdate`, right
+/// after the input arrives, and eats the press - a key given to the map
+/// must not also do its old work on the way in.
+pub(crate) fn catch_rebind(
+    mut keys: ResMut<ButtonInput<KeyCode>>,
+    mut arming: ResMut<Rebinding>,
+    mut keymap: ResMut<crate::keymap::Keymap>,
+    codex: Option<Res<Codex>>,
+    panels: Query<&Visibility, With<VillagePanel>>,
+) {
+    let Some(deed) = arming.0 else {
+        return;
+    };
+    // The book closed, or turned to another page, mid-listen: stand down.
+    let listening = codex.is_some_and(|codex| codex.page == CodexPage::Settings)
+        && panels.iter().any(|seen| *seen != Visibility::Hidden);
+    if !listening {
+        arming.0 = None;
+        return;
+    }
+    if keys.just_pressed(KeyCode::Escape) {
+        arming.0 = None;
+        keys.clear_just_pressed(KeyCode::Escape);
+        return;
+    }
+    let Some(key) = keys
+        .get_just_pressed()
+        .copied()
+        .find(|key| crate::keymap::key_name(*key).is_some())
+    else {
+        return;
+    };
+    keymap.bind(deed, key);
+    crate::keymap::save(&keymap);
+    arming.0 = None;
+    keys.clear_just_pressed(key);
 }

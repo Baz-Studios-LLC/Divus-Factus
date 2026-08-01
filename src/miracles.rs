@@ -59,6 +59,7 @@ impl Plugin for MiraclesPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SelectedMiracle>()
             .add_systems(Startup, spawn_hotbar)
+            .add_systems(Update, dress_slot_caps)
             .add_systems(
                 Update,
                 (
@@ -317,13 +318,38 @@ impl Miracle {
         }
     }
 
-    pub fn key(self) -> KeyCode {
-        match self {
-            Miracle::Flourish => KeyCode::Digit1,
-            Miracle::Smite => KeyCode::Digit2,
-            Miracle::Bounty => KeyCode::Digit3,
+    pub fn key(self, keymap: &crate::keymap::Keymap) -> KeyCode {
+        use crate::keymap::Deed;
+        keymap.key(match self {
+            Miracle::Flourish => Deed::Flourish,
+            Miracle::Smite => Deed::Smite,
+            Miracle::Bounty => Deed::Bounty,
             // Whichever of the pair is earned takes the fourth slot.
-            Miracle::Mend | Miracle::Quake => KeyCode::Digit4,
+            Miracle::Mend | Miracle::Quake => Deed::MendOrQuake,
+        })
+    }
+}
+
+/// The keycap letter in a slot's corner, kept true to the keymap.
+#[derive(Component)]
+struct SlotCap(usize);
+
+/// Keeps every slot's corner naming the key that actually arms it.
+fn dress_slot_caps(keymap: Res<crate::keymap::Keymap>, mut caps: Query<(&SlotCap, &mut Text)>) {
+    use crate::keymap::{Deed, key_name};
+    for (cap, mut text) in &mut caps {
+        let name = match cap.0 {
+            0 => key_name(keymap.key(Deed::Flourish)),
+            1 => key_name(keymap.key(Deed::Smite)),
+            2 => key_name(keymap.key(Deed::Bounty)),
+            3 => key_name(keymap.key(Deed::MendOrQuake)),
+            _ => None,
+        };
+        let fresh = name
+            .map(str::to_string)
+            .unwrap_or_else(|| format!("{}", cap.0 + 1));
+        if text.0 != fresh {
+            *text = Text::new(fresh);
         }
     }
 }
@@ -479,10 +505,11 @@ fn spawn_hotbar(mut commands: Commands) {
             ));
         }
 
-        // The number in the corner, hotkey-style.
+        // The key in the corner, hotkey-style, kept true to the keymap.
         let number = commands
             .spawn((
-                ui::dim(format!("{}", index + 1)),
+                SlotCap(index),
+                ui::dim(String::new()),
                 Node {
                     position_type: PositionType::Absolute,
                     left: px(4),
@@ -656,6 +683,7 @@ fn reveal_earned_miracle(
 /// Escape lowers the hand empty.
 fn choose_miracle(
     keys: Res<ButtonInput<KeyCode>>,
+    keymap: Res<crate::keymap::Keymap>,
     buttons: Res<ButtonInput<MouseButton>>,
     slots: Query<(&Interaction, &MiracleSlot), Changed<Interaction>>,
     all_slots: Query<&MiracleSlot>,
@@ -693,7 +721,8 @@ fn choose_miracle(
         Miracle::Mend,
         Miracle::Quake,
     ] {
-        if keys.just_pressed(miracle.key()) && all_slots.iter().any(|s| s.0 == Some(miracle)) {
+        if keys.just_pressed(miracle.key(&keymap)) && all_slots.iter().any(|s| s.0 == Some(miracle))
+        {
             arm(miracle, &mut selected);
         }
     }

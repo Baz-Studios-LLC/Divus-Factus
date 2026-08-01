@@ -1,0 +1,26 @@
+X:1
+T:Made By Belief
+C:ChatGPT
+M:4/4
+L:1/8
+Q:1/4=78
+K:Ddor
+
+V:1 name="Melody"
+| D2 F2 E2 D2 | A,2 D2 F2 E2 | G2 F2 E2 C2 | D4 A,4 |
+| D2 F2 A2 G2 | F2 E2 D2 C2 | A,2 C2 D2 F2 | E4 D4 |
+| F2 A2 G2 F2 | E2 D2 C2 A,2 | C2 D2 F2 E2 | D4 A,4 |
+| G2 F2 E2 D2 | A,2 D2 C2 A,2 | D2 F2 E2 C2 | D8 ||
+
+V:2 name="Drone"
+| D,4 A,,4 | D,4 A,,4 | C,4 G,,4 | D,4 A,,4 |
+| D,4 A,,4 | C,4 G,,4 | A,,4 C,4 | D,8 |
+| D,4 A,,4 | C,4 G,,4 | A,,4 C,4 | D,4 A,,4 |
+| G,,4 D,4 | A,,4 C,4 | D,4 A,,4 | D,8 ||
+
+V:3 name="Pulse"
+| D,2 z2 A,,2 z2 | D,2 z2 A,,2 z2 | C,2 z2 G,,2 z2 | D,2 z2 A,,2 z2 |
+| D,2 z2 A,,2 z2 | C,2 z2 G,,2 z2 | A,,2 z2 C,2 z2 | D,2 z2 D,2 z2 |
+| D,2 z2 A,,2 z2 | C,2 z2 G,,2 z2 | A,,2 z2 C,2 z2 | D,2 z2 A,,2 z2 |
+| G,,2 z2 D,2 z2 | A,,2 z2 C,2 z2 | D,2 z2 A,,2 z2 | D,8 ||
+

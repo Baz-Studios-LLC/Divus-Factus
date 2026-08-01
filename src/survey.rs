@@ -130,6 +130,7 @@ const SIDE: i32 = 80;
 
 fn toggle_survey(
     keys: Res<ButtonInput<KeyCode>>,
+    keymap: Res<crate::keymap::Keymap>,
     mut survey: ResMut<Survey>,
     mut notices: MessageWriter<crate::ui::Notice>,
     mut booted: Local<bool>,
@@ -140,7 +141,7 @@ fn toggle_survey(
             survey.on = true;
         }
     }
-    if !keys.just_pressed(KeyCode::KeyR) {
+    if !keymap.just_pressed(&keys, crate::keymap::Deed::Survey) {
         return;
     }
     survey.on = !survey.on;

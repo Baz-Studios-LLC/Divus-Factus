@@ -325,6 +325,7 @@ fn spawn_camera(mut commands: Commands) {
 
 fn read_camera_input(
     keys: Res<ButtonInput<KeyCode>>,
+    keymap: Res<crate::keymap::Keymap>,
     buttons: Res<ButtonInput<MouseButton>>,
     mouse_motion: Res<AccumulatedMouseMotion>,
     mouse_scroll: Res<AccumulatedMouseScroll>,
@@ -342,16 +343,17 @@ fn read_camera_input(
     // Panning. Speed scales with zoom so that crossing the screen takes about the
     // same time whether you are looking at one villager or the whole valley.
     let mut pan = Vec3::ZERO;
-    if keys.any_pressed([KeyCode::KeyW, KeyCode::ArrowUp]) {
+    use crate::keymap::Deed;
+    if keymap.pressed(&keys, Deed::PanNorth) || keys.pressed(KeyCode::ArrowUp) {
         pan += rig.ground_forward();
     }
-    if keys.any_pressed([KeyCode::KeyS, KeyCode::ArrowDown]) {
+    if keymap.pressed(&keys, Deed::PanSouth) || keys.pressed(KeyCode::ArrowDown) {
         pan -= rig.ground_forward();
     }
-    if keys.any_pressed([KeyCode::KeyA, KeyCode::ArrowLeft]) {
+    if keymap.pressed(&keys, Deed::PanWest) || keys.pressed(KeyCode::ArrowLeft) {
         pan -= rig.ground_right();
     }
-    if keys.any_pressed([KeyCode::KeyD, KeyCode::ArrowRight]) {
+    if keymap.pressed(&keys, Deed::PanEast) || keys.pressed(KeyCode::ArrowRight) {
         pan += rig.ground_right();
     }
 
@@ -391,10 +393,10 @@ fn read_camera_input(
 
     // Keyboard orbit, so the camera is fully usable without a mouse button held.
     let mut keyboard_yaw = 0.0;
-    if keys.pressed(KeyCode::KeyQ) {
+    if keymap.pressed(&keys, Deed::TurnLeft) {
         keyboard_yaw += 1.0;
     }
-    if keys.pressed(KeyCode::KeyE) {
+    if keymap.pressed(&keys, Deed::TurnRight) {
         keyboard_yaw -= 1.0;
     }
     if keyboard_yaw != 0.0 {

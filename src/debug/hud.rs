@@ -107,7 +107,7 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
         (HudValue::Focus, "focus", "F4/F5"),
         (HudValue::Visibility, "visibility", "F6/F7"),
         (HudValue::Exposure, "exposure", "F8/F9"),
-        (HudValue::Saturation, "saturation", "F12/F11"),
+        (HudValue::Saturation, "saturation", "F11/shift-F11"),
         (HudValue::DepthOfField, "depth of field", "F10"),
     ];
     for (value, label, hint) in look_rows {
@@ -117,8 +117,9 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
 
     let hints = commands
         .spawn(ui::dim(
-            "WASD or MMB-drag pan / QE or RMB orbit / wheel zoom\n\
-             hold LMB to grab, flick to throw / Tab opens the codex / F1 hides this panel",
+            "MMB-drag pans, RMB orbits, the wheel zooms; the letter keys \n\
+             live in the codex settings / hold LMB to grab, flick to throw \n\
+             / F1 hides this panel",
         ))
         .id();
     commands.entity(hints).insert((
@@ -191,6 +192,7 @@ pub(crate) fn nudge(value: &mut f32, delta: f32, lo: f32, hi: f32) -> bool {
 
 pub(crate) fn handle_tuning_input(
     keys: Res<ButtonInput<KeyCode>>,
+    keymap: Res<crate::keymap::Keymap>,
     playing: Res<State<crate::GameState>>,
     mut look: ResMut<LookSettings>,
     mut state: ResMut<DebugState>,
@@ -198,7 +200,9 @@ pub(crate) fn handle_tuning_input(
 ) {
     // Tab belongs to the player now: it opens the codex, the game's own
     // book. The developer's instrument panel retreats to F1.
-    if keys.just_pressed(KeyCode::Tab) && matches!(playing.get(), crate::GameState::Playing) {
+    if keymap.just_pressed(&keys, crate::keymap::Deed::Codex)
+        && matches!(playing.get(), crate::GameState::Playing)
+    {
         for mut visibility in &mut codex {
             *visibility = if *visibility == Visibility::Hidden {
                 Visibility::Visible
@@ -479,12 +483,13 @@ pub(crate) fn report_frames(time: Res<Time<Real>>, mut window: Local<(f32, u32, 
 /// (R already belongs to the survey.)
 pub(crate) fn toggle_roofs(
     keys: Res<ButtonInput<KeyCode>>,
+    keymap: Res<crate::keymap::Keymap>,
     mut lifted: Local<Option<bool>>,
     mut roofs: Query<&mut Visibility, With<crate::villager::work::RoofPart>>,
 ) {
     // Capture tooling: DIVUS_FACTUS_ROOFLESS starts the world cut away.
     let lifted = lifted.get_or_insert_with(|| std::env::var("DIVUS_FACTUS_ROOFLESS").is_ok());
-    if keys.just_pressed(KeyCode::KeyH) {
+    if keymap.just_pressed(&keys, crate::keymap::Deed::Roofs) {
         *lifted = !*lifted;
     }
     for mut visibility in &mut roofs {

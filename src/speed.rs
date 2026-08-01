@@ -124,22 +124,21 @@ fn spawn_speed_strip(mut commands: Commands) {
 /// wanting the world to move.
 fn command_time(
     keys: Res<ButtonInput<KeyCode>>,
+    keymap: Res<crate::keymap::Keymap>,
     buttons: Query<(&Interaction, &SpeedButton), Changed<Interaction>>,
     mut sim: ResMut<SimSpeed>,
 ) {
-    if keys.just_pressed(KeyCode::Space) {
+    if keymap.just_pressed(&keys, crate::keymap::Deed::Pause) {
         sim.paused = !sim.paused;
     }
     let step = STEPS
         .iter()
         .position(|s| (*s - sim.speed).abs() < 0.01)
         .unwrap_or(0);
-    let slower = keys.just_pressed(KeyCode::Comma)
-        || keys.just_pressed(KeyCode::Minus)
+    let slower = keymap.just_pressed(&keys, crate::keymap::Deed::Slower)
         || keys.just_pressed(KeyCode::NumpadSubtract);
-    // The plus lives on the Equal key without its shift; both read as +.
-    let faster = keys.just_pressed(KeyCode::Period)
-        || keys.just_pressed(KeyCode::Equal)
+    // The plus lives on the Equal key without its shift; it reads as +.
+    let faster = keymap.just_pressed(&keys, crate::keymap::Deed::Faster)
         || keys.just_pressed(KeyCode::NumpadAdd);
     if slower && step > 0 {
         sim.speed = STEPS[step - 1];
