@@ -93,6 +93,26 @@ impl Skills {
 }
 
 impl Vocation {
+    /// The trade as a name rather than a doing: what a person IS, for
+    /// the label over their head.
+    pub fn trade(self) -> &'static str {
+        match self {
+            Vocation::Gatherer => "gatherer",
+            Vocation::Fisher => "fisher",
+            Vocation::Hunter => "hunter",
+            Vocation::Miner => "miner",
+            Vocation::Forester => "forester",
+            Vocation::Carpenter => "carpenter",
+            Vocation::Farmer => "farmer",
+            Vocation::Mason => "mason",
+            Vocation::Cook => "cook",
+            Vocation::Healer => "healer",
+            Vocation::Priest => "priest",
+            Vocation::Explorer => "explorer",
+            Vocation::Guard => "guard",
+        }
+    }
+
     /// The vocation as the inspector names it.
     pub fn describe(self) -> &'static str {
         match self {

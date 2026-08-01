@@ -1714,6 +1714,7 @@ const KEYBINDS: &[(&str, &[Bind])] = &[
 walls down as well",
             ),
             Bind::Deed(Deed::Doings, "every soul says what they are at"),
+            Bind::Deed(Deed::Trades, "every soul says their trade"),
         ],
     ),
     (

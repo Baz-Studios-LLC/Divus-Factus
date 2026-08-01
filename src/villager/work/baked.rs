@@ -207,12 +207,18 @@ fn prism(lengthwise: bool) -> Mesh {
 }
 
 /// Which of the game's three build stages a baked stage belongs to.
-fn stage_of(stage: &str) -> u8 {
-    match stage {
-        "footing" => 0,
-        "frame" => 1,
-        "walls" => 2,
-        _ => 3,
+fn stage_of(stage: &str, framed: bool) -> u8 {
+    // A house drawn with no frame rises in three steps, not four, so its
+    // walls and roof must move DOWN a step to match - or the last step
+    // is one the build never reaches, and the roof and the furniture
+    // never arrive at all.
+    match (stage, framed) {
+        ("footing", _) => 0,
+        ("frame", _) => 1,
+        ("walls", true) => 2,
+        ("walls", false) => 1,
+        (_, true) => 3,
+        (_, false) => 2,
     }
 }
 
@@ -237,7 +243,12 @@ pub fn raise_baked(
     let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
     let wedge = meshes.add(prism(false));
     let ridge = meshes.add(prism(true));
-    for piece in work.boxes.iter().filter(|b| stage_of(&b.stage) == stage) {
+    let framed = has_frame(work);
+    for piece in work
+        .boxes
+        .iter()
+        .filter(|b| stage_of(&b.stage, framed) == stage)
+    {
         // The house's own walls and roof take this building's cloth;
         // every frame, sill, floorboard and stick of furniture keeps
         // exactly what the maker painted it.
