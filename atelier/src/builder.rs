@@ -490,10 +490,10 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         PartKind::Prop("door") => vec![
             // Jambs, lintel board, and the leaf itself, all on the
             // lattice, with a gold latch.
-            slab(-0.5625, 1.0, 0.0, 0.125, 2.0, 0.3125, "wood", 0.45),
-            slab(0.5625, 1.0, 0.0, 0.125, 2.0, 0.3125, "wood", 0.45),
-            slab(0.0, 2.0625, 0.0, 1.25, 0.125, 0.3125, "wood", 0.45),
-            slab(0.0, 1.0, 0.03125, 1.0, 1.9375, 0.0625, "wood", 0.35),
+            slab(-0.5625, 1.0, 0.0, 0.125, 2.0, 0.375, "wood", 0.45),
+            slab(0.5625, 1.0, 0.0, 0.125, 2.0, 0.375, "wood", 0.45),
+            slab(0.0, 2.0625, 0.0, 1.25, 0.125, 0.375, "wood", 0.45),
+            slab(0.0, 1.0, 0.03125, 1.0, 2.0, 0.0625, "wood", 0.35),
             slab(
                 0.375,
                 1.0,
@@ -508,17 +508,17 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         PartKind::Prop("doorway") => vec![
             // An opening with no leaf: jambs and a lintel, for the ways
             // between rooms that never wanted a door.
-            slab(-0.5625, 1.0, 0.0, 0.125, 2.0, 0.3125, "wood", 0.45),
-            slab(0.5625, 1.0, 0.0, 0.125, 2.0, 0.3125, "wood", 0.45),
-            slab(0.0, 2.0625, 0.0, 1.25, 0.125, 0.3125, "wood", 0.45),
+            slab(-0.5625, 1.0, 0.0, 0.125, 2.0, 0.375, "wood", 0.45),
+            slab(0.5625, 1.0, 0.0, 0.125, 2.0, 0.375, "wood", 0.45),
+            slab(0.0, 2.0625, 0.0, 1.25, 0.125, 0.375, "wood", 0.45),
         ],
         PartKind::Prop("window") => vec![
             // Frame boards around the opening and a pale pane within it,
             // all on the lattice.
-            slab(-0.5625, 1.375, 0.0, 0.125, 1.125, 0.3125, "wood", 0.45),
-            slab(0.5625, 1.375, 0.0, 0.125, 1.125, 0.3125, "wood", 0.45),
+            slab(-0.5625, 1.375, 0.0, 0.125, 1.125, 0.375, "wood", 0.45),
+            slab(0.5625, 1.375, 0.0, 0.125, 1.125, 0.375, "wood", 0.45),
             slab(0.0, 0.8125, 0.0, 1.25, 0.125, 0.375, "wood", 0.45),
-            slab(0.0, 1.9375, 0.0, 1.25, 0.125, 0.3125, "wood", 0.45),
+            slab(0.0, 1.9375, 0.0, 1.25, 0.125, 0.375, "wood", 0.45),
             glass(0.0, 1.375, 0.0, 1.0, 1.0, 0.0625, "sky", 0.8),
             slab(0.0, 1.375, 0.03125, 0.0625, 1.0, 0.0625, "wood", 0.5),
             slab(0.0, 1.375, 0.03125, 1.0, 0.0625, 0.0625, "wood", 0.5),
