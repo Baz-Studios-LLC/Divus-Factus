@@ -2515,10 +2515,12 @@ fn punch_wall(
     } else {
         PartKind::Prop("window")
     };
+    // The frame keeps the wall's own footing - a door in a wall on a
+    // foundation stands on the foundation, not sunk to the ground.
     let frame_at = base + along * middle;
     let frame = Placed {
         part: part_name(&frame_kind),
-        at: [frame_at.x, 0.0, frame_at.z],
+        at: [frame_at.x, base.y, frame_at.z],
         yaw: record.yaw,
         tilt: 0.0,
         ramp: hand.ramp.clone(),
@@ -2540,7 +2542,7 @@ fn punch_wall(
         let widget = PartKind::Widget("door");
         let mark = Placed {
             part: part_name(&widget),
-            at: [frame_at.x, 0.0, frame_at.z],
+            at: [frame_at.x, base.y, frame_at.z],
             yaw: record.yaw,
             tilt: 0.0,
             ramp: None,
