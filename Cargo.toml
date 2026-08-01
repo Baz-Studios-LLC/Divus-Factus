@@ -7,7 +7,7 @@ edition = "2024"
 winres = "0.1"
 
 [dependencies]
-bevy = { version = "0.19.0", features = ["serialize"] }
+bevy = { version = "0.19.0", features = ["serialize", "wav"] }
 # Temporary: names systems and components in B0001 conflict panics.
 bevy_ecs = { version = "0.19.0", features = ["debug"] }
 # The one other dependency, for save files. Hand-rolling serialization for a

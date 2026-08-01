@@ -14,6 +14,7 @@ mod markers;
 mod matter;
 mod meshbuild;
 mod miracles;
+mod music;
 mod navigation;
 mod noise;
 mod now;
@@ -168,7 +169,7 @@ fn main() {
             now::NowPlugin,
             telling::TellingPlugin,
         ))
-        .add_plugins(keymap::KeymapPlugin)
+        .add_plugins((keymap::KeymapPlugin, music::MusicPlugin))
         .add_systems(Startup, spawn_lighting)
         .run();
 }

@@ -112,6 +112,7 @@ impl Plugin for DebugPlugin {
                     people::meet_someone,
                     village::settings_panel,
                     village::keybind_panel,
+                    village::sound_panel,
                     apply_codex_page,
                     dress_ledger_banner,
                     update_dossier,

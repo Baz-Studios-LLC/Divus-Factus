@@ -2008,8 +2008,7 @@ fn build_settings_page(commands: &mut Commands, page: Entity) {
     let sound = ui::card_well(commands, av_row, "SOUND");
     commands.spawn((
         ui::dim(
-            "the world is still silent. wind, rain and the sounds of work \
-             will find their voices in a later age.",
+            "three airs, by the hour: the title's theme, the hearth by day, the presence by night.",
         ),
         Node {
             max_width: px(430),
@@ -2017,6 +2016,82 @@ fn build_settings_page(commands: &mut Commands, page: Entity) {
         },
         ChildOf(sound),
     ));
+    let row = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: px(10),
+                margin: UiRect::top(px(6)),
+                ..default()
+            },
+            ChildOf(sound),
+        ))
+        .id();
+    let nudge = |commands: &mut Commands, glyph: &str, step: i8| {
+        let button = commands
+            .spawn((
+                NudgeMusic(step),
+                ui::UiButton,
+                Interaction::default(),
+                Node {
+                    padding: UiRect::axes(px(10), px(4)),
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::all(px(7)),
+                    ..default()
+                },
+                BackgroundColor(Color::BLACK.with_alpha(0.18)),
+                BorderColor::all(ui::theme::panel_border().with_alpha(0.5)),
+                ChildOf(row),
+            ))
+            .id();
+        commands.spawn((
+            Text::new(glyph.to_string()),
+            TextFont {
+                font_size: FontSize::Px(13.0),
+                ..default()
+            },
+            TextColor(ui::theme::text()),
+            ChildOf(button),
+        ));
+    };
+    nudge(commands, "<", -1);
+    commands.spawn((MusicVolumeText, ui::body(""), ChildOf(row)));
+    nudge(commands, ">", 1);
+}
+
+/// The music volume readout on the sound card.
+#[derive(Component)]
+pub(crate) struct MusicVolumeText;
+
+/// A button that steps the music volume down (-1) or up (+1).
+#[derive(Component)]
+pub(crate) struct NudgeMusic(pub i8);
+
+/// The sound card at work: presses walk the volume in tenths, the readout
+/// stays true, and the choice is written down beside the saves.
+pub(crate) fn sound_panel(
+    mut volume: ResMut<crate::music::MusicVolume>,
+    buttons: Query<(&Interaction, &NudgeMusic), Changed<Interaction>>,
+    mut readouts: Query<&mut Text, With<MusicVolumeText>>,
+) {
+    for (interaction, nudge) in &buttons {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        volume.0 = (volume.0 + nudge.0 as f32 * 0.1).clamp(0.0, 1.0);
+        crate::music::save_volume(&volume);
+    }
+    let fresh = if volume.0 <= 0.0 {
+        "music - silent".to_string()
+    } else {
+        format!("music - {:.0}%", volume.0 * 100.0)
+    };
+    for mut text in &mut readouts {
+        if text.0 != fresh {
+            *text = Text::new(fresh.clone());
+        }
+    }
 }
 
 /// Presses on the hand swatches restyle the hand, mid-game; the chosen
