@@ -72,6 +72,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
 
 pub const FURNITURE: &[CatalogEntry] = &[
     prop("BED", "bed"),
+    prop("BED, DOUBLE", "bed-double"),
     prop("TABLE", "table"),
     prop("STOOL", "stool"),
     prop("CHAIR", "chair"),
@@ -159,6 +160,14 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(0.0, 0.26, 0.0, 0.76, 0.24, 1.64, "wood", 0.55),
             slab(0.0, 0.44, 0.0, 0.62, 0.18, 1.5, "bone", 0.8),
             slab(0.0, 0.56, 0.55, 0.46, 0.1, 0.32, "bone", 0.95),
+        ],
+        PartKind::Prop("bed-double") => vec![
+            // Room for two: the single's proportions, widened, with a
+            // pillow for each head at +Z.
+            slab(0.0, 0.26, 0.0, 1.29, 0.24, 1.64, "wood", 0.55),
+            slab(0.0, 0.44, 0.0, 1.15, 0.18, 1.5, "bone", 0.8),
+            slab(-0.27, 0.56, 0.55, 0.42, 0.1, 0.32, "bone", 0.95),
+            slab(0.27, 0.56, 0.55, 0.42, 0.1, 0.32, "bone", 0.95),
         ],
         PartKind::Prop("table") => {
             let mut parts = vec![slab(0.0, 0.72, 0.0, 1.5, 0.1, 0.9, "wood", 0.65)];
