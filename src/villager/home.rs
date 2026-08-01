@@ -131,12 +131,28 @@ pub(super) fn assign_beds(
     }
 }
 
-/// Holds sleepers to their mattresses: the one pose the animations must
-/// not argue with.
-pub(super) fn hold_abed(mut sleepers: Query<(&Abed, &mut Transform), With<Villager>>) {
-    for (abed, mut transform) in &mut sleepers {
-        transform.translation = abed.at;
-        transform.rotation = abed.facing;
+/// Holds sleepers to their mattresses — and is the ONE authority on
+/// rising. Daybreak frees every held sleeper regardless of what some
+/// other system set their activity to overnight; the first version only
+/// released the still-Sleeping, and anyone whose activity had been
+/// flipped meanwhile stayed nailed to the mattress for the rest of their
+/// lives while the ledger showed a village of eleven with nobody working.
+pub(super) fn hold_abed(
+    mut commands: Commands,
+    clock: Res<crate::calendar::WorldClock>,
+    mut sleepers: Query<(Entity, &Abed, &mut Transform, &mut CreatureMotion), With<Villager>>,
+) {
+    let night = clock.is_night();
+    for (entity, abed, mut transform, mut motion) in &mut sleepers {
+        if night {
+            transform.translation = abed.at;
+            transform.rotation = abed.facing;
+        } else {
+            commands.entity(entity).remove::<Abed>();
+            transform.rotation = Quat::IDENTITY;
+            transform.translation.y -= 0.3;
+            motion.speed = 1.0;
+        }
     }
 }
 
