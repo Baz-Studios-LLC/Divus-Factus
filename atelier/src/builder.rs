@@ -1671,11 +1671,40 @@ fn move_ghost(
         } else {
             4.0
         };
-        let to = Vec3::new(
+        let mut to = Vec3::new(
             (point.x * grid).round() / grid,
             anchor.y,
             (point.z * grid).round() / grid,
         );
+        // The drawn end answers the same magnets as any wall end: joint
+        // crossings, wall ends and platform corners pull it off the
+        // plain grid, so a stretched wall can actually MEET a seated
+        // one instead of stopping a half-thickness short.
+        let half_thick = WALL_THICK * 0.5;
+        let mut stops: Vec<Vec3> = Vec::new();
+        for (end, out) in wall_ends(&placed) {
+            stops.push(end);
+            stops.push(end - out * half_thick);
+        }
+        for platform in platform_rects(&placed) {
+            let spin = Quat::from_rotation_y(platform.yaw);
+            for (sx, sz) in [(-1.0f32, -1.0f32), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+                stops.push(
+                    platform.at + spin * Vec3::new(sx * platform.half.x, 0.0, sz * platform.half.y),
+                );
+            }
+        }
+        let mut best: Option<(f32, Vec3)> = None;
+        for stop in stops {
+            let gap = Vec2::new(stop.x - to.x, stop.z - to.z).length();
+            if gap < 0.4 && best.as_ref().is_none_or(|(b, _)| gap < *b) {
+                best = Some((gap, stop));
+            }
+        }
+        if let Some((_, stop)) = best {
+            to.x = stop.x;
+            to.z = stop.z;
+        }
         let reach = to - anchor;
         let (made, centre, yaw) = if axes == 1 {
             let on_x = reach.x.abs() >= reach.z.abs();
@@ -1825,13 +1854,15 @@ fn move_ghost(
 
     // Walls click to wall ends - a butt joint or a square corner - and
     // the corner pole magnetizes to the same points it exists to cover.
-    let magnetic = matches!(kind, PartKind::Wall(_)) || kind == PartKind::Prop("pole");
+    let magnetic = matches!(kind, PartKind::Wall(_))
+        || kind == PartKind::Prop("pole")
+        || kind.run_axes() == Some(1);
     if magnetic {
         let mut ends = wall_ends(&placed);
         let platforms = platform_rects(&placed);
         // The pole magnetizes to centreline crossings at platform corners
         // - the exact point two flush walls meet - alongside wall ends.
-        if kind == PartKind::Prop("pole") {
+        if kind == PartKind::Prop("pole") || kind.run_axes() == Some(1) {
             for platform in &platforms {
                 let spin = Quat::from_rotation_y(platform.yaw);
                 for (sx, sz) in [(-1.0f32, -1.0f32), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
