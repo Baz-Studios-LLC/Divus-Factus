@@ -689,17 +689,17 @@
       "flip": false
     },
     {
-      "part": "widget:sit",
+      "part": "prop:bed-double",
       "at": [
         -6.0,
-        0.4375,
-        0.27124983
+        0.375,
+        -5.5
       ],
-      "yaw": 4.712389,
+      "yaw": 3.1415927,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
-      "stage": "widget",
+      "stage": "furnishing",
       "flip": false
     },
     {
@@ -899,67 +899,11 @@
       "flip": false
     },
     {
-      "part": "widget:sit",
+      "part": "prop:side-table",
       "at": [
-        -6.875,
-        0.39250004,
-        1.375
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "widget",
-      "flip": false
-    },
-    {
-      "part": "widget:sit",
-      "at": [
-        -5.1875005,
-        0.3125,
-        1.35625
-      ],
-      "yaw": 3.1415927,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "widget",
-      "flip": false
-    },
-    {
-      "part": "prop:bed",
-      "at": [
-        -1.0,
+        -4.75,
         0.375,
-        -2.875
-      ],
-      "yaw": 3.1415927,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "furnishing",
-      "flip": false
-    },
-    {
-      "part": "prop:bed",
-      "at": [
-        -1.0,
-        0.375,
-        -5.6875
-      ],
-      "yaw": 3.1415927,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "furnishing",
-      "flip": false
-    },
-    {
-      "part": "prop:chair",
-      "at": [
-        -6.0,
-        0.375,
-        0.25
+        -6.1875
       ],
       "yaw": 0.0,
       "tilt": 0.0,
@@ -969,11 +913,53 @@
       "flip": false
     },
     {
-      "part": "prop:chair",
+      "part": "widget:sleep",
       "at": [
-        -6.0,
+        -6.5,
+        0.90625,
+        -5.5
+      ],
+      "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "widget",
+      "flip": false
+    },
+    {
+      "part": "widget:sit",
+      "at": [
+        -2.0625,
+        0.46875,
+        1.5
+      ],
+      "yaw": -1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "widget",
+      "flip": false
+    },
+    {
+      "part": "prop:couch",
+      "at": [
+        -2.5,
         0.375,
-        2.5
+        1.5
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "furnishing",
+      "flip": false
+    },
+    {
+      "part": "prop:bed",
+      "at": [
+        -1.0,
+        0.375,
+        -2.5
       ],
       "yaw": 3.1415927,
       "tilt": 0.0,
@@ -983,31 +969,45 @@
       "flip": false
     },
     {
-      "part": "prop:chair",
+      "part": "widget:sleep",
       "at": [
-        -6.9375,
-        0.375,
-        1.375
+        -1.0,
+        0.90625,
+        -5.25
       ],
-      "yaw": 7.853982,
+      "yaw": 1.5707964,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
-      "stage": "furnishing",
+      "stage": "widget",
       "flip": false
     },
     {
-      "part": "prop:chair",
+      "part": "widget:sleep",
       "at": [
-        -5.125,
-        0.375,
-        1.375
+        -1.0,
+        0.90625,
+        -2.5
       ],
-      "yaw": 10.995574,
+      "yaw": 1.5707964,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
-      "stage": "furnishing",
+      "stage": "widget",
+      "flip": false
+    },
+    {
+      "part": "widget:sleep",
+      "at": [
+        -5.5,
+        0.90625,
+        -5.5
+      ],
+      "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "widget",
       "flip": false
     },
     {
@@ -1081,17 +1081,17 @@
       "flip": false
     },
     {
-      "part": "widget:sit",
+      "part": "prop:bed",
       "at": [
-        -6.0,
-        0.39499998,
-        2.5
+        -1.0,
+        0.375,
+        -5.25
       ],
-      "yaw": 7.853982,
+      "yaw": 3.1415927,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
-      "stage": "widget",
+      "stage": "furnishing",
       "flip": false
     },
     {
@@ -1109,87 +1109,17 @@
       "flip": false
     },
     {
-      "part": "widget:sleep",
+      "part": "widget:sit",
       "at": [
-        -1.0,
-        0.905,
-        -2.75
+        -2.9375,
+        0.46875,
+        1.5
       ],
-      "yaw": 1.5707964,
+      "yaw": -1.5707964,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
       "stage": "widget",
-      "flip": false
-    },
-    {
-      "part": "widget:sleep",
-      "at": [
-        -1.0,
-        0.905,
-        -5.5
-      ],
-      "yaw": 1.5707964,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "widget",
-      "flip": false
-    },
-    {
-      "part": "prop:bed-double",
-      "at": [
-        -6.0,
-        0.375,
-        -5.5
-      ],
-      "yaw": 3.1415927,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "furnishing",
-      "flip": false
-    },
-    {
-      "part": "widget:sleep",
-      "at": [
-        -6.5,
-        0.90625,
-        -5.5
-      ],
-      "yaw": 7.853982,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "widget",
-      "flip": false
-    },
-    {
-      "part": "widget:sleep",
-      "at": [
-        -5.5,
-        0.90625,
-        -5.5
-      ],
-      "yaw": 7.853982,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "widget",
-      "flip": false
-    },
-    {
-      "part": "prop:side-table",
-      "at": [
-        -4.75,
-        0.375,
-        -6.1875
-      ],
-      "yaw": 0.0,
-      "tilt": 0.0,
-      "ramp": null,
-      "shade": 0.7,
-      "stage": "furnishing",
       "flip": false
     },
     {
@@ -1207,17 +1137,115 @@
       "flip": false
     },
     {
-      "part": "prop:couch",
+      "part": "prop:chair",
       "at": [
-        -2.5,
+        -6.0,
         0.375,
-        1.5
+        2.5
+      ],
+      "yaw": 3.1415927,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "furnishing",
+      "flip": false
+    },
+    {
+      "part": "widget:sit",
+      "at": [
+        -6.0,
+        0.375,
+        2.5
+      ],
+      "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "widget",
+      "flip": false
+    },
+    {
+      "part": "prop:chair",
+      "at": [
+        -5.0625,
+        0.375,
+        1.375
+      ],
+      "yaw": 17.278759,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "furnishing",
+      "flip": false
+    },
+    {
+      "part": "widget:sit",
+      "at": [
+        -5.0625,
+        0.375,
+        1.375
+      ],
+      "yaw": 15.707963,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "widget",
+      "flip": false
+    },
+    {
+      "part": "prop:chair",
+      "at": [
+        -6.0,
+        0.375,
+        0.3125
+      ],
+      "yaw": 12.56637,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "furnishing",
+      "flip": false
+    },
+    {
+      "part": "widget:sit",
+      "at": [
+        -6.0,
+        0.375,
+        0.3125
+      ],
+      "yaw": 10.995574,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "widget",
+      "flip": false
+    },
+    {
+      "part": "prop:chair",
+      "at": [
+        -6.75,
+        0.375,
+        1.3125
+      ],
+      "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "furnishing",
+      "flip": false
+    },
+    {
+      "part": "widget:sit",
+      "at": [
+        -6.75,
+        0.375,
+        1.3125
       ],
       "yaw": 0.0,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
-      "stage": "furnishing",
+      "stage": "widget",
       "flip": false
     }
   ]
