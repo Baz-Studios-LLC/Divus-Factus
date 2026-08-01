@@ -435,7 +435,9 @@ fn work_gizmo(
     };
     match state.grip {
         Grip::Slide => {
-            let step = ((t - state.t0) * 20.0).round() / 20.0;
+            // A sixteenth of a metre: the universal lattice's own step,
+            // so a fine move can always be undone by a coarse snap.
+            let step = ((t - state.t0) * 16.0).round() / 16.0;
             transform.translation = state.start_at + state.dir * step;
             record.at = transform.translation.into();
         }

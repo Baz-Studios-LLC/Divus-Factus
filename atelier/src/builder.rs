@@ -1667,7 +1667,7 @@ fn move_ghost(
             return;
         };
         let grid = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
-            20.0
+            16.0
         } else {
             4.0
         };
@@ -1839,7 +1839,7 @@ fn move_ghost(
     // five centimetres for the odd exact nestling.
     if seeded.is_none() {
         let grid = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
-            20.0
+            16.0
         } else {
             4.0
         };
