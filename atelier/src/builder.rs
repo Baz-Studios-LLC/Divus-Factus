@@ -453,6 +453,7 @@ impl Plugin for BuilderPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Hand>()
             .init_resource::<Naming>()
+            .init_resource::<Hovered>()
             .add_systems(Startup, (raise_shelf, load_workbench))
             .add_systems(
                 Update,
@@ -463,6 +464,7 @@ impl Plugin for BuilderPlugin {
                     work_templates,
                     steer_hand,
                     move_ghost,
+                    feel_ahead,
                     place_grab_remove,
                     save_workbench,
                     take_the_name,
@@ -1192,23 +1194,125 @@ fn move_ghost(
     }
 }
 
-/// The nearest placed part within arm's reach of a ground point.
-fn nearest_part(
+/// The part the cursor's ray touches first, tested against the actual
+/// boxes - so a bed wins over the floor beneath it, and a wall answers
+/// to a click on its face.
+#[derive(Resource, Default)]
+pub struct Hovered(pub Option<Entity>);
+
+fn ray_pick(
+    windows: &Query<&Window>,
+    cameras: &Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
-    point: Vec3,
 ) -> Option<Entity> {
-    let mut nearest: Option<(Entity, f32)> = None;
-    for (entity, transform, _) in placed {
-        let flat = Vec2::new(
-            transform.translation.x - point.x,
-            transform.translation.z - point.z,
-        );
-        let distance = flat.length();
-        if distance < 1.2 && nearest.is_none_or(|(_, d)| distance < d) {
-            nearest = Some((entity, distance));
+    let window = windows.iter().next()?;
+    let cursor = window.cursor_position()?;
+    let (camera, camera_at) = cameras.iter().next()?;
+    let ray = camera.viewport_to_world(camera_at, cursor).ok()?;
+
+    let mut first: Option<(Entity, f32)> = None;
+    for (entity, transform, record) in placed {
+        let Some(kind) = kind_from_name(&record.part) else {
+            continue;
+        };
+        // The ray, carried into the part's own space.
+        let inverse = Quat::from_rotation_y(record.yaw) * Quat::from_rotation_x(record.tilt);
+        let inverse = inverse.inverse();
+        let origin = inverse * (ray.origin - transform.translation);
+        let toward = inverse * Vec3::from(ray.direction);
+        let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
+        for Slab(at, size, _, _) in body_of(&kind, repaint) {
+            let low = at - size * 0.5;
+            let high = at + size * 0.5;
+            // The slab method: entry and exit along each axis.
+            let mut enter = f32::NEG_INFINITY;
+            let mut leave = f32::INFINITY;
+            let mut missed = false;
+            for axis in 0..3 {
+                let (o, d, lo, hi) = (origin[axis], toward[axis], low[axis], high[axis]);
+                if d.abs() < 1e-6 {
+                    if o < lo || o > hi {
+                        missed = true;
+                        break;
+                    }
+                    continue;
+                }
+                let a = (lo - o) / d;
+                let b = (hi - o) / d;
+                enter = enter.max(a.min(b));
+                leave = leave.min(a.max(b));
+            }
+            if missed || enter > leave || leave < 0.0 {
+                continue;
+            }
+            let reach = enter.max(0.0);
+            if first.is_none_or(|(_, t)| reach < t) {
+                first = Some((entity, reach));
+            }
         }
     }
-    nearest.map(|(entity, _)| entity)
+    first.map(|(entity, _)| entity)
+}
+
+/// Keeps the hovered part known, and lights it softly gold while the
+/// hand is empty - what glows is what a click will take.
+#[allow(clippy::too_many_arguments)]
+fn feel_ahead(
+    bench: Res<Bench>,
+    naming: Res<Naming>,
+    hand: Res<Hand>,
+    mut hovered: ResMut<Hovered>,
+    windows: Query<&Window>,
+    cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    placed: Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    hovers: Query<&Interaction>,
+    children: Query<&Children>,
+    slabs: Query<&MeshMaterial3d<StandardMaterial>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let over_ui = hovers
+        .iter()
+        .any(|interaction| *interaction != Interaction::None);
+    let fresh = if *bench == Bench::Builder && naming.0.is_none() && !over_ui {
+        ray_pick(&windows, &cameras, &placed)
+    } else {
+        None
+    };
+    if fresh == hovered.0 {
+        return;
+    }
+    // The old glow goes out; the new one comes on only for an empty hand.
+    let glow = |materials: &mut Assets<StandardMaterial>,
+                children: &Query<&Children>,
+                slabs: &Query<&MeshMaterial3d<StandardMaterial>>,
+                part: Entity,
+                lit: bool| {
+        let Ok(kids) = children.get(part) else {
+            return;
+        };
+        for &kid in kids {
+            if let Ok(handle) = slabs.get(kid)
+                && let Some(mut material) = materials.get_mut(&handle.0)
+            {
+                material.emissive = if lit {
+                    LinearRgba::new(0.14, 0.11, 0.04, 1.0)
+                } else {
+                    LinearRgba::BLACK
+                };
+            }
+        }
+    };
+    if let Some(old) = hovered.0
+        && placed.contains(old)
+    {
+        glow(&mut materials, &children, &slabs, old, false);
+    }
+    if let Some(new) = fresh
+        && hand.kind.is_none()
+    {
+        glow(&mut materials, &children, &slabs, new, true);
+    }
+    hovered.0 = fresh;
 }
 
 /// A full hand places on click. An empty hand picks a placed part back up.
@@ -1220,10 +1324,9 @@ fn place_grab_remove(
     keys: Res<ButtonInput<KeyCode>>,
     bench: Res<Bench>,
     naming: Res<Naming>,
+    hovered: Res<Hovered>,
     mut hand: ResMut<Hand>,
     palette: Res<Palette>,
-    windows: Query<&Window>,
-    cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     ghosts: Query<Entity, With<Ghost>>,
     ghost_spots: Query<&Transform, With<Ghost>>,
     placed: Query<(Entity, &Transform, &Placed), Without<Ghost>>,
@@ -1283,8 +1386,7 @@ fn place_grab_remove(
                     false,
                 );
             }
-        } else if let Some(point) = cursor_point(&windows, &cameras, 0.0)
-            && let Some(grabbed) = nearest_part(&placed, point)
+        } else if let Some(grabbed) = hovered.0
             && let Ok((_, transform, record)) = placed.get(grabbed)
             && let Some(kind) = kind_from_name(&record.part)
         {
@@ -1312,8 +1414,8 @@ fn place_grab_remove(
     }
 
     if keys.just_pressed(KeyCode::KeyX)
-        && let Some(point) = cursor_point(&windows, &cameras, 0.0)
-        && let Some(doomed) = nearest_part(&placed, point)
+        && let Some(doomed) = hovered.0
+        && placed.contains(doomed)
     {
         commands.entity(doomed).despawn();
     }
