@@ -57,6 +57,7 @@ fn spawn_camera(mut commands: Commands, rig: Res<OrbitRig>) {
 
 fn steer(
     keys: Res<ButtonInput<KeyCode>>,
+    naming: Res<crate::builder::Naming>,
     buttons: Res<ButtonInput<MouseButton>>,
     motion: Res<AccumulatedMouseMotion>,
     scroll: Res<AccumulatedMouseScroll>,
@@ -67,6 +68,11 @@ fn steer(
     if buttons.pressed(MouseButton::Right) {
         rig.yaw += motion.delta.x * 0.008;
         rig.pitch = (rig.pitch + motion.delta.y * 0.008).clamp(0.12, 1.55);
+    }
+
+    // While a name is being typed, the keyboard belongs to the pen.
+    if naming.0.is_some() {
+        return;
     }
 
     // Snapped views on the number row: the drafting angles. Front is the

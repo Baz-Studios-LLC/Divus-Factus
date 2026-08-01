@@ -24,6 +24,13 @@ struct Slab(Vec3, Vec3, String, f32);
 #[derive(Clone, Copy, PartialEq)]
 pub enum PartKind {
     Wall(f32),
+    /// A piece of wall left standing around an opening: the sides of a
+    /// doorway, the header above it, the sill strip under a window.
+    Seg {
+        long: f32,
+        high: f32,
+        lift: f32,
+    },
     Floor,
     Roof,
     Prop(&'static str),
@@ -56,6 +63,8 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     structure("WALL, 2M", PartKind::Wall(2.0), "walls"),
     structure("WALL, 4M", PartKind::Wall(4.0), "walls"),
     structure("CORNER POLE", PartKind::Prop("pole"), "frame"),
+    structure("DOOR", PartKind::Prop("door"), "walls"),
+    structure("WINDOW", PartKind::Prop("window"), "walls"),
     structure("FLOOR, 2M", PartKind::Floor, "footing"),
     structure("ROOF PANEL", PartKind::Roof, "roof"),
 ];
@@ -117,6 +126,16 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             0.0,
             *length,
             WALL_HIGH,
+            WALL_THICK,
+            "wood",
+            0.7,
+        )],
+        PartKind::Seg { long, high, lift } => vec![slab(
+            0.0,
+            lift + high * 0.5,
+            0.0,
+            *long,
+            *high,
             WALL_THICK,
             "wood",
             0.7,
@@ -233,6 +252,25 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 "wood",
                 0.45,
             ),
+        ],
+        PartKind::Prop("door") => vec![
+            // Jambs, lintel board, and the leaf itself, set just proud of
+            // the wall plane with a gold latch.
+            slab(-0.54, 1.0, 0.0, 0.08, 2.0, 0.3, "wood", 0.45),
+            slab(0.54, 1.0, 0.0, 0.08, 2.0, 0.3, "wood", 0.45),
+            slab(0.0, 2.04, 0.0, 1.16, 0.09, 0.3, "wood", 0.45),
+            slab(0.0, 0.98, 0.03, 0.96, 1.94, 0.08, "wood", 0.35),
+            slab(0.35, 1.0, 0.08, 0.07, 0.07, 0.05, "cloth-gold", 0.8),
+        ],
+        PartKind::Prop("window") => vec![
+            // Frame boards around the opening and a pale pane within it.
+            slab(-0.49, 1.35, 0.0, 0.07, 1.04, 0.28, "wood", 0.45),
+            slab(0.49, 1.35, 0.0, 0.07, 1.04, 0.28, "wood", 0.45),
+            slab(0.0, 0.86, 0.0, 1.05, 0.08, 0.32, "wood", 0.45),
+            slab(0.0, 1.84, 0.0, 1.05, 0.08, 0.28, "wood", 0.45),
+            slab(0.0, 1.35, 0.0, 0.92, 0.92, 0.05, "sky", 0.75),
+            slab(0.0, 1.35, 0.02, 0.05, 0.92, 0.04, "wood", 0.5),
+            slab(0.0, 1.35, 0.02, 0.92, 0.05, 0.04, "wood", 0.5),
         ],
         PartKind::Prop("mannequin") => vec![
             // The game's adult, boxed in bone: a measuring stick with a
@@ -367,11 +405,44 @@ struct Shelf;
 #[derive(Component)]
 struct SaveButton;
 
+/// The save button's label, so it can say what just happened.
+#[derive(Component)]
+struct SaveLabel;
+
+/// The export button's label, likewise.
+#[derive(Component)]
+struct ExportLabel;
+
+/// A label speaking a passing word; it returns to its old text at `until`.
+#[derive(Component)]
+struct PassingWord {
+    back: &'static str,
+    until: f32,
+}
+
+/// The SAVED WORK drawer's body, so a fresh export can join it live.
+#[derive(Resource)]
+struct SavedWorkDrawer(Entity);
+
+/// The name being typed for an export, while the naming card is up.
+/// While this is Some, every other key on the bench holds its tongue.
+#[derive(Resource, Default)]
+pub struct Naming(pub Option<String>);
+
+/// The naming card's root, for tearing it down.
+#[derive(Component)]
+struct NamingCard;
+
+/// The text inside the card that shows the name as it is typed.
+#[derive(Component)]
+struct NameText;
+
 pub struct BuilderPlugin;
 
 impl Plugin for BuilderPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Hand>()
+            .init_resource::<Naming>()
             .add_systems(Startup, (raise_shelf, load_workbench))
             .add_systems(
                 Update,
@@ -384,6 +455,8 @@ impl Plugin for BuilderPlugin {
                     move_ghost,
                     place_grab_remove,
                     save_workbench,
+                    take_the_name,
+                    settle_words,
                 )
                     .chain(),
             );
@@ -393,6 +466,7 @@ impl Plugin for BuilderPlugin {
 fn part_name(kind: &PartKind) -> String {
     match kind {
         PartKind::Wall(len) => format!("wall-{len}"),
+        PartKind::Seg { long, high, lift } => format!("wallseg-{long}x{high}@{lift}"),
         PartKind::Floor => "floor".to_string(),
         PartKind::Roof => "roof".to_string(),
         PartKind::Prop(name) => format!("prop:{name}"),
@@ -403,6 +477,15 @@ fn part_name(kind: &PartKind) -> String {
 fn kind_from_name(name: &str) -> Option<PartKind> {
     if let Some(rest) = name.strip_prefix("wall-") {
         return rest.parse::<f32>().ok().map(PartKind::Wall);
+    }
+    if let Some(rest) = name.strip_prefix("wallseg-") {
+        let (long, rest) = rest.split_once('x')?;
+        let (high, lift) = rest.split_once('@')?;
+        return Some(PartKind::Seg {
+            long: long.parse().ok()?,
+            high: high.parse().ok()?,
+            lift: lift.parse().ok()?,
+        });
     }
     if let Some(wanted) = name.strip_prefix("prop:") {
         return STRUCTURE
@@ -546,6 +629,7 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
     }
     // SAVED WORK: whatever exports already stand in out/buildings/.
     let saved = drawer(&mut commands, &fonts, &palette, shelf, "SAVED WORK", false);
+    commands.insert_resource(SavedWorkDrawer(saved));
     if let Some(dir) = bench_path().parent()
         && let Ok(entries) = std::fs::read_dir(dir)
     {
@@ -619,6 +703,7 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
         ))
         .id();
     commands.spawn((
+        ExportLabel,
         Text::new("EXPORT A COPY"),
         TextFont {
             font: fonts.display.clone().into(),
@@ -629,6 +714,7 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
         ChildOf(export),
     ));
     commands.spawn((
+        SaveLabel,
         Text::new("SAVE THE WORK"),
         TextFont {
             font: fonts.display.clone().into(),
@@ -914,12 +1000,13 @@ fn steer_hand(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
     palette: Res<Palette>,
+    naming: Res<Naming>,
     mut hand: ResMut<Hand>,
     ghosts: Query<Entity, With<Ghost>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    if hand.kind.is_none() {
+    if hand.kind.is_none() || naming.0.is_some() {
         return;
     }
     if keys.just_pressed(KeyCode::Escape) {
@@ -998,6 +1085,7 @@ fn cursor_point(
 fn move_ghost(
     bench: Res<Bench>,
     hand: Res<Hand>,
+    keys: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     mut ghosts: Query<&mut Transform, With<Ghost>>,
@@ -1008,12 +1096,19 @@ fn move_ghost(
     let Some(point) = cursor_point(&windows, &cameras, hand.lift) else {
         return;
     };
-    // Quarter-metre snap: coarse enough to line walls up by eye, fine
-    // enough to nudge a stool against a table.
+    // Quarter-metre snap by default; holding shift tightens the grid to
+    // five centimetres, for nestling a pole into a corner niche or a
+    // stool against a table leg. Wall faces sit 0.12 off the grid, so
+    // the coarse snap alone can never quite reach them.
+    let grid = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
+        20.0
+    } else {
+        4.0
+    };
     let snapped = Vec3::new(
-        (point.x * 4.0).round() / 4.0,
+        (point.x * grid).round() / grid,
         hand.lift,
-        (point.z * 4.0).round() / 4.0,
+        (point.z * grid).round() / grid,
     );
     for mut transform in &mut ghosts {
         transform.translation = snapped;
@@ -1048,6 +1143,7 @@ fn place_grab_remove(
     buttons: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
     bench: Res<Bench>,
+    naming: Res<Naming>,
     mut hand: ResMut<Hand>,
     palette: Res<Palette>,
     windows: Query<&Window>,
@@ -1059,7 +1155,7 @@ fn place_grab_remove(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    if *bench != Bench::Builder {
+    if *bench != Bench::Builder || naming.0.is_some() {
         return;
     }
     // A click that lands on UI is the UI's business.
@@ -1069,8 +1165,36 @@ fn place_grab_remove(
 
     if buttons.just_pressed(MouseButton::Left) && !over_ui {
         if let Some(kind) = hand.kind {
-            // Setting down.
-            if let Some(ghost_at) = ghost_spots.iter().next()
+            // Doors and windows would rather punch through a wall than
+            // stand alone: if one lands on a wall, the wall parts around
+            // the opening and the frame settles in.
+            let opening = match kind {
+                PartKind::Prop("door") => Some((1.16, 2.04, 0.0_f32, true)),
+                PartKind::Prop("window") => Some((1.05, 1.84, 0.9, false)),
+                _ => None,
+            };
+            let punched = if let Some((wide, head, sill, is_door)) = opening
+                && let Some(ghost_at) = ghost_spots.iter().next()
+            {
+                punch_wall(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    &palette,
+                    &placed,
+                    ghost_at.translation,
+                    wide,
+                    head,
+                    sill,
+                    is_door,
+                    &hand,
+                )
+            } else {
+                false
+            };
+            // Setting down (a punch already set the frame itself).
+            if !punched
+                && let Some(ghost_at) = ghost_spots.iter().next()
                 && let Some(record) = hand.record(ghost_at.translation)
             {
                 spawn_part(
@@ -1119,6 +1243,159 @@ fn place_grab_remove(
     }
 }
 
+/// Splits the nearest wall around an opening and sets the frame in it.
+/// Returns false when no wall stands close enough to take the punch.
+#[allow(clippy::too_many_arguments)]
+fn punch_wall(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    palette: &Palette,
+    placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    at: Vec3,
+    wide: f32,
+    head: f32,
+    sill: f32,
+    is_door: bool,
+    hand: &Hand,
+) -> bool {
+    // The nearest plain wall whose line the point sits on.
+    let mut best: Option<(Entity, f32, Vec3, f32, f32, Placed)> = None;
+    for (entity, transform, record) in placed {
+        let Some(PartKind::Wall(length)) = kind_from_name(&record.part) else {
+            continue;
+        };
+        let along = Quat::from_rotation_y(record.yaw) * Vec3::X;
+        let from_centre = at - transform.translation;
+        let t = from_centre.dot(along);
+        let sideways = (from_centre - along * t).length();
+        if sideways > 0.4 || t.abs() > length * 0.5 {
+            continue;
+        }
+        if best.as_ref().is_none_or(|(_, s, ..)| sideways < *s) {
+            best = Some((entity, sideways, along, t, length, record.clone()));
+        }
+    }
+    let Some((wall, _, along, t, length, record)) = best else {
+        return false;
+    };
+
+    // The opening, clamped so it never spills past the wall's ends.
+    let half = length * 0.5;
+    let middle = t.clamp(-half + wide * 0.5, half - wide * 0.5);
+    let centre_of = |offset: f32| {
+        let base = placed
+            .get(wall)
+            .map(|(_, tf, _)| tf.translation)
+            .unwrap_or(at);
+        base + along * offset
+    };
+
+    let mut leavings: Vec<(PartKind, Vec3)> = Vec::new();
+    let left = middle - wide * 0.5 + half;
+    if left > 0.06 {
+        leavings.push((
+            PartKind::Seg {
+                long: left,
+                high: WALL_HIGH,
+                lift: 0.0,
+            },
+            centre_of(-half + left * 0.5),
+        ));
+    }
+    let right = half - (middle + wide * 0.5);
+    if right > 0.06 {
+        leavings.push((
+            PartKind::Seg {
+                long: right,
+                high: WALL_HIGH,
+                lift: 0.0,
+            },
+            centre_of(half - right * 0.5),
+        ));
+    }
+    if WALL_HIGH - head > 0.06 {
+        leavings.push((
+            PartKind::Seg {
+                long: wide,
+                high: WALL_HIGH - head,
+                lift: head,
+            },
+            centre_of(middle),
+        ));
+    }
+    if sill > 0.06 {
+        leavings.push((
+            PartKind::Seg {
+                long: wide,
+                high: sill,
+                lift: 0.0,
+            },
+            centre_of(middle),
+        ));
+    }
+
+    let base = placed
+        .get(wall)
+        .map(|(_, tf, _)| tf.translation)
+        .unwrap_or(at);
+    commands.entity(wall).despawn();
+    for (kind, spot) in leavings {
+        let piece = Placed {
+            part: part_name(&kind),
+            at: spot.into(),
+            yaw: record.yaw,
+            tilt: 0.0,
+            ramp: record.ramp.clone(),
+            shade: record.shade,
+            stage: record.stage.clone(),
+        };
+        spawn_part(commands, meshes, materials, palette, &kind, &piece, false);
+    }
+
+    // The frame takes the wall's own line and turn.
+    let frame_kind = if is_door {
+        PartKind::Prop("door")
+    } else {
+        PartKind::Prop("window")
+    };
+    let frame_at = base + along * middle;
+    let frame = Placed {
+        part: part_name(&frame_kind),
+        at: [frame_at.x, 0.0, frame_at.z],
+        yaw: record.yaw,
+        tilt: 0.0,
+        ramp: hand.ramp.clone(),
+        shade: hand.shade,
+        stage: "walls".to_string(),
+    };
+    spawn_part(
+        commands,
+        meshes,
+        materials,
+        palette,
+        &frame_kind,
+        &frame,
+        false,
+    );
+
+    // A door is a doorway: the routing widget arrives with it.
+    if is_door {
+        let widget = PartKind::Widget("door");
+        let mark = Placed {
+            part: part_name(&widget),
+            at: [frame_at.x, 0.0, frame_at.z],
+            yaw: record.yaw,
+            tilt: 0.0,
+            ramp: None,
+            shade: 0.7,
+            stage: "widget".to_string(),
+        };
+        spawn_part(commands, meshes, materials, palette, &widget, &mark, false);
+    }
+    true
+}
+
 // ---------------------------------------------------------------- the file
 
 #[derive(Serialize, Deserialize, Default)]
@@ -1136,34 +1413,37 @@ fn bench_path() -> std::path::PathBuf {
 /// The save button writes the whole bench down; the work survives the
 /// window closing, and the file is the thing the god carries into the game.
 /// The export button writes a numbered copy nothing ever overwrites.
+#[allow(clippy::too_many_arguments)]
 fn save_workbench(
+    mut commands: Commands,
+    time: Res<Time>,
+    fonts: Res<Fonts>,
+    palette: Res<Palette>,
+    mut naming: ResMut<Naming>,
     saves: Query<&Interaction, (Changed<Interaction>, With<SaveButton>)>,
     exports: Query<&Interaction, (Changed<Interaction>, With<ExportButton>)>,
     placed: Query<&Placed, Without<Ghost>>,
+    mut save_labels: Query<(Entity, &mut Text), (With<SaveLabel>, Without<ExportLabel>)>,
 ) {
+    let speak = |commands: &mut Commands,
+                 labels: &mut dyn Iterator<Item = (Entity, Mut<Text>)>,
+                 word: String,
+                 back: &'static str| {
+        for (entity, mut text) in labels {
+            *text = Text::new(word.clone());
+            commands.entity(entity).insert(PassingWord {
+                back,
+                until: time.elapsed_secs() + 2.5,
+            });
+        }
+    };
+
     let exporting = exports
         .iter()
         .any(|interaction| *interaction == Interaction::Pressed);
-    if exporting {
-        let dir = bench_path().parent().map(|d| d.to_path_buf());
-        if let Some(dir) = dir {
-            let _ = std::fs::create_dir_all(&dir);
-            let mut n = 1;
-            let mut path = dir.join(format!("build-{n}.json"));
-            while path.exists() {
-                n += 1;
-                path = dir.join(format!("build-{n}.json"));
-            }
-            let bench = Workbench {
-                format: 1,
-                name: format!("build-{n}"),
-                parts: placed.iter().cloned().collect(),
-            };
-            if let Ok(json) = serde_json::to_string_pretty(&bench) {
-                let _ = std::fs::write(&path, json);
-                info!("exported {} parts to {}", bench.parts.len(), path.display());
-            }
-        }
+    if exporting && naming.0.is_none() {
+        naming.0 = Some(String::new());
+        raise_naming_card(&mut commands, &fonts, &palette);
     }
     let pressed = saves
         .iter()
@@ -1176,6 +1456,7 @@ fn save_workbench(
         name: "workbench".to_string(),
         parts: placed.iter().cloned().collect(),
     };
+    let count = bench.parts.len();
     let path = bench_path();
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
@@ -1183,9 +1464,204 @@ fn save_workbench(
     match serde_json::to_string_pretty(&bench) {
         Ok(json) => {
             let _ = std::fs::write(&path, json);
-            info!("saved {} parts to {}", bench.parts.len(), path.display());
+            info!("saved {count} parts to {}", path.display());
+            speak(
+                &mut commands,
+                &mut save_labels.iter_mut(),
+                format!("SAVED - {count} PARTS"),
+                "SAVE THE WORK",
+            );
         }
         Err(e) => warn!("could not write the bench: {e}"),
+    }
+}
+
+/// The card that asks for the work's name.
+fn raise_naming_card(commands: &mut Commands, fonts: &Fonts, palette: &Palette) {
+    let card = commands
+        .spawn((
+            NamingCard,
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Percent(50.0),
+                top: Val::Percent(40.0),
+                margin: UiRect {
+                    left: Val::Px(-170.0),
+                    ..default()
+                },
+                width: Val::Px(340.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                padding: UiRect::all(Val::Px(18.0)),
+                row_gap: Val::Px(8.0),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(theme::panel_bg()),
+            BorderColor::all(theme::accent(palette).with_alpha(0.7)),
+            GlobalZIndex(50),
+        ))
+        .id();
+    commands.spawn((
+        Text::new("NAME THE WORK"),
+        TextFont {
+            font: fonts.display.clone().into(),
+            font_size: FontSize::Px(15.0),
+            ..default()
+        },
+        TextColor(theme::accent(palette)),
+        ChildOf(card),
+    ));
+    commands.spawn((
+        NameText,
+        Text::new("_"),
+        TextFont {
+            font_size: FontSize::Px(15.0),
+            ..default()
+        },
+        TextColor(theme::text(palette)),
+        Node {
+            padding: UiRect::axes(Val::Px(12.0), Val::Px(6.0)),
+            border: UiRect::all(Val::Px(1.0)),
+            min_width: Val::Px(220.0),
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
+        BackgroundColor(Color::BLACK.with_alpha(0.35)),
+        BorderColor::all(theme::panel_border(palette)),
+        ChildOf(card),
+    ));
+    commands.spawn((
+        Text::new("enter saves - esc thinks better of it"),
+        TextFont {
+            font: fonts.text.clone().into(),
+            font_size: FontSize::Px(11.0),
+            ..default()
+        },
+        TextColor(theme::text_dim(palette).with_alpha(0.8)),
+        ChildOf(card),
+    ));
+}
+
+/// Typing while the card is up: letters, digits and dashes build the name,
+/// enter writes the file, escape puts the pen down.
+#[allow(clippy::too_many_arguments)]
+fn take_the_name(
+    mut commands: Commands,
+    mut keystrokes: MessageReader<bevy::input::keyboard::KeyboardInput>,
+    mut naming: ResMut<Naming>,
+    time: Res<Time>,
+    fonts: Res<Fonts>,
+    palette: Res<Palette>,
+    saved_drawer: Option<Res<SavedWorkDrawer>>,
+    placed: Query<&Placed, Without<Ghost>>,
+    cards: Query<Entity, With<NamingCard>>,
+    mut shown: Query<&mut Text, With<NameText>>,
+    mut export_labels: Query<(Entity, &mut Text), (With<ExportLabel>, Without<NameText>)>,
+) {
+    let Some(name) = naming.0.as_mut() else {
+        return;
+    };
+    use bevy::input::keyboard::Key;
+    let mut done: Option<bool> = None;
+    for stroke in keystrokes.read() {
+        if !stroke.state.is_pressed() {
+            continue;
+        }
+        match &stroke.logical_key {
+            Key::Character(text) => {
+                for letter in text.chars() {
+                    let letter = letter.to_ascii_lowercase();
+                    if (letter.is_ascii_alphanumeric() || letter == '-') && name.len() < 24 {
+                        name.push(letter);
+                    }
+                }
+            }
+            Key::Space => {
+                if name.len() < 24 && !name.is_empty() {
+                    name.push('-');
+                }
+            }
+            Key::Backspace => {
+                name.pop();
+            }
+            Key::Enter => done = Some(true),
+            Key::Escape => done = Some(false),
+            _ => {}
+        }
+    }
+    for mut text in &mut shown {
+        let fresh = format!("{name}_");
+        if text.0 != fresh {
+            *text = Text::new(fresh);
+        }
+    }
+    let Some(saving) = done else {
+        return;
+    };
+    if saving {
+        let written = if name.is_empty() {
+            "untitled"
+        } else {
+            name.as_str()
+        };
+        if let Some(dir) = bench_path().parent().map(|d| d.to_path_buf()) {
+            let _ = std::fs::create_dir_all(&dir);
+            // A taken name steps aside rather than overwriting silently.
+            let mut stem = written.to_string();
+            let mut path = dir.join(format!("{stem}.json"));
+            let mut n = 2;
+            while path.exists() {
+                stem = format!("{written}-{n}");
+                path = dir.join(format!("{stem}.json"));
+                n += 1;
+            }
+            let bench = Workbench {
+                format: 1,
+                name: stem.clone(),
+                parts: placed.iter().cloned().collect(),
+            };
+            if let Ok(json) = serde_json::to_string_pretty(&bench) {
+                let _ = std::fs::write(&path, json);
+                info!("exported {} parts to {}", bench.parts.len(), path.display());
+                for (entity, mut text) in &mut export_labels {
+                    *text = Text::new(format!("EXPORTED {}", stem.to_uppercase()));
+                    commands.entity(entity).insert(PassingWord {
+                        back: "EXPORT A COPY",
+                        until: time.elapsed_secs() + 2.5,
+                    });
+                }
+                if let Some(saved_drawer) = saved_drawer.as_deref() {
+                    let button = plain_button(&mut commands, &palette, saved_drawer.0);
+                    commands.entity(button).insert(LoadFileButton(path));
+                    button_label(
+                        &mut commands,
+                        &fonts,
+                        &palette,
+                        button,
+                        Box::leak(stem.to_uppercase().into_boxed_str()),
+                    );
+                }
+            }
+        }
+    }
+    naming.0 = None;
+    for card in &cards {
+        commands.entity(card).despawn();
+    }
+}
+
+/// Passing words return to their old text when their moment ends.
+fn settle_words(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut words: Query<(Entity, &PassingWord, &mut Text)>,
+) {
+    for (entity, word, mut text) in &mut words {
+        if time.elapsed_secs() >= word.until {
+            *text = Text::new(word.back.to_string());
+            commands.entity(entity).remove::<PassingWord>();
+        }
     }
 }
 
