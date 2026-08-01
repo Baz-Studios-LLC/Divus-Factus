@@ -13,6 +13,11 @@ use crate::Bench;
 use crate::look::{Fonts, Palette, theme};
 use crate::stage::BuilderFurniture;
 
+/// The bench's standard roof pitch: forty-five degrees, where the rise
+/// equals the run and the gable's peak is half its width. Roofs arm
+/// already pitched; T walks away from it in fifteens.
+const ROOF_PITCH: f32 = std::f32::consts::FRAC_PI_4;
+
 /// The Atelier's own measurements - the source of truth now; the game
 /// conforms to these when its buildings are replaced. A quarter-metre
 /// wall on a quarter-metre grid means centrelines always land on snaps.
@@ -250,7 +255,9 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         PartKind::Gable(long) => {
             // Courses of wall narrowing to a peak: the roof's own pitch,
             // stepped, because everything here is a box.
-            let pitch = 0.577_35_f32; // 30 degrees
+            // The standard pitch: rise equals run, so the peak sits at
+            // half the width.
+            let pitch = ROOF_PITCH.tan();
             let course = 0.25_f32;
             let half = long * 0.5;
             let mut steps = Vec::new();
@@ -600,10 +607,18 @@ pub struct Hand {
 
 impl Hand {
     fn filled(kind: PartKind, stage: String) -> Self {
+        // A roof comes to hand already pitched: a flat panel is the
+        // exception, not the starting point.
+        let tilt = if matches!(kind, PartKind::Roof(..) | PartKind::RoofRun) {
+            ROOF_PITCH
+        } else {
+            0.0
+        };
         Hand {
             kind: Some(kind),
             anchor: None,
             flip: false,
+            tilt,
             stage,
             shade: 0.7,
             ..default()
