@@ -3837,6 +3837,7 @@ pub(crate) fn dims_panel(
             PartKind::Seg { long, .. } => Some((part, long, None)),
             PartKind::Trim { long, .. } => Some((part, long, None)),
             PartKind::GableRoof(w, d, _) => Some((part, w, Some(d))),
+            PartKind::Chimney(drop) => Some((part, drop, None)),
             PartKind::Floor(w, d) | PartKind::Foundation(w, d) | PartKind::Roof(w, d) => {
                 Some((part, w, Some(d)))
             }
@@ -3908,6 +3909,7 @@ pub(crate) fn dims_panel(
                         PartKind::GableRoof(_, old, over) => {
                             Some(PartKind::GableRoof(w, d.unwrap_or(old), over))
                         }
+                        PartKind::Chimney(_) => Some(PartKind::Chimney(w)),
                         _ => None,
                     };
                     if let Some(made) = made {
@@ -4377,6 +4379,7 @@ pub(crate) fn lift_roofs(
                         | PartKind::RidgeLog(..)
                         | PartKind::GableRoof(..)
                         | PartKind::Roof(..)
+                        | PartKind::Chimney(..)
                 )
             );
         // The walls, and everything set INTO the walls: a door with no
@@ -4563,7 +4566,8 @@ mod bake {
                         | PartKind::Ridge(..)
                         | PartKind::RidgeLog(..)
                         | PartKind::GableRoof(..)
-                        | PartKind::Roof(..) => "roof",
+                        | PartKind::Roof(..)
+                        | PartKind::Chimney(..) => "roof",
                         _ => record.stage.as_str(),
                     };
                     // The cloth is named as well as resolved: the game

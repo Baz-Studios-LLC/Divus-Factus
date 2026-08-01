@@ -1168,10 +1168,10 @@
       "part": "widget:sit",
       "at": [
         -6.0,
-        0.875,
-        0.33374983
+        0.4375,
+        0.27124983
       ],
-      "yaw": 3.1415927,
+      "yaw": 4.712389,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
@@ -1182,14 +1182,28 @@
       "part": "widget:sit",
       "at": [
         -6.0,
-        1.125,
-        2.92375
+        0.39499998,
+        2.5
       ],
-      "yaw": 3.1415927,
+      "yaw": 7.853982,
       "tilt": 0.0,
       "ramp": null,
       "shade": 0.7,
       "stage": "widget",
+      "flip": false
+    },
+    {
+      "part": "prop:chimney",
+      "at": [
+        -2.0,
+        3.215,
+        4.125
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "furnishing",
       "flip": false
     }
   ]
