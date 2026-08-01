@@ -670,7 +670,7 @@ impl Plugin for BuilderPlugin {
             .init_resource::<Hovered>()
             .init_resource::<WorkName>()
             .init_resource::<SnapMode>()
-            .add_systems(Startup, raise_shelf)
+            .add_systems(Startup, raise_shelf.after(crate::rail::raise_rail))
             .add_systems(
                 Update,
                 (
@@ -693,7 +693,7 @@ impl Plugin for BuilderPlugin {
     }
 }
 
-fn part_name(kind: &PartKind) -> String {
+pub fn part_name(kind: &PartKind) -> String {
     match kind {
         PartKind::Wall(len) => format!("wall-{len}"),
         PartKind::Seg { long, high, lift } => format!("wallseg-{long}x{high}@{lift}"),
@@ -717,7 +717,7 @@ fn part_name(kind: &PartKind) -> String {
     }
 }
 
-fn kind_from_name(name: &str) -> Option<PartKind> {
+pub fn kind_from_name(name: &str) -> Option<PartKind> {
     if let Some(rest) = name.strip_prefix("wall-") {
         return rest.parse::<f32>().ok().map(PartKind::Wall);
     }
@@ -800,7 +800,6 @@ fn spawn_part(
     record: &Placed,
     ghostly: bool,
 ) -> Entity {
-    let translucent = ghostly || matches!(kind, PartKind::Widget(_));
     let root = commands
         .spawn((
             record.clone(),
@@ -814,6 +813,26 @@ fn spawn_part(
     if ghostly {
         commands.entity(root).insert(Ghost);
     }
+    dress_part(
+        commands, meshes, materials, palette, kind, record, root, ghostly,
+    );
+    root
+}
+
+/// Dresses an existing root in a part's boxes - the resize handles use
+/// this to rebuild a body in place without disturbing the entity.
+#[allow(clippy::too_many_arguments)]
+pub fn dress_part(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    palette: &Palette,
+    kind: &PartKind,
+    record: &Placed,
+    root: Entity,
+    ghostly: bool,
+) {
+    let translucent = ghostly || matches!(kind, PartKind::Widget(_));
     let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
     for Slab(at, size, ramp, shade, clarity) in body_of(kind, repaint) {
         let mut color = palette.shade(&ramp, shade);
@@ -844,7 +863,6 @@ fn spawn_part(
             ChildOf(root),
         ));
     }
-    root
 }
 
 /// Rebuilds the ghost from the hand's current state.
@@ -868,7 +886,12 @@ fn dress_ghost(
 
 // ---------------------------------------------------------------- the shelf
 
-fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>) {
+fn raise_shelf(
+    mut commands: Commands,
+    fonts: Res<Fonts>,
+    palette: Res<Palette>,
+    file_home: Option<Res<crate::rail::FileHome>>,
+) {
     let shelf = commands
         .spawn((
             Shelf,
@@ -902,8 +925,12 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
         ChildOf(shelf),
     ));
 
+    // The file work lives on the left rail when it offers a home; the
+    // shelf keeps only parts and widgets.
+    let files = file_home.map(|home| home.0).unwrap_or(shelf);
+
     // READY-MADE: templates and the broom.
-    let ready = drawer(&mut commands, &fonts, &palette, shelf, "READY-MADE", true);
+    let ready = drawer(&mut commands, &fonts, &palette, files, "READY-MADE", true);
     for (label, name) in TEMPLATES {
         let button = plain_button(&mut commands, &palette, ready);
         commands.entity(button).insert(TemplateButton(name));
@@ -927,7 +954,7 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
         }
     }
     // SAVED WORK: whatever exports already stand in out/buildings/.
-    let saved = drawer(&mut commands, &fonts, &palette, shelf, "SAVED WORK", false);
+    let saved = drawer(&mut commands, &fonts, &palette, files, "SAVED WORK", false);
     commands.insert_resource(SavedWorkDrawer(saved));
     if let Some(dir) = bench_path().parent()
         && let Ok(entries) = std::fs::read_dir(dir)
@@ -981,7 +1008,7 @@ fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>)
             },
             BackgroundColor(Color::BLACK.with_alpha(0.18)),
             BorderColor::all(theme::accent(&palette).with_alpha(0.7)),
-            ChildOf(shelf),
+            ChildOf(files),
         ))
         .id();
     commands.spawn((
@@ -1215,6 +1242,7 @@ fn work_shelf(
     mut materials: ResMut<Assets<StandardMaterial>>,
     palette: Res<Palette>,
     mut hand: ResMut<Hand>,
+    mut tool: ResMut<crate::gizmo::ToolMode>,
     mut parts: Query<(&Interaction, &ShelfButton, &mut BorderColor), Without<WidgetButton>>,
     mut widgets: Query<(&Interaction, &WidgetButton, &mut BorderColor), Without<ShelfButton>>,
     ghosts: Query<Entity, With<Ghost>>,
@@ -1234,6 +1262,7 @@ fn work_shelf(
         }
     }
     if rearmed {
+        *tool = crate::gizmo::ToolMode::Normal;
         dress_ghost(
             &mut commands,
             &mut meshes,
@@ -2065,6 +2094,7 @@ fn ray_scan(
 fn feel_ahead(
     bench: Res<Bench>,
     naming: Res<Naming>,
+    tool: Res<crate::gizmo::ToolMode>,
     hand: Res<Hand>,
     mut hovered: ResMut<Hovered>,
     windows: Query<&Window>,
@@ -2114,7 +2144,7 @@ fn feel_ahead(
         glow(&mut materials, &children, &slabs, old, false);
     }
     if let Some(new) = fresh
-        && hand.kind.is_none()
+        && (hand.kind.is_none() || *tool != crate::gizmo::ToolMode::Normal)
     {
         glow(&mut materials, &children, &slabs, new, true);
     }
@@ -2131,8 +2161,13 @@ fn place_grab_remove(
     bench: Res<Bench>,
     naming: Res<Naming>,
     hovered: Res<Hovered>,
-    gizmo_hot: Res<crate::gizmo::GizmoHot>,
-    selected: Res<crate::gizmo::Selected>,
+    // Bundled: Bevy's parameter ceiling is sixteen, and this system
+    // presses it.
+    gizmo: (
+        Res<crate::gizmo::GizmoHot>,
+        Res<crate::gizmo::Selected>,
+        Res<crate::gizmo::ToolMode>,
+    ),
     mut hand: ResMut<Hand>,
     palette: Res<Palette>,
     ghosts: Query<Entity, With<Ghost>>,
@@ -2142,7 +2177,13 @@ fn place_grab_remove(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    if *bench != Bench::Builder || naming.0.is_some() || gizmo_hot.0 || selected.0.is_some() {
+    let (gizmo_hot, selected, tool) = gizmo;
+    if *bench != Bench::Builder
+        || naming.0.is_some()
+        || gizmo_hot.0
+        || selected.0.is_some()
+        || *tool != crate::gizmo::ToolMode::Normal
+    {
         return;
     }
     // A click that lands on UI is the UI's business.

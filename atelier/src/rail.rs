@@ -11,16 +11,81 @@ use crate::look::{Fonts, Palette, theme};
 #[derive(Component)]
 struct BenchButton(Bench);
 
+/// A button on the top bar that sets the tool mode.
+#[derive(Component)]
+struct ModeButton(crate::gizmo::ToolMode);
+
+/// Where the file work lives on the rail: builder parents its save and
+/// load drawers here instead of crowding the shelf.
+#[derive(Resource)]
+pub struct FileHome(pub Entity);
+
 pub struct RailPlugin;
 
 impl Plugin for RailPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, raise_rail)
-            .add_systems(Update, work_buttons);
+            .add_systems(Update, (work_buttons, work_mode_bar));
     }
 }
 
-fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>) {
+pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>) {
+    // The mode bar, top centre, the way the big programs wear it.
+    let bar = commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Percent(50.0),
+                top: Val::Px(0.0),
+                margin: UiRect::left(Val::Px(-160.0)),
+                width: Val::Px(320.0),
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::Center,
+                column_gap: Val::Px(4.0),
+                padding: UiRect::all(Val::Px(6.0)),
+                border: UiRect {
+                    left: Val::Px(1.0),
+                    right: Val::Px(1.0),
+                    bottom: Val::Px(1.0),
+                    ..default()
+                },
+                ..default()
+            },
+            BackgroundColor(theme::panel_bg()),
+            BorderColor::all(theme::panel_border(&palette)),
+        ))
+        .id();
+    for (mode, label) in [
+        (crate::gizmo::ToolMode::Normal, "NORMAL"),
+        (crate::gizmo::ToolMode::Move, "MOVE"),
+        (crate::gizmo::ToolMode::Resize, "RESIZE"),
+    ] {
+        let button = commands
+            .spawn((
+                ModeButton(mode),
+                Interaction::default(),
+                Node {
+                    padding: UiRect::axes(Val::Px(14.0), Val::Px(5.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::BLACK.with_alpha(0.18)),
+                BorderColor::all(theme::panel_border(&palette)),
+                ChildOf(bar),
+            ))
+            .id();
+        commands.spawn((
+            Text::new(label),
+            TextFont {
+                font: fonts.display.clone().into(),
+                font_size: FontSize::Px(12.0),
+                ..default()
+            },
+            TextColor(theme::accent(&palette)),
+            ChildOf(button),
+        ));
+    }
+
     let rail = commands
         .spawn((
             Node {
@@ -110,6 +175,20 @@ fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>) 
         ));
     }
 
+    // The file work's home, between the benches and the keybinds.
+    let file_home = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(3.0),
+                margin: UiRect::top(Val::Px(10.0)),
+                ..default()
+            },
+            ChildOf(rail),
+        ))
+        .id();
+    commands.insert_resource(FileHome(file_home));
+
     // The footer: how the bench speaks to the world.
     let foot = commands
         .spawn((
@@ -152,7 +231,7 @@ fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>) 
         ),
         ("shift", "fine snap, 5cm"),
         ("F", "face snap on and off"),
-        ("r-click / V", "arrows for the last\ncentimetre; drag one"),
+        ("tab", "normal, move, resize;\nclick selects, drag a handle"),
         ("RMB drag", "swing the camera"),
         ("MMB drag", "pull the bench along"),
         ("wheel", "draw near, pull away"),
@@ -219,6 +298,43 @@ fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>) 
         },
         ChildOf(foot),
     ));
+}
+
+/// Mode presses set the tool; the standing mode wears the gold.
+fn work_mode_bar(
+    palette: Res<Palette>,
+    mut mode: ResMut<crate::gizmo::ToolMode>,
+    mut buttons: Query<(
+        &Interaction,
+        &ModeButton,
+        &mut BorderColor,
+        &mut BackgroundColor,
+    )>,
+) {
+    for (interaction, button, _, _) in &buttons {
+        if *interaction == Interaction::Pressed && *mode != button.0 {
+            *mode = button.0;
+        }
+    }
+    for (_, button, mut border, mut fill) in &mut buttons {
+        let standing = *mode == button.0;
+        let dress = BorderColor::all(if standing {
+            theme::accent(&palette)
+        } else {
+            theme::panel_border(&palette)
+        });
+        if *border != dress {
+            *border = dress;
+        }
+        let wanted = BackgroundColor(if standing {
+            Color::srgb(0.075, 0.082, 0.102)
+        } else {
+            Color::BLACK.with_alpha(0.18)
+        });
+        if fill.0 != wanted.0 {
+            *fill = wanted;
+        }
+    }
 }
 
 /// Bench presses walk the maker over; the standing bench wears the gold.

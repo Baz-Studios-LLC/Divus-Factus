@@ -1,65 +1,90 @@
-//! The fine hand: three axis arrows for the last centimetre.
+//! The tool modes and the fine hand.
 //!
-//! The magnets and faces place a part well; this places it exactly. V
-//! selects what the cursor touches, the arrows appear, and dragging one
-//! slides the part along that axis alone in clean five-centimetre steps -
-//! every snap deliberately silent while the arrows are in charge.
+//! A mode bar rides the top of the window, the way the big 3D programs
+//! do it: NORMAL places and grabs, MOVE puts translate arrows on what
+//! you click, RESIZE puts end-handles on any sized primitive and drags
+//! its dimensions in quarter-metre steps. Tab walks the modes.
 
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
 use crate::Bench;
-use crate::builder::{Hovered, Naming, Placed};
+use crate::builder::{self, Hovered, Naming, PartKind, Placed};
 use crate::look::Palette;
 
-/// The part currently wearing the arrows.
+/// Which tool the mouse is.
+#[derive(Resource, Clone, Copy, PartialEq, Eq, Default, Debug)]
+pub enum ToolMode {
+    #[default]
+    Normal,
+    Move,
+    Resize,
+}
+
+/// The part currently wearing handles.
 #[derive(Resource, Default)]
 pub struct Selected(pub Option<Entity>);
 
-/// A drag in progress: the axis, where along it the grip began, and the
-/// part's position when it did.
-#[derive(Resource, Default)]
-pub struct GizmoDrag(pub Option<(Vec3, f32, Vec3)>);
+/// A drag in progress.
+pub struct DragState {
+    dir: Vec3,
+    t0: f32,
+    start_at: Vec3,
+    grip: Grip,
+}
 
-/// True while the cursor is on an arrow or a drag is live - the bench's
-/// ordinary click work stands aside for it.
+#[derive(Clone, Copy)]
+enum Grip {
+    /// Slide the whole part along the handle's direction.
+    Slide,
+    /// Pull one end of a sized primitive: which local axis, and the
+    /// dimensions when the grip closed. The handle's own direction
+    /// already points out of the pulled end.
+    Size { on_x: bool, w0: f32, d0: f32 },
+}
+
+#[derive(Resource, Default)]
+pub struct GizmoDrag(Option<DragState>);
+
+/// True while the cursor rides a handle or a drag is live.
 #[derive(Resource, Default)]
 pub struct GizmoHot(pub bool);
 
-/// The arrows' root, parked at the selected part.
 #[derive(Component)]
 struct GizmoRoot;
 
-/// One arrow, knowing its world axis and the ramp it wears - the hover
-/// brightening needs to redye it.
+/// A handle: its world direction, its dye, and what gripping it does.
 #[derive(Component)]
-struct GizmoArrow(Vec3, &'static str);
+struct Handle {
+    dir: Vec3,
+    ramp: &'static str,
+    grip: Grip,
+}
 
-/// The camera that draws the arrows over everything: it runs after the
-/// main camera with a fresh depth buffer, so no wall can bury them.
 #[derive(Component)]
 struct GizmoCamera;
 
-/// The render layer the arrows live on, seen only by their own camera.
 const ARROW_LAYER: usize = 1;
 
 pub struct GizmoPlugin;
 
 impl Plugin for GizmoPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Selected>()
+        app.init_resource::<ToolMode>()
+            .init_resource::<Selected>()
             .init_resource::<GizmoDrag>()
             .init_resource::<GizmoHot>()
             .add_systems(Startup, raise_gizmo_camera)
             .add_systems(
                 Update,
-                (select_part, dress_gizmo, work_gizmo, ride_along).chain(),
+                (walk_modes, select_part, dress_gizmo, work_gizmo, ride_along).chain(),
             );
     }
 }
 
 /// The overlay camera: same eye as the bench camera, drawing only the
-/// arrow layer, after everything, onto a cleared depth buffer.
+/// arrow layer, after everything, onto a cleared depth buffer. The UI
+/// rides it too, so panels stay above the arrows.
 fn raise_gizmo_camera(mut commands: Commands) {
     commands.spawn((
         GizmoCamera,
@@ -69,15 +94,12 @@ fn raise_gizmo_camera(mut commands: Commands) {
             clear_color: bevy::camera::ClearColorConfig::None,
             ..default()
         },
-        // The UI rides the topmost camera, so panels stay above the
-        // arrows: world, then arrows, then the shelf and rail.
         IsDefaultUiCamera,
         RenderLayers::layer(ARROW_LAYER),
         Transform::default(),
     ));
 }
 
-/// The overlay camera wears the bench camera's exact pose every frame.
 fn ride_along(
     bench_camera: Query<&Transform, (With<Camera3d>, Without<GizmoCamera>)>,
     mut overlay: Query<&mut Transform, With<GizmoCamera>>,
@@ -90,21 +112,44 @@ fn ride_along(
     }
 }
 
-/// V or a clean right CLICK (a right DRAG stays the camera's) selects
-/// what the cursor touches; escape and vanishing both deselect.
+/// Tab walks the modes; returning to NORMAL drops the selection.
+fn walk_modes(
+    keys: Res<ButtonInput<KeyCode>>,
+    bench: Res<Bench>,
+    naming: Res<Naming>,
+    mut mode: ResMut<ToolMode>,
+    mut selected: ResMut<Selected>,
+) {
+    if *bench != Bench::Builder || naming.0.is_some() {
+        return;
+    }
+    if keys.just_pressed(KeyCode::Tab) {
+        *mode = match *mode {
+            ToolMode::Normal => ToolMode::Move,
+            ToolMode::Move => ToolMode::Resize,
+            ToolMode::Resize => ToolMode::Normal,
+        };
+    }
+    if mode.is_changed() && *mode == ToolMode::Normal {
+        selected.0 = None;
+    }
+}
+
+/// In MOVE and RESIZE, a left click selects what the cursor touches;
+/// escape and vanishing deselect. NORMAL keeps no selection at all.
 #[allow(clippy::too_many_arguments)]
 fn select_part(
     keys: Res<ButtonInput<KeyCode>>,
     buttons: Res<ButtonInput<MouseButton>>,
-    motion: Res<bevy::input::mouse::AccumulatedMouseMotion>,
-    mut swept: Local<f32>,
+    mode: Res<ToolMode>,
+    hot: Res<GizmoHot>,
     bench: Res<Bench>,
     naming: Res<Naming>,
     hovered: Res<Hovered>,
     parts: Query<(), With<Placed>>,
     mut selected: ResMut<Selected>,
 ) {
-    if *bench != Bench::Builder || naming.0.is_some() {
+    if *bench != Bench::Builder || naming.0.is_some() || *mode == ToolMode::Normal {
         selected.0 = None;
         return;
     }
@@ -113,100 +158,162 @@ fn select_part(
     {
         selected.0 = None;
     }
-    // A right press starts a tally of how far the mouse swept; releasing
-    // with the tally still tiny was a click, not an orbit.
-    if buttons.just_pressed(MouseButton::Right) {
-        *swept = 0.0;
-    }
-    if buttons.pressed(MouseButton::Right) {
-        *swept += motion.delta.length();
-    }
-    let right_clicked = buttons.just_released(MouseButton::Right) && *swept < 4.0;
-    if keys.just_pressed(KeyCode::KeyV) || right_clicked {
-        selected.0 = match (selected.0, hovered.grab) {
-            // Asking again on the selected part puts the arrows away.
-            (Some(standing), Some(touched)) if standing == touched => None,
-            (_, Some(touched)) => Some(touched),
-            (_, None) => None,
-        };
+    if buttons.just_pressed(MouseButton::Left)
+        && !hot.0
+        && let Some(touched) = hovered.grab
+    {
+        selected.0 = Some(touched);
     }
     if keys.just_pressed(KeyCode::Escape) {
         selected.0 = None;
     }
 }
 
-/// Raises and parks the arrows whenever the selection changes, and keeps
-/// them riding the part they belong to.
-fn dress_gizmo(
-    mut commands: Commands,
-    selected: Res<Selected>,
-    palette: Res<Palette>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    parts: Query<&Transform, (With<Placed>, Without<GizmoRoot>)>,
-    mut roots: Query<(Entity, &mut Transform), With<GizmoRoot>>,
-) {
-    let at = selected.0.and_then(|part| parts.get(part).ok());
-    match (at, roots.iter_mut().next()) {
-        (Some(part_at), Some((_, mut root_at))) => {
-            root_at.translation = part_at.translation;
-        }
-        (Some(part_at), None) => {
-            let root = commands
-                .spawn((
-                    GizmoRoot,
-                    Transform::from_translation(part_at.translation),
-                    Visibility::default(),
-                ))
-                .id();
-            let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
-            for (axis, ramp) in [
-                (Vec3::X, "cloth-red"),
-                (Vec3::Y, "cloth-gold"),
-                (Vec3::Z, "cloth-blue"),
-            ] {
-                let material = materials.add(StandardMaterial {
-                    base_color: palette.shade(ramp, 0.85),
-                    unlit: true,
-                    ..default()
-                });
-                let arrow = commands
-                    .spawn((
-                        GizmoArrow(axis, ramp),
-                        Transform::from_translation(axis * 0.7),
-                        Visibility::default(),
-                        ChildOf(root),
-                    ))
-                    .id();
-                // The shaft, then the head at its far end - each stamped
-                // onto the arrow layer, since layers do not inherit.
-                commands.spawn((
-                    Mesh3d(cube.clone()),
-                    MeshMaterial3d(material.clone()),
-                    Transform::from_scale(Vec3::splat(0.05) + axis.abs() * (1.3 - 0.05)),
-                    RenderLayers::layer(ARROW_LAYER),
-                    ChildOf(arrow),
-                ));
-                commands.spawn((
-                    Mesh3d(cube.clone()),
-                    MeshMaterial3d(material),
-                    Transform::from_translation(axis * 0.72).with_scale(Vec3::splat(0.14)),
-                    RenderLayers::layer(ARROW_LAYER),
-                    ChildOf(arrow),
+/// The handles a part deserves in the standing mode: direction, offset
+/// of the handle's FOOT from the part's origin, dye, grip.
+fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str, Grip)> {
+    let spin = Quat::from_rotation_y(record.yaw);
+    match mode {
+        ToolMode::Move => vec![
+            (Vec3::X, Vec3::ZERO, "cloth-red", Grip::Slide),
+            (Vec3::Y, Vec3::ZERO, "cloth-gold", Grip::Slide),
+            (Vec3::Z, Vec3::ZERO, "cloth-blue", Grip::Slide),
+        ],
+        ToolMode::Resize => {
+            let sized = builder::kind_from_name(&record.part).and_then(|kind| match kind {
+                PartKind::Wall(long) => Some((long, 0.0, false)),
+                PartKind::Trim { long, .. } => Some((long, 0.0, false)),
+                PartKind::Floor(w, d) => Some((w, d, true)),
+                PartKind::Foundation(w, d) => Some((w, d, true)),
+                PartKind::Roof(w, d) => Some((w, d, true)),
+                _ => None,
+            });
+            let Some((w, d, both)) = sized else {
+                return Vec::new();
+            };
+            let mut handles = Vec::new();
+            for end in [-1.0f32, 1.0] {
+                let dir = spin * (Vec3::X * end);
+                handles.push((
+                    dir,
+                    dir * (w * 0.5),
+                    "cloth-red",
+                    Grip::Size {
+                        on_x: true,
+                        w0: w,
+                        d0: d,
+                    },
                 ));
             }
+            if both {
+                for end in [-1.0f32, 1.0] {
+                    let dir = spin * (Vec3::Z * end);
+                    handles.push((
+                        dir,
+                        dir * (d * 0.5),
+                        "cloth-blue",
+                        Grip::Size {
+                            on_x: false,
+                            w0: w,
+                            d0: d,
+                        },
+                    ));
+                }
+            }
+            handles
         }
-        (None, Some((root, _))) => {
-            commands.entity(root).despawn();
-        }
-        (None, None) => {}
+        ToolMode::Normal => Vec::new(),
     }
 }
 
-/// Where the cursor's ray runs, if it runs anywhere.
+/// Raises, moves and retires the handles as selection, mode and the
+/// part's own size change.
+#[allow(clippy::too_many_arguments)]
+fn dress_gizmo(
+    mut commands: Commands,
+    selected: Res<Selected>,
+    mode: Res<ToolMode>,
+    palette: Res<Palette>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    parts: Query<(&Transform, &Placed), Without<GizmoRoot>>,
+    roots: Query<Entity, With<GizmoRoot>>,
+    mut stamp: Local<(Option<Entity>, ToolMode, String)>,
+) {
+    let standing = selected.0.and_then(|part| parts.get(part).ok());
+    let fresh = (
+        selected.0,
+        *mode,
+        standing
+            .map(|(_, record)| record.part.clone())
+            .unwrap_or_default(),
+    );
+    if *stamp == fresh {
+        if let Some((at, _)) = standing {
+            for root in &roots {
+                commands
+                    .entity(root)
+                    .insert(Transform::from_translation(at.translation));
+            }
+        }
+        return;
+    }
+    *stamp = fresh;
+    for root in &roots {
+        commands.entity(root).despawn();
+    }
+    let Some((at, record)) = standing else {
+        return;
+    };
+    let wanted = handles_for(*mode, record);
+    if wanted.is_empty() {
+        return;
+    }
+    let root = commands
+        .spawn((
+            GizmoRoot,
+            Transform::from_translation(at.translation),
+            Visibility::default(),
+        ))
+        .id();
+    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+    for (dir, foot, ramp, grip) in wanted {
+        let material = materials.add(StandardMaterial {
+            base_color: palette.shade(ramp, 0.85),
+            unlit: true,
+            ..default()
+        });
+        let handle = commands
+            .spawn((
+                Handle { dir, ramp, grip },
+                Transform::from_translation(foot),
+                Visibility::default(),
+                ChildOf(root),
+            ))
+            .id();
+        // The shaft runs out of the foot along the direction, the head
+        // caps it. Everything on the arrow layer.
+        commands.spawn((
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(material.clone()),
+            Transform::from_translation(dir * 0.65)
+                .with_scale(Vec3::splat(0.05) + dir.abs() * (1.3 - 0.05)),
+            RenderLayers::layer(ARROW_LAYER),
+            ChildOf(handle),
+        ));
+        commands.spawn((
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(material),
+            Transform::from_translation(dir * 1.35).with_scale(Vec3::splat(0.14)),
+            RenderLayers::layer(ARROW_LAYER),
+            ChildOf(handle),
+        ));
+    }
+}
+
 fn cursor_ray(
     windows: &Query<&Window>,
-    cameras: &Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    cameras: &Query<(&Camera, &GlobalTransform), (With<Camera3d>, Without<GizmoCamera>)>,
 ) -> Option<Ray3d> {
     let window = windows.iter().next()?;
     let cursor = window.cursor_position()?;
@@ -214,7 +321,8 @@ fn cursor_ray(
     camera.viewport_to_world(camera_at, cursor).ok()
 }
 
-/// The parameter along `axis` (through `origin`) closest to the ray.
+/// The parameter along `axis` (through `origin`) closest to the ray:
+/// t = (e - b·f)/(1 - b²).
 fn along_axis(ray: &Ray3d, origin: Vec3, axis: Vec3) -> Option<f32> {
     let toward = Vec3::from(ray.direction);
     let b = axis.dot(toward);
@@ -223,26 +331,32 @@ fn along_axis(ray: &Ray3d, origin: Vec3, axis: Vec3) -> Option<f32> {
         return None;
     }
     let w = ray.origin - origin;
-    // Least-squares meeting point of ray and axis: t = (e - b·f)/(1 - b²).
     Some((w.dot(axis) - b * w.dot(toward)) / denominator)
 }
 
-/// Dragging an arrow slides the part along that axis in 0.05 steps, and
-/// writes the move into the part's record so the export tells the truth.
+fn ray_reach(ray: &Ray3d, point: Vec3) -> f32 {
+    (point - ray.origin).dot(Vec3::from(ray.direction))
+}
+
+/// Dragging a handle: slides in MOVE (5cm steps), re-dimensions in
+/// RESIZE (25cm steps, the far end standing still). Every change lands
+/// in the part's record, and a resized body is rebuilt on the spot.
 #[allow(clippy::too_many_arguments)]
 fn work_gizmo(
+    mut commands: Commands,
     buttons: Res<ButtonInput<MouseButton>>,
     selected: Res<Selected>,
     mut drag: ResMut<GizmoDrag>,
     mut hot: ResMut<GizmoHot>,
     windows: Query<&Window>,
-    cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    arrows: Query<(Entity, &GizmoArrow, &GlobalTransform)>,
+    cameras: Query<(&Camera, &GlobalTransform), (With<Camera3d>, Without<GizmoCamera>)>,
+    handles: Query<(Entity, &Handle, &GlobalTransform)>,
     children: Query<&Children>,
-    handles: Query<&MeshMaterial3d<StandardMaterial>>,
+    dyes: Query<&MeshMaterial3d<StandardMaterial>>,
     palette: Res<Palette>,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut parts: Query<(&mut Transform, &mut Placed), Without<GizmoArrow>>,
+    mut parts: Query<(&mut Transform, &mut Placed), Without<Handle>>,
 ) {
     let Some(part) = selected.0 else {
         drag.0 = None;
@@ -253,38 +367,41 @@ fn work_gizmo(
         return;
     };
 
-    // Which arrow the cursor rides, tested against a generous sleeve.
-    let mut touched: Option<Vec3> = None;
-    for (_, arrow, at) in &arrows {
-        let origin = at.translation() - arrow.0 * 0.7;
-        let Some(t) = along_axis(&ray, origin, arrow.0) else {
+    // Which handle the cursor rides.
+    let mut touched: Option<(Vec3, Grip)> = None;
+    for (_, handle, at) in &handles {
+        let origin = at.translation();
+        let Some(t) = along_axis(&ray, origin, handle.dir) else {
             continue;
         };
         if !(-0.1..=1.5).contains(&t) {
             continue;
         }
-        let on_axis = origin + arrow.0 * t;
+        let on_axis = origin + handle.dir * t;
         let miss =
             (ray.origin + Vec3::from(ray.direction) * ray_reach(&ray, on_axis) - on_axis).length();
         if miss < 0.18 {
-            touched = Some(arrow.0);
+            touched = Some((handle.dir, handle.grip));
         }
     }
     hot.0 = touched.is_some() || drag.0.is_some();
 
-    // The ridden arrow brightens; the others keep their working dye. A
-    // live drag keeps its arrow lit however far the cursor strays.
-    let lit_axis = drag.0.map(|(axis, ..)| axis).or(touched);
-    for (entity, arrow, _) in &arrows {
-        let lit = lit_axis == Some(arrow.0);
+    // The ridden handle brightens; a live drag keeps its own lit.
+    let lit_dir = drag
+        .0
+        .as_ref()
+        .map(|state| state.dir)
+        .or(touched.map(|(dir, _)| dir));
+    for (entity, handle, _) in &handles {
+        let lit = lit_dir == Some(handle.dir);
         if let Ok(kids) = children.get(entity) {
             for &kid in kids {
-                if let Ok(handle) = handles.get(kid)
-                    && let Some(mut material) = materials.get_mut(&handle.0)
+                if let Ok(dye) = dyes.get(kid)
+                    && let Some(mut material) = materials.get_mut(&dye.0)
                 {
-                    let dye = palette.shade(arrow.1, if lit { 1.0 } else { 0.85 });
-                    if material.base_color != dye {
-                        material.base_color = dye;
+                    let wanted = palette.shade(handle.ramp, if lit { 1.0 } else { 0.85 });
+                    if material.base_color != wanted {
+                        material.base_color = wanted;
                     }
                 }
             }
@@ -292,29 +409,77 @@ fn work_gizmo(
     }
 
     if buttons.just_pressed(MouseButton::Left)
-        && let Some(axis) = touched
+        && let Some((dir, grip)) = touched
         && let Ok((transform, _)) = parts.get_mut(part)
+        && let Some(t0) = along_axis(&ray, transform.translation, dir)
     {
-        if let Some(t0) = along_axis(&ray, transform.translation, axis) {
-            drag.0 = Some((axis, t0, transform.translation));
-        }
+        drag.0 = Some(DragState {
+            dir,
+            t0,
+            start_at: transform.translation,
+            grip,
+        });
     }
     if !buttons.pressed(MouseButton::Left) {
         drag.0 = None;
         return;
     }
-    if let Some((axis, t0, start)) = drag.0
-        && let Ok((mut transform, mut record)) = parts.get_mut(part)
-        && let Some(t) = along_axis(&ray, start, axis)
-    {
-        // Clean five-centimetre steps: fine, but never float dust.
-        let step = ((t - t0) * 20.0).round() / 20.0;
-        transform.translation = start + axis * step;
-        record.at = transform.translation.into();
+    let Some(state) = drag.0.as_ref() else {
+        return;
+    };
+    let Ok((mut transform, mut record)) = parts.get_mut(part) else {
+        return;
+    };
+    let Some(t) = along_axis(&ray, state.start_at, state.dir) else {
+        return;
+    };
+    match state.grip {
+        Grip::Slide => {
+            let step = ((t - state.t0) * 20.0).round() / 20.0;
+            transform.translation = state.start_at + state.dir * step;
+            record.at = transform.translation.into();
+        }
+        Grip::Size { on_x, w0, d0 } => {
+            // Pulling outward along the handle grows the dimension; the
+            // far end stands still, so the centre walks half the growth.
+            let pull = ((t - state.t0) * 4.0).round() / 4.0;
+            let Some(kind) = builder::kind_from_name(&record.part) else {
+                return;
+            };
+            let (w, d) = if on_x {
+                ((w0 + pull).max(0.25), d0)
+            } else {
+                (w0, (d0 + pull).max(0.25))
+            };
+            let grown = if on_x { w - w0 } else { d - d0 };
+            let made = match kind {
+                PartKind::Wall(_) => PartKind::Wall(w),
+                PartKind::Trim { stone, .. } => PartKind::Trim { long: w, stone },
+                PartKind::Floor(..) => PartKind::Floor(w, d),
+                PartKind::Foundation(..) => PartKind::Foundation(w, d),
+                PartKind::Roof(..) => PartKind::Roof(w, d),
+                _ => return,
+            };
+            let fresh = builder::part_name(&made);
+            if fresh == record.part {
+                return;
+            }
+            transform.translation = state.start_at + state.dir * (grown * 0.5);
+            record.at = transform.translation.into();
+            record.part = fresh;
+            // The body is rebuilt in place; the entity, and with it the
+            // selection, stands.
+            commands.entity(part).despawn_related::<Children>();
+            builder::dress_part(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &palette,
+                &made,
+                &record,
+                part,
+                false,
+            );
+        }
     }
-}
-
-/// How far along the ray the given point sits.
-fn ray_reach(ray: &Ray3d, point: Vec3) -> f32 {
-    (point - ray.origin).dot(Vec3::from(ray.direction))
 }
