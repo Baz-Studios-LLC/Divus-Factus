@@ -124,6 +124,12 @@ fn fade(
 ) {
     let step = time.delta_secs() / FADE;
     for (entity, mut channel, sink) in &mut channels {
+        // A freshly spawned track has no sink until its file finishes
+        // loading; the envelope holds at silence until then, or the fade
+        // would already be spent when the first note lands.
+        if sink.is_none() && channel.rising {
+            continue;
+        }
         channel.level = if channel.rising {
             (channel.level + step).min(1.0)
         } else {

@@ -866,6 +866,7 @@ fn animate_hand(
     hand: Res<DivineHand>,
     pointer: Res<PointerContext>,
     buttons: Res<ButtonInput<MouseButton>>,
+    state: Res<State<crate::GameState>>,
     cameras: Query<&CameraRig>,
     anchors: Query<&GlobalTransform>,
     mut roots: Query<(&mut Transform, &mut Visibility, &mut HandRig), With<HandModel>>,
@@ -877,6 +878,11 @@ fn animate_hand(
     let Ok((mut transform, mut visibility, mut rig)) = roots.single_mut() else {
         return;
     };
+    // The splash belongs to the studio card alone: no hand hangs over it.
+    if matches!(state.get(), crate::GameState::Splash) {
+        *visibility = Visibility::Hidden;
+        return;
+    }
 
     let dt = time.delta_secs();
     let t = time.elapsed_secs();
