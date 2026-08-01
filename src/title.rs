@@ -463,7 +463,9 @@ fn spawn_smoke(commands: &mut Commands, images: &mut Assets<Image>, screen: Enti
         // rhythm, and no random draws to burn.
         let puff = SmokePuff {
             lane: (f * 0.618034).fract(),
-            home_y: 0.17 + 0.26 * (f * 0.377).fract(),
+            // Hugging the cropped logotype's band rather than the tall
+            // canvas it once shipped inside.
+            home_y: 0.21 + 0.17 * (f * 0.377).fract(),
             drift: 0.0045 + 0.006 * (f * 0.529).fract(),
             phase: f * 1.947,
             size: 260.0 + 360.0 * (f * 0.732).fract(),

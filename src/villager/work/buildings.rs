@@ -608,6 +608,9 @@ pub struct Bed {
     /// Whether the bed's length runs along local X (longhouse bays) or
     /// local Z (house walls) — the sleeper lies along it.
     pub along_x: bool,
+    /// Which end of that axis the PILLOW is at (-1.0 or 1.0): always the
+    /// wall end, and the sleeper's head goes with it.
+    pub head: f32,
 }
 
 /// A finished longhouse: a roof for everyone with no family to sleep beside.
@@ -953,7 +956,7 @@ pub(crate) fn raise_stage(
     // Furnishes one bed. The MATTRESS carries the Bed marker — its transform
     // is where a sleeper lies. `along_x` lays the bed's length on local X
     // (longhouse bays), otherwise on Z (house walls).
-    let bed = |slot: u8, at: Vec3, along_x: bool, length: f32| {
+    let bed = |slot: u8, at: Vec3, along_x: bool, head_sign: f32, length: f32| {
         let (lx, lz) = if along_x {
             (length, 0.62)
         } else {
@@ -973,7 +976,11 @@ pub(crate) fn raise_stage(
         ));
         // Mattress: the sleeper's mark.
         cmd.spawn((
-            Bed { slot, along_x },
+            Bed {
+                slot,
+                along_x,
+                head: head_sign,
+            },
             Mesh3d(cube.clone()),
             MeshMaterial3d(roof.clone()),
             Transform::from_translation(at + Vec3::Y * (lift + 0.3))
@@ -982,9 +989,9 @@ pub(crate) fn raise_stage(
         ));
         // Pillow, at the wall end.
         let head = if along_x {
-            Vec3::new(-lx * 0.38, 0.0, 0.0)
+            Vec3::new(head_sign * lx * 0.38, 0.0, 0.0)
         } else {
-            Vec3::new(0.0, 0.0, -lz * 0.38)
+            Vec3::new(0.0, 0.0, head_sign * lz * 0.38)
         };
         cmd.spawn((
             Mesh3d(cube.clone()),
@@ -1392,6 +1399,7 @@ pub(crate) fn raise_stage(
                         slot,
                         Vec3::new(-w + length * 0.5 + 0.25, 0.0, z),
                         true,
+                        -1.0,
                         length,
                     );
                 }
@@ -1523,6 +1531,7 @@ pub(crate) fn raise_stage(
                         slot,
                         Vec3::new(w * 0.45 * rank - 0.2, 0.0, side * (d - length * 0.5 - 0.3)),
                         false,
+                        side,
                         length,
                     );
                 }

@@ -107,6 +107,11 @@ pub(super) fn assign_beds(
     held: Query<(Entity, &Home, &BedSlot), With<Villager>>,
     kinds: Query<Has<Longhouse>, Or<(With<Hut>, With<Longhouse>)>>,
 ) {
+    // A finished house is claimed by its whole household in ONE frame, and
+    // command-inserted slots are not visible until the next — so the deals
+    // made THIS run must be remembered here, or everyone sees an empty
+    // house and takes bed zero together.
+    let mut dealt: std::collections::HashMap<Entity, Vec<u8>> = std::collections::HashMap::new();
     for (mover, home) in &movers {
         let capacity = match kinds.get(home.0) {
             Ok(true) => LONGHOUSE_CAPACITY,
@@ -118,8 +123,10 @@ pub(super) fn assign_beds(
             .filter(|(other, theirs, _)| *other != mover && theirs.0 == home.0)
             .map(|(_, _, slot)| slot.0)
             .collect();
+        taken.extend(dealt.get(&home.0).into_iter().flatten().copied());
         taken.sort_unstable();
         let slot = (0..capacity).find(|s| !taken.contains(s)).unwrap_or(0);
+        dealt.entry(home.0).or_default().push(slot);
         commands.entity(mover).insert(BedSlot(slot));
     }
 }
@@ -598,11 +605,21 @@ pub(super) fn assign_homes(
 
         let roof = kin_roof.or_else(|| {
             // Otherwise the nearest roof of the right kind. The unattached
-            // want the longhouse; the wed and their children want a house.
+            // want the longhouse; the wed and their children want a house —
+            // and a house holds ONE family: without kin already under it,
+            // only an empty house will do. Boarding with somebody else's
+            // family is exactly what the longhouse exists to prevent, and
+            // it was happening to widows and fresh couples squeezed into
+            // half-full homes.
             roofs
                 .iter()
                 .filter(|(roof, _, long)| {
-                    *long == want_longhouse && has_room(*roof, *long, &occupancy)
+                    *long == want_longhouse
+                        && if *long {
+                            has_room(*roof, *long, &occupancy)
+                        } else {
+                            occupancy.get(roof).copied().unwrap_or(0) == 0
+                        }
                 })
                 .map(|(roof, at, _)| (roof, at.translation.distance(transform.translation)))
                 .min_by(|a, b| a.1.total_cmp(&b.1))
@@ -764,6 +781,7 @@ pub(super) fn night_routine(
                 (
                     site.transform_point(local.translation),
                     bed.along_x,
+                    bed.head,
                     site.rotation,
                 )
             })
@@ -811,7 +829,7 @@ pub(super) fn night_routine(
                 // Their OWN bed, by claimed number. No claim yet (or no
                 // such bed in an old save's home): the door will do.
                 let berth = berth.and_then(|slot| bed_of(building, slot.0, site));
-                let Some((bed_at, along_x, site_spin)) = berth else {
+                let Some((bed_at, along_x, head, site_spin)) = berth else {
                     if transform.translation.distance(site.translation) > 2.2 {
                         *activity = Activity::Sleeping;
                         target.0 = Some(site.translation);
@@ -836,14 +854,22 @@ pub(super) fn night_routine(
                     target.0 = None;
                     motion.speed = 0.0;
                     motion.flail = 0.0;
-                    let body_yaw = if along_x {
-                        std::f32::consts::FRAC_PI_2
-                    } else {
+                    // Flat on the back, length along the mattress, head on
+                    // the pillow — whichever end the bed says its wall is.
+                    // The quarter-turn is the other way from first instinct;
+                    // the playtest photo of a sleeper lying ACROSS the bed
+                    // is the authority here.
+                    let mut body_yaw = if along_x {
                         0.0
+                    } else {
+                        std::f32::consts::FRAC_PI_2
                     };
+                    if head > 0.0 {
+                        body_yaw += std::f32::consts::PI;
+                    }
                     let facing = site_spin
                         * Quat::from_rotation_y(body_yaw)
-                        * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2 * 0.94);
+                        * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
                     info!("a sleeper settles into their bed");
                     commands.entity(entity).insert(Abed {
                         at: bed_at + Vec3::Y * 0.34,
