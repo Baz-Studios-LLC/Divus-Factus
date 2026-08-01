@@ -114,6 +114,8 @@ impl Plugin for VillagerPlugin {
             .add_systems(
                 Update,
                 (
+                    home::assign_beds,
+                    home::hold_abed,
                     rites::mark_the_dead,
                     rites::mourn,
                     rites::burials,

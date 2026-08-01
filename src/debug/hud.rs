@@ -471,6 +471,30 @@ pub(crate) fn report_frames(time: Res<Time<Real>>, mut window: Local<(f32, u32, 
     *window = (0.0, 0, 0.0);
 }
 
+/// R lifts the roofs off the world — the cutaway view into every interior —
+/// and puts them back. New roofs built while lifted come up lifted too.
+pub(crate) fn toggle_roofs(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut lifted: Local<Option<bool>>,
+    mut roofs: Query<&mut Visibility, With<crate::villager::work::RoofPart>>,
+) {
+    // Capture tooling: DIVUS_FACTUS_ROOFLESS starts the world cut away.
+    let lifted = lifted.get_or_insert_with(|| std::env::var("DIVUS_FACTUS_ROOFLESS").is_ok());
+    if keys.just_pressed(KeyCode::KeyR) {
+        *lifted = !*lifted;
+    }
+    for mut visibility in &mut roofs {
+        let wanted = if *lifted {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
+        if *visibility != wanted {
+            *visibility = wanted;
+        }
+    }
+}
+
 /// The backquote shows and hides the dev overlay.
 pub(crate) fn toggle_dev_overlay(
     keys: Res<ButtonInput<KeyCode>>,

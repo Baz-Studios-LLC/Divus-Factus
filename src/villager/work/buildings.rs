@@ -341,9 +341,11 @@ impl Blueprint {
         match kind {
             BuildingKind::House => Blueprint {
                 kind,
-                half_w: rng.range(1.9, 2.5),
-                half_d: rng.range(2.0, 2.7),
-                wall_h: rng.range(2.1, 2.6),
+                // Sized for its interior: four beds, a floor to cross, a
+                // doorway lane. The world has room to spare.
+                half_w: rng.range(2.6, 3.2),
+                half_d: rng.range(2.7, 3.4),
+                wall_h: rng.range(2.2, 2.7),
                 // Timber homes mostly; some whitewashed, a few painted in a
                 // cloth colour — a street, not a barracks.
                 walls: if rng.chance(0.55) {
@@ -366,8 +368,8 @@ impl Blueprint {
             // it looks it — no paint, no pride, just length.
             BuildingKind::Longhouse => Blueprint {
                 kind,
-                half_w: rng.range(2.0, 2.3),
-                half_d: rng.range(5.0, 6.0),
+                half_w: rng.range(2.7, 3.1),
+                half_d: rng.range(6.0, 7.2),
                 wall_h: rng.range(2.0, 2.3),
                 walls: if rng.chance(0.7) {
                     pal::shade(&pal::WOOD, rng.range(0.5, 0.7))
@@ -590,6 +592,23 @@ pub struct Building {
 /// A finished house: a roof for one family.
 #[derive(Component)]
 pub struct Hut;
+
+/// A piece of a building's roof. Marked so the roofs can be lifted off the
+/// world as one — the god's cutaway view into every interior.
+#[derive(Component)]
+pub struct RoofPart;
+
+/// One bed inside a home, numbered so each occupant owns theirs. The count
+/// is the capacity constant made physical: a house sleeps HOUSE_CAPACITY,
+/// a longhouse LONGHOUSE_CAPACITY, and the furniture cannot drift from the
+/// promise.
+#[derive(Component)]
+pub struct Bed {
+    pub slot: u8,
+    /// Whether the bed's length runs along local X (longhouse bays) or
+    /// local Z (house walls) — the sleeper lies along it.
+    pub along_x: bool,
+}
 
 /// A finished longhouse: a roof for everyone with no family to sleep beside.
 #[derive(Component)]
@@ -909,13 +928,86 @@ pub(crate) fn raise_stage(
     let (w, d, h) = (plan.half_w, plan.half_d, plan.wall_h);
 
     let lift = if stage == 0 { 0.0 } else { PLINTH_TOP };
+    // Several furnishing closures below need the spawner; a RefCell lets
+    // them share it, borrowing only for the instant of each spawn.
+    let cmd = std::cell::RefCell::new(commands);
+    // While set, every spawned part is a piece of ROOF — liftable by the
+    // cutaway view. Set around the roof-raising calls for the buildings
+    // whose interiors exist.
+    let roofing = std::cell::Cell::new(false);
     let mut part = |offset: Vec3, size: Vec3, rot_z: f32, material: &Handle<StandardMaterial>| {
-        commands.spawn((
+        let mut cmd = cmd.borrow_mut();
+        let mut spawned = cmd.spawn((
             Mesh3d(cube.clone()),
             MeshMaterial3d(material.clone()),
             Transform::from_translation(offset + Vec3::Y * lift)
                 .with_rotation(Quat::from_rotation_z(rot_z))
                 .with_scale(size),
+            ChildOf(site),
+        ));
+        if roofing.get() {
+            spawned.insert(RoofPart);
+        }
+    };
+
+    // Furnishes one bed. The MATTRESS carries the Bed marker — its transform
+    // is where a sleeper lies. `along_x` lays the bed's length on local X
+    // (longhouse bays), otherwise on Z (house walls).
+    let bed = |slot: u8, at: Vec3, along_x: bool, length: f32| {
+        let (lx, lz) = if along_x {
+            (length, 0.62)
+        } else {
+            (0.62, length)
+        };
+        let mut cmd = cmd.borrow_mut();
+        // Frame.
+        cmd.spawn((
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(frame.clone()),
+            Transform::from_translation(at + Vec3::Y * (lift + 0.14)).with_scale(Vec3::new(
+                lx + 0.14,
+                0.24,
+                lz + 0.14,
+            )),
+            ChildOf(site),
+        ));
+        // Mattress: the sleeper's mark.
+        cmd.spawn((
+            Bed { slot, along_x },
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(roof.clone()),
+            Transform::from_translation(at + Vec3::Y * (lift + 0.3))
+                .with_scale(Vec3::new(lx, 0.14, lz)),
+            ChildOf(site),
+        ));
+        // Pillow, at the wall end.
+        let head = if along_x {
+            Vec3::new(-lx * 0.38, 0.0, 0.0)
+        } else {
+            Vec3::new(0.0, 0.0, -lz * 0.38)
+        };
+        cmd.spawn((
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(stonework.clone()),
+            Transform::from_translation(at + head + Vec3::Y * (lift + 0.4)).with_scale(Vec3::new(
+                if along_x { 0.3 } else { 0.5 },
+                0.1,
+                if along_x { 0.5 } else { 0.3 },
+            )),
+            ChildOf(site),
+        ));
+    };
+    // A plank floor: the inside made a place instead of bare ground.
+    let floor = |half_w: f32, half_d: f32| {
+        let mut cmd = cmd.borrow_mut();
+        cmd.spawn((
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(frame.clone()),
+            Transform::from_translation(Vec3::Y * (lift + 0.03)).with_scale(Vec3::new(
+                half_w * 2.0 - 0.25,
+                0.07,
+                half_d * 2.0 - 0.25,
+            )),
             ChildOf(site),
         ));
     };
@@ -1160,9 +1252,10 @@ pub(crate) fn raise_stage(
                 // A little peaked cap over the beam, pitched across it. The
                 // part helper only tilts around Z, so these two spawn by
                 // hand, after the closure's last use in this arm.
-                drop(part);
+                let _ = &part;
+                let mut cmd = cmd.borrow_mut();
                 for (zed, tilt) in [(-d * 0.4, -0.5_f32), (d * 0.4, 0.5)] {
-                    commands.spawn((
+                    cmd.spawn((
                         Mesh3d(cube.clone()),
                         MeshMaterial3d(roof.clone()),
                         Transform::from_translation(
@@ -1273,6 +1366,7 @@ pub(crate) fn raise_stage(
             // The roof: one long gable, and a smoke louver over every
             // other bay — the tell that more than one hearth burns under it.
             _ => {
+                roofing.set(true);
                 raise_gable(&mut part, w, d, h, &roof, &wall, &frame);
                 // A smoke louver over every other bay — the tell that more
                 // than one hearth burns under this roof. They straddle the
@@ -1283,6 +1377,22 @@ pub(crate) fn raise_stage(
                         Vec3::new(0.5, 0.34, 0.7),
                         0.0,
                         &frame,
+                    );
+                }
+                roofing.set(false);
+                // The inside: a floor, and a bed to every berth — one per
+                // occupant the capacity promises, heads to the back wall,
+                // the door lane along the front left clear.
+                floor(w, d);
+                let berths = crate::villager::home::LONGHOUSE_CAPACITY as u8;
+                let length = (w * 0.95).clamp(1.1, 1.6);
+                for slot in 0..berths {
+                    let z = -d + (slot as f32 + 0.5) * (d * 2.0 / berths as f32);
+                    bed(
+                        slot,
+                        Vec3::new(-w + length * 0.5 + 0.25, 0.0, z),
+                        true,
+                        length,
                     );
                 }
             }
@@ -1392,10 +1502,30 @@ pub(crate) fn raise_stage(
         }
         // The roof: gable, or a working shed's single tilted slab.
         _ => {
+            // A house's roof lifts for the cutaway view; the working
+            // buildings keep theirs until their interiors are built.
+            roofing.set(plan.kind == BuildingKind::House);
             if plan.shed_roof {
                 raise_shed(&mut part, w, d, h, &roof, &wall);
             } else {
                 raise_gable(&mut part, w, d, h, &roof, &wall, &frame);
+            }
+            roofing.set(false);
+            if plan.kind == BuildingKind::House {
+                // The inside: floor and a bed to every berth — two to each
+                // side wall, the doorway lane left clear.
+                floor(w, d);
+                let length = (d * 0.8).clamp(1.1, 1.6);
+                for slot in 0..crate::villager::home::HOUSE_CAPACITY as u8 {
+                    let side = if slot % 2 == 0 { -1.0 } else { 1.0 };
+                    let rank = if slot < 2 { -1.0 } else { 1.0 };
+                    bed(
+                        slot,
+                        Vec3::new(w * 0.45 * rank - 0.2, 0.0, side * (d - length * 0.5 - 0.3)),
+                        false,
+                        length,
+                    );
+                }
             }
             // The gilded finial: on the ridge for a gable, on the high wall
             // for a shed. Either way it follows the roof rather than a

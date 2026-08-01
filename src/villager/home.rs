@@ -14,7 +14,7 @@
 
 use bevy::prelude::*;
 
-use super::work::{Hut, Longhouse, Stockpile};
+use super::work::{Bed, Hut, Longhouse, Stockpile};
 use super::{Activity, Chronicle, Needs, Parentage, Person, SimRng, Spouse, Villager};
 use crate::creature::anim::CreatureMotion;
 use crate::creature::genome::{Age, CreatureGenome};
@@ -83,6 +83,56 @@ pub struct Firelight;
 /// the roofless crowd the fire. Work goes on - slower, already taxed by
 /// the weather - but idle hands do not stand in a downpour for nothing.
 #[allow(clippy::type_complexity)]
+/// A claimed berth: which numbered bed in their home is THEIRS.
+///
+/// Assigned when a home is claimed and reassigned when it changes; the
+/// number maps to a physical [`Bed`] child of the building, so sleep is a
+/// walk to a real mattress instead of a vanishing act at the door.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct BedSlot(pub u8);
+
+/// Lying in bed: the pose held until morning. Enforced every frame, because
+/// the idle animation would otherwise stand the sleeper back up.
+#[derive(Component)]
+pub struct Abed {
+    pub at: Vec3,
+    pub facing: Quat,
+}
+
+/// Deals every housed villager a numbered berth, lowest free first.
+/// Runs on anyone whose home just changed, so a rehoming re-deals.
+pub(super) fn assign_beds(
+    mut commands: Commands,
+    movers: Query<(Entity, &Home), (With<Villager>, Changed<Home>)>,
+    held: Query<(Entity, &Home, &BedSlot), With<Villager>>,
+    kinds: Query<Has<Longhouse>, Or<(With<Hut>, With<Longhouse>)>>,
+) {
+    for (mover, home) in &movers {
+        let capacity = match kinds.get(home.0) {
+            Ok(true) => LONGHOUSE_CAPACITY,
+            Ok(false) => HOUSE_CAPACITY,
+            Err(_) => continue,
+        } as u8;
+        let mut taken: Vec<u8> = held
+            .iter()
+            .filter(|(other, theirs, _)| *other != mover && theirs.0 == home.0)
+            .map(|(_, _, slot)| slot.0)
+            .collect();
+        taken.sort_unstable();
+        let slot = (0..capacity).find(|s| !taken.contains(s)).unwrap_or(0);
+        commands.entity(mover).insert(BedSlot(slot));
+    }
+}
+
+/// Holds sleepers to their mattresses: the one pose the animations must
+/// not argue with.
+pub(super) fn hold_abed(mut sleepers: Query<(&Abed, &mut Transform), With<Villager>>) {
+    for (abed, mut transform) in &mut sleepers {
+        transform.translation = abed.at;
+        transform.rotation = abed.facing;
+    }
+}
+
 pub(super) fn take_shelter(
     clock: Res<crate::calendar::WorldClock>,
     weather: Option<Res<crate::weather::Weather>>,
@@ -95,7 +145,6 @@ pub(super) fn take_shelter(
             &Needs,
             &mut Activity,
             &mut MoveTarget,
-            &mut Visibility,
         ),
         (
             With<Villager>,
@@ -115,12 +164,11 @@ pub(super) fn take_shelter(
     let pouring = weather.intensity > 0.6;
     let fire_pos = fires.iter().next().map(|f| f.translation());
 
-    for (transform, home, needs, mut activity, mut target, mut visibility) in &mut villagers {
+    for (transform, home, needs, mut activity, mut target) in &mut villagers {
         // The starving do not wait out the rain: wet and fed beats dry
         // and dead, and the food systems own them until they have eaten.
         if needs.hunger > 0.7 {
             if *activity == Activity::Sheltering {
-                *visibility = Visibility::Inherited;
                 *activity = Activity::Idle;
                 target.0 = None;
             }
@@ -128,7 +176,6 @@ pub(super) fn take_shelter(
         }
         if !pouring {
             if *activity == Activity::Sheltering {
-                *visibility = Visibility::Inherited;
                 *activity = Activity::Idle;
                 target.0 = None;
             }
@@ -140,14 +187,15 @@ pub(super) fn take_shelter(
         }
         match home.and_then(|h| homes.get(h.0).ok()) {
             Some(hut) => {
-                let door = hut.translation;
-                if transform.translation.distance(door) > 2.2 {
+                // Inside means INSIDE now: stand under the actual roof,
+                // visible to anyone who lifts it. No vanishing at the door.
+                let indoors = hut.translation;
+                if transform.translation.distance(indoors) > 1.4 {
                     *activity = Activity::Sheltering;
-                    target.0 = Some(door);
+                    target.0 = Some(indoors);
                 } else {
                     *activity = Activity::Sheltering;
                     target.0 = None;
-                    *visibility = Visibility::Hidden;
                 }
             }
             None => {
@@ -679,18 +727,21 @@ pub(super) fn rehome_the_misplaced(
 /// The housed sleep indoors and vanish from the night streets. The homeless
 /// drift to the fire instead — the lit circle is a census of who has no roof.
 pub(super) fn night_routine(
+    mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,
     homes: Query<&Transform, (Or<(With<Hut>, With<Longhouse>)>, Without<Villager>)>,
+    beds: Query<(&ChildOf, &Transform, &Bed), Without<Villager>>,
     fires: Query<&GlobalTransform, (With<Bonfire>, Without<Villager>)>,
     mut rng: ResMut<SimRng>,
     mut villagers: Query<
         (
+            Entity,
             &Transform,
             Option<&Home>,
+            Option<&BedSlot>,
             &Needs,
             &mut Activity,
             &mut MoveTarget,
-            &mut Visibility,
             &mut CreatureMotion,
         ),
         (
@@ -704,14 +755,30 @@ pub(super) fn night_routine(
     let night = clock.is_night();
     let fire_pos = fires.iter().next().map(|f| f.translation());
 
-    for (transform, home, needs, mut activity, mut target, mut visibility, mut motion) in
+    // Where each numbered bed stands, in the world: the building's own
+    // rotation and place applied to the mattress's local offset.
+    let bed_of = |building: Entity, slot: u8, site: &Transform| {
+        beds.iter()
+            .find(|(parent, _, bed)| parent.parent() == building && bed.slot == slot)
+            .map(|(_, local, bed)| {
+                (
+                    site.transform_point(local.translation),
+                    bed.along_x,
+                    site.rotation,
+                )
+            })
+    };
+
+    for (entity, transform, home, berth, needs, mut activity, mut target, mut motion) in
         &mut villagers
     {
         if !night {
             if *activity == Activity::Sleeping {
-                *visibility = Visibility::Inherited;
                 *activity = Activity::Idle;
                 target.0 = None;
+                // Rise: stand beside the bed, upright, on the ground.
+                commands.entity(entity).remove::<Abed>();
+                motion.speed = 1.0;
             }
             continue;
         }
@@ -728,27 +795,59 @@ pub(super) fn night_routine(
         // firelit homeless escaped: sleep held the housed while hunger ran.
         if needs.hunger > 0.7 {
             if *activity == Activity::Sleeping {
-                *visibility = Visibility::Inherited;
                 *activity = Activity::Idle;
                 target.0 = None;
+                commands.entity(entity).remove::<Abed>();
+                motion.speed = 1.0;
             }
             continue;
         }
 
-        match home.and_then(|h| homes.get(h.0).ok()) {
-            Some(hut) => {
-                let door = hut.translation;
-                if transform.translation.distance(door) > 2.2 {
+        match home.map(|h| h.0) {
+            Some(building) => {
+                let Ok(site) = homes.get(building) else {
+                    continue;
+                };
+                // Their OWN bed, by claimed number. No claim yet (or no
+                // such bed in an old save's home): the door will do.
+                let berth = berth.and_then(|slot| bed_of(building, slot.0, site));
+                let Some((bed_at, along_x, site_spin)) = berth else {
+                    if transform.translation.distance(site.translation) > 2.2 {
+                        *activity = Activity::Sleeping;
+                        target.0 = Some(site.translation);
+                    } else {
+                        *activity = Activity::Sleeping;
+                        target.0 = None;
+                        motion.speed = 0.0;
+                    }
+                    continue;
+                };
+                let walk_goal = Vec3::new(bed_at.x, transform.translation.y, bed_at.z);
+                if transform.translation.distance(walk_goal) > 0.9 {
                     if *activity != Activity::Sleeping {
                         *activity = Activity::Sleeping;
                     }
-                    target.0 = Some(door);
-                } else if *visibility != Visibility::Hidden {
-                    // Indoors. The house stands for them until morning.
+                    target.0 = Some(walk_goal);
+                } else if *activity != Activity::Sleeping || target.0.is_some() {
+                    // Into bed: lie along the mattress, head to the pillow,
+                    // held there until morning. VISIBLY — the roof is what
+                    // hides a sleeper now, and the roof can be lifted.
                     *activity = Activity::Sleeping;
-                    *visibility = Visibility::Hidden;
                     target.0 = None;
                     motion.speed = 0.0;
+                    motion.flail = 0.0;
+                    let body_yaw = if along_x {
+                        std::f32::consts::FRAC_PI_2
+                    } else {
+                        0.0
+                    };
+                    let facing = site_spin
+                        * Quat::from_rotation_y(body_yaw)
+                        * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2 * 0.94);
+                    commands.entity(entity).insert(Abed {
+                        at: bed_at + Vec3::Y * 0.34,
+                        facing,
+                    });
                 }
             }
             None => {
