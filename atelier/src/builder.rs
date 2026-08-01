@@ -119,6 +119,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
         "walls",
     ),
     structure("DOOR", PartKind::Prop("door"), "walls"),
+    structure("DOORWAY", PartKind::Prop("doorway"), "walls"),
     structure("WINDOW", PartKind::Prop("window"), "walls"),
     structure("FOUNDATION, STRETCH", PartKind::FoundationRun, "footing"),
     structure("FOUNDATION, 2M", PartKind::Foundation(2.0, 2.0), "footing"),
@@ -392,6 +393,13 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 "cloth-gold",
                 0.8,
             ),
+        ],
+        PartKind::Prop("doorway") => vec![
+            // An opening with no leaf: jambs and a lintel, for the ways
+            // between rooms that never wanted a door.
+            slab(-0.5625, 1.0, 0.0, 0.125, 2.0, 0.3125, "wood", 0.45),
+            slab(0.5625, 1.0, 0.0, 0.125, 2.0, 0.3125, "wood", 0.45),
+            slab(0.0, 2.0625, 0.0, 1.25, 0.125, 0.3125, "wood", 0.45),
         ],
         PartKind::Prop("window") => vec![
             // Frame boards around the opening and a pale pane within it,
@@ -2325,6 +2333,7 @@ fn place_grab_remove(
             // the opening and the frame settles in.
             let opening = match kind {
                 PartKind::Prop("door") => Some((1.25, 2.125, 0.0_f32, true)),
+                PartKind::Prop("doorway") => Some((1.25, 2.125, 0.0, true)),
                 PartKind::Prop("window") => Some((1.25, 2.0, 0.75, false)),
                 _ => None,
             };
@@ -2367,6 +2376,15 @@ fn place_grab_remove(
             && let Ok((_, transform, record)) = placed.get(grabbed)
             && let Some(kind) = kind_from_name(&record.part)
         {
+            // An opening picked up closes the wall behind it.
+            heal_wall(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &palette,
+                &placed,
+                grabbed,
+            );
             // Picking back up: the part leaves the floor and rides the
             // cursor again with its paint and turn intact. Only the height
             // ABOVE its old support comes along - the new resting place
@@ -2403,8 +2421,110 @@ fn place_grab_remove(
         && let Some(doomed) = hovered.grab
         && placed.contains(doomed)
     {
+        // A removed opening leaves the wall whole again.
+        heal_wall(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &palette,
+            &placed,
+            doomed,
+        );
         commands.entity(doomed).despawn();
     }
+}
+
+/// Taking an opening out of a wall closes the wall back up: the pieces
+/// the punch left - the sides, the header, a window's sill - merge into
+/// one whole wall again, and a door's routing widget goes with it.
+fn heal_wall(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    palette: &Palette,
+    placed: &Query<(Entity, &Transform, &Placed), Without<Ghost>>,
+    frame: Entity,
+) -> bool {
+    let Ok((_, frame_at, frame_record)) = placed.get(frame) else {
+        return false;
+    };
+    let width = match kind_from_name(&frame_record.part) {
+        Some(PartKind::Prop("door" | "doorway" | "window")) => 1.25,
+        _ => return false,
+    };
+    let along = Quat::from_rotation_y(frame_record.yaw) * Vec3::X;
+    let base = frame_at.translation;
+
+    // Everything standing on this wall's own line, measured along it.
+    let mut doomed: Vec<Entity> = Vec::new();
+    let mut low = -width * 0.5;
+    let mut high = width * 0.5;
+    let mut cloth: Option<Placed> = None;
+    for (entity, transform, record) in placed {
+        if entity == frame {
+            continue;
+        }
+        let offset = transform.translation - base;
+        if (offset.y).abs() > 0.05 {
+            continue;
+        }
+        let reach = offset.dot(along);
+        if (offset - along * reach).length() > 0.2 {
+            continue;
+        }
+        // The door's own widget rides along.
+        if matches!(kind_from_name(&record.part), Some(PartKind::Widget("door")))
+            && reach.abs() < 0.2
+        {
+            doomed.push(entity);
+            continue;
+        }
+        let Some(kind) = kind_from_name(&record.part) else {
+            continue;
+        };
+        let facing = Quat::from_rotation_y(record.yaw) * Vec3::X;
+        if facing.dot(along).abs() < 0.99 {
+            continue;
+        }
+        let (long, full) = match kind {
+            PartKind::Wall(long) => (long, true),
+            PartKind::Seg { long, high, lift } => {
+                (long, lift.abs() < 0.01 && (high - WALL_HIGH).abs() < 0.05)
+            }
+            _ => continue,
+        };
+        let (piece_low, piece_high) = (reach - long * 0.5, reach + long * 0.5);
+        let fills_opening = reach.abs() < 0.1 && !full;
+        let touches_left = (piece_high - low).abs() < 0.1 && full;
+        let touches_right = (piece_low - high).abs() < 0.1 && full;
+        if !(fills_opening || touches_left || touches_right) {
+            continue;
+        }
+        doomed.push(entity);
+        low = low.min(piece_low);
+        high = high.max(piece_high);
+        if full {
+            cloth = Some(record.clone());
+        }
+    }
+
+    let dressed = cloth.unwrap_or_else(|| frame_record.clone());
+    let made = PartKind::Wall(((high - low) * 16.0).round() / 16.0);
+    let centre = base + along * ((low + high) * 0.5);
+    let whole = Placed {
+        part: part_name(&made),
+        at: centre.into(),
+        yaw: frame_record.yaw,
+        tilt: 0.0,
+        ramp: dressed.ramp.clone(),
+        shade: dressed.shade,
+        stage: "walls".to_string(),
+    };
+    for piece in doomed {
+        commands.entity(piece).despawn();
+    }
+    spawn_part(commands, meshes, materials, palette, &made, &whole, false);
+    true
 }
 
 /// Splits the nearest wall around an opening and sets the frame in it.
@@ -2548,7 +2668,7 @@ fn punch_wall(
 
     // The frame takes the wall's own line and turn.
     let frame_kind = if is_door {
-        PartKind::Prop("door")
+        hand.kind.unwrap_or(PartKind::Prop("door"))
     } else {
         PartKind::Prop("window")
     };
