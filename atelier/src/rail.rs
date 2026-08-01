@@ -230,6 +230,8 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
             BorderColor::all(theme::accent(&palette).with_alpha(0.5)),
             Visibility::Hidden,
             GlobalZIndex(40),
+            crate::look::Scrollable,
+            bevy::ui::ScrollPosition::default(),
         ))
         .id();
     commands.spawn((

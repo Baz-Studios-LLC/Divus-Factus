@@ -117,7 +117,13 @@ pub fn scroll_panes(
         if (cursor.x - centre.x).abs() <= half.x && (cursor.y - centre.y).abs() <= half.y {
             over_pane.0 = true;
             if wheel.delta.y != 0.0 {
-                scroll.0.y -= wheel.delta.y * 22.0;
+                // A line's worth per notch, and trackpads send small
+                // fractions of one - both read the same speed.
+                let notches = match wheel.unit {
+                    bevy::input::mouse::MouseScrollUnit::Line => wheel.delta.y * 3.0,
+                    bevy::input::mouse::MouseScrollUnit::Pixel => wheel.delta.y * 0.14,
+                };
+                scroll.0.y -= notches * 22.0;
             }
         }
     }

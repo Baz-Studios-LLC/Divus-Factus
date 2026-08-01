@@ -46,7 +46,13 @@ impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<OrbitRig>()
             .add_systems(Startup, spawn_camera)
-            .add_systems(Update, (steer, place).chain());
+            // After the panes have had the wheel: they decide whether the
+            // cursor is over a list, and a stale answer made the zoom
+            // steal scrolls on half the frames.
+            .add_systems(
+                Update,
+                (steer, place).chain().after(crate::look::scroll_panes),
+            );
     }
 }
 
