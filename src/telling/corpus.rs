@@ -146,6 +146,21 @@ impl Corpus {
                 best = Some((score, line, id));
             }
         }
+        // A pool worn thin shows as repetition before it shows as
+        // anything else: a line going out for the third time means the
+        // moments that reach for it outnumber the lines that answer
+        // them, whatever the corpus's total size says. File it under the
+        // same want-list - more lines needed HERE.
+        if let Some((_, line, id)) = &best
+            && self.heard.get(id).copied().unwrap_or(0) >= 2
+        {
+            let mut worn: Vec<&str> = line.tags.iter().map(|t| t.as_str()).collect();
+            worn.sort_unstable();
+            *self
+                .wanting
+                .entry(format!("(worn pool) {}", worn.join(" ")))
+                .or_default() += 1;
+        }
         // A miss, or a moment much deeper than the best line found for
         // it, is a line somebody should sit down and write.
         let depth = best
@@ -308,6 +323,12 @@ mod tests {
             .unwrap();
         assert_eq!(voice.wanting.len(), 2);
         assert!(voice.wanting.keys().any(|k| k == "cry drowning"));
+        // And a pool leaned on three times reports itself worn.
+        let mut thin = corpus(&[("again", &["muse"], false)]);
+        for speaker in 0..3 {
+            thin.pick(speaker, &["muse"], &[], &mut rng).unwrap();
+        }
+        assert!(thin.wanting.keys().any(|k| k.starts_with("(worn pool)")));
     }
 
     #[test]
