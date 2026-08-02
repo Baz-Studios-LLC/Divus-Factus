@@ -52,6 +52,14 @@ const VEIL_HIGH: f32 = 12.0;
 /// where the land's own veil takes over anyway.
 const SEA_SHEET: f32 = 0.35;
 
+/// Past this camera distance the land's stack collapses to one solid lid
+/// at the top of the bank. The stack exists to give the veil's EDGE depth,
+/// and from a quarter mile up that depth is a single pixel - but the six
+/// sheets still cost six draws of every chunk in a view that is at its
+/// widest exactly then. The soak put the whole difference at five and a
+/// half milliseconds a frame: 48fps with the stack, 64 with the lid.
+const LID_BEYOND: f32 = 350.0;
+
 /// Whether the veil is up. It is, from the first frame: the world a
 /// village has actually walked is the world the game is about, and the
 /// rest of the map is scenery the player was never meant to be reading.
@@ -172,6 +180,8 @@ fn drape_the_veil(
     mode: Res<FogMode>,
     mut materials: ResMut<Assets<FogMaterial>>,
     mut cloth: Local<Option<(Handle<FogMaterial>, Handle<FogMaterial>)>>,
+    mut was_lidded: Local<Option<bool>>,
+    rigs: Query<&crate::camera::CameraRig>,
     chunks: Query<
         (Entity, &Mesh3d, Option<&Children>, Has<WaterPlane>),
         Or<(With<TerrainChunk>, With<WaterPlane>)>,
@@ -184,8 +194,24 @@ fn drape_the_veil(
                 commands.entity(veil).despawn();
             }
         }
+        *was_lidded = None;
         return;
     }
+    // Stack or lid, by zoom - and when the answer changes, every veil
+    // comes off so the right dress goes on. A frame of bare world at the
+    // moment of switching would show; despawn and respawn land the same
+    // frame, so nothing flickers.
+    let lidded = rigs
+        .iter()
+        .next()
+        .is_some_and(|rig| rig.distance > LID_BEYOND);
+    if *was_lidded != Some(lidded) {
+        for veil in &veils {
+            commands.entity(veil).despawn();
+        }
+    }
+    let fresh = *was_lidded != Some(lidded);
+    *was_lidded = Some(lidded);
     // Two cloths, and both describe the whole world: one sheer, for
     // stacking over the land, and one at full weight for the sea's single
     // sheet. The holes in them are the same holes.
@@ -197,26 +223,40 @@ fn drape_the_veil(
         (materials.add(sheer), materials.add(solid))
     });
     for (chunk, mesh, children, sea) in &chunks {
-        let dressed = children.map_or(0, |kids| {
-            kids.iter().filter(|kid| veils.contains(*kid)).count()
-        });
-        let wanted = if sea { 1 } else { SHEETS };
+        let dressed = if fresh {
+            // The children still hold this frame's despawned veils;
+            // trusting them would dress nothing until next frame.
+            0
+        } else {
+            children.map_or(0, |kids| {
+                kids.iter().filter(|kid| veils.contains(*kid)).count()
+            })
+        };
+        let wanted = if sea || lidded { 1 } else { SHEETS };
         if dressed >= wanted {
             continue;
         }
         for sheet in dressed..wanted {
             // The lowest sits a hand's breadth up, so it never fights the
             // ground it covers for the same pixel; the rest climb to the
-            // top of the bank.
+            // top of the bank - and the lid goes straight to the top,
+            // draping the ground's own shape so it draws no contours and
+            // still stands over the trees.
             let lift = if sea {
                 SEA_SHEET
+            } else if lidded {
+                0.12 + VEIL_HIGH
             } else {
                 0.12 + VEIL_HIGH * (sheet as f32 / (SHEETS - 1) as f32)
             };
             commands.spawn((
                 Veil,
                 Mesh3d(mesh.0.clone()),
-                MeshMaterial3d(if sea { deep.clone() } else { cloth.clone() }),
+                MeshMaterial3d(if sea || lidded {
+                    deep.clone()
+                } else {
+                    cloth.clone()
+                }),
                 Transform::from_translation(Vec3::Y * lift),
                 // The veil is not a THING. Six sheets hanging over the
                 // world threw six sheets of shadow onto the ground they

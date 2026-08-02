@@ -467,7 +467,20 @@ pub(crate) fn update_dev_overlay(
 /// the worst frame of the window, in the log where a soak can grep them.
 /// `DIVUS_FACTUS_FRAMES=1`. The scrub's before-and-after numbers come from
 /// here, so a change's cost is a diff of two greps rather than an impression.
-pub(crate) fn report_frames(time: Res<Time<Real>>, mut window: Local<(f32, u32, f32)>) {
+pub(crate) fn report_frames(
+    time: Res<Time<Real>>,
+    mut window: Local<(f32, u32, f32)>,
+    // The suspects, counted alongside the frame times - a drop into the
+    // teens is only diagnosable if the same log line says what the world
+    // was doing at the time.
+    rigs: Query<&crate::camera::CameraRig>,
+    chunks: Option<Res<LoadedChunks>>,
+    meshes: Query<(), With<Mesh3d>>,
+    lit: Query<(), (With<Mesh3d>, Without<bevy::light::NotShadowCaster>)>,
+    veils: Query<&MeshMaterial3d<crate::fog::FogMaterial>>,
+    folk: Query<(), With<crate::villager::Villager>>,
+    known: Option<Res<crate::villager::explore::KnownWorld>>,
+) {
     let ms = time.delta_secs() * 1000.0;
     window.0 += ms;
     window.1 += 1;
@@ -475,12 +488,23 @@ pub(crate) fn report_frames(time: Res<Time<Real>>, mut window: Local<(f32, u32, 
     if window.0 < 5000.0 {
         return;
     }
+    let distance = rigs.iter().next().map_or(0.0, |rig| rig.distance);
     info!(
-        "frames: avg {:.1}ms, worst {:.1}ms over {} frames",
+        "frames: avg {:.1}ms, worst {:.1}ms over {} frames | zoom {:.0} chunks {} meshes {} \
+         casters {} veils {} folk {}",
         window.0 / window.1 as f32,
         window.2,
-        window.1
+        window.1,
+        distance,
+        chunks.as_ref().map_or(0, |c| c.count()),
+        meshes.iter().count(),
+        lit.iter().count(),
+        veils.iter().count(),
+        folk.iter().count(),
     );
+    if let Some(known) = known {
+        info!("known: {} pockets", known.pockets.len());
+    }
     *window = (0.0, 0, 0.0);
 }
 

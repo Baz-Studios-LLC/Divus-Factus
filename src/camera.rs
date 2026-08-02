@@ -93,7 +93,15 @@ fn fly_the_dive(
     let s = dive.t * dive.t * (3.0 - 2.0 * dive.t);
     rig.focus = from.0.lerp(dive.to_focus, s);
     rig.pitch = from.1 + (DIVE_PITCH - from.1) * s;
-    rig.distance = from.2 + (DIVE_DISTANCE - from.2) * s;
+    // The dive lands at the survey height - or wherever the capture
+    // dial parked the camera, since a soak cannot reach the mouse wheel
+    // and the dive used to stomp the dial three and a half seconds after
+    // it was read.
+    let landing = std::env::var("DIVUS_FACTUS_DISTANCE")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+        .unwrap_or(DIVE_DISTANCE);
+    rig.distance = from.2 + (landing - from.2) * s;
     rig.target_focus = rig.focus;
     rig.target_pitch = rig.pitch;
     rig.target_distance = rig.distance;

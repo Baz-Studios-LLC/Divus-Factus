@@ -761,7 +761,13 @@ impl Voice {
         // hitch before every bubble. On llama.cpp's kernels the CPU is fast
         // enough that nothing misses it.
         let backend = LlamaBackend::init().map_err(|e| e.to_string())?;
-        let params = LlamaModelParams::default();
+        // ZERO layers on the GPU - and this is load-bearing, not a tuning
+        // knob. The default is -1, every layer on Metal, where the render
+        // schedule and the prefill fight for the same silicon and every
+        // composed line lands as a dropped frame. The llama.cpp move
+        // reintroduced exactly the hitch the move was meant to bury; the
+        // trace put the game at 28fps each time a villager found words.
+        let params = LlamaModelParams::default().with_n_gpu_layers(0);
         let model =
             LlamaModel::load_from_file(&backend, weights, &params).map_err(|e| e.to_string())?;
         Ok(Voice { backend, model })
