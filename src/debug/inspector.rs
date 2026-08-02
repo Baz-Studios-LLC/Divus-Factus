@@ -531,24 +531,35 @@ pub(crate) fn update_inspector(
             },
         )
     } else if let Ok((construction, plan)) = rising.0.get(entity) {
-        // Say what the site is actually waiting on: a foundation short of
-        // stone blocks the carpenters, and that must be legible, or an
-        // honest wait reads as a broken village.
-        let stone_cost = plan.kind.stone_cost();
-        let line = if construction.stone_laid < stone_cost {
-            format!(
-                "waiting on stone - {:.0} of {:.0} laid in the foundation",
-                construction.stone_laid, stone_cost,
-            )
-        } else {
-            format!(
-                "{:.0} of {:.0} {} worked into it",
-                construction.progress.min(plan.kind.timber_cost()),
-                plan.kind.timber_cost(),
-                plan.stuff.word(),
-            )
+        // The whole bill, plainly: every material this build wants, how
+        // much is in it, how much it takes. A tooltip that named only the
+        // line the site happened to be stuck on left you guessing what
+        // the building cost and how far along it was.
+        let footing = construction.footing_stone(plan.kind);
+        let frame = plan.kind.timber_cost();
+        let mut bill: Vec<(String, f32, f32)> = Vec::new();
+        let mut want = |name: &str, have: f32, needs: f32| {
+            if needs <= 0.0 && have <= 0.0 && name != "Stone" {
+                return;
+            }
+            // A stone-built house founded on stone wants one line, not two.
+            match bill.iter_mut().find(|(had, ..)| had == name) {
+                Some(entry) => {
+                    entry.1 += have;
+                    entry.2 += needs;
+                }
+                None => bill.push((name.to_string(), have, needs)),
+            }
         };
-        (format!("{}, rising", plan.kind.name()), line)
+        want("Stone", construction.stone_laid.min(footing), footing);
+        let mut stuff = plan.stuff.word().to_string();
+        stuff[..1].make_ascii_uppercase();
+        want(&stuff, construction.progress.min(frame), frame);
+        let lines: Vec<String> = bill
+            .iter()
+            .map(|(name, have, needs)| format!("{name}: {have:.0}/{needs:.0}"))
+            .collect();
+        (format!("{}, rising", plan.kind.name()), lines.join("\n"))
     } else if let Ok((settlement, store)) = settlement_info.get(entity) {
         // The banner: the settlement's own dossier.
         let mut grown = 0;

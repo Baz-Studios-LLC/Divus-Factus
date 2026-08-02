@@ -44,6 +44,9 @@ const WORK_SECONDS: f32 = 6.0;
 /// How close counts as being at the worksite.
 const WORK_RANGE: f32 = 2.8;
 
+/// How many pieces a builder shoulders in one trip to the stores.
+const A_LOAD: f32 = 4.0;
+
 /// What one trip to the rock is worth, before craft. A single block was
 /// the old figure, and the walk out to a boulder is long enough that a
 /// four-stone footing cost a founding village most of a morning with
@@ -639,6 +642,14 @@ pub(super) fn do_work(
             OWN_WORKS.iter().any(|(trade, ..)| trade == vocation) || *vocation == Vocation::Guard;
         let raising_a_post =
             own_works && job.focus.is_some_and(|site| build_sites.get(site).is_ok());
+        // Which half of the build this plot is waiting on. One trade does
+        // both now, so which loop a builder runs is a property of the
+        // SITE and not of the person: stone until the footing is down,
+        // timber after it.
+        let footing_first = job
+            .focus
+            .and_then(|site| build_sites.get(site).ok())
+            .is_some_and(|(cs, plan)| cs.stone_laid < cs.footing_stone(plan.kind));
 
         // Guards are their own trade: no pile, no yield — the work is the
         // walking, and the wolves are the deadline.
@@ -716,19 +727,20 @@ pub(super) fn do_work(
         // Carpenters run a fetch-and-carry loop: to the pile for a log, log to
         // the site, hammer it in, and back for the next — every step walked.
         // A guard raising their own watch post runs the same loop.
-        if *vocation == Vocation::Carpenter || raising_a_post {
+        if (*vocation == Vocation::Builder || raising_a_post) && !footing_first {
             let Some(house) = job.focus else {
                 *activity = Activity::Idle;
                 commands.entity(entity).remove::<Job>();
                 continue;
             };
-            let Ok((_, site_plan)) = build_sites.get(house) else {
+            let Ok((site_now, site_plan)) = build_sites.get(house) else {
                 // Finished under someone else's hammer.
                 *activity = Activity::Idle;
                 commands.entity(entity).remove::<Job>();
                 continue;
             };
             let stuff = site_plan.stuff;
+            let site_progress = site_now.progress;
 
             if carrying.get(entity).is_err() {
                 // Empty-handed: fetch whatever this house is BUILT from.
@@ -755,12 +767,29 @@ pub(super) fn do_work(
                     }
                     continue;
                 }
-                match stuff {
-                    BuildStuff::Timber => store.timber -= 1.0,
-                    BuildStuff::Stone => store.stone -= 1.0,
-                    BuildStuff::MudBrick => store.clay -= 1.0,
+                // An ARMFUL, not a stick. One piece a trip meant twelve
+                // round trips to the pile for a longhouse, and the whole
+                // build read as a man pacing between the stores and a
+                // half-raised frame for no visible reason. He takes what
+                // the site still wants, up to a load.
+                let wanting = (site_plan.kind.timber_cost() - site_progress).max(0.0);
+                let load = match stuff {
+                    BuildStuff::Timber => store.timber,
+                    BuildStuff::Stone => store.stone,
+                    BuildStuff::MudBrick => store.clay,
                 }
-                commands.entity(entity).insert(CarryingWood { amount: 1.0 });
+                .min(wanting)
+                .min(A_LOAD)
+                .floor()
+                .max(1.0);
+                match stuff {
+                    BuildStuff::Timber => store.timber -= load,
+                    BuildStuff::Stone => store.stone -= load,
+                    BuildStuff::MudBrick => store.clay -= load,
+                }
+                commands
+                    .entity(entity)
+                    .insert(CarryingWood { amount: load });
                 shoulder_wood(&mut commands, &mut meshes, &mut materials, entity);
                 job.patience = 20.0 + job.site.distance(transform.translation) * 0.8;
                 continue;
@@ -771,8 +800,8 @@ pub(super) fn do_work(
                 target.0 = Some(job.site);
                 job.patience -= dt;
                 if job.patience <= 0.0 {
-                    // Give the log back rather than stranding it in their arms.
-                    store.timber += 1.0;
+                    // Give the load back rather than stranding it in their arms.
+                    store.timber += carrying.get(entity).map_or(1.0, |load| load.amount);
                     commands.entity(entity).remove::<CarryingWood>();
                     shed_wood(&mut commands, entity, &children, &loads);
                     *activity = Activity::Idle;
@@ -800,8 +829,18 @@ pub(super) fn do_work(
             }
             job.progress = 0.0;
 
-            commands.entity(entity).remove::<CarryingWood>();
-            shed_wood(&mut commands, entity, &children, &loads);
+            // One piece worked in per beat; the rest of the armful stays
+            // on the shoulder, so a load is several beats of hammering
+            // rather than several walks to the stores.
+            let left = carrying.get(entity).map_or(0.0, |load| load.amount) - 1.0;
+            if left > 0.0 {
+                commands
+                    .entity(entity)
+                    .insert(CarryingWood { amount: left });
+            } else {
+                commands.entity(entity).remove::<CarryingWood>();
+                shed_wood(&mut commands, entity, &children, &loads);
+            }
             let Ok((mut construction, plan)) = build_sites.get_mut(house) else {
                 continue;
             };
@@ -923,8 +962,10 @@ pub(super) fn do_work(
             continue;
         }
 
-        // Masons run the same fetch-and-carry loop as carpenters, in stone.
-        if *vocation == Vocation::Mason
+        // The same fetch-and-carry loop, in stone, for a footing that has
+        // not been laid yet.
+        if *vocation == Vocation::Builder
+            && footing_first
             && let Some(site_entity) = job.focus
             && build_sites.get(site_entity).is_ok()
         {
@@ -1222,7 +1263,7 @@ pub(super) fn do_work(
                 store.larder.add(FoodKind::Fish, catch);
             }
 
-            Vocation::Miner | Vocation::Mason => match job.focus {
+            Vocation::Miner | Vocation::Builder => match job.focus {
                 // Bare high ground still yields loose stone.
                 None => store.stone += LOOSE_STONE + skill * 1.5,
                 // The mine: a drift into standing rock gives up stone by
@@ -1355,7 +1396,6 @@ pub(super) fn do_work(
             },
 
             // Handled by the fetch-and-carry loop above.
-            Vocation::Carpenter => {}
 
             // A worked field surges; a ripe one is brought in.
             Vocation::Farmer => match job.focus {
@@ -1549,7 +1589,10 @@ mod tests {
             let boldness = (i as f32 / 300.0).clamp(0.05, 0.95);
             seen.insert(format!("{:?}", roll_vocation(boldness, &mut rng)));
         }
-        assert_eq!(seen.len(), 9, "some vocation never occurs: {seen:?}");
+        // Eight, since mason and carpenter became one builder. Cook,
+        // healer and priest are absent on purpose: those are not rolled
+        // into, they are called into.
+        assert_eq!(seen.len(), 8, "some vocation never occurs: {seen:?}");
     }
 
     #[test]

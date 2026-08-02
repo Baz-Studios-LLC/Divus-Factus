@@ -48,11 +48,11 @@
   {"t": "you learn where everything grows, doing this. every bush for a mile", "tags": ["muse", "trade:gatherer"]},
   {"t": "saw tracks this morning. something big came through in the night", "tags": ["muse", "trade:hunter"]},
   {"t": "a clean kill and a full larder. that's a good day", "tags": ["muse", "trade:hunter"]},
-  {"t": "that beam went up straight and true. I do good work, I don't care who hears it", "tags": ["muse", "trade:carpenter"]},
-  {"t": "measure it twice. every time. that's the whole secret", "tags": ["muse", "trade:carpenter"]},
+  {"t": "that beam went up straight and true. I do good work, I don't care who hears it", "tags": ["muse", "trade:builder"]},
+  {"t": "measure it twice. every time. that's the whole secret", "tags": ["muse", "trade:builder"]},
   {"t": "this forest could keep me busy for a lifetime", "tags": ["muse", "trade:forester"]},
   {"t": "you can tell a good tree by the sound it makes when you knock it", "tags": ["muse", "trade:forester"]},
-  {"t": "good stone today. splits right where you ask it to", "tags": ["muse", "trade:mason"]},
+  {"t": "good stone today. splits right where you ask it to", "tags": ["muse", "trade:builder"]},
   {"t": "my hands are all dust and I've stopped minding", "tags": ["muse", "trade:miner"]},
   {"t": "the field doesn't care how you feel. it wants water either way", "tags": ["muse", "trade:farmer"]},
   {"t": "quiet on the walls today. quiet is good. I like quiet", "tags": ["muse", "trade:guard"]},
@@ -62,5 +62,7 @@
   {"t": "thank you for today. it was a hard one but we got through", "tags": ["muse", "prayer"]},
   {"t": "if you're listening, we could use a dry week", "tags": ["muse", "prayer"]},
   {"t": "watch over the ones sleeping outside tonight", "tags": ["muse", "prayer", "housed"]},
-  {"t": "give me a roof before winter. I'm not asking for much", "tags": ["muse", "prayer", "roofless"]}
+  {"t": "give me a roof before winter. I'm not asking for much", "tags": ["muse", "prayer", "roofless"]},
+  {"t": "footing to roof, all of it mine. I like knowing the whole of a thing", "tags": ["muse", "trade:builder"]},
+  {"t": "my hands are all dust and splinters and I'm not complaining", "tags": ["muse", "trade:builder"]}
 ]

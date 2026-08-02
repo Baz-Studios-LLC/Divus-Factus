@@ -200,6 +200,7 @@ pub struct CivicNeeds {
 /// raise their works only when their own trade has nothing for them.
 pub const OWN_WORKS: &[(Vocation, BuildingKind, bool)] = &[
     (Vocation::Fisher, BuildingKind::Dock, true),
+    (Vocation::Priest, BuildingKind::Shrine, true),
     (Vocation::Miner, BuildingKind::Mine, true),
     (Vocation::Forester, BuildingKind::Sawmill, false),
     (Vocation::Healer, BuildingKind::Herbalist, false),
@@ -1987,6 +1988,7 @@ pub(crate) fn plan_houses(
     let mut miners = 0usize;
     let mut guards = 0usize;
     let mut healers = 0usize;
+    let mut priests = 0usize;
     // Shelter demand splits in two, because the roofs do: the wed and their
     // children want family houses, everyone else wants longhouse beds. A
     // village with four spare house rooms and no longhouse bed is not
@@ -2023,6 +2025,7 @@ pub(crate) fn plan_houses(
             Some(Vocation::Miner) => miners += 1,
             Some(Vocation::Guard) => guards += 1,
             Some(Vocation::Healer) => healers += 1,
+            Some(Vocation::Priest) => priests += 1,
             _ => {}
         }
     }
@@ -2032,6 +2035,7 @@ pub(crate) fn plan_houses(
         Vocation::Miner => miners,
         Vocation::Forester => foresters,
         Vocation::Healer => healers,
+        Vocation::Priest => priests,
         _ => 0,
     };
     // What the village is carrying of the teeth, and who is standing

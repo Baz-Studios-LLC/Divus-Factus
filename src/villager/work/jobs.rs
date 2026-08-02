@@ -482,58 +482,50 @@ pub(crate) fn take_up_work(
             .or_else(|| raising(BuildingKind::Sawmill)),
 
             // Carpenters go where ground is broken — if there is timber to work.
-            Vocation::Carpenter => {
-                if timber >= 1.0 || stone >= 1.0 || clay >= 1.0 {
-                    build_sites
-                        .iter()
-                        .filter(|(_, _, cs, plan, member)| {
-                            member.0 == home && cs.stone_laid >= cs.footing_stone(plan.kind)
-                        })
-                        .map(|(house, house_transform, _, plan, _)| {
+            // A builder serves any site in their own town, footing or
+            // frame, whichever that site is waiting on. This was two
+            // trades: a carpenter who could only work a site whose
+            // footing was already laid, and a mason who could only lay
+            // it - so a build stalled dead every time the muster had
+            // dealt one and not the other, with the stone sitting in the
+            // pile. One pair of hands carries a building the whole way
+            // now.
+            Vocation::Builder => {
+                let masonry = stone >= 1.0 || clay >= 1.0;
+                let laying = build_sites
+                    .iter()
+                    .filter(|(_, _, cs, plan, member)| {
+                        member.0 == home
+                            && if cs.stone_laid < cs.footing_stone(plan.kind) {
+                                masonry
+                            } else {
+                                timber >= 1.0 || masonry
+                            }
+                    })
+                    .map(|(site, at, cs, plan, _)| {
+                        (
+                            site,
+                            at.translation,
                             (
-                                house,
-                                house_transform.translation,
-                                // The most beds first, then the nearest.
-                                // Hands used to go to whichever site was
-                                // closest, and since a house costs half
-                                // what a hall does it always finished
-                                // first - the hall the planner put ahead
-                                // of it stood open while a family moved
-                                // in and the rest slept out. A hall is
-                                // eight beds for anybody; it gets the
-                                // hammers until it is closed in.
+                                // A footing waiting on its first stone
+                                // outranks a frame: nothing else can
+                                // begin on that plot until it is down.
+                                cs.stone_laid >= cs.footing_stone(plan.kind),
+                                // Then the most beds. Hands used to go to
+                                // whichever site was closest, and since a
+                                // house costs half what a hall does it
+                                // always finished first - the hall the
+                                // planner put ahead of it stood open
+                                // while a family moved in and the rest
+                                // slept out.
                                 std::cmp::Reverse(plan.kind.sleeps()),
-                                house_transform.translation.distance(transform.translation),
-                            )
-                        })
-                        .min_by(|a, b| a.2.cmp(&b.2).then(a.3.total_cmp(&b.3)))
-                        .map(|(house, at, _, d)| Job::at(at, Some(house), d))
-                } else {
-                    None
-                }
-            }
-
-            // Masons serve any site whose foundation still wants stone.
-            Vocation::Mason => {
-                let laying = if stone >= 1.0 || clay >= 1.0 {
-                    build_sites
-                        .iter()
-                        .filter(|(_, _, cs, plan, member)| {
-                            member.0 == home && cs.stone_laid < cs.footing_stone(plan.kind)
-                        })
-                        .map(|(b, t, ..)| {
-                            (
-                                b,
-                                t.translation,
-                                t.translation.distance(transform.translation),
-                            )
-                        })
-                        .min_by(|a, b| a.2.total_cmp(&b.2))
-                        .map(|(b, at, d)| Job::at(at, Some(b), d))
-                } else {
-                    None
-                };
-                // No foundations to lay: cut stone like a miner — or, when
+                            ),
+                            at.translation.distance(transform.translation),
+                        )
+                    })
+                    .min_by(|a, b| a.2.cmp(&b.2).then(a.3.total_cmp(&b.3)))
+                    .map(|(site, at, _, d)| Job::at(at, Some(site), d));
+                // Nothing to build on: cut stone like a miner — or, when
                 // the clay store is thin, dig the red bank instead.
                 laying
                     .or_else(|| {
@@ -788,7 +780,7 @@ pub(crate) fn take_up_work(
                     .iter()
                     .map(|(_, works, _)| *works)
                     .chain([BuildingKind::Watchtower])
-                    .find_map(|works| raising(works).map(|job| (Vocation::Carpenter, job)))
+                    .find_map(|works| raising(works).map(|job| (Vocation::Builder, job)))
             };
             // A thin larder outranks everything; otherwise stone, because
             // stone is the want that stalls a village hardest and berries

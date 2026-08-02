@@ -24,11 +24,14 @@ pub enum Vocation {
     Hunter,
     Miner,
     Forester,
-    Carpenter,
+    /// Footing to roof: the one pair of hands that can carry a building
+    /// the whole way. Mason and carpenter were two trades, and a build
+    /// stalled whenever the muster had dealt one and not the other - the
+    /// stone sat in the pile while the frame waited for a chisel that was
+    /// off cutting wood.
+    Builder,
     /// Tills fields, tends crops, brings in harvests.
     Farmer,
-    /// Lays the stone: foundations and, one day, walls.
-    Mason,
     /// Feeds the tavern's kitchen; the village eats better for it.
     Cook,
     /// Tends the hurt back to their feet.
@@ -109,9 +112,8 @@ impl Vocation {
             Vocation::Hunter => "hunter",
             Vocation::Miner => "miner",
             Vocation::Forester => "forester",
-            Vocation::Carpenter => "carpenter",
+            Vocation::Builder => "builder",
             Vocation::Farmer => "farmer",
-            Vocation::Mason => "mason",
             Vocation::Cook => "cook",
             Vocation::Healer => "healer",
             Vocation::Priest => "priest",
@@ -128,9 +130,8 @@ impl Vocation {
             Vocation::Hunter => "hunts",
             Vocation::Miner => "mines",
             Vocation::Forester => "cuts wood",
-            Vocation::Carpenter => "builds houses",
+            Vocation::Builder => "raises buildings",
             Vocation::Farmer => "works the fields",
-            Vocation::Mason => "lays stone",
             Vocation::Cook => "keeps the kitchen",
             Vocation::Healer => "tends the hurt",
             Vocation::Priest => "keeps the shrine",
@@ -147,9 +148,8 @@ impl Vocation {
             Vocation::Hunter => "took up the spear",
             Vocation::Miner => "took up the pick",
             Vocation::Forester => "took up the axe",
-            Vocation::Carpenter => "took up the hammer",
+            Vocation::Builder => "took up the hammer",
             Vocation::Farmer => "took up the plough",
-            Vocation::Mason => "took up the chisel",
             Vocation::Cook => "took up the ladle",
             Vocation::Healer => "took up the salves",
             Vocation::Priest => "took up the litany",
@@ -171,9 +171,8 @@ pub fn roll_vocation(boldness: f32, rng: &mut Rng) -> Vocation {
         (Vocation::Hunter, 0.25 + boldness * 1.6),
         (Vocation::Miner, 0.7),
         (Vocation::Forester, 0.9),
-        (Vocation::Carpenter, 0.8),
+        (Vocation::Builder, 1.5),
         (Vocation::Farmer, 1.0),
-        (Vocation::Mason, 0.7),
         (Vocation::Explorer, 0.1 + boldness * 0.4),
     ];
     let total: f32 = weights.iter().map(|(_, w)| w).sum();
@@ -265,7 +264,16 @@ pub(crate) fn morning_muster(
     >,
     // What the village is carrying, body and mind: the harm a healer is
     // wanted for, and the memories a guard is wanted for.
-    hurt: Query<(&Vitality, Option<&crate::witness::Witnessed>), (With<Villager>, Without<Corpse>)>,
+    // What the village is carrying: the harm a healer answers, the
+    // memories a guard answers, and the belief a priest answers.
+    hurt: Query<
+        (
+            &Vitality,
+            Option<&crate::witness::Witnessed>,
+            Option<&crate::villager::belief::Faith>,
+        ),
+        (With<Villager>, Without<Corpse>),
+    >,
     ground: (
         Option<Res<crate::villager::explore::KnownWorld>>,
         Query<(&GlobalTransform, &crate::scatter::FellableTree)>,
@@ -341,7 +349,11 @@ pub(crate) fn morning_muster(
     // to. It posted guards against wolves no one had ever seen and left
     // a child who limped home torn open to change nothing at all. A
     // village's fear should be made of what it has been through.
-    let peril = crate::witness::peril_of(hurt.iter().filter_map(|(_, held)| held), clock.day());
+    let peril = crate::witness::peril_of(hurt.iter().filter_map(|(_, held, _)| held), clock.day());
+    let believers = hurt
+        .iter()
+        .filter(|(_, _, faith)| faith.is_some_and(|f| f.is_believer()))
+        .count();
     let guards = if has(BuildingKind::Watchtower) {
         1.0
     } else {
@@ -393,12 +405,12 @@ pub(crate) fn morning_muster(
             },
         ),
         (Vocation::Explorer, if wood_known { 0.0 } else { 1.0 }),
-        (Vocation::Carpenter, raising.min(3.0)),
-        // A mason with no stone is NOT a mason with nothing to do: with
-        // no course to lay they cut rock like a miner, which is exactly
-        // the work an empty pile is asking for. The old `masonry >= 1.0`
-        // gate mustered no masons at all on the morning it mattered most.
-        (Vocation::Mason, footings_waiting.min(2.0)),
+        // Hands on the sites: one per build, and one more for every
+        // footing still wanting stone, because a builder with no course
+        // to lay cuts rock and a builder with rock in the pile lays it.
+        // These were two trades and two wants, and a build stalled every
+        // time the muster dealt a carpenter and no mason.
+        (Vocation::Builder, (raising + footings_waiting).min(4.0)),
         // One pick per two blocks the pile is short. This was a flat ONE
         // miner, and only while the pile held under four - so a village
         // with a single scrap of stone mustered nobody to the rock and
@@ -408,13 +420,23 @@ pub(crate) fn morning_muster(
             Vocation::Cook,
             if has(BuildingKind::Tavern) { 1.0 } else { 0.0 },
         ),
+        // Belief calls the priest, not the building. A priest was wanted
+        // only where a shrine already stood, and the shrine was behind a
+        // civic ladder that wants twelve souls and everyone housed - so
+        // neither ever happened, and a village of believers had nobody to
+        // keep its god. Whoever takes it up raises the shrine themselves;
+        // that is what OWN_WORKS is for.
         (
             Vocation::Priest,
-            if has(BuildingKind::Shrine) { 1.0 } else { 0.0 },
+            if has(BuildingKind::Shrine) || believers * 3 >= mouths {
+                1.0
+            } else {
+                0.0
+            },
         ),
         (
             Vocation::Healer,
-            if hurt.iter().filter(|(v, _)| v.harm > 0.15).count() >= 2 {
+            if hurt.iter().filter(|(v, ..)| v.harm > 0.15).count() >= 2 {
                 1.0
             } else {
                 0.0
@@ -425,7 +447,7 @@ pub(crate) fn morning_muster(
     // A roofless village needs a hammer whether or not ground is broken:
     // somebody has to be standing ready when it is.
     if homeless.iter().count() > 2 {
-        if let Some(entry) = wanted.iter_mut().find(|(v, _)| *v == Vocation::Carpenter) {
+        if let Some(entry) = wanted.iter_mut().find(|(v, _)| *v == Vocation::Builder) {
             entry.1 = entry.1.max(1.0);
         }
     }
@@ -444,7 +466,7 @@ pub(crate) fn morning_muster(
         wood_known as u8 as f32,
         shore_near as u8 as f32,
         guards,
-        hurt.iter().filter(|(v, _)| v.harm > 0.15).count().min(3) as f32,
+        hurt.iter().filter(|(v, ..)| v.harm > 0.15).count().min(3) as f32,
         has(BuildingKind::Tavern) as u8 as f32,
         has(BuildingKind::Shrine) as u8 as f32,
         has(BuildingKind::Watchtower) as u8 as f32,
