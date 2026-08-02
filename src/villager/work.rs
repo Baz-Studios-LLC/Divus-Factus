@@ -803,12 +803,14 @@ pub(super) fn do_work(
                 let mut done = commands.entity(house);
                 done.remove::<ConstructionSite>()
                     .insert((Building { kind }, Name::new(kind.name())));
+                // A carried-in building brings its own shell, doors and
+                // furnishings out of its own marks, below. Only a kind
+                // the bench has not drawn gets the village's own walls.
+                let drawn = baked::drawing_at(kind, plan.plan);
                 match kind {
                     BuildingKind::House => {
                         done.insert(Hut);
-                        // A carried-in house brings its own shell and
-                        // furnishings, below, out of its own marks.
-                        if baked::houses().is_empty() {
+                        if drawn.is_none() {
                             done.insert(Shell {
                                 half_w: plan.half_w,
                                 half_d: plan.half_d,
@@ -817,34 +819,32 @@ pub(super) fn do_work(
                         }
                     }
                     BuildingKind::Longhouse => {
-                        // One door per bay, mirroring the walls' own gaps.
-                        let d = plan.half_d;
-                        let bays = ((d * 2.0 / 3.4).round() as i32).clamp(3, 4);
-                        let doors = (0..bays)
-                            .map(|i| {
-                                Doorway::on_x_wall(
-                                    plan.half_w,
-                                    -d + (i as f32 + 0.5) * (d * 2.0 / bays as f32),
-                                )
-                            })
-                            .collect();
-                        done.insert((
-                            Longhouse,
-                            Shell {
+                        done.insert(Longhouse);
+                        if drawn.is_none() {
+                            // One door per bay, mirroring the walls' own gaps.
+                            let d = plan.half_d;
+                            let bays = ((d * 2.0 / 3.4).round() as i32).clamp(3, 4);
+                            let doors = (0..bays)
+                                .map(|i| {
+                                    Doorway::on_x_wall(
+                                        plan.half_w,
+                                        -d + (i as f32 + 0.5) * (d * 2.0 / bays as f32),
+                                    )
+                                })
+                                .collect();
+                            done.insert(Shell {
                                 half_w: plan.half_w,
                                 half_d: plan.half_d,
                                 doors,
-                            },
-                        ));
+                            });
+                        }
                     }
                     _ => {}
                 }
-                // The carried-in house furnishes itself: the beds it
-                // holds, the doors it opens, the table its family
-                // gathers at, all read from the marks the bench wrote.
-                if kind == BuildingKind::House
-                    && let Some(work) = baked::house_at(plan.plan)
-                {
+                // The carried-in building furnishes itself: the beds it
+                // holds, the doors it opens, the table its people gather
+                // at, all read from the marks the bench wrote.
+                if let Some(work) = drawn {
                     baked::furnish_baked(&mut commands, house, work);
                 }
                 // A holding comes with its ground broken: a plot turned beside

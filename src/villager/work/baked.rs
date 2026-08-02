@@ -130,33 +130,64 @@ fn carried() -> &'static Vec<Baked> {
     })
 }
 
-/// Every house carried in, in a settled order - so a world seed raises
-/// the same street twice.
-pub fn houses() -> Vec<&'static Baked> {
+/// What a kind's drawings are named. A kind absent from this list has no
+/// bench drawings and is raised by the village's own hand, the way
+/// everything was before there was an Atelier.
+fn called(kind: super::BuildingKind) -> Option<&'static str> {
+    match kind {
+        super::BuildingKind::House => Some("house"),
+        super::BuildingKind::Longhouse => Some("longhouse"),
+        _ => None,
+    }
+}
+
+/// Every drawing carried in for this kind, in a settled order - so a
+/// world seed raises the same street twice.
+pub fn drawings(kind: super::BuildingKind) -> Vec<&'static Baked> {
+    let Some(called) = called(kind) else {
+        return Vec::new();
+    };
     carried()
         .iter()
-        .filter(|work| work.name.starts_with("house"))
+        // "longhouse1" is not a house: a kind takes only the names that
+        // begin with its OWN word, and the longer word is checked by
+        // being its own prefix, not by being ruled out of the shorter.
+        .filter(|work| work.name.starts_with(called))
+        .filter(|work| called != "house" || !work.name.starts_with("longhouse"))
         .collect()
 }
 
-/// The house a given plan follows. Plans are rolled per building, so a
+/// The drawing a given plan follows. Plans are rolled per building, so a
 /// village of one blueprint became a village of however many the maker
 /// has drawn - and the roll survives a save, because it lives in the
 /// blueprint rather than being worked out again from the entity.
-pub fn house_at(plan: usize) -> Option<&'static Baked> {
-    let all = houses();
+pub fn drawing_at(kind: super::BuildingKind, plan: usize) -> Option<&'static Baked> {
+    let all = drawings(kind);
     (!all.is_empty()).then(|| all[plan % all.len()])
 }
 
-/// The widest of them. Ground is broken before a plan is rolled, so the
-/// plot has to be cut for whichever house turns up.
-pub fn widest_house() -> Option<f32> {
-    houses()
+/// The widest drawing of a kind. Ground is broken before a plan is
+/// rolled, so the plot has to be cut for whichever one turns up.
+pub fn widest(kind: super::BuildingKind) -> Option<f32> {
+    drawings(kind)
         .iter()
         .map(|work| work.half_w.max(work.half_d))
         .fold(None, |most: Option<f32>, reach| {
             Some(most.map_or(reach, |m| m.max(reach)))
         })
+}
+
+/// The fewest beds any drawing of this kind holds - what the planner may
+/// safely promise before it knows which one will be rolled. A carried-in
+/// building sleeps the beds its maker drew, not a constant: the bench
+/// longhouse holds ten, and a village that believed eight would break
+/// ground for a second hall it did not need.
+pub fn beds(kind: super::BuildingKind) -> Option<usize> {
+    drawings(kind)
+        .iter()
+        .map(|work| work.marks.iter().filter(|m| m.mark == "sleep").count())
+        .filter(|beds| *beds > 0)
+        .min()
 }
 
 /// A gable's prism, and the ridge cap's, cut the way the bench cuts
@@ -409,22 +440,73 @@ pub fn furnish_baked(commands: &mut Commands, site: Entity, work: &Baked) {
 mod tests {
     use super::*;
 
+    use super::super::BuildingKind;
+
     #[test]
-    fn every_house_in_the_folder_is_carried_and_dealt_in_turn() {
-        let all = houses();
-        assert!(!all.is_empty(), "no houses found beside the game");
-        // A settled order, so a world seed raises the same street twice.
-        let mut names: Vec<&str> = all.iter().map(|w| w.name.as_str()).collect();
-        let given = names.clone();
-        names.sort_unstable();
-        assert_eq!(given, names, "the houses came back out of order");
-        // Plans cycle, and a plan past the end wraps rather than panics.
-        for plan in 0..all.len() * 2 + 3 {
-            let picked = house_at(plan).expect("a plan always finds a house");
-            assert_eq!(picked.name, all[plan % all.len()].name);
+    fn every_drawing_in_the_folder_is_carried_and_dealt_in_turn() {
+        for kind in [BuildingKind::House, BuildingKind::Longhouse] {
+            let all = drawings(kind);
+            assert!(
+                !all.is_empty(),
+                "no {kind:?} drawings found beside the game"
+            );
+            // A settled order, so a world seed raises the same street twice.
+            let mut names: Vec<&str> = all.iter().map(|w| w.name.as_str()).collect();
+            let given = names.clone();
+            names.sort_unstable();
+            assert_eq!(given, names, "the {kind:?} drawings came back out of order");
+            // Plans cycle, and a plan past the end wraps rather than panics.
+            for plan in 0..all.len() * 2 + 3 {
+                let picked = drawing_at(kind, plan).expect("a plan always finds a drawing");
+                assert_eq!(picked.name, all[plan % all.len()].name);
+            }
+            // The plot is cut for whichever one turns up.
+            let widest = widest(kind).expect("a drawing has a width");
+            assert!(all.iter().all(|w| w.half_w.max(w.half_d) <= widest + 1e-3));
         }
-        // The plot is cut for whichever house turns up.
-        let widest = widest_house().expect("houses have a width");
-        assert!(all.iter().all(|w| w.half_w.max(w.half_d) <= widest + 1e-3));
+    }
+
+    #[test]
+    fn a_longhouse_is_never_dealt_out_as_a_house() {
+        // "longhouse1" begins with neither more nor less than its own
+        // word. A prefix test that forgot this handed the hall out as a
+        // family home, and every roof in the village became a hall.
+        for house in drawings(BuildingKind::House) {
+            assert!(
+                !house.name.starts_with("longhouse"),
+                "{} was dealt out as a house",
+                house.name
+            );
+        }
+        for hall in drawings(BuildingKind::Longhouse) {
+            assert!(
+                hall.name.starts_with("longhouse"),
+                "{} is no hall",
+                hall.name
+            );
+        }
+    }
+
+    #[test]
+    fn a_carried_in_roof_sleeps_the_beds_its_maker_drew() {
+        // The planner asks the KIND how many it shelters, and the answer
+        // has to be the drawing's own count or it breaks ground for
+        // roofs nobody needs.
+        for kind in [BuildingKind::House, BuildingKind::Longhouse] {
+            let drawn = beds(kind).expect("a carried-in roof has beds in it");
+            assert_eq!(kind.sleeps(), drawn);
+            for work in drawings(kind) {
+                let mine = work.marks.iter().filter(|m| m.mark == "sleep").count();
+                assert!(
+                    mine >= drawn,
+                    "{} sleeps {mine}, under the {drawn} the planner promises",
+                    work.name
+                );
+            }
+        }
+        assert!(
+            BuildingKind::Longhouse.sleeps() > BuildingKind::House.sleeps(),
+            "a hall must shelter more than a family home"
+        );
     }
 }

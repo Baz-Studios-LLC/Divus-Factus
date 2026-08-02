@@ -63,8 +63,17 @@ pub enum BuildingKind {
 impl BuildingKind {
     /// How many the finished roof sleeps. Zero for the kinds nobody
     /// beds down in, which is most of them.
+    ///
+    /// A carried-in building sleeps the beds its maker DREW. The
+    /// constants are the village's own hand, and stand only for a kind
+    /// with no drawing behind it — the bench longhouse holds ten, and a
+    /// village that went on believing eight would break ground for a
+    /// second hall it did not need.
     pub fn sleeps(self) -> usize {
         use crate::villager::home::{HOUSE_CAPACITY, LONGHOUSE_CAPACITY};
+        if let Some(drawn) = super::baked::beds(self) {
+            return drawn;
+        }
         match self {
             BuildingKind::House => HOUSE_CAPACITY,
             BuildingKind::Longhouse => LONGHOUSE_CAPACITY,
@@ -370,8 +379,8 @@ impl Blueprint {
         use crate::palette as pal;
         // Which of the maker's houses this one will be. Rolled for every
         // kind so the dice fall the same way whatever is being built.
-        let plan = rng.range_i(0, super::baked::houses().len().max(1) as i32) as usize;
-        let carried = super::baked::house_at(plan);
+        let plan = rng.range_i(0, super::baked::drawings(kind).len().max(1) as i32) as usize;
+        let carried = super::baked::drawing_at(kind, plan);
         match kind {
             BuildingKind::House => Blueprint {
                 kind,
@@ -409,8 +418,17 @@ impl Blueprint {
             BuildingKind::Longhouse => Blueprint {
                 kind,
                 plan,
-                half_w: rng.range(2.7, 3.1),
-                half_d: rng.range(6.0, 7.2),
+                // As with a house: a carried-in hall brings its own
+                // footprint, and the plot, the levelled pad and the
+                // walls are all cut to it. Leaving the rolled numbers
+                // here put a bench hall three times the size on a pad
+                // measured for the village's own.
+                half_w: carried
+                    .map(|work| work.half_w)
+                    .unwrap_or_else(|| rng.range(2.7, 3.1)),
+                half_d: carried
+                    .map(|work| work.half_d)
+                    .unwrap_or_else(|| rng.range(6.0, 7.2)),
                 wall_h: rng.range(2.0, 2.3),
                 walls: if rng.chance(0.7) {
                     pal::shade(&pal::WOOD, rng.range(0.5, 0.7))
@@ -848,8 +866,7 @@ pub(crate) fn open_boardwalks(
 /// house that was drawn with a frame, so its posts stand alone on the
 /// footing for a while, the way a real house is raised.
 pub fn steps_for(plan: &Blueprint) -> u8 {
-    if plan.kind == BuildingKind::House
-        && let Some(work) = super::baked::house_at(plan.plan)
+    if let Some(work) = super::baked::drawing_at(plan.kind, plan.plan)
         && super::baked::has_frame(work)
     {
         4
@@ -1047,9 +1064,7 @@ pub(crate) fn raise_stage(
 ) {
     // A house carried in from the bench is raised from its own boxes;
     // the village's own hand still builds everything else.
-    if plan.kind == BuildingKind::House
-        && let Some(work) = super::baked::house_at(plan.plan)
-    {
+    if let Some(work) = super::baked::drawing_at(plan.kind, plan.plan) {
         super::baked::raise_baked(
             commands, meshes, materials, site, stage, work, plan.walls, plan.roof,
         );
@@ -2307,8 +2322,8 @@ pub(crate) fn plan_houses(
     // carried-in house brings its own footprint, and the rolled ones
     // stay within their own range.
     let reach = match kind {
-        BuildingKind::House => super::baked::widest_house().unwrap_or(3.2),
-        BuildingKind::Longhouse => 7.2,
+        BuildingKind::House => super::baked::widest(BuildingKind::House).unwrap_or(3.2),
+        BuildingKind::Longhouse => super::baked::widest(BuildingKind::Longhouse).unwrap_or(7.2),
         _ => 3.0,
     };
     let (probe, clearance) = if kind == BuildingKind::Longhouse {
