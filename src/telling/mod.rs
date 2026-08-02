@@ -313,7 +313,6 @@ impl Tongue {
     }
 
     /// Writes the authoring want-list beside the game.
-    #[allow(dead_code)] // wired to a slow timer when the corpus ships
     pub fn note_wanting(&self) {
         self.voice.write_wanting();
     }
@@ -354,6 +353,25 @@ fn trade_tag(voice: Vocation) -> &'static str {
 pub struct SpeakingWith(pub String);
 
 /// Installs the teller. Silent and free when there are no weights to read.
+/// Flushes the authoring want-list every little while. A minute is
+/// nothing to a file this small, and it means a crash loses at most a
+/// minute of assignments - the want-list is the whole reason silent
+/// failures are worth anything.
+fn flush_the_want_list(
+    time: Res<Time>,
+    mut since_last: Local<f32>,
+    tongue: Option<Res<Tongue>>,
+) {
+    *since_last += time.delta_secs();
+    if *since_last < 60.0 {
+        return;
+    }
+    *since_last = 0.0;
+    if let Some(tongue) = tongue {
+        tongue.note_wanting();
+    }
+}
+
 pub struct TellingPlugin;
 
 impl Plugin for TellingPlugin {
@@ -372,6 +390,7 @@ impl Plugin for TellingPlugin {
             mused: HashMap::new(),
             replies: HashMap::new(),
         });
+        app.add_systems(Update, flush_the_want_list);
     }
 }
 

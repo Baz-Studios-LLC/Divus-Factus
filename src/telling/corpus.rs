@@ -193,7 +193,6 @@ impl Corpus {
     /// moment the corpus had nothing worthy to say, worst offenders
     /// first, ready to be turned into lines. Truthful accounting beats a
     /// tidy file, so it rewrites whole each time.
-    #[allow(dead_code)] // flushed on a slow timer once wired
     pub fn write_wanting(&self) {
         if self.wanting.is_empty() {
             return;
