@@ -403,6 +403,18 @@ pub(super) fn wild_growth(
     }
 }
 
+/// When a mauling was last cried out about, so that one long attack is
+/// one memory rather than one a frame. Not saved: a mauling that ends
+/// with the load is over, and the memory it laid down is what persists.
+#[derive(Component)]
+pub struct Torn(pub f64);
+
+/// Seconds before the same person being savaged counts as a fresh
+/// alarm. Long enough that a single wolf worrying at somebody is one
+/// story; short enough that being caught again the next morning is a
+/// second one.
+const TEETH_REMEMBERED: f64 = 90.0;
+
 /// Wolves test the roads. A villager alone and far from the square —
 /// a miner on the ore road, an explorer past the cairns — is prey the
 /// pack understands. Company is armour: anyone within a dozen strides
@@ -411,6 +423,9 @@ pub(super) fn wild_growth(
 #[allow(clippy::type_complexity)]
 pub(super) fn wolves_stalk(
     time: Res<Time>,
+    clock: Res<crate::calendar::WorldClock>,
+    mut commands: Commands,
+    mut alarms: MessageWriter<crate::witness::DivineEvent>,
     site: Option<Res<crate::villager::SettlementSite>>,
     towers: Query<(&GlobalTransform, &crate::villager::work::Building)>,
     mut telling: (
@@ -429,6 +444,7 @@ pub(super) fn wolves_stalk(
             Option<&crate::villager::work::Vocation>,
             &mut crate::creature::Vitality,
             &mut CreatureMotion,
+            Option<&Torn>,
         ),
         (
             With<Villager>,
@@ -450,7 +466,7 @@ pub(super) fn wolves_stalk(
     // Where everyone stands, for the loneliness test.
     let folk: Vec<(Entity, Vec3, bool)> = walkers
         .iter()
-        .map(|(entity, at, vocation, _, _)| {
+        .map(|(entity, at, vocation, ..)| {
             (
                 entity,
                 at.translation,
@@ -488,10 +504,29 @@ pub(super) fn wolves_stalk(
         // Teeth. A mauling is slow enough to run from, fast enough to
         // kill the one who cannot.
         target.0 = None;
-        if let Ok((_, _, _, mut vitality, mut motion)) = walkers.get_mut(*quarry) {
+        if let Ok((_, quarry_here, _, mut vitality, mut motion, torn)) = walkers.get_mut(*quarry) {
             vitality.harm += dt * 0.3;
             vitality.violent = true;
             motion.flail = 1.0;
+            // The village learns of this. Once per attack, not once per
+            // frame: teeth stay in for seconds, and a memory laid down
+            // sixty times would push everything else this person has ever
+            // seen out of their head inside a breath.
+            let fresh = torn.is_none_or(|torn| clock.elapsed - torn.0 > TEETH_REMEMBERED);
+            if fresh {
+                let where_at = quarry_here.translation;
+                commands.entity(*quarry).insert(Torn(clock.elapsed));
+                info!(
+                    "a wolf set upon one of the village, {:.0} strides out from the square",
+                    where_at.distance(site.centre)
+                );
+                alarms.write(crate::witness::DivineEvent {
+                    kind: crate::witness::DivineEventKind::Mauled,
+                    position: where_at,
+                    subject: Some(*quarry),
+                    intensity: 0.8,
+                });
+            }
             if rng.0.chance(dt * 0.4)
                 && let Some(tongue) = telling.0.as_mut()
             {

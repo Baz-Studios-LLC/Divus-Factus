@@ -263,17 +263,15 @@ pub(crate) fn morning_muster(
             Without<Corpse>,
         ),
     >,
-    hurt: Query<&Vitality, (With<Villager>, Without<Corpse>)>,
+    // What the village is carrying, body and mind: the harm a healer is
+    // wanted for, and the memories a guard is wanted for.
+    hurt: Query<(&Vitality, Option<&crate::witness::Witnessed>), (With<Villager>, Without<Corpse>)>,
     ground: (
         Option<Res<crate::villager::explore::KnownWorld>>,
         Query<(&GlobalTransform, &crate::scatter::FellableTree)>,
         Option<Res<Terrain>>,
         Option<Res<SettlementSite>>,
     ),
-    wild: Query<
-        (&Transform, &crate::creature::genome::CreatureGenome),
-        (With<crate::creature::wildlife::Wild>, Without<Corpse>),
-    >,
     mut workers: Query<
         (
             Entity,
@@ -334,14 +332,23 @@ pub(crate) fn morning_muster(
             })
         })
     });
-    let wolves_near = site.as_ref().map_or(0, |s| {
-        wild.iter()
-            .filter(|(at, genome)| {
-                genome.species == crate::creature::genome::Species::Wolf
-                    && at.translation.distance(s.centre) < 130.0
-            })
-            .count()
-    });
+    // How badly this village fears the woods, summed over the people who
+    // carry a fresh memory of the teeth - seen with their own eyes or
+    // told by someone who did.
+    //
+    // This was a count of live wolves within a hundred and thirty metres
+    // of the square: a god's-eye census nobody in the village had access
+    // to. It posted guards against wolves no one had ever seen and left
+    // a child who limped home torn open to change nothing at all. A
+    // village's fear should be made of what it has been through.
+    let peril = crate::witness::peril_of(hurt.iter().filter_map(|(_, held)| held), clock.day());
+    let guards = if has(BuildingKind::Watchtower) {
+        1.0
+    } else {
+        // One spear per three frightened souls. A single survivor is
+        // already enough for one: somebody walks the treeline now.
+        (peril / 3.0).ceil().min(2.0)
+    };
 
     let raising = sites.iter().count() as f32;
     let footings_waiting = sites
@@ -407,20 +414,13 @@ pub(crate) fn morning_muster(
         ),
         (
             Vocation::Healer,
-            if hurt.iter().filter(|v| v.harm > 0.15).count() >= 2 {
+            if hurt.iter().filter(|(v, _)| v.harm > 0.15).count() >= 2 {
                 1.0
             } else {
                 0.0
             },
         ),
-        (
-            Vocation::Guard,
-            if wolves_near >= 2 || has(BuildingKind::Watchtower) {
-                1.0
-            } else {
-                0.0
-            },
-        ),
+        (Vocation::Guard, guards),
     ];
     // A roofless village needs a hammer whether or not ground is broken:
     // somebody has to be standing ready when it is.
@@ -443,8 +443,8 @@ pub(crate) fn morning_muster(
         (stone_short * 0.5).ceil(),
         wood_known as u8 as f32,
         shore_near as u8 as f32,
-        wolves_near.min(3) as f32,
-        hurt.iter().filter(|v| v.harm > 0.15).count().min(3) as f32,
+        guards,
+        hurt.iter().filter(|(v, _)| v.harm > 0.15).count().min(3) as f32,
         has(BuildingKind::Tavern) as u8 as f32,
         has(BuildingKind::Shrine) as u8 as f32,
         has(BuildingKind::Watchtower) as u8 as f32,

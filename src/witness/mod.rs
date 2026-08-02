@@ -138,6 +138,10 @@ pub enum DivineEventKind {
     Delivered,
     /// The fields came in heavier than they promised.
     Flourished,
+    /// A wolf set upon one of the village. The world's own doing, not the
+    /// god's — but the village does not sort its fears by author, and this
+    /// is the memory a guard's post is eventually built out of.
+    Mauled,
 }
 
 impl DivineEventKind {
@@ -158,6 +162,11 @@ impl DivineEventKind {
             DivineEventKind::Perished => 30.0,
             DivineEventKind::Delivered => 24.0,
             DivineEventKind::Flourished => 20.0,
+            // A scream in the woods. It carries as far as a scream does,
+            // which is not far - and that is the point of it: most of
+            // these are known only because the one it happened to walked
+            // home and said so.
+            DivineEventKind::Mauled => 28.0,
         }
     }
 
@@ -176,6 +185,7 @@ impl DivineEventKind {
             DivineEventKind::Perished => 0.7,
             DivineEventKind::Delivered => 0.04,
             DivineEventKind::Flourished => 0.03,
+            DivineEventKind::Mauled => 0.85,
         }
     }
 
@@ -200,7 +210,24 @@ impl DivineEventKind {
             DivineEventKind::Perished => 0.22,
             DivineEventKind::Delivered => 0.3,
             DivineEventKind::Flourished => 0.28,
+            // A wolf is a wolf. Only the most devout read a hand into it,
+            // and they are the ones who will say the woods were owed
+            // something.
+            DivineEventKind::Mauled => 0.05,
         }
+    }
+
+    /// Whether the one it happened TO carries the memory themselves.
+    ///
+    /// For the god's own acts they do not: being thrown across a field is
+    /// something you are still in the middle of, not something you stand
+    /// and watch, and the reaction systems already have hold of you. A
+    /// mauling is the exception the whole social machine turns on — the
+    /// child who limps home out of the woods is the only witness there
+    /// was, and if they do not carry it, nobody in the village ever
+    /// learns it happened.
+    pub fn befalls_its_subject(self) -> bool {
+        matches!(self, DivineEventKind::Mauled)
     }
 
     /// How a villager would put it.
@@ -221,6 +248,7 @@ impl DivineEventKind {
             DivineEventKind::Perished => "saw one of their own die",
             DivineEventKind::Delivered => "saw a child come safe into the world",
             DivineEventKind::Flourished => "saw the fields come in heavy",
+            DivineEventKind::Mauled => "saw a wolf set upon one of their own",
         }
     }
 
@@ -301,6 +329,12 @@ impl DivineEventKind {
                 "the harvest filled every basket we had",
                 "the rows came in heavier than we hoped",
                 "a good harvest, better than last year",
+            ],
+            DivineEventKind::Mauled => &[
+                "a wolf took one of ours out past the trees",
+                "there are wolves in the woods and they are not afraid of us",
+                "somebody came home torn open today",
+                "it went for the throat and it nearly had it",
             ],
         }
     }
@@ -401,6 +435,11 @@ pub struct Memory {
     /// through gossip is the stance as much as the story.
     #[serde(default = "always")]
     pub divine: bool,
+    /// The day it was laid down, so a fear can fade. Old saves predate the
+    /// stamp and load as day zero, which reads as long ago — which, for
+    /// anything loaded off a disk, it is.
+    #[serde(default)]
+    pub day: u32,
 }
 
 /// Old saves predate doubt: their memories load as believed.
@@ -420,6 +459,8 @@ enum MemoryOnDisk {
         whom: Option<Whom>,
         #[serde(default = "always")]
         divine: bool,
+        #[serde(default)]
+        day: u32,
     },
     Bare(DivineEventKind),
 }
@@ -427,11 +468,22 @@ enum MemoryOnDisk {
 impl From<MemoryOnDisk> for Memory {
     fn from(disk: MemoryOnDisk) -> Memory {
         match disk {
-            MemoryOnDisk::Whole { kind, whom, divine } => Memory { kind, whom, divine },
+            MemoryOnDisk::Whole {
+                kind,
+                whom,
+                divine,
+                day,
+            } => Memory {
+                kind,
+                whom,
+                divine,
+                day,
+            },
             MemoryOnDisk::Bare(kind) => Memory {
                 kind,
                 whom: None,
                 divine: true,
+                day: 0,
             },
         }
     }
@@ -459,8 +511,16 @@ impl Witnessed {
     /// How many memories a villager keeps.
     pub const CAPACITY: usize = 8;
 
-    fn record(&mut self, kind: DivineEventKind, whom: Option<Whom>, divine: bool) {
-        self.recent.insert(0, Memory { kind, whom, divine });
+    fn record(&mut self, kind: DivineEventKind, whom: Option<Whom>, divine: bool, day: u32) {
+        self.recent.insert(
+            0,
+            Memory {
+                kind,
+                whom,
+                divine,
+                day,
+            },
+        );
         self.recent.truncate(Self::CAPACITY);
         self.total = self.total.saturating_add(1);
         // A fresh sight rekindles the urge to tell it.
@@ -488,6 +548,41 @@ impl Witnessed {
     pub fn is_innocent(&self) -> bool {
         self.total == 0
     }
+
+    /// How heavily the teeth sit on this one person today, 0 to 1. A
+    /// mauling they carry counts full on the day it happened and nothing
+    /// at all once it has faded; a memory heard secondhand is in `recent`
+    /// exactly like one seen, which is the point — a story frightens the
+    /// people it reaches, not only the person it happened to.
+    pub fn peril(&self, today: u32) -> f32 {
+        self.recent
+            .iter()
+            .filter(|memory| memory.kind == DivineEventKind::Mauled)
+            .map(|memory| {
+                let age = today.saturating_sub(memory.day) as f32;
+                (1.0 - age / PERIL_FADES).clamp(0.0, 1.0)
+            })
+            .fold(0.0f32, f32::max)
+    }
+}
+
+/// Days for a mauling to stop frightening the one who carries it. Rather
+/// longer than a season's work rota, so a bad autumn keeps a guard on the
+/// edge of the woods well into the winter, and a quiet year takes the
+/// post away again.
+pub const PERIL_FADES: f32 = 14.0;
+
+/// How badly a settlement fears the woods, counted in PEOPLE rather than
+/// in wolves: the sum of what everyone carries, so a story that reached
+/// eight ears weighs eight times what one silent survivor does.
+///
+/// This is the whole point of the thing. The want for a guard used to be
+/// read off a god's-eye census of live wolves within a hundred and thirty
+/// metres of the square — so a village feared wolves nobody had ever laid
+/// eyes on, and shrugged at a child who came home torn open. Fear belongs
+/// to the people who hold it.
+pub fn peril_of<'a>(village: impl Iterator<Item = &'a Witnessed>, today: u32) -> f32 {
+    village.map(|held| held.peril(today)).sum()
 }
 
 /// Chooses how a villager responds to something they just saw.
@@ -510,6 +605,7 @@ fn choose_reaction(kind: DivineEventKind, boldness: f32, closeness: f32) -> Reac
 fn perceive_events(
     mut events: MessageReader<DivineEvent>,
     mut commands: Commands,
+    clock: Res<crate::calendar::WorldClock>,
     mut villagers: Query<
         (
             Entity,
@@ -545,6 +641,7 @@ fn perceive_events(
         }
     };
 
+    let today = clock.day();
     for event in events.read() {
         let carry = event.kind.carry() * (0.6 + event.intensity * 0.6);
 
@@ -559,9 +656,12 @@ fn perceive_events(
         });
 
         for (entity, transform, temperament, mut witnessed, mut motion) in &mut villagers {
-            // The subject of an act is not a witness to it. They are the one it
-            // happened to, and they are already reacting by being thrown.
-            if event.subject == Some(entity) {
+            // The subject of an act is usually not a witness to it: they are
+            // the one it happened to, already reacting by being thrown. The
+            // exception is the one the whole social machine turns on — see
+            // `befalls_its_subject`.
+            let befell_them = event.subject == Some(entity);
+            if befell_them && !event.kind.befalls_its_subject() {
                 continue;
             }
 
@@ -579,6 +679,10 @@ fn perceive_events(
             // because this is the last place the subject is an entity — in
             // the memory they are a name and a tie.
             let whom = match (&subject_name, event.subject) {
+                // It happened to them. There is no third party to name,
+                // and a memory that named them to themselves would come
+                // back out of the mouth as somebody else's story.
+                _ if befell_them => None,
                 (Some(name), Some(subject)) => Some(Whom {
                     name: name.clone(),
                     tie: crate::villager::kin::tie(
@@ -602,7 +706,14 @@ fn perceive_events(
                 rng.0
                     .chance((event.kind.unmistakably_divine() * conviction).min(0.97))
             });
-            witnessed.record(event.kind, whom, divine);
+            witnessed.record(event.kind, whom, divine, today);
+
+            // The one it happened to is already flailing and running from
+            // the thing itself. Turning them to WATCH it would stop them
+            // where they stand, with the teeth still in them.
+            if befell_them {
+                continue;
+            }
 
             // A visible start, so it reads as a reaction rather than a decision.
             motion.flail = motion.flail.max(match kind {
@@ -782,11 +893,97 @@ mod tests {
     }
 
     #[test]
+    fn only_a_mauling_is_carried_by_the_one_it_happened_to() {
+        // Everything the god does, the subject is in the middle of and
+        // the reaction systems already have hold of. The teeth are the
+        // exception, and if that ever stops being true the child who
+        // limps home out of the woods stops being able to tell anyone.
+        assert!(DivineEventKind::Mauled.befalls_its_subject());
+        for kind in [
+            DivineEventKind::Lifted,
+            DivineEventKind::Thrown,
+            DivineEventKind::SetDown,
+            DivineEventKind::Impact,
+            DivineEventKind::Provided,
+            DivineEventKind::Smote,
+            DivineEventKind::Uprooted,
+            DivineEventKind::Mended,
+            DivineEventKind::Quaked,
+            DivineEventKind::Perished,
+            DivineEventKind::Delivered,
+            DivineEventKind::Flourished,
+        ] {
+            assert!(!kind.befalls_its_subject(), "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn a_fear_fades() {
+        let mut bitten = Witnessed::default();
+        bitten.record(DivineEventKind::Mauled, None, false, 10);
+        assert_eq!(bitten.peril(10), 1.0, "the day it happened");
+        assert!(bitten.peril(17) > 0.0, "a week on, still frightened");
+        assert!(bitten.peril(17) < 1.0, "but less so");
+        assert_eq!(bitten.peril(10 + PERIL_FADES as u32), 0.0, "and then gone");
+        assert_eq!(bitten.peril(400), 0.0, "and it stays gone");
+    }
+
+    #[test]
+    fn nothing_but_the_teeth_frightens_the_village_this_way() {
+        let mut seen = Witnessed::default();
+        for kind in [
+            DivineEventKind::Smote,
+            DivineEventKind::Quaked,
+            DivineEventKind::Perished,
+        ] {
+            seen.record(kind, None, true, 5);
+        }
+        assert_eq!(
+            seen.peril(5),
+            0.0,
+            "lightning is the god's business, not the guard's"
+        );
+    }
+
+    #[test]
+    fn the_story_frightens_more_people_than_the_wolf_bit() {
+        // The whole point. One survivor is one village's worth of unease;
+        // the same account in eight heads is eight, and THAT is what puts
+        // a spear on the treeline.
+        let bitten = {
+            let mut held = Witnessed::default();
+            held.record(DivineEventKind::Mauled, None, false, 3);
+            held
+        };
+        let told = {
+            let mut held = Witnessed::default();
+            held.hear(Memory {
+                kind: DivineEventKind::Mauled,
+                whom: None,
+                divine: false,
+                day: 3,
+            });
+            held
+        };
+        let quiet = Witnessed::default();
+
+        let alone = [&bitten, &quiet, &quiet];
+        let spread = [&bitten, &told, &told];
+        assert_eq!(peril_of(alone.into_iter(), 3), 1.0);
+        assert_eq!(peril_of(spread.into_iter(), 3), 3.0);
+        assert_eq!(
+            peril_of(spread.into_iter(), 3 + PERIL_FADES as u32),
+            0.0,
+            "and a quiet season empties the post again"
+        );
+    }
+
+    #[test]
     fn memory_is_capped_but_the_count_is_not() {
         let mut w = Witnessed::default();
         assert!(w.is_innocent());
         for _ in 0..50 {
-            w.record(DivineEventKind::Lifted, None, true);
+            w.record(DivineEventKind::Lifted, None, true, 1);
         }
         assert_eq!(w.recent.len(), Witnessed::CAPACITY);
         assert_eq!(w.total, 50);
@@ -796,7 +993,7 @@ mod tests {
     #[test]
     fn the_newest_memory_comes_first() {
         let mut w = Witnessed::default();
-        w.record(DivineEventKind::Lifted, None, true);
+        w.record(DivineEventKind::Lifted, None, true, 1);
         w.record(
             DivineEventKind::Thrown,
             Some(Whom {
@@ -804,6 +1001,7 @@ mod tests {
                 tie: "your neighbour".into(),
             }),
             true,
+            1,
         );
         assert_eq!(w.recent[0].kind, DivineEventKind::Thrown);
         assert_eq!(
@@ -850,6 +1048,7 @@ mod tests {
                 tie: "your brother".into(),
             }),
             false,
+            3,
         );
         let round: Witnessed =
             serde_json::from_str(&serde_json::to_string(&fresh).unwrap()).unwrap();

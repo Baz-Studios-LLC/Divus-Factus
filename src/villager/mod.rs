@@ -1850,6 +1850,7 @@ fn chronicle_divine_touch(
             crate::witness::DivineEventKind::Uprooted => "was torn from the earth",
             crate::witness::DivineEventKind::Mended => "was made whole by the hand of god",
             crate::witness::DivineEventKind::Quaked => "was thrown down when the earth buckled",
+            crate::witness::DivineEventKind::Mauled => "was set upon by a wolf, and got home",
             // The worldly turns write their own chronicle lines at their own
             // sites (the death, the birth, the harvest); nothing to add here.
             crate::witness::DivineEventKind::Perished
@@ -2379,6 +2380,7 @@ mod tests {
                     kind: crate::witness::DivineEventKind::Thrown,
                     whom: None,
                     divine: true,
+                    day: 1,
                 }],
                 total: 1,
                 secondhand: 0,
@@ -2445,6 +2447,7 @@ mod tests {
                     kind: crate::witness::DivineEventKind::Thrown,
                     whom: None,
                     divine: true,
+                    day: 1,
                 }],
                 total: 1,
                 secondhand: 0,

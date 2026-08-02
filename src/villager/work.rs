@@ -1579,12 +1579,14 @@ mod tests {
             Some(BuildingKind::Tavern)
         );
 
-        // Wolves at the door raise a tower.
+        // A village that has been bitten raises a tower. Note what this
+        // is NOT: a count of wolves. Three souls carrying the memory of
+        // the teeth is what puts a watch on the treeline.
         let hunted = CivicNeeds {
             population: 12,
             stone: 99.0,
             avg_spirits: 0.7,
-            wolves_near: 3,
+            peril: 3.0,
             ..Default::default()
         };
         assert_eq!(

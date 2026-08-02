@@ -4,7 +4,6 @@
 use bevy::prelude::*;
 
 use super::*;
-use crate::creature::genome::{CreatureGenome, Species};
 use crate::rng::Rng;
 use crate::terrain::{Terrain, WATER_LEVEL};
 /// Timber one ordinary house costs, delivered one unit per work cycle.
@@ -174,7 +173,11 @@ pub struct CivicNeeds {
     pub farmers: usize,
     pub foresters: usize,
     pub fields: usize,
-    pub wolves_near: usize,
+    /// How badly the village fears the woods, summed over the people who
+    /// carry a fresh memory of the teeth. NOT a count of live wolves: a
+    /// tower is raised out of what the village has been through and told
+    /// each other, not out of what a god's-eye census can see prowling.
+    pub peril: f32,
     pub pending_builds: usize,
     /// Whether walkable shore lies within working reach — no water, no dock.
     pub shore_near: bool,
@@ -252,9 +255,11 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
             Tavern => (0.75 - needs.avg_spirits).max(0.0) * 2.2,
             Weaver => needs.homeless as f32 * 0.12,
             Herbalist => needs.hurt as f32 * 0.35,
-            // Faith raises its own roof; fear raises a tower.
+            // Faith raises its own roof; fear raises a tower. The fear
+            // is the village's own - three souls carrying a mauling
+            // between them is what puts a watch on the treeline.
             Shrine => needs.believers as f32 * 0.12,
-            Watchtower => needs.wolves_near as f32 * 0.4,
+            Watchtower => needs.peril * 0.4,
             TownHall => (needs.population as f32 - 16.0) / 8.0,
             House | Longhouse => 0.0,
         };
@@ -1887,11 +1892,15 @@ pub(crate) fn plan_houses(
                 Has<crate::creature::Childhood>,
                 Option<&crate::villager::Spouse>,
                 Option<&crate::villager::MemberOf>,
+                Option<&crate::witness::Witnessed>,
             ),
             (With<Villager>, Without<Corpse>),
         >,
         Query<&Field>,
-        Query<(&Transform, &CreatureGenome), With<crate::creature::wildlife::Wild>>,
+        // The clock rides with the census because this system sits at
+        // Bevy's parameter ceiling, and what the day is for is reading
+        // the age of a memory in the census below.
+        Res<crate::calendar::WorldClock>,
     ),
     // Bundled: this system sits at Bevy's parameter ceiling, and the three
     // plot queries belong together anyway — what stands, what is rising, and
@@ -1927,7 +1936,10 @@ pub(crate) fn plan_houses(
         woodpile: home_ground.woodpile,
         settlement,
     };
-    let (souls, fields, wild) = census;
+    let (souls, fields, clock) = census;
+    // What the village carries of the teeth, and how fresh. Gathered from
+    // its OWN people: a settlement is not frightened by another's wolves.
+    let mut remembered: Vec<&crate::witness::Witnessed> = Vec::new();
 
     // The census: what the village actually is, right now.
     let mut population = 0usize;
@@ -1945,11 +1957,14 @@ pub(crate) fn plan_houses(
     // housed — it is two buildings away from housed.
     let mut family_souls = 0usize;
     let mut single_souls = 0usize;
-    for (vocation, morale, home, faith, vitality, child, spouse, member) in &souls {
+    for (vocation, morale, home, faith, vitality, child, spouse, member, held) in &souls {
         if member.map(|m| m.0) != Some(settlement) {
             continue;
         }
         population += 1;
+        if let Some(held) = held {
+            remembered.push(held);
+        }
         spirits_sum += morale.spirits;
         if crate::villager::home::wants_family_roof(spouse, child) {
             family_souls += 1;
@@ -2096,12 +2111,7 @@ pub(crate) fn plan_houses(
             farmers,
             foresters,
             fields: fields.iter().count(),
-            wolves_near: wild
-                .iter()
-                .filter(|(at, genome)| {
-                    genome.species == Species::Wolf && at.translation.distance(site.centre) < 130.0
-                })
-                .count(),
+            peril: crate::witness::peril_of(remembered.iter().copied(), clock.day()),
             pending_builds: pending
                 .iter()
                 .filter(|(_, _, member)| member.0 == settlement)

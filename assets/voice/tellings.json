@@ -31,5 +31,19 @@
   {"t": "the bushes went heavy with fruit overnight. I picked till my basket broke", "tags": ["tell", "event:flourished", "saw"]},
   {"t": "everything's blooming at once out east. go see it before the birds get it", "tags": ["tell", "event:flourished", "heard"]},
   {"t": "the land doesn't bloom like that on its own. that's a thank-you or an ask", "tags": ["tell", "event:flourished", "heard", "devout"]},
-  {"t": "good soil, good rain, good luck. no mystery in a berry", "tags": ["tell", "event:flourished", "heard", "doubting"]}
+  {"t": "good soil, good rain, good luck. no mystery in a berry", "tags": ["tell", "event:flourished", "heard", "doubting"]},
+  {"t": "a wolf came at me out past the trees. I got away, but only just", "tags": ["tell", "event:mauled", "saw"]},
+  {"t": "I've got teeth marks in my leg. I'm not going back out there alone", "tags": ["tell", "event:mauled", "saw"]},
+  {"t": "it had me down. I don't want to talk about how close that was", "tags": ["tell", "event:mauled", "saw", "worn"]},
+  {"t": "we need somebody watching the treeline. I'm saying that as the one who got bit", "tags": ["tell", "event:mauled", "saw"]},
+  {"t": "I keep hearing it behind me and there's nothing there", "tags": ["tell", "event:mauled", "saw", "worn"]},
+  {"t": "a wolf went for {whom} right in front of me and I couldn't do a thing", "tags": ["tell", "event:mauled", "saw"]},
+  {"t": "I watched {whom} get dragged before we got it off them", "tags": ["tell", "event:mauled", "saw"]},
+  {"t": "you heard about {whom}? a wolf, out past the trees", "tags": ["tell", "event:mauled", "heard"]},
+  {"t": "they're saying the wolves aren't scared of us any more", "tags": ["tell", "event:mauled", "heard"]},
+  {"t": "somebody came home torn up yesterday. nobody's saying much about it", "tags": ["tell", "event:mauled", "heard"]},
+  {"t": "I'm not walking that road on my own now, and neither should you", "tags": ["tell", "event:mauled", "heard"]},
+  {"t": "the woods are owed something, and they came and took it", "tags": ["tell", "event:mauled", "heard", "devout"]},
+  {"t": "a wolf is a wolf. it was hungry, that's the whole of it", "tags": ["tell", "event:mauled", "heard", "doubting"]},
+  {"t": "post a man on the edge and this stops. that's all it needs", "tags": ["tell", "event:mauled", "heard", "trade:guard"]}
 ]
