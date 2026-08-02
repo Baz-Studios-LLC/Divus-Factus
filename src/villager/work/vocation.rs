@@ -7,6 +7,13 @@ use super::*;
 use crate::creature::genome::{Age, CreatureGenome};
 use crate::rng::Rng;
 use crate::terrain::{Terrain, WATER_LEVEL};
+
+/// Stone the village likes to have in the pile whether or not a footing
+/// is presently waiting on it. Four blocks is one longhouse footing: the
+/// difference between breaking ground and building, and standing on the
+/// broken ground for a day.
+const STONE_RESERVE: f32 = 4.0;
+
 /// A calling. Rolled once at adulthood and kept.
 #[derive(
     Component, Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
@@ -228,10 +235,18 @@ pub(crate) fn assign_vocations(
 /// it best answers. A trade nobody needs is a trade nobody holds, and a
 /// village with more hands than wants puts the rest on the work that
 /// always exists - food and firewood. Nobody has nothing to do.
+///
+/// It musters at the working morning, and again whenever the SHAPE of the
+/// want changes - ground broken, a footing finally laid, a field left
+/// unworked. A morning's plan held against needs that have since moved is
+/// no plan at all: it is how three carpenters who went to the rock for
+/// want of a footing stay on the rock all afternoon while the laid
+/// footing waits for a hammer.
 pub(crate) fn morning_muster(
     mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,
-    mut mustered: Local<u32>,
+    mut mustered: Local<(u32, u64, f64)>,
+    mut reckoned: Local<f64>,
     mut notices: MessageWriter<crate::ui::Notice>,
     town: (
         Query<&Building>,
@@ -270,11 +285,17 @@ pub(crate) fn morning_muster(
         (With<Villager>, Without<Corpse>),
     >,
 ) {
-    // Once a day, when the working morning opens.
-    if !clock.work_hours() || *mustered == clock.day() {
+    // Only in working hours - and the reckoning below walks every tree
+    // on the map, so it is taken a few times a minute rather than every
+    // frame. A want counted in whole hands does not turn faster than
+    // that.
+    if !clock.work_hours() {
         return;
     }
-    *mustered = clock.day();
+    if clock.elapsed - *reckoned < 5.0 {
+        return;
+    }
+    *reckoned = clock.elapsed;
 
     let (buildings, sites, stores, fields) = town;
     let (known, trees, terrain, site) = ground;
@@ -327,6 +348,16 @@ pub(crate) fn morning_muster(
         .iter()
         .filter(|(cs, plan)| cs.stone_laid < cs.footing_stone(plan.kind))
         .count() as f32;
+    // Stone the broken ground still wants, block by block, against what
+    // the pile actually holds. A standing reserve of four keeps the NEXT
+    // ground broken from starting on an empty pile and losing a day to
+    // it - the whole village waits on the footing, and the footing waits
+    // on one pick.
+    let footing_short: f32 = sites
+        .iter()
+        .map(|(cs, plan)| (cs.footing_stone(plan.kind) - cs.stone_laid).max(0.0))
+        .sum();
+    let stone_short = (footing_short.max(STONE_RESERVE) - masonry).max(0.0);
     let unworked_fields = fields
         .iter()
         .filter(|f| f.farmer == Entity::PLACEHOLDER)
@@ -356,24 +387,16 @@ pub(crate) fn morning_muster(
         ),
         (Vocation::Explorer, if wood_known { 0.0 } else { 1.0 }),
         (Vocation::Carpenter, raising.min(3.0)),
-        // A mason with no stone is a mason with nothing to do; the miner
-        // is who fixes that, so the want lands on the miner first.
-        (
-            Vocation::Mason,
-            if footings_waiting > 0.0 && masonry >= 1.0 {
-                footings_waiting.min(2.0)
-            } else {
-                0.0
-            },
-        ),
-        (
-            Vocation::Miner,
-            if footings_waiting > 0.0 && masonry < 4.0 {
-                1.0
-            } else {
-                0.0
-            },
-        ),
+        // A mason with no stone is NOT a mason with nothing to do: with
+        // no course to lay they cut rock like a miner, which is exactly
+        // the work an empty pile is asking for. The old `masonry >= 1.0`
+        // gate mustered no masons at all on the morning it mattered most.
+        (Vocation::Mason, footings_waiting.min(2.0)),
+        // One pick per two blocks the pile is short. This was a flat ONE
+        // miner, and only while the pile held under four - so a village
+        // with a single scrap of stone mustered nobody to the rock and
+        // then stood a whole day waiting on a footing that wanted four.
+        (Vocation::Miner, (stone_short * 0.5).ceil().min(3.0)),
         (
             Vocation::Cook,
             if has(BuildingKind::Tavern) { 1.0 } else { 0.0 },
@@ -406,6 +429,39 @@ pub(crate) fn morning_muster(
             entry.1 = entry.1.max(1.0);
         }
     }
+
+    // The SHAPE of the want, in whole hands - and only the parts of it
+    // worth putting a tool down for. The food trades are deliberately
+    // absent: the larder rises and falls all day, and a gatherer is not
+    // made a mason by one good afternoon of berries. Counting them here
+    // turned two hands every five seconds and nobody got good at
+    // anything.
+    let shape = [
+        raising,
+        footings_waiting,
+        unworked_fields,
+        (stone_short * 0.5).ceil(),
+        wood_known as u8 as f32,
+        shore_near as u8 as f32,
+        wolves_near.min(3) as f32,
+        hurt.iter().filter(|v| v.harm > 0.15).count().min(3) as f32,
+        has(BuildingKind::Tavern) as u8 as f32,
+        has(BuildingKind::Shrine) as u8 as f32,
+        has(BuildingKind::Watchtower) as u8 as f32,
+    ]
+    .iter()
+    .fold(0u64, |acc, n| {
+        acc.wrapping_mul(1_000_003).wrapping_add(n.max(0.0) as u64)
+    });
+    // The morning's deal always happens; an in-day one waits on both a
+    // changed shape and a cooling-off, so the village takes stock a few
+    // times a day rather than a few times a minute.
+    let (last_day, last_shape, last_at) = *mustered;
+    let morning = last_day != clock.day();
+    if !morning && (last_shape == shape || clock.elapsed - last_at < 60.0) {
+        return;
+    }
+    *mustered = (clock.day(), shape, clock.elapsed);
 
     // The work that always exists, for hands the wants do not reach. Every
     // one of these has something to do on the first morning of the world.
@@ -467,6 +523,10 @@ pub(crate) fn morning_muster(
         if let Some(entry) = wanted.iter_mut().find(|(v, _)| *v == best) {
             entry.1 -= 1.0;
         }
+        // The muster is the new plan, so the stopgap's patience starts
+        // over with it: yesterday's dry spell must not overrule this
+        // morning's deal on its very first frame.
+        commands.entity(hand).remove::<Jobless>();
         if best == held {
             continue;
         }

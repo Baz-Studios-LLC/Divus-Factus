@@ -53,6 +53,18 @@ pub struct Shunned {
 /// How close to a shunned site a new job offer has to be to be refused too.
 const SHUN_RADIUS: f32 = 5.0;
 
+/// When a hand first came up empty. A trade comes up empty for all sorts
+/// of ordinary reasons — a bush picked bare a moment ago, a footing being
+/// laid this very instant, a world whose scatter has not finished
+/// spawning — so the stopgap below waits out a grace before it overrules
+/// the morning's muster.
+#[derive(Component)]
+pub struct Jobless(pub f64);
+
+/// How long a pair of hands may find nothing before they take up whatever
+/// work the ground does offer.
+const JOBLESS_GRACE: f64 = 6.0;
+
 /// Grudges against unreachable worksites fade.
 pub(crate) fn forget_shunned(
     mut commands: Commands,
@@ -161,8 +173,10 @@ pub(crate) fn take_up_work(
             &Transform,
             &Needs,
             &Vocation,
+            &Person,
             &mut Activity,
             Option<&Shunned>,
+            Option<&Jobless>,
         ),
         (
             With<Villager>,
@@ -223,7 +237,8 @@ pub(crate) fn take_up_work(
     }
     let daylight = is_work_hour(clock.time_of_day());
 
-    for (entity, transform, needs, vocation, mut activity, shunned) in &mut workers {
+    for (entity, transform, needs, vocation, person, mut activity, shunned, jobless) in &mut workers
+    {
         // Everything below is asked of the worker's OWN town: its square, its
         // larder, its building plots.
         let Ok(&crate::villager::MemberOf(home)) = members.get(entity) else {
@@ -660,32 +675,133 @@ pub(crate) fn take_up_work(
             }
         };
 
-        if let Some(job) = job {
-            // The road eats first. A worksite past a safe walk is taken
-            // only with rations out of the larder - about one meal per
-            // half-starvation of travel, capped at three - and a village
-            // too poor to provision the road keeps its people near home,
-            // where the famine watch will say so out loud.
-            let round_trip = job.site.distance(transform.translation) + job.site.distance(centre);
-            let meals = ((round_trip / 2.4) / (super::super::SECONDS_TO_STARVE * 0.5))
-                .floor()
-                .min(3.0);
-            if meals >= 1.0 && !feeds_the_village {
-                let Ok((_, mut store)) = towns.get_mut(home) else {
-                    continue;
-                };
-                if store.food() < meals + 2.0 {
-                    continue;
-                }
-                let mut owed = meals;
-                while owed > 0.0 {
-                    store.larder.draw(1.0);
-                    owed -= 1.0;
-                }
-                commands.entity(entity).insert(Rations(meals));
+        // Their own trade had nothing for them. A pair of hands with
+        // nothing to do is the one thing the muster exists to prevent, so
+        // instead of standing about until tomorrow morning they take up
+        // whatever work the ground DOES offer, and become that trade
+        // until the next muster deals them again. This is what keeps nine
+        // carpenters from watching an unlaid footing for a whole day
+        // because the one miner walked off the pick at dawn.
+        //
+        // Explorers are exempt: an explorer with no job is not idle, they
+        // are being held for a muster of their own.
+        let stopgap = || -> Option<(Vocation, Job)> {
+            if *vocation == Vocation::Explorer {
+                return None;
             }
-            *activity = Activity::Working;
-            commands.entity(entity).insert(job);
+            let cut = || {
+                nearest_job(
+                    boulders.iter().map(|(rock, t)| (rock, t.translation())),
+                    transform.translation,
+                    WORK_REACH,
+                    &known_far,
+                    &permitted,
+                )
+                .map(|job| (Vocation::Miner, job))
+            };
+            let fell = || {
+                nearest_job(
+                    trees
+                        .iter()
+                        .filter(|(_, _, tree)| tree.harvestable())
+                        .map(|(tree, t, _)| (tree, t.translation())),
+                    transform.translation,
+                    WORK_REACH,
+                    &known_far,
+                    &permitted,
+                )
+                .map(|job| (Vocation::Forester, job))
+            };
+            let pick = || {
+                nearest_job(
+                    bushes
+                        .iter()
+                        .filter(|(_, _, source)| source.amount > 0.5)
+                        .map(|(bush, t, _)| (bush, t.translation())),
+                    transform.translation,
+                    WORK_REACH,
+                    &known_far,
+                    &permitted,
+                )
+                .map(|job| (Vocation::Gatherer, job))
+            };
+            let hunt = || {
+                nearest_job(
+                    game.iter()
+                        .filter(|(_, _, genome)| genome.species != Species::Human)
+                        .map(|(prey, t, _)| (prey, t.translation)),
+                    transform.translation,
+                    WORK_REACH * 1.6,
+                    &known_far,
+                    &permitted,
+                )
+                .map(|job| (Vocation::Hunter, job))
+            };
+            // A thin larder outranks everything; otherwise stone, because
+            // stone is the want that stalls a village hardest and berries
+            // are the one thing always within reach.
+            if larder_thin {
+                pick().or_else(hunt).or_else(cut).or_else(fell)
+            } else {
+                cut().or_else(fell).or_else(pick).or_else(hunt)
+            }
+        };
+        let found = match job {
+            Some(job) => Some((*vocation, job)),
+            // Empty-handed. The clock starts; only a hand that has stayed
+            // empty through the grace is dealt again.
+            None => match jobless {
+                Some(Jobless(since)) if clock.elapsed - since > JOBLESS_GRACE => stopgap(),
+                Some(_) => None,
+                None => {
+                    commands.entity(entity).insert(Jobless(clock.elapsed));
+                    None
+                }
+            },
+        };
+        let Some((trade, job)) = found else {
+            continue;
+        };
+
+        // The road eats first. A worksite past a safe walk is taken
+        // only with rations out of the larder - about one meal per
+        // half-starvation of travel, capped at three - and a village
+        // too poor to provision the road keeps its people near home,
+        // where the famine watch will say so out loud.
+        let round_trip = job.site.distance(transform.translation) + job.site.distance(centre);
+        let meals = ((round_trip / 2.4) / (super::super::SECONDS_TO_STARVE * 0.5))
+            .floor()
+            .min(3.0);
+        let feeds_the_village = feeds_the_village
+            || matches!(
+                trade,
+                Vocation::Fisher | Vocation::Gatherer | Vocation::Hunter | Vocation::Farmer
+            );
+        if meals >= 1.0 && !feeds_the_village {
+            let Ok((_, mut store)) = towns.get_mut(home) else {
+                continue;
+            };
+            if store.food() < meals + 2.0 {
+                continue;
+            }
+            let mut owed = meals;
+            while owed > 0.0 {
+                store.larder.draw(1.0);
+                owed -= 1.0;
+            }
+            commands.entity(entity).insert(Rations(meals));
         }
+        if trade != *vocation {
+            info!(
+                "{} found no work as a {} and {}",
+                person.name,
+                vocation.trade(),
+                trade.taking_up()
+            );
+            commands.entity(entity).insert(trade);
+        }
+        *activity = Activity::Working;
+        commands.entity(entity).remove::<Jobless>();
+        commands.entity(entity).insert(job);
     }
 }
