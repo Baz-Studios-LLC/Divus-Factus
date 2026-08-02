@@ -1288,10 +1288,21 @@ pub(super) fn weariness(
         let brightness = manner.map_or(1.0, |m| m.brightness());
         let endurance = manner.map_or(1.0, |m| m.endurance());
         let asleep_indoors = *activity == Activity::Sleeping && *visibility == Visibility::Hidden;
+        // Sleep counts wherever it happens. When the roofless learned to
+        // lie down at the fire they became Sleeping-but-visible, which
+        // matched NEITHER arm of this ledger - so a night flat on the
+        // ground built weariness at the waking rate, sleeping rough came
+        // out WORSE than standing all night, and once the whole roofless
+        // half of a young village crossed the exhaustion gate nobody took
+        // a job again. Ground sleep sits between a bed and a doze: a
+        // mattress beats dirt, and dirt beats leaning on a fencepost.
+        let asleep_rough = *activity == Activity::Sleeping && !asleep_indoors;
         let dozing_by_fire = night && matches!(activity, Activity::Idle | Activity::Wandering);
 
         if asleep_indoors {
             needs.rest = (needs.rest - dt / 55.0).max(0.0);
+        } else if asleep_rough {
+            needs.rest = (needs.rest - dt / 90.0).max(0.0);
         } else if dozing_by_fire {
             needs.rest = (needs.rest - dt / 130.0).max(0.0);
         } else {

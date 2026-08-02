@@ -438,7 +438,12 @@ pub(crate) fn morning_muster(
         // every morning for a hair's advantage never gets good at
         // anything.
         let score =
-            |v: Vocation, left: f32| left * (0.55 + craft(v)) * if v == held { 1.35 } else { 1.0 };
+            // The thumb on the scale for the trade already held. At 1.35
+            // the muster reshuffled half the village every morning - the
+            // wants shift a little daily, and a hair's advantage kept
+            // outweighing the trade in hand - so nobody was ever a
+            // second-day anything and no skill accrued.
+            |v: Vocation, left: f32| left * (0.55 + craft(v)) * if v == held { 1.9 } else { 1.0 };
         let best = wanted
             .iter()
             .filter(|(_, left)| *left > 0.0)
