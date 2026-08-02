@@ -24,7 +24,11 @@ use std::io::{BufRead, Write};
 pub fn run() {
     let mut voice = Corpus::load();
     let mut dice = Rng::new(0x0_1CE);
-    println!("the voice bench - {} lines", voice.len());
+    println!(
+        "the voice bench - {} lines, {} utterances",
+        voice.len(),
+        voice.utterances()
+    );
     println!("type tags to hear a line, `help` for the rest, `quit` to go");
 
     let stdin = std::io::stdin();
@@ -146,7 +150,12 @@ fn audit(voice: &Corpus) {
             *by_tag.entry(tag.as_str()).or_default() += 1;
         }
     }
-    println!("  {} lines, {} distinct tags", lines.len(), by_tag.len());
+    println!(
+        "  {} authored lines -> {} utterances, {} distinct tags",
+        lines.len(),
+        voice.utterances(),
+        by_tag.len()
+    );
 
     // A pool is only reachable if some line needs NOTHING beyond the
     // role and the subject: anything narrower is a bonus, not a floor.

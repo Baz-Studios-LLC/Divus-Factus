@@ -38,6 +38,59 @@ fn one() -> f32 {
     1.0
 }
 
+/// Picks one option from every `{this|or this|or this}` in a line.
+///
+/// One authored shape becomes as many utterances as its choices
+/// multiply out to - "the {good bushes|near patches} are {picked
+/// over|nearly bare}" is four - which is the cheapest way there is to
+/// buy variety without writing four lines.
+///
+/// Deliberately NOT a grammar. The unit an author approves is still a
+/// whole sentence: swapping two nouns cannot change what a line means,
+/// where a rule that assembles clauses can, and does, and only shows you
+/// on the day a farmer says something eerie about the sky.
+///
+/// A brace with no `|` in it is a slot - `{whom}` - and is left alone.
+fn choose_among(line: &str, rng: &mut Rng) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut rest = line;
+    while let Some(open) = rest.find('{') {
+        let Some(close) = rest[open..].find('}').map(|end| open + end) else {
+            break;
+        };
+        let inside = &rest[open + 1..close];
+        out.push_str(&rest[..open]);
+        if inside.contains('|') {
+            let options: Vec<&str> = inside.split('|').collect();
+            out.push_str(options[rng.next_u32() as usize % options.len()]);
+        } else {
+            // A slot. Left whole for the caller to fill.
+            out.push_str(&rest[open..=close]);
+        }
+        rest = &rest[close + 1..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// How many utterances one line can make. Used by the voice bench, and
+/// by the test below that keeps the two functions honest with each other.
+fn ways_to_say(line: &str) -> usize {
+    let mut ways = 1;
+    let mut rest = line;
+    while let Some(open) = rest.find('{') {
+        let Some(close) = rest[open..].find('}').map(|end| open + end) else {
+            break;
+        };
+        let inside = &rest[open + 1..close];
+        if inside.contains('|') {
+            ways *= inside.split('|').count();
+        }
+        rest = &rest[close + 1..];
+    }
+    ways
+}
+
 /// The corpus, plus the world's memory of what has been said in it.
 #[derive(Default)]
 pub struct Corpus {
@@ -176,7 +229,7 @@ impl Corpus {
             *self.wanting.entry(moment.join(" ")).or_default() += 1;
         }
         let (_, line, id) = best?;
-        let mut words = line.t.clone();
+        let mut words = choose_among(&line.t, rng);
         for (key, value) in slots {
             words = words.replace(&format!("{{{key}}}"), value);
         }
@@ -187,6 +240,13 @@ impl Corpus {
             ring.remove(0);
         }
         Some(words)
+    }
+
+    /// How many different utterances the corpus can actually produce,
+    /// counting every way each line's alternations can fall. The line
+    /// count undersells a corpus that uses them.
+    pub fn utterances(&self) -> usize {
+        self.lines.iter().map(|line| ways_to_say(&line.t)).sum()
     }
 
     /// Writes the want-list where the maker will trip over it: every
