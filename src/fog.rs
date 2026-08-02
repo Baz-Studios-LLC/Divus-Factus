@@ -50,7 +50,7 @@ const VEIL_HIGH: f32 = 12.0;
 /// twelve metres of hiding, so the sea gets a single sheet carrying the
 /// whole weight, and the only line it can draw is the waterline itself -
 /// where the land's own veil takes over anyway.
-const SEA_SHEET: f32 = 0.12;
+const SEA_SHEET: f32 = 0.35;
 
 /// Whether the veil is up. It is, from the first frame: the world a
 /// village has actually walked is the world the game is about, and the
@@ -125,6 +125,19 @@ impl Material for FogMaterial {
 
     fn alpha_mode(&self) -> AlphaMode {
         AlphaMode::Blend
+    }
+
+    /// The veil is drawn LAST of the see-through things, always.
+    ///
+    /// Blended meshes are sorted by how far their origins sit from the
+    /// camera, and the sea's veil hangs a hand's breadth over a sea whose
+    /// origin is the world's. Two origins that close sort by rounding
+    /// error: turn the camera and the order flipped, and the water came
+    /// out on top of the fog that was supposed to be hiding it. A bias
+    /// this large is not a nudge, it is a statement - nothing transparent
+    /// in this world is ever meant to be in front of the veil.
+    fn depth_bias(&self) -> f32 {
+        10_000.0
     }
 }
 
