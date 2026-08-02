@@ -1099,6 +1099,43 @@ fn raise_gable(
 /// Raises the visible stage of a building under construction, shaped and
 /// coloured by its blueprint. Each stage spawns geometry as children of the
 /// site, so the building accretes in place — and no two need look alike.
+/// Something the god is pulling up out of the ground, and how far it has
+/// come. Not saved: whatever was rising when the world was put down has
+/// long since arrived.
+#[derive(Component)]
+pub struct OutOfTheEarth {
+    /// The height it started buried at, and the one it is coming to.
+    pub from: f32,
+    pub to: f32,
+    /// 0 still buried, 1 standing.
+    pub risen: f32,
+}
+
+/// Seconds for the earth to give something up.
+const RISES_OVER: f32 = 3.2;
+
+/// The rising itself, eased so it slows as it arrives rather than
+/// stopping dead.
+pub(crate) fn rise_out_of_the_earth(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut rising: Query<(Entity, &mut Transform, &mut OutOfTheEarth)>,
+) {
+    for (entity, mut at, mut coming) in &mut rising {
+        coming.risen = (coming.risen + time.delta_secs() / RISES_OVER).min(1.0);
+        // Slow in, slow out: heavy at the start, settling at the end.
+        // Interpolated from the REMEMBERED depth rather than from where
+        // it happens to be this frame, or the easing reads its own
+        // output and the whole rise drifts.
+        let eased = coming.risen * coming.risen * (3.0 - 2.0 * coming.risen);
+        at.translation.y = coming.from + (coming.to - coming.from) * eased;
+        if coming.risen >= 1.0 {
+            at.translation.y = coming.to;
+            commands.entity(entity).remove::<OutOfTheEarth>();
+        }
+    }
+}
+
 /// Raises a building whole, in one breath, on ground nobody worked for
 /// it — the god's own doing rather than a village's.
 ///
@@ -1145,12 +1182,17 @@ pub(crate) fn raise_the_founding_hall(
         // Facing the square it stands beside.
         .map(|(at, angle)| (at, angle + std::f32::consts::PI))?;
 
+    // How deep it starts. The whole building is set below the ground and
+    // comes up out of it, so what the player sees is the earth giving up
+    // a hall rather than one blinking into existence.
+    let buried = plan.wall_h * 2.4 + 4.0;
     let hall = commands
         .spawn((
             Name::new(BuildingKind::Longhouse.name()),
             crate::villager::MemberOf(settlement),
             plan.clone(),
-            Transform::from_translation(at).with_rotation(Quat::from_rotation_y(yaw)),
+            Transform::from_translation(at - Vec3::Y * buried)
+                .with_rotation(Quat::from_rotation_y(yaw)),
             Visibility::default(),
             crate::hand::PickRadius(reach + 0.9),
             crate::hand::Rooted,
@@ -1158,6 +1200,11 @@ pub(crate) fn raise_the_founding_hall(
                 kind: BuildingKind::Longhouse,
             },
             Longhouse,
+            OutOfTheEarth {
+                from: at.y - buried,
+                to: at.y,
+                risen: 0.0,
+            },
         ))
         .id();
     // Every stage at once: footing, frame, walls, roof.

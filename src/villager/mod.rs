@@ -154,6 +154,10 @@ impl Plugin for VillagerPlugin {
             // read it run whether or not there is a village.
             .init_resource::<explore::KnownWorld>()
             .add_systems(Startup, deal_the_dice)
+            // Its own registration rather than the chain above: that
+            // tuple is at Bevy's twenty-system ceiling, and the rising
+            // needs no ordering against any of it.
+            .add_systems(Update, work::rise_out_of_the_earth)
             .add_systems(
                 OnEnter(crate::GameState::Playing),
                 (spawn_settlement, point_camera_at_settlement).chain(),
@@ -1433,6 +1437,20 @@ pub(crate) fn spawn_settlement(
         )
     });
     let doorstep = doorstep.flatten();
+
+    // The light. It comes down BEFORE anything stands in it - that
+    // ordering is what makes the founding read as an act by someone
+    // rather than a building with a lamp on it.
+    if restoring.is_none() {
+        crate::miracles::spawn_glory(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            centre,
+            palette::shade(&palette::CLOTH_GOLD, 0.95),
+            true,
+        );
+    }
 
     let founders = if restoring.is_some() {
         0
