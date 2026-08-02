@@ -1,7 +1,6 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
+    5  (worn pool) chat:open topic:gatherer
     4  (worn pool) chat:end wavering
-    3  (worn pool) chat:open topic:gatherer
+    4  (worn pool) chat:reply topic:gatherer
     2  (worn pool) chat:reply topic:fisher
-    2  (worn pool) chat:reply topic:gatherer
-    1  (worn pool) chat:open topic:fisher

@@ -159,6 +159,10 @@ impl Plugin for VillagerPlugin {
             // needs no ordering against any of it.
             .add_systems(Update, work::rise_out_of_the_earth)
             .add_systems(
+                Update,
+                name_the_god.run_if(not(resource_exists::<DivineName>)),
+            )
+            .add_systems(
                 OnEnter(crate::GameState::Playing),
                 (spawn_settlement, point_camera_at_settlement).chain(),
             )
@@ -1384,19 +1388,16 @@ pub(crate) fn spawn_settlement(
         );
     }
 
-    // The god is named by its people, in their own tongue. The player never
-    // picks this: being named is the first thing belief does to you.
-    let divine_name = restoring
-        .as_ref()
-        .map(|r| r.god.clone())
-        .unwrap_or_else(|| language.name(&mut rng));
-    if restoring.is_none() {
-        info!("in {settlement_name} they name their god {divine_name}");
-        notices.write(crate::ui::Notice::fanfare(format!(
-            "In {settlement_name}, they name their god {divine_name}"
-        )));
+    // The god is named by its people, in their own tongue - the player
+    // never picks it, because being named is the first thing belief does
+    // to you. And it happens when they have SEEN something to name you
+    // for, not at the founding: a village that names a god on the
+    // morning it arrives has named it for nothing. See `name_the_god`.
+    //
+    // A restored world already knows what it calls you.
+    if let Some(known) = restoring.as_ref().map(|r| r.god.clone()) {
+        commands.insert_resource(DivineName(known));
     }
-    commands.insert_resource(DivineName(divine_name));
 
     // The square itself, raised by the same code that raises a colony's:
     // banner, fire, woodpile, stone pile, food sacks.
@@ -1591,6 +1592,59 @@ pub(crate) fn spawn_settlement(
     });
     commands.insert_resource(site);
     commands.insert_resource(SettlementCulture { language });
+}
+
+/// The first person to read a hand into what they saw gives it a name.
+///
+/// Every read of `DivineName` already took an `Option` and fell back to
+/// "the god", so a nameless god costs nothing and always did - it was
+/// simply never absent, because the founding handed one out before
+/// anybody had witnessed anything at all.
+///
+/// A skeptic's memory does not count. The verdict is rolled per witness
+/// and per act (`Memory::divine`), and somebody who decided it was the
+/// weather has not met a god to name.
+pub(crate) fn name_the_god(
+    mut commands: Commands,
+    clock: Res<crate::calendar::WorldClock>,
+    culture: Option<Res<SettlementCulture>>,
+    world_seed: Res<crate::WorldSeed>,
+    mut notices: MessageWriter<crate::ui::Notice>,
+    settlements: Query<&Settlement>,
+    mut believers: Query<(&Person, &crate::witness::Witnessed, Option<&mut Chronicle>)>,
+) {
+    let Some(culture) = culture else {
+        return;
+    };
+    let Some((person, chronicle)) = believers.iter_mut().find_map(|(who, seen, chronicle)| {
+        seen.recent
+            .iter()
+            .any(|memory| memory.divine)
+            .then_some((who, chronicle))
+    }) else {
+        return;
+    };
+    let mut rng = Rng::stream(world_seed.0 as u64, "divine name");
+    let named = culture.language.name(&mut rng);
+    let home = settlements
+        .iter()
+        .next()
+        .map(|s| s.name.clone())
+        .unwrap_or_default();
+    info!(
+        "{} saw the hand of something, and in {home} they name it {named}",
+        person.name
+    );
+    notices.write(crate::ui::Notice::fanfare(format!(
+        "In {home}, they name their god {named}"
+    )));
+    if let Some(mut chronicle) = chronicle {
+        chronicle.record(
+            clock.day(),
+            format!("was the first to name the god {named}"),
+        );
+    }
+    commands.insert_resource(DivineName(named));
 }
 
 /// The simulation's dice, from the first frame of the world.
@@ -2853,6 +2907,69 @@ mod tests {
             elapsed += dt;
         }
         assert!((elapsed - SECONDS_TO_STARVE).abs() < 1.0, "took {elapsed}s");
+    }
+
+    /// A world with one villager in it, who has seen what the test says
+    /// they have seen.
+    fn a_witness(divine: bool) -> App {
+        let mut app = App::new();
+        app.insert_resource(crate::calendar::WorldClock::default());
+        app.insert_resource(crate::WorldSeed(9));
+        app.insert_resource(SettlementCulture {
+            language: names::Language::random(&mut Rng::new(4)),
+        });
+        app.add_message::<crate::ui::Notice>();
+        app.world_mut().spawn(Settlement {
+            name: "Lavu".into(),
+            founded: 1,
+            banner_ramp: 0,
+            sigil: 0,
+        });
+        app.world_mut().spawn((
+            Person::born("Temewa".into(), "Kirap".into()),
+            crate::witness::Witnessed {
+                recent: vec![crate::witness::Memory {
+                    kind: crate::witness::DivineEventKind::Smote,
+                    whom: None,
+                    divine,
+                    day: 1,
+                }],
+                total: 1,
+                secondhand: 0,
+                told: 0,
+            },
+            Chronicle::default(),
+        ));
+        app.add_systems(Update, name_the_god);
+        app
+    }
+
+    #[test]
+    fn the_god_is_named_by_whoever_first_reads_a_hand_into_it() {
+        let mut app = a_witness(true);
+        assert!(
+            app.world().get_resource::<DivineName>().is_none(),
+            "named before anybody had seen anything"
+        );
+        app.update();
+        let named = app
+            .world()
+            .get_resource::<DivineName>()
+            .expect("somebody who believed what they saw should have named it");
+        assert!(!named.0.is_empty());
+    }
+
+    #[test]
+    fn a_skeptic_names_nothing() {
+        // The verdict is rolled per witness and per act. Somebody who
+        // decided it was the weather has not met a god to name, however
+        // much they saw.
+        let mut app = a_witness(false);
+        app.update();
+        assert!(
+            app.world().get_resource::<DivineName>().is_none(),
+            "a skeptic named a god they do not believe in"
+        );
     }
 
     #[test]
