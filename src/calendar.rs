@@ -78,7 +78,7 @@ impl Season {
             Season::Spring => 0.05,
             Season::Summer => -0.08,
             Season::Autumn => 0.08,
-            Season::Winter => 0.18,
+            Season::Winter => 0.14,
         }
     }
 

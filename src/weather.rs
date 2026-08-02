@@ -126,6 +126,21 @@ fn progress_fronts(
     // The calendar's cold rides along even between fronts.
     weather.chill = clock.season().chill();
     if clock.elapsed >= weather.next_front {
+        // The world opens fair. A god's first sight of it should not be
+        // through rain, and a village with twelve hands and no roof has
+        // enough to be going on with on its first morning. The first
+        // front waits for the second day - unless a sky was asked for by
+        // name, which is what the override is FOR.
+        if clock.day() <= 1 && std::env::var("DIVUS_FACTUS_WEATHER").is_err() {
+            weather.target = 0.12;
+            weather.next_front = crate::calendar::DAY_SECONDS as f64;
+            weather.chill = clock.season().chill();
+            let dt = time.delta_secs();
+            weather.intensity += (weather.target - weather.intensity).clamp(-dt / 45.0, dt / 45.0);
+            let wind_target = 0.15 + weather.intensity * 0.85;
+            weather.wind += (wind_target - weather.wind) * (1.0 - (-dt * 0.5).exp());
+            return;
+        }
         // Clear-ish weather is the ordinary day; storms are events. An
         // override for photographing and testing particular skies.
         weather.target = match std::env::var("DIVUS_FACTUS_WEATHER").as_deref() {
@@ -133,20 +148,31 @@ fn progress_fronts(
             Ok("rain") => 0.7,
             Ok("storm") => 1.0,
             _ => {
-                // Fair weather is the ordinary day and rain is an event.
-                // A front that crosses the rain line (0.6) used to come up
-                // one time in four, which over a season of two-hundred
-                // second fronts reads as a wet country rather than a
-                // village with weather.
+                // Weighted against a real place: New City, New York, in
+                // the lower Hudson valley - about fifty inches of rain a
+                // year spread over a hundred and twenty-odd wet days. A
+                // third of days see rain; only about a tenth of HOURS do.
+                //
+                // A day here is six hundred seconds and a front runs two
+                // to five of its hours, so roughly three fronts fall in a
+                // day. Twelve wet fronts in a hundred therefore puts rain
+                // in one day out of three - 1 - 0.88 cubed - while the
+                // sky stays fair round nine hours in ten. Both numbers
+                // land on the real ones, which is as close as a dice roll
+                // gets to a climate.
                 let roll = rng.f32();
-                let base = if roll < 0.62 {
-                    rng.range(0.05, 0.3)
-                } else if roll < 0.87 {
-                    rng.range(0.3, 0.55)
+                // The grey band stops short of the rain line on purpose:
+                // the season's thumb pushes it up, and a winter overcast
+                // should stay an overcast rather than tipping into a
+                // downpour because it is January.
+                let base = if roll < 0.70 {
+                    rng.range(0.02, 0.24)
+                } else if roll < 0.88 {
+                    rng.range(0.24, 0.36)
                 } else if roll < 0.97 {
-                    rng.range(0.55, 0.8)
+                    rng.range(0.52, 0.72)
                 } else {
-                    rng.range(0.8, 1.0)
+                    rng.range(0.72, 1.0)
                 };
                 // The season's thumb on the dice: winters run grey and
                 // stormy, summers clear.
