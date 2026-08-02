@@ -468,9 +468,40 @@ fn apply_camera_smoothing(time: Res<Time>, mut rigs: Query<&mut CameraRig>) {
     rig.yaw += yaw_delta * t;
 }
 
-fn write_camera_transform(mut cameras: Query<(&CameraRig, &mut Transform), With<GodCamera>>) {
+/// How far the eye keeps off the ground at full standoff, in metres. The
+/// clearance tapers to nothing at the focus, which is ON the ground and is
+/// supposed to be.
+const EYE_CLEARANCE: f32 = 1.2;
+
+fn write_camera_transform(
+    terrain: Option<Res<Terrain>>,
+    mut cameras: Query<(&CameraRig, &mut Transform), With<GodCamera>>,
+) {
     for (rig, mut transform) in &mut cameras {
-        *transform = Transform::from_translation(rig.eye()).looking_at(rig.focus, Vec3::Y);
+        let mut eye = rig.eye();
+        // The focus rides the ground, but the EYE swings out behind it -
+        // and on a hillside that put it under the slope. Orbiting buried
+        // the camera in the hill it was looking across.
+        //
+        // The whole line from focus to eye has to clear the land, not
+        // just the eye's own footing: a ridge between the two is just as
+        // solid. Each sample says how high the eye would have to be for
+        // the sightline to pass over THAT point, and the eye takes the
+        // highest answer. Lifting rather than pushing back keeps the
+        // framing: the camera cranes up over the brow instead of
+        // retreating from it.
+        if let Some(terrain) = &terrain {
+            let mut lift = eye.y;
+            for step in 1..=10 {
+                let t = step as f32 / 10.0;
+                let along = rig.focus.lerp(eye, t);
+                let ground =
+                    terrain.height_at(along.x, along.z).max(WATER_LEVEL) + EYE_CLEARANCE * t;
+                lift = lift.max(rig.focus.y + (ground - rig.focus.y) / t);
+            }
+            eye.y = lift;
+        }
+        *transform = Transform::from_translation(eye).looking_at(rig.focus, Vec3::Y);
     }
 }
 
