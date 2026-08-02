@@ -29,6 +29,7 @@ pub enum Trait {
 }
 
 impl Trait {
+    #[allow(dead_code)] // spoke in the LLM prompts; the corpus may want it back
     pub fn word(self) -> &'static str {
         match self {
             Trait::Diligent => "diligent",
@@ -75,6 +76,7 @@ impl Bearing {
     /// How the teller is told about it. `None` for a manner that changes
     /// nothing, so the plainly-spoken get a shorter prompt rather than a line
     /// telling the model to ignore something.
+    #[allow(dead_code)] // spoke in the LLM prompts; the corpus may want it back as a tag
     pub fn word(self) -> Option<&'static str> {
         match self {
             Bearing::Terse => Some("says as little as will do"),

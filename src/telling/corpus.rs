@@ -193,6 +193,7 @@ impl Corpus {
     /// moment the corpus had nothing worthy to say, worst offenders
     /// first, ready to be turned into lines. Truthful accounting beats a
     /// tidy file, so it rewrites whole each time.
+    #[allow(dead_code)] // flushed on a slow timer once wired
     pub fn write_wanting(&self) {
         if self.wanting.is_empty() {
             return;
@@ -212,13 +213,20 @@ impl Corpus {
         );
     }
 
+    /// How many lines the book holds.
+    pub fn len(&self) -> usize {
+        self.lines.len()
+    }
+
     /// The hearing ledger, for the save file.
+    #[allow(dead_code)] // the save file's, once the ledger is wired in
     pub fn export_heard(&self) -> Vec<(u64, u32)> {
         self.heard.iter().map(|(id, n)| (*id, *n)).collect()
     }
 
     /// Restores the ledger from a save, so `once` means once per world
     /// and not once per sitting.
+    #[allow(dead_code)] // likewise
     pub fn import_heard(&mut self, heard: &[(u64, u32)]) {
         self.heard = heard.iter().copied().collect();
     }
