@@ -10,6 +10,7 @@ use bevy::prelude::*;
 use bevy::text::FontSize;
 
 use crate::creature::{Childhood, Corpse};
+use crate::villager::gossip::Conversing;
 use crate::villager::work::Vocation;
 use crate::villager::{Activity, Person, Villager};
 
@@ -74,7 +75,7 @@ fn toggle_labels(
 }
 
 /// What a person is at, in the fewest words that still tell the truth.
-fn doing_of(activity: &Activity, vocation: Option<&Vocation>) -> String {
+fn doing_of(activity: &Activity, vocation: Option<&Vocation>, talk: Option<&Conversing>) -> String {
     let work = vocation.map(|v| v.describe()).unwrap_or("no trade");
     match activity {
         Activity::Idle => "idle".to_string(),
@@ -87,7 +88,14 @@ fn doing_of(activity: &Activity, vocation: Option<&Vocation>) -> String {
         Activity::Praying => "praying".to_string(),
         Activity::Sheltering => "sheltering".to_string(),
         Activity::TendingFire => "tending the fire".to_string(),
-        Activity::Chatting => "talking".to_string(),
+        // Most of a conversation is the walk to it: two people who have
+        // agreed to speak can be a dozen strides apart and still be
+        // Chatting. Saying "talking" over both of them is a lie the label
+        // was telling all by itself.
+        Activity::Chatting => match talk {
+            Some(talk) if talk.spoke_at.is_some() => "talking".to_string(),
+            _ => "off to talk".to_string(),
+        },
         Activity::Mourning => "mourning".to_string(),
         Activity::Hauling => format!("hauling - {work}"),
         Activity::Bearing => "bearing the dead".to_string(),
@@ -117,6 +125,7 @@ fn tend_labels(
             &Activity,
             Option<&Vocation>,
             Has<Childhood>,
+            Option<&Conversing>,
         ),
         (With<Villager>, With<Person>, Without<Corpse>),
     >,
@@ -144,15 +153,18 @@ fn tend_labels(
         Labels::Trades => crate::palette::shade(&crate::palette::CLOTH_GOLD, 0.92),
         _ => crate::palette::shade(&crate::palette::BONE, 0.97),
     };
-    let say = |activity: &Activity, vocation: Option<&Vocation>, child: bool| match *mode {
+    let say = |activity: &Activity,
+               vocation: Option<&Vocation>,
+               child: bool,
+               talk: Option<&Conversing>| match *mode {
         Labels::Trades => trade_of(vocation, child),
-        _ => doing_of(activity, vocation),
+        _ => doing_of(activity, vocation, talk),
     };
 
     // Everyone who already wears a label.
     let mut worn: std::collections::HashSet<Entity> = std::collections::HashSet::new();
     for (label, doing, mut node, mut visibility, children) in &mut labels {
-        let Ok((_, at, activity, vocation, child)) = folk.get(doing.0) else {
+        let Ok((_, at, activity, vocation, child, talk)) = folk.get(doing.0) else {
             commands.entity(label).despawn();
             continue;
         };
@@ -160,7 +172,7 @@ fn tend_labels(
         if let Some(&pill) = children.first()
             && let Ok((mut text, mut colour)) = words.get_mut(pill)
         {
-            let word = say(activity, vocation, child);
+            let word = say(activity, vocation, child, talk);
             if text.0 != word {
                 *text = Text::new(word);
             }
@@ -182,7 +194,7 @@ fn tend_labels(
         }
     }
 
-    for (who, _, activity, vocation, child) in &folk {
+    for (who, _, activity, vocation, child, talk) in &folk {
         if worn.contains(&who) {
             continue;
         }
@@ -203,7 +215,7 @@ fn tend_labels(
             .id();
         commands.spawn((
             (
-                Text::new(say(activity, vocation, child)),
+                Text::new(say(activity, vocation, child, talk)),
                 TextFont {
                     font: fonts.text.clone().into(),
                     font_size: FontSize::Px(11.0),

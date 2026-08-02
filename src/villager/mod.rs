@@ -16,7 +16,7 @@ mod speech;
 pub mod traits;
 pub mod work;
 
-mod gossip;
+pub mod gossip;
 pub mod kin;
 pub(crate) use gossip::*;
 
