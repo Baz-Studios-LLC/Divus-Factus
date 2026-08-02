@@ -11,8 +11,7 @@
   {"t": "people see what they want to see. no offense", "tags": ["reply", "doubting"]},
   {"t": "or it's weather, and we're all scaring ourselves over weather", "tags": ["reply", "doubting"]},
   {"t": "come on. you really believe that?", "tags": ["reply", "doubting"]},
-  {"t": "let's talk about something happier, can we?", "tags": ["reply", "hungry"]},
-  {"t": "can't think about signs and wonders on an empty stomach", "tags": ["reply", "hungry"]},
+  {"t": "let's talk about something happier, can we?", "tags": ["reply"]},
   {"t": "yeah, I heard that too", "tags": ["reply"]},
   {"t": "I don't like the sound of that", "tags": ["reply"]},
   {"t": "that's not the kind of story you forget", "tags": ["reply"]},
@@ -27,10 +26,10 @@
   {"t": "we should be thankful, even if we're scared", "tags": ["reply", "devout"]},
   {"t": "or people are scared and making the story bigger", "tags": ["reply", "doubting"]},
   {"t": "I believe that something happened. that's as far as I'll go", "tags": ["reply", "doubting"]},
-  {"t": "people love a miracle when they don't have an answer", "tags": ["reply", "doubting"]},
+  {"t": "everyone's very sure about this and nobody was actually there", "tags": ["reply", "doubting"]},
   {"t": "if it keeps happening, somebody should write it down", "tags": ["reply", "trade:priest"]},
   {"t": "that's why we need someone watching the edge", "tags": ["reply", "trade:guard"]},
-  {"t": "I can patch a wound. I can't patch fear", "tags": ["reply", "trade:healer"]},
+  {"t": "they don't want a bandage, they want me to tell them it's over. I can't do that one", "tags": ["reply", "trade:healer"]},
   {"t": "if this affects the stores, I need to know now", "tags": ["reply", "trade:cook"]},
   {"t": "roads will be harder if everyone is scared", "tags": ["reply", "trade:explorer"]}
 ]
