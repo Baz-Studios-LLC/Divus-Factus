@@ -119,22 +119,41 @@ fn exchange(voice: &mut Corpus, dice: &mut Rng, topic: &str, speaker: &mut u64) 
         *speaker = speaker.wrapping_add(1);
         *speaker
     };
-    let beats = [
-        ("A", a, "chat:open"),
-        ("B", b, "chat:reply"),
-        ("A", a, "chat:followup"),
-        ("B", b, "chat:end"),
-    ];
+    // A conversation about something one of them SAW opens with the
+    // telling and is answered with a reply; only ordinary talk opens
+    // with `chat:open`. Getting this wrong made the bench print "not
+    // stopping, just saying hello" as the opening line of an account of
+    // a mauling, which is exactly the kind of lie a bench must not tell.
+    let told = topic.starts_with("event:");
+    let beats: [(&str, u64, &str, &[&str]); 4] = if told {
+        [
+            ("A", a, "tell", &["tell", "saw"]),
+            ("B", b, "reply", &["reply"]),
+            ("A", a, "chat:followup", &["chat:followup", "told"]),
+            ("B", b, "chat:end", &["chat:end"]),
+        ]
+    } else {
+        [
+            ("A", a, "chat:open", &["chat:open"]),
+            ("B", b, "chat:reply", &["chat:reply"]),
+            ("A", a, "chat:followup", &["chat:followup"]),
+            ("B", b, "chat:end", &["chat:end"]),
+        ]
+    };
     println!("  [{topic}]");
-    for (who, seed, role) in beats {
+    for (who, seed, role, base) in beats {
+        let mut on_topic: Vec<&str> = base.to_vec();
+        on_topic.push(topic);
         let said = voice
-            .pick(seed, &[role, topic], &SLOTS, dice)
+            .pick(seed, &on_topic, &SLOTS, dice)
             // A beat with nothing on topic falls back to the role alone,
-            // exactly as the game does.
-            .or_else(|| voice.pick(seed, &[role], &SLOTS, dice));
+            // exactly as the game does. A telling has no such fallback -
+            // it either has words for that act or the written phrasing
+            // answers instead, which is not the corpus's business.
+            .or_else(|| voice.pick(seed, base, &SLOTS, dice));
         match said {
             Some(said) => println!("  {who}: {said}"),
-            None => println!("  {who}: ...  ({role} has nothing at all)"),
+            None => println!("  {who}: ...  ({role} has nothing for this)"),
         }
     }
 }
