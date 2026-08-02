@@ -84,9 +84,15 @@ impl Plugin for FogPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(MaterialPlugin::<FogMaterial>::default())
             .init_resource::<FogMode>()
+            // Only over a world that has a village in it. While the god
+            // is still choosing where to plant the flag there is nothing
+            // known and nothing to hide - and a player cannot pick
+            // ground they are not allowed to look at.
             .add_systems(
                 Update,
-                (toggle_fog, drape_the_veil, follow_the_known).chain(),
+                (toggle_fog, drape_the_veil, follow_the_known)
+                    .chain()
+                    .run_if(in_state(crate::GameState::Playing)),
             );
     }
 }

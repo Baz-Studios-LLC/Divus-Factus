@@ -149,6 +149,7 @@ fn finish_when_world_is_built(
     time: Res<Time<Real>>,
     started: Option<Res<LoadingStarted>>,
     chunks: Option<Res<LoadedChunks>>,
+    restoring: Option<Res<crate::villager::RestoringSeed>>,
     mut next: ResMut<NextState<GameState>>,
 ) {
     let elapsed = started.map_or(0.0, |s| time.elapsed_secs() - s.0);
@@ -157,7 +158,13 @@ fn finish_when_world_is_built(
     }
 
     if chunks.is_some_and(|c| c.is_complete()) {
-        next.set(GameState::Playing);
+        // A restored world already knows where it stands; a new one is
+        // handed to the player with a flag and no village in it.
+        next.set(if restoring.is_some() {
+            GameState::Playing
+        } else {
+            GameState::Choosing
+        });
     }
 }
 

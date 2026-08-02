@@ -756,24 +756,28 @@ fn begin_descent(
     site: Option<&crate::villager::SettlementSite>,
     next: &mut NextState<GameState>,
 ) {
-    // Nowhere to descend TO yet, so do not leave. The founding lands a moment
-    // after the terrain does, and pressing on through that gap used to drop the
-    // player into a playing world with the camera still up at the title
-    // vantage — the village a thousand units below, no dive queued, and nothing
-    // that would ever queue one, since the opening framing is a PostStartup
-    // pass that has long since run. The whole session then looked like a world
-    // that had simply forgotten to zoom in.
+    // Where the dive lands. A RESTORED world descends onto its own
+    // village; a new one has none to descend to - the god has not chosen
+    // the ground yet - so it comes down over the middle of the map with
+    // the flag in hand.
     //
-    // The caller retries, so waiting costs a frame rather than the press.
-    let Some(site) = site else {
-        return;
-    };
+    // This used to refuse to leave the title at all without a settlement,
+    // which was right while the founding happened at startup: the dive
+    // would otherwise drop the player into a playing world with the
+    // camera still at the title vantage, the village a thousand units
+    // below and nothing left that would ever queue a dive. Now an absent
+    // village is the ordinary case rather than a gap to wait out.
+    let landing = site.map_or(Vec3::ZERO, |site| site.centre);
     if chunks.is_some_and(|c| c.is_complete()) {
-        next.set(GameState::Playing);
+        next.set(if site.is_some() {
+            GameState::Playing
+        } else {
+            GameState::Choosing
+        });
     } else {
         next.set(GameState::Loading);
     }
-    commands.insert_resource(crate::camera::CameraDive::descend_to(site.centre));
+    commands.insert_resource(crate::camera::CameraDive::descend_to(landing));
 }
 
 /// Capture tooling: DIVUS_FACTUS_AUTOBEGIN=seconds presses Begin unattended, so

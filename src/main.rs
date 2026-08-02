@@ -8,6 +8,7 @@ mod creature;
 mod debug;
 mod doings;
 mod fog;
+mod founding;
 mod grass;
 mod hand;
 mod keymap;
@@ -76,6 +77,12 @@ pub enum GameState {
     /// The front door.
     Title,
     Loading,
+    /// The world, empty, and a flag in the god's hand. Nothing has been
+    /// founded yet — the player is looking for ground to found it on.
+    /// Every instrument is still locked here, because they are all gated
+    /// on `Playing`: there is no chronicle to read and no village to
+    /// survey until somebody plants the flag.
+    Choosing,
     Playing,
 }
 
@@ -175,6 +182,7 @@ fn main() {
             keymap::KeymapPlugin,
             music::MusicPlugin,
             doings::DoingsPlugin,
+            founding::FoundingPlugin,
             fog::FogPlugin,
         ))
         .add_systems(Startup, spawn_lighting)

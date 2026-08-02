@@ -146,11 +146,18 @@ impl Plugin for VillagerPlugin {
             .init_resource::<belief::Belief>()
             .init_resource::<belief::FaithHistory>()
             .init_resource::<belief::Legend>()
+            // The village is founded when the flag goes in, not when the
+            // program starts. A world with nobody in it is the opening.
+            .init_resource::<ChosenGround>()
+            // Known ground exists from the first frame, empty. It is the
+            // village's own once one is founded, but the systems that
+            // read it run whether or not there is a village.
+            .init_resource::<explore::KnownWorld>()
+            .add_systems(Startup, deal_the_dice)
             .add_systems(
-                Startup,
-                spawn_settlement.after(crate::creature::body::init_creature_assets),
+                OnEnter(crate::GameState::Playing),
+                (spawn_settlement, point_camera_at_settlement).chain(),
             )
-            .add_systems(PostStartup, point_camera_at_settlement)
             .add_systems(
                 Update,
                 (
@@ -645,6 +652,56 @@ const SETTLEMENT_SEARCH_RADIUS: f32 = 900.0;
 /// Scores one patch of ground as a place to raise a town, or rejects it.
 ///
 /// Shared by the world's first settlement and by every colony founded after
+/// How much of the ground a village would stand on is dry, level and
+/// buildable: twelve spokes out to the far edge of the building rings.
+/// 1.0 is a parade ground, 0.0 is a cliff or open water.
+fn level_room(terrain: &Terrain, x: f32, z: f32) -> f32 {
+    let mut buildable = 0;
+    let mut samples = 0;
+    for angle_step in 0..12 {
+        let angle = angle_step as f32 / 12.0 * std::f32::consts::TAU;
+        for distance in [6.0, 12.0, 18.0, 24.0, 30.0, 36.0] {
+            let sx = x + angle.cos() * distance;
+            let sz = z + angle.sin() * distance;
+            samples += 1;
+            if terrain.is_walkable(sx, sz) && terrain.height_at(sx, sz) > WATER_LEVEL + 2.0 {
+                buildable += 1;
+            }
+        }
+    }
+    buildable as f32 / samples as f32
+}
+
+/// Why this ground will not take a village, or `None` if it will.
+///
+/// The one standard, used by the site search AND by the flag in the
+/// god's hand — a player must not be able to plant where the machine
+/// would have refused to. It says WHY, because "no" is not something a
+/// person can act on.
+pub fn will_take_a_village(terrain: &Terrain, x: f32, z: f32) -> Option<&'static str> {
+    if terrain.is_submerged(x, z) {
+        return Some("this is water");
+    }
+    if !terrain.is_walkable(x, z) {
+        return Some("too steep to stand a banner in");
+    }
+    let height = terrain.height_at(x, z);
+    if height < WATER_LEVEL + 3.0 {
+        // The banner itself stands well above the tide, always.
+        return Some("the tide would come up to it");
+    }
+    // And never on the mountain: summits are for mines, not banners.
+    // The founding fire belongs on low country, with the rock a walk
+    // away - not under the bedrolls.
+    if height > WATER_LEVEL + 30.0 {
+        return Some("too high up the mountain");
+    }
+    if level_room(terrain, x, z) < MIN_SETTLEMENT_LAND {
+        return Some("not enough level ground for a village");
+    }
+    None
+}
+
 /// it, so a daughter town is held to exactly the standards its parent was:
 /// dry, buildable, off the mountain, with timber and stone in a working walk.
 ///
@@ -655,55 +712,14 @@ fn score_town_ground(
     z: f32,
     coastal_yearning: f32,
 ) -> Option<(f32, Vec3, f32, f32)> {
-    if !terrain.is_walkable(x, z) {
+    // One standard for the searcher and for the god's own flag: whatever
+    // ground the machine would refuse, the player is refused too.
+    if will_take_a_village(terrain, x, z).is_some() {
         return None;
     }
-
     let height = terrain.height_at(x, z);
-    if height < WATER_LEVEL + 3.0 {
-        // The banner itself stands well above the tide, always.
-        return None;
-    }
-    // And never on the mountain: summits are for mines, not banners.
-    // The founding fire belongs on low country, with the rock a walk
-    // away — not under the bedrolls.
-    if height > WATER_LEVEL + 30.0 {
-        return None;
-    }
 
-    // Survey in two bands. The town band is where the building rings and
-    // the fields actually go — it must be dry, walkable ground, as a hard
-    // requirement: a beachfront banner leaves half the village standing
-    // in the sea waiting for plots that can never pass. The reach band is
-    // where the water should be — near enough to fish, far enough that
-    // no house drowns for it.
-    let mut buildable = 0;
-    let mut town_samples = 0;
-    let mut town_misses = 0;
-    'survey: for angle_step in 0..12 {
-        let angle = angle_step as f32 / 12.0 * std::f32::consts::TAU;
-        for distance in [6.0, 12.0, 18.0, 24.0, 30.0, 36.0] {
-            let sx = x + angle.cos() * distance;
-            let sz = z + angle.sin() * distance;
-            town_samples += 1;
-            if terrain.is_walkable(sx, sz) && terrain.height_at(sx, sz) > WATER_LEVEL + 2.0 {
-                buildable += 1;
-            } else {
-                town_misses += 1;
-                if town_misses > 18 {
-                    // Too wet or broken to ever pass; stop surveying.
-                    break 'survey;
-                }
-            }
-        }
-    }
-    if town_misses > 18 {
-        return None;
-    }
-    let buildable_fraction = buildable as f32 / town_samples as f32;
-    if buildable_fraction < MIN_SETTLEMENT_LAND {
-        return None;
-    }
+    let buildable_fraction = level_room(terrain, x, z);
 
     let mut reach_water = 0;
     let mut reach_samples = 0;
@@ -773,7 +789,7 @@ fn score_town_ground(
     Some((score, Vec3::new(x, height, z), timberland, stoneland))
 }
 
-fn choose_settlement_site(terrain: &Terrain, rng: &mut Rng) -> Vec3 {
+pub(crate) fn choose_settlement_site(terrain: &Terrain, rng: &mut Rng) -> Vec3 {
     let mut best: Option<(f32, Vec3, f32, f32)> = None;
     // How much this founding people care for the sea. Rolled per world:
     // some folk are fishers to the bone, some would rather farm a valley
@@ -1150,6 +1166,11 @@ pub(crate) fn raise_town_fixtures(
 /// generation at the start, or a party of colonists walking out of a crowded
 /// village mid-game.
 #[allow(clippy::too_many_arguments)]
+/// The ground the god chose with the flag. Empty until it is planted,
+/// and read once by `spawn_settlement` on the way into `Playing`.
+#[derive(Resource, Default)]
+pub struct ChosenGround(pub Option<Vec3>);
+
 pub(crate) fn found_settlement(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
@@ -1190,6 +1211,7 @@ pub(crate) fn spawn_settlement(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut notices: MessageWriter<crate::ui::Notice>,
     restoring: Option<Res<RestoringSeed>>,
+    chosen: Res<ChosenGround>,
 ) {
     let mut rng = Rng::stream(world_seed.0 as u64, "settlement");
 
@@ -1197,9 +1219,13 @@ pub(crate) fn spawn_settlement(
     // kept for life, so its children are named in it too.
     let language = names::Language::random(&mut Rng::stream(world_seed.0 as u64, "language"));
 
+    // Where the god put the flag. A restored world keeps its own ground,
+    // and a world that somehow arrived here unplanted falls back on the
+    // old search rather than founding nothing.
     let centre = restoring
         .as_ref()
         .map(|r| r.centre)
+        .or(chosen.0)
         .unwrap_or_else(|| choose_settlement_site(&terrain, &mut rng));
 
     // The place is named in the same tongue as its people, because the people
@@ -1473,6 +1499,16 @@ pub(crate) fn spawn_settlement(
     });
     commands.insert_resource(site);
     commands.insert_resource(SettlementCulture { language });
+}
+
+/// The simulation's dice, from the first frame of the world.
+///
+/// These used to be handed out by the founding, which was fine while the
+/// founding happened at startup. Now that the world opens empty and waits
+/// on a flag, every system that rolls anything would be reaching for dice
+/// that do not exist yet - and they are not the village's dice anyway,
+/// they are the world's.
+fn deal_the_dice(mut commands: Commands, world_seed: Res<crate::WorldSeed>) {
     commands.insert_resource(SimRng(Rng::stream(world_seed.0 as u64, "behaviour")));
 }
 
