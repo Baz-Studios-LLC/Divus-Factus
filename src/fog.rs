@@ -25,7 +25,7 @@ const SHADER_PATH: &str = "shaders/fog.wgsl";
 
 /// As many pockets as the shader's uniform holds. Explorers bring back far
 /// fewer than this; the oldest simply stop being drawn if they ever do not.
-const MAX_POCKETS: usize = 64;
+const MAX_POCKETS: usize = 128;
 
 /// How high the veil stands, and in how many sheets. The tallest tree in
 /// the world is a shade over eight metres, so a bank that reaches twelve
@@ -40,14 +40,17 @@ const MAX_POCKETS: usize = 64;
 const SHEETS: usize = 6;
 const VEIL_HIGH: f32 = 12.0;
 
-/// Whether the veil is up. `DIVUS_FACTUS_FOG=1` raises it at startup, for
-/// photographing the known world without reaching for the key.
+/// Whether the veil is up. It is, from the first frame: the world a
+/// village has actually walked is the world the game is about, and the
+/// rest of the map is scenery the player was never meant to be reading.
+/// `DIVUS_FACTUS_FOG=0` lifts it at startup, for photographing the whole
+/// world without reaching for the key.
 #[derive(Resource)]
 pub struct FogMode(pub bool);
 
 impl Default for FogMode {
     fn default() -> Self {
-        FogMode(std::env::var("DIVUS_FACTUS_FOG").is_ok_and(|dial| dial == "1"))
+        FogMode(!std::env::var("DIVUS_FACTUS_FOG").is_ok_and(|dial| dial == "0"))
     }
 }
 

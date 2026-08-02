@@ -669,6 +669,14 @@ pub struct Bed {
     pub double: bool,
 }
 
+/// The turn that lays a body down with its head pointing `head` - the one
+/// piece of arithmetic behind every sleeper in the world, in a bed or on
+/// the bare ground. A body tipped onto its back has its head along -Z, so
+/// the turn is read straight off the direction wanted.
+pub fn lie_toward(head: Vec3) -> f32 {
+    (-head.x).atan2(-head.z)
+}
+
 /// The turn a body takes to lie on a bed described the old way: which axis
 /// the bed's length runs on, and which end its pillow is at. The quarter is
 /// the other way from first instinct - a playtest photo of a sleeper lying

@@ -312,7 +312,7 @@ pub fn furnish_baked(commands: &mut Commands, site: Entity, work: &Baked) {
         // body's head points along -Z, so the turn that carries it to the
         // pillow is read straight off that direction.
         let head_way = Quat::from_rotation_y(mark.yaw) * Vec3::X;
-        let lie = (-head_way.x).atan2(-head_way.z);
+        let lie = super::buildings::lie_toward(head_way);
         commands.spawn((
             Bed { slot, lie, double },
             Transform::from_translation(at),

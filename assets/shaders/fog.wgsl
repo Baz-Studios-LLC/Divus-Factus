@@ -19,7 +19,7 @@ struct FogParams {
     // x how many pockets are live, y how many metres the edge takes to fade.
     dials: vec4<f32>,
     // xyz each pocket's centre, w its radius.
-    pockets: array<vec4<f32>, 64>,
+    pockets: array<vec4<f32>, 128>,
 }
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(0) var<uniform> fog: FogParams;

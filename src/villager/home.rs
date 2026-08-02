@@ -245,6 +245,24 @@ pub(super) fn assign_beds(
     }
 }
 
+/// Where to stand a body's ROOT so that the body itself lies centred on
+/// the place it was told to sleep.
+///
+/// A villager's root is between their feet: standing, everything is above
+/// it. Tip that body onto its back and it no longer reaches up from the
+/// root, it reaches out from it - head-first, a whole body's length. So a
+/// root left on the mark puts the sleeper's feet on the pillow and the
+/// rest of them off the end of the bed, which is what a playtest photo
+/// showed. Half a length back along the way the head points, and up by
+/// half the body's depth so their back rests on the mattress rather than
+/// inside it.
+fn laid_from(genome: &crate::creature::genome::CreatureGenome, facing: Quat) -> Vec3 {
+    // Where the head lies: the body's own up, once it has been tipped.
+    let head = facing * Vec3::Y;
+    let flat = Vec3::new(head.x, 0.0, head.z).normalize_or(Vec3::X);
+    -flat * (genome.height() * 0.5) + Vec3::Y * (genome.thickness() * 0.5)
+}
+
 /// Holds sleepers to their mattresses — and is the ONE authority on
 /// rising. Daybreak frees every held sleeper regardless of what some
 /// other system set their activity to overnight; the first version only
@@ -915,6 +933,7 @@ pub(super) fn night_routine(
             &Transform,
             Option<&Home>,
             Option<&BedSlot>,
+            &crate::creature::genome::CreatureGenome,
             &Needs,
             &mut Activity,
             &mut MoveTarget,
@@ -945,7 +964,7 @@ pub(super) fn night_routine(
             })
     };
 
-    for (entity, transform, home, berth, needs, mut activity, mut target, mut motion) in
+    for (entity, transform, home, berth, genome, needs, mut activity, mut target, mut motion) in
         &mut villagers
     {
         if !night {
@@ -1022,25 +1041,43 @@ pub(super) fn night_routine(
                         * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
                     info!("a sleeper settles into their bed");
                     commands.entity(entity).insert(Abed {
-                        at: bed_at + Vec3::Y * 0.34,
+                        at: bed_at + laid_from(genome, facing),
                         facing,
                     });
                 }
             }
             None => {
-                // No roof: keep to the firelight.
+                // No roof: the firelight, and then the ground. They used
+                // to stand there all night, which is not what anybody
+                // does at a fire at three in the morning - and it made
+                // the roofless look content with the arrangement.
                 let Some(fire) = fire_pos else { continue };
                 if !matches!(*activity, Activity::Idle | Activity::Wandering) {
                     continue;
                 }
                 if transform.translation.distance(fire) > 7.0 {
-                    *activity = Activity::Wandering;
+                    *activity = Activity::Sleeping;
                     target.0 =
                         Some(fire + Vec3::new(rng.0.range(-4.0, 4.0), 0.0, rng.0.range(-4.0, 4.0)));
-                } else {
-                    *activity = Activity::Idle;
-                    target.0 = None;
+                    continue;
                 }
+                // Down where they stand, feet to the warmth and head to
+                // the dark - which is how anybody lies by a fire, and
+                // lays them in a ring around it without anyone having to
+                // arrange one.
+                *activity = Activity::Sleeping;
+                target.0 = None;
+                motion.speed = 0.0;
+                motion.flail = 0.0;
+                let outward = (transform.translation - fire)
+                    .with_y(0.0)
+                    .normalize_or(Vec3::X);
+                let facing = Quat::from_rotation_y(super::work::lie_toward(outward))
+                    * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
+                commands.entity(entity).insert(Abed {
+                    at: transform.translation + laid_from(genome, facing),
+                    facing,
+                });
             }
         }
     }

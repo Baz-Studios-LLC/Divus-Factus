@@ -123,6 +123,7 @@ impl Plugin for VillagerPlugin {
                     speech::muse_the_watched,
                     speech::show_musings,
                     stretch_settlement,
+                    explore::walk_the_world,
                     explore::expeditions,
                     explore::escort_duty,
                     explore::raise_cairns,

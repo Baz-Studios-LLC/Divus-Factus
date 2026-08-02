@@ -84,6 +84,68 @@ pub struct Escorting {
 /// Idle explorers walk out past the cairns, read the land, and come home
 /// with what they found.
 #[allow(clippy::type_complexity)]
+/// How far a pair of feet can see: a villager standing somewhere knows
+/// that place and a little around it.
+const FOOTFALL: f32 = 34.0;
+/// The grid those footfalls are rounded onto, so ten thousand steps
+/// across the same meadow leave ONE pocket rather than ten thousand. The
+/// cell's diagonal is twice the reach, so neighbouring cells just touch
+/// and a walked road opens as a continuous corridor.
+const FOOTFALL_GRID: f32 = 48.0;
+/// As many pockets as the veil's shader can be handed at once.
+const MOST_POCKETS: usize = 128;
+
+/// Ground is known because somebody stood on it.
+///
+/// Expeditions still do the real work - they push past the cairns on
+/// purpose and bring back whole regions - but a gatherer who walks half
+/// a mile after a berry bush has, in the plainest sense, been there. The
+/// map used to disagree, and the fog sat over a man standing in it.
+pub(super) fn walk_the_world(
+    time: Res<Time>,
+    mut since_last: Local<f32>,
+    mut known: Option<ResMut<KnownWorld>>,
+    walkers: Query<
+        &Transform,
+        (
+            With<crate::villager::Villager>,
+            Without<crate::creature::Corpse>,
+        ),
+    >,
+) {
+    // Feet are slow. Once a second is finer than anyone can walk out of.
+    *since_last += time.delta_secs();
+    if *since_last < 1.0 {
+        return;
+    }
+    *since_last = 0.0;
+    let Some(known) = known.as_mut() else {
+        return;
+    };
+    for at in &walkers {
+        if known.pockets.len() >= MOST_POCKETS || known.knows(at.translation) {
+            continue;
+        }
+        // Rounded onto the grid, so the same meadow is opened once.
+        let cell = Vec3::new(
+            (at.translation.x / FOOTFALL_GRID).round() * FOOTFALL_GRID,
+            at.translation.y,
+            (at.translation.z / FOOTFALL_GRID).round() * FOOTFALL_GRID,
+        );
+        if known
+            .pockets
+            .iter()
+            .any(|pocket| pocket.at.distance(cell) < 1.0)
+        {
+            continue;
+        }
+        known.pockets.push(Pocket {
+            at: cell,
+            radius: FOOTFALL,
+        });
+    }
+}
+
 pub(super) fn expeditions(
     mut commands: Commands,
     time: Res<Time>,
