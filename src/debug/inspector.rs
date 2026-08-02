@@ -78,6 +78,7 @@ pub(crate) fn update_inspector(
             Option<&Morale>,
             Option<&crate::villager::belief::Faith>,
             Option<&crate::villager::traits::Traits>,
+            Option<&crate::villager::speech::RecentlySaid>,
         ),
     )>,
     corpse_check: Query<Option<&crate::creature::Vitality>, With<crate::creature::Corpse>>,
@@ -370,7 +371,7 @@ pub(crate) fn update_inspector(
         member_of,
         chronicle,
         vocation,
-        (morale, faith, manner),
+        (morale, faith, manner, said),
     )) = people.get(entity)
         && corpse.is_err()
     {
@@ -473,6 +474,28 @@ pub(crate) fn update_inspector(
                         .join("\n")
                 },
             );
+            // And under the life, the last few things out of their mouth.
+            // The chronicle keeps what they DID and what they were told;
+            // this is what they have been saying, which is the question a
+            // person's page is really being asked.
+            let fresh = match said.filter(|said| !said.0.is_empty()) {
+                Some(said) => {
+                    let tail = said.0.len().saturating_sub(3);
+                    let lately = said.0[tail..]
+                        .iter()
+                        .map(|u| {
+                            if u.thought {
+                                format!("d{}  ({})", u.day, u.text)
+                            } else {
+                                format!("d{}  \"{}\"", u.day, u.text)
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    format!("{fresh}\n\nlately\n{lately}")
+                }
+                None => fresh,
+            };
             if life.0 != fresh {
                 *life = Text::new(fresh);
             }

@@ -831,8 +831,16 @@ fn cast(
             notices.write(crate::ui::Notice::fanfare(format!(
                 "{god} made the land flourish"
             )));
+            // Flourished, not Provided. Both wrote Provided, which
+            // flattened two theologically different acts into one story:
+            // "food was set down before us" and "the land itself was made
+            // to give more" are not the same claim about what the god is,
+            // and doctrine will one day be spun from exactly that
+            // difference. It also stranded the four `event:flourished`
+            // lines already in the corpus - written for abundance, and
+            // unreachable by the abundance miracle.
             witnessed.write(DivineEvent {
-                kind: DivineEventKind::Provided,
+                kind: DivineEventKind::Flourished,
                 position: site.centre,
                 subject: None,
                 intensity: 0.9,

@@ -12,7 +12,7 @@ pub mod explore;
 pub mod home;
 pub mod names;
 pub mod rites;
-mod speech;
+pub mod speech;
 pub mod traits;
 pub mod work;
 
@@ -168,6 +168,7 @@ impl Plugin for VillagerPlugin {
                     rites::burials,
                     seek_company,
                     speech::muse_the_watched,
+                    speech::remember_what_was_said,
                     speech::show_musings,
                     stretch_settlement,
                     explore::walk_the_world,
@@ -1459,6 +1460,7 @@ pub(crate) fn spawn_settlement(
             ),
             crate::witness::Temperament::random(&mut rng),
             crate::witness::Witnessed::default(),
+            speech::RecentlySaid::default(),
             Needs {
                 // Stagger starting hunger so the settlement does not arrive at the
                 // food crisis in lockstep.
@@ -2214,6 +2216,7 @@ fn births(
         chronicle,
         crate::witness::Temperament::random(&mut rng.0),
         crate::witness::Witnessed::default(),
+        speech::RecentlySaid::default(),
         Needs {
             hunger: 0.2,
             ..default()

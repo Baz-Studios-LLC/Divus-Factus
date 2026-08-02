@@ -9,6 +9,49 @@
 
 use bevy::prelude::*;
 
+/// The last handful of things out of this person's mouth — thoughts,
+/// tellings, answers, prayers and shouts alike.
+///
+/// The chronicle keeps a whole life of DEEDS, and what they were told by
+/// others; nothing kept what they themselves said, so every line went to
+/// a bubble and vanished. This is deliberately a short tail rather than a
+/// full log: two hundred repetitions of "I should fix my boots" would
+/// bury the chronicle's signal, and the question worth answering on a
+/// person's page is what they are like NOW.
+#[derive(Component, Default)]
+pub struct RecentlySaid(pub Vec<Utterance>);
+
+pub struct Utterance {
+    pub day: u32,
+    pub text: String,
+    /// Kept to themselves rather than said out loud.
+    pub thought: bool,
+}
+
+/// How many are worth keeping.
+const KEPT: usize = 6;
+
+/// Everything anybody says passes through `Say`, so one reader catches
+/// every channel there is without each of them remembering to report.
+pub(super) fn remember_what_was_said(
+    clock: Res<crate::calendar::WorldClock>,
+    mut said: MessageReader<crate::ui::Say>,
+    mut mouths: Query<&mut RecentlySaid>,
+) {
+    for spoken in said.read() {
+        let Ok(mut kept) = mouths.get_mut(spoken.speaker) else {
+            continue;
+        };
+        kept.0.push(Utterance {
+            day: clock.day(),
+            text: spoken.text.clone(),
+            thought: spoken.thought,
+        });
+        let over = kept.0.len().saturating_sub(KEPT);
+        kept.0.drain(..over);
+    }
+}
+
 use crate::creature::{Corpse, Held, Vitality};
 use crate::rng::Rng;
 use crate::weather::WeatherKind;
