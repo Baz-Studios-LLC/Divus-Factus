@@ -213,6 +213,11 @@ impl Corpus {
     }
 
     /// How many lines the book holds.
+    /// Every line, for the voice bench's coverage audit.
+    pub fn lines(&self) -> &[Line] {
+        &self.lines
+    }
+
     pub fn len(&self) -> usize {
         self.lines.len()
     }

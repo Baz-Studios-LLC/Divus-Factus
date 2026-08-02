@@ -31,7 +31,8 @@ use std::collections::HashMap;
 
 use bevy::prelude::*;
 
-pub mod corpus;
+pub mod bench;
+mod corpus;
 #[allow(deprecated)]
 use crate::villager::traits::Bearing;
 use crate::villager::work::Vocation;
@@ -279,7 +280,27 @@ impl Tongue {
         voice: Option<Vocation>,
         whom: Option<&str>,
     ) -> Option<String> {
+        self.turn_about(who, role, about, false, faith, voice, whom)
+    }
+
+    /// As [`Tongue::turn`], but saying whether the subject is something
+    /// one of them WITNESSED. The witness voice - "I know what I saw" -
+    /// has no business in a conversation about the weather.
+    #[allow(clippy::too_many_arguments)]
+    pub fn turn_about(
+        &mut self,
+        who: Entity,
+        role: &'static str,
+        about: &str,
+        told: bool,
+        faith: FaithBand,
+        voice: Option<Vocation>,
+        whom: Option<&str>,
+    ) -> Option<String> {
         let mut tags = vec![role, about, faith_tag(faith)];
+        if told {
+            tags.push("told");
+        }
         tags.extend(voice.map(trade_tag));
         let slots: Vec<(&str, &str)> = whom.map(|whom| ("whom", whom)).into_iter().collect();
         self.voice

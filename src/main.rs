@@ -129,6 +129,12 @@ impl Default for WorldSeed {
 }
 
 fn main() {
+    // The voice bench: the corpus with no world around it, for judging
+    // the writing without hunting two villagers across a valley first.
+    if std::env::args().any(|arg| arg == "--voice") {
+        telling::bench::run();
+        return;
+    }
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {

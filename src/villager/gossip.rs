@@ -788,10 +788,15 @@ pub(crate) fn hold_conversations(
                         .as_ref()
                         .and_then(|memory| memory.whom.as_ref())
                         .map(|whom| whom.name.clone());
-                    tongue.turn(
+                    // A retelling's later beats may reach for the
+                    // witness voice - "I know what I saw" - which is
+                    // nonsense in a conversation about a leaky roof.
+                    let told = matches!(topic, Chat::Memory(_));
+                    tongue.turn_about(
                         entity,
                         role,
                         &topic.tag(),
+                        told,
                         crate::telling::FaithBand::of(trust),
                         voice,
                         whom.as_deref(),
