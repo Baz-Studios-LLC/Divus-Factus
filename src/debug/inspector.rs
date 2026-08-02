@@ -590,7 +590,7 @@ pub(crate) fn update_inspector(
             .map(|(person, ..)| format!("the body of {}", person.full_name()))
             .unwrap_or_else(|_| "a body".to_string());
         let cause = match vitality {
-            Some(v) if v.violent => "broken against the earth",
+            Some(v) if v.violent => v.undoing.how(),
             Some(_) => "wasted away by hunger",
             None => "still",
         };

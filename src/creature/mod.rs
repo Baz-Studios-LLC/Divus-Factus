@@ -79,6 +79,44 @@ pub struct Vitality {
     /// Whether the killing blow, if it comes now, was violence rather than want.
     /// Doctrine will care about the difference; the dead do not.
     pub violent: bool,
+    /// What last did them harm. The chronicle used to say only "was
+    /// broken against the earth" for every violent death - lightning, a
+    /// wolf, a fall, a hunter's spear, all one line - which told the
+    /// player nothing about what their village is actually losing people
+    /// to.
+    pub undoing: Undoing,
+}
+
+/// What killed someone, in the plainest terms the chronicle can put it.
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
+pub enum Undoing {
+    /// An empty stomach and no larder to answer it.
+    #[default]
+    Hunger,
+    /// A wolf.
+    Teeth,
+    /// The ground, arriving hard - thrown by the god, or dropped.
+    Fall,
+    /// Struck out of the sky.
+    Lightning,
+    /// Crushed by something the god was carrying.
+    Weight,
+    /// A blow from another living thing that was not a wolf.
+    Blow,
+}
+
+impl Undoing {
+    /// How the chronicle says it, after the name.
+    pub fn how(self) -> &'static str {
+        match self {
+            Undoing::Hunger => "starved",
+            Undoing::Teeth => "was killed by a wolf",
+            Undoing::Fall => "was thrown down and died of the fall",
+            Undoing::Lightning => "was struck dead by lightning",
+            Undoing::Weight => "was crushed",
+            Undoing::Blow => "was struck down",
+        }
+    }
 }
 
 /// Harm inflicted by hitting the ground at `impact` severity.
@@ -720,6 +758,7 @@ fn apply_ballistics(
                 if harm > 0.0 {
                     vitality.harm = (vitality.harm + harm).min(1.0);
                     vitality.violent = true;
+                    vitality.undoing = Undoing::Fall;
                 }
             }
 
@@ -821,12 +860,15 @@ fn succumb(
 
         let name = person.map(|p| p.name.clone());
         match &name {
+            // Named, so the log says what the village is actually losing
+            // people to. "died violently" covered a wolf, a fall, a
+            // lightning strike and a hunter's spear alike.
             Some(name) => info!(
-                "{name} has died{}",
+                "{name} {}",
                 if vitality.violent {
-                    " violently"
+                    vitality.undoing.how()
                 } else {
-                    " of hunger"
+                    "starved"
                 }
             ),
             None => info!("a creature has died"),

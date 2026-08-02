@@ -33,8 +33,16 @@ use crate::rng::Rng;
 use crate::scatter::FoodSource;
 use crate::terrain::{Biome, Terrain, WATER_LEVEL};
 
-/// How many villagers the settlement starts with.
-pub const STARTING_POPULATION: usize = 12;
+/// How many villagers the settlement starts with: five women and five
+/// men, all grown, dealt by the alternation in `found_the_village`.
+///
+/// Ten because the hall sleeps ten. The founding village is housed from
+/// its first minute, which is the whole point - the first quarter-hour
+/// used to be twelve people in the dirt splitting a dozen hands between
+/// food, timber, stone and a frame, and losing at all four. If the bench
+/// longhouse is ever redrawn with a different number of beds, this
+/// should move with it.
+pub const STARTING_POPULATION: usize = 10;
 
 /// Seconds of not eating it takes to go from fed to starving.
 ///
@@ -93,6 +101,19 @@ const BOND_INTERVAL: f32 = 12.0;
 /// crosses paths — which the player shapes every time they move someone, place
 /// food, or scatter a crowd.
 const COURTSHIP_DISTANCE: f32 = 12.0;
+
+/// Days a pair walk out together before they wed. Without this, standing
+/// near someone WAS the wedding: on the founding morning ten strangers
+/// are milling around one fire, and half the village married inside a
+/// minute of the world beginning.
+const COURTSHIP_DAYS: u32 = 4;
+
+/// A pair who are walking out together, and the day they began.
+#[derive(Component, Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct Courting {
+    pub with: Entity,
+    pub since: u32,
+}
 
 /// Seconds between rounds of talk.
 const GOSSIP_INTERVAL: f32 = 8.0;
@@ -1321,10 +1342,10 @@ pub(crate) fn spawn_settlement(
     for i in 0..founders {
         let position =
             random_walkable_point(&terrain, &mut rng, centre, site.radius * 0.6).unwrap_or(centre);
-        // Six and six, all grown. A founding generation with children in
-        // it is a founding generation that cannot work: a quarter of the
-        // world's first hands used to be too small to lift anything, and
-        // the village spent its first week learning that.
+        // Five and five, all grown. A founding generation with children
+        // in it is a founding generation that cannot work: a quarter of
+        // the world's first hands used to be too small to lift anything,
+        // and the village spent its first week learning that.
         let sex = if i % 2 == 0 { Sex::Female } else { Sex::Male };
         let genome = CreatureGenome::adult(Species::Human, sex, &mut rng);
         let is_child = genome.age == Age::Child;
@@ -1808,14 +1829,14 @@ fn bereave(
             }
         };
         notices.write(crate::ui::Notice::new(match vitality {
-            Some(v) if v.violent => format!("{} was broken against the earth", person.name),
+            Some(v) if v.violent => format!("{} {}", person.name, v.undoing.how()),
             _ => starved_because(),
         }));
         if let Some(mut chronicle) = chronicle {
             chronicle.record(
                 day,
                 match vitality {
-                    Some(v) if v.violent => "was broken against the earth".to_string(),
+                    Some(v) if v.violent => v.undoing.how().to_string(),
                     _ => starved_because()
                         .replace(&format!("{} ", person.name), "")
                         .replacen("starved", "starved:", 1),
@@ -2692,6 +2713,32 @@ mod tests {
             elapsed += dt;
         }
         assert!((elapsed - SECONDS_TO_STARVE).abs() < 1.0, "took {elapsed}s");
+    }
+
+    #[test]
+    fn the_founding_is_five_women_and_five_men_all_grown() {
+        // Brett's rule, pinned: ten founders, an even split, nobody too
+        // small to lift anything. The alternation below is the same one
+        // the spawn loop uses, so a change to either shows up here.
+        let mut rng = Rng::new(5);
+        let mut women = 0;
+        let mut men = 0;
+        for i in 0..STARTING_POPULATION {
+            let sex = if i % 2 == 0 { Sex::Female } else { Sex::Male };
+            let genome = CreatureGenome::adult(Species::Human, sex, &mut rng);
+            assert_eq!(genome.age, Age::Adult, "a founder must be grown");
+            match genome.sex {
+                Sex::Female => women += 1,
+                Sex::Male => men += 1,
+            }
+        }
+        assert_eq!((women, men), (5, 5));
+        // And the hall they wake up in holds exactly all of them.
+        assert_eq!(
+            crate::villager::work::BuildingKind::Longhouse.sleeps(),
+            STARTING_POPULATION,
+            "the founding village must fit under its own roof"
+        );
     }
 
     #[test]

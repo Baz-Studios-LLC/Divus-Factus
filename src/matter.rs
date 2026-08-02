@@ -241,6 +241,7 @@ fn roll(
                     vitality.harm =
                         (vitality.harm + (matter.mass * speed / 1500.0).clamp(0.2, 1.2)).min(1.5);
                     vitality.violent = true;
+                    vitality.undoing = crate::creature::Undoing::Weight;
                     motion.flail = 1.0;
                     // The blow costs the roller most of its force.
                     state.velocity *= 0.4;

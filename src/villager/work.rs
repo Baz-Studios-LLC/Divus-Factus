@@ -691,6 +691,7 @@ pub(super) fn do_work(
                             }
                             vitality.harm += 0.7;
                             vitality.violent = true;
+                            vitality.undoing = crate::creature::Undoing::Blow;
                             wolf_motion.flail = 1.0;
                             if vitality.harm >= 1.0 {
                                 info!("{} slew a wolf", person.name);
@@ -1568,6 +1569,7 @@ pub(super) fn do_work(
                 // the dying, the same as for every other creature.
                 vitality.harm += 0.55;
                 vitality.violent = true;
+                vitality.undoing = crate::creature::Undoing::Blow;
                 prey_motion.flail = 1.0;
                 motion.flail = motion.flail.max(0.4);
             }

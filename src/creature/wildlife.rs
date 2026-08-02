@@ -275,6 +275,7 @@ pub(super) fn wolves_hunt(
         {
             vitality.harm += 0.45;
             vitality.violent = true;
+            vitality.undoing = crate::creature::Undoing::Teeth;
         }
     }
     for meal in eaten {
@@ -507,6 +508,7 @@ pub(super) fn wolves_stalk(
         if let Ok((_, quarry_here, _, mut vitality, mut motion, torn)) = walkers.get_mut(*quarry) {
             vitality.harm += dt * 0.3;
             vitality.violent = true;
+            vitality.undoing = crate::creature::Undoing::Teeth;
             motion.flail = 1.0;
             // The village learns of this. Once per attack, not once per
             // frame: teeth stay in for seconds, and a memory laid down

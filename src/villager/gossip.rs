@@ -25,7 +25,13 @@ pub(crate) fn form_bonds(
     mut chronicles: Query<&mut Chronicle>,
     mut notices: MessageWriter<crate::ui::Notice>,
     singles: Query<
-        (Entity, &Transform, &CreatureGenome, &Person),
+        (
+            Entity,
+            &Transform,
+            &CreatureGenome,
+            &Person,
+            Option<&Courting>,
+        ),
         (
             With<Villager>,
             Without<Spouse>,
@@ -44,33 +50,68 @@ pub(crate) fn form_bonds(
 
     let mut women = Vec::new();
     let mut men = Vec::new();
-    for (entity, transform, genome, person) in &singles {
+    for (entity, transform, genome, person, courting) in &singles {
         if genome.age != Age::Adult {
             continue;
         }
         match genome.sex {
-            Sex::Female => women.push((entity, transform.translation, person)),
+            Sex::Female => women.push((entity, transform.translation, person, courting)),
             Sex::Male => men.push((entity, transform.translation, person)),
         }
     }
 
-    for (woman, at, her) in women {
-        let Some((slot, _)) = men
-            .iter()
-            .enumerate()
-            .map(|(i, (_, position, _))| (i, position.distance(at)))
-            .filter(|(_, d)| *d <= COURTSHIP_DISTANCE)
-            .min_by(|a, b| a.1.total_cmp(&b.1))
-        else {
-            continue;
-        };
-
-        // Nearness is necessary, not sufficient. Some pairs just never happen.
-        if !rng.0.chance(0.4) {
-            continue;
+    let today = clock.day();
+    for (woman, at, her, courting) in women {
+        // Who she is walking out with, if he is still unwed and alive. A
+        // courtship survives the working day: they are courting, not
+        // conjoined, and requiring the two of them to be within a dozen
+        // strides at every check meant every courtship in the village
+        // was dropped the first morning both of them went to work.
+        // Nearness is asked for again at the wedding itself, below.
+        let walking_out = courting.and_then(|courting| {
+            men.iter()
+                .position(|(man, ..)| *man == courting.with)
+                .map(|slot| (slot, courting.since))
+        });
+        if courting.is_some() && walking_out.is_none() {
+            commands.entity(woman).remove::<Courting>();
         }
 
+        let slot = match walking_out {
+            // Courting, and not long enough yet. A wedding is a thing two
+            // people arrive at, not a thing proximity does to them.
+            Some((_, since)) if today.saturating_sub(since) < COURTSHIP_DAYS => continue,
+            // Courted long enough - now they have to be standing
+            // together for it, the way a wedding needs both of them.
+            Some((slot, _)) if men[slot].1.distance(at) <= COURTSHIP_DISTANCE => slot,
+            Some(_) => continue,
+            None => {
+                // Not walking out with anyone: the nearest unwed man may
+                // become the one she does.
+                let Some((slot, _)) = men
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (_, position, _))| (i, position.distance(at)))
+                    .filter(|(_, d)| *d <= COURTSHIP_DISTANCE)
+                    .min_by(|a, b| a.1.total_cmp(&b.1))
+                else {
+                    continue;
+                };
+                // Nearness is necessary, not sufficient. Some pairs just
+                // never happen.
+                if !rng.0.chance(0.4) {
+                    continue;
+                }
+                commands.entity(woman).insert(Courting {
+                    with: men[slot].0,
+                    since: today,
+                });
+                continue;
+            }
+        };
+
         let (man, _, him) = men.swap_remove(slot);
+        commands.entity(woman).remove::<Courting>();
         info!("{} and {} were wed", her.full_name(), him.full_name());
         notices.write(crate::ui::Notice::new(format!(
             "{} and {} were wed",
@@ -621,10 +662,33 @@ mod tests {
             app.update();
         }
 
+        // Standing next to someone is not a wedding. They are walking out
+        // together, and that is all, until the courtship has run.
+        assert!(
+            app.world().entity(bride).get::<Spouse>().is_none(),
+            "they wed on the day they met",
+        );
+        assert!(
+            app.world().entity(bride).get::<Courting>().is_some(),
+            "nobody started walking out at all",
+        );
+
+        // A season of it later, they marry.
+        app.world_mut()
+            .resource_mut::<crate::calendar::WorldClock>()
+            .elapsed += (COURTSHIP_DAYS as f32 * crate::calendar::DAY_SECONDS) as f64;
+        for _ in 0..12 {
+            app.update();
+        }
+
         let world = app.world();
         assert!(
             world.entity(bride).get::<Spouse>().is_some(),
             "the pair never wed, so there is nothing to test",
+        );
+        assert!(
+            world.entity(bride).get::<Courting>().is_none(),
+            "the courtship should end at the wedding",
         );
 
         let wife = world.entity(bride).get::<Person>().unwrap();

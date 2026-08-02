@@ -330,6 +330,7 @@ fn storm_strikes(
         }
         vitality.harm += 1.2;
         vitality.violent = true;
+        vitality.undoing = crate::creature::Undoing::Lightning;
         motion.flail = 1.0;
         struck.get_or_insert(entity);
     }
