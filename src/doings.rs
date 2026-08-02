@@ -1,10 +1,10 @@
 //! The labels: a word over every head. Two of them, on two keys.
 //!
-//! One says what a soul is AT, this minute - the god's own diagnostic,
-//! for when a village builds two longhouses in twelve days and you want
-//! to know what the other nine were doing instead. The other says what
-//! they ARE: the trade they were set to, whatever they happen to be
-//! doing with it.
+//! One says what a soul is AT this minute AND the trade they hold - the
+//! god's own diagnostic, for when a village builds two longhouses in
+//! twelve days and you want to know what the other nine were doing
+//! instead. "wandering - miner" is a whole bug report in two words. The
+//! other says only what they ARE, one word a head, for reading a crowd.
 
 use bevy::prelude::*;
 use bevy::text::FontSize;
@@ -66,7 +66,7 @@ fn toggle_labels(
         let cap = crate::keymap::key_name(keymap.key(deed)).unwrap_or("the key");
         let said = match wanted {
             Labels::Trades => "Every soul says their trade",
-            _ => "Every soul says what they are at",
+            _ => "Every soul says what they are at, and their trade",
         };
         notices.write(crate::ui::Notice::new(format!(
             "{said} - press {cap} again for quiet"
@@ -74,32 +74,43 @@ fn toggle_labels(
     }
 }
 
-/// What a person is at, in the fewest words that still tell the truth.
-fn doing_of(activity: &Activity, vocation: Option<&Vocation>, talk: Option<&Conversing>) -> String {
-    let work = vocation.map(|v| v.describe()).unwrap_or("no trade");
-    match activity {
-        Activity::Idle => "idle".to_string(),
-        Activity::Wandering => "wandering".to_string(),
-        Activity::SeekingFood(_) => "foraging, hungry".to_string(),
-        Activity::Eating(_) => "eating off a bush".to_string(),
-        Activity::VisitingStore => "eating at the stores".to_string(),
-        Activity::Sleeping => "asleep".to_string(),
-        Activity::Working => format!("working - {work}"),
-        Activity::Praying => "praying".to_string(),
-        Activity::Sheltering => "sheltering".to_string(),
-        Activity::TendingFire => "tending the fire".to_string(),
+/// What a person is at, in the fewest words that still tell the truth —
+/// and, after it, the trade the muster set them to this morning.
+///
+/// The doing alone only ever answered half the question. A soul reading
+/// "wandering" is either between errands or holds a trade with no work
+/// left on the ground for it, and nothing but the trade beside the doing
+/// says which — which is exactly the case an overseer wants to catch.
+fn doing_of(
+    activity: &Activity,
+    vocation: Option<&Vocation>,
+    child: bool,
+    talk: Option<&Conversing>,
+) -> String {
+    let doing = match activity {
+        Activity::Idle => "idle",
+        Activity::Wandering => "wandering",
+        Activity::SeekingFood(_) => "foraging, hungry",
+        Activity::Eating(_) => "eating off a bush",
+        Activity::VisitingStore => "eating at the stores",
+        Activity::Sleeping => "asleep",
+        Activity::Working => "working",
+        Activity::Praying => "praying",
+        Activity::Sheltering => "sheltering",
+        Activity::TendingFire => "tending the fire",
         // Most of a conversation is the walk to it: two people who have
         // agreed to speak can be a dozen strides apart and still be
         // Chatting. Saying "talking" over both of them is a lie the label
         // was telling all by itself.
         Activity::Chatting => match talk {
-            Some(talk) if talk.spoke_at.is_some() => "talking".to_string(),
-            _ => "off to talk".to_string(),
+            Some(talk) if talk.spoke_at.is_some() => "talking",
+            _ => "off to talk",
         },
-        Activity::Mourning => "mourning".to_string(),
-        Activity::Hauling => format!("hauling - {work}"),
-        Activity::Bearing => "bearing the dead".to_string(),
-    }
+        Activity::Mourning => "mourning",
+        Activity::Hauling => "hauling",
+        Activity::Bearing => "bearing the dead",
+    };
+    format!("{doing} - {}", trade_of(vocation, child))
 }
 
 /// The trade they were set to - the one word an overseer wants.
@@ -158,7 +169,7 @@ fn tend_labels(
                child: bool,
                talk: Option<&Conversing>| match *mode {
         Labels::Trades => trade_of(vocation, child),
-        _ => doing_of(activity, vocation, talk),
+        _ => doing_of(activity, vocation, child, talk),
     };
 
     // Everyone who already wears a label.
@@ -218,7 +229,9 @@ fn tend_labels(
                 Text::new(say(activity, vocation, child, talk)),
                 TextFont {
                     font: fonts.text.clone().into(),
-                    font_size: FontSize::Px(11.0),
+                    // Eleven pixels was a squint at any camera height the
+                    // game is actually played at.
+                    font_size: FontSize::Px(15.0),
                     ..default()
                 },
                 TextColor(ink),
@@ -230,7 +243,7 @@ fn tend_labels(
             BackgroundColor(Color::srgba(0.04, 0.04, 0.06, 0.68)),
             BorderColor::all(Color::BLACK.with_alpha(0.45)),
             Node {
-                padding: UiRect::axes(Val::Px(6.0), Val::Px(1.0)),
+                padding: UiRect::axes(Val::Px(7.0), Val::Px(2.0)),
                 border: UiRect::all(Val::Px(1.0)),
                 border_radius: BorderRadius::all(Val::Px(5.0)),
                 // The parent is a point with no width of its own; without

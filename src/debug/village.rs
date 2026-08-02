@@ -1713,7 +1713,11 @@ const KEYBINDS: &[(&str, &[Bind])] = &[
                 "the cutaway: whole, roof off,
 walls down as well",
             ),
-            Bind::Deed(Deed::Doings, "every soul says what they are at"),
+            Bind::Deed(
+                Deed::Doings,
+                "every soul says what they are at,
+and the trade they hold",
+            ),
             Bind::Deed(Deed::Trades, "every soul says their trade"),
             Bind::Deed(Deed::Fog, "only the ground your people know"),
         ],
