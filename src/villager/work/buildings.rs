@@ -257,6 +257,8 @@ pub struct RoofNeeds {
     pub population: usize,
     pub house_rising: bool,
     pub longhouse_rising: bool,
+    /// Grown souls with no roof at all tonight.
+    pub roofless: usize,
 }
 
 /// Which roof to break ground on next, if either.
@@ -275,11 +277,23 @@ pub fn next_roof(needs: &RoofNeeds) -> Option<BuildingKind> {
     let family_slack = (needs.houses * HOUSE_CAPACITY) as i32 - needs.family_souls as i32;
     let single_slack = (needs.longhouses * LONGHOUSE_CAPACITY) as i32 - needs.single_souls as i32;
 
+    // A hall shelters EIGHT of anybody, and it is the only roof that will
+    // take a stranger. While people are sleeping in the dirt and no hall
+    // stands, the hall goes first however the slack falls: it is the
+    // shortest road from a village in the open to a village under cover.
+    // Houses are the reward that follows, not the way out of the rain.
+    if needs.roofless > 0 && needs.longhouses == 0 && !needs.longhouse_rising {
+        return Some(BuildingKind::Longhouse);
+    }
+
     let want_house = family_slack < HOUSE_CAPACITY as i32 && !needs.house_rising;
     // A longhouse is a big single commitment: eight beds' worth of timber in
     // one build. A hamlet puts what it has into family roofs first and
     // sleeps its handful of unwed by the fire until there are enough of them
     // to be worth a long roof.
+    // The population gate keeps a hamlet from sinking a hall's worth of
+    // timber into beds for two - but it never applies while anyone is
+    // actually roofless, which the clause above has already answered.
     let want_longhouse = single_slack < LONGHOUSE_CAPACITY as i32
         && needs.population >= 8
         && !needs.longhouse_rising;
@@ -2011,6 +2025,7 @@ pub(crate) fn plan_houses(
         next_roof(&RoofNeeds {
             family_souls,
             single_souls,
+            roofless: roofless_adults,
             houses: standing(BuildingKind::House),
             longhouses: standing(BuildingKind::Longhouse),
             population,
@@ -2612,7 +2627,45 @@ mod tests {
             population: family + single,
             house_rising: false,
             longhouse_rising: false,
+            // Snug means everyone is under a roof already, which is what
+            // lets these cases test the slack arithmetic rather than the
+            // shelter-first rule that outranks it.
+            roofless: 0,
         }
+    }
+
+    #[test]
+    fn the_hall_goes_up_before_any_house_while_people_sleep_outside() {
+        // The founding: twelve in the open, three couples wed on the first
+        // morning. The slack alone would have started a house - it did,
+        // and the six wed could not take a longhouse bed anyway, so half
+        // the village lay in the dirt waiting on family rooms.
+        let founding = RoofNeeds {
+            family_souls: 6,
+            single_souls: 6,
+            houses: 0,
+            longhouses: 0,
+            population: 12,
+            house_rising: false,
+            longhouse_rising: false,
+            roofless: 12,
+        };
+        assert_eq!(next_roof(&founding), Some(BuildingKind::Longhouse));
+
+        // With the hall up, houses resume for the families that want them.
+        let sheltered = RoofNeeds {
+            longhouses: 1,
+            roofless: 0,
+            ..founding
+        };
+        assert_eq!(next_roof(&sheltered), Some(BuildingKind::House));
+
+        // And a hall already rising is not asked for twice.
+        let waiting = RoofNeeds {
+            longhouse_rising: true,
+            ..founding
+        };
+        assert_ne!(next_roof(&waiting), Some(BuildingKind::Longhouse));
     }
 
     #[test]

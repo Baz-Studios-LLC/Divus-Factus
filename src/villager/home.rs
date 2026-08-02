@@ -783,10 +783,26 @@ pub(super) fn assign_homes(
                     .or_else(|| tenants.get(s.0).ok().map(|h| h.0))
             })
         };
+        // The unwed may never take a house - a stranger in a family's room
+        // is the thing the longhouse exists to prevent. But the reverse
+        // does no harm at all: a longhouse is a common hall, and a couple
+        // bedded in it while they wait for a house of their own is how
+        // every village in history has worked. Three weddings on the first
+        // morning used to move six people out of the longhouse's reach
+        // entirely, and they slept in the dirt for want of a rule.
+        // ...but only while no house is open to them. Otherwise the kin
+        // path drags them straight back: a groom rehomed OUT of the hall
+        // finds his bride still in it, follows her in, and the pair never
+        // reach the empty house standing ready across the square.
+        let house_open = roofs
+            .iter()
+            .any(|(roof, _, long)| !long && occupancy.get(&roof).copied().unwrap_or(0) == 0);
+        let acceptable =
+            |long: bool| long == want_longhouse || (long && !want_longhouse && !house_open);
         let kin_roof = kin.filter(|roof| {
-            roofs.get(*roof).is_ok_and(|(_, _, long)| {
-                long == want_longhouse && has_room(*roof, long, &occupancy)
-            })
+            roofs
+                .get(*roof)
+                .is_ok_and(|(_, _, long)| acceptable(long) && has_room(*roof, long, &occupancy))
         });
 
         let roof = kin_roof.or_else(|| {
@@ -800,16 +816,25 @@ pub(super) fn assign_homes(
             roofs
                 .iter()
                 .filter(|(roof, _, long)| {
-                    *long == want_longhouse
+                    acceptable(*long)
                         && if *long {
                             has_room(*roof, *long, &occupancy)
                         } else {
                             occupancy.get(roof).copied().unwrap_or(0) == 0
                         }
                 })
-                .map(|(roof, at, _)| (roof, at.translation.distance(transform.translation)))
-                .min_by(|a, b| a.1.total_cmp(&b.1))
-                .map(|(roof, _)| roof)
+                // An empty house first, then a bed in the hall: the
+                // preference survives, only the refusal goes. Nearest
+                // breaks the tie within a kind.
+                .map(|(roof, at, long)| {
+                    (
+                        roof,
+                        (long != want_longhouse) as u8,
+                        at.translation.distance(transform.translation),
+                    )
+                })
+                .min_by(|a, b| a.1.cmp(&b.1).then(a.2.total_cmp(&b.2)))
+                .map(|(roof, ..)| roof)
         });
 
         let Some(roof) = roof else {
