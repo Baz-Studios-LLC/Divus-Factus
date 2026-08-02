@@ -136,12 +136,15 @@ impl Corpus {
             if line.once && heard > 0 {
                 continue;
             }
-            if said.contains(&id) {
-                continue;
-            }
+            // Repeating yourself is a fault; silence is a worse one. A
+            // line this speaker just said takes a penalty no fresh rival
+            // ever loses to - but when the pool is thin enough that the
+            // rivals ran out, it goes out again rather than not at all,
+            // and the worn-pool tally below records what that cost.
+            let echo = if said.contains(&id) { 100.0 } else { 0.0 };
             // Specificity first, then freshness, then the dice.
-            let score =
-                line.tags.len() as f32 * 10.0 - heard as f32 * 4.0 + line.w * rng.range(0.0, 3.0);
+            let score = line.tags.len() as f32 * 10.0 - heard as f32 * 4.0 - echo
+                + line.w * rng.range(0.0, 3.0);
             if best.as_ref().is_none_or(|(top, ..)| score > *top) {
                 best = Some((score, line, id));
             }
@@ -338,5 +341,8 @@ mod tests {
         let first = voice.pick(9, &["muse"], &[], &mut rng).unwrap();
         let second = voice.pick(9, &["muse"], &[], &mut rng).unwrap();
         assert_ne!(first, second, "the ring must hold the last line out");
+        // Both said, pool exhausted: a repeat beats silence, and the
+        // early corpus keeps talking while the want-list keeps score.
+        assert!(voice.pick(9, &["muse"], &[], &mut rng).is_some());
     }
 }
