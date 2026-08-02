@@ -50,6 +50,11 @@ pub struct Corpus {
     /// repeats themselves in an evening even when the eligible pool is
     /// thin. Speakers are keyed by entity bits.
     recent: HashMap<u64, Vec<u64>>,
+    /// Moments the corpus failed: nothing eligible, or nothing deeper
+    /// than filler for a moment that deserved better. Tallied by the
+    /// moment's own tags, and written out as the authoring want-list -
+    /// the corpus grows toward what the world actually produces.
+    wanting: HashMap<String, u32>,
 }
 
 /// A stable id for a line: FNV-1a over its words.
@@ -141,6 +146,17 @@ impl Corpus {
                 best = Some((score, line, id));
             }
         }
+        // A miss, or a moment much deeper than the best line found for
+        // it, is a line somebody should sit down and write.
+        let depth = best
+            .as_ref()
+            .map(|(_, line, _)| line.tags.len())
+            .unwrap_or(0);
+        if depth == 0 || (context.len() >= 5 && depth <= 1) {
+            let mut moment: Vec<&str> = context.to_vec();
+            moment.sort_unstable();
+            *self.wanting.entry(moment.join(" ")).or_default() += 1;
+        }
         let (_, line, id) = best?;
         let mut words = line.t.clone();
         for (key, value) in slots {
@@ -153,6 +169,29 @@ impl Corpus {
             ring.remove(0);
         }
         Some(words)
+    }
+
+    /// Writes the want-list where the maker will trip over it: every
+    /// moment the corpus had nothing worthy to say, worst offenders
+    /// first, ready to be turned into lines. Truthful accounting beats a
+    /// tidy file, so it rewrites whole each time.
+    pub fn write_wanting(&self) {
+        if self.wanting.is_empty() {
+            return;
+        }
+        let root = std::env::var("BEVY_ASSET_ROOT").unwrap_or_else(|_| ".".to_string());
+        let mut rows: Vec<(&String, &u32)> = self.wanting.iter().collect();
+        rows.sort_by_key(|(_, n)| std::cmp::Reverse(**n));
+        let body: String = rows
+            .iter()
+            .map(|(moment, n)| format!("{n:5}  {moment}\n"))
+            .collect();
+        let _ = std::fs::write(
+            std::path::PathBuf::from(root).join("voice-wanted.txt"),
+            format!(
+                "# Moments that went without words - write lines for these.\n# count  tags of the moment\n{body}"
+            ),
+        );
     }
 
     /// The hearing ledger, for the save file.
@@ -251,6 +290,24 @@ mod tests {
                 )
                 .is_none()
         );
+    }
+
+    #[test]
+    fn unanswered_moments_are_written_down() {
+        let mut voice = corpus(&[("some weather", &["muse"], false)]);
+        let mut rng = Rng::new(1);
+        // A plain miss, and a deep moment fobbed off with filler.
+        assert!(voice.pick(1, &["cry", "drowning"], &[], &mut rng).is_none());
+        voice
+            .pick(
+                1,
+                &["muse", "roofless", "storm", "widowed", "night", "devout"],
+                &[],
+                &mut rng,
+            )
+            .unwrap();
+        assert_eq!(voice.wanting.len(), 2);
+        assert!(voice.wanting.keys().any(|k| k == "cry drowning"));
     }
 
     #[test]
