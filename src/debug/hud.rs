@@ -52,21 +52,29 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
         DevOverlay,
         // Hand-built rather than ui::dim, which already carries a
         // TextFont - a bundle with two of anything panics, the same trap
-        // the splash line fell into. The dim kit's small size also reads
-        // fine in a panel row but squints floating alone over the world,
-        // and it sat close enough under the date to read as its subtitle.
+        // the splash line fell into. Dressed like the date's own small
+        // line, and centred at the top of the screen where it reads as
+        // an instrument rather than a subtitle.
         Text::new(""),
         ui::SerifFace,
         TextFont {
             font_size: FontSize::Px(17.0),
             ..default()
         },
-        TextColor(ui::theme::text_dim()),
+        TextColor(Color::WHITE.with_alpha(0.66)),
+        TextLayout {
+            justify: Justify::Center,
+            ..default()
+        },
         Node {
             position_type: PositionType::Absolute,
-            // Below the date card, which owns the corner itself.
-            left: px(18),
-            top: px(112),
+            // The whole width, centring its own words: the text can
+            // change length every half second, and a pinned left edge
+            // would make it crawl.
+            left: px(0),
+            right: px(0),
+            top: px(10),
+            justify_content: JustifyContent::Center,
             ..default()
         },
         Visibility::Hidden,

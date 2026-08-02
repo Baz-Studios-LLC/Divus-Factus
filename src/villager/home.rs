@@ -1060,7 +1060,20 @@ pub(super) fn night_routine(
                 // does at a fire at three in the morning - and it made
                 // the roofless look content with the arrangement.
                 let Some(fire) = fire_pos else { continue };
-                if !matches!(*activity, Activity::Idle | Activity::Wandering) {
+                // Idle and wandering folk are drafted; the already-
+                // Sleeping stay in hand too, because the walk to the
+                // berth happens UNDER Sleeping - the first cut admitted
+                // only the idle, so one tick sent a sleeper walking and
+                // every later tick skipped them: ten people standing
+                // bolt upright round the fire, all labelled asleep.
+                if !matches!(
+                    *activity,
+                    Activity::Idle | Activity::Wandering | Activity::Sleeping
+                ) {
+                    continue;
+                }
+                // Bedded down already: nothing left to arrange tonight.
+                if *activity == Activity::Sleeping && target.0.is_none() {
                     continue;
                 }
                 // Each soul owns a berth in the ring: their own angle
@@ -1086,6 +1099,7 @@ pub(super) fn night_routine(
                 motion.flail = 0.0;
                 let facing = Quat::from_rotation_y(super::work::lie_toward(outward))
                     * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
+                info!("a sleeper beds down at the fire");
                 commands.entity(entity).insert(Abed {
                     // No pillow on the bare ground: the head lies a
                     // third of them past their berth, away from the
