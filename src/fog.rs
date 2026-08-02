@@ -40,6 +40,18 @@ const MAX_POCKETS: usize = 128;
 const SHEETS: usize = 6;
 const VEIL_HIGH: f32 = 12.0;
 
+/// The sea takes ONE sheet, at full weight.
+///
+/// A stack works on land because every sheet drapes the ground's own
+/// shape and hangs parallel to it. Over water the sheets are FLAT, and a
+/// flat sheet cut by a shelving seabed draws a contour line - six of them
+/// drew six, and a low-poly seabed turned the six into a staircase
+/// marching out from every shore. Nothing floats on the sea that needs
+/// twelve metres of hiding, so the sea gets a single sheet carrying the
+/// whole weight, and the only line it can draw is the waterline itself -
+/// where the land's own veil takes over anyway.
+const SEA_SHEET: f32 = 0.12;
+
 /// Whether the veil is up. It is, from the first frame: the world a
 /// village has actually walked is the world the game is about, and the
 /// rest of the map is scenery the player was never meant to be reading.
@@ -146,8 +158,11 @@ fn drape_the_veil(
     mut commands: Commands,
     mode: Res<FogMode>,
     mut materials: ResMut<Assets<FogMaterial>>,
-    mut cloth: Local<Option<Handle<FogMaterial>>>,
-    chunks: Query<(Entity, &Mesh3d, Option<&Children>), Or<(With<TerrainChunk>, With<WaterPlane>)>>,
+    mut cloth: Local<Option<(Handle<FogMaterial>, Handle<FogMaterial>)>>,
+    chunks: Query<
+        (Entity, &Mesh3d, Option<&Children>, Has<WaterPlane>),
+        Or<(With<TerrainChunk>, With<WaterPlane>)>,
+    >,
     veils: Query<Entity, With<Veil>>,
 ) {
     if !mode.0 {
@@ -158,25 +173,37 @@ fn drape_the_veil(
         }
         return;
     }
-    // One material for every chunk: the uniform describes the whole world,
-    // not any one piece of it.
-    let cloth = cloth.get_or_insert_with(|| materials.add(FogMaterial::default()));
-    for (chunk, mesh, children) in &chunks {
+    // Two cloths, and both describe the whole world: one sheer, for
+    // stacking over the land, and one at full weight for the sea's single
+    // sheet. The holes in them are the same holes.
+    let (cloth, deep) = cloth.get_or_insert_with(|| {
+        let sheer = FogMaterial::default();
+        let mut solid = FogMaterial::default();
+        // What six sheer sheets come to, in one.
+        solid.params.tint.w = 1.0 - (1.0 - sheer.params.tint.w).powi(SHEETS as i32);
+        (materials.add(sheer), materials.add(solid))
+    });
+    for (chunk, mesh, children, sea) in &chunks {
         let dressed = children.map_or(0, |kids| {
             kids.iter().filter(|kid| veils.contains(*kid)).count()
         });
-        if dressed >= SHEETS {
+        let wanted = if sea { 1 } else { SHEETS };
+        if dressed >= wanted {
             continue;
         }
-        for sheet in dressed..SHEETS {
+        for sheet in dressed..wanted {
             // The lowest sits a hand's breadth up, so it never fights the
             // ground it covers for the same pixel; the rest climb to the
             // top of the bank.
-            let lift = 0.12 + VEIL_HIGH * (sheet as f32 / (SHEETS - 1) as f32);
+            let lift = if sea {
+                SEA_SHEET
+            } else {
+                0.12 + VEIL_HIGH * (sheet as f32 / (SHEETS - 1) as f32)
+            };
             commands.spawn((
                 Veil,
                 Mesh3d(mesh.0.clone()),
-                MeshMaterial3d(cloth.clone()),
+                MeshMaterial3d(if sea { deep.clone() } else { cloth.clone() }),
                 Transform::from_translation(Vec3::Y * lift),
                 // The veil is not a THING. Six sheets hanging over the
                 // world threw six sheets of shadow onto the ground they
