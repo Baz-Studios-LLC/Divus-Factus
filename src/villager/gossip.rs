@@ -172,6 +172,41 @@ pub(crate) fn form_bonds(
 /// miracle for it to change them — they need to know someone who did. What a
 /// villager carries secondhand is counted apart from what they saw, because a
 /// faith built on rumour and a faith built on witness are different faiths,
+/// What two people are talking ABOUT.
+///
+/// It used to be only ever a miracle: the whole conversation system hung
+/// off somebody having a `Witnessed` memory to retell, so two foresters
+/// felling the same tree had no way to talk about the tree. Most talk in
+/// a village is not news - it is the work, the food, the roof and the
+/// weather - and a village that only speaks when the god does something
+/// is a very quiet village.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Chat {
+    /// Something one of them saw the god do.
+    Memory(crate::witness::DivineEventKind),
+    /// The trade they share, or the one the opener holds.
+    Work(work::Vocation),
+    /// The stores, and what there is to eat.
+    Food,
+    /// Roofs: who has one, who is still waiting.
+    Roof,
+    /// What the sky is doing to them.
+    Weather,
+}
+
+impl Chat {
+    /// The tag the corpus knows this subject by.
+    pub fn tag(self) -> String {
+        match self {
+            Chat::Memory(kind) => format!("event:{kind:?}").to_lowercase(),
+            Chat::Work(trade) => format!("topic:{}", trade.trade()),
+            Chat::Food => "topic:food".to_string(),
+            Chat::Roof => "topic:roof".to_string(),
+            Chat::Weather => "topic:weather".to_string(),
+        }
+    }
+}
+
 /// A conversation in progress: who with, when it ends, and how far the
 /// telling has got.
 #[derive(Component)]
@@ -186,7 +221,11 @@ pub struct Conversing {
     /// What the exchange is about, carried by BOTH speakers so the later
     /// beats stay on topic instead of being reinvented from whatever the
     /// speaker happens to remember.
-    pub topic: Option<crate::witness::DivineEventKind>,
+    pub topic: Option<Chat>,
+    /// Whether this one opened it. The two sides used to be told apart by
+    /// which of them held the memory, which stops working the moment a
+    /// conversation is about the weather.
+    pub opener: bool,
     /// The whole memory, not just its kind: the telling needs who it
     /// happened to, in the teller's own terms.
     ///
@@ -240,6 +279,14 @@ pub(crate) fn meet_to_talk(
             Without<Conversing>,
         ),
     >,
+    // What there is to talk about besides miracles: the work in their
+    // hands, whether they have eaten, whether they have a bed.
+    circumstances: Query<(
+        Option<&work::Vocation>,
+        Option<&super::Needs>,
+        Has<super::home::Home>,
+    )>,
+    weather: Option<Res<crate::weather::Weather>>,
 ) {
     *since_last += time.delta_secs();
     if *since_last < GOSSIP_INTERVAL {
@@ -255,10 +302,25 @@ pub(crate) fn meet_to_talk(
         if paired.contains(&teller) {
             continue;
         }
-        let Some(memory) = witnessed.recent.first().cloned() else {
-            continue;
+        let memory = witnessed.recent.first().cloned();
+        // Who is free to fall into conversation. News interrupts an idle
+        // moment; ordinary talk also happens over the work, at the fire,
+        // and under the eaves waiting out rain - which is most of when
+        // people actually talk to each other. Requiring both parties to
+        // be idle meant the only pairs that ever qualified were the one
+        // or two nobody had given a job to, and they were never standing
+        // near each other.
+        let free_to_talk = |activity: &Activity| {
+            matches!(
+                activity,
+                Activity::Idle
+                    | Activity::Wandering
+                    | Activity::Working
+                    | Activity::Sheltering
+                    | Activity::TendingFire
+            )
         };
-        if !matches!(*activity, Activity::Idle | Activity::Wandering) {
+        if !free_to_talk(activity) {
             continue;
         }
         // A story wears out in its own telling: each retelling cools the
@@ -267,23 +329,75 @@ pub(crate) fn meet_to_talk(
         // every witness retelling it in a loop forever.
         let tongue = manner.map_or(1.0, |m| m.talkativeness());
         let fatigue = 1.0 / (1.0 + witnessed.told as f32 * 0.8);
-        if !rng.0.chance((0.4 * tongue * fatigue).min(0.95)) {
+        // With news, the urge is the story's. Without it, it is just the
+        // ordinary wish to say something to somebody - rarer, because a
+        // village where every passing pair strikes up a conversation is
+        // as unreal as one where nobody ever does.
+        let urge = if memory.is_some() {
+            0.4 * tongue * fatigue
+        } else {
+            0.14 * tongue
+        };
+        if !rng.0.chance(urge.min(0.95)) {
             continue;
         }
         // The nearest idle neighbour becomes the audience.
+        // News is worth crossing a yard for; a word about the weather is
+        // said to whoever is already beside you.
+        let reach = if memory.is_some() {
+            EARSHOT * 2.0
+        } else {
+            EARSHOT * 1.4
+        };
         let Some((listener, _)) = talkers
             .iter()
             .filter(|(other, _, other_activity, _, _)| {
-                *other != teller
-                    && !paired.contains(other)
-                    && matches!(**other_activity, Activity::Idle | Activity::Wandering)
+                *other != teller && !paired.contains(other) && free_to_talk(other_activity)
             })
             .map(|(other, other_at, ..)| (other, other_at.translation.distance(at.translation)))
-            .filter(|(_, d)| *d <= EARSHOT * 2.0)
+            .filter(|(_, d)| *d <= reach)
             .min_by(|a, b| a.1.total_cmp(&b.1))
         else {
             continue;
         };
+        // What the two of them have to talk about, if it is not news.
+        // Shared circumstances first - the same trade, the same empty
+        // stomach, the same lack of a roof - because that is what people
+        // actually talk about, and only then the sky, which is what you
+        // fall back on with a stranger.
+        let subject = match memory.as_ref() {
+            Some(memory) => Chat::Memory(memory.kind),
+            None => {
+                let mine = circumstances.get(teller).ok();
+                let theirs = circumstances.get(listener).ok();
+                let (my_trade, my_needs, my_roof) = mine.unwrap_or((None, None, false));
+                let (their_trade, their_needs, their_roof) = theirs.unwrap_or((None, None, false));
+                let both_hungry = my_needs.is_some_and(|n| n.hunger > 0.4)
+                    && their_needs.is_some_and(|n| n.hunger > 0.4);
+                let both_roofless = !my_roof && !their_roof;
+                let shared_trade = my_trade
+                    .copied()
+                    .filter(|mine| Some(mine) == their_trade.as_deref());
+                let foul = weather
+                    .as_ref()
+                    .is_some_and(|weather| weather.intensity > 0.25 || weather.chill > 0.5);
+                match (shared_trade, both_hungry, both_roofless, foul) {
+                    (Some(trade), ..) => Chat::Work(trade),
+                    (_, true, ..) => Chat::Food,
+                    (_, _, true, _) => Chat::Roof,
+                    (_, _, _, true) => Chat::Weather,
+                    // Nothing pressing in common: their own work, or the
+                    // weather if they have no trade between them.
+                    _ => my_trade.copied().map_or(Chat::Weather, Chat::Work),
+                }
+            }
+        };
+        // Logged, because a chat about the work writes no chronicle and
+        // shows no bubble unless the god happens to be watching - which
+        // leaves a soak no way at all to tell talking from silence.
+        if memory.is_none() {
+            info!("two of them fell to talking about {}", subject.tag());
+        }
         paired.push(teller);
         paired.push(listener);
         let until = clock.elapsed + 14.0;
@@ -293,8 +407,9 @@ pub(crate) fn meet_to_talk(
                 until,
                 spoke_at: None,
                 beat: 0,
-                topic: Some(memory.kind),
-                kind: Some(memory.clone()),
+                topic: Some(subject),
+                opener: true,
+                kind: memory.clone(),
             },
             Activity::Chatting,
         ));
@@ -304,7 +419,8 @@ pub(crate) fn meet_to_talk(
                 until,
                 spoke_at: None,
                 beat: 0,
-                topic: Some(memory.kind),
+                topic: Some(subject),
+                opener: false,
                 kind: None,
             },
             Activity::Chatting,
@@ -575,7 +691,7 @@ pub(crate) fn hold_conversations(
             }
         }
         // The reply, a beat after the meeting settles, from the listener.
-        if talk.kind.is_none() && talk.beat == 0 && clock.elapsed > talk.until - 9.0 {
+        if !talk.opener && talk.beat == 0 && clock.elapsed > talk.until - 9.0 {
             talk.beat = 1;
             let regard = crate::attention::regard(attention.as_deref(), at.translation);
             // Their own answer, if it came back in time. Composed against
@@ -595,14 +711,60 @@ pub(crate) fn hold_conversations(
                 }
                 continue;
             }
-            // No composed answer, no answer: a beat of silence is honest.
+            // No composed answer: the corpus answers instead, on topic.
+            // Silence was honest when the only subject was a miracle and
+            // the only source was a model; a chat about the day's work
+            // has a pool of its own and no excuse to go quiet.
+            if let Some(topic) = talk.topic {
+                let trust = minds
+                    .get(entity)
+                    .ok()
+                    .and_then(|(_, _, _, faith)| faith.map(|f| f.trust))
+                    .unwrap_or(0.3);
+                let voice = voices.get(entity).ok().and_then(|(v, ..)| v.copied());
+                let answered = tongue.as_mut().and_then(|tongue| {
+                    tongue.turn(
+                        entity,
+                        "chat:reply",
+                        &topic.tag(),
+                        crate::telling::FaithBand::of(trust),
+                        voice,
+                        None,
+                    )
+                });
+                if let Some(line) = answered
+                    && regard.worth_saying()
+                {
+                    say.write(crate::ui::Say {
+                        speaker: entity,
+                        text: line.replace("the god", god),
+                        thought: false,
+                        prayer: false,
+                        own_words: true,
+                    });
+                }
+            }
         }
 
         // The two later beats. Nothing changes hands here - the story
         // moved on the opener, and everything after it is the two of them
         // working out what to make of it. That split is the whole reason
         // a four-beat conversation does not spread a rumour four times.
-        let role = beat_role(talk.kind.is_some(), talk.beat, clock.elapsed, talk.until);
+        // A chat about the work or the weather has no story to hand over,
+        // so it never enters the telling above - it opens here instead,
+        // and runs the same four beats.
+        let role = if talk.kind.is_none() && talk.opener {
+            match talk.beat {
+                0 => {
+                    talk.spoke_at = Some(clock.elapsed);
+                    Some("chat:open")
+                }
+                1 if clock.elapsed > talk.until - 6.0 => Some("chat:followup"),
+                _ => None,
+            }
+        } else {
+            beat_role(talk.opener, talk.beat, clock.elapsed, talk.until)
+        };
         if let Some(role) = role
             && let Some(topic) = talk.topic
         {
@@ -629,7 +791,7 @@ pub(crate) fn hold_conversations(
                     tongue.turn(
                         entity,
                         role,
-                        topic,
+                        &topic.tag(),
                         crate::telling::FaithBand::of(trust),
                         voice,
                         whom.as_deref(),

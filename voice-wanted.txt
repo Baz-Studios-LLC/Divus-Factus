@@ -1,6 +1,14 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-    2  (worn pool) chat:followup wavering
-    2  (worn pool) chat:end wavering
-    2  (worn pool) chat:followup event:mauled
-    1  (worn pool) chat:end trade:builder
+   17  chat:reply event:mauled trade:forester wavering
+    8  (worn pool) chat:open topic:roof
+    8  chat:reply event:mauled trade:guard wavering
+    7  (worn pool) chat:end
+    6  (worn pool) chat:end wavering
+    6  (worn pool) chat:reply topic:roof
+    6  chat:reply event:mauled trade:builder wavering
+    4  (worn pool) chat:followup wavering
+    4  chat:reply event:mauled trade:miner wavering
+    4  (worn pool) chat:followup event:mauled
+    3  chat:reply event:mauled trade:fisher wavering
+    1  chat:reply event:mauled trade:gatherer wavering

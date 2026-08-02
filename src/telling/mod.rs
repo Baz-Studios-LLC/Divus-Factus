@@ -274,13 +274,12 @@ impl Tongue {
         &mut self,
         who: Entity,
         role: &'static str,
-        about: crate::witness::DivineEventKind,
+        about: &str,
         faith: FaithBand,
         voice: Option<Vocation>,
         whom: Option<&str>,
     ) -> Option<String> {
-        let kind = format!("event:{about:?}").to_lowercase();
-        let mut tags = vec![role, kind.as_str(), faith_tag(faith)];
+        let mut tags = vec![role, about, faith_tag(faith)];
         tags.extend(voice.map(trade_tag));
         let slots: Vec<(&str, &str)> = whom.map(|whom| ("whom", whom)).into_iter().collect();
         self.voice
