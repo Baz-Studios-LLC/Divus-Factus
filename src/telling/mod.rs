@@ -263,6 +263,31 @@ impl Tongue {
             .map(|said| tidy(&said))
     }
 
+    /// A line for one beat of a conversation: the teller's followup, the
+    /// listener's close, whatever role the exchange has reached.
+    ///
+    /// Unlike [`Tongue::line`] this carries no memory and moves no
+    /// knowledge - the story changed hands on the opener, and everything
+    /// after it is interpretation. That split is what keeps a four-beat
+    /// conversation from propagating a rumour four times.
+    pub fn turn(
+        &mut self,
+        who: Entity,
+        role: &'static str,
+        about: crate::witness::DivineEventKind,
+        faith: FaithBand,
+        voice: Option<Vocation>,
+        whom: Option<&str>,
+    ) -> Option<String> {
+        let kind = format!("event:{about:?}").to_lowercase();
+        let mut tags = vec![role, kind.as_str(), faith_tag(faith)];
+        tags.extend(voice.map(trade_tag));
+        let slots: Vec<(&str, &str)> = whom.map(|whom| ("whom", whom)).into_iter().collect();
+        self.voice
+            .pick(who.to_bits(), &tags, &slots, &mut self.dice)
+            .map(|said| tidy(&said))
+    }
+
     /// Picks someone's thought (or their reply) on the spot. The old
     /// teller composed ahead of the beat; the corpus needs no head start.
     pub fn muse(&mut self, of: Musing) {

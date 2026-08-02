@@ -179,7 +179,14 @@ pub struct Conversing {
     pub partner: Entity,
     pub until: f64,
     pub spoke_at: Option<f64>,
-    pub replied: bool,
+    /// How many turns THIS speaker has taken. A conversation is four
+    /// beats now - the telling, the answer, the teller's followup, the
+    /// listener's close - and each side takes two of them.
+    pub beat: u8,
+    /// What the exchange is about, carried by BOTH speakers so the later
+    /// beats stay on topic instead of being reinvented from whatever the
+    /// speaker happens to remember.
+    pub topic: Option<crate::witness::DivineEventKind>,
     /// The whole memory, not just its kind: the telling needs who it
     /// happened to, in the teller's own terms.
     ///
@@ -187,6 +194,26 @@ pub struct Conversing {
     /// reply is composed, straight from their own memories — the old
     /// `hearing` echo retired with the stock replies it served.)
     pub kind: Option<crate::witness::Memory>,
+}
+
+/// Whose turn it is to speak, and in what role.
+///
+/// A conversation is four beats: the teller's opener, the listener's
+/// answer, the teller's followup, the listener's close. The first two are
+/// handled where the story changes hands; this schedules the two after
+/// it, which carry no knowledge and only interpretation.
+///
+/// Spaced so it reads as an exchange rather than a volley - the answer
+/// five seconds in, the followup at eight, the close at eleven, and three
+/// seconds of standing together before they part.
+fn beat_role(teller: bool, beat: u8, elapsed: f64, until: f64) -> Option<&'static str> {
+    match (teller, beat) {
+        // The teller pushes, softens, or explains themselves.
+        (true, 1) if elapsed > until - 6.0 => Some("chat:followup"),
+        // And the listener closes it.
+        (false, 1) if elapsed > until - 3.0 => Some("chat:end"),
+        _ => None,
+    }
 }
 
 /// Whoever has news finds an idle neighbour and goes TO them: both stop,
@@ -265,7 +292,8 @@ pub(crate) fn meet_to_talk(
                 partner: listener,
                 until,
                 spoke_at: None,
-                replied: false,
+                beat: 0,
+                topic: Some(memory.kind),
                 kind: Some(memory.clone()),
             },
             Activity::Chatting,
@@ -275,7 +303,8 @@ pub(crate) fn meet_to_talk(
                 partner: teller,
                 until,
                 spoke_at: None,
-                replied: false,
+                beat: 0,
+                topic: Some(memory.kind),
                 kind: None,
             },
             Activity::Chatting,
@@ -361,6 +390,7 @@ pub(crate) fn hold_conversations(
         {
             let kind = memory.kind;
             talk.spoke_at = Some(clock.elapsed);
+            talk.beat = 1;
             let teller_name = minds
                 .get(entity)
                 .map(|(p, ..)| p.name.clone())
@@ -545,8 +575,8 @@ pub(crate) fn hold_conversations(
             }
         }
         // The reply, a beat after the meeting settles, from the listener.
-        if talk.kind.is_none() && !talk.replied && clock.elapsed > talk.until - 9.0 {
-            talk.replied = true;
+        if talk.kind.is_none() && talk.beat == 0 && clock.elapsed > talk.until - 9.0 {
+            talk.beat = 1;
             let regard = crate::attention::regard(attention.as_deref(), at.translation);
             // Their own answer, if it came back in time. Composed against
             // the actual words they heard, so it reacts instead of picking
@@ -566,6 +596,54 @@ pub(crate) fn hold_conversations(
                 continue;
             }
             // No composed answer, no answer: a beat of silence is honest.
+        }
+
+        // The two later beats. Nothing changes hands here - the story
+        // moved on the opener, and everything after it is the two of them
+        // working out what to make of it. That split is the whole reason
+        // a four-beat conversation does not spread a rumour four times.
+        let role = beat_role(talk.kind.is_some(), talk.beat, clock.elapsed, talk.until);
+        if let Some(role) = role
+            && let Some(topic) = talk.topic
+        {
+            talk.beat = 2;
+            let regard = crate::attention::regard(attention.as_deref(), at.translation);
+            let said = tongue
+                .as_mut()
+                .filter(|_| regard.worth_saying())
+                .and_then(|tongue| {
+                    let (voice, _, _) = voices
+                        .get(entity)
+                        .map(|(v, t, manner)| (v.copied(), t, manner))
+                        .unwrap_or((None, None, None));
+                    let trust = minds
+                        .get(entity)
+                        .ok()
+                        .and_then(|(_, _, _, faith)| faith.map(|f| f.trust))
+                        .unwrap_or(0.3);
+                    let whom = talk
+                        .kind
+                        .as_ref()
+                        .and_then(|memory| memory.whom.as_ref())
+                        .map(|whom| whom.name.clone());
+                    tongue.turn(
+                        entity,
+                        role,
+                        topic,
+                        crate::telling::FaithBand::of(trust),
+                        voice,
+                        whom.as_deref(),
+                    )
+                });
+            if let Some(line) = said {
+                say.write(crate::ui::Say {
+                    speaker: entity,
+                    text: line.replace("the god", god),
+                    thought: false,
+                    prayer: false,
+                    own_words: true,
+                });
+            }
         }
     }
 }
@@ -745,6 +823,64 @@ mod tests {
         // His own name is untouched, and carries no maiden note.
         assert_eq!(husband.full_name(), "Shezirav Rohap");
         assert_eq!(husband.maiden_house(), None);
+    }
+
+    #[test]
+    fn a_conversation_runs_four_beats_in_order() {
+        // The whole exchange, on the clock it actually uses: a meeting
+        // that ends at 14 seconds. Nobody speaks out of turn, nobody
+        // speaks twice, and the two later beats do not fire until the
+        // ones before them have.
+        let until = 14.0;
+        let at = |t: f64| until - 14.0 + t;
+
+        // The teller has opened (beat 1) and the listener has answered
+        // (beat 1). Neither later beat is due yet.
+        assert_eq!(beat_role(true, 1, at(6.0), until), None);
+        assert_eq!(beat_role(false, 1, at(6.0), until), None);
+
+        // Eight seconds in, the teller follows up - and only the teller.
+        assert_eq!(beat_role(true, 1, at(8.5), until), Some("chat:followup"));
+        assert_eq!(beat_role(false, 1, at(8.5), until), None);
+
+        // Eleven, and the listener closes it.
+        assert_eq!(beat_role(false, 1, at(11.5), until), Some("chat:end"));
+
+        // Nobody who has not taken their first beat gets a later one, and
+        // nobody speaks a third time.
+        for who in [true, false] {
+            assert_eq!(
+                beat_role(who, 0, at(13.0), until),
+                None,
+                "spoke out of turn"
+            );
+            assert_eq!(beat_role(who, 2, at(13.0), until), None, "spoke twice");
+        }
+    }
+
+    #[test]
+    fn every_conversation_beat_has_something_to_say() {
+        // A role with no line for some event is a beat of silence in the
+        // middle of a conversation, which reads worse than no
+        // conversation at all. Both roles need an unconditional line -
+        // one that needs nothing of the speaker but the topic.
+        let corpus: Vec<serde_json::Value> =
+            serde_json::from_str(include_str!("../../assets/voice/chat.json")).expect("chat.json");
+        for role in ["chat:followup", "chat:end"] {
+            let plain = corpus
+                .iter()
+                .filter(|line| {
+                    let tags: Vec<&str> = line["tags"]
+                        .as_array()
+                        .expect("tags")
+                        .iter()
+                        .map(|t| t.as_str().expect("tag"))
+                        .collect();
+                    tags == [role]
+                })
+                .count();
+            assert!(plain >= 4, "{role} has only {plain} lines that always fit");
+        }
     }
 
     #[test]
