@@ -1,4 +1,3 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-    1  event:lifted saw tell trade:forester wavering
-    1  event:delivered saw tell trade:forester wavering
+    1  (worn pool) reply wavering

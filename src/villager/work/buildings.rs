@@ -188,6 +188,23 @@ pub struct CivicNeeds {
     pub rock_near: bool,
 }
 
+/// A trade and the works it will raise for ITSELF when the village has
+/// none — without waiting on the civic ladder, which will not reach any
+/// of these until everybody is housed and the town has grown to ten.
+///
+/// `at_once` says whether the works outrank the trade's ordinary work. A
+/// fisher on a bare shore and a miner chipping loose boulders should both
+/// down tools and build: the works are what makes their trade worth
+/// having. A forester must NOT — the sawmill is built out of the timber
+/// they have not cut yet — and a healer's patients come first. Those two
+/// raise their works only when their own trade has nothing for them.
+pub const OWN_WORKS: &[(Vocation, BuildingKind, bool)] = &[
+    (Vocation::Fisher, BuildingKind::Dock, true),
+    (Vocation::Miner, BuildingKind::Mine, true),
+    (Vocation::Forester, BuildingKind::Sawmill, false),
+    (Vocation::Healer, BuildingKind::Herbalist, false),
+];
+
 /// Chooses the next civic building by NEED, not by a fixed ladder: each
 /// candidate scores against what the village actually lacks, and the
 /// loudest need above a threshold gets ground broken. Soft population
@@ -280,7 +297,9 @@ pub struct RoofNeeds {
     pub houses: usize,
     pub longhouses: usize,
     pub population: usize,
-    pub house_rising: bool,
+    /// How many family roofs are already going up. A count, not a flag:
+    /// one-at-a-time was a queue, and a founding village spent days in it.
+    pub houses_rising: usize,
     pub longhouse_rising: bool,
     /// Grown souls with no roof at all tonight.
     pub roofless: usize,
@@ -302,16 +321,28 @@ pub fn next_roof(needs: &RoofNeeds) -> Option<BuildingKind> {
     let family_slack = (needs.houses * HOUSE_CAPACITY) as i32 - needs.family_souls as i32;
     let single_slack = (needs.longhouses * LONGHOUSE_CAPACITY) as i32 - needs.single_souls as i32;
 
-    // A hall shelters EIGHT of anybody, and it is the only roof that will
-    // take a stranger. While people are sleeping in the dirt and no hall
-    // stands, the hall goes first however the slack falls: it is the
-    // shortest road from a village in the open to a village under cover.
-    // Houses are the reward that follows, not the way out of the rain.
-    if needs.roofless > 0 && needs.longhouses == 0 && !needs.longhouse_rising {
-        return Some(BuildingKind::Longhouse);
+    // The hall goes up first, and ALONE. It sleeps ten of anybody, which
+    // on the founding morning is the whole village, and it is the only
+    // roof that will take a stranger - the shortest road there is from
+    // people in the dirt to people under cover. Nothing else is planned
+    // until it stands: a family house begun beside it only splits the
+    // hands that could be closing it in, and both then take twice as
+    // long. Houses are the reward that follows, not the way out of the
+    // rain.
+    if needs.longhouses == 0 && needs.roofless > 0 {
+        return (!needs.longhouse_rising).then_some(BuildingKind::Longhouse);
     }
 
-    let want_house = family_slack < HOUSE_CAPACITY as i32 && !needs.house_rising;
+    // How many family roofs may rise at once. This was ONE, ever, and it
+    // made a queue nothing could shorten: six couples wed on the founding
+    // morning meant six houses in series, while the timber pile grew past
+    // three hundred and carpenters wandered off for want of a site. The
+    // cap is the shortfall itself now - a roof for every four kin who
+    // want one - held to three, so a village never carries more open
+    // shells than its hands can close in.
+    let short = (needs.family_souls as i32 - (needs.houses * HOUSE_CAPACITY) as i32).max(0);
+    let may_rise = (short as usize).div_ceil(HOUSE_CAPACITY).clamp(1, 3);
+    let want_house = family_slack < HOUSE_CAPACITY as i32 && needs.houses_rising < may_rise;
     // A longhouse is a big single commitment: eight beds' worth of timber in
     // one build. A hamlet puts what it has into family roofs first and
     // sleeps its handful of unwed by the fire until there are enough of them
@@ -595,13 +626,16 @@ impl Blueprint {
                 shed_roof: true,
                 stuff: BuildStuff::Timber,
             },
-            // A narrow stone finger with a platform at the top.
+            // A narrow stone finger with a platform at the top. Tall
+            // enough to see over the canopy, which is the entire point of
+            // climbing one - at three and a half metres it was a shed
+            // with ambitions.
             BuildingKind::Watchtower => Blueprint {
                 kind,
                 plan,
-                half_w: 1.1,
-                half_d: 1.1,
-                wall_h: 3.6,
+                half_w: 1.35,
+                half_d: 1.35,
+                wall_h: 7.5,
                 walls: pal::shade(&pal::STONE, 0.4),
                 roof: pal::shade(&pal::WOOD, 0.4),
                 shed_roof: false,
@@ -1951,6 +1985,8 @@ pub(crate) fn plan_houses(
     let mut farmers = 0usize;
     let mut foresters = 0usize;
     let mut miners = 0usize;
+    let mut guards = 0usize;
+    let mut healers = 0usize;
     // Shelter demand splits in two, because the roofs do: the wed and their
     // children want family houses, everyone else wants longhouse beds. A
     // village with four spare house rooms and no longhouse bed is not
@@ -1985,9 +2021,26 @@ pub(crate) fn plan_houses(
             Some(Vocation::Farmer) => farmers += 1,
             Some(Vocation::Forester) => foresters += 1,
             Some(Vocation::Miner) => miners += 1,
+            Some(Vocation::Guard) => guards += 1,
+            Some(Vocation::Healer) => healers += 1,
             _ => {}
         }
     }
+    // Hands at each trade that raises its own works.
+    let hands_at = |trade: Vocation| match trade {
+        Vocation::Fisher => fishers,
+        Vocation::Miner => miners,
+        Vocation::Forester => foresters,
+        Vocation::Healer => healers,
+        _ => 0,
+    };
+    // What the village is carrying of the teeth, and who is standing
+    // watch because of it.
+    let peril = crate::witness::peril_of(remembered.iter().copied(), clock.day());
+    let standing_longhouses = civics
+        .iter()
+        .filter(|(b, member)| b.kind == BuildingKind::Longhouse && member.0 == settlement)
+        .count();
 
     let has_kind = |kind: BuildingKind| {
         civics
@@ -2051,6 +2104,50 @@ pub(crate) fn plan_houses(
         && !has_kind(BuildingKind::Dock)
     {
         BuildingKind::Dock
+    // A trade with no works to work at raises its own — see OWN_WORKS.
+    // The person who needs the building is the person who breaks ground
+    // for it. Never before the first hall, though: ten beds under one
+    // roof outranks any works, and a village that starts a sawmill on
+    // its founding morning is a village milling planks over people
+    // asleep in the open.
+    } else if let Some(works) = (standing_longhouses > 0 || roofless_adults == 0)
+        .then(|| {
+            OWN_WORKS
+                .iter()
+                .find(|(trade, works, _)| {
+                    hands_at(*trade) > 0
+                        && !has_kind(*works)
+                        && store_now.timber >= 2.0
+                        && match works {
+                            BuildingKind::Dock => shore_near,
+                            BuildingKind::Mine => rock_near,
+                            _ => true,
+                        }
+                })
+                .map(|(_, works, _)| *works)
+        })
+        .flatten()
+    {
+        works
+    // And one need outranks even that: a village that has been bitten
+    // puts up a watch. This jumps the whole queue on purpose. The civic
+    // ladder wants everyone housed first, ten souls in the town and six
+    // stone in the pile, and by the time all three are true the fear has
+    // faded and the tower is never built - while the tower is the only
+    // thing in the world that actually stops a mauling, because wolves
+    // will not hunt in its shadow. A guard is not civic ambition. It is
+    // somebody frightened doing something about it.
+    } else if guards > 0
+        && peril >= 1.5
+        && !has_kind(BuildingKind::Watchtower)
+        && store_now.timber >= 2.0
+        // But never before the first hall. Ten beds under one roof is
+        // still the shortest road out of the dirt, and a village that
+        // starts a tower on its founding morning is a village raising a
+        // lookout over people asleep in the open.
+        && (standing_longhouses > 0 || roofless_adults == 0)
+    {
+        BuildingKind::Watchtower
     } else if let Some(roof) = {
         let rising = |kind: BuildingKind| {
             pending
@@ -2070,7 +2167,10 @@ pub(crate) fn plan_houses(
             houses: standing(BuildingKind::House),
             longhouses: standing(BuildingKind::Longhouse),
             population,
-            house_rising: rising(BuildingKind::House),
+            houses_rising: pending
+                .iter()
+                .filter(|(b, _, member)| b.kind == BuildingKind::House && member.0 == settlement)
+                .count(),
             longhouse_rising: rising(BuildingKind::Longhouse),
         })
     } {
@@ -2111,7 +2211,7 @@ pub(crate) fn plan_houses(
             farmers,
             foresters,
             fields: fields.iter().count(),
-            peril: crate::witness::peril_of(remembered.iter().copied(), clock.day()),
+            peril,
             pending_builds: pending
                 .iter()
                 .filter(|(_, _, member)| member.0 == settlement)
@@ -2295,7 +2395,17 @@ pub(crate) fn plan_houses(
     let ring_reach = 5 + (population / 6) as u32;
     // Both roofs are homes, and homes leave the plaza to the civic works.
     let dwelling = matches!(kind, BuildingKind::House | BuildingKind::Longhouse);
-    let rings = if dwelling {
+    let rings = if kind == BuildingKind::Watchtower {
+        // A watch post belongs on the edge of the village's reach, not
+        // in the middle of its square. Civic works take the inner ring
+        // because that is where people go to use them; nobody visits a
+        // tower. Out here its shadow - the fifty-five metres wolves will
+        // not hunt inside of - falls across the ground where people are
+        // actually taken, which in a soak was sixty to a hundred and
+        // forty strides out. In the plaza it covered nothing but the
+        // plaza.
+        2..(ring_reach.min(5) + 1)
+    } else if dwelling {
         1..ring_reach
     } else {
         0..ring_reach.min(7)
@@ -2393,11 +2503,21 @@ pub(crate) fn plan_houses(
             plan.half_d *= 1.12;
         }
         // A land of woods and nothing else still shelters its people: with
-        // no stone in the pile and no clay to brick, a timber home is
-        // post-framed straight into the earth and owes the masons nothing.
-        // Another path to a roof — until fire comes to the world, when
-        // these will be the homes that fear it.
-        let timber_footing = dwelling && store_now.stone < 1.0 && store_now.clay < 1.0;
+        // nothing to found on, a timber home is post-framed straight into
+        // the earth and owes the masons nothing. Another path to a roof —
+        // until fire comes to the world, when these will be the homes
+        // that fear it.
+        //
+        // And a roofless village always takes that path. The test used to
+        // be an EMPTY pile, so a founding hall with one chip of stone in
+        // the store waited on the other three - and on the founding
+        // morning that is a hundred seconds of everybody sleeping in the
+        // dirt beside sixty timber, while one mason walks to a boulder
+        // and back four times. Stone footings are for the village that
+        // already has roofs; people in the open get posts in the ground
+        // tonight.
+        let nothing_to_found_on = store_now.stone < 1.0 && store_now.clay < 1.0;
+        let timber_footing = dwelling && (nothing_to_found_on || roofless_adults > 0);
         if dwelling {
             // The land dictates the walls: too few standing trees within a
             // working walk makes timber homes a fantasy - build from what
@@ -2672,7 +2792,7 @@ mod tests {
             houses: family.div_ceil(HOUSE_CAPACITY),
             longhouses: single.div_ceil(LONGHOUSE_CAPACITY),
             population: family + single,
-            house_rising: false,
+            houses_rising: 0,
             longhouse_rising: false,
             // Snug means everyone is under a roof already, which is what
             // lets these cases test the slack arithmetic rather than the
@@ -2693,7 +2813,7 @@ mod tests {
             houses: 0,
             longhouses: 0,
             population: 12,
-            house_rising: false,
+            houses_rising: 0,
             longhouse_rising: false,
             roofless: 12,
         };
@@ -2923,7 +3043,7 @@ mod tests {
         assert_eq!(next_roof(&wants_house), Some(BuildingKind::House));
         assert_eq!(
             next_roof(&RoofNeeds {
-                house_rising: true,
+                houses_rising: 1,
                 ..wants_house
             }),
             None

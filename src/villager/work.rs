@@ -44,6 +44,12 @@ const WORK_SECONDS: f32 = 6.0;
 /// How close counts as being at the worksite.
 const WORK_RANGE: f32 = 2.8;
 
+/// What one trip to the rock is worth, before craft. A single block was
+/// the old figure, and the walk out to a boulder is long enough that a
+/// four-stone footing cost a founding village most of a morning with
+/// sixty timber already stacked beside the plot. A barrow, not a pocket.
+const LOOSE_STONE: f32 = 2.5;
+
 /// How far afield anyone will go to work.
 pub(crate) const WORK_REACH: f32 = 170.0;
 
@@ -621,6 +627,19 @@ pub(super) fn do_work(
             continue;
         }
 
+        // A guard whose job is a broken plot is raising a watch post, and
+        // builds it exactly as a carpenter would. Wolves still come first
+        // - the hammer goes down the moment one shows.
+        // A tradesman whose job is a broken plot is raising their own
+        // works - the guard his watch post, the fisher her dock - and
+        // builds it exactly as a carpenter would. The trade still comes
+        // first where it has a claim: the guard's hammer goes down the
+        // moment a wolf shows.
+        let own_works =
+            OWN_WORKS.iter().any(|(trade, ..)| trade == vocation) || *vocation == Vocation::Guard;
+        let raising_a_post =
+            own_works && job.focus.is_some_and(|site| build_sites.get(site).is_ok());
+
         // Guards are their own trade: no pile, no yield — the work is the
         // walking, and the wolves are the deadline.
         if *vocation == Vocation::Guard {
@@ -670,28 +689,34 @@ pub(super) fn do_work(
                 }
                 continue;
             }
-            // No wolves in sight: walk the round. A new leg of the patrol
-            // whenever the last one is done.
-            if at.distance(job.site) > 2.0 {
-                target.0 = Some(job.site);
-            } else {
-                target.0 = None;
-                job.progress += dt;
-                if job.progress >= 6.0 {
-                    job.progress = 0.0;
-                    let angle = rng.0.range(0.0, std::f32::consts::TAU);
-                    let (sin, cos) = angle.sin_cos();
-                    let reach = rng.0.range(14.0, 30.0);
-                    let (x, z) = (centre.x + cos * reach, centre.z + sin * reach);
-                    job.site = Vec3::new(x, 0.0, z);
+            // No wolves in sight. If ground is broken for a watch post,
+            // THAT is the work - a guard raises their own tower, and
+            // falls through to the builder's loop below to do it. Only a
+            // guard with nothing rising walks the round.
+            if !raising_a_post {
+                // A new leg of the patrol whenever the last one is done.
+                if at.distance(job.site) > 2.0 {
+                    target.0 = Some(job.site);
+                } else {
+                    target.0 = None;
+                    job.progress += dt;
+                    if job.progress >= 6.0 {
+                        job.progress = 0.0;
+                        let angle = rng.0.range(0.0, std::f32::consts::TAU);
+                        let (sin, cos) = angle.sin_cos();
+                        let reach = rng.0.range(14.0, 30.0);
+                        let (x, z) = (centre.x + cos * reach, centre.z + sin * reach);
+                        job.site = Vec3::new(x, 0.0, z);
+                    }
                 }
+                continue;
             }
-            continue;
         }
 
         // Carpenters run a fetch-and-carry loop: to the pile for a log, log to
         // the site, hammer it in, and back for the next — every step walked.
-        if *vocation == Vocation::Carpenter {
+        // A guard raising their own watch post runs the same loop.
+        if *vocation == Vocation::Carpenter || raising_a_post {
             let Some(house) = job.focus else {
                 *activity = Activity::Idle;
                 commands.entity(entity).remove::<Job>();
@@ -1199,7 +1224,7 @@ pub(super) fn do_work(
 
             Vocation::Miner | Vocation::Mason => match job.focus {
                 // Bare high ground still yields loose stone.
-                None => store.stone += 1.0 + skill * 0.5,
+                None => store.stone += LOOSE_STONE + skill * 1.5,
                 // The mine: a drift into standing rock gives up stone by
                 // the cartload, and never runs out the way a boulder does.
                 Some(works)
@@ -1238,7 +1263,7 @@ pub(super) fn do_work(
                         commands.entity(entity).remove::<Job>();
                         continue;
                     };
-                    store.stone += 1.0 + skill * 0.5;
+                    store.stone += LOOSE_STONE + skill * 1.5;
                     // An outcrop gives up its stone slowly - the pick takes
                     // the same bite from a much bigger body - then chips
                     // away like any boulder once it is down to one.

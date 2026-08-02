@@ -306,6 +306,27 @@ pub(crate) fn take_up_work(
         // out: the pockets are why expeditions matter to the trades.
         let known_far = |at: Vec3, d: f32| d < 700.0 && known.as_ref().is_some_and(|k| k.knows(at));
 
+        // The works this trade raises for itself, if ground is broken for
+        // it and there is anything to build with. See OWN_WORKS.
+        let raising = |kind: BuildingKind| {
+            (timber >= 1.0)
+                .then(|| {
+                    build_sites.iter().find(|(_, _, cs, plan, member)| {
+                        member.0 == home
+                            && plan.kind == kind
+                            && cs.stone_laid >= cs.footing_stone(plan.kind)
+                    })
+                })
+                .flatten()
+                .map(|(site, at, ..)| {
+                    Job::at(
+                        at.translation,
+                        Some(site),
+                        at.translation.distance(transform.translation),
+                    )
+                })
+        };
+
         let job = match vocation {
             // Gatherers fill the larder first; with food put by, they go
             // after the rarer gifts — incense herb and dyeflowers.
@@ -363,28 +384,37 @@ pub(crate) fn take_up_work(
                 )
             }),
 
-            // The dock is the fisher's post when one stands; the bare
-            // shore otherwise.
-            Vocation::Fisher => buildings
-                .iter()
-                .find(|(_, _, b)| b.kind == BuildingKind::Dock)
-                .map(|(dock, dock_at, _)| {
-                    // The post is out at the deck's end, past the shallows —
-                    // the planks are ground now, and the fish run under the
-                    // far rail.
-                    let at = dock_at.translation() + dock_at.rotation() * Vec3::new(0.0, 0.0, 4.6);
-                    Job::at(at, Some(dock), at.distance(transform.translation))
-                })
-                .or_else(|| {
-                    find_shore(&terrain, centre, &mut rng.0)
-                        .filter(|at| permitted(*at))
-                        .map(|at| Job::at(at, None, at.distance(transform.translation)))
-                }),
+            // The dock is the fisher's post when one stands - and when
+            // one is RISING, laying its planks is the work. A fisher who
+            // fishes off a bare shore all season while the dock they
+            // would rather stand on waits for a spare carpenter has the
+            // wrong priorities, and so did the code.
+            Vocation::Fisher => raising(BuildingKind::Dock).or_else(|| {
+                buildings
+                    .iter()
+                    .find(|(_, _, b)| b.kind == BuildingKind::Dock)
+                    .map(|(dock, dock_at, _)| {
+                        // The post is out at the deck's end, past the shallows —
+                        // the planks are ground now, and the fish run under the
+                        // far rail.
+                        let at =
+                            dock_at.translation() + dock_at.rotation() * Vec3::new(0.0, 0.0, 4.6);
+                        Job::at(at, Some(dock), at.distance(transform.translation))
+                    })
+                    .or_else(|| {
+                        find_shore(&terrain, centre, &mut rng.0)
+                            .filter(|at| permitted(*at))
+                            .map(|at| Job::at(at, None, at.distance(transform.translation)))
+                    })
+            }),
 
             // Miners feed two hungers: the stone every foundation wants,
             // and the ore the blacksmith's fire waits on. Stone while the
             // pile runs thin; the far vein once the village can spare the
             // walk.
+            // A mine going up outranks everything: three cartloads a
+            // swing once it stands, against one barrow off a boulder.
+            Vocation::Miner if raising(BuildingKind::Mine).is_some() => raising(BuildingKind::Mine),
             Vocation::Miner => {
                 // A built mine outranks loose boulders: the drift is dug,
                 // the stone is waiting, and the yard is the miner's post.
@@ -445,7 +475,11 @@ pub(crate) fn take_up_work(
                 WORK_REACH,
                 &known_far,
                 &permitted,
-            ),
+            )
+            // No wood standing in reach: raise the mill instead. Never
+            // before that - the mill is built out of timber they have
+            // not cut yet.
+            .or_else(|| raising(BuildingKind::Sawmill)),
 
             // Carpenters go where ground is broken — if there is timber to work.
             Vocation::Carpenter => {
@@ -644,7 +678,9 @@ pub(crate) fn take_up_work(
                         Some(patient),
                         at.translation.distance(transform.translation),
                     )
-                }),
+                })
+                // Nobody to tend: raise the hut the salves will live in.
+                .or_else(|| raising(BuildingKind::Herbalist)),
 
             // Explorers muster on their own; the expedition system owns them.
             Vocation::Explorer => None,
@@ -660,7 +696,13 @@ pub(crate) fn take_up_work(
 
             // A guard's post is the tower if one stands, the village edge
             // otherwise; the walking of it is the work.
-            Vocation::Guard => {
+            //
+            // Unless one is RISING, in which case that is the work. The
+            // fear that made them a guard is the fear that broke the
+            // ground, and a spear walked in a circle at twenty-two
+            // strides never reaches a mauling out at ninety. The tower
+            // does, because wolves will not come near it.
+            Vocation::Guard => raising(BuildingKind::Watchtower).or_else(|| {
                 let post = buildings
                     .iter()
                     .find(|(_, _, b)| b.kind == BuildingKind::Watchtower)
@@ -672,7 +714,7 @@ pub(crate) fn take_up_work(
                         Vec3::new(x, terrain.height_at(x, z), z)
                     });
                 Some(Job::at(post, None, post.distance(transform.translation)))
-            }
+            }),
         };
 
         // Their own trade had nothing for them. A pair of hands with
@@ -737,13 +779,32 @@ pub(crate) fn take_up_work(
                 )
                 .map(|job| (Vocation::Hunter, job))
             };
+            // A tower going up takes any spare pair of hands before
+            // anything else does. One frightened guard raising a watch
+            // post alone is a long job, and the whole village has an
+            // interest in it being a short one.
+            let raise_the_watch = || {
+                OWN_WORKS
+                    .iter()
+                    .map(|(_, works, _)| *works)
+                    .chain([BuildingKind::Watchtower])
+                    .find_map(|works| raising(works).map(|job| (Vocation::Carpenter, job)))
+            };
             // A thin larder outranks everything; otherwise stone, because
             // stone is the want that stalls a village hardest and berries
             // are the one thing always within reach.
             if larder_thin {
-                pick().or_else(hunt).or_else(cut).or_else(fell)
+                pick()
+                    .or_else(hunt)
+                    .or_else(raise_the_watch)
+                    .or_else(cut)
+                    .or_else(fell)
             } else {
-                cut().or_else(fell).or_else(pick).or_else(hunt)
+                raise_the_watch()
+                    .or_else(cut)
+                    .or_else(fell)
+                    .or_else(pick)
+                    .or_else(hunt)
             }
         };
         let found = match job {
