@@ -2561,6 +2561,35 @@ fn move_ghost(
     // final; the top of a thing seeds the position and then passes
     // through the magnets like any other placement, so a wall set down
     // on a foundation's top still seats flush to its edges.
+    // A door or a window does not stand ON a wall, it stands IN one - and
+    // it belongs to walls alone. Shown any other way the ghost clings to
+    // whatever the cursor finds, roofs included, and leaps a metre the
+    // instant the aim slips off the timber. It seats itself here with the
+    // punch's own arithmetic, so what you see is where it goes.
+    if let Some((wide, ..)) = opening_of(&kind_now) {
+        let seat = hovered
+            .build
+            .filter(|hit| hit.normal.y.abs() < 0.3)
+            .and_then(|hit| {
+                let (_, wall_at, record, _) = placed.get(hit.entity).ok()?;
+                let length = punchable_length(record)?;
+                let along = Quat::from_rotation_y(record.yaw) * Vec3::X;
+                let middle = opening_seat(wall_at.translation, along, length, wide, hit.point);
+                Some((wall_at.translation + along * middle, record.yaw))
+            });
+        // Nothing punchable under the cursor: hold still. A ghost that
+        // jumps to the ground whenever the aim wanders is worse than one
+        // that waits where it was last wanted.
+        let Some((seat, wall_yaw)) = seat else {
+            return;
+        };
+        for (_, mut transform, _) in &mut ghosts {
+            transform.translation = seat;
+            transform.rotation = pose(wall_yaw, hand.tilt, hand.flip);
+        }
+        return;
+    }
+
     let mut seeded: Option<Vec3> = None;
     if mode.face
         && let Some(hit) = hovered.build
@@ -3084,14 +3113,7 @@ fn place_grab_remove(
             // Doors and windows would rather punch through a wall than
             // stand alone: if one lands on a wall, the wall parts around
             // the opening and the frame settles in.
-            let opening = match kind {
-                PartKind::Prop("door") => Some((1.25, 2.125, 0.0_f32, true)),
-                // A bare doorway needs no widget: the gap itself is the
-                // portal, and a widget would only say it twice.
-                PartKind::Prop("doorway") => Some((1.25, 2.125, 0.0, false)),
-                PartKind::Prop("window") => Some((1.25, 2.0, 0.75, false)),
-                _ => None,
-            };
+            let opening = opening_of(&kind);
             let punched = if let Some((wide, head, sill, is_door)) = opening
                 && let Some((ghost_at, _)) = ghost_spots.iter().next()
             {
@@ -3321,6 +3343,31 @@ fn heal_wall_at(
 #[allow(clippy::too_many_arguments)]
 /// A wall the punch may part: pristine, or a full-height leaving from
 /// an earlier punch - a second window in the same run is honest work.
+/// The hole a part cuts in a wall: how wide, how high its head, how far
+/// its sill stands off the floor, and whether a routing widget comes with
+/// it. One table, read both by the ghost that SHOWS the placement and by
+/// the punch that makes it - they each had their own copy once, and the
+/// ghost drifted off onto the roof while the door went into the wall.
+pub fn opening_of(kind: &PartKind) -> Option<(f32, f32, f32, bool)> {
+    match kind {
+        PartKind::Prop("door") => Some((1.25, 2.125, 0.0, true)),
+        // A bare doorway needs no widget: the gap itself is the portal,
+        // and a widget would only say it twice.
+        PartKind::Prop("doorway") => Some((1.25, 2.125, 0.0, false)),
+        PartKind::Prop("window") => Some((1.25, 2.0, 0.75, false)),
+        _ => None,
+    }
+}
+
+/// Where along a wall an opening aimed at `point` actually lands: on the
+/// lattice, and never spilling past either end.
+pub fn opening_seat(wall_at: Vec3, along: Vec3, length: f32, wide: f32, point: Vec3) -> f32 {
+    let half = length * 0.5;
+    let reach = (half - wide * 0.5).max(0.0);
+    let t = (point - wall_at).dot(along).clamp(-reach, reach);
+    ((t * 16.0).round() / 16.0).clamp(-reach, reach)
+}
+
 fn punchable_length(record: &Placed) -> Option<f32> {
     match kind_from_name(&record.part)? {
         PartKind::Wall(long) => Some(long),
@@ -3387,9 +3434,14 @@ fn punch_wall(
         return false;
     };
 
-    // The opening, clamped so it never spills past the wall's ends.
+    // The opening, on the lattice and clamped so it never spills past the
+    // wall's ends. The ghost seats itself with this same arithmetic.
     let half = length * 0.5;
-    let middle = t.clamp(-half + wide * 0.5, half - wide * 0.5);
+    let wall_at = placed
+        .get(wall)
+        .map(|(_, tf, _, _)| tf.translation)
+        .unwrap_or(at);
+    let middle = opening_seat(wall_at, along, length, wide, wall_at + along * t);
     let centre_of = |offset: f32| {
         let base = placed
             .get(wall)
