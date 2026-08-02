@@ -17,6 +17,17 @@ use crate::GameState;
 use crate::terrain::Terrain;
 use crate::villager::{ChosenGround, will_take_a_village};
 
+/// The likeliest ground in the world, found once at startup.
+///
+/// The old site search still runs — it just no longer FOUNDS anything.
+/// It picks where the opening dive comes down, so the god always arrives
+/// standing over good land instead of somewhere at random (which, on the
+/// first world tried, was open water). From there the flag can go
+/// straight in, or the player can go looking for somewhere they like
+/// better. The machine offers; it no longer decides.
+#[derive(Resource)]
+pub struct OpeningVantage(pub Vec3);
+
 /// What the ground under the flag is, refreshed as it moves.
 #[derive(Resource, Default)]
 pub struct GroundUnderTheFlag {
@@ -31,6 +42,15 @@ pub struct FoundingPlugin;
 impl Plugin for FoundingPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<GroundUnderTheFlag>()
+            // Not at Startup: the land itself is inserted by another
+            // startup system, and a survey that runs first finds no
+            // terrain, says nothing, and drops the opening dive on the
+            // world origin - which on the first world tried was open
+            // ocean. It runs until it succeeds instead.
+            .add_systems(
+                Update,
+                survey_the_land.run_if(not(resource_exists::<OpeningVantage>)),
+            )
             .add_systems(
                 Update,
                 (read_the_ground, plant_the_flag)
@@ -38,6 +58,38 @@ impl Plugin for FoundingPlugin {
                     .run_if(in_state(GameState::Choosing)),
             )
             .add_systems(OnEnter(GameState::Choosing), plant_it_unattended);
+    }
+}
+
+/// Finds the likeliest ground in the world, so the opening dive has
+/// somewhere worth coming down to.
+fn survey_the_land(
+    mut commands: Commands,
+    terrain: Option<Res<Terrain>>,
+    seed: Option<Res<crate::WorldSeed>>,
+    mut rigs: Query<&mut crate::camera::CameraRig>,
+) {
+    let (Some(terrain), Some(seed)) = (terrain, seed) else {
+        return;
+    };
+    let mut rng = crate::rng::Rng::stream(seed.0 as u64, "settlement");
+    let at = crate::villager::choose_settlement_site(&terrain, &mut rng);
+    info!(
+        "the land was surveyed: the likeliest ground lies at {:.0}, {:.0}",
+        at.x, at.z
+    );
+    commands.insert_resource(OpeningVantage(at));
+
+    // And the title drifts over THAT ground, not over the world origin.
+    // The opening framing used to be a PostStartup pass aimed at the
+    // settlement, so the title always hung above the village and Begin
+    // was a short drop straight down onto it. With the founding moved
+    // into the player's hands there is no village to aim at - and
+    // without this the title sat over open ocean and Begin flew the
+    // whole map sideways to get anywhere worth standing.
+    if let Ok(mut rig) = rigs.single_mut() {
+        rig.focus = at;
+        rig.target_focus = at;
     }
 }
 
@@ -91,8 +143,7 @@ fn plant_the_flag(
 /// being true and the whole verification harness goes dark. `1` takes the
 /// search's own answer.
 fn plant_it_unattended(
-    terrain: Option<Res<Terrain>>,
-    seed: Option<Res<crate::WorldSeed>>,
+    vantage: Option<Res<OpeningVantage>>,
     mut chosen: ResMut<ChosenGround>,
     mut next: ResMut<NextState<GameState>>,
 ) {
@@ -100,14 +151,12 @@ fn plant_it_unattended(
     if std::env::var("DIVUS_FACTUS_AUTOPLANT").is_err() {
         return;
     }
-    let (Some(terrain), Some(seed)) = (terrain, seed) else {
-        warn!("nothing to plant in: the land itself is not ready");
+    let Some(vantage) = vantage else {
+        warn!("nothing to plant in: the land was never surveyed");
         return;
     };
-    let mut rng = crate::rng::Rng::stream(seed.0 as u64, "settlement");
-    let at = crate::villager::choose_settlement_site(&terrain, &mut rng);
-    info!("the flag was planted unattended, on the ground the search liked best");
-    found_here(at, &mut chosen, &mut next);
+    info!("the flag was planted unattended, on the ground the survey liked best");
+    found_here(vantage.0, &mut chosen, &mut next);
 }
 
 fn found_here(at: Vec3, chosen: &mut ChosenGround, next: &mut NextState<GameState>) {

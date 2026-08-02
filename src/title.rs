@@ -754,6 +754,7 @@ fn begin_descent(
     commands: &mut Commands,
     chunks: Option<&crate::terrain::LoadedChunks>,
     site: Option<&crate::villager::SettlementSite>,
+    vantage: Option<&crate::founding::OpeningVantage>,
     next: &mut NextState<GameState>,
 ) {
     // Where the dive lands. A RESTORED world descends onto its own
@@ -767,7 +768,10 @@ fn begin_descent(
     // camera still at the title vantage, the village a thousand units
     // below and nothing left that would ever queue a dive. Now an absent
     // village is the ordinary case rather than a gap to wait out.
-    let landing = site.map_or(Vec3::ZERO, |site| site.centre);
+    let landing = site
+        .map(|site| site.centre)
+        .or(vantage.map(|vantage| vantage.0))
+        .unwrap_or(Vec3::ZERO);
     if chunks.is_some_and(|c| c.is_complete()) {
         next.set(if site.is_some() {
             GameState::Playing
@@ -788,6 +792,7 @@ fn auto_begin(
     mut waited: Local<f32>,
     chunks: Option<Res<crate::terrain::LoadedChunks>>,
     site: Option<Res<crate::villager::SettlementSite>>,
+    vantage: Option<Res<crate::founding::OpeningVantage>>,
     mut next: ResMut<NextState<GameState>>,
 ) {
     let Some(after) = std::env::var("DIVUS_FACTUS_AUTOBEGIN")
@@ -803,7 +808,13 @@ fn auto_begin(
         // again — pressing it on the title's first frame would dive on the
         // OLD world's coordinates before the fresh founding has landed.
         *waited = 0.0;
-        begin_descent(&mut commands, chunks.as_deref(), site.as_deref(), &mut next);
+        begin_descent(
+            &mut commands,
+            chunks.as_deref(),
+            site.as_deref(),
+            vantage.as_deref(),
+            &mut next,
+        );
     }
 }
 
@@ -1060,12 +1071,19 @@ fn handle_choice(
     open_settings: Query<Entity, With<SettingsScreen>>,
     chunks: Option<Res<crate::terrain::LoadedChunks>>,
     site: Option<Res<crate::villager::SettlementSite>>,
+    vantage: Option<Res<crate::founding::OpeningVantage>>,
     mut next: ResMut<NextState<GameState>>,
     mut exit: MessageWriter<AppExit>,
 ) {
     for interaction in &begin {
         if *interaction == Interaction::Pressed {
-            begin_descent(&mut commands, chunks.as_deref(), site.as_deref(), &mut next);
+            begin_descent(
+                &mut commands,
+                chunks.as_deref(),
+                site.as_deref(),
+                vantage.as_deref(),
+                &mut next,
+            );
         }
     }
     // Load Game opens the saves window over the title; picking a slot there
