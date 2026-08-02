@@ -10,7 +10,6 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use std::f32::consts::{FRAC_PI_2, TAU};
 
-use crate::GameState;
 use crate::terrain::{Terrain, WATER_LEVEL};
 
 pub struct CameraPlugin;
@@ -22,15 +21,18 @@ impl Plugin for CameraPlugin {
             .add_systems(
                 Update,
                 (
-                    // The player's hands stay off the wheel until the game is
-                    // actually theirs: the title drift and the opening descent
-                    // both own the rig outright.
+                    // The player's hands stay off the wheel until the game
+                    // is actually theirs: the title drift and the opening
+                    // descent both own the rig outright. The CHOOSING is
+                    // theirs too, though - it is the first thing they do,
+                    // and a god who cannot turn the camera cannot pick
+                    // anywhere to put a village.
                     read_camera_input.run_if(
-                        in_state(GameState::Playing)
+                        crate::world_is_afoot
                             .and_then(|dive: Option<Res<CameraDive>>| dive.is_none()),
                     ),
                     apply_follow,
-                    fly_the_dive.run_if(in_state(GameState::Playing)),
+                    fly_the_dive.run_if(crate::world_is_afoot),
                     follow_ground,
                     apply_camera_smoothing,
                     write_camera_transform,

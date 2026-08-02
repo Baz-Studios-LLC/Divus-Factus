@@ -68,6 +68,7 @@ fn plant_the_flag(
         return;
     }
     let Some(at) = reading.at else {
+        // The cursor is off the world - open sky, or over a panel.
         return;
     };
     if let Some(refusal) = reading.refusal {
@@ -110,6 +111,7 @@ fn plant_it_unattended(
 }
 
 fn found_here(at: Vec3, chosen: &mut ChosenGround, next: &mut NextState<GameState>) {
+    info!("the flag goes in at {:.0}, {:.0}", at.x, at.z);
     chosen.0 = Some(at);
     next.set(GameState::Playing);
 }

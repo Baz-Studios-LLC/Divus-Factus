@@ -86,6 +86,16 @@ pub enum GameState {
     Playing,
 }
 
+/// Whether the world is the player's to move around in — choosing ground
+/// or playing on it, but not drifting behind the title.
+///
+/// The camera and the god's hand answer to this rather than to `Playing`
+/// alone: during the choosing the game IS theirs, and a player who
+/// cannot turn the camera cannot pick anywhere to found.
+pub fn world_is_afoot(state: Res<State<GameState>>) -> bool {
+    matches!(state.get(), GameState::Choosing | GameState::Playing)
+}
+
 /// Seed for every procedurally generated part of the world.
 ///
 /// A single seed drives terrain, creature bodies and scatter, so a world can be
