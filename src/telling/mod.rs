@@ -546,15 +546,14 @@ pub fn model_dir() -> Option<std::path::PathBuf> {
 /// reasoning that nobody puts one there by accident. That is the whole of the
 /// "bring your own bigger model" feature, and it costs nothing.
 fn find_model() -> Option<std::path::PathBuf> {
-    // A remembered choice outranks size: the settings page writes one when
-    // the player switches, and it must survive a restart or the switch was
-    // a lie. A choice whose file has since been deleted falls through.
-    let dir = model_dir()?;
-    let chosen = std::fs::read_to_string(dir.join("chosen"))
-        .ok()
-        .map(|name| dir.join(name.trim()))
-        .filter(|path| path.is_file());
-    chosen.or_else(|| list_models().into_iter().next())
+    // Size decides, full stop. A remembered choice used to outrank it, from
+    // when the settings page had a voice picker - but the picker is gone,
+    // and a remembered choice with no way to un-remember it is a trap: a
+    // "chosen" file left over from one afternoon's experiment quietly held
+    // the village to a smaller voice for every launch afterwards, with
+    // nothing anywhere to say so. If the picker ever comes back, the read
+    // comes back with it.
+    list_models().into_iter().next()
 }
 
 /// Every model on disk, largest first — the order the settings page shows.
@@ -580,6 +579,13 @@ pub fn list_models() -> Vec<std::path::PathBuf> {
     weights.into_iter().map(|(_, path)| path).collect()
 }
 
+/// Which weights the teller actually took up, by name - so the instrument
+/// panel can say it out loud. Worth saying: the choice is made from what
+/// is on disk, and a village speaking in a smaller voice than you meant it
+/// to is otherwise invisible.
+#[derive(Resource)]
+pub struct SpeakingWith(pub String);
+
 /// Installs the teller. Silent and free when there are no weights to read.
 pub struct TellingPlugin;
 
@@ -593,6 +599,7 @@ impl Plugin for TellingPlugin {
         let Some(weights) = find_model() else {
             // No model on disk: the village keeps to its written lines, and
             // nothing about the game is worse than it was.
+            app.insert_resource(SpeakingWith("none - written lines".to_string()));
             return;
         };
         let weights_name = weights
@@ -601,6 +608,7 @@ impl Plugin for TellingPlugin {
             .to_string_lossy()
             .to_string();
         info!("the teller found {weights_name}");
+        app.insert_resource(SpeakingWith(weights_name.clone()));
 
         let (ask, requests) = channel::<Ask>();
         let (answers, heard) = channel::<Answer>();

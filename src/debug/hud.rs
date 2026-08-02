@@ -36,6 +36,7 @@ pub(crate) enum HudValue {
     Hungry,
     Eating,
     Watching,
+    Teller,
     Aperture,
     Focus,
     Visibility,
@@ -93,6 +94,7 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
         (HudValue::Hungry, "hungry"),
         (HudValue::Eating, "eating"),
         (HudValue::Watching, "watching"),
+        (HudValue::Teller, "teller"),
     ];
     for (value, label) in world_rows {
         let row = ui::stat_row(&mut commands, hud.root, label, None);
@@ -306,6 +308,7 @@ pub(crate) fn update_hud(
     corpses: Query<(), (With<crate::creature::Corpse>, With<Person>)>,
     reactions: Query<(), (With<Reaction>, With<Person>)>,
     stores: Query<&crate::villager::work::Stockpile>,
+    voice: Option<Res<crate::telling::SpeakingWith>>,
     mut panels: Query<&mut Visibility, With<HudPanel>>,
     mut values: Query<(&HudValue, &mut Text)>,
 ) {
@@ -399,6 +402,9 @@ pub(crate) fn update_hud(
             HudValue::Hungry => hungry.to_string(),
             HudValue::Eating => eating.to_string(),
             HudValue::Watching => watching.to_string(),
+            HudValue::Teller => voice
+                .as_ref()
+                .map_or_else(|| "silent".to_string(), |v| v.0.clone()),
             HudValue::Aperture => format!("f/{:.0}", look.aperture),
             HudValue::Focus => format!("{:.2}x", look.focus_bias),
             HudValue::Visibility => format!("{:.2}", look.visibility),

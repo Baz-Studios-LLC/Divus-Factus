@@ -308,21 +308,13 @@ pub fn furnish_baked(commands: &mut Commands, site: Entity, work: &Baked) {
             .enumerate()
             .any(|(other, twin)| other != index && Vec3::from(twin.at).distance(at) < 1.4);
         // A mark faces its own +X, the way every mark does: for a
-        // sleeper that is the way their head lies.
+        // sleeper that is the way their head lies. Tipped onto its back a
+        // body's head points along -Z, so the turn that carries it to the
+        // pillow is read straight off that direction.
         let head_way = Quat::from_rotation_y(mark.yaw) * Vec3::X;
-        let along_x = head_way.x.abs() > head_way.z.abs();
-        let head = if along_x {
-            head_way.x.signum()
-        } else {
-            head_way.z.signum()
-        };
+        let lie = (-head_way.x).atan2(-head_way.z);
         commands.spawn((
-            Bed {
-                slot,
-                along_x,
-                head,
-                double,
-            },
+            Bed { slot, lie, double },
             Transform::from_translation(at),
             Visibility::Hidden,
             ChildOf(site),

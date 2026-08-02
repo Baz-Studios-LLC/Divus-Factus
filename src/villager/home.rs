@@ -939,8 +939,7 @@ pub(super) fn night_routine(
             .map(|(_, local, bed)| {
                 (
                     site.transform_point(local.translation),
-                    bed.along_x,
-                    bed.head,
+                    bed.lie,
                     site.rotation,
                 )
             })
@@ -988,7 +987,7 @@ pub(super) fn night_routine(
                 // Their OWN bed, by claimed number. No claim yet (or no
                 // such bed in an old save's home): the door will do.
                 let berth = berth.and_then(|slot| bed_of(building, slot.0, site));
-                let Some((bed_at, along_x, head, site_spin)) = berth else {
+                let Some((bed_at, lie, site_spin)) = berth else {
                     if transform.translation.distance(site.translation) > 2.2 {
                         *activity = Activity::Sleeping;
                         target.0 = Some(site.translation);
@@ -1018,16 +1017,8 @@ pub(super) fn night_routine(
                     // The quarter-turn is the other way from first instinct;
                     // the playtest photo of a sleeper lying ACROSS the bed
                     // is the authority here.
-                    let mut body_yaw = if along_x {
-                        0.0
-                    } else {
-                        std::f32::consts::FRAC_PI_2
-                    };
-                    if head > 0.0 {
-                        body_yaw += std::f32::consts::PI;
-                    }
                     let facing = site_spin
-                        * Quat::from_rotation_y(body_yaw)
+                        * Quat::from_rotation_y(lie)
                         * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
                     info!("a sleeper settles into their bed");
                     commands.entity(entity).insert(Abed {

@@ -654,15 +654,36 @@ pub struct Shell {
 #[derive(Component)]
 pub struct Bed {
     pub slot: u8,
-    /// Whether the bed's length runs along local X (longhouse bays) or
-    /// local Z (house walls) — the sleeper lies along it.
-    pub along_x: bool,
-    /// Which end of that axis the PILLOW is at (-1.0 or 1.0): always the
-    /// wall end, and the sleeper's head goes with it.
-    pub head: f32,
+    /// The turn a sleeping body takes about the building's own Y before it
+    /// is tipped onto its back — an ANGLE, not an axis and a sign.
+    ///
+    /// It was a pair of those once: which way the bed ran, and which end
+    /// the pillow was at. Every maker of a bed then had to know the
+    /// unobvious mapping from that pair to the turn, and the moment a
+    /// second maker appeared - a carried-in house, whose marks carry a
+    /// real direction - the two disagreed by a quarter and its sleepers
+    /// lay across the mattress.
+    pub lie: f32,
     /// A bed made for two: the wedded pair of the household claims it
     /// together, each to their own side, and children never do.
     pub double: bool,
+}
+
+/// The turn a body takes to lie on a bed described the old way: which axis
+/// the bed's length runs on, and which end its pillow is at. The quarter is
+/// the other way from first instinct - a playtest photo of a sleeper lying
+/// ACROSS the mattress is the authority - which is exactly why this is
+/// written down once here instead of being rediscovered at every bedside.
+pub fn lie_of(along_x: bool, head: f32) -> f32 {
+    let mut lie = if along_x {
+        0.0
+    } else {
+        std::f32::consts::FRAC_PI_2
+    };
+    if head > 0.0 {
+        lie += std::f32::consts::PI;
+    }
+    lie
 }
 
 /// A finished longhouse: a roof for everyone with no family to sleep beside.
@@ -1041,6 +1062,7 @@ pub(crate) fn raise_stage(
     // is where a sleeper lies. `along_x` lays the bed's length on local X
     // (longhouse bays), otherwise on Z (house walls).
     let bed = |slot: u8, at: Vec3, along_x: bool, head_sign: f32, length: f32| {
+        let lie = lie_of(along_x, head_sign);
         let (lx, lz) = if along_x {
             (length, 0.62)
         } else {
@@ -1062,8 +1084,7 @@ pub(crate) fn raise_stage(
         cmd.spawn((
             Bed {
                 slot,
-                along_x,
-                head: head_sign,
+                lie,
                 double: false,
             },
             Mesh3d(cube.clone()),
