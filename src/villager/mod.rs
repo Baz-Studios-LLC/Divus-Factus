@@ -38,11 +38,13 @@ pub const STARTING_POPULATION: usize = 12;
 
 /// Seconds of not eating it takes to go from fed to starving.
 ///
-/// Half a day (day = 600s): two meals a day, and a night slept through on
-/// a part-full stomach is survivable. At the old 150 a stomach lasted a
-/// quarter-day, everyone ate four times daily, and food logistics smothered
-/// every other ambition the village might have had.
-pub(crate) const SECONDS_TO_STARVE: f32 = 300.0;
+/// A day and a half (day = 600s). This is not a starvation simulator:
+/// hunger is a rhythm the day is built around - a reason to fish, a
+/// reason to come home - not the thing most likely to kill you. At 300 a
+/// stomach lasted half a day, and any walk past eighty strides was a
+/// gamble with a life; at the 150 before that, food logistics smothered
+/// every other ambition the village had.
+pub(crate) const SECONDS_TO_STARVE: f32 = 900.0;
 
 /// Hunger above this makes finding food the villager's priority.
 const HUNGRY_THRESHOLD: f32 = 0.35;
@@ -53,11 +55,17 @@ const EATING_RANGE: f32 = 1.6;
 /// Minimum fraction of a settlement's surroundings that must be walkable ground.
 const MIN_SETTLEMENT_LAND: f32 = 0.55;
 
-/// Seconds of standing at empty starving before hunger kills.
-const SECONDS_STARVING_TO_DIE: f32 = 120.0;
+/// Seconds of standing at empty starving before hunger kills. Long
+/// enough that an empty larder is a crisis somebody can still walk out
+/// of, and a village that is losing people to it has been failing for
+/// most of a day rather than a couple of minutes.
+const SECONDS_STARVING_TO_DIE: f32 = 300.0;
 
 /// Seconds of decent feeding to heal from the brink back to whole.
-const SECONDS_TO_MEND: f32 = 160.0;
+/// Kept above SECONDS_STARVING_TO_DIE, and moved up with it: dying is
+/// faster than healing, deliberately, and softening hunger must not
+/// quietly turn a wound into something a good lunch undoes.
+const SECONDS_TO_MEND: f32 = 400.0;
 
 // There is no numeric population cap: a village grows as far as its
 // shelter, its larder and its land allow. Cities are meant to get huge -

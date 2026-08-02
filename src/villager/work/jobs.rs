@@ -291,7 +291,10 @@ pub(crate) fn take_up_work(
             vocation,
             Vocation::Fisher | Vocation::Gatherer | Vocation::Hunter | Vocation::Farmer
         );
-        if needs.hunger > HUNGRY_THRESHOLD && !feeds_the_village {
+        // ...and only while the larder is THIN, which is the emergency
+        // the exemption was written for. Applied to a full store it
+        // meant a gatherer never once turned for home.
+        if needs.hunger > HUNGRY_THRESHOLD && !(feeds_the_village && larder_thin) {
             continue;
         }
         // The exhausted do not show up. Sleep is the cure, and the fire or a
@@ -825,12 +828,23 @@ pub(crate) fn take_up_work(
         let meals = ((round_trip / 2.4) / (super::super::SECONDS_TO_STARVE * 0.5))
             .floor()
             .min(3.0);
+        // Rations for the road - for the FOOD trades most of all, since
+        // they are the ones who walk furthest. They were the one group
+        // excluded, on the reasoning that they eat what they harvest:
+        // they do nibble at the worksite, but nothing feeds them on the
+        // walk out or the walk back, and eight of them starved together
+        // a hundred and twenty strides from a larder holding sixty.
+        //
+        // A thin larder is the one exception, and the one the exclusion
+        // was written for: a village too poor to provision the road
+        // sends its gatherers anyway, because the alternative is
+        // everybody starving at home instead of somebody starving out.
         let feeds_the_village = feeds_the_village
             || matches!(
                 trade,
                 Vocation::Fisher | Vocation::Gatherer | Vocation::Hunter | Vocation::Farmer
             );
-        if meals >= 1.0 && !feeds_the_village {
+        if meals >= 1.0 && !(feeds_the_village && larder_thin) {
             let Ok((_, mut store)) = towns.get_mut(home) else {
                 continue;
             };

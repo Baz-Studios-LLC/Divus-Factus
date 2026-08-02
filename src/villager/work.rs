@@ -623,7 +623,13 @@ pub(super) fn do_work(
         // Meals still in the satchel buy the road back.
         let walk_home = transform.translation.distance(centre) / 2.4;
         let projected = needs.hunger + walk_home / SECONDS_TO_STARVE - rations_left * 0.6;
-        if !on_shift || (projected > DOWN_TOOLS_HUNGER && !feeds_the_village) {
+        // The food trades work through hunger only while the larder is
+        // THIN. That exemption exists so a village does not starve beside
+        // an empty store with its fishers too hungry to fish; left on
+        // while the store was full, it meant a gatherer a hundred and
+        // twenty strides out never turned for home at all.
+        let works_through_hunger = feeds_the_village && larder_thin;
+        if !on_shift || (projected > DOWN_TOOLS_HUNGER && !works_through_hunger) {
             *activity = Activity::Idle;
             target.0 = None;
             commands.entity(entity).remove::<Job>();

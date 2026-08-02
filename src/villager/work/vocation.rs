@@ -363,6 +363,7 @@ pub(crate) fn morning_muster(
     };
 
     let raising = sites.iter().count() as f32;
+    let roofless = homeless.iter().count() as f32;
     let footings_waiting = sites
         .iter()
         .filter(|(cs, plan)| cs.stone_laid < cs.footing_stone(plan.kind))
@@ -377,6 +378,24 @@ pub(crate) fn morning_muster(
         .map(|(cs, plan)| (cs.footing_stone(plan.kind) - cs.stone_laid).max(0.0))
         .sum();
     let stone_short = (footing_short.max(STONE_RESERVE) - masonry).max(0.0);
+    // Shelter is the loudest want there is. A roofless village puts hands
+    // on the frames until it has none to spare - but only where ground is
+    // actually broken, since a builder with no site is a builder standing
+    // in a field. A hammer is kept ready even so, so somebody is there
+    // the moment the planner breaks ground.
+    let builders = if raising > 0.0 {
+        (raising + footings_waiting)
+            .max((roofless / 2.0).ceil())
+            // Never more than a third of the village on the frames.
+            // Builders eat and do not gather, and a crew that big with
+            // nobody left in the woods is how a village starves inside
+            // its own full larder.
+            .min((mouths as f32 / 3.0).floor().max(1.0))
+    } else if roofless > 2.0 {
+        1.0
+    } else {
+        0.0
+    };
     let unworked_fields = fields
         .iter()
         .filter(|f| f.farmer == Entity::PLACEHOLDER)
@@ -463,6 +482,7 @@ pub(crate) fn morning_muster(
         footings_waiting,
         unworked_fields,
         (stone_short * 0.5).ceil(),
+        builders,
         wood_known as u8 as f32,
         shore_near as u8 as f32,
         guards,
