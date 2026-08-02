@@ -245,22 +245,31 @@ pub(super) fn assign_beds(
     }
 }
 
-/// Where to stand a body's ROOT so that the body itself lies centred on
-/// the place it was told to sleep.
+/// How far in front of a sleeping place its pillow lies. The bench's own
+/// sleeping figure carries its head exactly this far ahead of the mark it
+/// is placed on, so a villager whose head lands here lands on the pillow
+/// the maker drew - whatever size that villager happens to be.
+const PILLOW_AHEAD: f32 = 0.625;
+
+/// Where to stand a body's ROOT so that its HEAD comes down on `ahead`
+/// metres in front of the place it was told to sleep.
 ///
-/// A villager's root is between their feet: standing, everything is above
-/// it. Tip that body onto its back and it no longer reaches up from the
-/// root, it reaches out from it - head-first, a whole body's length. So a
-/// root left on the mark puts the sleeper's feet on the pillow and the
-/// rest of them off the end of the bed, which is what a playtest photo
-/// showed. Half a length back along the way the head points, and up by
-/// half the body's depth so their back rests on the mattress rather than
-/// inside it.
-fn laid_from(genome: &crate::creature::genome::CreatureGenome, facing: Quat) -> Vec3 {
-    // Where the head lies: the body's own up, once it has been tipped.
+/// A villager's root is between their feet: standing, all of them is
+/// above it, but tipped onto their back they reach OUT from it, head
+/// first, a whole body's length. A root left on the mark therefore put
+/// their feet on the pillow and the rest of them off the end of the bed.
+///
+/// The head is the part that has to land somewhere in particular, so the
+/// head is what this solves for and the rest of the body follows it back.
+/// A tall sleeper's feet hang further down the mattress; their head still
+/// finds the pillow.
+fn laid_from(genome: &crate::creature::genome::CreatureGenome, facing: Quat, ahead: f32) -> Vec3 {
+    // Which way the head lies: the body's own up, once it has been tipped.
     let head = facing * Vec3::Y;
     let flat = Vec3::new(head.x, 0.0, head.z).normalize_or(Vec3::X);
-    -flat * (genome.height() * 0.5) + Vec3::Y * (genome.thickness() * 0.5)
+    // From the root to the middle of the head, along the body.
+    let to_the_head = genome.height() * (1.0 - genome.proportions.head_size * 0.5);
+    flat * (ahead - to_the_head) + Vec3::Y * (genome.thickness() * 0.5)
 }
 
 /// Holds sleepers to their mattresses — and is the ONE authority on
@@ -1041,7 +1050,7 @@ pub(super) fn night_routine(
                         * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
                     info!("a sleeper settles into their bed");
                     commands.entity(entity).insert(Abed {
-                        at: bed_at + laid_from(genome, facing),
+                        at: bed_at + laid_from(genome, facing, PILLOW_AHEAD),
                         facing,
                     });
                 }
@@ -1075,7 +1084,9 @@ pub(super) fn night_routine(
                 let facing = Quat::from_rotation_y(super::work::lie_toward(outward))
                     * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
                 commands.entity(entity).insert(Abed {
-                    at: transform.translation + laid_from(genome, facing),
+                    // No pillow on the bare ground: they simply lie where
+                    // they stood, straddling the spot.
+                    at: transform.translation + laid_from(genome, facing, genome.height() * 0.35),
                     facing,
                 });
             }
