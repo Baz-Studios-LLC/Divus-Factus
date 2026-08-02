@@ -244,20 +244,30 @@ impl Language {
     /// names lean on closed, consonant endings; feminine names end open, on
     /// the language's chosen vowel.
     pub fn name_for(&self, sex: crate::creature::genome::Sex, rng: &mut Rng) -> String {
-        match sex {
-            crate::creature::genome::Sex::Male => self.build(rng, 0.3),
-            crate::creature::genome::Sex::Female => {
-                let mut name = self.build(rng, -1.0);
-                if name
-                    .chars()
-                    .last()
-                    .is_some_and(|c| !"aeiouy".contains(c.to_ascii_lowercase()))
-                {
-                    name.push_str(&self.feminine_ending);
+        // Screened AFTER the ending goes on, not before. A gate on the mill
+        // alone is no gate at all: every suffix here glues a new word
+        // together out of a stem nobody objected to, which is precisely how
+        // a playtest met a surname it should never have met.
+        for _ in 0..24 {
+            let tried = match sex {
+                crate::creature::genome::Sex::Male => self.build(rng, 0.3),
+                crate::creature::genome::Sex::Female => {
+                    let mut name = self.build(rng, -1.0);
+                    if name
+                        .chars()
+                        .last()
+                        .is_some_and(|c| !"aeiouy".contains(c.to_ascii_lowercase()))
+                    {
+                        name.push_str(&self.feminine_ending);
+                    }
+                    name
                 }
-                name
+            };
+            if !unspeakable(&tried) {
+                return tried;
             }
         }
+        self.build(rng, 0.0)
     }
 
     /// Builds a family name: a stem in this tongue plus the people's shared
@@ -268,6 +278,17 @@ impl Language {
     /// A house keeps its name down the generations while its given names all
     /// change, which is exactly what makes a lineage legible.
     pub fn surname(&self, rng: &mut Rng) -> String {
+        for _ in 0..24 {
+            let tried = self.mill_surname(rng);
+            if !unspeakable(&tried) {
+                return tried;
+            }
+        }
+        self.build_syllables(rng, -1.0, 2)
+    }
+
+    /// The surname mill: stem plus the people's shared ending, unscreened.
+    fn mill_surname(&self, rng: &mut Rng) -> String {
         // Always a two-syllable stem, never three: the ending adds a syllable
         // of its own, and a house called Thoutouyyruh is not a house anyone
         // says twice. An open stem, so the ending attaches cleanly.
@@ -309,6 +330,29 @@ impl Language {
     /// Assembles a name of a given length. Callers that want a fixed shape —
     /// family names — come in here and skip the length roll.
     fn build_syllables(&self, rng: &mut Rng, final_coda_bias: f32, syllables: usize) -> String {
+        // A syllable mill with a few hundred sounds will, given a village
+        // and enough generations, eventually assemble a slur, an obscenity
+        // or a brand. It is not a common event and it is a completely
+        // unacceptable one - a player meeting it once has met the game
+        // saying it. Roll again until the mill produces something that is
+        // only a name; the shapes are cheap and the vocabulary is vast.
+        for _ in 0..24 {
+            let tried = self.mill(rng, final_coda_bias, syllables);
+            if !unspeakable(&tried) {
+                return tried;
+            }
+        }
+        // Two dozen unlucky rolls in a row is not a thing that happens,
+        // but a name is still owed: the plainest shape the language has.
+        capitalise(&format!(
+            "{}{}",
+            self.onsets.first().map_or("a", |o| o.as_str()),
+            self.nuclei.first().map_or("n", |n| n.as_str())
+        ))
+    }
+
+    /// The mill itself: sounds in, a name out, no questions asked.
+    fn mill(&self, rng: &mut Rng, final_coda_bias: f32, syllables: usize) -> String {
         let mut name = String::new();
         let mut previous_coda: Option<&str> = None;
         // One cluster per name. Two is a tongue-twister every time.
@@ -378,6 +422,157 @@ impl Language {
     }
 }
 
+/// Whether a milled name is one no village should ever say.
+///
+/// Matched on the name folded to plain letters, and on substrings rather
+/// than whole words: "Negro" arrived as a surname in a playtest, and it
+/// would have arrived inside a longer name just as easily. Leetspeak and
+/// accents are not a concern - the mill only makes plain letters - so
+/// this stays a simple contains check.
+///
+/// The list is deliberately short and blunt. It covers racial and ethnic
+/// slurs, sexual obscenity, and a few brand-shaped collisions; it does
+/// not try to be a profanity filter for the ages. Additions are welcome
+/// the moment a playtest turns one up.
+fn unspeakable(name: &str) -> bool {
+    let plain = name.to_ascii_lowercase();
+    const FORBIDDEN: &[&str] = &[
+        // Racial and ethnic slurs, and the words that only ever precede
+        // them.
+        "negro",
+        "nigg",
+        "nigr",
+        "chink",
+        "gook",
+        "spic",
+        "wetback",
+        "kike",
+        "gypo",
+        "gyppo",
+        "paki",
+        "raghead",
+        "towelhead",
+        "coon",
+        "darkie",
+        "darky",
+        "honkey",
+        "honky",
+        "cracka",
+        "beaner",
+        "wop",
+        "dago",
+        "abbo",
+        "injun",
+        "redskin",
+        "squaw",
+        "jigg",
+        "zipperhead",
+        "mick",
+        "kraut",
+        "slant",
+        "half-breed",
+        "mulatto",
+        "quadroon",
+        "sambo",
+        "golliwog",
+        // Sexual and scatological obscenity.
+        "fuck",
+        "fuk",
+        "shit",
+        "cunt",
+        "cock",
+        "dick",
+        "penis",
+        "vagina",
+        "pussy",
+        "twat",
+        "arse",
+        "asshole",
+        "bastard",
+        "bitch",
+        "whore",
+        "slut",
+        "hooker",
+        "rape",
+        "rapist",
+        "molest",
+        "incest",
+        "pedo",
+        "paedo",
+        "nonce",
+        "boner",
+        "semen",
+        "cum",
+        "jizz",
+        "wank",
+        "tits",
+        "titty",
+        "boob",
+        "anus",
+        "rectum",
+        "scrotum",
+        "testicle",
+        "clit",
+        "felch",
+        "rimjob",
+        "blowjob",
+        "handjob",
+        "dildo",
+        "porn",
+        "sodom",
+        "bugger",
+        "prick",
+        "knob",
+        "queef",
+        // Slurs of sexuality and disability.
+        "fag",
+        "dyke",
+        "tranny",
+        "shemale",
+        "homo",
+        "queer",
+        "retard",
+        "spastic",
+        "spaz",
+        "cripple",
+        "mongoloid",
+        "midget",
+        // Hate movements and their shorthands.
+        "nazi",
+        "hitler",
+        "kkk",
+        "jihad",
+        "isis",
+        "gestapo",
+        "reich",
+        // Brand and trademark collisions, which read as jokes rather than
+        // names and belong to somebody else besides.
+        "google",
+        "amazon",
+        "disney",
+        "nintendo",
+        "pepsi",
+        "nike",
+        "adidas",
+        "coca",
+        "xerox",
+        "tesla",
+        "netflix",
+        "twitter",
+        "reddit",
+        "tiktok",
+        // Substances and modern nouns that puncture the setting.
+        "heroin",
+        "cocaine",
+        "meth",
+        "crack",
+        "weed",
+        "vape",
+        "opioid",
+    ];
+    FORBIDDEN.iter().any(|bad| plain.contains(bad))
+}
+
 fn capitalise(word: &str) -> String {
     let mut chars = word.chars();
     match chars.next() {
@@ -437,6 +632,35 @@ mod tests {
         );
     }
     use std::collections::HashSet;
+
+    #[test]
+    fn the_mill_never_says_the_unsayable() {
+        // The gate itself, on the words a playtest and a wary eye found.
+        assert!(unspeakable("Negro"));
+        assert!(unspeakable("Zounegroh"), "matched inside a longer name");
+        assert!(unspeakable("NEGRO"), "folded to plain letters first");
+        assert!(unspeakable("Fuknar"));
+        assert!(unspeakable("Retardo"));
+        assert!(!unspeakable("Zoubomb"), "an innocent name is left alone");
+        assert!(!unspeakable("Sisuv"));
+        assert!(!unspeakable("Feitreh"));
+
+        // And no language, over a great many names, produces one.
+        let mut rng = Rng::new(20260802);
+        for seed in 0..400u64 {
+            let tongue = Language::random(&mut Rng::new(seed));
+            for _ in 0..40 {
+                for name in [
+                    tongue.name(&mut rng),
+                    tongue.surname(&mut rng),
+                    tongue.name_for(crate::creature::genome::Sex::Female, &mut rng),
+                    tongue.name_for(crate::creature::genome::Sex::Male, &mut rng),
+                ] {
+                    assert!(!unspeakable(&name), "the mill said {name}");
+                }
+            }
+        }
+    }
 
     #[test]
     fn names_are_stable_for_a_seed() {

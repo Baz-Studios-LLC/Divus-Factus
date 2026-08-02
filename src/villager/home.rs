@@ -932,6 +932,10 @@ pub(super) fn rehome_the_misplaced(
 pub(super) fn night_routine(
     mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,
+    // Where each fire-bound sleeper was last seen making progress. A walk
+    // can stall for reasons this system will never enumerate - and a
+    // sleeper standing bolt upright all night is worse than any of them.
+    mut trudge: Local<std::collections::HashMap<Entity, (Vec3, f64)>>,
     homes: Query<&Transform, (Or<(With<Hut>, With<Longhouse>)>, Without<Villager>)>,
     beds: Query<(&ChildOf, &Transform, &Bed), Without<Villager>>,
     fires: Query<&GlobalTransform, (With<Bonfire>, Without<Villager>)>,
@@ -1086,13 +1090,33 @@ pub(super) fn night_routine(
                 let turn = entity.index().index() as f32 * 2.399963;
                 let outward = Vec3::new(turn.cos(), 0.0, turn.sin());
                 let berth = fire + outward * (3.4 + (entity.index().index() % 2) as f32 * 1.3);
-                if transform.translation.distance(berth) > 0.9 {
+                // Progress is measured, not assumed. Whatever stops a
+                // walk - and the playtest found stoppers this system will
+                // never enumerate - a sleeper four seconds without a
+                // stride lies down where they stand, which is what a
+                // person that tired does anyway. Better a bedroll in an
+                // odd spot than a scarecrow at the fire till dawn.
+                let here = transform.translation;
+                let mark = trudge.entry(entity).or_insert((here, clock.elapsed));
+                if here.distance(mark.0) > 0.35 {
+                    *mark = (here, clock.elapsed);
+                }
+                let stuck = clock.elapsed - mark.1 > 4.0;
+                if here.distance(berth) > 1.4 && !stuck {
                     *activity = Activity::Sleeping;
                     target.0 = Some(berth);
                     continue;
                 }
+                trudge.remove(&entity);
                 // Feet to the warmth, head to the dark - which is how
-                // anybody lies by a fire.
+                // anybody lies by a fire. The stuck lie down right where
+                // they gave up, still turned away from the light.
+                let outward = if stuck {
+                    (here - fire).with_y(0.0).normalize_or(outward)
+                } else {
+                    outward
+                };
+                let spot = if stuck { here } else { berth };
                 *activity = Activity::Sleeping;
                 target.0 = None;
                 motion.speed = 0.0;
@@ -1104,7 +1128,7 @@ pub(super) fn night_routine(
                     // No pillow on the bare ground: the head lies a
                     // third of them past their berth, away from the
                     // flames, and the feet stop short of the ring.
-                    at: berth + laid_from(genome, facing, genome.height() * 0.35),
+                    at: spot + laid_from(genome, facing, genome.height() * 0.35),
                     facing,
                 });
             }
