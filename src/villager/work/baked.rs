@@ -351,11 +351,35 @@ pub fn furnish_baked(commands: &mut Commands, site: Entity, work: &Baked) {
             }
         })
         .collect();
+    // The shell is the WALLS, not the whole building. The file's own
+    // half-extents take in the roof, which on a house with eaves reaches
+    // most of a metre past the wall it shelters - and a doorway that
+    // measures as INSIDE the shell is a doorway nobody can be routed
+    // through. They walk at the wall beside it instead.
+    let (mut half_w, mut half_d) = (0.0_f32, 0.0_f32);
+    for piece in work
+        .boxes
+        .iter()
+        .filter(|b| b.stage == "walls" || b.stage == "frame")
+    {
+        let turn = Quat::from_array(piece.turn);
+        let half = Vec3::from(piece.size) * 0.5;
+        // A turned box's reach along each world axis.
+        let reach = (turn * Vec3::new(half.x, 0.0, 0.0)).abs()
+            + (turn * Vec3::new(0.0, half.y, 0.0)).abs()
+            + (turn * Vec3::new(0.0, 0.0, half.z)).abs();
+        half_w = half_w.max(piece.at[0].abs() + reach.x);
+        half_d = half_d.max(piece.at[2].abs() + reach.z);
+    }
+    if half_w <= 0.0 || half_d <= 0.0 {
+        half_w = work.half_w;
+        half_d = work.half_d;
+    }
     commands.entity(site).insert(Shell {
-        half_w: work.half_w,
-        half_d: work.half_d,
+        half_w,
+        half_d,
         doors: if doors.is_empty() {
-            vec![Doorway::on_x_wall(work.half_w, 0.0)]
+            vec![Doorway::on_x_wall(half_w, 0.0)]
         } else {
             doors
         },

@@ -144,12 +144,16 @@ pub(super) fn use_doors(
             else {
                 continue;
             };
-            let step = door.out * 0.9;
+            // Far enough out that the two standing places straddle the
+            // shell without argument: a doorway sits in the thickness of a
+            // wall, not on the line the shell is measured to, and a step
+            // too short puts BOTH places on the same side of it.
+            let step = door.out * 1.6;
             let outer = Vec3::new(door.at.x + step.x, 0.0, door.at.y + step.y);
             let inner = Vec3::new(door.at.x - step.x, 0.0, door.at.y - step.y);
             let near = if im { inner } else { outer };
             let far = if im { outer } else { inner };
-            let leg = if (me - near).with_y(0.0).length() < 0.9 {
+            let leg = if (me - near).with_y(0.0).length() < 1.1 {
                 far
             } else {
                 near
@@ -332,11 +336,23 @@ pub(super) fn take_shelter(
                 }
             }
             None => {
-                // No roof: the fire circle is the next best thing — a spot
-                // in a loose RING around it, held as Sheltering. The first
-                // version left them Idle at the fire's exact centre, so the
-                // idle wander walked them ten feet off and this system
-                // marched them straight back, all day, in the rain, forever.
+                // Nobody with no roof waits out the rain during working
+                // hours. A ring of soaked people standing around a fire
+                // they are not under is not shelter — it is the whole
+                // workforce parked while the timber that would ROOF them
+                // sits in the pile. Wet and building beats wet and idle.
+                if clock.work_hours() {
+                    if *activity == Activity::Sheltering {
+                        *activity = Activity::Idle;
+                        target.0 = None;
+                    }
+                    continue;
+                }
+                // Off the clock, the fire circle is the next best thing — a
+                // spot in a loose RING around it, held as Sheltering. The
+                // first version left them Idle at the fire's exact centre,
+                // so the idle wander walked them ten feet off and this
+                // system marched them straight back, all day, forever.
                 if let Some(fire) = fire_pos {
                     let stand = fire
                         + (transform.translation - fire)
