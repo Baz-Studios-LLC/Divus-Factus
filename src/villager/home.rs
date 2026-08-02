@@ -99,6 +99,44 @@ pub struct Abed {
     pub facing: Quat,
 }
 
+/// How far to either side of a doorway's axis still counts as lined up
+/// with it. Narrower than the opening, so a walker who commits is aimed
+/// at the gap rather than at the jamb.
+const DOOR_CORRIDOR: f32 = 0.8;
+
+/// How far either side of the wall the two standing places sit. Far
+/// enough out that they straddle the shell without argument: a doorway
+/// sits in the THICKNESS of a wall, not on the line the shell is measured
+/// to, and a step too short puts both places on the same side of it.
+const DOOR_STAND: f32 = 1.6;
+
+/// The next standing place for a walk that has to cross this doorway,
+/// in the building's own space. `inside` is which side of the shell the
+/// walker is on now.
+///
+/// The near place until they are LINED UP with the doorway, then the one
+/// beyond it, straight through. This was a radius once — aim past the
+/// door once you are within 1.1 of the near place — and it shook walkers
+/// to pieces on the threshold: leaving `inner` at 1.1 flipped the target
+/// back to `inner`, arriving at 1.1 flipped it out again, and the walker
+/// juddered in a band half a stride short of the door, getting through
+/// only when a frame's step happened to jump the whole band. Sideways
+/// offset has no such edge — walking the corridor drives it to nothing,
+/// so the choice can never flip back.
+fn door_leg(here: Vec2, door: &super::work::Doorway, inside: bool) -> Vec3 {
+    let step = door.out * DOOR_STAND;
+    let outer = Vec3::new(door.at.x + step.x, 0.0, door.at.y + step.y);
+    let inner = Vec3::new(door.at.x - step.x, 0.0, door.at.y - step.y);
+    let (near, far) = if inside {
+        (inner, outer)
+    } else {
+        (outer, inner)
+    };
+    let offset = here - door.at;
+    let lateral = (offset - door.out * offset.dot(door.out)).length();
+    if lateral < DOOR_CORRIDOR { far } else { near }
+}
+
 /// Bends any walk that crosses a home's walls through its doorway.
 ///
 /// No collision, no navmesh: the only solid architecture a villager enters
@@ -144,21 +182,7 @@ pub(super) fn use_doors(
             else {
                 continue;
             };
-            // Far enough out that the two standing places straddle the
-            // shell without argument: a doorway sits in the thickness of a
-            // wall, not on the line the shell is measured to, and a step
-            // too short puts BOTH places on the same side of it.
-            let step = door.out * 1.6;
-            let outer = Vec3::new(door.at.x + step.x, 0.0, door.at.y + step.y);
-            let inner = Vec3::new(door.at.x - step.x, 0.0, door.at.y - step.y);
-            let near = if im { inner } else { outer };
-            let far = if im { outer } else { inner };
-            let leg = if (me - near).with_y(0.0).length() < 1.1 {
-                far
-            } else {
-                near
-            };
-            let world = site.translation + site.rotation * leg;
+            let world = site.translation + site.rotation * door_leg(here, door, im);
             target.0 = Some(Vec3::new(world.x, goal.y, world.z));
             break;
         }
@@ -1656,5 +1680,101 @@ mod tests {
         // family while a child and longhouse material the day after.
         assert!(wants_family_roof(None, true));
         assert!(!wants_family_roof(None, false));
+    }
+
+    /// Walks a body from `from` to the door in small steps, re-asking for
+    /// the leg every step the way the system does, and returns the whole
+    /// run of waypoints it was given.
+    fn walk_out(half_w: f32, from: Vec2, stride: f32) -> Vec<Vec3> {
+        let door = crate::villager::work::Doorway::on_x_wall(half_w, 0.0);
+        let mut me = from;
+        let mut legs = Vec::new();
+        for _ in 0..STEPS {
+            // Through the wall: the router lets go here, because the
+            // walker and their goal are on the same side of it now.
+            if me.x.abs() >= half_w + 0.15 {
+                break;
+            }
+            let leg = door_leg(me, &door, true);
+            legs.push(leg);
+            let toward = (Vec2::new(leg.x, leg.z) - me).normalize_or_zero();
+            me += toward * stride;
+        }
+        legs
+    }
+
+    /// Steps allowed in a walk test. At the two-centimetre stride that is
+    /// twenty-four metres, three times the longest way out of the room
+    /// below - a walk that does not finish inside it is stuck, not slow.
+    const STEPS: usize = 1200;
+
+    /// The far standing place sits past the wall; the near one short of
+    /// it. Which one a leg IS, is which side of the wall line it lies on.
+    fn is_outward(leg: Vec3, half_w: f32) -> bool {
+        leg.x > half_w
+    }
+
+    #[test]
+    fn a_walker_never_turns_back_at_the_threshold() {
+        // The shake: a body leaving a house was handed `outer`, then
+        // `inner`, then `outer` again, a stride short of the doorway, and
+        // stood there juddering. Whatever else changes, the leg it is
+        // given must never reverse once it has been sent through.
+        //
+        // The start is deliberately off the door's axis: a body already
+        // lined up is committed on its first frame and never exercises
+        // the handover that used to flip.
+        for stride in [0.02, 0.05, 0.12, 0.3] {
+            let legs = walk_out(4.0, Vec2::new(-2.0, 2.5), stride);
+            let mut sent_out = false;
+            for leg in &legs {
+                let outward = is_outward(*leg, 4.0);
+                assert!(
+                    !(sent_out && !outward),
+                    "at a stride of {stride} the door sent a walker back inside"
+                );
+                sent_out |= outward;
+            }
+            assert!(sent_out, "at a stride of {stride} nobody was ever sent out");
+        }
+    }
+
+    #[test]
+    fn a_walker_reaches_the_open_air() {
+        // And it is not enough not to reverse - they have to get THROUGH.
+        for start in [
+            Vec2::new(-2.0, 0.0),
+            Vec2::new(-2.0, 2.5),
+            Vec2::new(-3.5, -3.0),
+            Vec2::new(0.0, 3.9),
+            Vec2::new(-3.9, 3.9),
+        ] {
+            let legs = walk_out(4.0, start, 0.02);
+            assert!(
+                legs.len() < STEPS,
+                "a walker starting at {start} never got out of the door"
+            );
+        }
+    }
+
+    #[test]
+    fn the_corridor_is_what_commits_a_walker_not_a_radius() {
+        let door = crate::villager::work::Doorway::on_x_wall(4.0, 0.0);
+        // Lined up, deep inside: sent straight out, however far back in
+        // the room they stand. The old radius held them to `inner` until
+        // they were all but touching it.
+        assert!(is_outward(door_leg(Vec2::new(-6.0, 0.0), &door, true), 4.0));
+        // Off to one side: sent to the inner standing place first, to be
+        // brought into line with the opening.
+        assert!(!is_outward(
+            door_leg(Vec2::new(-1.0, 3.0), &door, true),
+            4.0
+        ));
+        // And the same in reverse for someone on their way in.
+        assert!(!is_outward(
+            door_leg(Vec2::new(9.0, 0.0), &door, false),
+            4.0
+        ));
+        assert!(is_outward(door_leg(Vec2::new(6.0, 3.0), &door, false), 4.0));
     }
 }
