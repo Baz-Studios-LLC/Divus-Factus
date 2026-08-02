@@ -7,6 +7,7 @@ mod camera;
 mod creature;
 mod debug;
 mod doings;
+mod fog;
 mod grass;
 mod hand;
 mod keymap;
@@ -174,6 +175,7 @@ fn main() {
             keymap::KeymapPlugin,
             music::MusicPlugin,
             doings::DoingsPlugin,
+            fog::FogPlugin,
         ))
         .add_systems(Startup, spawn_lighting)
         .run();

@@ -1715,6 +1715,7 @@ walls down as well",
             ),
             Bind::Deed(Deed::Doings, "every soul says what they are at"),
             Bind::Deed(Deed::Trades, "every soul says their trade"),
+            Bind::Deed(Deed::Fog, "only the ground your people know"),
         ],
     ),
     (
