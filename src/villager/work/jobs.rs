@@ -183,6 +183,9 @@ pub(crate) fn take_up_work(
             Without<Held>,
             Without<Airborne>,
             Without<Corpse>,
+            // Somebody running from a wolf is not available for work,
+            // however idle they look on the way past.
+            Without<crate::creature::wildlife::Fleeing>,
         ),
     >,
     bushes: Query<(Entity, &GlobalTransform, &FoodSource), Without<Villager>>,

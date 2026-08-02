@@ -404,6 +404,16 @@ pub(super) fn wild_growth(
     }
 }
 
+/// Someone running for the square with teeth behind them, and when they
+/// may stop. Not saved: a chase that outlives the session is over.
+#[derive(Component)]
+pub struct Fleeing(pub f64);
+
+/// How long the running lasts. Far enough to carry a mauled villager out
+/// of the woods and most of the way home, short enough that a scare does
+/// not cost them the whole working day.
+const FLIGHT: f64 = 22.0;
+
 /// When a mauling was last cried out about, so that one long attack is
 /// one memory rather than one a frame. Not saved: a mauling that ends
 /// with the load is over, and the memory it laid down is what persists.
@@ -415,6 +425,44 @@ pub struct Torn(pub f64);
 /// story; short enough that being caught again the next morning is a
 /// second one.
 const TEETH_REMEMBERED: f64 = 90.0;
+
+/// The run home. Whoever has teeth behind them makes for the square,
+/// where the fire and the other people are, and does not stop to be
+/// given a job on the way.
+pub(super) fn flee_to_safety(
+    mut commands: Commands,
+    clock: Res<crate::calendar::WorldClock>,
+    site: Option<Res<crate::villager::SettlementSite>>,
+    mut running: Query<
+        (
+            Entity,
+            &Transform,
+            &Fleeing,
+            &mut MoveTarget,
+            &mut crate::villager::Activity,
+        ),
+        Without<Corpse>,
+    >,
+) {
+    let Some(site) = site else {
+        return;
+    };
+    for (entity, at, until, mut target, mut activity) in &mut running {
+        // Home, or near enough that there are people about.
+        let home = at.translation.distance(site.centre) < 26.0;
+        if clock.elapsed > until.0 || home {
+            commands.entity(entity).remove::<Fleeing>();
+            target.0 = None;
+            if *activity == crate::villager::Activity::Wandering {
+                *activity = crate::villager::Activity::Idle;
+            }
+            continue;
+        }
+        // Whatever they were at, they are not at it now.
+        *activity = crate::villager::Activity::Wandering;
+        target.0 = Some(site.centre);
+    }
+}
 
 /// Wolves test the roads. A villager alone and far from the square —
 /// a miner on the ore road, an explorer past the cairns — is prey the
@@ -522,6 +570,17 @@ pub(super) fn wolves_stalk(
                     "a wolf set upon one of the village, {:.0} strides out from the square",
                     where_at.distance(site.centre)
                 );
+                // They shout, and they run. A yell is speech with nobody
+                // to say it to, which is exactly what this is - and it
+                // goes out whether or not the god happens to be looking,
+                // because a scream that waits for an audience is not a
+                // scream.
+                commands
+                    .entity(*quarry)
+                    .insert(Fleeing(clock.elapsed + FLIGHT));
+                if let Some(tongue) = telling.0.as_mut() {
+                    tongue.cry(*quarry, "wolf", crate::telling::FaithBand::Wavering, None);
+                }
                 alarms.write(crate::witness::DivineEvent {
                     kind: crate::witness::DivineEventKind::Mauled,
                     position: where_at,

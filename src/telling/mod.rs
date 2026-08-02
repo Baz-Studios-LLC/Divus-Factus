@@ -322,6 +322,38 @@ impl Tongue {
         }
     }
 
+    /// A shout, with nobody in particular to shout at.
+    ///
+    /// Every other line in the game is aimed at someone or is a thought
+    /// kept inside. A cry for help is neither: it is speech with no
+    /// listener, thrown at whoever happens to be in earshot, and it is
+    /// the one thing a person being savaged is certain to do. `why` names
+    /// the trouble — "wolf" for teeth in the leg — so the pool can answer
+    /// the actual emergency rather than the speaker's mood.
+    ///
+    /// Never composed ahead: a scream that arrives a beat late is not a
+    /// scream.
+    pub fn cry(
+        &mut self,
+        who: Entity,
+        why: &'static str,
+        faith: FaithBand,
+        voice: Option<Vocation>,
+    ) {
+        let mut tags = vec!["yell", why, faith_tag(faith)];
+        tags.extend(voice.map(trade_tag));
+        if let Some(said) = self
+            .voice
+            .pick(who.to_bits(), &tags, &[], &mut self.dice)
+            .map(|said| tidy(&said))
+        {
+            // Straight into the mouth, over anything they were musing:
+            // nobody finishes a thought about their boots while a wolf
+            // has hold of them.
+            self.mused.insert(who, (said, true, false));
+        }
+    }
+
     /// The thought waiting for this person, if any.
     pub fn take_musing(&mut self, who: Entity) -> Option<(String, bool, bool)> {
         self.mused.remove(&who)
