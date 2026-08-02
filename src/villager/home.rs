@@ -763,11 +763,15 @@ pub(super) fn assign_homes(
     // `commands` are deferred, so `tenants` cannot see them yet.
     let mut placed: std::collections::HashMap<Entity, Entity> = std::collections::HashMap::new();
 
+    // How many a roof of each kind holds. Asked of the KIND rather than
+    // read off the constants, because a carried-in building sleeps the
+    // beds its maker drew: the bench hall has ten, the constant said
+    // eight, and two founders slept in the dirt beside two empty beds.
     let capacity = |longhouse: bool| {
         if longhouse {
-            LONGHOUSE_CAPACITY
+            crate::villager::work::BuildingKind::Longhouse.sleeps()
         } else {
-            HOUSE_CAPACITY
+            crate::villager::work::BuildingKind::House.sleeps()
         }
     };
     let has_room =
@@ -937,9 +941,9 @@ pub(super) fn rehome_the_misplaced(
     }
     let room_of_kind = |longhouse: bool, occupancy: &std::collections::HashMap<Entity, usize>| {
         let cap = if longhouse {
-            LONGHOUSE_CAPACITY
+            crate::villager::work::BuildingKind::Longhouse.sleeps()
         } else {
-            HOUSE_CAPACITY
+            crate::villager::work::BuildingKind::House.sleeps()
         };
         roofs.iter().any(|(roof, long)| {
             long == longhouse && occupancy.get(&roof).copied().unwrap_or(0) < cap

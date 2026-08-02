@@ -1419,14 +1419,39 @@ pub(crate) fn spawn_settlement(
     commands.entity(settlement).insert(site.ground());
     let day = clock.day();
 
+    // The hall the god raised, and the doorstep the founders walk out
+    // of. Only for a new world: a restored one already has its own.
+    let doorstep = restoring.is_none().then(|| {
+        work::raise_the_founding_hall(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &terrain,
+            settlement,
+            centre,
+            &mut rng,
+        )
+    });
+    let doorstep = doorstep.flatten();
+
     let founders = if restoring.is_some() {
         0
     } else {
         STARTING_POPULATION
     };
     for i in 0..founders {
-        let position =
-            random_walkable_point(&terrain, &mut rng, centre, site.radius * 0.6).unwrap_or(centre);
+        // Out of the hall's door, one after another, rather than
+        // scattered across a field they were never in.
+        let position = match doorstep {
+            Some(step) => {
+                let turn = i as f32 * 2.399_963;
+                let out = Vec3::new(turn.cos(), 0.0, turn.sin()) * (1.2 + i as f32 * 0.35);
+                let spot = step + out;
+                Vec3::new(spot.x, terrain.height_at(spot.x, spot.z), spot.z)
+            }
+            None => random_walkable_point(&terrain, &mut rng, centre, site.radius * 0.6)
+                .unwrap_or(centre),
+        };
         // Five and five, all grown. A founding generation with children
         // in it is a founding generation that cannot work: a quarter of
         // the world's first hands used to be too small to lift anything,

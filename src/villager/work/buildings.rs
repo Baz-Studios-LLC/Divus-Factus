@@ -1099,6 +1099,94 @@ fn raise_gable(
 /// Raises the visible stage of a building under construction, shaped and
 /// coloured by its blueprint. Each stage spawns geometry as children of the
 /// site, so the building accretes in place — and no two need look alike.
+/// Raises a building whole, in one breath, on ground nobody worked for
+/// it — the god's own doing rather than a village's.
+///
+/// This is the founding hall, and it is the only building in the game
+/// that is not built. Ten beds come up out of the earth under the light
+/// and the founders walk out of them, which is both the opening of the
+/// game and the reason `STARTING_POPULATION` is ten.
+///
+/// Deliberately does no terracing and rebuilds no chunks: the flag
+/// already refused any ground that was not level enough for a village,
+/// so there is nothing to flatten, and touching the terrain here would
+/// drag half the world-building systems into the founding.
+///
+/// Returns where its door stands, so the people can come out of it.
+pub(crate) fn raise_the_founding_hall(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    terrain: &Terrain,
+    settlement: Entity,
+    centre: Vec3,
+    rng: &mut Rng,
+) -> Option<Vec3> {
+    let plan = Blueprint::roll(BuildingKind::Longhouse, rng);
+    let reach = plan.half_w.max(plan.half_d);
+
+    // Off the square, so it does not stand on the banner - and on the
+    // flattest of a ring of candidates, since nothing here will level
+    // the ground for it.
+    let (at, yaw) = (0..12)
+        .map(|i| {
+            let angle = i as f32 / 12.0 * std::f32::consts::TAU;
+            let (sin, cos) = angle.sin_cos();
+            let out = reach + 9.0;
+            let (x, z) = (centre.x + cos * out, centre.z + sin * out);
+            (Vec3::new(x, terrain.height_at(x, z), z), angle)
+        })
+        .filter(|(at, _)| terrain.is_walkable(at.x, at.z))
+        .min_by(|a, b| {
+            terrain
+                .slope_at(a.0.x, a.0.z)
+                .total_cmp(&terrain.slope_at(b.0.x, b.0.z))
+        })
+        // Facing the square it stands beside.
+        .map(|(at, angle)| (at, angle + std::f32::consts::PI))?;
+
+    let hall = commands
+        .spawn((
+            Name::new(BuildingKind::Longhouse.name()),
+            crate::villager::MemberOf(settlement),
+            plan.clone(),
+            Transform::from_translation(at).with_rotation(Quat::from_rotation_y(yaw)),
+            Visibility::default(),
+            crate::hand::PickRadius(reach + 0.9),
+            crate::hand::Rooted,
+            Building {
+                kind: BuildingKind::Longhouse,
+            },
+            Longhouse,
+        ))
+        .id();
+    // Every stage at once: footing, frame, walls, roof.
+    for stage in 0..=steps_for(&plan) {
+        raise_stage(commands, meshes, materials, hall, stage, &plan);
+    }
+    // And its beds, its table, its doors - out of the maker's own marks.
+    match super::baked::drawing_at(BuildingKind::Longhouse, plan.plan) {
+        Some(work) => super::baked::furnish_baked(commands, hall, work),
+        None => {
+            commands.entity(hall).insert(Shell {
+                half_w: plan.half_w,
+                half_d: plan.half_d,
+                doors: vec![Doorway::on_x_wall(plan.half_w, 0.0)],
+            });
+        }
+    }
+
+    // The doorstep, in the world: where ten people are about to be
+    // standing. Read off the drawing's own door when it has one.
+    let door = super::baked::drawing_at(BuildingKind::Longhouse, plan.plan)
+        .and_then(|work| work.marks.iter().find(|mark| mark.mark == "door"))
+        .map(|mark| Vec2::new(mark.at[0], mark.at[2]))
+        .unwrap_or(Vec2::new(plan.half_w, 0.0));
+    let out = Quat::from_rotation_y(yaw) * Vec3::new(door.x + 2.2, 0.0, door.y);
+    let step = at + out;
+    Some(Vec3::new(step.x, terrain.height_at(step.x, step.z), step.z))
+}
+
 pub(crate) fn raise_stage(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
