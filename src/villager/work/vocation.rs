@@ -215,28 +215,30 @@ pub(crate) fn assign_vocations(
     }
 }
 
-/// Fresh to a calling the village pressed on them: for a few days this
-/// person is off the retraining table, or two competing needs would
-/// bounce one soul between the hammer and the net every audit, forever,
-/// and the chronicle would read like a bad joke.
-#[derive(Component)]
-pub struct NewToTheTrade {
-    pub until: f64,
-}
-
-/// The village calls people into the trades it lacks.
+/// The morning muster: every day, before the first shift, the village
+/// looks at what needs doing and sets its hands to it.
 ///
-/// A tavern with no cook, a shrine with no keeper, a bruised village with no
-/// healer: when demand appears, someone from the crowded trades sets their
-/// tools down and takes up new ones — and their chronicle records the turn.
-pub(crate) fn retrain(
+/// Trades were once rolled at adulthood and kept for life, with a slow
+/// audit moving ONE pair of hands every twenty seconds when a post stood
+/// empty. That left a third of a new village standing about: a farmer
+/// with no field and a mason with no stone had nothing they were allowed
+/// to do, and nothing short of a specific unfilled post would move them.
+///
+/// Now the want is counted in HANDS, and every hand is dealt to the want
+/// it best answers. A trade nobody needs is a trade nobody holds, and a
+/// village with more hands than wants puts the rest on the work that
+/// always exists - food and firewood. Nobody has nothing to do.
+pub(crate) fn morning_muster(
     mut commands: Commands,
-    time: Res<Time>,
-    mut since_last: Local<f32>,
     clock: Res<crate::calendar::WorldClock>,
-    buildings: Query<&Building>,
-    sites: Query<(&ConstructionSite, &Blueprint)>,
-    stores: Query<&Stockpile>,
+    mut mustered: Local<u32>,
+    mut notices: MessageWriter<crate::ui::Notice>,
+    town: (
+        Query<&Building>,
+        Query<(&ConstructionSite, &Blueprint)>,
+        Query<&Stockpile>,
+        Query<&Field>,
+    ),
     homeless: Query<
         (),
         (
@@ -246,12 +248,13 @@ pub(crate) fn retrain(
             Without<Corpse>,
         ),
     >,
-    mut notices: MessageWriter<crate::ui::Notice>,
     hurt: Query<&Vitality, (With<Villager>, Without<Corpse>)>,
-    known: Option<Res<crate::villager::explore::KnownWorld>>,
-    trees: Query<(&GlobalTransform, &crate::scatter::FellableTree)>,
-    terrain: Option<Res<Terrain>>,
-    site: Option<Res<SettlementSite>>,
+    ground: (
+        Option<Res<crate::villager::explore::KnownWorld>>,
+        Query<(&GlobalTransform, &crate::scatter::FellableTree)>,
+        Option<Res<Terrain>>,
+        Option<Res<SettlementSite>>,
+    ),
     wild: Query<
         (&Transform, &crate::creature::genome::CreatureGenome),
         (With<crate::creature::wildlife::Wild>, Without<Corpse>),
@@ -263,54 +266,42 @@ pub(crate) fn retrain(
             &Person,
             Option<&mut Chronicle>,
             Option<&Skills>,
-            Option<&NewToTheTrade>,
         ),
         (With<Villager>, Without<Corpse>),
     >,
 ) {
-    // A standing audit, not a frame-by-frame twitch: the village looks at
-    // itself every little while and reallocates one pair of hands at most.
-    *since_last += time.delta_secs();
-    if *since_last < 20.0 {
+    // Once a day, when the working morning opens.
+    if !clock.work_hours() || *mustered == clock.day() {
         return;
     }
-    *since_last = 0.0;
+    *mustered = clock.day();
 
-    let has_building = |kind: BuildingKind| buildings.iter().any(|b| b.kind == kind);
-    let count_of = |v: Vocation| workers.iter().filter(|(_, w, ..)| **w == v).count();
-    let has_vocation = |v: Vocation| count_of(v) > 0;
-    let timber_low = stores.iter().next().is_none_or(|s| s.timber < 6.0);
+    let (buildings, sites, stores, fields) = town;
+    let (known, trees, terrain, site) = ground;
+    let mouths = workers.iter().count();
+    if mouths == 0 {
+        return;
+    }
+
+    let store = stores.iter().next();
+    let food = store.map_or(0.0, |s| s.food());
+    let timber = store.map_or(0.0, |s| s.timber);
+    let masonry = store.map_or(0.0, |s| s.stone + s.clay);
+    let has = |kind: BuildingKind| buildings.iter().any(|b| b.kind == kind);
+
+    // The larder's floor rises with the population: twelve food is a
+    // pantry for eight and a rounding error for twenty-four.
+    let floor = (mouths as f32 * 1.2).max(12.0);
+    let hungry = ((floor - food) / floor).clamp(0.0, 1.0);
+
     // Whether any fellable tree stands on ground the village knows. When
-    // none does, more foresters are useless — someone has to go find woods.
+    // none does, more foresters are useless - someone has to go find woods.
     let wood_known = known.as_ref().is_none_or(|k| {
         trees
             .iter()
             .any(|(at, tree)| tree.harvestable() && k.knows(at.translation()))
     });
-
-    // The village's needs, in the order they kill. Every want here is a
-    // deadlock somewhere else: no woodcutter starves the fire and every
-    // build; no carpenter leaves the homeless in the rain; and so on.
-    // Hunger kills first, so food hands top the ladder: a thin larder
-    // with too few of the trades that fill it retrains someone toward
-    // the water or the bushes before anything else gets a say.
-    let mouths = workers.iter().count();
-    // The larder's floor rises with the population: twelve food is a
-    // pantry for eight and a rounding error for twenty-four.
-    let food_low = stores
-        .iter()
-        .next()
-        .is_none_or(|s| s.food() < (mouths as f32 * 1.2).max(12.0));
-    let food_hands: usize = [
-        Vocation::Fisher,
-        Vocation::Gatherer,
-        Vocation::Hunter,
-        Vocation::Farmer,
-    ]
-    .into_iter()
-    .map(|v| count_of(v))
-    .sum();
-    // Whether water lies within a working walk of the square — twelve
+    // Whether water lies within a working walk of the square - twelve
     // spokes, no dart-throwing, so no rng is needed here.
     let shore_near = terrain.as_ref().zip(site.as_ref()).is_some_and(|(t, s)| {
         (0..12).any(|i| {
@@ -322,8 +313,6 @@ pub(crate) fn retrain(
             })
         })
     });
-    // Wolves pressing the village, or a manned post waiting for its
-    // man: danger calls a guard the way hunger calls a fisher.
     let wolves_near = site.as_ref().map_or(0, |s| {
         wild.iter()
             .filter(|(at, genome)| {
@@ -332,137 +321,175 @@ pub(crate) fn retrain(
             })
             .count()
     });
-    let mut wanted: Option<Vocation> = None;
-    if food_low && food_hands * 5 < mouths.max(4) {
-        wanted = Some(if shore_near {
-            Vocation::Fisher
-        } else {
-            Vocation::Gatherer
-        });
-    } else if !has_vocation(Vocation::Guard)
-        && (wolves_near >= 2 || has_building(BuildingKind::Watchtower))
-    {
-        wanted = Some(Vocation::Guard);
-    } else if timber_low && !wood_known && !has_vocation(Vocation::Explorer) {
-        wanted = Some(Vocation::Explorer);
-    } else if !has_vocation(Vocation::Forester) && timber_low && wood_known {
-        wanted = Some(Vocation::Forester);
-    } else if has_building(BuildingKind::Dock) && !has_vocation(Vocation::Fisher) {
-        wanted = Some(Vocation::Fisher);
-    } else if !has_vocation(Vocation::Mason)
-        && sites
-            .iter()
-            .any(|(cs, plan)| cs.stone_laid < cs.footing_stone(plan.kind))
-    {
-        // BEFORE the carpenter: an unlaid foundation blocks every other
-        // trade on the site, and the ladder only fills one post per pass —
-        // ranked below the carpenter, churn kept refilling the carpenter's
-        // post while a finished-looking longhouse waited years on four
-        // stones nobody was allowed to carry.
-        wanted = Some(Vocation::Mason);
-    } else if !has_vocation(Vocation::Carpenter)
-        && (!sites.is_empty() || homeless.iter().count() > 2)
-    {
-        wanted = Some(Vocation::Carpenter);
-    } else if has_building(BuildingKind::Tavern) && !has_vocation(Vocation::Cook) {
-        wanted = Some(Vocation::Cook);
-    } else if has_building(BuildingKind::Shrine) && !has_vocation(Vocation::Priest) {
-        wanted = Some(Vocation::Priest);
-    } else if !has_vocation(Vocation::Healer) && hurt.iter().filter(|v| v.harm > 0.15).count() >= 2
-    {
-        wanted = Some(Vocation::Healer);
-    }
-    let Some(wanted) = wanted else {
-        return;
-    };
 
-    // The most crowded trade gives someone up — and no trade gives up its
-    // last pair of hands. The village rebalances itself by need.
-    let mut counts: Vec<(Vocation, usize)> = [
+    let raising = sites.iter().count() as f32;
+    let footings_waiting = sites
+        .iter()
+        .filter(|(cs, plan)| cs.stone_laid < cs.footing_stone(plan.kind))
+        .count() as f32;
+    let unworked_fields = fields
+        .iter()
+        .filter(|f| f.farmer == Entity::PLACEHOLDER)
+        .count() as f32;
+
+    // What the village wants, counted in hands. A want of zero is a trade
+    // nobody takes up - which is the whole point: a farmer is somebody who
+    // has a field, not somebody who once rolled a plough.
+    let food_hands = mouths as f32 * (0.2 + 0.4 * hungry);
+    let mut wanted: Vec<(Vocation, f32)> = vec![
+        (Vocation::Gatherer, food_hands * 0.45),
+        (
+            Vocation::Fisher,
+            if shore_near { food_hands * 0.3 } else { 0.0 },
+        ),
+        (Vocation::Hunter, food_hands * 0.25),
+        (Vocation::Farmer, unworked_fields),
+        // Wood: for the fire, for every build, and for the pile that has
+        // to exist before a carpenter has anything to carry.
+        (
+            Vocation::Forester,
+            if wood_known {
+                1.0 + raising + if timber < 8.0 { 1.0 } else { 0.0 }
+            } else {
+                0.0
+            },
+        ),
+        (Vocation::Explorer, if wood_known { 0.0 } else { 1.0 }),
+        (Vocation::Carpenter, raising.min(3.0)),
+        // A mason with no stone is a mason with nothing to do; the miner
+        // is who fixes that, so the want lands on the miner first.
+        (
+            Vocation::Mason,
+            if footings_waiting > 0.0 && masonry >= 1.0 {
+                footings_waiting.min(2.0)
+            } else {
+                0.0
+            },
+        ),
+        (
+            Vocation::Miner,
+            if footings_waiting > 0.0 && masonry < 4.0 {
+                1.0
+            } else {
+                0.0
+            },
+        ),
+        (
+            Vocation::Cook,
+            if has(BuildingKind::Tavern) { 1.0 } else { 0.0 },
+        ),
+        (
+            Vocation::Priest,
+            if has(BuildingKind::Shrine) { 1.0 } else { 0.0 },
+        ),
+        (
+            Vocation::Healer,
+            if hurt.iter().filter(|v| v.harm > 0.15).count() >= 2 {
+                1.0
+            } else {
+                0.0
+            },
+        ),
+        (
+            Vocation::Guard,
+            if wolves_near >= 2 || has(BuildingKind::Watchtower) {
+                1.0
+            } else {
+                0.0
+            },
+        ),
+    ];
+    // A roofless village needs a hammer whether or not ground is broken:
+    // somebody has to be standing ready when it is.
+    if homeless.iter().count() > 2 {
+        if let Some(entry) = wanted.iter_mut().find(|(v, _)| *v == Vocation::Carpenter) {
+            entry.1 = entry.1.max(1.0);
+        }
+    }
+
+    // The work that always exists, for hands the wants do not reach. Every
+    // one of these has something to do on the first morning of the world.
+    let standing: Vec<Vocation> = [
         Vocation::Gatherer,
-        Vocation::Fisher,
+        Vocation::Forester,
         Vocation::Hunter,
         Vocation::Miner,
-        Vocation::Forester,
-        Vocation::Carpenter,
-        Vocation::Farmer,
-        Vocation::Mason,
+        Vocation::Fisher,
     ]
     .into_iter()
-    .map(|v| (v, count_of(v)))
+    .filter(|v| *v != Vocation::Fisher || shore_near)
+    .filter(|v| *v != Vocation::Forester || wood_known)
     .collect();
-    counts.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
-    let Some((give, _)) = counts
-        .iter()
-        .copied()
-        .find(|(v, n)| *v != wanted && *n >= 2)
-        .or_else(|| {
-            // A village of singletons must still answer its needs: when no
-            // trade can spare a second pair of hands, borrow the least
-            // critical single instead - never a food trade while food is
-            // the worry, never the last forester while timber is. Without
-            // this, twelve founders spread one-per-trade could never
-            // appoint a mason; one unfinished foundation then blocked
-            // every house, and the village froze at its founding dozen.
-            counts.iter().copied().find(|(v, n)| {
-                *n >= 1
-                    && *v != wanted
-                    && !(food_low
-                        && matches!(
-                            v,
-                            Vocation::Fisher
-                                | Vocation::Gatherer
-                                | Vocation::Hunter
-                                | Vocation::Farmer
-                        ))
-                    && !(timber_low && *v == Vocation::Forester)
-            })
-        })
-    else {
-        return;
-    };
-    // From the giving trade, take the GREENEST hands, never the master:
-    // a need can pull anyone, but the village does not melt down its
-    // finest fisher to hold a hammer while an apprentice stands idle.
-    // And never someone still learning the last trade it pressed on them.
-    let donor = workers
-        .iter_mut()
-        .filter(|(_, v, ..)| **v == give)
-        .filter(|(.., fresh)| fresh.is_none_or(|f| clock.elapsed > f.until))
-        .min_by(|a, b| {
-            let a_craft = a.4.map_or(0.0, |s| s.of(give));
-            let b_craft = b.4.map_or(0.0, |s| s.of(give));
-            a_craft.total_cmp(&b_craft)
-        });
-    let Some((entity, old, person, chronicle, _, _)) = donor else {
-        return;
-    };
-    let old = *old;
 
-    commands.entity(entity).insert((
-        wanted,
-        NewToTheTrade {
-            until: clock.elapsed + crate::calendar::DAY_SECONDS as f64 * 3.0,
-        },
-    ));
-    info!(
-        "{} set down their tools and {}",
-        person.name,
-        wanted.taking_up()
-    );
-    notices.write(crate::ui::Notice::new(format!(
-        "{} {} - the village needed it",
-        person.name,
-        wanted.taking_up()
-    )));
-    if let Some(mut chronicle) = chronicle {
-        chronicle.record(
-            clock.day(),
-            format!(
-                "set down the tools of one who {} and {}",
-                old.describe(),
-                wanted.taking_up()
-            ),
+    // Dealt in a fixed order so a re-run of the same world musters the
+    // same way.
+    let mut hands: Vec<Entity> = workers.iter().map(|(e, ..)| e).collect();
+    hands.sort_unstable_by_key(|e| e.to_bits());
+
+    let mut turned = 0usize;
+    for hand in hands {
+        let Ok((_, held, person, chronicle, skills)) = workers.get_mut(hand) else {
+            continue;
+        };
+        let held = *held;
+        let craft = |v: Vocation| skills.as_ref().map_or(0.0, |s| s.of(v));
+        // Need first, aptitude second, and a thumb on the scale for the
+        // trade they already know - a village that reshuffles every hand
+        // every morning for a hair's advantage never gets good at
+        // anything.
+        let score =
+            |v: Vocation, left: f32| left * (0.55 + craft(v)) * if v == held { 1.35 } else { 1.0 };
+        let best = wanted
+            .iter()
+            .filter(|(_, left)| *left > 0.0)
+            .map(|(v, left)| (*v, score(*v, *left)))
+            .max_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(v, _)| v)
+            .or_else(|| {
+                // Nothing left to want: the standing work, at whatever
+                // they are best at.
+                standing
+                    .iter()
+                    .copied()
+                    .max_by(|a, b| {
+                        let (a_craft, b_craft) = (craft(*a), craft(*b));
+                        let bump = |v: Vocation| if v == held { 0.2 } else { 0.0 };
+                        (a_craft + bump(*a)).total_cmp(&(b_craft + bump(*b)))
+                    })
+                    .or(Some(Vocation::Gatherer))
+            });
+        let Some(best) = best else { continue };
+        if let Some(entry) = wanted.iter_mut().find(|(v, _)| *v == best) {
+            entry.1 -= 1.0;
+        }
+        if best == held {
+            continue;
+        }
+        turned += 1;
+        commands.entity(hand).insert(best);
+        info!(
+            "{} set down their tools and {}",
+            person.name,
+            best.taking_up()
         );
+        if let Some(mut chronicle) = chronicle {
+            chronicle.record(
+                clock.day(),
+                format!(
+                    "set down the tools of one who {} and {}",
+                    held.describe(),
+                    best.taking_up()
+                ),
+            );
+        }
+    }
+    // One notice for the whole muster: a village that reassigns six hands
+    // should not shout six times.
+    if turned > 0 {
+        notices.write(crate::ui::Notice::new(if turned == 1 {
+            "One pair of hands turned to work the village needed".to_string()
+        } else {
+            format!("{turned} pairs of hands turned to work the village needed")
+        }));
     }
 }

@@ -271,7 +271,18 @@ impl CreatureGenome {
         } else {
             Age::Adult
         };
+        Self::built(species, sex, age, rng)
+    }
 
+    /// A grown creature of a chosen sex - what a founding generation is
+    /// made of. Sex and age reach into the body itself (build, leg length,
+    /// the head's share of the height, whether a beard is possible), so
+    /// they are chosen BEFORE it is grown rather than stamped on after.
+    pub fn adult(species: Species, sex: Sex, rng: &mut Rng) -> Self {
+        Self::built(species, sex, Age::Adult, rng)
+    }
+
+    fn built(species: Species, sex: Sex, age: Age, rng: &mut Rng) -> Self {
         let proportions = match species {
             // Deliberately not human proportions. Villagers are three or four
             // pixels tall at normal zoom, and a realistically-proportioned figure

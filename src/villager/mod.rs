@@ -148,7 +148,7 @@ impl Plugin for VillagerPlugin {
                         .chain(),
                     (
                         work::assign_vocations,
-                        work::retrain,
+                        work::morning_muster,
                         work::forget_shunned,
                         work::plan_houses,
                         work::take_up_work,
@@ -1312,7 +1312,12 @@ pub(crate) fn spawn_settlement(
     for i in 0..founders {
         let position =
             random_walkable_point(&terrain, &mut rng, centre, site.radius * 0.6).unwrap_or(centre);
-        let genome = CreatureGenome::random(Species::Human, &mut rng);
+        // Six and six, all grown. A founding generation with children in
+        // it is a founding generation that cannot work: a quarter of the
+        // world's first hands used to be too small to lift anything, and
+        // the village spent its first week learning that.
+        let sex = if i % 2 == 0 { Sex::Female } else { Sex::Male };
+        let genome = CreatureGenome::adult(Species::Human, sex, &mut rng);
         let is_child = genome.age == Age::Child;
         let genome_sex = genome.sex;
         let genome_age = genome.age;

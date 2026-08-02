@@ -133,12 +133,17 @@ fn progress_fronts(
             Ok("rain") => 0.7,
             Ok("storm") => 1.0,
             _ => {
+                // Fair weather is the ordinary day and rain is an event.
+                // A front that crosses the rain line (0.6) used to come up
+                // one time in four, which over a season of two-hundred
+                // second fronts reads as a wet country rather than a
+                // village with weather.
                 let roll = rng.f32();
-                let base = if roll < 0.45 {
+                let base = if roll < 0.62 {
                     rng.range(0.05, 0.3)
-                } else if roll < 0.75 {
+                } else if roll < 0.87 {
                     rng.range(0.3, 0.55)
-                } else if roll < 0.93 {
+                } else if roll < 0.97 {
                     rng.range(0.55, 0.8)
                 } else {
                     rng.range(0.8, 1.0)
