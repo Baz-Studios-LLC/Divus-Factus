@@ -50,15 +50,18 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
     // the HUD's own live values — a row here is a HudValue and a Node.
     commands.spawn((
         DevOverlay,
-        ui::dim(""),
-        // The dim kit's small size reads fine in a panel row; floating
-        // alone over the world it squints, and it sat close enough under
-        // the date to read as the date's own subtitle. Bigger, and given
-        // its own air.
+        // Hand-built rather than ui::dim, which already carries a
+        // TextFont - a bundle with two of anything panics, the same trap
+        // the splash line fell into. The dim kit's small size also reads
+        // fine in a panel row but squints floating alone over the world,
+        // and it sat close enough under the date to read as its subtitle.
+        Text::new(""),
+        ui::SerifFace,
         TextFont {
             font_size: FontSize::Px(17.0),
             ..default()
         },
+        TextColor(ui::theme::text_dim()),
         Node {
             position_type: PositionType::Absolute,
             // Below the date card, which owns the corner itself.
