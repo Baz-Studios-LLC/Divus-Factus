@@ -12,10 +12,12 @@
 //! chronicle to read and nothing to survey until somebody plants.
 
 use bevy::prelude::*;
+use bevy::text::FontSize;
 
 use crate::GameState;
+use crate::palette;
 use crate::terrain::Terrain;
-use crate::villager::{ChosenGround, will_take_a_village};
+use crate::villager::{ChosenGround, reckon_ground, will_take_a_village};
 
 /// The likeliest ground in the world, found once at startup.
 ///
@@ -35,7 +37,36 @@ pub struct GroundUnderTheFlag {
     pub at: Option<Vec3>,
     /// Why this ground will not take a village, if it will not.
     pub refusal: Option<&'static str>,
+    /// How much of a working walk bears wood, and rock, 0 to 1.
+    pub timberland: f32,
+    pub stoneland: f32,
+    /// Whether there is shore within a working walk.
+    pub shore: bool,
+    /// Where the reckoning above was taken. The survey walks a hundred
+    /// and fifty terrain samples; it is not worth retaking for a cursor
+    /// that has shifted a handspan.
+    reckoned_at: Option<Vec3>,
 }
+
+impl GroundUnderTheFlag {
+    /// Whether the flag would go in here.
+    pub fn will_take_it(&self) -> bool {
+        self.at.is_some() && self.refusal.is_none()
+    }
+}
+
+/// The flag the god carries, and the parts of it that take a colour.
+#[derive(Component)]
+struct TheFlag {
+    cloth: Vec<Entity>,
+}
+
+/// The line of text under the flag, saying what the ground is.
+#[derive(Component)]
+struct GroundReadout;
+
+/// How far the cursor must move before the reckoning is retaken.
+const RESURVEY: f32 = 4.0;
 
 pub struct FoundingPlugin;
 
@@ -53,11 +84,20 @@ impl Plugin for FoundingPlugin {
             )
             .add_systems(
                 Update,
-                (read_the_ground, plant_the_flag)
+                (
+                    read_the_ground,
+                    carry_the_flag,
+                    say_the_ground,
+                    plant_the_flag,
+                )
                     .chain()
                     .run_if(in_state(GameState::Choosing)),
             )
-            .add_systems(OnEnter(GameState::Choosing), plant_it_unattended);
+            .add_systems(
+                OnEnter(GameState::Choosing),
+                (raise_the_flag, plant_it_unattended).chain(),
+            )
+            .add_systems(OnExit(GameState::Choosing), put_the_flag_away);
     }
 }
 
@@ -93,6 +133,88 @@ fn survey_the_land(
     }
 }
 
+/// A pole, a crossarm and a drop of cloth — the town banner, before there
+/// is a town to raise it over.
+fn raise_the_flag(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+    let wood = materials.add(StandardMaterial {
+        base_color: palette::shade(&palette::WOOD, 0.55),
+        perceptual_roughness: 0.9,
+        ..default()
+    });
+    let cloth_stuff = materials.add(StandardMaterial {
+        base_color: palette::shade(&palette::CLOTH_GOLD, 0.85),
+        perceptual_roughness: 0.85,
+        cull_mode: None,
+        ..default()
+    });
+
+    let flag = commands
+        .spawn((
+            Name::new("The founding flag"),
+            Transform::default(),
+            Visibility::Hidden,
+        ))
+        .id();
+    let mut part = |offset: Vec3, size: Vec3, stuff: &Handle<StandardMaterial>| -> Entity {
+        commands
+            .spawn((
+                Mesh3d(cube.clone()),
+                MeshMaterial3d(stuff.clone()),
+                Transform::from_translation(offset).with_scale(size),
+                ChildOf(flag),
+            ))
+            .id()
+    };
+    // The pole stands in the ground; the cloth hangs from a crossarm at
+    // the head of it, the way the town's own banner does.
+    part(Vec3::new(0.0, 1.6, 0.0), Vec3::new(0.14, 3.2, 0.14), &wood);
+    part(Vec3::new(0.45, 3.1, 0.0), Vec3::new(1.0, 0.12, 0.12), &wood);
+    let cloth = vec![part(
+        Vec3::new(0.5, 2.45, 0.0),
+        Vec3::new(0.9, 1.2, 0.06),
+        &cloth_stuff,
+    )];
+    commands.entity(flag).insert(TheFlag { cloth });
+
+    // And the words under it.
+    commands.spawn((
+        GroundReadout,
+        Text::new(""),
+        TextFont {
+            font_size: FontSize::Px(15.0),
+            ..default()
+        },
+        TextColor(palette::shade(&palette::BONE, 0.95)),
+        TextLayout {
+            justify: Justify::Center,
+            ..default()
+        },
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(72.0),
+            left: Val::Px(0.0),
+            right: Val::Px(0.0),
+            ..default()
+        },
+        GlobalZIndex(6),
+    ));
+}
+
+fn put_the_flag_away(
+    mut commands: Commands,
+    flags: Query<Entity, With<TheFlag>>,
+    words: Query<Entity, With<GroundReadout>>,
+) {
+    for gone in flags.iter().chain(words.iter()) {
+        commands.entity(gone).despawn();
+    }
+}
+
 /// The flag reads the ground it is over, every frame it moves.
 fn read_the_ground(
     terrain: Option<Res<Terrain>>,
@@ -106,6 +228,99 @@ fn read_the_ground(
     reading.refusal = hand
         .cursor_world
         .and_then(|at| will_take_a_village(&terrain, at.x, at.z));
+
+    // The materials reckoning is a hundred and fifty terrain samples;
+    // retaking it every frame for a cursor that has barely moved is
+    // waste, and a few strides is finer than the ground itself varies.
+    let Some(at) = hand.cursor_world else {
+        return;
+    };
+    if reading
+        .reckoned_at
+        .is_some_and(|was| was.distance(at) < RESURVEY)
+    {
+        return;
+    }
+    let (timberland, stoneland, shore) = reckon_ground(&terrain, at.x, at.z);
+    reading.timberland = timberland;
+    reading.stoneland = stoneland;
+    reading.shore = shore;
+    reading.reckoned_at = Some(at);
+}
+
+/// The flag follows the cursor, and goes red over ground that will not
+/// have it — so a refusal is something the god SEES while sweeping,
+/// rather than something they are told after committing to it.
+fn carry_the_flag(
+    reading: Res<GroundUnderTheFlag>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut flags: Query<(&TheFlag, &mut Transform, &mut Visibility)>,
+    cloth: Query<&MeshMaterial3d<StandardMaterial>>,
+) {
+    let Ok((flag, mut at, mut showing)) = flags.single_mut() else {
+        return;
+    };
+    let Some(ground) = reading.at else {
+        *showing = Visibility::Hidden;
+        return;
+    };
+    *showing = Visibility::Inherited;
+    at.translation = ground;
+
+    let colour = if reading.refusal.is_some() {
+        palette::shade(&palette::CLOTH_RED, 0.55)
+    } else {
+        palette::shade(&palette::CLOTH_GOLD, 0.85)
+    };
+    for piece in &flag.cloth {
+        if let Ok(stuff) = cloth.get(*piece)
+            && let Some(mut stuff) = materials.get_mut(&stuff.0)
+            && stuff.base_color != colour
+        {
+            stuff.base_color = colour;
+        }
+    }
+}
+
+/// What the ground is, in the founders' own terms.
+fn say_the_ground(
+    reading: Res<GroundUnderTheFlag>,
+    mut words: Query<(&mut Text, &mut TextColor), With<GroundReadout>>,
+) {
+    let Ok((mut text, mut ink)) = words.single_mut() else {
+        return;
+    };
+    let (said, colour) = match (reading.at, reading.refusal) {
+        (None, _) => (String::new(), palette::shade(&palette::BONE, 0.95)),
+        (Some(_), Some(refusal)) => (
+            refusal.to_string(),
+            palette::shade(&palette::CLOTH_RED, 0.75),
+        ),
+        (Some(_), None) => {
+            let wood = match reading.timberland {
+                t if t > 0.66 => "deep woods",
+                t if t > 0.33 => "trees enough",
+                t if t > 0.05 => "thin woods",
+                _ => "no timber in reach",
+            };
+            let rock = match reading.stoneland {
+                s if s > 0.5 => "stone in the rises",
+                s if s > 0.1 => "some rock",
+                _ => "no rock in reach",
+            };
+            let water = if reading.shore { ", water" } else { "" };
+            (
+                format!("{wood}, {rock}{water}"),
+                palette::shade(&palette::BONE, 0.95),
+            )
+        }
+    };
+    if text.0 != said {
+        *text = Text::new(said);
+    }
+    if ink.0 != colour {
+        *ink = TextColor(colour);
+    }
 }
 
 /// The flag goes in, and the world begins.
@@ -114,24 +329,16 @@ fn plant_the_flag(
     reading: Res<GroundUnderTheFlag>,
     mut chosen: ResMut<ChosenGround>,
     mut next: ResMut<NextState<GameState>>,
-    mut notices: MessageWriter<crate::ui::Notice>,
 ) {
     if !mouse.just_pressed(MouseButton::Left) {
         return;
     }
-    let Some(at) = reading.at else {
-        // The cursor is off the world - open sky, or over a panel.
+    // Refused ground simply will not take it. The flag has been reading
+    // red the whole time the cursor was over it and the words beneath
+    // have been saying why, so there is nothing left to announce.
+    let Some(at) = reading.at.filter(|_| reading.will_take_it()) else {
         return;
     };
-    if let Some(refusal) = reading.refusal {
-        // Refused, and told why. The ghost should already have been
-        // reading red before the click ever came - this is the backstop,
-        // not the message.
-        notices.write(crate::ui::Notice::new(format!(
-            "The flag will not stand here: {refusal}"
-        )));
-        return;
-    }
     found_here(at, &mut chosen, &mut next);
 }
 

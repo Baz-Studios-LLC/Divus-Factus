@@ -672,6 +672,53 @@ fn level_room(terrain: &Terrain, x: f32, z: f32) -> f32 {
     buildable as f32 / samples as f32
 }
 
+/// What the ground offers a village that stood here: how much of the
+/// working walk bears wood, how much is stony enough to shed boulders,
+/// and whether there is shore in reach.
+///
+/// The same reckoning the site search scores on, said out loud - so the
+/// god chooses with the founders' own information instead of guessing
+/// from the look of the place.
+pub fn reckon_ground(terrain: &Terrain, x: f32, z: f32) -> (f32, f32, bool) {
+    let mut timber = 0.0;
+    let mut stony = 0;
+    let mut samples = 0;
+    for angle_step in 0..12 {
+        let angle = angle_step as f32 / 12.0 * std::f32::consts::TAU;
+        for distance in [45.0, 70.0, 95.0, 120.0] {
+            let sx = x + angle.cos() * distance;
+            let sz = z + angle.sin() * distance;
+            samples += 1;
+            if terrain.is_submerged(sx, sz) {
+                continue;
+            }
+            if terrain.slope_at(sx, sz) > 0.42 {
+                if distance >= 70.0 {
+                    stony += 1;
+                }
+            } else if terrain.forest_at(sx, sz) > 0.50 && terrain.moisture_at(sx, sz) > 0.38 {
+                timber += match terrain.biome_at(sx, sz) {
+                    Biome::Arid => 0.2,
+                    Biome::Alpine => 0.35,
+                    _ => 1.0,
+                };
+            }
+        }
+    }
+    let shore = (0..12).any(|i| {
+        let angle = i as f32 / 12.0 * std::f32::consts::TAU;
+        (1..=15).any(|step| {
+            let d = step as f32 * 4.0;
+            terrain.is_submerged(x + angle.cos() * d, z + angle.sin() * d)
+        })
+    });
+    (
+        (timber / samples as f32 / 0.33).min(1.0),
+        (stony as f32 / samples as f32 / 0.20).min(1.0),
+        shore,
+    )
+}
+
 /// Why this ground will not take a village, or `None` if it will.
 ///
 /// The one standard, used by the site search AND by the flag in the
