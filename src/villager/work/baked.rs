@@ -120,6 +120,9 @@ fn carried() -> &'static Vec<Baked> {
                 }
             }
             if !works.is_empty() {
+                // read_dir's order is the filesystem's business; a world
+                // seed's is ours.
+                works.sort_by(|a, b| a.name.cmp(&b.name));
                 break;
             }
         }
@@ -127,9 +130,33 @@ fn carried() -> &'static Vec<Baked> {
     })
 }
 
-/// The house the village raises, if one has been carried in.
-pub fn house() -> Option<&'static Baked> {
-    carried().iter().find(|work| work.name.starts_with("house"))
+/// Every house carried in, in a settled order - so a world seed raises
+/// the same street twice.
+pub fn houses() -> Vec<&'static Baked> {
+    carried()
+        .iter()
+        .filter(|work| work.name.starts_with("house"))
+        .collect()
+}
+
+/// The house a given plan follows. Plans are rolled per building, so a
+/// village of one blueprint became a village of however many the maker
+/// has drawn - and the roll survives a save, because it lives in the
+/// blueprint rather than being worked out again from the entity.
+pub fn house_at(plan: usize) -> Option<&'static Baked> {
+    let all = houses();
+    (!all.is_empty()).then(|| all[plan % all.len()])
+}
+
+/// The widest of them. Ground is broken before a plan is rolled, so the
+/// plot has to be cut for whichever house turns up.
+pub fn widest_house() -> Option<f32> {
+    houses()
+        .iter()
+        .map(|work| work.half_w.max(work.half_d))
+        .fold(None, |most: Option<f32>, reach| {
+            Some(most.map_or(reach, |m| m.max(reach)))
+        })
 }
 
 /// A gable's prism, and the ridge cap's, cut the way the bench cuts
@@ -376,4 +403,28 @@ pub fn furnish_baked(commands: &mut Commands, site: Entity, work: &Baked) {
             doors
         },
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_house_in_the_folder_is_carried_and_dealt_in_turn() {
+        let all = houses();
+        assert!(!all.is_empty(), "no houses found beside the game");
+        // A settled order, so a world seed raises the same street twice.
+        let mut names: Vec<&str> = all.iter().map(|w| w.name.as_str()).collect();
+        let given = names.clone();
+        names.sort_unstable();
+        assert_eq!(given, names, "the houses came back out of order");
+        // Plans cycle, and a plan past the end wraps rather than panics.
+        for plan in 0..all.len() * 2 + 3 {
+            let picked = house_at(plan).expect("a plan always finds a house");
+            assert_eq!(picked.name, all[plan % all.len()].name);
+        }
+        // The plot is cut for whichever house turns up.
+        let widest = widest_house().expect("houses have a width");
+        assert!(all.iter().all(|w| w.half_w.max(w.half_d) <= widest + 1e-3));
+    }
 }

@@ -333,21 +333,31 @@ pub struct Blueprint {
     /// the land around this settlement actually offers.
     #[serde(default)]
     pub stuff: BuildStuff,
+    /// Which carried-in house this one follows, when there are several.
+    /// Rolled once with the rest of the blueprint and kept, so the house
+    /// that finishes is the house whose ground was broken.
+    #[serde(default)]
+    pub plan: usize,
 }
 
 impl Blueprint {
     pub fn roll(kind: BuildingKind, rng: &mut Rng) -> Blueprint {
         use crate::palette as pal;
+        // Which of the maker's houses this one will be. Rolled for every
+        // kind so the dice fall the same way whatever is being built.
+        let plan = rng.range_i(0, super::baked::houses().len().max(1) as i32) as usize;
+        let carried = super::baked::house_at(plan);
         match kind {
             BuildingKind::House => Blueprint {
                 kind,
+                plan,
                 // A carried-in house brings its own footprint, so the
                 // plots are cut to fit it; otherwise the village's own
                 // sizing stands - four beds, a floor to cross, a lane.
-                half_w: super::baked::house()
+                half_w: carried
                     .map(|work| work.half_w)
                     .unwrap_or_else(|| rng.range(2.6, 3.2)),
-                half_d: super::baked::house()
+                half_d: carried
                     .map(|work| work.half_d)
                     .unwrap_or_else(|| rng.range(2.7, 3.4)),
                 wall_h: rng.range(2.2, 2.7),
@@ -373,6 +383,7 @@ impl Blueprint {
             // it looks it — no paint, no pride, just length.
             BuildingKind::Longhouse => Blueprint {
                 kind,
+                plan,
                 half_w: rng.range(2.7, 3.1),
                 half_d: rng.range(6.0, 7.2),
                 wall_h: rng.range(2.0, 2.3),
@@ -387,6 +398,7 @@ impl Blueprint {
             },
             BuildingKind::Sawmill => Blueprint {
                 kind,
+                plan,
                 half_w: 2.3,
                 half_d: 1.7,
                 wall_h: 0.9,
@@ -397,6 +409,7 @@ impl Blueprint {
             },
             BuildingKind::Blacksmith => Blueprint {
                 kind,
+                plan,
                 half_w: 1.7,
                 half_d: 1.9,
                 wall_h: 1.7,
@@ -407,6 +420,7 @@ impl Blueprint {
             },
             BuildingKind::Tavern => Blueprint {
                 kind,
+                plan,
                 half_w: 2.2,
                 half_d: 2.3,
                 wall_h: 1.9,
@@ -417,6 +431,7 @@ impl Blueprint {
             },
             BuildingKind::TownHall => Blueprint {
                 kind,
+                plan,
                 half_w: 2.5,
                 half_d: 2.9,
                 wall_h: 2.6,
@@ -427,6 +442,7 @@ impl Blueprint {
             },
             BuildingKind::Shrine => Blueprint {
                 kind,
+                plan,
                 half_w: 1.3,
                 half_d: 1.3,
                 wall_h: 1.1,
@@ -438,6 +454,7 @@ impl Blueprint {
             // Long, low and windowless: a roof over the piles.
             BuildingKind::Storehouse => Blueprint {
                 kind,
+                plan,
                 half_w: 2.8,
                 half_d: 1.6,
                 wall_h: 1.3,
@@ -449,6 +466,7 @@ impl Blueprint {
             // Squat and tall-roofed; its stilts show in the frame stage.
             BuildingKind::Granary => Blueprint {
                 kind,
+                plan,
                 half_w: 1.5,
                 half_d: 1.5,
                 wall_h: 1.7,
@@ -460,6 +478,7 @@ impl Blueprint {
             // A stone ring with a little peaked cap.
             BuildingKind::Well => Blueprint {
                 kind,
+                plan,
                 half_w: 0.9,
                 half_d: 0.9,
                 wall_h: 0.7,
@@ -471,6 +490,7 @@ impl Blueprint {
             // Dark-walled and low, stained by its own trade.
             BuildingKind::Smokehouse => Blueprint {
                 kind,
+                plan,
                 half_w: 1.4,
                 half_d: 1.4,
                 wall_h: 1.5,
@@ -482,6 +502,7 @@ impl Blueprint {
             // Tall for its footprint; the sails are the tell.
             BuildingKind::Mill => Blueprint {
                 kind,
+                plan,
                 half_w: 1.7,
                 half_d: 1.7,
                 wall_h: 2.8,
@@ -493,6 +514,7 @@ impl Blueprint {
             // Warm-walled, wide-doored, always faintly floured.
             BuildingKind::Bakery => Blueprint {
                 kind,
+                plan,
                 half_w: 1.8,
                 half_d: 1.6,
                 wall_h: 1.6,
@@ -504,6 +526,7 @@ impl Blueprint {
             // A cottage hung with dyed cloth.
             BuildingKind::Weaver => Blueprint {
                 kind,
+                plan,
                 half_w: 1.6,
                 half_d: 1.5,
                 wall_h: 1.6,
@@ -515,6 +538,7 @@ impl Blueprint {
             // Small, green-roofed, half garden already.
             BuildingKind::Herbalist => Blueprint {
                 kind,
+                plan,
                 half_w: 1.3,
                 half_d: 1.4,
                 wall_h: 1.4,
@@ -526,6 +550,7 @@ impl Blueprint {
             // A narrow stone finger with a platform at the top.
             BuildingKind::Watchtower => Blueprint {
                 kind,
+                plan,
                 half_w: 1.1,
                 half_d: 1.1,
                 wall_h: 3.6,
@@ -538,6 +563,7 @@ impl Blueprint {
             // shows, the works are in the dark. half_d points into the rise.
             BuildingKind::Mine => Blueprint {
                 kind,
+                plan,
                 half_w: rng.range(1.4, 1.7),
                 half_d: 1.6,
                 wall_h: 1.4,
@@ -550,6 +576,7 @@ impl Blueprint {
             // pilings. half_d is the long axis, pointing seaward.
             BuildingKind::Dock => Blueprint {
                 kind,
+                plan,
                 half_w: rng.range(1.0, 1.3),
                 half_d: rng.range(2.8, 3.4),
                 wall_h: 0.9,
@@ -797,7 +824,7 @@ pub(crate) fn open_boardwalks(
 /// footing for a while, the way a real house is raised.
 pub fn steps_for(plan: &Blueprint) -> u8 {
     if plan.kind == BuildingKind::House
-        && let Some(work) = super::baked::house()
+        && let Some(work) = super::baked::house_at(plan.plan)
         && super::baked::has_frame(work)
     {
         4
@@ -996,7 +1023,7 @@ pub(crate) fn raise_stage(
     // A house carried in from the bench is raised from its own boxes;
     // the village's own hand still builds everything else.
     if plan.kind == BuildingKind::House
-        && let Some(work) = super::baked::house()
+        && let Some(work) = super::baked::house_at(plan.plan)
     {
         super::baked::raise_baked(
             commands, meshes, materials, site, stage, work, plan.walls, plan.roof,
@@ -2248,9 +2275,7 @@ pub(crate) fn plan_houses(
     // carried-in house brings its own footprint, and the rolled ones
     // stay within their own range.
     let reach = match kind {
-        BuildingKind::House => super::baked::house()
-            .map(|work| work.half_w.max(work.half_d))
-            .unwrap_or(3.2),
+        BuildingKind::House => super::baked::widest_house().unwrap_or(3.2),
         BuildingKind::Longhouse => 7.2,
         _ => 3.0,
     };

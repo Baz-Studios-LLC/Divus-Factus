@@ -808,7 +808,7 @@ pub(super) fn do_work(
                         done.insert(Hut);
                         // A carried-in house brings its own shell and
                         // furnishings, below, out of its own marks.
-                        if baked::house().is_none() {
+                        if baked::houses().is_empty() {
                             done.insert(Shell {
                                 half_w: plan.half_w,
                                 half_d: plan.half_d,
@@ -843,7 +843,7 @@ pub(super) fn do_work(
                 // holds, the doors it opens, the table its family
                 // gathers at, all read from the marks the bench wrote.
                 if kind == BuildingKind::House
-                    && let Some(work) = baked::house()
+                    && let Some(work) = baked::house_at(plan.plan)
                 {
                     baked::furnish_baked(&mut commands, house, work);
                 }
