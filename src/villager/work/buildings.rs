@@ -2138,17 +2138,11 @@ pub(crate) fn plan_houses(
             face.y + plan.wall_h + 1.4,
         );
         let (chunks, grass, chunk_assets, stripped, dirty_groves) = &mut ground;
-        crate::terrain::rebuild_chunks_near(
-            &mut commands,
-            &mut meshes,
-            chunk_assets,
-            &terrain,
-            chunks,
-            face.x,
-            face.z,
-            plan.half_w + 9.0,
-        );
-        grass.invalidate_near(&mut commands, face.x, face.z, plan.half_w + 9.0);
+        // The felling comes FIRST, before the chunks are swapped. A
+        // scattered tree is a child of its chunk, and a chunk despawn
+        // takes its children with it - so clearing after the rebuild was
+        // despawning entities that were already dead, dozens of ECS
+        // warnings per ground-breaking.
         let mut cleared = 0.0;
         for (tree, tree_at, home) in &standing {
             if tree_at.translation().distance(face) < plan.half_w + 4.0 {
@@ -2163,6 +2157,17 @@ pub(crate) fn plan_houses(
         {
             store.timber += cleared;
         }
+        crate::terrain::rebuild_chunks_near(
+            &mut commands,
+            &mut meshes,
+            chunk_assets,
+            &terrain,
+            chunks,
+            face.x,
+            face.z,
+            plan.half_w + 9.0,
+        );
+        grass.invalidate_near(&mut commands, face.x, face.z, plan.half_w + 9.0);
 
         let building = commands
             .spawn((
@@ -2204,17 +2209,7 @@ pub(crate) fn plan_houses(
         // A small worked pad on the dry end; the rest stands on pilings.
         terrain.flatten(shore.x, shore.z, plan.half_w + 1.2, 2.0, shore.y);
         let (chunks, grass, chunk_assets, stripped, dirty_groves) = &mut ground;
-        crate::terrain::rebuild_chunks_near(
-            &mut commands,
-            &mut meshes,
-            chunk_assets,
-            &terrain,
-            chunks,
-            shore.x,
-            shore.z,
-            plan.half_w + 5.0,
-        );
-        grass.invalidate_near(&mut commands, shore.x, shore.z, plan.half_w + 5.0);
+        // Felling before the chunk swap: see the mine above.
         let mut cleared = 0.0;
         for (tree, tree_at, home) in &standing {
             if tree_at.translation().distance(shore) < plan.half_w + 4.0 {
@@ -2229,6 +2224,17 @@ pub(crate) fn plan_houses(
         {
             store.timber += cleared;
         }
+        crate::terrain::rebuild_chunks_near(
+            &mut commands,
+            &mut meshes,
+            chunk_assets,
+            &terrain,
+            chunks,
+            shore.x,
+            shore.z,
+            plan.half_w + 5.0,
+        );
+        grass.invalidate_near(&mut commands, shore.x, shore.z, plan.half_w + 5.0);
 
         let building = commands
             .spawn((
@@ -2395,21 +2401,15 @@ pub(crate) fn plan_houses(
         let pad = plan.half_w.max(plan.half_d) + 1.6;
         let worked = terrain.terrace(at.x, at.z, pad, 2.4, at.y);
         let (chunks, grass, chunk_assets, stripped, dirty_groves) = &mut ground;
-        crate::terrain::rebuild_chunks_near(
-            &mut commands,
-            &mut meshes,
-            chunk_assets,
-            &terrain,
-            chunks,
-            at.x,
-            at.z,
-            worked + 4.0,
-        );
-        grass.invalidate_near(&mut commands, at.x, at.z, worked + 4.0);
 
         // And clears it properly: every tree within canopy's reach of the
         // walls is felled into the pile. Nobody roofs over a living oak,
         // and nobody wants branches through the bedroom either.
+        //
+        // The felling comes BEFORE the chunk swap. A scattered tree is a
+        // child of its chunk, and a chunk despawn takes its children with
+        // it, so clearing afterwards was despawning entities that were
+        // already dead - dozens of ECS warnings per ground-breaking.
         let clearing = plan.half_w.max(plan.half_d) + 4.5;
         let mut cleared = 0.0;
         for (tree, tree_at, home) in &standing {
@@ -2425,6 +2425,17 @@ pub(crate) fn plan_houses(
         {
             store.timber += cleared;
         }
+        crate::terrain::rebuild_chunks_near(
+            &mut commands,
+            &mut meshes,
+            chunk_assets,
+            &terrain,
+            chunks,
+            at.x,
+            at.z,
+            worked + 4.0,
+        );
+        grass.invalidate_near(&mut commands, at.x, at.z, worked + 4.0);
 
         let building = commands
             .spawn((
