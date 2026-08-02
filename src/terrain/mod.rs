@@ -50,9 +50,18 @@ pub fn stream_radius(camera_distance: f32) -> i32 {
     let chunks = (camera_distance / CHUNK_SIZE) * 1.6 + MIN_VIEW_CHUNKS as f32;
     (chunks.round() as i32).clamp(MIN_VIEW_CHUNKS, VIEW_CHUNKS)
 }
-/// Chunks built per frame during play. Generation is cheap but not free, and
-/// spreading it out keeps streaming from showing up as a stutter.
+/// Chunks built per frame during play when there is little to do.
+///
+/// Generation is cheap but not free, and spreading it out keeps streaming
+/// from showing up as a stutter.
 const CHUNKS_PER_FRAME: usize = 3;
+
+/// The most per frame when there is a lot to do - a full zoom-out asks
+/// for a thousand chunks at once, and three a frame means seven seconds
+/// of watching the world assemble itself. The loading screen already
+/// builds forty-eight a frame and stays responsive, so this is a
+/// conservative ceiling rather than a brave one.
+const CHUNKS_PER_HURRIED_FRAME: usize = 20;
 
 /// Chunks built per frame while the loading screen is up. Nothing is being rendered
 /// yet that a hitch would spoil, so this is limited only by keeping the window
@@ -620,6 +629,11 @@ pub struct LoadedChunks {
     wanted: usize,
     /// Stream radius in chunks, as of the last update.
     radius: i32,
+    /// The widest radius this view has ever asked for. Chunks are kept out
+    /// to it even after the camera comes back in: the memory was already
+    /// paid at the widest moment, and throwing them away only means
+    /// building them again the next time the god leans back.
+    held: i32,
 }
 
 impl LoadedChunks {
@@ -1212,12 +1226,26 @@ fn stream_chunks(
 
     let radius = stream_radius(rig.distance);
     loaded.radius = radius;
+    // What the view wants BUILT, and what is worth keeping. They differ
+    // when the camera comes back in: zooming out, watching the world
+    // assemble, then zooming in and out again and watching it assemble a
+    // second time is the whole complaint, and it happens because the
+    // chunks were thrown away in between. They are not thrown away now.
+    // Panning still frees them - the kept ring travels with the camera -
+    // so the cost is bounded by the widest view, which is a cost the game
+    // already pays at full zoom-out.
+    loaded.held = loaded.held.max(radius);
     let wanted = chunks_in_view(centre, radius);
     let wanted_set: HashSet<IVec2> = wanted.iter().copied().collect();
+    let kept: HashSet<IVec2> = if loaded.held > radius {
+        chunks_in_view(centre, loaded.held).into_iter().collect()
+    } else {
+        wanted_set.clone()
+    };
 
     // Unload first, so memory is released before more is claimed.
     loaded.entities.retain(|coord, entity| {
-        if wanted_set.contains(coord) {
+        if kept.contains(coord) {
             true
         } else {
             commands.entity(*entity).despawn();
@@ -1229,10 +1257,14 @@ fn stream_chunks(
     // something honest to report.
     loaded.wanted = wanted_set.len();
 
+    // A big backlog earns a bigger budget: the point of rationing is to
+    // hide the seams, and three a frame stopped hiding anything the moment
+    // a thousand chunks came due at once.
+    let missing = wanted_set.len().saturating_sub(loaded.entities.len());
     let budget = if *state.get() == crate::GameState::Loading {
         CHUNKS_PER_LOADING_FRAME
     } else {
-        CHUNKS_PER_FRAME
+        (CHUNKS_PER_FRAME + missing / 24).min(CHUNKS_PER_HURRIED_FRAME)
     };
 
     // Load a bounded number per frame, nearest first.
