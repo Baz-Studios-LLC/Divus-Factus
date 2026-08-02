@@ -88,9 +88,11 @@ impl Plugin for FogPlugin {
             // is still choosing where to plant the flag there is nothing
             // known and nothing to hide - and a player cannot pick
             // ground they are not allowed to look at.
+            .init_resource::<VeilRising>()
+            .add_systems(OnEnter(crate::GameState::Playing), the_veil_is_down)
             .add_systems(
                 Update,
-                (toggle_fog, drape_the_veil, follow_the_known)
+                (toggle_fog, drape_the_veil, follow_the_known, raise_the_veil)
                     .chain()
                     .run_if(in_state(crate::GameState::Playing)),
             );
@@ -274,6 +276,53 @@ fn drape_the_veil(
                 ChildOf(chunk),
             ));
         }
+    }
+}
+
+/// How far the veil has risen since the world began, 0 to 1.
+///
+/// The fog is off while the god is choosing ground - a player cannot pick
+/// somewhere they are not allowed to look at - so without this it would
+/// simply snap on the instant the flag went in. It comes up instead, over
+/// the same breath the village does: the world closing in around a place
+/// that now has people in it and an edge to their knowledge.
+#[derive(Resource)]
+pub struct VeilRising {
+    risen: f32,
+}
+
+impl Default for VeilRising {
+    fn default() -> Self {
+        // Fully up by default, so a restored world does not fade in every
+        // time it loads and the veil is simply there, as it was.
+        VeilRising { risen: 1.0 }
+    }
+}
+
+/// Seconds for the veil to come all the way up behind a new village.
+const VEIL_RISES_OVER: f32 = 4.0;
+
+/// The veil starts down over ground nobody has settled yet.
+fn the_veil_is_down(mut rising: ResMut<VeilRising>, chosen: Res<crate::villager::ChosenGround>) {
+    // Only for a world founded this session. A load already has its fog.
+    if chosen.0.is_some() {
+        rising.risen = 0.0;
+    }
+}
+
+/// And comes up behind them.
+fn raise_the_veil(
+    time: Res<Time>,
+    mut rising: ResMut<VeilRising>,
+    mut materials: ResMut<Assets<FogMaterial>>,
+) {
+    if rising.risen >= 1.0 {
+        return;
+    }
+    rising.risen = (rising.risen + time.delta_secs() / VEIL_RISES_OVER).min(1.0);
+    let full = FogParams::default().tint.w;
+    for (_, material) in materials.iter_mut() {
+        material.params.tint.w = full * rising.risen;
     }
 }
 
