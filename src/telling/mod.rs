@@ -539,3 +539,35 @@ mod tests {
         assert_eq!(Retelling::hand_of(&rumoured), Hand::Distant);
     }
 }
+
+#[cfg(test)]
+mod corpus_wiring_tests {
+    use super::*;
+
+    #[test]
+    fn a_musing_is_answered_from_the_book() {
+        let mut tongue = Tongue {
+            voice: corpus::Corpus::load(),
+            dice: crate::rng::Rng::new(1),
+            mused: HashMap::new(),
+            replies: HashMap::new(),
+        };
+        let who = Entity::from_raw_u32(7).unwrap();
+        tongue.muse(Musing {
+            who,
+            voice: None,
+            bearing: Default::default(),
+            faith: FaithBand::Wavering,
+            body: vec!["hungry", "roofless"],
+            place: Vec::new(),
+            mind: String::new(),
+            heard: None,
+            aloud: false,
+            prayer: false,
+            known: Vec::new(),
+        });
+        let (line, ..) = tongue.take_musing(who).expect("the book must answer");
+        assert!(!line.is_empty());
+        println!("said: {line}");
+    }
+}

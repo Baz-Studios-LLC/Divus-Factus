@@ -1,0 +1,16 @@
+[
+  {"t": "I heard the same thing. everyone's talking about it", "tags": ["reply"]},
+  {"t": "you're the third person to tell me that today", "tags": ["reply"]},
+  {"t": "huh. and you saw this yourself?", "tags": ["reply"]},
+  {"t": "that gives me chills, honestly", "tags": ["reply"]},
+  {"t": "well. the world's gotten strange, that's all I'll say", "tags": ["reply"]},
+  {"t": "I don't know what to make of that. I really don't", "tags": ["reply"]},
+  {"t": "if that's true, it changes things. that's all I'm saying", "tags": ["reply", "wavering"]},
+  {"t": "that's the god's work. plain as anything", "tags": ["reply", "devout"]},
+  {"t": "I believe you. after what I've seen here, I believe anything", "tags": ["reply", "devout"]},
+  {"t": "people see what they want to see. no offense", "tags": ["reply", "doubting"]},
+  {"t": "or it's weather, and we're all scaring ourselves over weather", "tags": ["reply", "doubting"]},
+  {"t": "come on. you really believe that?", "tags": ["reply", "doubting"]},
+  {"t": "let's talk about something happier, can we?", "tags": ["reply", "hungry"]},
+  {"t": "can't think about signs and wonders on an empty stomach", "tags": ["reply", "hungry"]}
+]

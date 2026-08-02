@@ -160,6 +160,16 @@ pub(super) fn muse_the_watched(
     if vitality.is_some_and(|v| v.harm > 0.3) {
         body.push("hurt");
     }
+    // The corpus reads these as tags: the deeper the moment's true
+    // description, the sharper the line it can reach for.
+    body.push(if house.is_some() {
+        "housed"
+    } else {
+        "roofless"
+    });
+    if spouse.is_some() {
+        body.push("married");
+    }
 
     let saw = witnessed
         .and_then(|w| w.recent.first())
@@ -195,6 +205,7 @@ pub(super) fn muse_the_watched(
     }
 
     last_mused.insert(entity, *clock);
+    debug!("{} is asked for words", person.name);
     tongue.muse(crate::telling::Musing {
         who: entity,
         voice: vocation.copied(),
