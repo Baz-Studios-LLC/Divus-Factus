@@ -1079,6 +1079,33 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     ),
                 ];
             }
+            // Smoke has one direction and it is not a compass point. Every
+            // other widget wears a nose along its own +X to say which way
+            // it faces - and that nose CANNOT be tilted up, because tilt
+            // turns a part about its own X and the nose lies along it. So
+            // this one is drawn rising instead of pointing: a plume
+            // thinning as it goes, which is the whole of what the mark
+            // means.
+            // A fire is the same case: people gather at one from every
+            // side, so a nose pointing at one of them says something the
+            // eye cannot check. Drawn as a flame instead - and the yaw is
+            // still written into the mark either way, so if a hearth's
+            // open side ever comes to matter the direction is already
+            // there in the file, carried by the hearth's own turn.
+            if *name == "fire" {
+                return vec![
+                    slab(0.0, 0.09375, 0.0, 0.375, 0.1875, 0.375, ramp, shade),
+                    slab(0.0, 0.3125, 0.0, 0.25, 0.25, 0.25, ramp, shade),
+                    slab(0.0, 0.5, 0.0, 0.125, 0.125, 0.125, ramp, shade),
+                ];
+            }
+            if *name == "smoke" {
+                return vec![
+                    slab(0.0, 0.1875, 0.0, 0.375, 0.375, 0.375, ramp, shade),
+                    slab(0.0, 0.5, 0.0, 0.25, 0.25, 0.25, ramp, shade),
+                    slab(0.0, 0.6875, 0.0, 0.125, 0.125, 0.125, ramp, shade),
+                ];
+            }
             // A seat is shaped like the sitter: knees toward the facing,
             // so a stool's height and a table's clearance can be judged
             // by eye instead of by arithmetic.
@@ -1372,6 +1399,7 @@ impl Plugin for BuilderPlugin {
                     toggle_snap_mode,
                     disarm_on_mode,
                     turn_part,
+                    tilt_part,
                     turn_the_work,
                     reflow_openings,
                     lift_roofs,
@@ -2232,7 +2260,16 @@ fn steer_hand(
         hand.yaw += std::f32::consts::FRAC_PI_2;
     }
     if keys.just_pressed(KeyCode::KeyT) {
-        hand.tilt = (hand.tilt + 15f32.to_radians()).rem_euclid(std::f32::consts::FRAC_PI_2);
+        // A whole turn, not a quarter. Stopping at ninety meant the tilt
+        // wrapped back to flat just as it reached upright, so nothing
+        // could ever be stood on its end - and shift walks it back, since
+        // twenty-three presses to undo one is not a control.
+        let step = if held_shift(&keys) {
+            -15f32.to_radians()
+        } else {
+            15f32.to_radians()
+        };
+        hand.tilt = (hand.tilt + step).rem_euclid(std::f32::consts::TAU);
     }
     if keys.just_pressed(KeyCode::KeyQ) {
         hand.lift = (hand.lift + 0.25).min(8.0);
@@ -4904,6 +4941,40 @@ fn turn_the_work(
         transform.translation = Vec3::from(record.at);
         transform.rotation = pose(record.yaw, record.tilt, record.flip);
     }
+}
+
+/// T tilts the selected part a notch, the way R turns it. Tilt was the
+/// hand's alone until now: a piece already set down could be turned but
+/// never leaned, so getting it wrong meant picking it up and starting the
+/// approach again.
+fn tilt_part(
+    keys: Res<ButtonInput<KeyCode>>,
+    bench: Res<Bench>,
+    naming: Res<Naming>,
+    dims: Res<DimsEntry>,
+    selected: Res<crate::gizmo::Selected>,
+    mut parts: Query<(&mut Transform, &mut Placed), Without<Ghost>>,
+) {
+    if *bench != Bench::Builder
+        || naming.0.is_some()
+        || dims.0.is_some()
+        || !keys.just_pressed(KeyCode::KeyT)
+    {
+        return;
+    }
+    let Some(part) = selected.0 else {
+        return;
+    };
+    let Ok((mut transform, mut record)) = parts.get_mut(part) else {
+        return;
+    };
+    let step = if held_shift(&keys) {
+        -15f32.to_radians()
+    } else {
+        15f32.to_radians()
+    };
+    record.tilt = (record.tilt + step).rem_euclid(std::f32::consts::TAU);
+    transform.rotation = pose(record.yaw, record.tilt, record.flip);
 }
 
 fn turn_part(

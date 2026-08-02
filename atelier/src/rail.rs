@@ -292,7 +292,7 @@ paste it into the hand",
         ),
         ("R", "turn a quarter"),
         ("SHIFT R", "turn the whole work"),
-        ("T", "tilt a roof panel"),
+        ("T / SHIFT T", "lean it, and lean it back"),
         (
             "M",
             "mirror it - the far half
