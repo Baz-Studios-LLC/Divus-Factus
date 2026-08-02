@@ -291,6 +291,7 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
 paste it into the hand",
         ),
         ("R", "turn a quarter"),
+        ("SHIFT R", "turn the whole work"),
         ("T", "tilt a roof panel"),
         (
             "M",
