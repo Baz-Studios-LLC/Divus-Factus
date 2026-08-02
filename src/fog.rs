@@ -11,6 +11,7 @@
 //! and nothing is painted: the shader measures each pixel against the
 //! handful of circles the village actually knows.
 
+use bevy::light::{NotShadowCaster, NotShadowReceiver};
 use bevy::pbr::{Material, MaterialPlugin};
 use bevy::prelude::*;
 use bevy::reflect::TypePath;
@@ -170,6 +171,13 @@ fn drape_the_veil(
                 Mesh3d(mesh.0.clone()),
                 MeshMaterial3d(cloth.clone()),
                 Transform::from_translation(Vec3::Y * lift),
+                // The veil is not a THING. Six sheets hanging over the
+                // world threw six sheets of shadow onto the ground they
+                // were meant to be hiding, and the known island - the one
+                // place the veil never covers - went darkest of all,
+                // because it lay under all six.
+                NotShadowCaster,
+                NotShadowReceiver,
                 ChildOf(chunk),
             ));
         }
