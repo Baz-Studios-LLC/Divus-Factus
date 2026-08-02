@@ -253,6 +253,33 @@ impl Terrain {
         }
     }
 
+    /// Levels a pad and banks it back into the land with a bank cut to the
+    /// earth it actually has to move, answering how far the whole working
+    /// reaches. `least` is a floor on the bank, not the answer: a pad laid
+    /// on the flat keeps it, and one cut into a hillside gets a bank long
+    /// enough to walk down.
+    ///
+    /// This is for ground people live on. A short fixed falloff left a
+    /// house on a slope standing on a mesa with a metre of cliff at its
+    /// downhill edge - fine for a mine mouth, which wants to look cut, and
+    /// wrong for everywhere anyone walks.
+    pub fn terrace(&self, x: f32, z: f32, radius: f32, least: f32, height: f32) -> f32 {
+        // The worst of the earth to be moved, read around the pad's rim.
+        let mut cut: f32 = 0.0;
+        for step in 0..12 {
+            let turn = std::f32::consts::TAU * step as f32 / 12.0;
+            let (sin, cos) = turn.sin_cos();
+            let rim = self.height_at(x + cos * radius, z + sin * radius);
+            cut = cut.max((rim - height).abs());
+        }
+        // One in three: graded earth rather than a quarry face. Smoothstep
+        // steepens toward the middle of the ring, so the true grade at the
+        // halfway line is a shade sharper than that.
+        let falloff = least.max((cut * 3.0).min(18.0));
+        self.flatten(x, z, radius, falloff, height);
+        radius + falloff
+    }
+
     /// Every worked pad, for the save file.
     pub fn export_worked(&self) -> Vec<(f32, f32, f32, f32, f32)> {
         self.worked

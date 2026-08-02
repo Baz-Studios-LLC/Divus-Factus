@@ -2313,7 +2313,7 @@ pub(crate) fn plan_houses(
         // back into the hillside, so no floor, sill, or stake ever clips
         // into a slope. This is what a foundation is *for*.
         let pad = plan.half_w.max(plan.half_d) + 1.6;
-        terrain.flatten(at.x, at.z, pad, 2.4, at.y);
+        let worked = terrain.terrace(at.x, at.z, pad, 2.4, at.y);
         let (chunks, grass, chunk_assets, stripped, dirty_groves) = &mut ground;
         crate::terrain::rebuild_chunks_near(
             &mut commands,
@@ -2323,9 +2323,9 @@ pub(crate) fn plan_houses(
             chunks,
             at.x,
             at.z,
-            pad + 4.0,
+            worked + 4.0,
         );
-        grass.invalidate_near(&mut commands, at.x, at.z, pad + 4.0);
+        grass.invalidate_near(&mut commands, at.x, at.z, worked + 4.0);
 
         // And clears it properly: every tree within canopy's reach of the
         // walls is felled into the pile. Nobody roofs over a living oak,
