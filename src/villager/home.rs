@@ -935,7 +935,6 @@ pub(super) fn night_routine(
     homes: Query<&Transform, (Or<(With<Hut>, With<Longhouse>)>, Without<Villager>)>,
     beds: Query<(&ChildOf, &Transform, &Bed), Without<Villager>>,
     fires: Query<&GlobalTransform, (With<Bonfire>, Without<Villager>)>,
-    mut rng: ResMut<SimRng>,
     mut villagers: Query<
         (
             Entity,
@@ -1064,29 +1063,34 @@ pub(super) fn night_routine(
                 if !matches!(*activity, Activity::Idle | Activity::Wandering) {
                     continue;
                 }
-                if transform.translation.distance(fire) > 7.0 {
+                // Each soul owns a berth in the ring: their own angle
+                // dealt by the golden turn, so any number of sleepers
+                // space themselves without a plan, in two loose rows.
+                // The first cut walked everyone to a random spot in a
+                // box CENTRED ON THE FIRE and laid them down where they
+                // stopped - a heap of sleepers with their hair in the
+                // coals, which a playtest photo made hard to deny.
+                let turn = entity.index().index() as f32 * 2.399963;
+                let outward = Vec3::new(turn.cos(), 0.0, turn.sin());
+                let berth = fire + outward * (3.4 + (entity.index().index() % 2) as f32 * 1.3);
+                if transform.translation.distance(berth) > 0.9 {
                     *activity = Activity::Sleeping;
-                    target.0 =
-                        Some(fire + Vec3::new(rng.0.range(-4.0, 4.0), 0.0, rng.0.range(-4.0, 4.0)));
+                    target.0 = Some(berth);
                     continue;
                 }
-                // Down where they stand, feet to the warmth and head to
-                // the dark - which is how anybody lies by a fire, and
-                // lays them in a ring around it without anyone having to
-                // arrange one.
+                // Feet to the warmth, head to the dark - which is how
+                // anybody lies by a fire.
                 *activity = Activity::Sleeping;
                 target.0 = None;
                 motion.speed = 0.0;
                 motion.flail = 0.0;
-                let outward = (transform.translation - fire)
-                    .with_y(0.0)
-                    .normalize_or(Vec3::X);
                 let facing = Quat::from_rotation_y(super::work::lie_toward(outward))
                     * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
                 commands.entity(entity).insert(Abed {
-                    // No pillow on the bare ground: they simply lie where
-                    // they stood, straddling the spot.
-                    at: transform.translation + laid_from(genome, facing, genome.height() * 0.35),
+                    // No pillow on the bare ground: the head lies a
+                    // third of them past their berth, away from the
+                    // flames, and the feet stop short of the ring.
+                    at: berth + laid_from(genome, facing, genome.height() * 0.35),
                     facing,
                 });
             }

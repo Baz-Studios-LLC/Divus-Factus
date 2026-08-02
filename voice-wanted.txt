@@ -1,0 +1,5 @@
+# Moments that went without words - write lines for these.
+# count  tags of the moment
+    1  event:delivered saw tell trade:gatherer wavering
+    1  event:delivered saw tell trade:forester wavering
+    1  event:delivered saw tell trade:fisher wavering

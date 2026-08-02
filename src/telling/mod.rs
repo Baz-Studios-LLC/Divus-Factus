@@ -357,11 +357,7 @@ pub struct SpeakingWith(pub String);
 /// nothing to a file this small, and it means a crash loses at most a
 /// minute of assignments - the want-list is the whole reason silent
 /// failures are worth anything.
-fn flush_the_want_list(
-    time: Res<Time>,
-    mut since_last: Local<f32>,
-    tongue: Option<Res<Tongue>>,
-) {
+fn flush_the_want_list(time: Res<Time>, mut since_last: Local<f32>, tongue: Option<Res<Tongue>>) {
     *since_last += time.delta_secs();
     if *since_last < 60.0 {
         return;

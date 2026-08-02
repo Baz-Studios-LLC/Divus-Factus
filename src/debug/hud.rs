@@ -51,11 +51,19 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
     commands.spawn((
         DevOverlay,
         ui::dim(""),
+        // The dim kit's small size reads fine in a panel row; floating
+        // alone over the world it squints, and it sat close enough under
+        // the date to read as the date's own subtitle. Bigger, and given
+        // its own air.
+        TextFont {
+            font_size: FontSize::Px(17.0),
+            ..default()
+        },
         Node {
             position_type: PositionType::Absolute,
             // Below the date card, which owns the corner itself.
             left: px(18),
-            top: px(70),
+            top: px(112),
             ..default()
         },
         Visibility::Hidden,
