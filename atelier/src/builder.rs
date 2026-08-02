@@ -1086,6 +1086,17 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // this one is drawn rising instead of pointing: a plume
             // thinning as it goes, which is the whole of what the mark
             // means.
+            // A candle throws its light every way at once, so it is the
+            // third of the directionless three. A taper with a flame on
+            // it: slimmer and taller than the hearth's, so the two read
+            // apart at a glance across a dark room.
+            if *name == "light" {
+                return vec![
+                    slab(0.0, 0.25, 0.0, 0.125, 0.5, 0.125, ramp, shade),
+                    slab(0.0, 0.5625, 0.0, 0.25, 0.125, 0.25, ramp, shade),
+                    slab(0.0, 0.6875, 0.0, 0.125, 0.125, 0.125, ramp, shade),
+                ];
+            }
             // A fire is the same case: people gather at one from every
             // side, so a nose pointing at one of them says something the
             // eye cannot check. Drawn as a flame instead - and the yaw is
