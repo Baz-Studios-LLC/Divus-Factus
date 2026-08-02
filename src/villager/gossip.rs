@@ -38,6 +38,7 @@ pub(crate) fn form_bonds(
             Without<crate::creature::Corpse>,
         ),
     >,
+    shrines: Query<(&GlobalTransform, &crate::villager::work::Building)>,
 ) {
     *since_last += time.delta_secs();
     if *since_last < BOND_INTERVAL {
@@ -82,8 +83,31 @@ pub(crate) fn form_bonds(
             // people arrive at, not a thing proximity does to them.
             Some((_, since)) if today.saturating_sub(since) < COURTSHIP_DAYS => continue,
             // Courted long enough - now they have to be standing
-            // together for it, the way a wedding needs both of them.
-            Some((slot, _)) if men[slot].1.distance(at) <= COURTSHIP_DISTANCE => slot,
+            // together for it, the way a wedding needs both of them,
+            // and there has to be somewhere to do it.
+            Some((slot, since)) if men[slot].1.distance(at) <= COURTSHIP_DISTANCE => {
+                let god_house = shrines.iter().any(|(shrine_at, building)| {
+                    building.kind == crate::villager::work::BuildingKind::Shrine
+                        && shrine_at.translation().distance(at) < SHRINE_REACH
+                });
+                // Vows are made in the god's house. A village with none
+                // has couples waiting on it, and that waiting is what
+                // gets one built - see CivicNeeds::betrothed.
+                //
+                // But not forever. A hard dependency on a building runs
+                // backwards into extinction: no shrine, no weddings, no
+                // children, no village. A couple left a whole season
+                // without one marry at the fire instead - grown people
+                // live years, so a season is real patience rather than a
+                // technicality, and the shrine stays what it should be:
+                // the thing a village wants badly, not the thing it dies
+                // without.
+                let waited = today.saturating_sub(since);
+                if !god_house && waited < crate::calendar::DAYS_PER_SEASON {
+                    continue;
+                }
+                slot
+            }
             Some(_) => continue,
             None => {
                 // Not walking out with anyone: the nearest unwed man may
@@ -673,10 +697,26 @@ mod tests {
             "nobody started walking out at all",
         );
 
-        // A season of it later, they marry.
+        // Courted long enough now - and still not wed, because vows are
+        // made in the god's house and this village has not built one.
         app.world_mut()
             .resource_mut::<crate::calendar::WorldClock>()
             .elapsed += (COURTSHIP_DAYS as f32 * crate::calendar::DAY_SECONDS) as f64;
+        for _ in 0..12 {
+            app.update();
+        }
+        assert!(
+            app.world().entity(bride).get::<Spouse>().is_none(),
+            "they wed with no shrine to be wed in",
+        );
+
+        // Raise one, and they marry.
+        app.world_mut().spawn((
+            GlobalTransform::from(Transform::from_xyz(4.0, 0.0, 0.0)),
+            crate::villager::work::Building {
+                kind: crate::villager::work::BuildingKind::Shrine,
+            },
+        ));
         for _ in 0..12 {
             app.update();
         }
@@ -705,5 +745,38 @@ mod tests {
         // His own name is untouched, and carries no maiden note.
         assert_eq!(husband.full_name(), "Shezirav Rohap");
         assert_eq!(husband.maiden_house(), None);
+    }
+
+    #[test]
+    fn a_village_with_no_shrine_still_marries_eventually() {
+        // The safety valve. A hard dependency on a building runs
+        // backwards into extinction - no shrine, no weddings, no
+        // children - so a couple left a whole season without one marry
+        // at the fire. Grown people live years; a season is patience,
+        // not a technicality.
+        let mut app = App::new();
+        let mut time = Time::<()>::default();
+        time.advance_by(std::time::Duration::from_secs_f32(BOND_INTERVAL + 1.0));
+        app.insert_resource(time);
+        app.init_resource::<crate::calendar::WorldClock>();
+        app.insert_resource(SimRng(Rng::new(3)));
+        app.add_message::<crate::ui::Notice>();
+        app.add_systems(Update, form_bonds);
+
+        let (bride, _) = courting_pair(&mut app);
+        for _ in 0..12 {
+            app.update();
+        }
+        app.world_mut()
+            .resource_mut::<crate::calendar::WorldClock>()
+            .elapsed +=
+            (crate::calendar::DAYS_PER_SEASON as f32 * crate::calendar::DAY_SECONDS) as f64;
+        for _ in 0..12 {
+            app.update();
+        }
+        assert!(
+            app.world().entity(bride).get::<Spouse>().is_some(),
+            "a season of waiting and still no wedding: the village cannot renew itself",
+        );
     }
 }

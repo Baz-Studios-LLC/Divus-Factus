@@ -274,6 +274,7 @@ pub(crate) fn morning_muster(
         ),
         (With<Villager>, Without<Corpse>),
     >,
+    courting: Query<&crate::villager::Courting, (With<Villager>, Without<Corpse>)>,
     ground: (
         Option<Res<crate::villager::explore::KnownWorld>>,
         Query<(&GlobalTransform, &crate::scatter::FellableTree)>,
@@ -353,6 +354,13 @@ pub(crate) fn morning_muster(
     let believers = hurt
         .iter()
         .filter(|(_, _, faith)| faith.is_some_and(|f| f.is_believer()))
+        .count();
+    // Couples who have courted their four days and have nowhere to be
+    // wed. They are the loudest argument a hamlet has for a priest: the
+    // shrine is not scenery, it is where the vows are made.
+    let betrothed = courting
+        .iter()
+        .filter(|courting| courting.ripe(clock.day()))
         .count();
     let guards = if has(BuildingKind::Watchtower) {
         1.0
@@ -447,7 +455,7 @@ pub(crate) fn morning_muster(
         // that is what OWN_WORKS is for.
         (
             Vocation::Priest,
-            if has(BuildingKind::Shrine) || believers * 3 >= mouths {
+            if has(BuildingKind::Shrine) || believers * 3 >= mouths || betrothed > 0 {
                 1.0
             } else {
                 0.0
@@ -483,6 +491,7 @@ pub(crate) fn morning_muster(
         unworked_fields,
         (stone_short * 0.5).ceil(),
         builders,
+        betrothed.min(3) as f32,
         wood_known as u8 as f32,
         shore_near as u8 as f32,
         guards,

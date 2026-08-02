@@ -108,11 +108,22 @@ const COURTSHIP_DISTANCE: f32 = 12.0;
 /// minute of the world beginning.
 const COURTSHIP_DAYS: u32 = 4;
 
+/// How near the god's house has to be to be the village's own.
+const SHRINE_REACH: f32 = 140.0;
+
 /// A pair who are walking out together, and the day they began.
 #[derive(Component, Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Courting {
     pub with: Entity,
     pub since: u32,
+}
+
+impl Courting {
+    /// Whether this pair have courted long enough to want a wedding.
+    /// What the village reads to decide it needs a shrine.
+    pub fn ripe(&self, today: u32) -> bool {
+        today.saturating_sub(self.since) >= COURTSHIP_DAYS
+    }
 }
 
 /// Seconds between rounds of talk.

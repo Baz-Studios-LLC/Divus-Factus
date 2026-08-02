@@ -178,6 +178,11 @@ pub struct CivicNeeds {
     /// tower is raised out of what the village has been through and told
     /// each other, not out of what a god's-eye census can see prowling.
     pub peril: f32,
+    /// Couples who have courted long enough and have nowhere to be wed.
+    /// Vows are made in the god's house, so a village with pairs waiting
+    /// on one wants it built - which is the whole reason a shrine gets
+    /// raised in a hamlet that has not yet grown to twelve souls.
+    pub betrothed: usize,
     pub pending_builds: usize,
     /// Whether walkable shore lies within working reach — no water, no dock.
     pub shore_near: bool,
@@ -276,7 +281,7 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
             // Faith raises its own roof; fear raises a tower. The fear
             // is the village's own - three souls carrying a mauling
             // between them is what puts a watch on the treeline.
-            Shrine => needs.believers as f32 * 0.12,
+            Shrine => needs.believers as f32 * 0.12 + needs.betrothed as f32 * 0.5,
             Watchtower => needs.peril * 0.4,
             TownHall => (needs.population as f32 - 16.0) / 8.0,
             House | Longhouse => 0.0,
@@ -1928,6 +1933,7 @@ pub(crate) fn plan_houses(
                 Option<&crate::villager::Spouse>,
                 Option<&crate::villager::MemberOf>,
                 Option<&crate::witness::Witnessed>,
+                Option<&crate::villager::Courting>,
             ),
             (With<Villager>, Without<Corpse>),
         >,
@@ -1989,19 +1995,23 @@ pub(crate) fn plan_houses(
     let mut guards = 0usize;
     let mut healers = 0usize;
     let mut priests = 0usize;
+    let mut betrothed = 0usize;
     // Shelter demand splits in two, because the roofs do: the wed and their
     // children want family houses, everyone else wants longhouse beds. A
     // village with four spare house rooms and no longhouse bed is not
     // housed — it is two buildings away from housed.
     let mut family_souls = 0usize;
     let mut single_souls = 0usize;
-    for (vocation, morale, home, faith, vitality, child, spouse, member, held) in &souls {
+    for (vocation, morale, home, faith, vitality, child, spouse, member, held, courting) in &souls {
         if member.map(|m| m.0) != Some(settlement) {
             continue;
         }
         population += 1;
         if let Some(held) = held {
             remembered.push(held);
+        }
+        if courting.is_some_and(|courting| courting.ripe(clock.day())) {
+            betrothed += 1;
         }
         spirits_sum += morale.spirits;
         if crate::villager::home::wants_family_roof(spouse, child) {
@@ -2216,6 +2226,7 @@ pub(crate) fn plan_houses(
             foresters,
             fields: fields.iter().count(),
             peril,
+            betrothed,
             pending_builds: pending
                 .iter()
                 .filter(|(_, _, member)| member.0 == settlement)
