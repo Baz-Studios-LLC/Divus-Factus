@@ -440,15 +440,25 @@ pub(crate) fn take_up_work(
                         .filter(|(_, _, cs, plan, member)| {
                             member.0 == home && cs.stone_laid >= cs.footing_stone(plan.kind)
                         })
-                        .map(|(house, house_transform, ..)| {
+                        .map(|(house, house_transform, _, plan, _)| {
                             (
                                 house,
                                 house_transform.translation,
+                                // The most beds first, then the nearest.
+                                // Hands used to go to whichever site was
+                                // closest, and since a house costs half
+                                // what a hall does it always finished
+                                // first - the hall the planner put ahead
+                                // of it stood open while a family moved
+                                // in and the rest slept out. A hall is
+                                // eight beds for anybody; it gets the
+                                // hammers until it is closed in.
+                                std::cmp::Reverse(plan.kind.sleeps()),
                                 house_transform.translation.distance(transform.translation),
                             )
                         })
-                        .min_by(|a, b| a.2.total_cmp(&b.2))
-                        .map(|(house, at, d)| Job::at(at, Some(house), d))
+                        .min_by(|a, b| a.2.cmp(&b.2).then(a.3.total_cmp(&b.3)))
+                        .map(|(house, at, _, d)| Job::at(at, Some(house), d))
                 } else {
                     None
                 }

@@ -61,6 +61,17 @@ pub enum BuildingKind {
 }
 
 impl BuildingKind {
+    /// How many the finished roof sleeps. Zero for the kinds nobody
+    /// beds down in, which is most of them.
+    pub fn sleeps(self) -> usize {
+        use crate::villager::home::{HOUSE_CAPACITY, LONGHOUSE_CAPACITY};
+        match self {
+            BuildingKind::House => HOUSE_CAPACITY,
+            BuildingKind::Longhouse => LONGHOUSE_CAPACITY,
+            _ => 0,
+        }
+    }
+
     pub fn timber_cost(self) -> f32 {
         match self {
             BuildingKind::House => HOUSE_TIMBER,

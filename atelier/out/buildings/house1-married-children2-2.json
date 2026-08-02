@@ -1247,6 +1247,20 @@
       "shade": 0.7,
       "stage": "widget",
       "flip": false
+    },
+    {
+      "part": "widget:smoke",
+      "at": [
+        -1.9375,
+        5.715,
+        4.125
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "widget",
+      "flip": false
     }
   ]
 }
