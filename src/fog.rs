@@ -18,7 +18,7 @@ use bevy::reflect::TypePath;
 use bevy::render::render_resource::{AsBindGroup, ShaderType};
 use bevy::shader::ShaderRef;
 
-use crate::terrain::TerrainChunk;
+use crate::terrain::{TerrainChunk, WaterPlane};
 use crate::villager::explore::KnownWorld;
 
 const SHADER_PATH: &str = "shaders/fog.wgsl";
@@ -138,12 +138,16 @@ fn toggle_fog(
 /// away when it comes down. A veil is a CHILD of its chunk, so a chunk
 /// rebuilt by a levelled plot takes its veil with it and this puts a fresh
 /// one on the replacement.
+///
+/// The sea gets one too. The lakebed's sheets hang UNDER the water, which
+/// is drawn straight over them - so an unexplored lake sat there in plain
+/// daylight with the fog stacked politely on the mud beneath it.
 fn drape_the_veil(
     mut commands: Commands,
     mode: Res<FogMode>,
     mut materials: ResMut<Assets<FogMaterial>>,
     mut cloth: Local<Option<Handle<FogMaterial>>>,
-    chunks: Query<(Entity, &Mesh3d, Option<&Children>), With<TerrainChunk>>,
+    chunks: Query<(Entity, &Mesh3d, Option<&Children>), Or<(With<TerrainChunk>, With<WaterPlane>)>>,
     veils: Query<Entity, With<Veil>>,
 ) {
     if !mode.0 {
