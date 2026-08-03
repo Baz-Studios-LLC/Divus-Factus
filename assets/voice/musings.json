@@ -1,132 +1,1206 @@
 [
-  {"t": "man, I'm {really|properly|so} hungry today. I hope we got food in the {storage|stores}", "tags": ["muse", "hungry"]},
-  {"t": "my stomach's been {growling|complaining|at me} since I {woke up|got up}", "tags": ["muse", "hungry"]},
-  {"t": "I keep thinking about {supper|dinner|food} and it's not even {midday|noon}", "tags": ["muse", "hungry"]},
-  {"t": "if there's nothing in the stores tonight I'm going to be miserable", "tags": ["muse", "hungry"]},
-  {"t": "I'd eat just about anything right now, honestly", "tags": ["muse", "hungry"]},
-  {"t": "skipped a meal yesterday and I'm feeling it now", "tags": ["muse", "hungry"]},
-  {"t": "hungry and fishing all day. the fish get to eat better than I do", "tags": ["muse", "hungry", "trade:fisher"]},
-  {"t": "picking berries all day and I'm not supposed to eat any? come on", "tags": ["muse", "hungry", "trade:gatherer"]},
-  {"t": "hard to aim a spear when your stomach won't shut up", "tags": ["muse", "hungry", "trade:hunter"]},
-  {"t": "swinging an axe on an empty stomach is a good way to lose a foot", "tags": ["muse", "hungry", "trade:forester"]},
-  {"t": "I am {so|dead|bone} tired. I just want to {lie down|sit down|stop} for a bit", "tags": ["muse", "worn out"]},
-  {"t": "my {feet|legs|shoulders} are killing me today", "tags": ["muse", "worn out"]},
-  {"t": "I could fall asleep standing up, I swear", "tags": ["muse", "worn out"]},
-  {"t": "one more haul and then I'm done, I mean it this time", "tags": ["muse", "worn out"]},
-  {"t": "worn out and still no bed of my own to fall into. that's the worst part", "tags": ["muse", "worn out", "roofless"]},
-  {"t": "this arm's not right. I should get it looked at", "tags": ["muse", "hurt"]},
-  {"t": "everything aches. I'm too old for whatever that was", "tags": ["muse", "hurt"]},
-  {"t": "still sleeping on the {ground|dirt|cold ground}. somebody build a house already", "tags": ["muse", "roofless"]},
-  {"t": "a roof. that's all I {want|ask for}. four walls and a roof", "tags": ["muse", "roofless"]},
-  {"t": "I hear them hammering all day but I still sleep in the dirt", "tags": ["muse", "roofless"]},
-  {"t": "my back is one big knot from sleeping outside", "tags": ["muse", "roofless"]},
-  {"t": "when I finally get a bed I'm not leaving it for two days", "tags": ["muse", "roofless"]},
-  {"t": "it's a good little house. I keep stopping to look at it", "tags": ["muse", "housed"]},
-  {"t": "I should sweep the floor when I get home. it's getting bad", "tags": ["muse", "housed"]},
-  {"t": "nothing like shutting your own door at the end of the day", "tags": ["muse", "housed"]},
-  {"t": "I wonder what my better half is up to right now", "tags": ["muse", "married"]},
-  {"t": "I should bring something home tonight. it's been a while since I did", "tags": ["muse", "married"]},
-  {"t": "we should sit by the water some evening, the two of us. been ages", "tags": ["muse", "married"]},
-  {"t": "the god's been good to us lately. I should say so more often", "tags": ["muse", "devout"]},
-  {"t": "I felt watched today. not in a bad way. just watched", "tags": ["muse", "devout"]},
-  {"t": "whatever's up there, it put the fish in the water, and that'll do for me", "tags": ["muse", "wavering"]},
-  {"t": "signs and wonders. or weather. hard to say which", "tags": ["muse", "doubting"]},
-  {"t": "everyone keeps talking about the god this, the god that. I just work", "tags": ["muse", "doubting"]},
-  {"t": "long day. they're all {long days|like this} lately", "tags": ["muse"]},
-  {"t": "I should {fix|see to|patch} my boots before the {cold|winter} comes", "tags": ["muse"]},
-  {"t": "that cloud looks like a boar. no, a bear. no, a boar", "tags": ["muse"]},
-  {"t": "I had a dream about my mother last night. strange how that comes back", "tags": ["muse"]},
-  {"t": "somebody's been moving my things. I know exactly where I left that basket", "tags": ["muse"]},
-  {"t": "I wonder what's past the far hills. someone should go look", "tags": ["muse"]},
-  {"t": "the days go by fast when your hands are busy", "tags": ["muse"]},
-  {"t": "I could go for a swim. maybe when the work's done", "tags": ["muse"]},
-  {"t": "half the village snores. you can hear it from the fire", "tags": ["muse"]},
-  {"t": "soup again tonight, probably. it's always soup", "tags": ["muse"]},
-  {"t": "the water was good to me today. can't complain", "tags": ["muse", "trade:fisher"]},
-  {"t": "one of these days I'm pulling up something huge. I can feel it", "tags": ["muse", "trade:fisher"]},
-  {"t": "these bushes are nearly picked clean. we need to range farther", "tags": ["muse", "trade:gatherer"]},
-  {"t": "you learn where everything grows, doing this. every bush for a mile", "tags": ["muse", "trade:gatherer"]},
-  {"t": "saw tracks this morning. something big came through in the night", "tags": ["muse", "trade:hunter"]},
-  {"t": "a clean kill and a full larder. that's a good day", "tags": ["muse", "trade:hunter"]},
-  {"t": "that beam went up straight and true. I do good work, I don't care who hears it", "tags": ["muse", "trade:builder"]},
-  {"t": "measure it twice. every time. that's the whole secret", "tags": ["muse", "trade:builder"]},
-  {"t": "this forest could keep me busy for a lifetime", "tags": ["muse", "trade:forester"]},
-  {"t": "you can tell a good tree by the sound it makes when you knock it", "tags": ["muse", "trade:forester"]},
-  {"t": "good stone today. splits right where you ask it to", "tags": ["muse", "trade:builder"]},
-  {"t": "my hands are all dust and I've stopped minding", "tags": ["muse", "trade:miner"]},
-  {"t": "the field doesn't care how you feel. it wants water either way", "tags": ["muse", "trade:farmer"]},
-  {"t": "quiet on the walls today. quiet is good. I like quiet", "tags": ["muse", "trade:guard"]},
-  {"t": "everyone's hurt until they're hungry, then everyone's healed. funny how that works", "tags": ["muse", "trade:healer"]},
-  {"t": "please just let the stores hold out through the season", "tags": ["muse", "prayer"]},
-  {"t": "keep an eye on the little ones. that's all I ask", "tags": ["muse", "prayer"]},
-  {"t": "thank you for today. it was a hard one but we got through", "tags": ["muse", "prayer"]},
-  {"t": "if you're listening, we could use a dry week", "tags": ["muse", "prayer"]},
-  {"t": "watch over the ones sleeping outside tonight", "tags": ["muse", "prayer", "housed"]},
-  {"t": "give me a roof before winter. I'm not asking for much", "tags": ["muse", "prayer", "roofless"]},
-  {"t": "footing to roof, all of it mine. I like knowing the whole of a thing", "tags": ["muse", "trade:builder"]},
-  {"t": "my hands are all dust and splinters and I'm not complaining", "tags": ["muse", "trade:builder"]},
-  {"t": "I should check the stores before I get too hopeful about dinner", "tags": ["muse", "hungry"]},
-  {"t": "I keep doing the math on how much food is left. I don't like the answer", "tags": ["muse", "hungry"]},
-  {"t": "one decent meal would fix half my mood right now", "tags": ["muse", "hungry"]},
-  {"t": "I can work hungry, but I can't work stupid. I'm getting close to stupid", "tags": ["muse", "hungry"]},
-  {"t": "if I sit down, I might not get back up today", "tags": ["muse", "worn out"]},
-  {"t": "my legs feel like they belong to somebody older", "tags": ["muse", "worn out"]},
-  {"t": "I need a quiet hour and nobody asking me for anything", "tags": ["muse", "worn out"]},
-  {"t": "I thought I slept, but my body disagrees", "tags": ["muse", "worn out"]},
-  {"t": "that still hurts when I breathe too deep", "tags": ["muse", "hurt"]},
-  {"t": "I keep telling myself it's just a bruise. it better be just a bruise", "tags": ["muse", "hurt"]},
-  {"t": "I'm moving slower today. no point pretending otherwise", "tags": ["muse", "hurt"]},
-  {"t": "sleeping outside makes every morning start badly", "tags": ["muse", "roofless"]},
-  {"t": "I know houses take time. I also know rain does not care", "tags": ["muse", "roofless"]},
-  {"t": "I would trade a lot for a dry blanket tonight", "tags": ["muse", "roofless"]},
-  {"t": "every finished roof makes me happy and a little jealous", "tags": ["muse", "roofless"]},
-  {"t": "I still listen for leaks when it rains, even with a roof over me", "tags": ["muse", "housed"]},
-  {"t": "having a door changes your whole mood. strange thing, but it does", "tags": ["muse", "housed"]},
-  {"t": "I should patch that corner before it gets worse", "tags": ["muse", "housed"]},
-  {"t": "home is small, but it's ours, and that counts", "tags": ["muse", "housed", "married"]},
-  {"t": "I hope they're eating enough. they always say they are", "tags": ["muse", "married"]},
-  {"t": "I forgot the thing they asked me to bring. again", "tags": ["muse", "married"]},
-  {"t": "I should be kinder when I get home tired", "tags": ["muse", "married", "worn out"]},
-  {"t": "I don't need a sign every day. once in a while is enough", "tags": ["muse", "devout"]},
-  {"t": "I pray because it helps me keep my head straight", "tags": ["muse", "devout"]},
-  {"t": "maybe the god helps. maybe we help each other and call it that", "tags": ["muse", "wavering"]},
-  {"t": "I want to believe, but wanting is not the same thing", "tags": ["muse", "wavering"]},
-  {"t": "funny how it's only the god's doing when it goes somebody's way", "tags": ["muse", "doubting"]},
-  {"t": "if the god wants trust, making things clearer would help", "tags": ["muse", "doubting"]},
-  {"t": "the net behaved today. can't say the same for anybody else", "tags": ["muse", "trade:fisher"]},
-  {"t": "if the water is quiet, I start wondering if I'm wasting my time", "tags": ["muse", "trade:fisher"]},
-  {"t": "I found a good patch today. not telling everyone, not yet", "tags": ["muse", "trade:gatherer"]},
-  {"t": "berries look simple until you bet dinner on them", "tags": ["muse", "trade:gatherer"]},
-  {"t": "the woods feel different when you're the one carrying the spear", "tags": ["muse", "trade:hunter"]},
-  {"t": "I hate wasting a shot. meat is too much work for that", "tags": ["muse", "trade:hunter"]},
-  {"t": "this plank has warped on me twice now. I'm going to use it anyway", "tags": ["muse", "trade:builder"]},
-  {"t": "spent the whole morning redoing what I rushed yesterday. serves me right", "tags": ["muse", "trade:builder"]},
-  {"t": "trees fall fast. hauling them is the hard part", "tags": ["muse", "trade:forester"]},
-  {"t": "I can tell which axe is mine by the handle biting my hand", "tags": ["muse", "trade:forester"]},
-  {"t": "hit it wrong this morning and my arm's still ringing", "tags": ["muse", "trade:miner"]},
-  {"t": "I come back from the pit with dust in places dust should not be", "tags": ["muse", "trade:miner"]},
-  {"t": "if the rows are straight, the day feels less messy", "tags": ["muse", "trade:farmer"]},
-  {"t": "that row came up thin again. I've stopped arguing with it", "tags": ["muse", "trade:farmer"]},
-  {"t": "the pot is never big enough when everyone comes in hungry", "tags": ["muse", "trade:cook"]},
-  {"t": "people complain less when the food is hot. that's my whole craft", "tags": ["muse", "trade:cook"]},
-  {"t": "I can bind a cut. I can't make people rest after", "tags": ["muse", "trade:healer"]},
-  {"t": "I've told him to sit down four times. he's still not sitting down", "tags": ["muse", "trade:healer"]},
-  {"t": "I know what people want me to say. that doesn't make it true", "tags": ["muse", "trade:priest"]},
-  {"t": "nobody came to me all summer. now the stores are low and there's a queue", "tags": ["muse", "trade:priest"]},
-  {"t": "got turned around twice on the way home. don't tell anyone", "tags": ["muse", "trade:explorer"]},
-  {"t": "I mark trees because I trust trees more than my memory", "tags": ["muse", "trade:explorer"]},
-  {"t": "watch duty is mostly standing still and not acting bored", "tags": ["muse", "trade:guard"]},
-  {"t": "quiet makes me nervous, but noise is usually worse", "tags": ["muse", "trade:guard"]},
-  {"t": "please send food before people start turning on each other", "tags": ["muse", "prayer", "hungry"]},
-  {"t": "I don't need plenty. I just need enough for tonight", "tags": ["muse", "prayer", "hungry"]},
-  {"t": "if you can hear me, help the ones sleeping outside", "tags": ["muse", "prayer", "roofless"]},
-  {"t": "keep the rain off us until the roof is done", "tags": ["muse", "prayer", "roofless"]},
-  {"t": "thank you for the roof. I mean that", "tags": ["muse", "prayer", "housed"]},
-  {"t": "look after my family when I can't", "tags": ["muse", "prayer", "married"]},
-  {"t": "give me patience, because I am running out of it", "tags": ["muse", "prayer"]},
-  {"t": "help me not say the thing I'm thinking", "tags": ["muse", "prayer"]},
-  {"t": "I don't know if this is prayer or just talking upward", "tags": ["muse", "prayer", "wavering"]},
-  {"t": "if you're real, today would be a good day to show it", "tags": ["muse", "prayer", "doubting"]},
-  {"t": "thank you. I don't know what else to say, so thank you", "tags": ["muse", "prayer", "devout"]},
-  {"t": "can't think about signs and wonders on an empty stomach", "tags": ["muse", "hungry"]}
+  {
+    "t": "man, I'm {really|properly|so} hungry today. I hope we got food in the {storage|stores}",
+    "tags": [
+      "muse",
+      "hungry"
+    ]
+  },
+  {
+    "t": "my stomach's been {growling|complaining|at me} since I {woke up|got up}",
+    "tags": [
+      "muse",
+      "hungry"
+    ]
+  },
+  {
+    "t": "I keep thinking about {supper|dinner|food} and it's not even {midday|noon}",
+    "tags": [
+      "muse",
+      "hungry"
+    ]
+  },
+  {
+    "t": "if there's nothing in the stores tonight I'm going to be miserable",
+    "tags": [
+      "muse",
+      "hungry"
+    ]
+  },
+  {
+    "t": "I'd eat just about anything right now, honestly",
+    "tags": [
+      "muse",
+      "hungry"
+    ]
+  },
+  {
+    "t": "skipped a meal yesterday and I'm feeling it now",
+    "tags": [
+      "muse",
+      "hungry"
+    ]
+  },
+  {
+    "t": "hungry and fishing all day. the fish get to eat better than I do",
+    "tags": [
+      "muse",
+      "hungry",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "picking berries all day and I'm not supposed to eat any? come on",
+    "tags": [
+      "muse",
+      "hungry",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "hard to aim a spear when your stomach won't shut up",
+    "tags": [
+      "muse",
+      "hungry",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "swinging an axe on an empty stomach is a good way to lose a foot",
+    "tags": [
+      "muse",
+      "hungry",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "I am {so|dead|bone} tired. I just want to {lie down|sit down|stop} for a bit",
+    "tags": [
+      "muse",
+      "worn out"
+    ]
+  },
+  {
+    "t": "my {feet|legs|shoulders} are killing me today",
+    "tags": [
+      "muse",
+      "worn out"
+    ]
+  },
+  {
+    "t": "I could fall asleep standing up, I swear",
+    "tags": [
+      "muse",
+      "worn out"
+    ]
+  },
+  {
+    "t": "one more haul and then I'm done, I mean it this time",
+    "tags": [
+      "muse",
+      "worn out"
+    ]
+  },
+  {
+    "t": "worn out and still no bed of my own to fall into. that's the worst part",
+    "tags": [
+      "muse",
+      "worn out",
+      "roofless"
+    ]
+  },
+  {
+    "t": "this arm's not right. I should get it looked at",
+    "tags": [
+      "muse",
+      "hurt"
+    ]
+  },
+  {
+    "t": "everything aches. I'm too old for whatever that was",
+    "tags": [
+      "muse",
+      "hurt"
+    ]
+  },
+  {
+    "t": "still sleeping on the {ground|dirt|cold ground}. somebody build a house already",
+    "tags": [
+      "muse",
+      "roofless"
+    ]
+  },
+  {
+    "t": "a roof. that's all I {want|ask for}. four walls and a roof",
+    "tags": [
+      "muse",
+      "roofless"
+    ]
+  },
+  {
+    "t": "I hear them hammering all day but I still sleep in the dirt",
+    "tags": [
+      "muse",
+      "roofless"
+    ]
+  },
+  {
+    "t": "my back is one big knot from sleeping outside",
+    "tags": [
+      "muse",
+      "roofless"
+    ]
+  },
+  {
+    "t": "when I finally get a bed I'm not leaving it for two days",
+    "tags": [
+      "muse",
+      "roofless"
+    ]
+  },
+  {
+    "t": "it's a good little house. I keep stopping to look at it",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I should sweep the floor when I get home. it's getting bad",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "nothing like shutting your own door at the end of the day",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I wonder what my better half is up to right now",
+    "tags": [
+      "muse",
+      "married"
+    ]
+  },
+  {
+    "t": "I should bring something home tonight. it's been a while since I did",
+    "tags": [
+      "muse",
+      "married"
+    ]
+  },
+  {
+    "t": "we should sit by the water some evening, the two of us. been ages",
+    "tags": [
+      "muse",
+      "married"
+    ]
+  },
+  {
+    "t": "the god's been good to us lately. I should say so more often",
+    "tags": [
+      "muse",
+      "devout"
+    ]
+  },
+  {
+    "t": "I felt watched today. not in a bad way. just watched",
+    "tags": [
+      "muse",
+      "devout"
+    ]
+  },
+  {
+    "t": "whatever's up there, it put the fish in the water, and that'll do for me",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "signs and wonders. or weather. hard to say which",
+    "tags": [
+      "muse",
+      "doubting"
+    ]
+  },
+  {
+    "t": "everyone keeps talking about the god this, the god that. I just work",
+    "tags": [
+      "muse",
+      "doubting"
+    ]
+  },
+  {
+    "t": "long day. they're all {long days|like this} lately",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "I should {fix|see to|patch} my boots before the {cold|winter} comes",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "that cloud looks like a boar. no, a bear. no, a boar",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "I had a dream about my mother last night. strange how that comes back",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "somebody's been moving my things. I know exactly where I left that basket",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "I wonder what's past the far hills. someone should go look",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "the days go by fast when your hands are busy",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "I could go for a swim. maybe when the work's done",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "half the village snores. you can hear it from the fire",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "soup again tonight, probably. it's always soup",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "the water was good to me today. can't complain",
+    "tags": [
+      "muse",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "one of these days I'm pulling up something huge. I can feel it",
+    "tags": [
+      "muse",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "these bushes are nearly picked clean. we need to range farther",
+    "tags": [
+      "muse",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "you learn where everything grows, doing this. every bush for a mile",
+    "tags": [
+      "muse",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "saw tracks this morning. something big came through in the night",
+    "tags": [
+      "muse",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "a clean kill and a full larder. that's a good day",
+    "tags": [
+      "muse",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "that beam went up straight and true. I do good work, I don't care who hears it",
+    "tags": [
+      "muse",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "measure it twice. every time. that's the whole secret",
+    "tags": [
+      "muse",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "this forest could keep me busy for a lifetime",
+    "tags": [
+      "muse",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "you can tell a good tree by the sound it makes when you knock it",
+    "tags": [
+      "muse",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "good stone today. splits right where you ask it to",
+    "tags": [
+      "muse",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "my hands are all dust and I've stopped minding",
+    "tags": [
+      "muse",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "the field doesn't care how you feel. it wants water either way",
+    "tags": [
+      "muse",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "quiet on the walls today. quiet is good. I like quiet",
+    "tags": [
+      "muse",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "everyone's hurt until they're hungry, then everyone's healed. funny how that works",
+    "tags": [
+      "muse",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "please just let the stores hold out through the season",
+    "tags": [
+      "muse",
+      "prayer"
+    ]
+  },
+  {
+    "t": "keep an eye on the little ones. that's all I ask",
+    "tags": [
+      "muse",
+      "prayer"
+    ]
+  },
+  {
+    "t": "thank you for today. it was a hard one but we got through",
+    "tags": [
+      "muse",
+      "prayer"
+    ]
+  },
+  {
+    "t": "if you're listening, we could use a dry week",
+    "tags": [
+      "muse",
+      "prayer"
+    ]
+  },
+  {
+    "t": "watch over the ones sleeping outside tonight",
+    "tags": [
+      "muse",
+      "prayer",
+      "housed"
+    ]
+  },
+  {
+    "t": "give me a roof before winter. I'm not asking for much",
+    "tags": [
+      "muse",
+      "prayer",
+      "roofless"
+    ]
+  },
+  {
+    "t": "footing to roof, all of it mine. I like knowing the whole of a thing",
+    "tags": [
+      "muse",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "my hands are all dust and splinters and I'm not complaining",
+    "tags": [
+      "muse",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "I should check the stores before I get too hopeful about dinner",
+    "tags": [
+      "muse",
+      "hungry"
+    ]
+  },
+  {
+    "t": "I keep doing the math on how much food is left. I don't like the answer",
+    "tags": [
+      "muse",
+      "hungry"
+    ]
+  },
+  {
+    "t": "one decent meal would fix half my mood right now",
+    "tags": [
+      "muse",
+      "hungry"
+    ]
+  },
+  {
+    "t": "I can work hungry, but I can't work stupid. I'm getting close to stupid",
+    "tags": [
+      "muse",
+      "hungry"
+    ]
+  },
+  {
+    "t": "if I sit down, I might not get back up today",
+    "tags": [
+      "muse",
+      "worn out"
+    ]
+  },
+  {
+    "t": "my legs feel like they belong to somebody older",
+    "tags": [
+      "muse",
+      "worn out"
+    ]
+  },
+  {
+    "t": "I need a quiet hour and nobody asking me for anything",
+    "tags": [
+      "muse",
+      "worn out"
+    ]
+  },
+  {
+    "t": "I thought I slept, but my body disagrees",
+    "tags": [
+      "muse",
+      "worn out"
+    ]
+  },
+  {
+    "t": "that still hurts when I breathe too deep",
+    "tags": [
+      "muse",
+      "hurt"
+    ]
+  },
+  {
+    "t": "I keep telling myself it's just a bruise. it better be just a bruise",
+    "tags": [
+      "muse",
+      "hurt"
+    ]
+  },
+  {
+    "t": "I'm moving slower today. no point pretending otherwise",
+    "tags": [
+      "muse",
+      "hurt"
+    ]
+  },
+  {
+    "t": "sleeping outside makes every morning start badly",
+    "tags": [
+      "muse",
+      "roofless"
+    ]
+  },
+  {
+    "t": "I know houses take time. I also know rain does not care",
+    "tags": [
+      "muse",
+      "roofless"
+    ]
+  },
+  {
+    "t": "I would trade a lot for a dry blanket tonight",
+    "tags": [
+      "muse",
+      "roofless"
+    ]
+  },
+  {
+    "t": "every finished roof makes me happy and a little jealous",
+    "tags": [
+      "muse",
+      "roofless"
+    ]
+  },
+  {
+    "t": "I still listen for leaks when it rains, even with a roof over me",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "having a door changes your whole mood. strange thing, but it does",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I should patch that corner before it gets worse",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "home is small, but it's ours, and that counts",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "I hope they're eating enough. they always say they are",
+    "tags": [
+      "muse",
+      "married"
+    ]
+  },
+  {
+    "t": "I forgot the thing they asked me to bring. again",
+    "tags": [
+      "muse",
+      "married"
+    ]
+  },
+  {
+    "t": "I should be kinder when I get home tired",
+    "tags": [
+      "muse",
+      "married",
+      "worn out"
+    ]
+  },
+  {
+    "t": "I don't need a sign every day. once in a while is enough",
+    "tags": [
+      "muse",
+      "devout"
+    ]
+  },
+  {
+    "t": "I pray because it helps me keep my head straight",
+    "tags": [
+      "muse",
+      "devout"
+    ]
+  },
+  {
+    "t": "maybe the god helps. maybe we help each other and call it that",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I want to believe, but wanting is not the same thing",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "funny how it's only the god's doing when it goes somebody's way",
+    "tags": [
+      "muse",
+      "doubting"
+    ]
+  },
+  {
+    "t": "if the god wants trust, making things clearer would help",
+    "tags": [
+      "muse",
+      "doubting"
+    ]
+  },
+  {
+    "t": "the net behaved today. can't say the same for anybody else",
+    "tags": [
+      "muse",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "if the water is quiet, I start wondering if I'm wasting my time",
+    "tags": [
+      "muse",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "I found a good patch today. not telling everyone, not yet",
+    "tags": [
+      "muse",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "berries look simple until you bet dinner on them",
+    "tags": [
+      "muse",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "the woods feel different when you're the one carrying the spear",
+    "tags": [
+      "muse",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "I hate wasting a shot. meat is too much work for that",
+    "tags": [
+      "muse",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "this plank has warped on me twice now. I'm going to use it anyway",
+    "tags": [
+      "muse",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "spent the whole morning redoing what I rushed yesterday. serves me right",
+    "tags": [
+      "muse",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "trees fall fast. hauling them is the hard part",
+    "tags": [
+      "muse",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "I can tell which axe is mine by the handle biting my hand",
+    "tags": [
+      "muse",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "hit it wrong this morning and my arm's still ringing",
+    "tags": [
+      "muse",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "I come back from the pit with dust in places dust should not be",
+    "tags": [
+      "muse",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "if the rows are straight, the day feels less messy",
+    "tags": [
+      "muse",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "that row came up thin again. I've stopped arguing with it",
+    "tags": [
+      "muse",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "the pot is never big enough when everyone comes in hungry",
+    "tags": [
+      "muse",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "people complain less when the food is hot. that's my whole craft",
+    "tags": [
+      "muse",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "I can bind a cut. I can't make people rest after",
+    "tags": [
+      "muse",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "I've told him to sit down four times. he's still not sitting down",
+    "tags": [
+      "muse",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "I know what people want me to say. that doesn't make it true",
+    "tags": [
+      "muse",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "nobody came to me all summer. now the stores are low and there's a queue",
+    "tags": [
+      "muse",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "got turned around twice on the way home. don't tell anyone",
+    "tags": [
+      "muse",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "I mark trees because I trust trees more than my memory",
+    "tags": [
+      "muse",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "watch duty is mostly standing still and not acting bored",
+    "tags": [
+      "muse",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "quiet makes me nervous, but noise is usually worse",
+    "tags": [
+      "muse",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "please send food before people start turning on each other",
+    "tags": [
+      "muse",
+      "prayer",
+      "hungry"
+    ]
+  },
+  {
+    "t": "I don't need plenty. I just need enough for tonight",
+    "tags": [
+      "muse",
+      "prayer",
+      "hungry"
+    ]
+  },
+  {
+    "t": "if you can hear me, help the ones sleeping outside",
+    "tags": [
+      "muse",
+      "prayer",
+      "roofless"
+    ]
+  },
+  {
+    "t": "keep the rain off us until the roof is done",
+    "tags": [
+      "muse",
+      "prayer",
+      "roofless"
+    ]
+  },
+  {
+    "t": "thank you for the roof. I mean that",
+    "tags": [
+      "muse",
+      "prayer",
+      "housed"
+    ]
+  },
+  {
+    "t": "look after my family when I can't",
+    "tags": [
+      "muse",
+      "prayer",
+      "married"
+    ]
+  },
+  {
+    "t": "give me patience, because I am running out of it",
+    "tags": [
+      "muse",
+      "prayer"
+    ]
+  },
+  {
+    "t": "help me not say the thing I'm thinking",
+    "tags": [
+      "muse",
+      "prayer"
+    ]
+  },
+  {
+    "t": "I don't know if this is prayer or just talking upward",
+    "tags": [
+      "muse",
+      "prayer",
+      "wavering"
+    ]
+  },
+  {
+    "t": "if you're real, today would be a good day to show it",
+    "tags": [
+      "muse",
+      "prayer",
+      "doubting"
+    ]
+  },
+  {
+    "t": "thank you. I don't know what else to say, so thank you",
+    "tags": [
+      "muse",
+      "prayer",
+      "devout"
+    ]
+  },
+  {
+    "t": "can't think about signs and wonders on an empty stomach",
+    "tags": [
+      "muse",
+      "hungry"
+    ]
+  },
+  {
+    "t": "long day. long week, really",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "I'll sleep well tonight, at least",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "my hands are wrecked",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "I could do this in my sleep by now",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "there's always more of it tomorrow",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "I should ask for help. I won't, but I should",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "nobody's going to do it if I don't",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "it's coming along. slowly, but it's coming",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "that's better than it was, anyway",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "I've done worse work than this",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "who put this here?",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "I'll fix that properly one day",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "that'll hold. probably",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "I've been at this since first light",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "where does the day go",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "quiet today. I don't mind quiet",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "too quiet, maybe",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "I like it here, most days",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "I never thought I'd end up here",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "this was all empty ground not long ago",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "we've built something, haven't we",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "I hope the children remember it started like this",
+    "tags": [
+      "muse"
+    ]
+  },
+  {
+    "t": "I need to sit down before I fall down",
+    "tags": [
+      "muse",
+      "worn out"
+    ]
+  },
+  {
+    "t": "I've nothing left in me today",
+    "tags": [
+      "muse",
+      "worn out"
+    ]
+  },
+  {
+    "t": "one more hour. I can do one more hour",
+    "tags": [
+      "muse",
+      "worn out"
+    ]
+  },
+  {
+    "t": "I'd trade a day's work for a hot meal",
+    "tags": [
+      "muse",
+      "hungry"
+    ]
+  },
+  {
+    "t": "I keep thinking about bread",
+    "tags": [
+      "muse",
+      "hungry"
+    ]
+  },
+  {
+    "t": "I should say something nice to {spouse} tonight",
+    "tags": [
+      "muse",
+      "married"
+    ]
+  },
+  {
+    "t": "I got lucky with {spouse}, I really did",
+    "tags": [
+      "muse",
+      "married"
+    ]
+  },
+  {
+    "t": "{spouse} was right about it. I'll never admit that",
+    "tags": [
+      "muse",
+      "married"
+    ]
+  },
+  {
+    "t": "another night by the fire, then",
+    "tags": [
+      "muse",
+      "roofless"
+    ]
+  },
+  {
+    "t": "I'd give anything for four walls",
+    "tags": [
+      "muse",
+      "roofless"
+    ]
+  },
+  {
+    "t": "I'm sick of waking up cold",
+    "tags": [
+      "muse",
+      "roofless"
+    ]
+  },
+  {
+    "t": "a door of my own. I still can't believe it",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "it's not much but it's mine",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "if anyone's listening, we could use a good week",
+    "tags": [
+      "muse",
+      "prayer"
+    ]
+  },
+  {
+    "t": "I don't ask for much. a bit of luck would do",
+    "tags": [
+      "muse",
+      "prayer"
+    ]
+  },
+  {
+    "t": "watch over this place. that's all",
+    "tags": [
+      "muse",
+      "prayer"
+    ]
+  },
+  {
+    "t": "somebody's looking after us. I feel it",
+    "tags": [
+      "muse",
+      "devout"
+    ]
+  },
+  {
+    "t": "I'll give thanks tonight, properly",
+    "tags": [
+      "muse",
+      "devout"
+    ]
+  },
+  {
+    "t": "if there's anything out there it's not saying much",
+    "tags": [
+      "muse",
+      "doubting"
+    ]
+  },
+  {
+    "t": "we did this ourselves, whatever anyone says",
+    "tags": [
+      "muse",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I can't decide what I believe any more",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "something's out there. I just can't name it",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  }
 ]

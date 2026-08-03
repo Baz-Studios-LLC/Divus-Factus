@@ -252,7 +252,12 @@ impl Tongue {
         let trade = of.key.voice.map(trade_tag);
         tags.extend(trade);
         if of.told > 2 {
-            tags.push("worn");
+            // `retold`, and not `worn`: a story worn thin from repetition and
+            // a body worn out from work are unrelated things, and `worn` sat
+            // one keystroke from the `worn out` that `speech.rs` emits for a
+            // tired villager. Five lines were written against one of them and
+            // thirteen against the other, and nothing warned either author.
+            tags.push("retold");
         }
         let whom = of.key.whom.as_ref().map(|w| w.name.clone());
         let mut slots: Vec<(&str, &str)> = Vec::new();

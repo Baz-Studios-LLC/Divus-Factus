@@ -1,16 +1,280 @@
 [
-  {"t": "help! {somebody|anybody}!", "tags": ["yell", "wolf"]},
-  {"t": "WOLF! wolf, get out here!", "tags": ["yell", "wolf"]},
-  {"t": "help me, it's got me!", "tags": ["yell", "wolf"]},
-  {"t": "somebody get a {spear|hand|axe}!", "tags": ["yell", "wolf"]},
-  {"t": "help! I can't get it off me!", "tags": ["yell", "wolf"]},
-  {"t": "get away! GET AWAY FROM ME!", "tags": ["yell", "wolf"]},
-  {"t": "wolf on the road! wolf!", "tags": ["yell", "wolf"]},
-  {"t": "somebody, {please|help}!", "tags": ["yell", "wolf"]},
-  {"t": "god help me, somebody hear this", "tags": ["yell", "wolf", "devout"]},
-  {"t": "if anyone's listening, help me now", "tags": ["yell", "wolf", "devout"]},
-  {"t": "I've got it! stay back!", "tags": ["yell", "wolf", "trade:guard"]},
-  {"t": "keep clear, I'll handle it!", "tags": ["yell", "wolf", "trade:guard"]},
-  {"t": "I need a hand over here!", "tags": ["yell", "hurt"]},
-  {"t": "somebody come quick!", "tags": ["yell", "hurt"]}
+  {
+    "t": "help! {somebody|anybody}!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "WOLF! wolf, get out here!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "help me, it's got me!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "somebody get a {spear|hand|axe}!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "help! I can't get it off me!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "get away! GET AWAY FROM ME!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "wolf on the road! wolf!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "somebody, {please|help}!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "god help me, somebody hear this",
+    "tags": [
+      "yell",
+      "wolf",
+      "devout"
+    ]
+  },
+  {
+    "t": "if anyone's listening, help me now",
+    "tags": [
+      "yell",
+      "wolf",
+      "devout"
+    ]
+  },
+  {
+    "t": "I've got it! stay back!",
+    "tags": [
+      "yell",
+      "wolf",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "keep clear, I'll handle it!",
+    "tags": [
+      "yell",
+      "wolf",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "I need a hand over here!",
+    "tags": [
+      "yell",
+      "hurt"
+    ]
+  },
+  {
+    "t": "somebody come quick!",
+    "tags": [
+      "yell",
+      "hurt"
+    ]
+  },
+  {
+    "t": "get it off! GET IT OFF!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "wolf on me! wolf!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "someone help, please!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "HELP! over here!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "it's on me, it's on me!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "don't just stand there!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "RUN! it's not alone!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "there's more of them!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "get the children in!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "get inside, all of you!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "guard! where's the guard?!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "somebody ring something!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "I can't hold it!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "my arm, it's got my arm!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "please, anybody!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "to me! to me!",
+    "tags": [
+      "yell",
+      "wolf"
+    ]
+  },
+  {
+    "t": "help! somebody!",
+    "tags": [
+      "yell"
+    ]
+  },
+  {
+    "t": "I need help over here!",
+    "tags": [
+      "yell"
+    ]
+  },
+  {
+    "t": "HELP!",
+    "tags": [
+      "yell"
+    ]
+  },
+  {
+    "t": "over here! quick!",
+    "tags": [
+      "yell"
+    ]
+  },
+  {
+    "t": "somebody come, now!",
+    "tags": [
+      "yell"
+    ]
+  },
+  {
+    "t": "don't leave me out here!",
+    "tags": [
+      "yell"
+    ]
+  },
+  {
+    "t": "I'm hurt, I'm hurt bad",
+    "tags": [
+      "yell",
+      "hurt"
+    ]
+  },
+  {
+    "t": "I can't walk on it",
+    "tags": [
+      "yell",
+      "hurt"
+    ]
+  },
+  {
+    "t": "get me to the healer",
+    "tags": [
+      "yell",
+      "hurt"
+    ]
+  },
+  {
+    "t": "I'm bleeding, someone help me",
+    "tags": [
+      "yell",
+      "hurt"
+    ]
+  }
 ]

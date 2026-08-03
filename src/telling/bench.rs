@@ -103,7 +103,7 @@ fn help() {
   tags: muse tell reply yell chat:open chat:reply chat:followup chat:end
         event:smote event:mauled ... topic:food topic:roof topic:weather
         topic:<trade> devout wavering doubting saw heard distant
-        hungry \"worn out\" hurt roofless housed married prayer"
+        hungry \"worn out\" hurt roofless housed married prayer retold"
     );
 }
 
