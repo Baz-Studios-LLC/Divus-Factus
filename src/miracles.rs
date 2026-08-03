@@ -357,6 +357,7 @@ fn dress_slot_caps(keymap: Res<crate::keymap::Keymap>, mut caps: Query<(&SlotCap
             1 => key_name(keymap.key(Deed::Smite)),
             2 => key_name(keymap.key(Deed::Bounty)),
             3 => key_name(keymap.key(Deed::MendOrQuake)),
+            4 => key_name(keymap.key(Deed::Avatar)),
             _ => None,
         };
         let fresh = name
@@ -482,12 +483,15 @@ fn spawn_hotbar(mut commands: Commands) {
         ))
         .id();
 
+    // The fourth is held empty for whichever of Mend or Quake the legends
+    // crystallise; Avatar is the god's from the start and sits in the
+    // fifth, where its key already points.
     for (index, miracle) in [
         Some(Miracle::Flourish),
         Some(Miracle::Smite),
         Some(Miracle::Bounty),
         None,
-        None,
+        Some(Miracle::Avatar),
         None,
         None,
         None,
@@ -622,6 +626,33 @@ fn spawn_hotbar(mut commands: Commands) {
                     commands.entity(dot).insert(ChildOf(slot));
                 }
             }
+            // A body, standing empty and waiting to be worn: head, trunk,
+            // two legs. The only miracle whose icon is a person, because
+            // it is the only one where the god becomes one.
+            Some(Miracle::Avatar) => {
+                for (l, t, w, h, round) in [
+                    (17.0, 9.0, 8.0, 8.0, true),
+                    (18.0, 18.0, 6.0, 9.0, false),
+                    (18.0, 27.0, 2.0, 6.0, false),
+                    (22.0, 27.0, 2.0, 6.0, false),
+                ] {
+                    let part = commands
+                        .spawn((
+                            Node {
+                                position_type: PositionType::Absolute,
+                                left: px(l),
+                                top: px(t),
+                                width: px(w),
+                                height: px(h),
+                                border_radius: BorderRadius::all(px(if round { 4.0 } else { 1.0 })),
+                                ..default()
+                            },
+                            BackgroundColor(ui::theme::accent().with_alpha(0.85)),
+                        ))
+                        .id();
+                    commands.entity(part).insert(ChildOf(slot));
+                }
+            }
             _ => {}
         }
     }
@@ -734,6 +765,7 @@ fn choose_miracle(
         Miracle::Bounty,
         Miracle::Mend,
         Miracle::Quake,
+        Miracle::Avatar,
     ] {
         if keys.just_pressed(miracle.key(&keymap)) && all_slots.iter().any(|s| s.0 == Some(miracle))
         {

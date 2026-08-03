@@ -27,6 +27,10 @@ use crate::villager::{Activity, Villager};
 pub struct Ridden {
     /// Seconds of riding left.
     pub left: f32,
+    /// Whether the body is currently hidden because the camera has arrived
+    /// inside it. Remembered so the visibility is written on the two frames
+    /// it changes rather than on every frame.
+    hidden: bool,
 }
 
 /// How long a body may be worn, before belief runs out anyway.
@@ -45,15 +49,46 @@ const STRIDE: f32 = 3.0;
 /// working zoom, so you are returned to the view you play from.
 const LEAVING_HEIGHT: f32 = 80.0;
 
+/// Where the god's gaze is set as it arrives in a body: a touch below
+/// level, the way somebody walking looks at the ground ahead of them.
+const ARRIVING_PITCH: f32 = 0.12;
+
+/// Inside this camera distance the worn body's HEAD stops being drawn.
+///
+/// The head alone, and not the rest: looking down and finding your own
+/// chest, arms and boots there is what sells being in somebody. But a head
+/// is a solid box with the eyes inside it, so that one part has to go —
+/// along with its hair, beard and hat, which hang off it and go with it.
+///
+/// Not on possession, though: hiding it the moment the body is taken would
+/// pop the head off a villager the god is still forty metres above. By the
+/// time the camera is this close it is already within the skull, so both
+/// the vanishing and the return happen where they cannot be seen.
+const OUT_OF_SIGHT: f32 = 2.5;
+
 pub struct AvatarPlugin;
 
 impl Plugin for AvatarPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (take_a_body, wear_it, drive_the_body)
+            (take_a_body, wear_it)
                 .chain()
                 .run_if(in_state(crate::GameState::Playing)),
+        )
+        // Driving runs in `Last`, and that is not tidiness. Better than
+        // twenty villager systems write `MoveTarget` — work, errands,
+        // doorways, gossip, wandering — and none of them are ordered
+        // against each other or against this one, so writing the god's
+        // step anywhere in `Update` is a coin toss with the villager's own
+        // errand. They kept winning: the body wandered off on its own
+        // business with the god aboard. Written here it is the last word
+        // of the frame, and `plan_routes` at the head of the next one reads
+        // it. Nothing else in the schedule can outvote it, including
+        // whatever behaviour gets added next year.
+        .add_systems(
+            Last,
+            drive_the_body.run_if(in_state(crate::GameState::Playing)),
         );
     }
 }
@@ -70,6 +105,8 @@ fn take_a_body(
     mut notices: MessageWriter<crate::ui::Notice>,
     folk: Query<(), (With<Villager>, Without<crate::creature::Corpse>)>,
     worn: Query<Entity, With<Ridden>>,
+    mut lens: Query<&mut Projection, With<crate::camera::GodCamera>>,
+    mut rigs: Query<&mut CameraRig>,
 ) {
     if selected.0 != Some(Miracle::Avatar) {
         return;
@@ -88,9 +125,30 @@ fn take_a_body(
         commands.entity(already).remove::<Ridden>();
     }
     belief.spent += AVATAR_COST;
-    commands.entity(who).insert(Ridden { left: RIDE_FOR });
+    commands.entity(who).insert(Ridden {
+        left: RIDE_FOR,
+        hidden: false,
+    });
     follow.entity = Some(who);
     follow.style = FollowStyle::Eyes;
+    // The lens has to come in. Overhead, the near plane sits at half a
+    // metre because nothing is ever nearer than that; behind a mortal's
+    // eyes their own chest is a hand's width away, and at half a metre the
+    // whole body is clipped out of the frame. Looking down and finding
+    // yourself standing there is most of what sells this, so the plane
+    // comes in to a few centimetres for as long as the ride lasts.
+    if let Ok(mut lens) = lens.single_mut()
+        && let Projection::Perspective(lens) = &mut *lens
+    {
+        lens.near = crate::camera::CLOSE_NEAR;
+    }
+    // Level the look once, on the way in. Overhead the rig is pitched
+    // steeply down at the ground; arriving in a body still pitched that way
+    // would put the god's first mortal view at their own feet. A little
+    // below level, so the first thing seen is the village.
+    if let Ok(mut rig) = rigs.single_mut() {
+        rig.target_pitch = ARRIVING_PITCH;
+    }
     selected.0 = None;
     notices.write(crate::ui::Notice::new(
         "You are looking out of somebody else's eyes".to_string(),
@@ -102,21 +160,53 @@ fn wear_it(
     time: Res<Time>,
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
+    mut selected: ResMut<SelectedMiracle>,
     mut belief: ResMut<crate::villager::belief::Belief>,
     mut follow: ResMut<FollowTarget>,
     mut notices: MessageWriter<crate::ui::Notice>,
-    mut ridden: Query<(Entity, &mut Ridden)>,
+    mut ridden: Query<(Entity, &mut Ridden, &crate::creature::body::CreatureRig)>,
     mut rigs: Query<&mut CameraRig>,
+    mut lens: Query<&mut Projection, With<crate::camera::GodCamera>>,
 ) {
     let dt = time.delta_secs();
-    for (who, mut ride) in &mut ridden {
+    // How far the dive has got. Read before the loop, since the same rig
+    // serves whoever is worn.
+    let arrived = rigs.single().is_ok_and(|rig| rig.distance < OUT_OF_SIGHT);
+    for (who, mut ride, body) in &mut ridden {
         ride.left -= dt;
         belief.spent += DRAIN * dt;
+        if arrived != ride.hidden {
+            ride.hidden = arrived;
+            commands.entity(body.head).insert(if arrived {
+                Visibility::Hidden
+            } else {
+                Visibility::Inherited
+            });
+        }
+        // Reaching for the miracle a second time is how you put the body
+        // down. Arming costs nothing, so leaving costs nothing — the god
+        // has already paid to be here. The selection is cleared with it,
+        // or the next click on the ground would try to cast at a person.
+        let recast = selected.0 == Some(Miracle::Avatar);
+        if recast {
+            selected.0 = None;
+        }
         // Given back willingly, run out of time, or run out of belief.
-        let done =
-            ride.left <= 0.0 || belief.available() <= 0.0 || keys.just_pressed(KeyCode::Escape);
+        let done = recast
+            || ride.left <= 0.0
+            || belief.available() <= 0.0
+            || keys.just_pressed(KeyCode::Escape);
         if done {
             commands.entity(who).remove::<Ridden>();
+            // Given back with their head on. If the god is thrown out of a
+            // body while still inside it — belief running dry mid-ride —
+            // this is the only thing that puts the head back.
+            commands.entity(body.head).insert(Visibility::Inherited);
+            if let Ok(mut lens) = lens.single_mut()
+                && let Projection::Perspective(lens) = &mut *lens
+            {
+                lens.near = crate::camera::WIDE_NEAR;
+            }
             if follow.entity == Some(who) {
                 follow.entity = None;
                 follow.style = FollowStyle::Overhead;

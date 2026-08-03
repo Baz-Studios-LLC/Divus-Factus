@@ -42,6 +42,11 @@ const THROW_STRENGTH: f32 = 1.35;
 /// Speed below which a release is a drop rather than a throw.
 const THROW_THRESHOLD: f32 = 2.5;
 
+/// Inside this camera distance the hand is not drawn at all. Well below the
+/// twelve metres ordinary play is clamped to, so only a first-person view -
+/// Avatar - ever reaches it.
+const WITHDRAW_WITHIN: f32 = 6.0;
+
 /// How far in front of the camera the hand floats while it is the UI cursor.
 ///
 /// Close enough to clear every piece of world geometry, far enough past the near
@@ -345,15 +350,21 @@ fn update_hand_ray(
 fn update_hover(
     windows: Query<&Window, With<PrimaryWindow>>,
     cameras: Query<(&Camera, &GlobalTransform), With<GodCamera>>,
+    rigs: Query<&CameraRig>,
     candidates: Query<(Entity, &GlobalTransform, &PickRadius), Without<Held>>,
     pointer: Res<PointerContext>,
     mut hand: ResMut<DivineHand>,
 ) {
     // A panel between the cursor and the world blocks the world. Hovering a
     // villager through the HUD and snatching them with a misclick is exactly the
-    // kind of accident the interface layer exists to prevent. Likewise the
-    // shoulder camera: a withdrawn hand touches nothing.
-    if hand.held.is_some() || pointer.over_ui {
+    // kind of accident the interface layer exists to prevent. Likewise a body
+    // being worn: the hand is withdrawn at that range, and a withdrawn hand
+    // touches nothing. Naming what is "beneath your hand" while the god has
+    // no hand to speak of gives the whole thing away.
+    let riding = rigs
+        .single()
+        .is_ok_and(|rig| rig.distance < crate::camera::FIRST_PERSON);
+    if hand.held.is_some() || pointer.over_ui || riding {
         hand.hovered = None;
         return;
     }
@@ -899,9 +910,12 @@ fn animate_hand(
     let pointing = pointer.over_ui && !held;
     rig.point += ((pointing as u32 as f32) - rig.point) * ease;
 
-    // Over the shoulder, the hand withdraws entirely — it would fill the frame
-    // at that distance. It fades away and back rather than popping.
-    let withdrawn = false && !held;
+    // Behind a mortal's eyes the hand withdraws entirely — at that range it
+    // would fill the whole frame, and a god wearing a body has no business
+    // waving its own hand in front of the face. Ordinary play never comes
+    // closer than `MIN_DISTANCE`, twelve metres, so nothing but Avatar can
+    // trip this. It fades away and back rather than popping.
+    let withdrawn = camera.distance < WITHDRAW_WITHIN && !held;
     let fade_ease = 1.0 - (-6.0 * dt).exp();
     rig.fade += ((!withdrawn as u32 as f32) - rig.fade) * fade_ease;
 

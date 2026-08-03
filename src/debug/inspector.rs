@@ -176,12 +176,19 @@ pub(crate) fn update_inspector(
 
     // Whoever the hand holds or hovers — and failing that, whoever the camera
     // is following. The card of a follow stays up for the whole ride.
+    //
+    // Unless the god is INSIDE them, in which case there is no watching going
+    // on and nothing to put on a card. A dossier of your own hunger and
+    // spirits, pinned open in the corner while you walk about in the body it
+    // describes, gives the whole conceit away — and it cannot be dismissed,
+    // because the follow that raises it is the possession itself.
+    let worn = follow.style == crate::camera::FollowStyle::Eyes;
     let subject = hand
         .held
         .as_ref()
         .map(|h| h.entity)
         .or(hand.hovered)
-        .or(follow.entity);
+        .or_else(|| follow.entity.filter(|_| !worn));
     let Some(entity) = subject else {
         *visibility = Visibility::Hidden;
         return;

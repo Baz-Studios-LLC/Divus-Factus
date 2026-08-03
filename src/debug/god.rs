@@ -169,6 +169,30 @@ fn quake_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     );
 }
 
+/// Avatar: a body with nobody in it - head, trunk and two legs, waiting to
+/// be worn.
+fn avatar_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+    let c = glyph_canvas(commands, parent, 18.0);
+    deity_bar(commands, c, (6.0, 1.0, 6.0, 6.0), 0.0, tint, true);
+    deity_bar(commands, c, (6.5, 7.5, 5.0, 6.5), 0.0, tint, false);
+    deity_bar(
+        commands,
+        c,
+        (6.5, 14.0, 1.5, 3.5),
+        0.0,
+        tint.with_alpha(0.7),
+        false,
+    );
+    deity_bar(
+        commands,
+        c,
+        (10.0, 14.0, 1.5, 3.5),
+        0.0,
+        tint.with_alpha(0.7),
+        false,
+    );
+}
+
 /// A leaf: your unseen nature.
 fn leaf_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     let c = glyph_canvas(commands, parent, 18.0);
@@ -755,6 +779,7 @@ pub(crate) fn spawn_god_panel(
         Miracle::Flourish,
         Miracle::Smite,
         Miracle::Bounty,
+        Miracle::Avatar,
         Miracle::Mend,
         Miracle::Quake,
     ] {
@@ -806,8 +831,7 @@ pub(crate) fn spawn_god_panel(
             Miracle::Bounty => berry_glyph(&mut commands, badge, gold),
             Miracle::Mend => mend_glyph(&mut commands, badge, gold),
             Miracle::Quake => quake_glyph(&mut commands, badge, gold),
-            // No glyph of its own yet; the badge carries the name.
-            Miracle::Avatar => {}
+            Miracle::Avatar => avatar_glyph(&mut commands, badge, gold),
         }
         for field in [0u8, 1, 2] {
             commands.spawn((
@@ -1116,7 +1140,7 @@ pub(crate) fn update_god_panel(
 
     // The powers: three born active, two crystallised by legend.
     let unlocked = |miracle: Miracle| match miracle {
-        Miracle::Flourish | Miracle::Smite | Miracle::Bounty => true,
+        Miracle::Flourish | Miracle::Smite | Miracle::Bounty | Miracle::Avatar => true,
         m => legend.as_ref().is_some_and(|l| l.unlocked == Some(m)),
     };
     for (card, mut fill, mut border) in &mut cards {

@@ -136,11 +136,26 @@ pub struct FollowTarget {
     pub style: FollowStyle,
 }
 
+/// How high the eyes sit above the feet, for a body built from `genome`.
+///
+/// The head is a box centred a little way down into the torso; the eyes are
+/// in its upper third, which is also where the face features are painted on.
+/// Kept here beside the camera that needs it rather than in the body module,
+/// since nothing else asks the question.
+pub fn eye_height(genome: &crate::creature::genome::CreatureGenome) -> f32 {
+    let p = &genome.proportions;
+    let h = genome.height();
+    let head = crate::creature::body::biped_head_size(genome);
+    let centre = (p.leg_length + p.torso_length + p.neck_length) * h - head * 0.12;
+    centre + head * 0.28
+}
+
 /// Rides the focus (and, at the shoulder, the whole rig) along with whoever
 /// is being followed.
 fn apply_follow(
     mut follow: ResMut<FollowTarget>,
     targets: Query<&GlobalTransform>,
+    bodies: Query<&crate::creature::genome::CreatureGenome>,
     mut rigs: Query<&mut CameraRig>,
 ) {
     let Some(entity) = follow.entity else {
@@ -169,9 +184,18 @@ fn apply_follow(
         // into the body over about a second rather than cutting to it.
         // Writing the immediate values as well - which is what this did
         // first - snapped the camera into their skull in one frame.
-        rig.target_focus.y = at.y + EYE_HEIGHT;
+        // Read off the body itself, every frame. Asking whoever set this
+        // style to also hand over the eye height was the wrong shape: the
+        // right-click follow sets the style too and knew nothing about it,
+        // so it fell back to a floor value and put the view down around the
+        // ankles. The body is right here and can be measured.
+        let eyes = bodies.get(entity).map_or(1.3, eye_height);
+        rig.target_focus.y = at.y + eyes;
         rig.target_distance = 0.0;
-        rig.target_pitch = rig.target_pitch.min(0.9);
+        // The pitch is deliberately NOT touched here. Clamping it every
+        // frame — which is what this did first — capped the downward look at
+        // whatever the clamp was, so you could never find your own feet. It
+        // is levelled once, on possession, and after that it is yours.
     }
 }
 
@@ -185,8 +209,33 @@ pub struct CameraSet;
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CameraStartupSet;
 
-/// How high a villager's eyes sit above the ground they stand on.
-const EYE_HEIGHT: f32 = 1.55;
+/// The near plane for the god's ordinary view of the world.
+///
+/// Half a metre: overhead the camera is never within twelve of anything, so
+/// the plane can sit far out and buy depth precision across a three-kilometre
+/// far plane.
+pub const WIDE_NEAR: f32 = 0.5;
+
+/// The near plane while the god is wearing a body.
+///
+/// Their own chest is a hand's width below the eyes and their hands swing
+/// closer than that, so the plane has to come in to a few centimetres or the
+/// body is clipped away and looking down shows bare ground. The cost is
+/// depth precision out at the horizon, which is a fair trade for five
+/// minutes and is put back the moment the body is given up.
+pub const CLOSE_NEAR: f32 = 0.04;
+
+/// Below this camera distance the rig is taken to be behind somebody's eyes
+/// rather than orbiting them, and several rules change: the pitch range
+/// opens both ways, the transform is pointed by yaw and pitch rather than at
+/// the focus, and the ground-clearance lift is skipped. Well under the
+/// twelve metres ordinary play is clamped to, so only Avatar reaches it.
+pub const FIRST_PERSON: f32 = 0.5;
+
+/// How far up and down a worn body may look, in radians — about 77° each
+/// way, which finds both the sky and your own boots without letting the
+/// neck fold over backwards.
+const RIDDEN_PITCH: f32 = 1.35;
 
 const MIN_PITCH: f32 = 0.20;
 const MAX_PITCH: f32 = FRAC_PI_2 - 0.06;
@@ -253,8 +302,17 @@ impl Default for CameraRig {
 
 impl CameraRig {
     /// Unit vector the camera looks along, from its eye toward the focus.
+    /// Unit direction the camera is looking.
+    ///
+    /// Derived from yaw and pitch alone rather than from the offset between
+    /// eye and focus, because that offset is a ZERO VECTOR when the god is
+    /// wearing a body: the eye sits exactly on the focus, and normalising
+    /// the nothing between them gave NaN, which reached the transform and
+    /// pointed the view nowhere at all.
     pub fn forward(&self) -> Vec3 {
-        -self.eye_offset().normalize()
+        let (sy, cy) = self.yaw.sin_cos();
+        let (sp, cp) = self.pitch.sin_cos();
+        -Vec3::new(sy * cp, sp, cy * cp)
     }
 
     /// Offset from focus to eye.
@@ -343,7 +401,7 @@ fn spawn_camera(mut commands: Commands) {
             // A slightly long lens flattens the scene, which reinforces the
             // look-at-a-model feeling the tilt-shift pass will build on.
             fov: 0.62,
-            near: 0.5,
+            near: WIDE_NEAR,
             // Past max zoom (1400) plus the widest fog band, so overlooking the
             // world from the top of the zoom shows a world, not the clip plane.
             far: 3000.0,
@@ -418,8 +476,17 @@ fn read_camera_input(
         if delta != Vec2::ZERO {
             let sensitivity = rig.orbit_sensitivity;
             rig.target_yaw -= delta.x * sensitivity;
-            rig.target_pitch =
-                (rig.target_pitch + delta.y * sensitivity).clamp(MIN_PITCH, MAX_PITCH);
+            // The overhead camera is never allowed to look level or upward,
+            // because it orbits a point on the ground and would end up
+            // underneath it. A person looking out of their own eyes has no
+            // such trouble, and needs the range both ways: up at the sky
+            // they pray to, and down far enough to find their own boots.
+            let (floor, ceiling) = if rig.target_distance < FIRST_PERSON {
+                (-RIDDEN_PITCH, RIDDEN_PITCH)
+            } else {
+                (MIN_PITCH, MAX_PITCH)
+            };
+            rig.target_pitch = (rig.target_pitch + delta.y * sensitivity).clamp(floor, ceiling);
         }
     }
 
@@ -460,6 +527,15 @@ fn follow_ground(terrain: Option<Res<Terrain>>, mut rigs: Query<&mut CameraRig>)
     let (Some(terrain), Ok(mut rig)) = (terrain, rigs.single_mut()) else {
         return;
     };
+    // Not when the focus IS somebody's eyes. This runs after `apply_follow`
+    // in the chain and used to overwrite its work every single frame: the
+    // eye height went in, the ground height came straight back out, and the
+    // god ended up looking out of the villager's boots no matter how
+    // carefully their eyes had been measured. The orbit is what needs its
+    // focus pinned to the land; a head is not an orbit.
+    if rig.target_distance < FIRST_PERSON {
+        return;
+    }
     let ground = terrain
         .height_at(rig.target_focus.x, rig.target_focus.z)
         .max(WATER_LEVEL);
@@ -510,6 +586,18 @@ fn write_camera_transform(
     mut cameras: Query<(&CameraRig, &mut Transform), With<GodCamera>>,
 ) {
     for (rig, mut transform) in &mut cameras {
+        // Behind a mortal's eyes there is no orbit to speak of, and both of
+        // the things this function does next are wrong there. `looking_at`
+        // has no direction to work from when the eye is already at the
+        // focus, and the sightline lift below reads the ground under the
+        // focus as an obstacle to clear — which, for anybody whose eyes are
+        // lower than `EYE_CLEARANCE`, a child especially, cranes the view up
+        // out of the top of their head. So: point it by yaw and pitch, and
+        // trust the body to be standing somewhere it can stand.
+        if rig.distance < FIRST_PERSON {
+            *transform = Transform::from_translation(rig.focus).looking_to(rig.forward(), Vec3::Y);
+            continue;
+        }
         let mut eye = rig.eye();
         // The focus rides the ground, but the EYE swings out behind it -
         // and on a hillside that put it under the slope. Orbiting buried
@@ -652,5 +740,81 @@ mod tests {
         };
         assert!(near.zoom_fraction() < 1e-5);
         assert!((far.zoom_fraction() - 1.0).abs() < 1e-5);
+    }
+
+    /// The whole of Avatar rests on this. At zero distance the eye sits on
+    /// the focus, and `forward` used to be the normalised offset between
+    /// them — which is a zero vector, and normalising it gave NaN. A NaN
+    /// look direction does not crash: it silently points the view nowhere,
+    /// so the god turns their head and nothing moves.
+    #[test]
+    fn the_look_direction_survives_zero_distance() {
+        for pitch in [-RIDDEN_PITCH, -0.4, 0.0, ARRIVING_ISH, RIDDEN_PITCH] {
+            for yaw in [0.0, 1.0, 3.0, -2.5] {
+                let rig = CameraRig {
+                    distance: 0.0,
+                    yaw,
+                    pitch,
+                    ..default()
+                };
+                let dir = rig.forward();
+                assert!(dir.is_finite(), "pitch {pitch} yaw {yaw} gave {dir:?}");
+                assert!((dir.length() - 1.0).abs() < 1e-4, "not a unit: {dir:?}");
+            }
+        }
+    }
+
+    /// A worn body has to be able to look up as well as down — the overhead
+    /// floor of `MIN_PITCH` faces permanently at the ground.
+    #[test]
+    fn a_worn_body_can_look_up_and_at_its_own_boots() {
+        let up = CameraRig {
+            distance: 0.0,
+            pitch: -RIDDEN_PITCH,
+            ..default()
+        };
+        let down = CameraRig {
+            distance: 0.0,
+            pitch: RIDDEN_PITCH,
+            ..default()
+        };
+        assert!(
+            up.forward().y > 0.5,
+            "cannot see the sky: {:?}",
+            up.forward()
+        );
+        assert!(
+            down.forward().y < -0.5,
+            "cannot see its feet: {:?}",
+            down.forward()
+        );
+        // And the overhead rig still cannot, which is what keeps the orbit
+        // from going under the ground it orbits.
+        assert!(MIN_PITCH > 0.0);
+    }
+
+    const ARRIVING_ISH: f32 = 0.12;
+
+    /// Eyes belong in the head: above the shoulders, below the crown. Get
+    /// this wrong and the god either looks out of somebody's chest or floats
+    /// above their hair.
+    #[test]
+    fn the_eyes_sit_within_the_head() {
+        use crate::creature::genome::{CreatureGenome, Species};
+        let mut rng = crate::rng::Rng::new(0x_EEE5);
+        for _ in 0..200 {
+            let genome = CreatureGenome::random(Species::Human, &mut rng);
+            let p = &genome.proportions;
+            let h = genome.height();
+            let head = crate::creature::body::biped_head_size(&genome);
+            let centre = (p.leg_length + p.torso_length + p.neck_length) * h - head * 0.12;
+            let eyes = eye_height(&genome);
+            assert!(
+                eyes > centre - head * 0.5 && eyes < centre + head * 0.5,
+                "eyes at {eyes} are outside a head of {head} centred at {centre}"
+            );
+            // And above the shoulders, so looking down finds a chest.
+            assert!(eyes > (p.leg_length + p.torso_length) * h);
+        }
     }
 }
