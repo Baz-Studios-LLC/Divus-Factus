@@ -150,6 +150,21 @@ pub fn eye_height(genome: &crate::creature::genome::CreatureGenome) -> f32 {
     centre + head * 0.28
 }
 
+/// How far forward of the head's centre the eyes sit, for a body built from
+/// `genome`.
+///
+/// Eyes are on the FACE. Put the camera at the middle of the skull instead —
+/// which is where measuring only the height puts it — and looking down looks
+/// straight down the inside of the neck. From the face, looking down finds
+/// your own chest and boots, which is the entire reason the body is left
+/// standing there to be looked at.
+///
+/// Just inside the front of the head box rather than flush with it, so a
+/// turn of the head never swings the near plane out through the cheek.
+pub fn eye_forward(genome: &crate::creature::genome::CreatureGenome) -> f32 {
+    crate::creature::body::biped_head_size(genome) * 0.42
+}
+
 /// Rides the focus (and, at the shoulder, the whole rig) along with whoever
 /// is being followed.
 fn apply_follow(
@@ -191,6 +206,15 @@ fn apply_follow(
         // ankles. The body is right here and can be measured.
         let eyes = bodies.get(entity).map_or(1.3, eye_height);
         rig.target_focus.y = at.y + eyes;
+        // And forward, onto the face. At the centre of the head, looking
+        // down looked straight down the inside of the neck. The offset
+        // follows the LOOK direction rather than the body's own facing, so
+        // turning to look at something takes the eyes round with it the way
+        // a head does — and a body standing still can still be looked down
+        // at from its own face.
+        let face = rig.ground_forward() * bodies.get(entity).map_or(0.19, eye_forward);
+        rig.target_focus.x = at.x + face.x;
+        rig.target_focus.z = at.z + face.z;
         rig.target_distance = 0.0;
         // The pitch is deliberately NOT touched here. Clamping it every
         // frame — which is what this did first — capped the downward look at
@@ -815,6 +839,14 @@ mod tests {
             );
             // And above the shoulders, so looking down finds a chest.
             assert!(eyes > (p.leg_length + p.torso_length) * h);
+
+            // Forward of the head's centre, but not out past the face. At
+            // the centre, looking down looks down the neck hole.
+            let ahead = eye_forward(&genome);
+            assert!(
+                ahead > head * 0.25 && ahead < head * 0.5,
+                "eyes {ahead} forward of centre in a head of {head}"
+            );
         }
     }
 }

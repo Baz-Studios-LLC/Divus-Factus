@@ -174,7 +174,9 @@ fn wear_it(
     let arrived = rigs.single().is_ok_and(|rig| rig.distance < OUT_OF_SIGHT);
     for (who, mut ride, body) in &mut ridden {
         ride.left -= dt;
-        belief.spent += DRAIN * dt;
+        // Take what there is to take. Spending past the end of the pool
+        // would run `available` negative, and the readout with it.
+        belief.spent += (DRAIN * dt).min(belief.available().max(0.0));
         if arrived != ride.hidden {
             ride.hidden = arrived;
             commands.entity(body.head).insert(if arrived {
@@ -191,16 +193,20 @@ fn wear_it(
         if recast {
             selected.0 = None;
         }
-        // Given back willingly, run out of time, or run out of belief.
-        let done = recast
-            || ride.left <= 0.0
-            || belief.available() <= 0.0
-            || keys.just_pressed(KeyCode::Escape);
+        // Given back willingly, or run out of time.
+        //
+        // NOT on an empty pool, which is what threw the god out of a body
+        // one frame after entering it: the cast costs three and an early
+        // village only believes three, so `available` was nought before the
+        // first step was taken. Time is the bound that matters — five
+        // minutes — and the drain above still empties the pool, so a long
+        // ride is paid for by having no miracles left when it ends.
+        let done = recast || ride.left <= 0.0 || keys.just_pressed(KeyCode::Escape);
         if done {
             commands.entity(who).remove::<Ridden>();
-            // Given back with their head on. If the god is thrown out of a
-            // body while still inside it — belief running dry mid-ride —
-            // this is the only thing that puts the head back.
+            // Given back with their head on. If the god leaves while the
+            // camera is still inside the skull, this is the only thing that
+            // puts the head back.
             commands.entity(body.head).insert(Visibility::Inherited);
             if let Ok(mut lens) = lens.single_mut()
                 && let Projection::Perspective(lens) = &mut *lens

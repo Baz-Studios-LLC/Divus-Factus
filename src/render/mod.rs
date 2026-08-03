@@ -95,17 +95,6 @@ fn dream_lens(
         return;
     }
     for (rig, mut dof) in &mut cameras {
-        // Behind a mortal's eyes there is no diorama to photograph. The lens
-        // focuses at the camera's own orbit distance, and that distance is
-        // NOUGHT when the god is wearing a body — so the focal plane fell to
-        // the ten-centimetre floor below and every single thing in the world,
-        // the ground included, went to mush. The shallow lens is what makes
-        // the world look like a model on a table; from inside the model it
-        // has nothing left to say, so it is simply switched off.
-        if rig.distance < crate::camera::FIRST_PERSON {
-            dof.aperture_f_stops = 0.0;
-            continue;
-        }
         dof.aperture_f_stops = look.aperture + (DREAM_APERTURE - look.aperture) * lens.0;
         let sharp = rig.distance * look.focus_bias;
         let dreamy = rig.distance * DREAM_FOCUS;
@@ -367,6 +356,23 @@ fn focus_depth_of_field(
     mut cameras: Query<(&CameraRig, &mut DepthOfField), With<GodCamera>>,
 ) {
     for (rig, mut dof) in &mut cameras {
+        // Behind a mortal's eyes there is no diorama to photograph, and this
+        // sum is actively harmful there: the focal plane sits at the camera's
+        // own orbit distance, and that distance is NOUGHT when the god is
+        // wearing a body. The plane fell to the ten-centimetre floor below
+        // and every single thing in the world, the ground included, went to
+        // mush. The shallow lens is what makes the village look like a model
+        // on a table; from inside the model it has nothing left to say, so it
+        // is switched off outright.
+        //
+        // This is the system that does it, and not `dream_lens`, which also
+        // writes the aperture but returns early the moment the title stops
+        // dreaming — a fix put there did nothing at all in play.
+        if rig.distance < crate::camera::FIRST_PERSON {
+            dof.aperture_f_stops = 0.0;
+            continue;
+        }
+        dof.aperture_f_stops = look.aperture;
         dof.focal_distance = (rig.distance * look.focus_bias).max(0.1);
     }
 }
