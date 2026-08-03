@@ -76,7 +76,7 @@ impl Default for FogMode {
 
 /// The veil laid over one terrain chunk.
 #[derive(Component)]
-struct Veil;
+pub struct Veil;
 
 pub struct FogPlugin;
 
@@ -294,7 +294,24 @@ fn drape_the_veil(
                 } else {
                     cloth.clone()
                 }),
-                Transform::from_translation(Vec3::Y * lift),
+                // Lifted RADIALLY, not along world Y. The sheets copy the
+                // chunk's own mesh, and those vertices are seated on the
+                // sphere - so "up" is away from the planet's centre, and it
+                // differs everywhere. A uniform scale about that centre
+                // raises every vertex by `lift` along its own radial at
+                // once: p' = centre + k(p - centre), which is exactly a
+                // scale of k plus a translation of centre(1 - k). Lifting
+                // along Y instead only worked at the reference point and
+                // sheared the veil off the world everywhere else.
+                {
+                    let centre = crate::globe::planet_centre();
+                    let k = (crate::terrain::PLANET_RADIUS + lift) / crate::terrain::PLANET_RADIUS;
+                    Transform {
+                        translation: centre * (1.0 - k),
+                        rotation: Quat::IDENTITY,
+                        scale: Vec3::splat(k),
+                    }
+                },
                 // The veil is not a THING. Six sheets hanging over the
                 // world threw six sheets of shadow onto the ground they
                 // were meant to be hiding, and the known island - the one

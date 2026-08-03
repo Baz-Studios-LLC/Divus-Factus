@@ -46,25 +46,6 @@ const MIN_VIEW_CHUNKS: i32 = 6;
 /// radius the whole time means paying for a thousand chunks while looking at one
 /// village. Tying the radius to the zoom keeps close work cheap and still opens the
 /// world up when the player rises.
-/// Where the flat world is allowed to live: the streamed chunks stay within
-/// this arc of the world origin, whatever the camera does.
-///
-/// The chunks render in the flat tangent frame, and that frame is only
-/// honest near the origin - at two thousand units its ground already floats
-/// three hundred units off the sphere, and streamed around a focus that had
-/// been grabbed to the far side of the planet it hung in empty space like a
-/// postcard beside the world. The flat world exists to carry villagers,
-/// trees and buildings, and those live HERE; the rest of the planet belongs
-/// to the patches, which sit on the sphere correctly at every longitude.
-/// The tether moves the day the chunks themselves bend onto the ball.
-pub const HOMELANDS: f32 = 1_600.0;
-
-/// The streamed world's centre: the camera's focus, held within
-/// [`HOMELANDS`] of the origin.
-pub fn homeland_heart(focus: Vec3) -> Vec2 {
-    Vec2::new(focus.x, focus.z).clamp_length_max(HOMELANDS)
-}
-
 pub fn stream_radius(camera_distance: f32) -> i32 {
     let chunks = (camera_distance / CHUNK_SIZE) * 1.6 + MIN_VIEW_CHUNKS as f32;
     let wanted = (chunks.round() as i32).clamp(MIN_VIEW_CHUNKS, VIEW_CHUNKS);
@@ -824,47 +805,69 @@ fn chunks_in_view(centre: IVec2, radius: i32) -> Vec<IVec2> {
 /// Lives here rather than with the Hand because it is a terrain query: the camera
 /// uses it to zoom toward the cursor, and the Hand uses it to place the cursor.
 pub fn raycast(terrain: &Terrain, ray: Ray3d) -> Option<Vec3> {
-    const MAX_DISTANCE: f32 = 3_000.0;
+    // The ray lives in the BENT world - the picture the player clicks is on
+    // the sphere - and the answer comes back in FLAT coordinates, the only
+    // language the simulation speaks. Altitude is distance from the planet's
+    // centre less the radius; the ground under a point is found by turning
+    // its direction back into the scaffold's (x, z).
+    const MAX_DISTANCE: f32 = 4_000.0;
     const STEP: f32 = 1.5;
+
+    let centre = crate::globe::planet_centre();
+    let stance_back = crate::globe::planet_stance().inverse();
+    let flat_of = |p: Vec3| -> (f32, f32, f32) {
+        let v = p - centre;
+        let r = v.length().max(1.0);
+        let (x, z) = crate::globe::ground_coordinates(stance_back * (v / r));
+        (x, z, r - PLANET_RADIUS)
+    };
+    let above_ground = |p: Vec3| -> bool {
+        let (x, z, altitude) = flat_of(p);
+        altitude > terrain.height_at(x, z).max(WATER_LEVEL)
+    };
 
     let origin = ray.origin;
     let direction = *ray.direction;
 
-    // A ray pointing up from above the terrain will never hit it.
-    if direction.y >= 0.0 && origin.y > TERRAIN_HEIGHT {
-        return None;
+    // A ray climbing away from the planet, already above everything, will
+    // never come down.
+    {
+        let v = origin - centre;
+        let outward = direction.dot(v.normalize_or(Vec3::Y));
+        if outward >= 0.0 && v.length() - PLANET_RADIUS > TERRAIN_HEIGHT {
+            return None;
+        }
     }
-
-    let ground_at = |p: Vec3| terrain.height_at(p.x, p.z).max(WATER_LEVEL);
 
     let mut travelled = 0.0;
     let mut previous = origin;
-    let mut previous_above = origin.y > ground_at(origin);
+    let mut previous_above = above_ground(origin);
 
     while travelled < MAX_DISTANCE {
         travelled += STEP;
         let current = origin + direction * travelled;
-        let above = current.y > ground_at(current);
+        let above = above_ground(current);
 
         if previous_above && !above {
-            // Crossed the surface between `previous` and `current`. Bisect.
+            // Crossed the surface between `previous` and `current`. Bisect,
+            // then answer in the flat frame.
             let mut lo = previous;
             let mut hi = current;
             for _ in 0..14 {
                 let mid = (lo + hi) * 0.5;
-                if mid.y > ground_at(mid) {
+                if above_ground(mid) {
                     lo = mid;
                 } else {
                     hi = mid;
                 }
             }
-            return Some((lo + hi) * 0.5);
+            let (x, z, _) = flat_of((lo + hi) * 0.5);
+            let ground = terrain.height_at(x, z).max(WATER_LEVEL);
+            return Some(Vec3::new(x, ground, z));
         }
-
         previous = current;
         previous_above = above;
     }
-
     None
 }
 
@@ -1106,8 +1109,19 @@ pub fn build_chunk_mesh(terrain: &Terrain, coord: IVec2) -> Mesh {
             )
             .to_linear();
 
-            positions.push([ix as f32 * cell, y, iz as f32 * cell]);
-            normals.push([normal.x, normal.y, normal.z]);
+            // Bent HERE, per vertex, in world space. Seating a whole chunk
+            // rigidly on its tangent point was the first plan and it is not
+            // good enough: a sixty-four unit chunk seated at its origin bows
+            // two thirds of a unit at its far corner, and neighbours seated
+            // by their own origins disagree at every shared edge - a step
+            // at every chunk seam across the whole world. Bending the
+            // vertices costs nothing (the mesh is built once) and the chunks
+            // then tile the sphere EXACTLY, because a shared edge is the
+            // same world position for both of them and gets the same seat.
+            let (seat, turn) = crate::globe::bend_frame(Vec3::new(world_x, y, world_z));
+            positions.push(seat.to_array());
+            let bent_normal = turn * normal;
+            normals.push([bent_normal.x, bent_normal.y, bent_normal.z]);
             colors.push([color.red, color.green, color.blue, 1.0]);
         }
     }
@@ -1310,7 +1324,9 @@ fn setup_terrain(
         Name::new("Water"),
         Mesh3d(water_mesh),
         MeshMaterial3d(water_material.clone()),
-        Transform::from_xyz(0.0, WATER_LEVEL, 0.0),
+        // Identity: the sea's vertices are seated on the sphere in world
+        // space by `follow_water_plane`, sea level and curve baked in.
+        Transform::IDENTITY,
         // Water casting a shadow onto the seabed puts a dark band under every
         // shoreline, which reads as the surface hovering above the sand rather than
         // meeting it.
@@ -1344,8 +1360,7 @@ fn stream_chunks(
     let Ok(rig) = cameras.single() else {
         return;
     };
-    let heart = homeland_heart(rig.focus);
-    let centre = terrain.chunk_of(heart.x, heart.y);
+    let centre = terrain.chunk_of(rig.focus.x, rig.focus.z);
 
     let radius = stream_radius(rig.distance);
     loaded.radius = radius;
@@ -1429,11 +1444,9 @@ pub(crate) fn spawn_chunk(
             TerrainChunk { coord },
             Mesh3d(meshes.add(build_chunk_mesh(terrain, coord))),
             MeshMaterial3d(assets.ground_material.clone()),
-            Transform::from_xyz(
-                coord.x as f32 * CHUNK_SIZE,
-                0.0,
-                coord.y as f32 * CHUNK_SIZE,
-            ),
+            // Identity: the mesh's vertices are already seated on the
+            // sphere in world space, so the entity places nothing.
+            Transform::IDENTITY,
             Visibility::default(),
         ))
         .id();
@@ -1489,7 +1502,9 @@ pub(crate) fn rebuild_chunks_near(
 /// Keeps the sea centred under the camera.
 fn follow_water_plane(
     cameras: Query<&crate::camera::CameraRig>,
-    mut water: Query<&mut Transform, With<WaterPlane>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    water: Query<(&Mesh3d, &Transform), With<WaterPlane>>,
+    mut woven: Local<Option<(i32, i32, i32)>>,
 ) {
     let Ok(rig) = cameras.single() else {
         return;
@@ -1501,21 +1516,65 @@ fn follow_water_plane(
     // planet's painted ocean owns everything beyond the loaded shore. It
     // will follow the curve itself the day the chunks do; they share a
     // frame, and bending one without the other tears every shoreline.
-    // And it bows out entirely as the god climbs. The flat sea exists to
-    // wet flat land, and it cannot curve before the land does - the shore
-    // must meet the water exactly, and a curved sea would sag sixty units
-    // below the village beach and turn every coast into a cliff. From
-    // altitude the planet paints its own ocean and its own lakes, so the
-    // quad's job simply ends; it shrinks away across a band of climb and
-    // the painted water beneath carries on.
+    // The sea is CURVED: its vertices are seated on the sphere one by one,
+    // because a sheet thousands of units wide cannot be seated rigidly the
+    // way a chunk can. Rebuilt only when the view moves - a few thousand
+    // vertices, well under a millisecond - and sized with the streamed
+    // ground, since past the loaded shore the planet paints its own ocean.
     let receding = 1.0 - ((rig.distance - 2_200.0) / 800.0).clamp(0.0, 1.0);
-    let fit = (stream_radius(rig.distance) as f32 / VIEW_CHUNKS as f32) * receding;
-    let heart = homeland_heart(rig.focus);
-    for mut transform in &mut water {
-        transform.translation.x = heart.x;
-        transform.translation.z = heart.y;
-        transform.scale = Vec3::new(fit.max(0.001), 1.0, fit.max(0.001));
+    let fit = (stream_radius(rig.distance) as f32 / VIEW_CHUNKS as f32) * receding.max(0.001);
+    let heart = Vec2::new(rig.focus.x, rig.focus.z);
+    let signature = (
+        (heart.x / 8.0).round() as i32,
+        (heart.y / 8.0).round() as i32,
+        (fit * 128.0).round() as i32,
+    );
+    if *woven == Some(signature) {
+        return;
     }
+    *woven = Some(signature);
+
+    let Some((mesh3d, _)) = water.iter().next() else {
+        return;
+    };
+    let Some(mut mesh) = meshes.get_mut(&mesh3d.0) else {
+        return;
+    };
+
+    const CELLS: usize = 40;
+    let half = CHUNK_SIZE * VIEW_CHUNKS as f32 * 1.15 * fit;
+    let step = half * 2.0 / CELLS as f32;
+    let stride = CELLS + 1;
+    let mut positions = Vec::with_capacity(stride * stride);
+    let mut normals = Vec::with_capacity(stride * stride);
+    let mut uvs = Vec::with_capacity(stride * stride);
+    for j in 0..stride {
+        for i in 0..stride {
+            let flat = Vec3::new(
+                heart.x - half + i as f32 * step,
+                WATER_LEVEL,
+                heart.y - half + j as f32 * step,
+            );
+            let (seat, turn) = crate::globe::bend_frame(flat);
+            positions.push(seat.to_array());
+            normals.push((turn * Vec3::Y).to_array());
+            uvs.push([i as f32 / CELLS as f32, j as f32 / CELLS as f32]);
+        }
+    }
+    let mut indices = Vec::with_capacity(CELLS * CELLS * 6);
+    for j in 0..CELLS as u32 {
+        for i in 0..CELLS as u32 {
+            let tl = j * stride as u32 + i;
+            let tr = tl + 1;
+            let bl = tl + stride as u32;
+            let br = bl + 1;
+            indices.extend([tl, bl, tr, tr, bl, br]);
+        }
+    }
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    mesh.insert_indices(Indices::U32(indices));
 }
 
 #[cfg(test)]
@@ -2031,8 +2090,12 @@ mod tests {
             }
         }
         let target = target.expect("no dry land found");
-        let origin = target + Vec3::new(30.0, 60.0, 40.0);
-        let ray = Ray3d::new(origin, Dir3::new(target - origin).unwrap());
+        // Rays live in the BENT world now - the picture the player clicks -
+        // so the test aims one there: seat the target on the sphere, stand
+        // off along its own local up-and-over, and fire back at it.
+        let (seat, turn) = crate::globe::bend_frame(target);
+        let origin = seat + turn * Vec3::new(30.0, 60.0, 40.0);
+        let ray = Ray3d::new(origin, Dir3::new(seat - origin).unwrap());
 
         let hit = raycast(&t, ray).expect("ray missed the ground");
         assert!(hit.distance(target) < 2.0, "hit {hit:?}, wanted {target:?}");

@@ -934,10 +934,15 @@ fn animate_hand(
     let t = time.elapsed_secs();
 
     let held = hand.held.is_some();
+    // Un-bent. The hand is placed in FLAT coordinates and the world bend
+    // seats it on the sphere afterwards, like everything else - but a hovered
+    // thing's `GlobalTransform` has already been through that bend, and
+    // feeding it back in bent it twice: the hand flew off to a second seat
+    // a quarter-world away from the villager it was reaching for.
     let hovered = hand
         .hovered
         .and_then(|entity| anchors.get(entity).ok())
-        .map(|global| global.translation());
+        .map(|global| crate::globe::unbend(global.translation()));
 
     // How far into UI-cursor mode the hand is. Eased, so crossing a panel edge
     // reads as the hand lifting off the world rather than teleporting.

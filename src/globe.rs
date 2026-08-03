@@ -235,7 +235,129 @@ impl Plugin for GlobePlugin {
                     .after(crate::camera::CameraSet)
                     .run_if(crate::world_is_afoot),
             )
-            .add_systems(Update, dress_for_space.after(crate::render::paint_the_sky));
+            .add_systems(Update, dress_for_space.after(crate::render::paint_the_sky))
+            // The bend runs at the very end of the transform pipeline: after
+            // propagation has written every entity's final flat pose, before
+            // the renderer reads it. That ordering IS the design - the
+            // simulation keeps its flat world, the picture gets the sphere.
+            .add_systems(
+                PostUpdate,
+                bend_the_world.after(bevy::transform::TransformSystems::Propagate),
+            );
+    }
+}
+
+// ----------------------------------------------------------------- the bend
+
+/// A flat-world position's seat on the sphere, and the tangent rotation that
+/// stands things upright there.
+///
+/// This is the whole trick of the round world, in one function. The
+/// simulation lives on a flat plane - a hundred and nine call sites speak
+/// `(x, z)` and height, and none of them change. The PICTURE lives on the
+/// sphere: `x` and `z` become a direction, height becomes distance from the
+/// planet's centre, and the rotation turns "up" into the local outward
+/// radial, east into east along the curve. Applied rigidly to a whole chunk
+/// the error within its sixty-four units is eight centimetres, which is why
+/// chunks can tile a planet without knowing they are doing it.
+pub(crate) fn bend_frame(flat: Vec3) -> (Vec3, Quat) {
+    let stance = planet_stance();
+    let up = stance * crate::terrain::direction_at(flat.x, flat.z);
+    // East, from the seat's own derivative along +x, straightened against up.
+    let ahead = stance * crate::terrain::direction_at(flat.x + 1.0, flat.z);
+    let behind = stance * crate::terrain::direction_at(flat.x - 1.0, flat.z);
+    let east = (ahead - behind).normalize_or(Vec3::X);
+    let east = (east - up * east.dot(up)).normalize_or(Vec3::X);
+    let turn = Quat::from_mat3(&Mat3::from_cols(east, up, east.cross(up)));
+    let seat = planet_centre() + up * (PLANET_RADIUS + flat.y);
+    (seat, turn)
+}
+
+/// The bend, undone: a seated world position back into the flat coordinates
+/// the simulation speaks.
+///
+/// Needed wherever a bent answer has to re-enter flat reasoning - the god's
+/// hand reads hovered entities' `GlobalTransform`, which is already seated,
+/// and would otherwise be bent a second time and thrown a quarter of a world
+/// away from the thing it was reaching for.
+pub(crate) fn unbend(seat: Vec3) -> Vec3 {
+    let from_centre = seat - planet_centre();
+    let radius = from_centre.length().max(1.0);
+    let dir = planet_stance().inverse() * (from_centre / radius);
+    let (x, z) = ground_coordinates(dir);
+    Vec3::new(x, radius - PLANET_RADIUS, z)
+}
+
+/// Seats every world entity's RENDER transform on the sphere, once per
+/// propagation write.
+///
+/// The simulation is never touched: it owns `Transform` and keeps thinking
+/// in the flat frame. This rewrites `GlobalTransform` - what the renderer,
+/// the culling and the camera actually consume - after propagation has
+/// finished with it, through `bypass_change_detection` so the write is
+/// invisible to change tracking and each pose is bent exactly once, when
+/// propagation produces it. Chunks, trees, buildings, villagers, the fire,
+/// the flag, the god's own camera: one map, everything on the ball.
+///
+/// Excluded: UI nodes (their transforms are pixels), the planet's own
+/// patches (already spherical), directional lights (a direction has no
+/// seat), and the water plane, whose vertices are bent individually because
+/// a single rigid seat cannot serve a sheet thousands of units wide.
+fn bend_the_world(
+    mut bendable: Query<
+        &mut GlobalTransform,
+        (
+            Changed<GlobalTransform>,
+            Without<Node>,
+            Without<Patch>,
+            Without<ThePlanet>,
+            Without<crate::terrain::WaterPlane>,
+            Without<DirectionalLight>,
+            Without<CameraRig>,
+            // Geometry already seated on the sphere by its own vertices:
+            // chunks, their rivers, and the veil sheets that copy them.
+            Without<crate::terrain::TerrainChunk>,
+            Without<crate::fog::Veil>,
+        ),
+    >,
+    mut eyes: Query<(&mut GlobalTransform, &CameraRig)>,
+) {
+    for mut global in &mut bendable {
+        let (scale, rotation, translation) = global.to_scale_rotation_translation();
+        let (seat, turn) = bend_frame(translation);
+        *global.bypass_change_detection() = GlobalTransform::from(Transform {
+            translation: seat,
+            rotation: turn * rotation,
+            scale,
+        });
+    }
+
+    // The camera cannot be bent rigidly, and this is the one place the naive
+    // map fails outright. Its eye stands thousands of units from its focus -
+    // at play pitch, two and a half thousand, which on a six-thousand radius
+    // world is twenty-five degrees of arc - so seating the eye by its own
+    // (x, z) drops it a quarter-continent away and turns it into THAT local
+    // frame, where it stares at unrelated ground. What must be preserved is
+    // the RELATIONSHIP: the eye seated where it belongs, looking at the
+    // focus where the focus now is, with the focus's own outward as up.
+    for (mut global, rig) in &mut eyes {
+        let (eye_seat, eye_turn) = bend_frame(global.translation());
+        let (focus_seat, focus_turn) = bend_frame(rig.focus);
+        let up = focus_turn * Vec3::Y;
+        let bent = if rig.distance < crate::camera::FIRST_PERSON {
+            // Behind a mortal's eyes there is no separation to preserve, and
+            // `looking_at` has no direction to work from: carry the flat
+            // forward into the seat's own frame instead.
+            let (_, rotation, _) = global.to_scale_rotation_translation();
+            Transform {
+                translation: eye_seat,
+                rotation: eye_turn * rotation,
+                scale: Vec3::ONE,
+            }
+        } else {
+            Transform::from_translation(eye_seat).looking_at(focus_seat, up)
+        };
+        *global.bypass_change_detection() = GlobalTransform::from(bent);
     }
 }
 
@@ -563,7 +685,7 @@ fn build_patch(
 
 /// The `(x, z)` the terrain speaks, for a direction in the scaffold's frame.
 /// The minus mirrors `direction_at`'s: the game's north is -z.
-fn ground_coordinates(dir: Vec3) -> (f32, f32) {
+pub(crate) fn ground_coordinates(dir: Vec3) -> (f32, f32) {
     let lat = dir.y.clamp(-1.0, 1.0).asin();
     let lon = dir.x.atan2(dir.z);
     (lon * PLANET_RADIUS, -lat * PLANET_RADIUS)
@@ -837,6 +959,93 @@ fn dress_for_space(mut clear: ResMut<ClearColor>, cameras: Query<&CameraRig, Wit
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The bend is a RENDER map, and its first duty is to leave the ground
+    /// where the simulation put it. A flat position at the reference point
+    /// seats at the tangent point, and the frame there stands up the same way
+    /// the flat world did — so a village that has always been at the origin
+    /// is drawn exactly where it was.
+    #[test]
+    fn the_bend_leaves_home_where_it_was() {
+        let (seat, turn) = bend_frame(Vec3::new(0.0, WATER_LEVEL, 0.0));
+        assert!(seat.length() < 9.0, "home moved to {seat}");
+        let up = turn * Vec3::Y;
+        assert!(up.dot(Vec3::Y) > 0.9999, "up leans to {up}");
+    }
+
+    /// Height is preserved exactly: a thing standing ten units above the
+    /// ground stands ten units above the ground, everywhere on the planet.
+    /// If this drifts, villagers sink or float.
+    #[test]
+    fn the_bend_keeps_every_height() {
+        for &(x, z) in &[(0.0, 0.0), (900.0, -400.0), (-5_000.0, 3_000.0)] {
+            let low = bend_frame(Vec3::new(x, WATER_LEVEL, z)).0;
+            let high = bend_frame(Vec3::new(x, WATER_LEVEL + 10.0, z)).0;
+            assert!(
+                ((high - low).length() - 10.0).abs() < 0.01,
+                "ten units became {}",
+                (high - low).length()
+            );
+        }
+    }
+
+    /// Why chunk GEOMETRY is bent per vertex rather than each chunk being
+    /// seated rigidly on its own tangent point — measured, because the rigid
+    /// version was tried first on the strength of an eight-centimetre
+    /// estimate that turned out to be for a bigger planet and a nearer point.
+    /// At this radius a chunk's corner bows a fifth of a unit from its
+    /// centre's frame and two thirds from its ORIGIN's, so neighbours seated
+    /// by their own origins would disagree at every shared edge: a step at
+    /// every seam in the world. Bent per vertex, a shared edge is the same
+    /// world position for both chunks and gets the same seat, exactly.
+    #[test]
+    fn a_rigidly_seated_chunk_would_not_have_tiled() {
+        let cell = crate::terrain::CHUNK_SIZE;
+        let (seat, turn) = bend_frame(Vec3::new(0.0, WATER_LEVEL, 0.0));
+        let corner = Vec3::new(cell, 0.0, cell);
+        let rigid = seat + turn * corner;
+        let honest = bend_frame(Vec3::new(corner.x, WATER_LEVEL, corner.z)).0;
+        let bow = rigid.distance(honest);
+        assert!(
+            bow > 0.3,
+            "a rigid chunk only bows {bow} - the per-vertex bend would be needless"
+        );
+    }
+
+    /// The bend and its inverse are the same map read both ways. Every
+    /// crossing between the flat simulation and the seated picture goes
+    /// through one of them, so a drift here is a hand that misses, a click
+    /// that lands elsewhere, a villager grabbed from empty air.
+    #[test]
+    fn the_bend_undoes_itself() {
+        for &(x, y, z) in &[
+            (0.0, WATER_LEVEL, 0.0),
+            (420.0, 60.0, -180.0),
+            (-3_000.0, 25.0, 2_400.0),
+            (9_000.0, 140.0, -6_500.0),
+        ] {
+            let flat = Vec3::new(x, y, z);
+            let there_and_back = unbend(bend_frame(flat).0);
+            assert!(
+                there_and_back.distance(flat) < 0.05,
+                "{flat} came back as {there_and_back}"
+            );
+        }
+    }
+
+    /// And the curve is REAL at the scale the eye sees: across the streamed
+    /// world the far edge drops a couple of hundred units below the tangent
+    /// plane, which is the difference between a horizon and a plate.
+    #[test]
+    fn the_streamed_world_visibly_curves() {
+        let rim = crate::terrain::CHUNK_SIZE * crate::terrain::VIEW_CHUNKS as f32;
+        let far = bend_frame(Vec3::new(rim, WATER_LEVEL, 0.0)).0;
+        let drop = -far.y;
+        assert!(
+            drop > 100.0,
+            "the streamed rim only drops {drop} units - the world is flat"
+        );
+    }
 
     /// Leaving orbit must land where the orbit was looking: direction to
     /// ground words to direction is the identity, sign conventions and all.
