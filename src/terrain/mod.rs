@@ -810,7 +810,13 @@ pub fn raycast(terrain: &Terrain, ray: Ray3d) -> Option<Vec3> {
     // language the simulation speaks. Altitude is distance from the planet's
     // centre less the radius; the ground under a point is found by turning
     // its direction back into the scaffold's (x, z).
-    const MAX_DISTANCE: f32 = 4_000.0;
+    // Far enough to cross the whole planet from the highest the god can climb.
+    // It used to stop at four thousand, which is not even as high as the wheel
+    // goes now: from any real altitude the march simply ran out before it
+    // reached the ground and reported open sky, so nothing up there could be
+    // clicked, zoomed toward, or reached for.
+    const MAX_DISTANCE: f32 = 60_000.0;
+    /// The finest step, used in the last stretch above the ground.
     const STEP: f32 = 1.5;
 
     let centre = crate::globe::planet_centre();
@@ -821,9 +827,12 @@ pub fn raycast(terrain: &Terrain, ray: Ray3d) -> Option<Vec3> {
         let (x, z) = crate::globe::ground_coordinates(stance_back * (v / r));
         (x, z, r - PLANET_RADIUS)
     };
-    let above_ground = |p: Vec3| -> bool {
+    // How far the point stands above the ground beneath it. Signed, so the
+    // march can both test for a crossing and know how big a stride it can
+    // safely take.
+    let clearance = |p: Vec3| -> f32 {
         let (x, z, altitude) = flat_of(p);
-        altitude > terrain.height_at(x, z).max(WATER_LEVEL)
+        altitude - terrain.height_at(x, z).max(WATER_LEVEL)
     };
 
     let origin = ray.origin;
@@ -841,12 +850,20 @@ pub fn raycast(terrain: &Terrain, ray: Ray3d) -> Option<Vec3> {
 
     let mut travelled = 0.0;
     let mut previous = origin;
-    let mut previous_above = above_ground(origin);
+    let mut previous_above = clearance(origin) > 0.0;
 
     while travelled < MAX_DISTANCE {
-        travelled += STEP;
+        // A stride the height of the ground below, halved: high above the
+        // world it covers ground in leagues, and closing on the surface it
+        // shortens to the old fixed step. Sixty thousand units at a step and
+        // a half would be forty thousand samples a frame; this crosses the
+        // same distance in a couple of hundred and is no coarser anywhere it
+        // matters, because the stride is never longer than the room there is
+        // to fall.
+        let gap = clearance(previous).abs();
+        travelled += (gap * 0.5).clamp(STEP, 2_000.0);
         let current = origin + direction * travelled;
-        let above = above_ground(current);
+        let above = clearance(current) > 0.0;
 
         if previous_above && !above {
             // Crossed the surface between `previous` and `current`. Bisect,
@@ -855,7 +872,7 @@ pub fn raycast(terrain: &Terrain, ray: Ray3d) -> Option<Vec3> {
             let mut hi = current;
             for _ in 0..14 {
                 let mid = (lo + hi) * 0.5;
-                if above_ground(mid) {
+                if clearance(mid) > 0.0 {
                     lo = mid;
                 } else {
                     hi = mid;
@@ -2105,6 +2122,39 @@ mod tests {
 
         let hit = raycast(&t, ray).expect("ray missed the ground");
         assert!(hit.distance(target) < 2.0, "hit {hit:?}, wanted {target:?}");
+    }
+
+    /// And it reaches from as high as the god can climb.
+    ///
+    /// The march used to stop at four thousand units, which is not a quarter of
+    /// the way up the wheel now: from any real altitude it ran out of road and
+    /// reported open sky, so from up there nothing could be clicked, nothing
+    /// zoomed toward, and the hand had no ground to hover over. A stride that
+    /// grows with the clearance below crosses the whole distance in a couple of
+    /// hundred samples — and the test above proves it is still exact where it
+    /// lands.
+    #[test]
+    fn the_ground_can_be_found_from_the_top_of_the_climb() {
+        let t = Terrain::new(2024);
+        for altitude in [1_000.0, 5_000.0, 20_000.0] {
+            let (seat, turn) = crate::globe::bend_frame(Vec3::new(0.0, altitude, 0.0));
+            // Straight down, and again at a slant, which is the longer road.
+            // A gentle slant, and it has to be: from twenty thousand up the
+            // whole planet is only thirteen degrees wide (sin θ = R / (R + h)),
+            // so anything bolder than that genuinely does fly off into space
+            // and SHOULD find no ground.
+            for aim in [Vec3::NEG_Y, Vec3::new(0.08, -1.0, 0.05)] {
+                let direction = Dir3::new(turn * aim).unwrap();
+                let hit = raycast(&t, Ray3d::new(seat, direction))
+                    .unwrap_or_else(|| panic!("lost the ground from {altitude} up, aiming {aim}"));
+                let ground = t.height_at(hit.x, hit.z).max(WATER_LEVEL);
+                assert!(
+                    (hit.y - ground).abs() < 0.5,
+                    "landed {} off the ground from {altitude} up",
+                    hit.y - ground
+                );
+            }
+        }
     }
 
     #[test]

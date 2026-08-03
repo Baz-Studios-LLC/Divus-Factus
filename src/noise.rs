@@ -220,12 +220,15 @@ mod tests {
     /// field that has none.
     #[test]
     fn the_field_is_smooth_all_the_way_round_the_sphere() {
-        use std::f32::consts::TAU;
+        use std::f32::consts::{FRAC_PI_2, TAU};
         const SCALE: f32 = 16.5;
         // Three octaves, so the finest feature is a quarter of a noise unit,
         // and six thousand steps, so each stride is a fiftieth of one.
         let steps = 6_000;
-        for &lat in &[0.0f32, 0.7, 1.4, -1.4, 1.5707] {
+        // The last one is a whisker short of the pole, where a latitude ring is
+        // nearly a point — at the pole exactly it IS one, and the walk would
+        // prove nothing.
+        for &lat in &[0.0f32, 0.7, 1.4, -1.4, FRAC_PI_2 - 0.001] {
             let mut prev: Option<f32> = None;
             for i in 0..=steps {
                 let lon = i as f32 / steps as f32 * TAU;
@@ -273,10 +276,13 @@ mod tests {
         for n in [north, south] {
             assert!((0.0..=1.0).contains(&n));
         }
-        // Walking over the top: approach the pole and pass beyond it.
+        // Walking over the top: approach the pole and pass beyond it — which
+        // means latitudes ABOVE a right angle, where the direction tips over
+        // onto the far side. Written to stop just short of the pole once, it
+        // never actually crossed the thing it claimed to cross.
         let mut prev: Option<f32> = None;
         for i in 0..=400 {
-            let lat = 1.5707 - i as f32 * 0.0002;
+            let lat = std::f32::consts::FRAC_PI_2 + 0.04 - i as f32 * 0.0002;
             let dir = Vec3::new(0.0, lat.sin(), lat.cos()).normalize();
             let n = fbm_3d(dir * 16.5, 4242, 3, 2.0, 0.5);
             if let Some(p) = prev {

@@ -317,6 +317,13 @@ const LOOK_JUMP: f32 = 160.0;
 /// neck fold over backwards.
 const RIDDEN_PITCH: f32 = 1.35;
 
+/// [`CameraRig::zoom_fraction`] for a bare distance, so callers holding an
+/// altitude rather than a rig can ask the same question - the hand pins its
+/// screen size to what it would be at a chosen height.
+pub(crate) fn zoom_fraction_of(distance: f32) -> f32 {
+    ((distance - MIN_DISTANCE) / (MAX_DISTANCE - MIN_DISTANCE)).clamp(0.0, 1.0)
+}
+
 const MIN_PITCH: f32 = 0.20;
 pub const MAX_PITCH: f32 = FRAC_PI_2 - 0.06;
 const MIN_DISTANCE: f32 = 12.0;
@@ -433,7 +440,7 @@ impl CameraRig {
 
     /// Zoom as a 0-to-1 value, 0 being closest.
     pub fn zoom_fraction(&self) -> f32 {
-        ((self.distance - MIN_DISTANCE) / (MAX_DISTANCE - MIN_DISTANCE)).clamp(0.0, 1.0)
+        zoom_fraction_of(self.distance)
     }
 }
 

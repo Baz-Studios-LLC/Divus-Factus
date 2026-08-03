@@ -184,6 +184,19 @@ pub struct Rooted;
 #[derive(Component)]
 pub struct HandModel;
 
+/// Every entity the hand is built from: the root, the palm, each finger joint
+/// and each bone, and the glow.
+///
+/// The round world's bend rewrites `GlobalTransform` per entity, so marking
+/// only the root is not enough — the fingers would each be seated on the
+/// planet from a global that is *already* seated, sending them out to a radius
+/// of six thousand plus their own altitude. The hand places itself in seated
+/// space (it has to: as the UI pointer it floats a few units in front of the
+/// camera, and no flat position bends to "just in front of the camera"), so
+/// the entire hierarchy has to be left alone.
+#[derive(Component)]
+pub(crate) struct HandPart;
+
 /// The hand's joints, and its one piece of animation state.
 #[derive(Component)]
 struct HandRig {
@@ -344,27 +357,7 @@ fn update_hand_ray(
     // ground on the sphere - answered about somewhere else entirely, and the
     // hand went there. The same map, applied the same way, keeps the mouse
     // over what it is pointing at.
-    let camera_transform = {
-        let eye_seat = crate::globe::bend_frame(rig.eye()).0;
-        let (focus_seat, focus_turn) = crate::globe::bend_frame(rig.focus);
-        if rig.distance < crate::camera::FIRST_PERSON {
-            // Behind a mortal's eyes there is no separation to look along;
-            // carry the flat gaze into the seat's own frame instead.
-            let (seat, turn) = crate::globe::bend_frame(rig.eye());
-            GlobalTransform::from(Transform {
-                translation: seat,
-                rotation: turn
-                    * Transform::default()
-                        .looking_to(rig.forward(), Vec3::Y)
-                        .rotation,
-                scale: Vec3::ONE,
-            })
-        } else {
-            GlobalTransform::from(
-                Transform::from_translation(eye_seat).looking_at(focus_seat, focus_turn * Vec3::Y),
-            )
-        }
-    };
+    let camera_transform = GlobalTransform::from(crate::globe::bent_camera_pose(rig));
 
     let cursor = match window.cursor_position() {
         Some(cursor) => cursor,
@@ -788,6 +781,7 @@ fn spawn_hand_cursor(
         .spawn((
             Name::new("Divine Hand"),
             HandModel,
+            HandPart,
             Transform::default(),
             Visibility::Hidden,
         ))
@@ -799,6 +793,7 @@ fn spawn_hand_cursor(
     // by night it swells and breathes, and the hand becomes a lantern.
     commands.spawn((
         HandGlow,
+        HandPart,
         PointLight {
             color: Color::srgb(1.0, 0.93, 0.72),
             intensity: 0.0,
@@ -819,6 +814,7 @@ fn spawn_hand_cursor(
         MeshMaterial3d(skin.clone()),
         Transform::from_xyz(0.0, 0.0, 0.12).with_scale(Vec3::new(1.0, 0.26, 1.08)),
         RenderLayers::layer(HAND_LAYER),
+        HandPart,
         ChildOf(root),
     ));
 
@@ -835,6 +831,7 @@ fn spawn_hand_cursor(
             .spawn((
                 Transform::from_translation(joint).with_rotation(Quat::from_rotation_y(yaw)),
                 Visibility::default(),
+                HandPart,
                 ChildOf(parent),
             ))
             .id();
@@ -847,6 +844,7 @@ fn spawn_hand_cursor(
                 length,
             )),
             RenderLayers::layer(HAND_LAYER),
+            HandPart,
             ChildOf(joint_entity),
         ));
         joint_entity
@@ -894,15 +892,11 @@ fn spawn_hand_cursor(
 /// Where the hand sits and how it is oriented while acting as the UI cursor:
 /// floating just in front of the camera on the cursor ray, back of the hand to
 /// the viewer, index finger reaching up-screen with its tip on the cursor point.
-fn ui_cursor_placement(camera: &CameraRig, ray: Ray3d, tap: f32) -> (Vec3, Quat) {
-    let camera_rotation = Transform::from_translation(camera.eye())
-        .looking_at(camera.focus, Vec3::Y)
-        .rotation;
-
+fn ui_cursor_placement(camera: &Transform, ray: Ray3d, tap: f32) -> (Vec3, Quat) {
     // Rotating local +Y onto camera +Z turns the palm to face the screen with the
     // fingers running up it; the slight yaw and pitch tip the index finger toward
     // upper-left, the way every cursor since the first has leaned.
-    let rotation = camera_rotation
+    let rotation = camera.rotation
         * Quat::from_rotation_x(FRAC_PI_2)
         * Quat::from_rotation_y(0.25)
         * Quat::from_rotation_x(-0.15);
@@ -917,9 +911,41 @@ fn ui_cursor_placement(camera: &CameraRig, ray: Ray3d, tap: f32) -> (Vec3, Quat)
         -(0.52 * proximal.sin() + 0.416 * distal.sin()),
         -(0.42 + 0.52 * proximal.cos() + 0.416 * distal.cos()),
     ) * UI_CURSOR_SCALE;
-    let position = ray.origin + *ray.direction * UI_CURSOR_DEPTH - rotation * fingertip_local;
+
+    // From the EYE, not from `ray.origin`. A viewport ray starts on the NEAR
+    // PLANE, and the near plane rides the zoom now (it has to: at a far plane
+    // of seventy thousand a fixed near plane fights the depth buffer and the
+    // world tears into grey streaks). So `ray.origin` stands as much as ninety
+    // units ahead of the god's eye, and five more put the cursor a hundred
+    // units out while it was still scaled for five - a two-pixel speck at
+    // altitude, which is precisely "I can't see the hand on the UI or the
+    // title screen". The near-plane point lies ON the eye's ray through the
+    // pixel, so starting from the eye keeps the same screen position and
+    // fixes the depth.
+    let position =
+        camera.translation + *ray.direction * UI_CURSOR_DEPTH - rotation * fingertip_local;
 
     (position, rotation)
+}
+
+/// How big the hand stands in the world at a given camera distance.
+///
+/// Mild growth with the zoom, so it neither vanishes from altitude nor
+/// swallows the village up close — and never smaller ON SCREEN than it is at a
+/// hundred units up, which is Brett's floor and the right one: the hand looks
+/// like a hand at village height, and that is the size it should hold however
+/// far the god climbs.
+///
+/// Screen size is scale over distance, so holding it takes growing WITH
+/// distance. `zoom_fraction` saturates at the play ceiling of fourteen hundred,
+/// so past that the old rule held the hand at a few fixed units against a view
+/// twenty thousand deep and it dwindled away to nothing — from orbit there was
+/// no cursor at all. Below the floor the gentle zoom growth still wins, so a
+/// hand over one villager is not the same size as a hand over a valley.
+fn world_scale_at(distance: f32) -> f32 {
+    const FLOOR_AT: f32 = 100.0;
+    let by_zoom = |d| 1.6 + crate::camera::zoom_fraction_of(d) * 2.8;
+    by_zoom(distance).max(by_zoom(FLOOR_AT) * distance / FLOOR_AT)
 }
 
 /// Poses and places the hand every frame.
@@ -1006,14 +1032,28 @@ fn animate_hand(
             Some(cursor) => Some(cursor.lerp(position + Vec3::Y * 1.0, 0.5)),
             None => Some(position + Vec3::Y * 1.0),
         }
-    } else {
+    } else if hand.cursor_world.is_some() {
         hand.cursor_world
+    } else {
+        // Open sky under the cursor - past the horizon, or off the planet's
+        // limb entirely from high up. The hand hovers out there at the same
+        // range the ground would have been, rather than snapping to interface
+        // depth: that snap changed its screen size by a factor of three the
+        // instant the cursor crossed the skyline, and on a round world the
+        // skyline is in frame most of the way out.
+        hand.cursor_ray.map(|ray| {
+            crate::globe::unbend(ray.origin + *ray.direction * camera.distance.max(1.0))
+        })
     };
 
     // The interface placement, available whenever there is a cursor at all.
+    // The camera as it is actually SEATED, shared with the cursor ray so the
+    // two cannot disagree. Everything below works in that space: the hand is
+    // excluded from the world bend precisely so it can.
+    let seated_camera = crate::globe::bent_camera_pose(camera);
     let ui_placement = hand
         .cursor_ray
-        .map(|ray| ui_cursor_placement(camera, ray, rig.tap));
+        .map(|ray| ui_cursor_placement(&seated_camera, ray, rig.tap));
 
     // With no ground under the cursor the hand rides at UI depth regardless of
     // rig.point — over open sky it stays a cursor instead of vanishing.
@@ -1044,19 +1084,7 @@ fn animate_hand(
     let target_grip = open_grip.max(rig.carry);
     rig.grip += (target_grip - rig.grip) * ease;
 
-    // Mild growth with zoom, so the hand neither vanishes from altitude nor
-    // swallows the village up close.
-    //
-    // And past the play zoom it grows in PROPORTION to the distance, because
-    // it hovers over the ground it points at and that ground is now as far
-    // away as the god has climbed. `zoom_fraction` saturates at the play
-    // ceiling, so beyond it the hand held a fixed few units against a view
-    // twenty thousand units deep and shrank to nothing: from orbit there was
-    // no cursor at all. Scaling with distance keeps it the same size on
-    // screen at every height, which is what a cursor is for.
-    let play_ceiling = 1_400.0;
-    let aloft = (camera.distance / play_ceiling).max(1.0);
-    let world_scale = (1.6 + camera.zoom_fraction() * 2.8) * aloft;
+    let world_scale = world_scale_at(camera.distance);
     let scale = world_scale + (UI_CURSOR_SCALE - world_scale) * blend;
 
     // Two incommensurate sines so the drift never reads as a loop. Gripping
@@ -1065,7 +1093,13 @@ fn animate_hand(
     let calm = (1.0 - rig.grip * 0.7) * (1.0 - blend);
     let bob = ((t * 1.1).sin() * 0.16 + (t * 1.9 + 2.0).sin() * 0.07) * calm;
 
-    let world_position = anchor.map(|anchor| anchor + Vec3::Y * (hover * world_scale * 0.5 + bob));
+    // Seated. The anchor is a flat position - the ground under the cursor, or
+    // an un-bent hovered thing - lifted along flat up, then placed on the
+    // sphere.
+    let world_seat = anchor.map(|anchor| {
+        crate::globe::bend_frame(anchor + Vec3::Y * (hover * world_scale * 0.5 + bob))
+    });
+    let world_position = world_seat.map(|(seat, _)| seat);
     let position = match (world_position, ui_placement) {
         (Some(world), Some((ui, _))) => world.lerp(ui, blend),
         (Some(world), None) => world,
@@ -1074,7 +1108,9 @@ fn animate_hand(
     };
     // A tap presses the whole hand slightly into the interface, along the view
     // ray — the finger does most of the acting, this sells the follow-through.
-    let position = position + camera.forward() * (rig.tap * blend * 0.7 * scale);
+    // The SEATED forward: in this space the flat one points off through the
+    // planet.
+    let position = position + seated_camera.forward() * (rig.tap * blend * 0.7 * scale);
 
     let previous = transform.translation;
     // Over the world the hand glides; as a cursor it snaps, because a
@@ -1088,7 +1124,12 @@ fn animate_hand(
     // fling it across the map and it heels over; stop and it settles level.
     // Suppressed while pointing — an interface cursor holds its attitude.
     let velocity = (transform.translation - previous) / dt.max(1e-5);
-    let local = Quat::from_rotation_y(-camera.yaw) * velocity;
+    // Taken back into the local tangent frame first, where "up" is Y and the
+    // camera's yaw means what it says. Left in seated space the same westward
+    // flick banked the hand differently depending on where on the planet it
+    // happened.
+    let upright = world_seat.map_or(Quat::IDENTITY, |(_, turn)| turn);
+    let local = Quat::from_rotation_y(-camera.yaw) * (upright.inverse() * velocity);
     let target_bank = Vec2::new(
         (local.x * 0.035).clamp(-0.55, 0.55),
         (local.z * 0.03).clamp(-0.45, 0.45),
@@ -1103,9 +1144,12 @@ fn animate_hand(
 
     // Back of the hand to the camera, fingers up-screen, palm laid nearly flat —
     // tipped just enough toward the ground to show intent.
-    let world_rotation = Quat::from_rotation_y(camera.yaw)
+    let flat_rotation = Quat::from_rotation_y(camera.yaw)
         * Quat::from_rotation_x(-0.12 + sway_pitch + rig.bank.y + CARRY_PITCH * rig.carry)
         * Quat::from_rotation_z(sway_roll - rig.bank.x + CARRY_ROLL * rig.carry);
+    // Turned into the frame of the ground it hovers over, so the hand stands
+    // upright on the curve wherever it is.
+    let world_rotation = world_seat.map_or(flat_rotation, |(_, turn)| turn * flat_rotation);
     transform.rotation = match ui_placement {
         Some((_, ui_rotation)) => world_rotation.slerp(ui_rotation, blend),
         None => world_rotation,
@@ -1209,5 +1253,68 @@ mod tests {
             recent: Vec::new(),
         });
         assert_eq!(hand.grip_point(), Some(Vec3::new(1.0, 8.0, 2.0)));
+    }
+
+    /// The floor is about APPARENT size, which is scale over distance — a fixed
+    /// scale looks smaller the further off it is, and that is exactly how the
+    /// cursor used to disappear on the long climb out. Past a hundred units the
+    /// hand holds the screen size it had there, all the way to orbit.
+    #[test]
+    fn the_hand_stops_shrinking_at_a_hundred_units_up() {
+        let apparent = |d: f32| world_scale_at(d) / d;
+        let floor = apparent(100.0);
+
+        for step in 0..200 {
+            let distance = 100.0 + step as f32 * 100.0;
+            let there = apparent(distance);
+            assert!(
+                (there - floor).abs() < 1e-4,
+                "at {distance} up the hand is {there} on screen, not {floor}"
+            );
+        }
+    }
+
+    /// The interface cursor hangs at its own depth from the EYE, whatever the
+    /// near plane is doing.
+    ///
+    /// This is the bug that hid the hand on every panel and over the whole
+    /// title screen. A viewport ray starts on the near plane, and the near
+    /// plane rides the zoom on a round world — up to ninety units out — so
+    /// measuring the cursor's depth from `ray.origin` put it a hundred units
+    /// away while it was still scaled for five, and a cursor two pixels across
+    /// is a cursor that is not there.
+    #[test]
+    fn the_ui_cursor_keeps_its_depth_however_far_out_the_near_plane_is() {
+        // Out at a planet's radius, the way it really is.
+        let camera = Transform::from_xyz(0.0, 6_000.0, 0.0).looking_to(Vec3::NEG_Z, Vec3::Y);
+        let placed = |near: f32| {
+            let ray = Ray3d {
+                origin: camera.translation + Vec3::NEG_Z * near,
+                direction: Dir3::NEG_Z,
+            };
+            ui_cursor_placement(&camera, ray, 0.0).0
+        };
+
+        let close = placed(0.5);
+        assert!(
+            (close.distance(camera.translation) - UI_CURSOR_DEPTH).abs() < 0.5,
+            "the cursor sits {} out, not {UI_CURSOR_DEPTH}",
+            close.distance(camera.translation)
+        );
+        for near in [5.0, 30.0, 90.0] {
+            assert!(
+                (placed(near) - close).length() < 1e-3,
+                "a near plane at {near} moved the cursor"
+            );
+        }
+    }
+
+    /// And below the floor it still grows with the zoom rather than sticking:
+    /// a hand over one villager should not be the size of a hand over a valley.
+    #[test]
+    fn closer_in_the_hand_still_answers_the_zoom() {
+        assert!(world_scale_at(12.0) < world_scale_at(90.0));
+        // Continuous across the floor, so crossing it cannot pop.
+        assert!((world_scale_at(99.9) - world_scale_at(100.1)).abs() < 0.01);
     }
 }

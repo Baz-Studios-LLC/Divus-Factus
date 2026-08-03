@@ -183,8 +183,14 @@ fn raise_the_flag(
     let held = Transform::from_translation(GRIP + Vec3::X * HELD_UP_THE_POLE)
         .with_rotation(Quat::from_rotation_z(FRAC_PI_2))
         .with_scale(Vec3::splat(FLAG_IN_HAND));
-    let mut flag_bundle =
-        commands.spawn((Name::new("The founding flag"), held, Visibility::Hidden));
+    // `HandPart` because it rides in seated space with the hand: the bend must
+    // leave everything hanging off the god's hand exactly where the hand put it.
+    let mut flag_bundle = commands.spawn((
+        Name::new("The founding flag"),
+        crate::hand::HandPart,
+        held,
+        Visibility::Hidden,
+    ));
     if let Ok(hand) = hands.single() {
         flag_bundle.insert(ChildOf(hand));
     }
@@ -207,6 +213,7 @@ fn raise_the_flag(
                 MeshMaterial3d(stuff.clone()),
                 Transform::from_translation(offset).with_scale(size),
                 RenderLayers::layer(crate::render::HAND_LAYER),
+                crate::hand::HandPart,
                 ChildOf(flag),
             ))
             .id()

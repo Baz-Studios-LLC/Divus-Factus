@@ -28,6 +28,7 @@ use bevy::render::mesh::{Indices, PrimitiveTopology};
 use std::f32::consts::FRAC_PI_2;
 
 use crate::camera::{CameraRig, GodCamera};
+use crate::hand::HandPart;
 use crate::palette;
 use crate::terrain::{PLANET_RADIUS, Terrain, WATER_LEVEL};
 
@@ -290,6 +291,31 @@ pub(crate) fn bend_frame(flat: Vec3) -> (Vec3, Quat) {
     (seat, turn)
 }
 
+/// The camera's seated pose, derived the same way the bend derives it.
+///
+/// Shared, because two other things need the camera in bent space and must
+/// agree with it exactly: the cursor ray, which is walked through the seated
+/// world, and the god's hand, which floats in front of the camera as the UI
+/// pointer. Each computed it their own way once, and each was wrong in its
+/// own direction.
+pub(crate) fn bent_camera_pose(rig: &CameraRig) -> Transform {
+    let (eye_seat, eye_turn) = bend_frame(rig.eye());
+    if rig.distance < crate::camera::FIRST_PERSON {
+        // No separation to look along; carry the flat gaze into the seat.
+        Transform {
+            translation: eye_seat,
+            rotation: eye_turn
+                * Transform::default()
+                    .looking_to(rig.forward(), Vec3::Y)
+                    .rotation,
+            scale: Vec3::ONE,
+        }
+    } else {
+        let (focus_seat, focus_turn) = bend_frame(rig.focus);
+        Transform::from_translation(eye_seat).looking_at(focus_seat, focus_turn * Vec3::Y)
+    }
+}
+
 /// The bend, undone: a seated world position back into the flat coordinates
 /// the simulation speaks.
 ///
@@ -335,9 +361,21 @@ fn bend_the_world(
             // chunks, their rivers, and the veil sheets that copy them.
             Without<crate::terrain::TerrainChunk>,
             Without<crate::fog::Veil>,
+            // The god's hand places itself in seated space already - it has
+            // to, because as the UI pointer it floats a few units in front of
+            // the camera, and there is no flat position that bends to "just
+            // in front of the camera". Bent again here it was flung to the
+            // seat of a point beside the god's eye, thousands of units away:
+            // no cursor on any panel, and none on the title screen. Every
+            // part, not just the root - see `HandPart`.
+            Without<HandPart>,
+            // And the camera that draws it, which is a child of the god's own
+            // and must share its pose exactly; it gets that below.
+            Without<crate::render::HandCamera>,
         ),
     >,
-    mut eyes: Query<(&mut GlobalTransform, &CameraRig)>,
+    mut eyes: Query<(&mut GlobalTransform, &CameraRig), Without<crate::render::HandCamera>>,
+    mut overlay: Query<&mut GlobalTransform, With<crate::render::HandCamera>>,
 ) {
     for mut global in &mut bendable {
         let (scale, rotation, translation) = global.to_scale_rotation_translation();
@@ -357,6 +395,7 @@ fn bend_the_world(
     // frame, where it stares at unrelated ground. What must be preserved is
     // the RELATIONSHIP: the eye seated where it belongs, looking at the
     // focus where the focus now is, with the focus's own outward as up.
+    let mut seated_eye = None;
     for (mut global, rig) in &mut eyes {
         let (eye_seat, eye_turn) = bend_frame(global.translation());
         let (focus_seat, focus_turn) = bend_frame(rig.focus);
@@ -375,6 +414,19 @@ fn bend_the_world(
             Transform::from_translation(eye_seat).looking_at(focus_seat, up)
         };
         *global.bypass_change_detection() = GlobalTransform::from(bent);
+        seated_eye = Some(bent);
+    }
+
+    // The hand's camera is an identity child of the god's, so that it always
+    // sees exactly what the god sees and the cursor lands where it looks. Its
+    // global was computed by propagation from the FLAT parent, before the loop
+    // above bent it, and the ordinary rule would then bend it by a different
+    // law than the look-at - leaving the overlay pass pointing degrees away
+    // from the pass beneath it. Hand it the same pose instead.
+    if let Some(bent) = seated_eye {
+        for mut global in &mut overlay {
+            *global.bypass_change_detection() = GlobalTransform::from(bent);
+        }
     }
 }
 
@@ -988,6 +1040,48 @@ mod tests {
         assert!(seat.length() < 9.0, "home moved to {seat}");
         let up = turn * Vec3::Y;
         assert!(up.dot(Vec3::Y) > 0.9999, "up leans to {up}");
+    }
+
+    /// The god's hand, and everything hanging off it, is left exactly where it
+    /// put itself.
+    ///
+    /// It places itself in SEATED space — it has to, because as the UI pointer
+    /// it floats five units in front of the camera and no flat position bends
+    /// to "just in front of the camera" — so a bend applied to it is a bend
+    /// applied twice. That is what hid the cursor on every panel and over the
+    /// whole title screen, which is one big interface: the hand was flung to
+    /// the seat of a point beside the god's eye, six thousand units out.
+    ///
+    /// Marking the root was not enough, and that is the point of this test.
+    /// The bend rewrites `GlobalTransform` PER ENTITY, so each finger joint
+    /// was still being seated from a global that was already seated — sending
+    /// the fingers out to a radius of six thousand plus their own altitude
+    /// while the palm stayed put. Every part carries `HandPart`.
+    #[test]
+    fn the_bend_never_touches_the_gods_hand() {
+        let mut app = App::new();
+        app.add_systems(Update, bend_the_world);
+
+        let palm = GlobalTransform::from(Transform::from_xyz(20.0, 6_040.0, 5.0));
+        let finger = GlobalTransform::from(Transform::from_xyz(20.3, 6_040.2, 4.6));
+        let hand = app.world_mut().spawn((HandPart, palm)).id();
+        let joint = app.world_mut().spawn((HandPart, finger)).id();
+        // And an ordinary thing beside them, to prove the bend ran at all.
+        let ordinary = app
+            .world_mut()
+            .spawn(GlobalTransform::from(Transform::from_xyz(20.0, 5.0, 5.0)))
+            .id();
+
+        app.update();
+
+        let at = |entity| *app.world().get::<GlobalTransform>(entity).unwrap();
+        assert_eq!(at(hand), palm, "the palm was bent");
+        assert_eq!(at(joint), finger, "a finger was bent");
+        assert_ne!(
+            at(ordinary).translation(),
+            Vec3::new(20.0, 5.0, 5.0),
+            "the bend did not run, so this test proves nothing"
+        );
     }
 
     /// Height is preserved exactly: a thing standing ten units above the
