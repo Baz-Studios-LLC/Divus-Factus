@@ -451,6 +451,20 @@ fn populate_chunks(
                 // local IS its world position, and the world bend seats it
                 // from there like any other entity.
                 let local = Vec3::new(x, height, z);
+                // Loose scenery is BAKED into one mesh per chunk, and a mesh
+                // cannot be bent per vertex without shearing every rock it
+                // holds - so the patch is seated rigidly at the chunk's
+                // middle and its pieces are measured from there. Baked in
+                // world coordinates under an identity transform, as they
+                // briefly were, the whole scenery mesh was seated at the
+                // world origin and its rocks stayed FLAT while the ground
+                // curved away beneath them: a cloud of boulders hanging in
+                // the sky over the treeline.
+                let seated = Vec3::new(
+                    origin.x + CHUNK_SIZE * 0.5,
+                    0.0,
+                    origin.y + CHUNK_SIZE * 0.5,
+                );
 
                 let biome = terrain.biome_at(x, z);
 
@@ -488,7 +502,7 @@ fn populate_chunks(
                             );
                             commands.entity(rock).insert(ChildOf(entity));
                         } else {
-                            bake_rock(&mut builder, local, &mut rng);
+                            bake_rock(&mut builder, local - seated, &mut rng);
                         }
                     }
                 } else if forest > 0.50 && moisture > 0.38 {
@@ -551,7 +565,7 @@ fn populate_chunks(
                         );
                         commands.entity(rock).insert(ChildOf(entity));
                     } else {
-                        bake_rock(&mut builder, local, &mut rng);
+                        bake_rock(&mut builder, local - seated, &mut rng);
                     }
                 } else if rng.chance(0.05 * scarcity) {
                     let bush = spawn_bush(
@@ -583,7 +597,7 @@ fn populate_chunks(
                     );
                     commands.entity(flowers).insert(ChildOf(entity));
                 } else if rng.chance(0.05) {
-                    bake_rock(&mut builder, local, &mut rng);
+                    bake_rock(&mut builder, local - seated, &mut rng);
                 }
             }
         }
@@ -646,7 +660,11 @@ fn populate_chunks(
                 Name::new("Chunk Scenery"),
                 Mesh3d(meshes.add(builder.build())),
                 MeshMaterial3d(terrain_assets.ground_material.clone()),
-                Transform::default(),
+                Transform::from_xyz(
+                    origin.x + CHUNK_SIZE * 0.5,
+                    0.0,
+                    origin.y + CHUNK_SIZE * 0.5,
+                ),
                 ChildOf(entity),
             ));
         }
