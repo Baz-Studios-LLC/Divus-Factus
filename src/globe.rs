@@ -787,14 +787,9 @@ fn behold_the_world(
 
 /// Space is dark, and the climb to it starts before the chunks bow out.
 ///
-/// The fog tracker paints the clear colour with the horizon every frame;
-/// this runs after it and pulls the sky toward black as the god rises, so
-/// whatever void survives above the planet's limb reads as air thinning
-/// rather than a dead grey frame. And from the moment the planet is drawn
-/// beneath the world, the play fog lets go: its band is a thousand units
-/// deep, sized to hide a streaming edge that the planet behind it now hides
-/// better — left in place it painted a pale grey ring over the very seam
-/// the underlay had made invisible, and drowned the whole ball from orbit.
+/// The sky painter writes the horizon colour into the clear colour every
+/// frame; this runs after it and takes the sky through what a climb should
+/// look like — blue first, black only with real altitude.
 fn dress_for_space(
     view: Option<Res<GlobeView>>,
     mut clear: ResMut<ClearColor>,
@@ -815,13 +810,11 @@ fn dress_for_space(
         return;
     }
 
-    // The sky becomes a sky, and then becomes space. The clear colour below
-    // the ascent is a deliberately neutral grey - it has to match the fog so
-    // the flat world dissolves into it without a seam - but it was never
-    // meant to be LOOKED at, and above a genuinely curving horizon it read
-    // as a dead grey band lying on the world. Up here the fog has let go of
-    // the clear colour entirely, so it is free to do what the eye expects
-    // of a climb: deepen to blue first, and only then thin out to black.
+    // The sky becomes a sky, and then becomes space. The horizon colour it
+    // starts from is a neutral grey from the era when terrain had to
+    // dissolve into it; above a genuinely curving horizon that grey read as
+    // a dead band lying on the world, so the climb takes it to blue first
+    // and only then thins it out to black.
     let mix =
         |a: bevy::color::LinearRgba, b: bevy::color::LinearRgba, t: f32| bevy::color::LinearRgba {
             red: a.red + (b.red - a.red) * t,
