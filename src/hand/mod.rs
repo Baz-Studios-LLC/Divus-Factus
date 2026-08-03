@@ -179,9 +179,10 @@ pub fn fade_divine_mark(
 #[derive(Component)]
 pub struct Rooted;
 
-/// Marks the visible hand.
+/// Marks the visible hand — the root the whole rig hangs from, and what
+/// anything the god is carrying should be parented to.
 #[derive(Component)]
-struct HandModel;
+pub struct HandModel;
 
 /// The hand's joints, and its one piece of animation state.
 #[derive(Component)]

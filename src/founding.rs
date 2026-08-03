@@ -14,6 +14,7 @@
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::text::FontSize;
+use std::f32::consts::FRAC_PI_2;
 
 use crate::GameState;
 use crate::palette;
@@ -136,10 +137,28 @@ fn survey_the_land(
 
 /// A pole, a crossarm and a drop of cloth — the town banner, before there
 /// is a town to raise it over.
+/// Where the pole sits in the closed fist, in the hand's own space.
+///
+/// The fingers curl about the hand's local X, so the tube a fist makes has
+/// its axis along X and a held shaft runs down it. With the carrying roll on,
+/// local -X is the way up, which is why the flag is turned to lie along it.
+const GRIP: Vec3 = Vec3::new(0.0, -0.30, -0.62);
+
+/// How far up the shaft the hand takes it. Low, the way anybody carries a
+/// standard - hold it at the middle and the cloth is over your head.
+const HELD_UP_THE_POLE: f32 = 1.0;
+
+/// The flag's own size inside the fist. The hand's scale is inherited, so
+/// this is a fraction of it rather than a size in metres - which is the point:
+/// the flag now grows and shrinks WITH the hand instead of staying
+/// human-sized in a god's grip.
+const FLAG_IN_HAND: f32 = 0.9;
+
 fn raise_the_flag(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    hands: Query<Entity, With<crate::hand::HandModel>>,
 ) {
     let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
     let wood = materials.add(StandardMaterial {
@@ -154,13 +173,22 @@ fn raise_the_flag(
         ..default()
     });
 
-    let flag = commands
-        .spawn((
-            Name::new("The founding flag"),
-            Transform::default(),
-            Visibility::Hidden,
-        ))
-        .id();
+    // Hung off the hand itself, not placed in the world beside it. Setting a
+    // world position every frame looked attached only while the cursor was
+    // still: the hand's own position is SMOOTHED toward the cursor and its
+    // rotation carries pitch, bank and sway, none of which a world-placed flag
+    // knew anything about. Move the mouse quickly and the two came apart;
+    // tilt the hand and the flag stayed stubbornly upright. As a child it
+    // inherits every one of those for nothing.
+    let held = Transform::from_translation(GRIP + Vec3::X * HELD_UP_THE_POLE)
+        .with_rotation(Quat::from_rotation_z(FRAC_PI_2))
+        .with_scale(Vec3::splat(FLAG_IN_HAND));
+    let mut flag_bundle =
+        commands.spawn((Name::new("The founding flag"), held, Visibility::Hidden));
+    if let Ok(hand) = hands.single() {
+        flag_bundle.insert(ChildOf(hand));
+    }
+    let flag = flag_bundle.id();
     // On the HAND's render layer, not the world's. The god's hand is drawn by
     // an overlay camera above everything else so a cursor can never be
     // occluded - which meant the pole, an ordinary world object, was drawn in
@@ -267,18 +295,19 @@ fn read_the_ground(
 fn carry_the_flag(
     reading: Res<GroundUnderTheFlag>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut flags: Query<(&TheFlag, &mut Transform, &mut Visibility)>,
+    mut flags: Query<(&TheFlag, &mut Visibility)>,
     cloth: Query<&MeshMaterial3d<StandardMaterial>>,
 ) {
-    let Ok((flag, mut at, mut showing)) = flags.single_mut() else {
+    let Ok((flag, mut showing)) = flags.single_mut() else {
         return;
     };
-    let Some(ground) = reading.at else {
+    // Where it IS is the hand's business now - it hangs off the fist. All this
+    // decides is whether there is a flag to see and what colour it reads.
+    if reading.at.is_none() {
         *showing = Visibility::Hidden;
         return;
-    };
+    }
     *showing = Visibility::Inherited;
-    at.translation = ground;
 
     let colour = if reading.refusal.is_some() {
         palette::shade(&palette::CLOTH_RED, 0.55)
