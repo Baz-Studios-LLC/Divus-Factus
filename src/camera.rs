@@ -266,6 +266,12 @@ pub const CLOSE_NEAR: f32 = 0.04;
 /// twelve metres ordinary play is clamped to, so only Avatar reaches it.
 pub const FIRST_PERSON: f32 = 0.5;
 
+/// Mouse travel in a single frame, in pixels, past which free look treats the
+/// motion as a pointer warp rather than a movement of somebody's hand. Locking
+/// the cursor reports the jump to the window centre as relative motion, and at
+/// free-look sensitivity that is most of a full turn.
+const LOOK_JUMP: f32 = 160.0;
+
 /// How far up and down a worn body may look, in radians — about 77° each
 /// way, which finds both the sky and your own boots without letting the
 /// neck fold over backwards.
@@ -531,10 +537,21 @@ fn read_camera_input(
     // and nothing else for the mouse to do: the pointer is locked away and
     // the hand withdrawn, so the mouse simply IS the neck, the way it is in
     // every game that has ever put you inside a head.
-    let looking_about = rig.in_a_body;
+    // Free look only while the window actually has the player's attention.
+    // Grabbing the pointer WARPS it to the middle of the window, and the warp
+    // comes back as one enormous relative motion — which, with no button
+    // needed to turn the head any more, slammed the view round the instant a
+    // body was taken. An unfocused window delivering stray motion did the
+    // same. A soak with nobody at the keyboard was enough to see it: the
+    // pitch wandered from 0.85 to -1.25 and back with no input at all.
+    let attended = windows.single().is_ok_and(|window| window.focused);
+    let looking_about = rig.in_a_body && attended;
     if buttons.pressed(MouseButton::Right) || looking_about {
         let delta = mouse_motion.delta;
-        if delta != Vec2::ZERO {
+        // A jump this big in one frame is a warp or a focus change, never a
+        // wrist.
+        let warped = looking_about && delta.length_squared() > LOOK_JUMP * LOOK_JUMP;
+        if delta != Vec2::ZERO && !warped {
             let sensitivity = rig.orbit_sensitivity;
             rig.target_yaw -= delta.x * sensitivity;
             // The overhead camera is never allowed to look level or upward,

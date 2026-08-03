@@ -112,7 +112,7 @@ fn take_a_body(
     mut belief: ResMut<crate::villager::belief::Belief>,
     mut follow: ResMut<FollowTarget>,
     mut notices: MessageWriter<crate::ui::Notice>,
-    folk: Query<(), (With<Villager>, Without<crate::creature::Corpse>)>,
+    folk: Query<&Transform, (With<Villager>, Without<crate::creature::Corpse>)>,
     worn: Query<Entity, With<Ridden>>,
     mut lens: Query<&mut Projection, With<crate::camera::GodCamera>>,
     mut rigs: Query<&mut CameraRig>,
@@ -124,7 +124,10 @@ fn take_a_body(
     if !buttons.just_pressed(MouseButton::Left) || pointer.over_ui {
         return;
     }
-    let Some(who) = hand.hovered.filter(|who| folk.contains(*who)) else {
+    let Some((who, facing)) = hand
+        .hovered
+        .and_then(|who| folk.get(who).ok().map(|at| (who, at.rotation)))
+    else {
         return;
     };
     if belief.available() < AVATAR_COST {
@@ -172,6 +175,21 @@ fn take_a_body(
     // below level, so the first thing seen is the village.
     if let Ok(mut rig) = rigs.single_mut() {
         rig.target_pitch = ARRIVING_PITCH;
+        // And turn to face the way THEY are facing. This is the whole of
+        // what read as being moved somewhere else: the rig arrives looking
+        // along its own orbit bearing, which points from wherever the camera
+        // happened to be, through the body, and onward — so the god landed
+        // at ground level staring outward at empty country, with the body
+        // invisible and not a landmark in sight. Nothing had moved. Only the
+        // heading was wrong, and a wrong heading with no reference is
+        // indistinguishable from having been carried off.
+        //
+        // The target alone, so the descent swings round into their bearing
+        // instead of snapping to it. A body's model faces -Z, which is the
+        // same convention the rig's own forward uses, so its Y rotation IS
+        // the yaw.
+        let (theirs, _, _) = facing.to_euler(EulerRot::YXZ);
+        rig.target_yaw = theirs;
     }
     hold_the_pointer(&mut windows, true);
     selected.0 = None;
