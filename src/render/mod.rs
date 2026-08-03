@@ -268,7 +268,13 @@ fn setup_pipeline(
             Projection::Perspective(PerspectiveProjection {
                 fov: 0.62,
                 near: 0.5,
-                far: 3000.0,
+                // As far as the world camera sees. The hand hovers over the
+                // ground it is pointing at, and once the wheel could climb to
+                // orbit that ground went past three thousand units - so the
+                // cursor was clipped clean out of the frame by its own
+                // camera's far plane, which reads exactly like a cursor that
+                // has stopped working.
+                far: 70_000.0,
                 ..default()
             }),
             RenderLayers::layer(HAND_LAYER),

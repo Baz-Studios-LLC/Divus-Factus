@@ -47,10 +47,6 @@ const THROW_THRESHOLD: f32 = 2.5;
 /// Avatar - ever reaches it.
 const WITHDRAW_WITHIN: f32 = 6.0;
 
-/// Past this distance the hand fades out on the way to orbit — a little over
-/// the play zoom's ceiling, so it is gone before the planet takes the frame.
-const LEAVING_THE_WORLD: f32 = 1_600.0;
-
 /// How far in front of the camera the hand floats while it is the UI cursor.
 ///
 /// Close enough to clear every piece of world geometry, far enough past the near
@@ -405,12 +401,7 @@ fn update_hover(
     // touches nothing. Naming what is "beneath your hand" while the god has
     // no hand to speak of gives the whole thing away.
     let riding = rigs.single().is_ok_and(|rig| rig.in_a_body);
-    // And nothing hovers from the upper air: the hand withdraws past the
-    // play zoom, and a withdrawn hand touches nothing.
-    let aloft = rigs
-        .single()
-        .is_ok_and(|rig| rig.distance > LEAVING_THE_WORLD);
-    if hand.held.is_some() || pointer.over_ui || riding || aloft {
+    if hand.held.is_some() || pointer.over_ui || riding {
         hand.hovered = None;
         return;
     }
@@ -980,11 +971,15 @@ fn animate_hand(
     // waving its own hand in front of the face. Ordinary play never comes
     // closer than `MIN_DISTANCE`, twelve metres, so nothing but Avatar can
     // trip this. It fades away and back rather than popping.
-    // Withdrawn at both ends of the zoom: inside a mortal's head, where it
-    // would fill the frame, and past the play ceiling on the way to orbit,
-    // where a fist the size of a county would hang over the shrinking world.
-    let withdrawn =
-        (camera.distance < WITHDRAW_WITHIN || camera.distance > LEAVING_THE_WORLD) && !held;
+    // Withdrawn only behind a mortal's eyes, where it would fill the frame.
+    //
+    // It used to withdraw at altitude as well, on the theory that a fist the
+    // size of a county has no business over a shrinking world - but the hand
+    // is the CURSOR, and a cursor that disappears takes the menus with it:
+    // over a panel the hand is drawn small and close by the overlay camera,
+    // and a fade applied for the world's sake blanked it there too. It keeps
+    // its screen size at altitude instead, which is the honest fix.
+    let withdrawn = camera.distance < WITHDRAW_WITHIN && !held;
     let fade_ease = 1.0 - (-6.0 * dt).exp();
     rig.fade += ((!withdrawn as u32 as f32) - rig.fade) * fade_ease;
 
@@ -1051,7 +1046,17 @@ fn animate_hand(
 
     // Mild growth with zoom, so the hand neither vanishes from altitude nor
     // swallows the village up close.
-    let world_scale = 1.6 + camera.zoom_fraction() * 2.8;
+    //
+    // And past the play zoom it grows in PROPORTION to the distance, because
+    // it hovers over the ground it points at and that ground is now as far
+    // away as the god has climbed. `zoom_fraction` saturates at the play
+    // ceiling, so beyond it the hand held a fixed few units against a view
+    // twenty thousand units deep and shrank to nothing: from orbit there was
+    // no cursor at all. Scaling with distance keeps it the same size on
+    // screen at every height, which is what a cursor is for.
+    let play_ceiling = 1_400.0;
+    let aloft = (camera.distance / play_ceiling).max(1.0);
+    let world_scale = (1.6 + camera.zoom_fraction() * 2.8) * aloft;
     let scale = world_scale + (UI_CURSOR_SCALE - world_scale) * blend;
 
     // Two incommensurate sines so the drift never reads as a loop. Gripping
