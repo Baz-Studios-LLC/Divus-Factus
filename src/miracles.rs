@@ -41,6 +41,11 @@ pub const QUAKE_COST: f32 = 8.0;
 /// witnesses convert and belief flows back.
 pub const BOUNTY_COST: f32 = 2.0;
 
+/// Taking a body is cheap; STAYING in one is not. The drain is in
+/// `avatar.rs` - a god who can be a person indefinitely stops being a
+/// god, so the ride is paid for by the minute.
+pub const AVATAR_COST: f32 = 3.0;
+
 /// How far Bounty's blessing reaches from the cast point.
 const BOUNTY_RADIUS: f32 = 9.0;
 
@@ -284,6 +289,11 @@ pub enum Miracle {
     Mend,
     /// Earned by a legend of dread: the ground thrown like a blanket.
     Quake,
+    /// Not done TO the world but INSIDE it: the god takes a villager's
+    /// body and walks around in it. Nobody remarks on it, which is the
+    /// whole point - it is the only way a god ever hears what is said
+    /// about them by people who think they are alone.
+    Avatar,
 }
 
 impl Miracle {
@@ -294,6 +304,7 @@ impl Miracle {
             Miracle::Bounty => "Bounty",
             Miracle::Mend => "Mend",
             Miracle::Quake => "Quake",
+            Miracle::Avatar => "Avatar",
         }
     }
 
@@ -304,6 +315,7 @@ impl Miracle {
             Miracle::Bounty => BOUNTY_COST,
             Miracle::Mend => MEND_COST,
             Miracle::Quake => QUAKE_COST,
+            Miracle::Avatar => AVATAR_COST,
         }
     }
 
@@ -315,6 +327,7 @@ impl Miracle {
             Miracle::Bounty => "the bushes at the touch erupt with fruit",
             Miracle::Mend => "knits the hurt whole around the touch",
             Miracle::Quake => "throws the ground and everyone on it",
+            Miracle::Avatar => "wear somebody's body and walk about in it",
         }
     }
 
@@ -326,6 +339,7 @@ impl Miracle {
             Miracle::Bounty => Deed::Bounty,
             // Whichever of the pair is earned takes the fourth slot.
             Miracle::Mend | Miracle::Quake => Deed::MendOrQuake,
+            Miracle::Avatar => Deed::Avatar,
         })
     }
 }
@@ -774,6 +788,12 @@ fn cast(
     let god = name.as_ref().map_or("the god", |n| n.0.as_str());
 
     match miracle {
+        // Worn rather than cast: `avatar.rs` owns the whole of it,
+        // because taking a body is a click on a PERSON rather than on a
+        // patch of ground, and this system is at Bevy's parameter
+        // ceiling besides.
+        Miracle::Avatar => {}
+
         Miracle::Bounty => {
             if belief.available() < BOUNTY_COST {
                 return;

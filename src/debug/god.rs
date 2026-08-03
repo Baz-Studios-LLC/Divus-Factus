@@ -806,6 +806,8 @@ pub(crate) fn spawn_god_panel(
             Miracle::Bounty => berry_glyph(&mut commands, badge, gold),
             Miracle::Mend => mend_glyph(&mut commands, badge, gold),
             Miracle::Quake => quake_glyph(&mut commands, badge, gold),
+            // No glyph of its own yet; the badge carries the name.
+            Miracle::Avatar => {}
         }
         for field in [0u8, 1, 2] {
             commands.spawn((

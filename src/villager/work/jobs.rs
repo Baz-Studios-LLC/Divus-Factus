@@ -197,6 +197,8 @@ pub(crate) fn take_up_work(
             // Somebody running from a wolf is not available for work,
             // however idle they look on the way past.
             Without<crate::creature::wildlife::Fleeing>,
+            // Nor is somebody the god is currently walking around in.
+            Without<crate::avatar::Ridden>,
         ),
     >,
     bushes: Query<(Entity, &GlobalTransform, &FoodSource), Without<Villager>>,

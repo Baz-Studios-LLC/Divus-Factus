@@ -119,6 +119,9 @@ pub enum FollowStyle {
     /// The god's view, pinned to them: orbit and zoom stay free.
     #[default]
     Overhead,
+    /// Out of their eyes. The rig collapses onto the head and the orbit
+    /// becomes the neck - looking about rather than circling them.
+    Eyes,
 }
 
 /// Whom the camera is following, if anyone.
@@ -154,6 +157,22 @@ fn apply_follow(
     rig.target_focus.z = at.z;
     // A followed zoom anchor fights the pin; the pin wins.
     rig.zoom_anchor = None;
+
+    if follow.style == FollowStyle::Eyes {
+        // Behind the eyes: the focus rises to head height and the orbit
+        // closes to nothing, so the rig's yaw and pitch become where
+        // this person is looking. `MIN_DISTANCE` is twelve metres and
+        // would hold the camera out in front of their own face, so the
+        // eye distance is written straight past it, and the pitch is let
+        // below the overhead floor - a person can look at their boots.
+        // TARGETS only: the rig's own smoothing then flies the god down
+        // into the body over about a second rather than cutting to it.
+        // Writing the immediate values as well - which is what this did
+        // first - snapped the camera into their skull in one frame.
+        rig.target_focus.y = at.y + EYE_HEIGHT;
+        rig.target_distance = 0.0;
+        rig.target_pitch = rig.target_pitch.min(0.9);
+    }
 }
 
 /// Camera systems run as a unit so that anything needing a settled camera — the
@@ -165,6 +184,9 @@ pub struct CameraSet;
 /// this so it has a camera to attach the offscreen target to.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CameraStartupSet;
+
+/// How high a villager's eyes sit above the ground they stand on.
+const EYE_HEIGHT: f32 = 1.55;
 
 const MIN_PITCH: f32 = 0.20;
 const MAX_PITCH: f32 = FRAC_PI_2 - 0.06;

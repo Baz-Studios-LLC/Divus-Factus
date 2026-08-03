@@ -2,6 +2,7 @@
 //! who believe in it.
 
 mod attention;
+mod avatar;
 mod calendar;
 mod camera;
 mod creature;
@@ -198,6 +199,7 @@ fn main() {
             keymap::KeymapPlugin,
             music::MusicPlugin,
             doings::DoingsPlugin,
+            avatar::AvatarPlugin,
             founding::FoundingPlugin,
             fog::FogPlugin,
         ))

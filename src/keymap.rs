@@ -33,10 +33,11 @@ pub enum Deed {
     Doings,
     Trades,
     Fog,
+    Avatar,
 }
 
 impl Deed {
-    pub const ALL: [Deed; 20] = [
+    pub const ALL: [Deed; 21] = [
         Deed::PanNorth,
         Deed::PanSouth,
         Deed::PanWest,
@@ -57,6 +58,7 @@ impl Deed {
         Deed::Doings,
         Deed::Trades,
         Deed::Fog,
+        Deed::Avatar,
     ];
 
     /// The name the deed goes by in the keys file.
@@ -82,6 +84,7 @@ impl Deed {
             Deed::Doings => "doings",
             Deed::Trades => "trades",
             Deed::Fog => "fog",
+            Deed::Avatar => "avatar",
         }
     }
 
@@ -107,6 +110,7 @@ impl Deed {
             Deed::Doings => KeyCode::KeyL,
             Deed::Trades => KeyCode::KeyK,
             Deed::Fog => KeyCode::KeyF,
+            Deed::Avatar => KeyCode::Digit5,
         }
     }
 }
