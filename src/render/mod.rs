@@ -352,28 +352,48 @@ fn setup_pipeline(
 /// of focus as soon as the player zooms, which reads as a broken camera rather than
 /// as a stylistic choice.
 fn focus_depth_of_field(
+    mut commands: Commands,
     look: Res<LookSettings>,
-    mut cameras: Query<(&CameraRig, &mut DepthOfField), With<GodCamera>>,
+    mut cameras: Query<(Entity, &CameraRig, Option<&mut DepthOfField>), With<GodCamera>>,
 ) {
-    for (rig, mut dof) in &mut cameras {
-        // Behind a mortal's eyes there is no diorama to photograph, and this
-        // sum is actively harmful there: the focal plane sits at the camera's
-        // own orbit distance, and that distance is NOUGHT when the god is
-        // wearing a body. The plane fell to the ten-centimetre floor below
-        // and every single thing in the world, the ground included, went to
-        // mush. The shallow lens is what makes the village look like a model
-        // on a table; from inside the model it has nothing left to say, so it
-        // is switched off outright.
+    for (entity, rig, dof) in &mut cameras {
+        // Behind a mortal's eyes there is no diorama to photograph, and the
+        // sum below is actively harmful there: the focal plane sits at the
+        // camera's own orbit distance, and that distance is NOUGHT when the
+        // god is wearing a body. The plane fell to the ten-centimetre floor
+        // and the whole world, the ground included, went to mush.
         //
-        // This is the system that does it, and not `dream_lens`, which also
-        // writes the aperture but returns early the moment the title stops
-        // dreaming — a fix put there did nothing at all in play.
+        // The lens is taken off entirely, by REMOVING the component — not by
+        // setting the aperture to zero, which is what this tried first and
+        // which is worse than doing nothing. Bevy builds its blur from
+        // `focal_length² / (sensor_height * aperture_f_stops)` and guards
+        // that division nowhere, so a zero aperture is a divide by zero, an
+        // infinite circle of confusion, and a screen of pure smear. The
+        // comment in `apply_look_settings` about adding and removing the
+        // component rather than leaving it at zero aperture was right, and
+        // this is the second reason for it.
         if rig.distance < crate::camera::FIRST_PERSON {
-            dof.aperture_f_stops = 0.0;
+            if dof.is_some() {
+                commands.entity(entity).remove::<DepthOfField>();
+            }
             continue;
         }
-        dof.aperture_f_stops = look.aperture;
-        dof.focal_distance = (rig.distance * look.focus_bias).max(0.1);
+        let focus = (rig.distance * look.focus_bias).max(0.1);
+        match dof {
+            // The aperture is left to `apply_look_settings` and `dream_lens`,
+            // which own it; this system only ever aims the plane.
+            Some(mut dof) => dof.focal_distance = focus,
+            // Put back on the way out of a body.
+            None if look.depth_of_field_enabled() => {
+                commands.entity(entity).insert(DepthOfField {
+                    mode: DepthOfFieldMode::Bokeh,
+                    aperture_f_stops: look.aperture,
+                    focal_distance: focus,
+                    ..default()
+                });
+            }
+            None => {}
+        }
     }
 }
 

@@ -53,17 +53,18 @@ const LEAVING_HEIGHT: f32 = 80.0;
 /// level, the way somebody walking looks at the ground ahead of them.
 const ARRIVING_PITCH: f32 = 0.12;
 
-/// Inside this camera distance the worn body's HEAD stops being drawn.
+/// Inside this camera distance the worn body stops being drawn at all.
 ///
-/// The head alone, and not the rest: looking down and finding your own
-/// chest, arms and boots there is what sells being in somebody. But a head
-/// is a solid box with the eyes inside it, so that one part has to go —
-/// along with its hair, beard and hat, which hang off it and go with it.
+/// The head first, on the theory that looking down and finding your own
+/// chest and boots would sell the possession — but these bodies are built
+/// for the middle distance, and from eight inches away a villager is a
+/// stack of boxes. So the whole of it goes.
 ///
 /// Not on possession, though: hiding it the moment the body is taken would
-/// pop the head off a villager the god is still forty metres above. By the
-/// time the camera is this close it is already within the skull, so both
-/// the vanishing and the return happen where they cannot be seen.
+/// vanish a villager the god is still forty metres above, which reads as
+/// them dropping dead. By the time the camera is this close it is already
+/// inside the skull, so both the vanishing and the return happen where they
+/// cannot be seen.
 const OUT_OF_SIGHT: f32 = 2.5;
 
 pub struct AvatarPlugin;
@@ -164,7 +165,7 @@ fn wear_it(
     mut belief: ResMut<crate::villager::belief::Belief>,
     mut follow: ResMut<FollowTarget>,
     mut notices: MessageWriter<crate::ui::Notice>,
-    mut ridden: Query<(Entity, &mut Ridden, &crate::creature::body::CreatureRig)>,
+    mut ridden: Query<(Entity, &mut Ridden)>,
     mut rigs: Query<&mut CameraRig>,
     mut lens: Query<&mut Projection, With<crate::camera::GodCamera>>,
 ) {
@@ -172,14 +173,15 @@ fn wear_it(
     // How far the dive has got. Read before the loop, since the same rig
     // serves whoever is worn.
     let arrived = rigs.single().is_ok_and(|rig| rig.distance < OUT_OF_SIGHT);
-    for (who, mut ride, body) in &mut ridden {
+    for (who, mut ride) in &mut ridden {
         ride.left -= dt;
         // Take what there is to take. Spending past the end of the pool
         // would run `available` negative, and the readout with it.
         belief.spent += (DRAIN * dt).min(belief.available().max(0.0));
         if arrived != ride.hidden {
             ride.hidden = arrived;
-            commands.entity(body.head).insert(if arrived {
+            // The root, so every part of them goes with it.
+            commands.entity(who).insert(if arrived {
                 Visibility::Hidden
             } else {
                 Visibility::Inherited
@@ -204,10 +206,10 @@ fn wear_it(
         let done = recast || ride.left <= 0.0 || keys.just_pressed(KeyCode::Escape);
         if done {
             commands.entity(who).remove::<Ridden>();
-            // Given back with their head on. If the god leaves while the
-            // camera is still inside the skull, this is the only thing that
-            // puts the head back.
-            commands.entity(body.head).insert(Visibility::Inherited);
+            // Given back visible. If the god leaves while the camera is still
+            // inside the skull, this is the only thing that puts them back in
+            // the world at all.
+            commands.entity(who).insert(Visibility::Inherited);
             if let Ok(mut lens) = lens.single_mut()
                 && let Projection::Perspective(lens) = &mut *lens
             {
