@@ -1474,9 +1474,18 @@ fn follow_water_plane(
     let Ok(rig) = cameras.single() else {
         return;
     };
+    // The sea wears the streamed world's own size. The quad is cut for the
+    // widest play-zoom view; as the stream radius tapers with altitude the
+    // sea tapers with it, or it hangs over the planet as a flat blue square
+    // long after the ground it was wetting has slimmed to a sliver - the
+    // planet's painted ocean owns everything beyond the loaded shore. It
+    // will follow the curve itself the day the chunks do; they share a
+    // frame, and bending one without the other tears every shoreline.
+    let fit = stream_radius(rig.distance) as f32 / VIEW_CHUNKS as f32;
     for mut transform in &mut water {
         transform.translation.x = rig.focus.x;
         transform.translation.z = rig.focus.z;
+        transform.scale = Vec3::new(fit, 1.0, fit);
     }
 }
 
