@@ -341,9 +341,34 @@ fn update_hand_ray(
     // static camera hides the difference; a moving one (the title drift, the
     // opening descent, a follow) turns it into a per-frame sawtooth that made
     // the pointing hand visibly jitter.
-    let camera_transform = GlobalTransform::from(
-        Transform::from_translation(rig.eye()).looking_at(rig.focus, Vec3::Y),
-    );
+    // ...and then BENT, exactly the way the camera itself is bent, because
+    // the ray is about to be walked through the seated world. Built flat, it
+    // started in the wrong universe: the origin was a flat eye position and
+    // the direction a flat gaze, so `raycast` - which now measures against
+    // ground on the sphere - answered about somewhere else entirely, and the
+    // hand went there. The same map, applied the same way, keeps the mouse
+    // over what it is pointing at.
+    let camera_transform = {
+        let eye_seat = crate::globe::bend_frame(rig.eye()).0;
+        let (focus_seat, focus_turn) = crate::globe::bend_frame(rig.focus);
+        if rig.distance < crate::camera::FIRST_PERSON {
+            // Behind a mortal's eyes there is no separation to look along;
+            // carry the flat gaze into the seat's own frame instead.
+            let (seat, turn) = crate::globe::bend_frame(rig.eye());
+            GlobalTransform::from(Transform {
+                translation: seat,
+                rotation: turn
+                    * Transform::default()
+                        .looking_to(rig.forward(), Vec3::Y)
+                        .rotation,
+                scale: Vec3::ONE,
+            })
+        } else {
+            GlobalTransform::from(
+                Transform::from_translation(eye_seat).looking_at(focus_seat, focus_turn * Vec3::Y),
+            )
+        }
+    };
 
     let cursor = match window.cursor_position() {
         Some(cursor) => cursor,
