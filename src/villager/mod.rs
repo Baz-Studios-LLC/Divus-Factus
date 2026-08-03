@@ -2478,7 +2478,20 @@ fn pursue_activity(
             &mut CreatureMotion,
             &Transform,
         ),
-        (With<Villager>, Without<Held>, Without<Airborne>),
+        (
+            With<Villager>,
+            Without<Held>,
+            Without<Airborne>,
+            // A body the god is wearing takes no errands. This is the system
+            // that turns an activity into somewhere to walk, so excluding it
+            // here stops all of them at once — and it has to be excluded,
+            // not merely overruled: `Wandering` with nowhere to go rolls a
+            // FRESH destination every frame, and one drawn around the
+            // settlement centre rather than the walker when the walker is
+            // out past its edge. Possess a hunter in the woods and the body
+            // would set off home at a stride, carrying the god with it.
+            Without<crate::avatar::Ridden>,
+        ),
     >,
     mut food: Query<(&GlobalTransform, &mut FoodSource), Without<Villager>>,
 ) {

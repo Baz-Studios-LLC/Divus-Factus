@@ -121,15 +121,29 @@ fn take_a_body(
     if belief.available() < AVATAR_COST {
         return;
     }
-    // One body at a time.
+    // One body at a time — and give the last one back VISIBLE. Dropping
+    // `Ridden` alone left whoever was worn before standing about the village
+    // permanently invisible, since the only thing that undraws a body is the
+    // ride and the only thing that redraws it is the ride ending properly.
     for already in &worn {
-        commands.entity(already).remove::<Ridden>();
+        commands
+            .entity(already)
+            .remove::<Ridden>()
+            .insert(Visibility::Inherited);
     }
     belief.spent += AVATAR_COST;
-    commands.entity(who).insert(Ridden {
-        left: RIDE_FOR,
-        hidden: false,
-    });
+    // Taken mid-stride, and stopped there: the errand, the destination and
+    // the path already found to it are all dropped, or the body would finish
+    // walking wherever it was going before the god arrived.
+    commands.entity(who).insert((
+        Ridden {
+            left: RIDE_FOR,
+            hidden: false,
+        },
+        Activity::Idle,
+        MoveTarget(None),
+        crate::creature::Route::default(),
+    ));
     follow.entity = Some(who);
     follow.style = FollowStyle::Eyes;
     // The lens has to come in. Overhead, the near plane sits at half a
@@ -247,9 +261,13 @@ fn drive_the_body(
         return;
     };
     for (at, mut target, mut activity) in &mut ridden {
-        // Whatever errand they were on, they are not on it now.
-        if *activity != Activity::Wandering {
-            *activity = Activity::Wandering;
+        // Whatever errand they were on, they are not on it now. IDLE, and
+        // deliberately not `Wandering` — wandering is not a state of doing
+        // nothing, it is the state that goes looking for somewhere to be,
+        // and a driven body set to it walked off toward the middle of the
+        // settlement on its own. Idle is the one that stands still.
+        if *activity != Activity::Idle {
+            *activity = Activity::Idle;
         }
         // Where the eyes are pointed, flattened: forward on the ground
         // is the camera's own bearing.
