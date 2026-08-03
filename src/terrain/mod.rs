@@ -1236,8 +1236,14 @@ pub fn build_river_mesh(terrain: &Terrain, coord: IVec2) -> Option<Mesh> {
                 (0.0, cell, c),
                 (cell, cell, d),
             ] {
-                positions.push([x0 + dx, y, z0 + dz]);
-                normals.push([0.0, 1.0, 0.0]);
+                // Bent in world space, like the ground it runs through: the
+                // river shares its chunk's identity transform, so a
+                // chunk-local vertex would put every river in the world at
+                // the origin.
+                let flat = Vec3::new(origin.x + x0 + dx, y, origin.y + z0 + dz);
+                let (seat, turn) = crate::globe::bend_frame(flat);
+                positions.push(seat.to_array());
+                normals.push((turn * Vec3::Y).to_array());
             }
 
             indices.extend_from_slice(&[base, base + 2, base + 3, base, base + 3, base + 1]);

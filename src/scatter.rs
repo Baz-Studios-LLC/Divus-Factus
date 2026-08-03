@@ -443,8 +443,14 @@ fn populate_chunks(
                 let moisture = terrain.moisture_at(x, z);
                 let forest = terrain.forest_at(x, z);
 
-                // Positions are chunk-local; the chunk's transform places them.
-                let local = Vec3::new(x - origin.x, height, z - origin.y);
+                // WORLD positions. These were chunk-local, placed by the
+                // chunk's own transform - and when chunks moved their geometry
+                // into world space and went to identity, every tree, rock and
+                // bush in the world collapsed into a single sixty-four unit
+                // cube at the origin. A parent of identity means a child's
+                // local IS its world position, and the world bend seats it
+                // from there like any other entity.
+                let local = Vec3::new(x, height, z);
 
                 let biome = terrain.biome_at(x, z);
 
@@ -602,7 +608,7 @@ fn populate_chunks(
             let mut grove_mesh = MeshBuilder::default();
             let mut bodies: Vec<(Vec3, TreeBody)> = Vec::new();
             for (local, kind) in &members {
-                let body = TreeBody::at(*kind, origin.x + local.x, origin.y + local.z);
+                let body = TreeBody::at(*kind, local.x, local.z);
                 bake_tree(
                     &mut grove_mesh,
                     *local - anchor,

@@ -180,6 +180,14 @@ fn biome_growth(biome: Biome) -> (f32, f32) {
 /// that unloads and reloads grows back identical.
 pub fn build_grass_mesh(terrain: &Terrain, seed: u32, coord: IVec2) -> Option<Mesh> {
     let origin = Vec2::new(coord.x as f32 * CHUNK_SIZE, coord.y as f32 * CHUNK_SIZE);
+    // Blades are measured from the chunk's MIDDLE, and the patch is seated
+    // there. A blade must stand along its own local up, so the patch is
+    // seated rigidly rather than bent per vertex - and a rigid seat bows
+    // furthest from its anchor. Anchored at a corner the far corner floats
+    // two thirds of a unit, which on knee-high grass is a visible hover;
+    // anchored at the middle the worst case is a sixth of a unit, under a
+    // blade's own height.
+    let centre = origin + Vec2::splat(CHUNK_SIZE * 0.5);
     let mut rng = Rng::new(
         (seed as u64) << 32
             ^ ((coord.x as u32 as u64) << 16)
@@ -245,9 +253,9 @@ pub fn build_grass_mesh(terrain: &Terrain, seed: u32, coord: IVec2) -> Option<Me
             for _ in 0..3 {
                 builder.push_blade(
                     Vec3::new(
-                        x - origin.x + rng.range(-0.16, 0.16),
+                        x - centre.x + rng.range(-0.16, 0.16),
                         height,
-                        z - origin.y + rng.range(-0.16, 0.16),
+                        z - centre.y + rng.range(-0.16, 0.16),
                     ),
                     // Knee height at the tallest, judged against the people wading it.
                     rng.range(0.18, 0.4) * stature,
@@ -320,9 +328,9 @@ fn stream_grass(
                     Mesh3d(meshes.add(mesh)),
                     MeshMaterial3d(assets.material.clone()),
                     Transform::from_xyz(
-                        coord.x as f32 * CHUNK_SIZE,
+                        (coord.x as f32 + 0.5) * CHUNK_SIZE,
                         0.0,
-                        coord.y as f32 * CHUNK_SIZE,
+                        (coord.y as f32 + 0.5) * CHUNK_SIZE,
                     ),
                     NotShadowCaster,
                 ))
