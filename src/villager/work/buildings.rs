@@ -2337,9 +2337,16 @@ pub(crate) fn plan_houses(
         if uphill == Vec3::ZERO {
             return false;
         }
-        t.height_at(x + uphill.x * 7.0, z + uphill.z * 7.0) - t.height_at(x, z) > 3.0
+        // A drift wants a bank to cut into, not a cliff. Three metres of
+        // rise over seven is a twenty-three degree slope, and a village on
+        // merely rolling country never found any - so it never wanted a
+        // mine, and its only stone was the loose boulders, which run out.
+        t.height_at(x + uphill.x * 7.0, z + uphill.z * 7.0) - t.height_at(x, z) > 1.8
     };
-    let rock_near = find_ground(&terrain, site.centre, &mut rng.0, minable).is_some();
+    // Thrown wide, because this is the question the whole stone economy
+    // turns on and a false negative here costs the village every building
+    // that wants masonry.
+    let rock_near = find_ground_in(&terrain, site.centre, &mut rng.0, 200, minable).is_some();
 
     // A person needs a house, so a house gets built: ground breaks because
     // roofless people exist, not because a formula says the town is due.
@@ -2481,7 +2488,10 @@ pub(crate) fn plan_houses(
     // ground beside rising stone takes the portal, driven uphill so the
     // works read as underground.
     if kind == BuildingKind::Mine {
-        let Some(face) = find_ground(&terrain, site.centre, &mut rng.0, minable) else {
+        // Thrown as wide as the question that decided to want one. Asking
+        // with forty darts what was answered with two hundred is how a
+        // village comes to want a mine it can never find a face for.
+        let Some(face) = find_ground_in(&terrain, site.centre, &mut rng.0, 200, minable) else {
             return;
         };
         // The portal faces uphill: sample the gradient and point local +Z

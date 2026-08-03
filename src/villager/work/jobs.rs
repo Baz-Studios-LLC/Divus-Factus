@@ -129,8 +129,28 @@ pub(crate) fn find_ground(
     rng: &mut Rng,
     wanted: impl Fn(&Terrain, f32, f32) -> bool,
 ) -> Option<Vec3> {
+    find_ground_in(terrain, centre, rng, 40, wanted)
+}
+
+/// [`find_ground`] with the number of darts thrown made explicit.
+///
+/// Forty is plenty when the question is loose - somewhere flat, somewhere
+/// wooded - because such ground is everywhere and any dart will do. It is far
+/// too few when the question is NARROW, and a miss then is not "there is none"
+/// but "we did not look hard enough". A settlement went eight days without
+/// ever wanting a mine because forty darts kept failing to land on the one
+/// bank it could have cut a drift into, and stone stayed at nine while timber
+/// passed four hundred. A negative from this function is only worth what the
+/// search behind it cost.
+pub(crate) fn find_ground_in(
+    terrain: &Terrain,
+    centre: Vec3,
+    rng: &mut Rng,
+    tries: usize,
+    wanted: impl Fn(&Terrain, f32, f32) -> bool,
+) -> Option<Vec3> {
     let mut best: Option<(f32, Vec3)> = None;
-    for _ in 0..40 {
+    for _ in 0..tries {
         let angle = rng.range(0.0, std::f32::consts::TAU);
         let distance = rng.range(10.0, WORK_REACH);
         let (sin, cos) = angle.sin_cos();
