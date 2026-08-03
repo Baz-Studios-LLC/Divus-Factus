@@ -168,14 +168,24 @@ struct PlanetTree {
     grown_for: Option<u32>,
     /// Frames since the world began, for the forgetting below.
     beat: u64,
+    /// Which painting of the veil the world currently wants. Bumped when the
+    /// fog of war toggles or the known world grows; patches wearing an older
+    /// painting are rebuilt a few per frame, so the veil SWEEPS rather than
+    /// hitches.
+    paint_beat: u64,
+    /// A cheap fingerprint of (fog mode, known world) to notice the change.
+    veil_print: (bool, u32, usize),
 }
 
-/// A standing patch: its entity, its mesh, and the last frame it was on
-/// screen — the tree forgets what it has not shown for a while.
+/// A standing patch: its entity, its mesh, the last frame it was on screen —
+/// the tree forgets what it has not shown for a while — and which painting
+/// of the veil it wears, so the fog of war can sweep across a planet that
+/// already stands.
 struct Patch2 {
     entity: Entity,
     mesh: Handle<Mesh>,
     last_shown: u64,
+    painted: u64,
 }
 
 /// How long a hidden patch is kept before it is felled, in frames. Long
@@ -237,10 +247,15 @@ impl Plugin for GlobePlugin {
 fn plant_the_tree(
     mut commands: Commands,
     terrain: Res<Terrain>,
+    veil: (
+        Option<Res<crate::fog::FogMode>>,
+        Option<Res<crate::villager::explore::KnownWorld>>,
+    ),
     mut tree: ResMut<PlanetTree>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    let shroud = veil_of(&veil.0, &veil.1);
     if tree.grown_for == Some(terrain.seed) {
         return;
     }
@@ -283,14 +298,27 @@ fn plant_the_tree(
         ..default()
     })));
 
+    // One level past the evergreens: those patches may be evicted later if
+    // long unseen, but growing them here means the first descent anywhere
+    // on the planet finds its middle distances already standing - Brett's
+    // "preload the chunks at creation", scoped to what memory affords.
+    const PREBAKED: u8 = EVERGREEN + 1;
     let mut grown = 0;
     for face in 0..6u8 {
-        for level in 0..=EVERGREEN {
+        for level in 0..=PREBAKED {
             let across = 1u32 << level;
             for y in 0..across {
                 for x in 0..across {
                     let key = PatchKey { face, level, x, y };
-                    grow_patch(&mut commands, &terrain, &mut meshes, &mut tree, root, key);
+                    grow_patch(
+                        &mut commands,
+                        &terrain,
+                        shroud,
+                        &mut meshes,
+                        &mut tree,
+                        root,
+                        key,
+                    );
                     grown += 1;
                 }
             }
@@ -306,12 +334,18 @@ fn plant_the_tree(
 fn grow_patch(
     commands: &mut Commands,
     terrain: &Terrain,
+    veil: Option<&crate::villager::explore::KnownWorld>,
     meshes: &mut Assets<Mesh>,
     tree: &mut PlanetTree,
     root: Entity,
     key: PatchKey,
 ) -> Entity {
-    let mesh = meshes.add(build_patch(terrain, key));
+    // A regrowth replaces the old stand outright.
+    if let Some(old) = tree.built.remove(&key) {
+        commands.entity(old.entity).despawn();
+        meshes.remove(&old.mesh);
+    }
+    let mesh = meshes.add(build_patch(terrain, veil, key));
     let entity = commands
         .spawn((
             Patch(key),
@@ -325,12 +359,14 @@ fn grow_patch(
         ))
         .id();
     let beat = tree.beat;
+    let painted = tree.paint_beat;
     tree.built.insert(
         key,
         Patch2 {
             entity,
             mesh,
             last_shown: beat,
+            painted,
         },
     );
     entity
@@ -353,12 +389,28 @@ fn dress_the_patches(
     }
 }
 
+/// The veil to paint with, if the fog of war is on and a known world exists.
+fn veil_of<'k>(
+    mode: &Option<Res<crate::fog::FogMode>>,
+    known: &'k Option<Res<crate::villager::explore::KnownWorld>>,
+) -> Option<&'k crate::villager::explore::KnownWorld> {
+    let veiled = mode.as_ref().is_none_or(|mode| mode.0);
+    if !veiled {
+        return None;
+    }
+    known.as_ref().map(|known| &**known)
+}
+
 // -------------------------------------------------------------- the building
 
 /// Samples one patch of the world: heights and paint from the same fields
 /// the chunks are built from, and a skirt around the edge to curtain the
 /// hairline cracks where neighbouring patches meet at different depths.
-fn build_patch(terrain: &Terrain, key: PatchKey) -> Mesh {
+fn build_patch(
+    terrain: &Terrain,
+    veil: Option<&crate::villager::explore::KnownWorld>,
+    key: PatchKey,
+) -> Mesh {
     let n = PATCH_CELLS;
     let stride = n + 1;
     let padded = n + 3;
@@ -415,7 +467,23 @@ fn build_patch(terrain: &Terrain, key: PatchKey) -> Mesh {
 
             positions.push(here.to_array());
             normals.push(normal.to_array());
-            colors.push(paint(terrain, x, z, h, wet, slope));
+            let mut color = paint(terrain, x, z, h, wet, slope);
+            // The fog of war wraps the whole planet: ground the village has
+            // not walked wears the veil's own slate, sea and land alike, at
+            // the six-sheet weight the cloths stack to at play height. The
+            // god does not see round the world; the god sees what has been
+            // SHOWN, and from orbit that is a handful of clearings on a
+            // shrouded ball.
+            if let Some(known) = veil
+                && !known.knows(Vec3::new(x, h, z))
+            {
+                const SLATE: [f32; 3] = [0.05, 0.07, 0.11];
+                const WEIGHT: f32 = 0.86;
+                for (channel, dark) in color.iter_mut().take(3).zip(SLATE) {
+                    *channel += (dark - *channel) * WEIGHT;
+                }
+            }
+            colors.push(color);
         }
     }
 
@@ -574,6 +642,10 @@ fn paint(terrain: &Terrain, x: f32, z: f32, h: f32, wet: f32, slope: f32) -> [f3
 fn tend_the_tree(
     mut commands: Commands,
     terrain: Option<Res<Terrain>>,
+    veil: (
+        Option<Res<crate::fog::FogMode>>,
+        Option<Res<crate::villager::explore::KnownWorld>>,
+    ),
     mut tree: ResMut<PlanetTree>,
     mut meshes: ResMut<Assets<Mesh>>,
     windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
@@ -621,11 +693,32 @@ fn tend_the_tree(
         }
     }
 
-    // Grow the missing, nearest first, a few per frame.
+    // Notice the veil changing — the F key, or the known world growing —
+    // and mark every standing patch's painting stale by bumping the beat.
+    let shroud = veil_of(&veil.0, &veil.1);
+    let print = (
+        shroud.is_some(),
+        shroud.map_or(0, |k| k.radius as u32),
+        shroud.map_or(0, |k| k.pockets.len()),
+    );
+    if tree.veil_print != print {
+        tree.veil_print = print;
+        tree.paint_beat += 1;
+    }
+
+    // Grow the missing and repaint the stale, nearest first, a few per
+    // frame. A stale patch keeps its old painting on screen until its
+    // replacement lands, so the veil sweeps across the world instead of
+    // blinking it empty.
+    let paint_beat = tree.paint_beat;
     let mut missing: Vec<PatchKey> = wanted
         .iter()
         .copied()
-        .filter(|key| !tree.built.contains_key(key))
+        .filter(|key| {
+            tree.built
+                .get(key)
+                .is_none_or(|patch| patch.painted < paint_beat)
+        })
         .collect();
     missing.sort_by(|a, b| {
         let da = cam_mesh.distance(a.centre_dir() * PLANET_RADIUS);
@@ -633,7 +726,15 @@ fn tend_the_tree(
         da.total_cmp(&db)
     });
     for key in missing.iter().take(BUILDS_PER_FRAME) {
-        grow_patch(&mut commands, &terrain, &mut meshes, &mut tree, root, *key);
+        grow_patch(
+            &mut commands,
+            &terrain,
+            shroud,
+            &mut meshes,
+            &mut tree,
+            root,
+            *key,
+        );
     }
 
     // Resolve the cut to what can be shown today: a wanted patch that
@@ -846,6 +947,7 @@ mod tests {
         let t = Terrain::new(7);
         let mesh = build_patch(
             &t,
+            None,
             PatchKey {
                 face: 2,
                 level: 3,

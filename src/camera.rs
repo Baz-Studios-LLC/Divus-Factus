@@ -515,9 +515,23 @@ fn read_camera_input(
     }
 
     if pan != Vec3::ZERO {
-        let zoom_scale = 0.35 + rig.zoom_fraction() * 1.6;
+        // Within the play zoom the pan speed rides the zoom fraction, as it
+        // always has. Past it the speed grows with the DISTANCE itself, the
+        // way a map's does, because the focus is now how the god travels the
+        // planet: from twenty thousand up, a pan sweeps continents in
+        // seconds, the streaming follows the focus wherever it lands, and
+        // zooming back in arrives on whatever ground is under the view -
+        // the far side of the world included. At the old capped speed that
+        // journey took five minutes of held keys.
+        let zoom_scale = 0.35
+            + rig.zoom_fraction() * 1.6
+            + (rig.target_distance - MAX_DISTANCE).max(0.0) * 0.012;
         let speed = rig.pan_speed * zoom_scale * time.delta_secs();
         rig.target_focus += pan.normalize() * speed;
+        // East-west wraps with the world; north-south stops short of the
+        // poles, where the scaffold's one-longitude-per-point breaks down.
+        let brim = crate::terrain::planet_circumference() * 0.24;
+        rig.target_focus.z = rig.target_focus.z.clamp(-brim, brim);
     }
 
     // Drag-panning on middle mouse. Moves the world with the pointer rather than

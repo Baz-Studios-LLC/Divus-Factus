@@ -48,7 +48,19 @@ const MIN_VIEW_CHUNKS: i32 = 6;
 /// world up when the player rises.
 pub fn stream_radius(camera_distance: f32) -> i32 {
     let chunks = (camera_distance / CHUNK_SIZE) * 1.6 + MIN_VIEW_CHUNKS as f32;
-    (chunks.round() as i32).clamp(MIN_VIEW_CHUNKS, VIEW_CHUNKS)
+    let wanted = (chunks.round() as i32).clamp(MIN_VIEW_CHUNKS, VIEW_CHUNKS);
+
+    // And back DOWN again past the play zoom. The flat world is drawn in its
+    // tangent frame, and a twenty-five-hundred-unit plate on a six-thousand
+    // radius sphere lifts half a thousand units off the curve at its edge -
+    // from orbit it read as a square sticker jutting off the planet into
+    // space. High up, the planet's own patches are the better picture of
+    // this ground anyway; the plate tapers to a sliver whose lift off the
+    // curve is a dozen units, and a thousand chunks stop being drawn from
+    // heights where they were smaller than the pixels they cost.
+    let receding = ((camera_distance - 1_400.0) / 4_000.0).clamp(0.0, 1.0);
+    let ceiling = VIEW_CHUNKS as f32 + (MIN_VIEW_CHUNKS as f32 - VIEW_CHUNKS as f32) * receding;
+    wanted.min(ceiling.round() as i32)
 }
 /// Chunks built per frame during play when there is little to do.
 ///
@@ -1550,11 +1562,25 @@ mod tests {
     }
 
     #[test]
-    fn the_stream_radius_never_shrinks_as_the_camera_rises() {
+    fn the_stream_radius_tapers_past_the_play_zoom() {
+        // Rising through the play zoom grows the view; rising past it hands
+        // the ground to the planet's patches and the plate shrinks away.
+        assert_eq!(stream_radius(1_400.0), VIEW_CHUNKS);
+        assert!(stream_radius(3_500.0) < VIEW_CHUNKS);
+        assert_eq!(stream_radius(6_000.0), MIN_VIEW_CHUNKS);
+        assert_eq!(stream_radius(20_000.0), MIN_VIEW_CHUNKS);
+    }
+
+    #[test]
+    fn the_stream_radius_never_shrinks_within_the_play_zoom() {
+        // Inside the play zoom, rising only ever widens the view. Past it
+        // the radius tapers by design - the planet's patches carry the far
+        // ground - so the old any-height version of this invariant died
+        // with the flat plate it protected.
         let mut previous = 0;
-        for step in 0..200 {
+        for step in 0..175 {
             let r = stream_radius(step as f32 * 8.0);
-            assert!(r >= previous, "radius shrank while zooming out");
+            assert!(r >= previous, "radius shrank while zooming out in play");
             previous = r;
         }
     }
