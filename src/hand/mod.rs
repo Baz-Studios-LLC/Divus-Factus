@@ -361,9 +361,7 @@ fn update_hover(
     // being worn: the hand is withdrawn at that range, and a withdrawn hand
     // touches nothing. Naming what is "beneath your hand" while the god has
     // no hand to speak of gives the whole thing away.
-    let riding = rigs
-        .single()
-        .is_ok_and(|rig| rig.distance < crate::camera::FIRST_PERSON);
+    let riding = rigs.single().is_ok_and(|rig| rig.in_a_body);
     if hand.held.is_some() || pointer.over_ui || riding {
         hand.hovered = None;
         return;
@@ -391,10 +389,23 @@ fn toggle_follow(
     pointer: Res<PointerContext>,
     hand: Res<DivineHand>,
     creatures: Query<(), With<crate::creature::Creature>>,
+    rigs: Query<&crate::camera::CameraRig>,
     mut follow: ResMut<crate::camera::FollowTarget>,
     mut press_at: Local<Option<Vec2>>,
 ) {
     use crate::camera::FollowStyle;
+
+    // A worn body is not a follow the player may click out of. This cycle
+    // releases the pin on any clean right-click that lands on nothing new —
+    // sensible when the pin is a choice about whom to watch, ruinous when it
+    // is a possession, and the mouse is locked away and every stray click
+    // lands on nothing. It let go of the body while the god was still inside
+    // it: nothing pinned the camera any more, so it kept the eye height it
+    // had and the movement keys flew it through hillsides. The ride is ended
+    // by the miracle or by Escape, not by a click.
+    if rigs.single().is_ok_and(|rig| rig.in_a_body) {
+        return;
+    }
 
     let Ok(window) = windows.single() else {
         return;

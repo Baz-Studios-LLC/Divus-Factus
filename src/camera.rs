@@ -173,14 +173,24 @@ fn apply_follow(
     bodies: Query<&crate::creature::genome::CreatureGenome>,
     mut rigs: Query<&mut CameraRig>,
 ) {
-    let Some(entity) = follow.entity else {
+    // The rig is fetched before anything else, and `in_a_body` is answered on
+    // EVERY path out of here — including the paths where there is nobody to
+    // follow. Leaving it stale is what let a released follow strand the camera
+    // under the rules of a head it was no longer inside.
+    let Ok(mut rig) = rigs.single_mut() else {
         return;
     };
-    let (Ok(mut rig), Ok(target)) = (rigs.single_mut(), targets.get(entity)) else {
+    let Some(entity) = follow.entity else {
+        rig.in_a_body = false;
+        return;
+    };
+    let Ok(target) = targets.get(entity) else {
         // Whoever it was is gone from the world.
         follow.entity = None;
+        rig.in_a_body = false;
         return;
     };
+    rig.in_a_body = follow.style == FollowStyle::Eyes;
 
     let at = target.translation();
     rig.target_focus.x = at.x;
@@ -288,6 +298,17 @@ pub struct CameraRig {
     pub target_pitch: f32,
     pub distance: f32,
     pub target_distance: f32,
+    /// Whether the camera is presently behind somebody's eyes.
+    ///
+    /// Written by [`apply_follow`] every frame, and the authority on the
+    /// question. It was inferred from `distance` being near nought before,
+    /// which is a CONSEQUENCE of being in a body rather than the fact of it —
+    /// and the difference bit hard: releasing the follow (a stray right-click
+    /// does it) left the distance at nought with nothing pinning the camera
+    /// to anybody, so the rules that only make sense inside a head stayed on.
+    /// The ground-following stayed off and the keys still panned, which flew
+    /// the god about at a fixed height and straight through hillsides.
+    pub in_a_body: bool,
     /// How fast panning moves the focus, in world units per second at mid zoom.
     pub pan_speed: f32,
     pub orbit_sensitivity: f32,
@@ -315,6 +336,7 @@ impl Default for CameraRig {
             target_pitch: 0.85,
             distance: 62.0,
             target_distance: 62.0,
+            in_a_body: false,
             pan_speed: 28.0,
             orbit_sensitivity: 0.005,
             zoom_sensitivity: 0.12,
@@ -454,21 +476,31 @@ fn read_camera_input(
         return;
     };
 
+    use crate::keymap::Deed;
+
     // Panning. Speed scales with zoom so that crossing the screen takes about the
     // same time whether you are looking at one villager or the whole valley.
+    //
+    // None of it inside a body: those four keys are the LEGS then, and the
+    // camera has no business also sliding itself sideways when they are
+    // pressed. It got away with it only because the follow overwrote the
+    // focus again a moment later, which is not a rule so much as a
+    // coincidence — and the moment the follow was released the coincidence
+    // ended and the keys flew the god through the landscape.
     let mut pan = Vec3::ZERO;
-    use crate::keymap::Deed;
-    if keymap.pressed(&keys, Deed::PanNorth) || keys.pressed(KeyCode::ArrowUp) {
-        pan += rig.ground_forward();
-    }
-    if keymap.pressed(&keys, Deed::PanSouth) || keys.pressed(KeyCode::ArrowDown) {
-        pan -= rig.ground_forward();
-    }
-    if keymap.pressed(&keys, Deed::PanWest) || keys.pressed(KeyCode::ArrowLeft) {
-        pan -= rig.ground_right();
-    }
-    if keymap.pressed(&keys, Deed::PanEast) || keys.pressed(KeyCode::ArrowRight) {
-        pan += rig.ground_right();
+    if !rig.in_a_body {
+        if keymap.pressed(&keys, Deed::PanNorth) || keys.pressed(KeyCode::ArrowUp) {
+            pan += rig.ground_forward();
+        }
+        if keymap.pressed(&keys, Deed::PanSouth) || keys.pressed(KeyCode::ArrowDown) {
+            pan -= rig.ground_forward();
+        }
+        if keymap.pressed(&keys, Deed::PanWest) || keys.pressed(KeyCode::ArrowLeft) {
+            pan -= rig.ground_right();
+        }
+        if keymap.pressed(&keys, Deed::PanEast) || keys.pressed(KeyCode::ArrowRight) {
+            pan += rig.ground_right();
+        }
     }
 
     if pan != Vec3::ZERO {
@@ -499,7 +531,7 @@ fn read_camera_input(
     // and nothing else for the mouse to do: the pointer is locked away and
     // the hand withdrawn, so the mouse simply IS the neck, the way it is in
     // every game that has ever put you inside a head.
-    let looking_about = rig.target_distance < FIRST_PERSON;
+    let looking_about = rig.in_a_body;
     if buttons.pressed(MouseButton::Right) || looking_about {
         let delta = mouse_motion.delta;
         if delta != Vec2::ZERO {
@@ -510,7 +542,7 @@ fn read_camera_input(
             // underneath it. A person looking out of their own eyes has no
             // such trouble, and needs the range both ways: up at the sky
             // they pray to, and down far enough to find their own boots.
-            let (floor, ceiling) = if rig.target_distance < FIRST_PERSON {
+            let (floor, ceiling) = if rig.in_a_body {
                 (-RIDDEN_PITCH, RIDDEN_PITCH)
             } else {
                 (MIN_PITCH, MAX_PITCH)
@@ -562,7 +594,12 @@ fn follow_ground(terrain: Option<Res<Terrain>>, mut rigs: Query<&mut CameraRig>)
     // god ended up looking out of the villager's boots no matter how
     // carefully their eyes had been measured. The orbit is what needs its
     // focus pinned to the land; a head is not an orbit.
-    if rig.target_distance < FIRST_PERSON {
+    //
+    // Asked of `in_a_body` and not of the distance: with nobody followed the
+    // distance stays where it was left, and a camera skipping this while
+    // pinned to nothing is a camera at a fixed height that walks through
+    // hills.
+    if rig.in_a_body {
         return;
     }
     let ground = terrain

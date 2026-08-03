@@ -372,7 +372,7 @@ fn focus_depth_of_field(
         // comment in `apply_look_settings` about adding and removing the
         // component rather than leaving it at zero aperture was right, and
         // this is the second reason for it.
-        if rig.distance < crate::camera::FIRST_PERSON {
+        if rig.in_a_body || rig.distance < crate::camera::FIRST_PERSON {
             if dof.is_some() {
                 commands.entity(entity).remove::<DepthOfField>();
             }
