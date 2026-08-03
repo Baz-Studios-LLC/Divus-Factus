@@ -15,6 +15,7 @@
 //! a person indefinitely stops being a god.
 
 use bevy::prelude::*;
+use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 
 use crate::camera::{CameraRig, FollowStyle, FollowTarget};
 use crate::creature::MoveTarget;
@@ -40,10 +41,17 @@ const RIDE_FOR: f32 = 300.0;
 /// staying is not.
 const DRAIN: f32 = 0.05;
 
-/// How far ahead of the eyes the body is told to walk. Far enough that
-/// the ordinary locomotion has somewhere to go, near enough that letting
-/// go of the key stops them promptly.
-const STRIDE: f32 = 3.0;
+/// How far ahead of the eyes the body is told to walk.
+///
+/// It has to clear the arrival crawl. Locomotion eases off as it nears a
+/// destination — `distance / (height * 2)`, floored at a quarter speed —
+/// which for an adult means anything inside about three and a half metres is
+/// walked at less than full pace. At three metres, which this was, the god
+/// never got out of that crawl and plodded everywhere. Eight is past the
+/// threshold for the tallest villager with room to spare, and costs nothing
+/// in responsiveness: the goal is re-aimed from the body's own position
+/// every frame, and letting go of the key clears it outright.
+const STRIDE: f32 = 8.0;
 
 /// How far the god pulls back out to on letting a body go — the ordinary
 /// working zoom, so you are returned to the view you play from.
@@ -108,6 +116,7 @@ fn take_a_body(
     worn: Query<Entity, With<Ridden>>,
     mut lens: Query<&mut Projection, With<crate::camera::GodCamera>>,
     mut rigs: Query<&mut CameraRig>,
+    mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
     if selected.0 != Some(Miracle::Avatar) {
         return;
@@ -164,10 +173,30 @@ fn take_a_body(
     if let Ok(mut rig) = rigs.single_mut() {
         rig.target_pitch = ARRIVING_PITCH;
     }
+    hold_the_pointer(&mut windows, true);
     selected.0 = None;
     notices.write(crate::ui::Notice::new(
         "You are looking out of somebody else's eyes".to_string(),
     ));
+}
+
+/// Takes the mouse pointer away, or gives it back.
+///
+/// Locked and hidden, the mouse stops being a cursor over a map and becomes
+/// the neck: it can turn past the edge of the screen without running out of
+/// desk, which is the whole reason first person locks it. There is nothing
+/// for it to point at in here anyway — the hand is withdrawn at this range
+/// and hovering is switched off with it.
+fn hold_the_pointer(windows: &mut Query<&mut CursorOptions, With<PrimaryWindow>>, hold: bool) {
+    let Ok(mut cursor) = windows.single_mut() else {
+        return;
+    };
+    cursor.grab_mode = if hold {
+        CursorGrabMode::Locked
+    } else {
+        CursorGrabMode::None
+    };
+    cursor.visible = !hold;
 }
 
 /// The ride: it costs belief every second, and it ends.
@@ -182,8 +211,40 @@ fn wear_it(
     mut ridden: Query<(Entity, &mut Ridden)>,
     mut rigs: Query<&mut CameraRig>,
     mut lens: Query<&mut Projection, With<crate::camera::GodCamera>>,
+    mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
     let dt = time.delta_secs();
+
+    // Nothing worn: make certain everything borrowed has been given back.
+    //
+    // A possessed villager can be killed by a wolf halfway through a ride,
+    // and the loop below never runs for a body that no longer exists — which
+    // would leave the mouse locked away with no way to ask for it back, the
+    // lens focused four centimetres from the eye, and the camera lying on the
+    // grass where the body used to be. Every one of those is recovered here
+    // rather than at each of the places a ride can end.
+    if ridden.is_empty() {
+        let held = windows
+            .single()
+            .is_ok_and(|cursor| cursor.grab_mode != CursorGrabMode::None);
+        if held {
+            hold_the_pointer(&mut windows, false);
+        }
+        if let Ok(mut lens) = lens.single_mut()
+            && let Projection::Perspective(lens) = &mut *lens
+            && lens.near < crate::camera::WIDE_NEAR
+        {
+            lens.near = crate::camera::WIDE_NEAR;
+        }
+        if let Ok(mut rig) = rigs.single_mut()
+            && rig.target_distance < crate::camera::FIRST_PERSON
+        {
+            rig.target_distance = LEAVING_HEIGHT;
+            rig.target_pitch = rig.target_pitch.max(0.7);
+        }
+        return;
+    }
+
     // How far the dive has got. Read before the loop, since the same rig
     // serves whoever is worn.
     let arrived = rigs.single().is_ok_and(|rig| rig.distance < OUT_OF_SIGHT);
@@ -229,6 +290,7 @@ fn wear_it(
             {
                 lens.near = crate::camera::WIDE_NEAR;
             }
+            hold_the_pointer(&mut windows, false);
             if follow.entity == Some(who) {
                 follow.entity = None;
                 follow.style = FollowStyle::Overhead;

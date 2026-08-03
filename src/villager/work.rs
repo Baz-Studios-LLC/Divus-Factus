@@ -85,6 +85,7 @@ pub(super) fn haul_wood(
         (
             With<Villager>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
             Without<Corpse>,
         ),
@@ -185,6 +186,7 @@ pub(super) fn lend_a_hand(
             With<Villager>,
             Without<Corpse>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
             Without<crate::creature::Childhood>,
         ),
@@ -302,6 +304,7 @@ pub(super) fn salvage_timber(
         (
             Without<crate::scatter::FellableTree>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
             Without<Villager>,
         ),
@@ -319,6 +322,7 @@ pub(super) fn salvage_timber(
             With<Villager>,
             Without<Corpse>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
         ),
     >,
@@ -470,6 +474,7 @@ pub(super) fn do_work(
         (
             With<Villager>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
             Without<Corpse>,
         ),

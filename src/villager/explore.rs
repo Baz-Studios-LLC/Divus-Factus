@@ -182,6 +182,7 @@ pub(super) fn expeditions(
             With<Villager>,
             Without<Corpse>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
         ),
     >,

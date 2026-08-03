@@ -167,6 +167,7 @@ pub(super) fn use_doors(
         (
             With<Villager>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
             Without<Corpse>,
             Without<Abed>,
@@ -368,6 +369,7 @@ pub(super) fn take_shelter(
         (
             With<Villager>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<crate::creature::Airborne>,
             Without<Corpse>,
         ),
@@ -674,6 +676,7 @@ pub(super) fn tend_fire(
         (
             With<Villager>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
             Without<Corpse>,
         ),
@@ -1038,6 +1041,7 @@ pub(super) fn night_routine(
         (
             With<Villager>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
             Without<Corpse>,
         ),
@@ -1243,6 +1247,7 @@ pub(super) fn midday_meal(
         (
             With<Villager>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
             Without<Corpse>,
         ),
@@ -1281,6 +1286,7 @@ pub(super) fn family_supper(
         (
             With<Villager>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
             Without<Corpse>,
         ),
@@ -1340,6 +1346,7 @@ pub(super) fn tavern_evenings(
         (
             With<Villager>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
             Without<Corpse>,
         ),

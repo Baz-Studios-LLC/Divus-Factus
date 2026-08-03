@@ -2361,7 +2361,12 @@ fn choose_activity(
     stores: Query<&work::Stockpile>,
     mut villagers: Query<
         (&mut Activity, &Needs, &Transform, &MoveTarget),
-        (With<Villager>, Without<Held>, Without<Airborne>),
+        (
+            With<Villager>,
+            Without<Held>,
+            Without<crate::avatar::Ridden>,
+            Without<Airborne>,
+        ),
     >,
     food: Query<(Entity, &GlobalTransform, &FoodSource), Without<Villager>>,
 ) {
@@ -2482,14 +2487,14 @@ fn pursue_activity(
             With<Villager>,
             Without<Held>,
             Without<Airborne>,
-            // A body the god is wearing takes no errands. This is the system
-            // that turns an activity into somewhere to walk, so excluding it
-            // here stops all of them at once — and it has to be excluded,
-            // not merely overruled: `Wandering` with nowhere to go rolls a
-            // FRESH destination every frame, and one drawn around the
-            // settlement centre rather than the walker when the walker is
-            // out past its edge. Possess a hunter in the woods and the body
-            // would set off home at a stride, carrying the god with it.
+            // A body the god is wearing takes no errands, the same way one in
+            // the god's hand takes none. This is the system that turns an
+            // activity into somewhere to walk, and it has to EXCLUDE a worn
+            // body rather than be overruled by one: `Wandering` with nowhere
+            // to go rolls a fresh destination every frame, and one drawn
+            // around the settlement centre rather than the walker when the
+            // walker is outside its radius. Possess a hunter in the woods and
+            // the body sets off home at a stride, carrying the god with it.
             Without<crate::avatar::Ridden>,
         ),
     >,

@@ -173,7 +173,12 @@ pub(super) fn mourn(
             &mut MoveTarget,
             &mut CreatureMotion,
         ),
-        (With<Villager>, Without<Held>, Without<Airborne>),
+        (
+            With<Villager>,
+            Without<Held>,
+            Without<crate::avatar::Ridden>,
+            Without<Airborne>,
+        ),
     >,
 ) {
     for (mourner, at, grieving, mut activity, mut target, mut motion) in &mut mourners {
@@ -223,6 +228,7 @@ pub(super) fn burials(
             With<Corpse>,
             With<Villager>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
         ),
     >,
@@ -242,6 +248,7 @@ pub(super) fn burials(
             With<Villager>,
             Without<Corpse>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
         ),
     >,

@@ -170,6 +170,7 @@ pub(super) fn kneel(
             With<Villager>,
             Without<Prayer>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
             Without<Corpse>,
         ),

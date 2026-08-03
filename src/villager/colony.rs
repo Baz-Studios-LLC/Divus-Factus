@@ -346,7 +346,12 @@ pub(super) fn walk_to_the_new_ground(
             &mut Activity,
             &mut MoveTarget,
         ),
-        (With<Villager>, Without<Held>, Without<Airborne>),
+        (
+            With<Villager>,
+            Without<Held>,
+            Without<crate::avatar::Ridden>,
+            Without<Airborne>,
+        ),
     >,
 ) {
     for (leader, charter) in &charters {

@@ -868,6 +868,7 @@ pub(crate) fn seek_company(
             Without<Childhood>,
             Without<crate::creature::Corpse>,
             Without<Held>,
+            Without<crate::avatar::Ridden>,
             Without<Airborne>,
         ),
     >,

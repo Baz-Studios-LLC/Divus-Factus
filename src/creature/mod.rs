@@ -254,7 +254,19 @@ fn plan_routes(
     terrain: Option<Res<Terrain>>,
     mut creatures: Query<
         (&Transform, &MoveTarget, &mut Route),
-        (With<Creature>, Without<Held>, Without<Airborne>),
+        (
+            With<Creature>,
+            Without<Held>,
+            Without<Airborne>,
+            // A body the god is driving is steered, not routed. Its goal is
+            // only a few strides ahead and moves every frame, so pathfinding
+            // to it re-planned continuously and handed locomotion a first
+            // waypoint almost underfoot — and locomotion eases off as it
+            // nears a waypoint, so the god crawled. With no route, the walk
+            // aims straight at where the god is pointing, which is the whole
+            // idea of driving.
+            Without<crate::avatar::Ridden>,
+        ),
     >,
 ) {
     let Some(terrain) = terrain else {

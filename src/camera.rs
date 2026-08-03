@@ -494,8 +494,13 @@ fn read_camera_input(
         }
     }
 
-    // Orbiting, on right mouse.
-    if buttons.pressed(MouseButton::Right) {
+    // Orbiting, on right mouse — or freely, with no button at all, when the
+    // god is behind somebody's eyes. In a body there is no orbit to speak of
+    // and nothing else for the mouse to do: the pointer is locked away and
+    // the hand withdrawn, so the mouse simply IS the neck, the way it is in
+    // every game that has ever put you inside a head.
+    let looking_about = rig.target_distance < FIRST_PERSON;
+    if buttons.pressed(MouseButton::Right) || looking_about {
         let delta = mouse_motion.delta;
         if delta != Vec2::ZERO {
             let sensitivity = rig.orbit_sensitivity;
