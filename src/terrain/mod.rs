@@ -1501,12 +1501,20 @@ fn follow_water_plane(
     // planet's painted ocean owns everything beyond the loaded shore. It
     // will follow the curve itself the day the chunks do; they share a
     // frame, and bending one without the other tears every shoreline.
-    let fit = stream_radius(rig.distance) as f32 / VIEW_CHUNKS as f32;
+    // And it bows out entirely as the god climbs. The flat sea exists to
+    // wet flat land, and it cannot curve before the land does - the shore
+    // must meet the water exactly, and a curved sea would sag sixty units
+    // below the village beach and turn every coast into a cliff. From
+    // altitude the planet paints its own ocean and its own lakes, so the
+    // quad's job simply ends; it shrinks away across a band of climb and
+    // the painted water beneath carries on.
+    let receding = 1.0 - ((rig.distance - 2_200.0) / 800.0).clamp(0.0, 1.0);
+    let fit = (stream_radius(rig.distance) as f32 / VIEW_CHUNKS as f32) * receding;
     let heart = homeland_heart(rig.focus);
     for mut transform in &mut water {
         transform.translation.x = heart.x;
         transform.translation.z = heart.y;
-        transform.scale = Vec3::new(fit, 1.0, fit);
+        transform.scale = Vec3::new(fit.max(0.001), 1.0, fit.max(0.001));
     }
 }
 
