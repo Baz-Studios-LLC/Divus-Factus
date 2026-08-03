@@ -1268,6 +1268,7 @@ pub(crate) fn spawn_settlement(
         ResMut<crate::terrain::LoadedChunks>,
         Res<crate::terrain::TerrainAssets>,
         ResMut<crate::scatter::StrippedGround>,
+        ResMut<crate::grass::GrassChunks>,
     ),
     woods: Query<(Entity, &GlobalTransform), With<crate::scatter::FellableTree>>,
     world_seed: Res<crate::WorldSeed>,
@@ -1440,7 +1441,7 @@ pub(crate) fn spawn_settlement(
             .iter()
             .map(|(tree, at)| (tree, at.translation()))
             .collect();
-        let (terrain, chunks, chunk_assets, stripped) = &mut ground;
+        let (terrain, chunks, chunk_assets, stripped, grass) = &mut ground;
         work::raise_the_founding_hall(
             &mut commands,
             &mut meshes,
@@ -1449,6 +1450,7 @@ pub(crate) fn spawn_settlement(
             chunks,
             chunk_assets,
             stripped,
+            grass,
             &standing,
             settlement,
             centre,

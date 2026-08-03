@@ -1187,6 +1187,7 @@ pub(crate) fn raise_the_founding_hall(
     chunks: &mut crate::terrain::LoadedChunks,
     chunk_assets: &crate::terrain::TerrainAssets,
     stripped: &mut crate::scatter::StrippedGround,
+    grass: &mut crate::grass::GrassChunks,
     standing: &[(Entity, Vec3)],
     settlement: Entity,
     centre: Vec3,
@@ -1195,14 +1196,15 @@ pub(crate) fn raise_the_founding_hall(
     let plan = Blueprint::roll(BuildingKind::Longhouse, rng);
     let reach = plan.half_w.max(plan.half_d);
 
-    // Well off the square: its own half-length again beyond the ring, so
-    // the walls stand a good twenty strides clear of the banner rather
-    // than crowding it.
+    // Well off the square: three of its own half-lengths out, so a hall
+    // this size sits about fifty strides from the banner with its walls
+    // a good thirty clear of it. Two half-lengths still read as crowding
+    // the flag.
     let (at, angle) = (0..12)
         .map(|i| {
             let angle = i as f32 / 12.0 * std::f32::consts::TAU;
             let (sin, cos) = angle.sin_cos();
-            let out = reach * 2.0 + 8.0;
+            let out = reach * 3.0 + 12.0;
             let (x, z) = (centre.x + cos * out, centre.z + sin * out);
             (Vec3::new(x, terrain.height_at(x, z), z), angle)
         })
@@ -1225,7 +1227,12 @@ pub(crate) fn raise_the_founding_hall(
     // vetted the site was wrong: ground level enough for a village is
     // nowhere near level enough for a hall twenty-five metres long, and
     // the thing came up half buried.
-    let pad = reach + 2.0;
+    // The pad has to cover the CORNERS, not the longest side: a rectangle
+    // reaches further diagonally than either half-extent, so a pad cut to
+    // `reach` left the ends of the hall - and its porch - standing on
+    // ground nothing had marked as worked, with grass coming up through
+    // the boards.
+    let pad = plan.half_w.hypot(plan.half_d) + 2.5;
     let worked = terrain.terrace(at.x, at.z, pad, 2.4, at.y);
 
     // The clearing, BEFORE the chunks are swapped - a scattered tree is
@@ -1248,6 +1255,11 @@ pub(crate) fn raise_the_founding_hall(
         at.z,
         worked + 4.0,
     );
+    // And the grass with it. Rebuilding the chunk leaves the grass where
+    // it was until something else happens to invalidate it, so the blades
+    // stood up through the floor and the porch for a good while after the
+    // hall arrived. Every other site does these two together.
+    grass.invalidate_near(commands, at.x, at.z, worked + 4.0);
     let at = Vec3::new(at.x, terrain.height_at(at.x, at.z), at.z);
 
     // How deep it starts. The whole building is set below the ground and
