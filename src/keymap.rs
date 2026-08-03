@@ -34,10 +34,11 @@ pub enum Deed {
     Trades,
     Fog,
     Avatar,
+    Sprint,
 }
 
 impl Deed {
-    pub const ALL: [Deed; 21] = [
+    pub const ALL: [Deed; 22] = [
         Deed::PanNorth,
         Deed::PanSouth,
         Deed::PanWest,
@@ -59,6 +60,7 @@ impl Deed {
         Deed::Trades,
         Deed::Fog,
         Deed::Avatar,
+        Deed::Sprint,
     ];
 
     /// The name the deed goes by in the keys file.
@@ -85,6 +87,7 @@ impl Deed {
             Deed::Trades => "trades",
             Deed::Fog => "fog",
             Deed::Avatar => "avatar",
+            Deed::Sprint => "sprint",
         }
     }
 
@@ -111,6 +114,7 @@ impl Deed {
             Deed::Trades => KeyCode::KeyK,
             Deed::Fog => KeyCode::KeyF,
             Deed::Avatar => KeyCode::Digit5,
+            Deed::Sprint => KeyCode::ShiftLeft,
         }
     }
 }
@@ -207,6 +211,8 @@ const NAMED: &[(KeyCode, &str)] = &[
     (KeyCode::Digit8, "8"),
     (KeyCode::Digit9, "9"),
     (KeyCode::Space, "Space"),
+    (KeyCode::ShiftLeft, "Shift"),
+    (KeyCode::ShiftRight, "Right Shift"),
     (KeyCode::Tab, "Tab"),
     (KeyCode::Minus, "-"),
     (KeyCode::Equal, "="),

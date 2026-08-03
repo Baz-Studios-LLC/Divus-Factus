@@ -198,6 +198,16 @@ pub struct Airborne {
     pub velocity: Vec3,
 }
 
+/// A creature moving faster than its own ordinary pace: a multiplier on the
+/// walk, applied by [`locomotion`].
+///
+/// Only the god sprinting a body it is driving, for now. Kept here beside the
+/// walking rather than in the miracle, because the walking is what has to
+/// honour it — and because a villager who learns to run one day should find
+/// the mechanism already waiting.
+#[derive(Component)]
+pub struct Sprinting(pub f32);
+
 /// A childhood in progress. Ticks down; at zero the child comes of age and the
 /// body is rebuilt as an adult's.
 ///
@@ -326,6 +336,7 @@ fn locomotion(
             &mut CreatureMotion,
             &mut Route,
             Option<&Vitality>,
+            Option<&Sprinting>,
         ),
         (
             With<Creature>,
@@ -340,7 +351,9 @@ fn locomotion(
     };
     let dt = time.delta_secs();
 
-    for (genome, mut transform, mut target, mut motion, mut route, vitality) in &mut creatures {
+    for (genome, mut transform, mut target, mut motion, mut route, vitality, sprint) in
+        &mut creatures
+    {
         let mut speed = 0.0;
         // The dying walk like the dying.
         let vigor = vitality.map_or(1.0, |v| 1.0 - v.harm * 0.55);
@@ -385,7 +398,8 @@ fn locomotion(
                 let paved = trails.as_ref().map_or(1.0, |t| {
                     t.haste(transform.translation.x, transform.translation.z)
                 });
-                speed = genome.walk_speed() * approach * vigor * paved;
+                let running = sprint.map_or(1.0, |s| s.0);
+                speed = genome.walk_speed() * approach * vigor * paved * running;
 
                 // Swimming is slow: most of the stride is lost to the water.
                 let step = (speed * dt).min(distance) * (1.0 - motion.swim * 0.55);

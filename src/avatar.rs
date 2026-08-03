@@ -57,6 +57,21 @@ const STRIDE: f32 = 8.0;
 /// working zoom, so you are returned to the view you play from.
 const LEAVING_HEIGHT: f32 = 80.0;
 
+/// How much faster a sprinted body moves than a walked one.
+///
+/// Not so much that a villager reads as a vehicle — they are still somebody's
+/// legs — but enough that crossing the settlement is a decision rather than a
+/// wait.
+const SPRINT: f32 = 1.8;
+
+/// Upward speed of a jump, in world units per second.
+///
+/// Chosen against the landing: the fall home arrives at the same speed it
+/// left, and harm begins above about eight, so this clears a low wall and
+/// still lands without hurting the body it borrowed. Jump off something tall
+/// and that is a different sum, and the fall will be honoured as any other.
+const JUMP: f32 = 7.0;
+
 /// Where the god's gaze is set as it arrives in a body: a touch below
 /// level, the way somebody walking looks at the ground ahead of them.
 const ARRIVING_PITCH: f32 = 0.12;
@@ -298,7 +313,10 @@ fn wear_it(
         // ride is paid for by having no miracles left when it ends.
         let done = recast || ride.left <= 0.0 || keys.just_pressed(KeyCode::Escape);
         if done {
-            commands.entity(who).remove::<Ridden>();
+            commands
+                .entity(who)
+                .remove::<Ridden>()
+                .remove::<crate::creature::Sprinting>();
             // Given back visible. If the god leaves while the camera is still
             // inside the skull, this is the only thing that puts them back in
             // the world at all.
@@ -331,16 +349,28 @@ fn wear_it(
 /// walks there on its own legs, so every gait, slope and stumble the
 /// village already has applies to the god as much as to anybody.
 fn drive_the_body(
+    mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
     keymap: Res<crate::keymap::Keymap>,
     rigs: Query<&CameraRig>,
-    mut ridden: Query<(&Transform, &mut MoveTarget, &mut Activity), With<Ridden>>,
+    mut ridden: Query<
+        (
+            Entity,
+            &Transform,
+            &mut MoveTarget,
+            &mut Activity,
+            &crate::creature::genome::CreatureGenome,
+            Option<&crate::creature::Airborne>,
+            Option<&crate::creature::Sprinting>,
+        ),
+        With<Ridden>,
+    >,
 ) {
     use crate::keymap::Deed;
     let Ok(rig) = rigs.single() else {
         return;
     };
-    for (at, mut target, mut activity) in &mut ridden {
+    for (who, at, mut target, mut activity, genome, aloft, sprinting) in &mut ridden {
         // Whatever errand they were on, they are not on it now. IDLE, and
         // deliberately not `Wandering` — wandering is not a state of doing
         // nothing, it is the state that goes looking for somewhere to be,
@@ -367,7 +397,38 @@ fn drive_the_body(
         if keymap.pressed(&keys, Deed::PanEast) {
             push += beside;
         }
-        target.0 =
-            (push.length_squared() > 0.0).then(|| at.translation + push.normalize() * STRIDE);
+        let going = (push.length_squared() > 0.0).then(|| push.normalize());
+        target.0 = going.map(|way| at.translation + way * STRIDE);
+
+        // Sprinting is a component rather than a number written here, so the
+        // walking stays the one authority on how fast anything moves.
+        let running = keymap.pressed(&keys, Deed::Sprint);
+        if running && sprinting.is_none() {
+            commands
+                .entity(who)
+                .insert(crate::creature::Sprinting(SPRINT));
+        } else if !running && sprinting.is_some() {
+            commands.entity(who).remove::<crate::creature::Sprinting>();
+        }
+
+        // A jump hands the body to the same ballistics that carry a villager
+        // the god has thrown: gravity, a tumble, and a landing that is
+        // reckoned honestly. Whatever pace they were going at leaves with
+        // them, so a running jump carries — and while they are aloft the
+        // walking lets go of them, which is what makes it a jump rather than
+        // a hop straight up out of a stride.
+        // Space, read directly rather than through the keymap: it already
+        // belongs to Pause, and the keymap holds every deed to one key of its
+        // own. These two never want it at the same moment — inside a body
+        // there is nothing worth pausing — so `command_time` stands aside
+        // while one is worn and the key means jump.
+        if aloft.is_none() && keys.just_pressed(KeyCode::Space) {
+            let carry = going.unwrap_or(Vec3::ZERO)
+                * genome.walk_speed()
+                * if running { SPRINT } else { 1.0 };
+            commands.entity(who).insert(crate::creature::Airborne {
+                velocity: carry + Vec3::Y * JUMP,
+            });
+        }
     }
 }

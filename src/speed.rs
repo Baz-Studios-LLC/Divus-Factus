@@ -125,9 +125,14 @@ fn command_time(
     keys: Res<ButtonInput<KeyCode>>,
     keymap: Res<crate::keymap::Keymap>,
     buttons: Query<(&Interaction, &SpeedButton), Changed<Interaction>>,
+    rigs: Query<&crate::camera::CameraRig>,
     mut sim: ResMut<SimSpeed>,
 ) {
-    if keymap.just_pressed(&keys, crate::keymap::Deed::Pause) {
+    // Space stops the world — unless the god is standing in it wearing a
+    // body, in which case the same key is a jump and pausing is beside the
+    // point. The two share the key because they never want it at once.
+    let in_a_body = rigs.single().is_ok_and(|rig| rig.in_a_body);
+    if !in_a_body && keymap.just_pressed(&keys, crate::keymap::Deed::Pause) {
         sim.paused = !sim.paused;
     }
     let step = STEPS
