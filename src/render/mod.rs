@@ -373,10 +373,16 @@ fn focus_depth_of_field(
         // comment in `apply_look_settings` about adding and removing the
         // component rather than leaving it at zero aperture was right, and
         // this is the second reason for it.
-        // Nor is there one from orbit: the planet is a single mesh a long way
-        // off, and a lens focused at the frozen play distance would blur it.
+        // Nor from anywhere past the play zoom: the diorama lens focused at
+        // three thousand units smeared the whole climb - the band between
+        // the play ceiling and orbit was a blur that read as a broken
+        // renderer rather than a style.
         let in_orbit = globe.as_ref().is_some_and(|globe| globe.shown);
-        if rig.in_a_body || rig.distance < crate::camera::FIRST_PERSON || in_orbit {
+        if rig.in_a_body
+            || rig.distance < crate::camera::FIRST_PERSON
+            || rig.distance > crate::globe::ASCENT
+            || in_orbit
+        {
             if dof.is_some() {
                 commands.entity(entity).remove::<DepthOfField>();
             }

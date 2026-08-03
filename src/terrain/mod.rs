@@ -616,13 +616,9 @@ impl Terrain {
             - 1.0
     }
 
-    /// Rough temperature in `[0, 1]`, falling with altitude.
-    pub fn temperature_at(&self, x: f32, z: f32) -> f32 {
-        self.temperature_for(x, z, self.height_at(x, z))
-    }
-
-    /// [`temperature_at`](Self::temperature_at) with the height already in
-    /// hand, for the same bulk-sampling reason as [`biome_for`](Self::biome_for).
+    /// Rough temperature in `[0, 1]`, falling with altitude. Takes the height
+    /// already in hand, for the same bulk-sampling reason as
+    /// [`biome_for`](Self::biome_for) — the planet asks this once per vertex.
     pub fn temperature_for(&self, x: f32, z: f32, height: f32) -> f32 {
         let base = fbm_3d(
             direction_at(x, z) * spherical(0.00042) + Vec3::new(-400.0, 250.0, 90.0),
