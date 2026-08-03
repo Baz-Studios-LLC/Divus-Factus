@@ -471,6 +471,7 @@ fn spawn_camera(mut commands: Commands) {
 }
 
 fn read_camera_input(
+    mut grabbed: Local<Option<Vec3>>,
     keys: Res<ButtonInput<KeyCode>>,
     keymap: Res<crate::keymap::Keymap>,
     buttons: Res<ButtonInput<MouseButton>>,
@@ -534,20 +535,58 @@ fn read_camera_input(
         rig.target_focus.z = rig.target_focus.z.clamp(-brim, brim);
     }
 
-    // Drag-panning on middle mouse. Moves the world with the pointer rather than
-    // moving the camera with it, which is the direction people expect from having
-    // dragged every map they have ever used.
+    // The middle mouse GRABS THE WORLD. Not a camera pan: the ground under
+    // the cursor is seized on the press, and while the button is held the
+    // whole planet is turned so that piece of ground stays under the hand -
+    // the gesture Black and White taught, and the only one that makes sense
+    // once the world is a ball. At village zoom the turn is microscopic and
+    // it feels exactly like the drag-pan it replaces; from altitude the same
+    // pull spins continents. One mechanism, every height.
+    if buttons.just_pressed(MouseButton::Middle) {
+        *grabbed = cursor_sphere_direction(&windows, &cameras);
+    }
+    if buttons.just_released(MouseButton::Middle) {
+        *grabbed = None;
+    }
     if buttons.pressed(MouseButton::Middle) {
-        let delta = mouse_motion.delta;
-        if delta != Vec2::ZERO {
-            // Scale with distance so a pixel of mouse travel covers roughly the same
-            // amount of ground at every zoom level, and the grabbed point stays
-            // under the cursor.
-            let scale = rig.distance * DRAG_PAN_SCALE;
-            let right = rig.ground_right();
-            let forward = rig.ground_forward();
-            rig.target_focus -= right * delta.x * scale;
-            rig.target_focus += forward * delta.y * scale;
+        if let Some(held) = *grabbed {
+            if let Some(now) = cursor_sphere_direction(&windows, &cameras) {
+                // Turn the world so the grabbed ground comes back under the
+                // cursor: rotate the focus by the arc from where the grab
+                // is now to where the hand holds it.
+                let turn = Quat::from_rotation_arc(now, held);
+                let stance = crate::globe::planet_stance();
+                let focus_dir =
+                    stance * crate::terrain::direction_at(rig.target_focus.x, rig.target_focus.z);
+                let turned = stance.inverse() * (turn * focus_dir);
+                let lat = turned.y.clamp(-1.0, 1.0).asin();
+                let lon = turned.x.atan2(turned.z);
+                let radius = crate::terrain::PLANET_RADIUS;
+                // Longitude unwraps toward the focus it came from, so a grab
+                // never teleports the coordinates across the date line.
+                let round = crate::terrain::planet_circumference();
+                let mut x = lon * radius;
+                while x - rig.target_focus.x > round * 0.5 {
+                    x -= round;
+                }
+                while rig.target_focus.x - x > round * 0.5 {
+                    x += round;
+                }
+                let brim = round * 0.24;
+                rig.target_focus.x = x;
+                rig.target_focus.z = (-lat * radius).clamp(-brim, brim);
+            }
+        } else {
+            // The grab began on the sky: fall back to the old drag-pan so
+            // the gesture still does something sensible.
+            let delta = mouse_motion.delta;
+            if delta != Vec2::ZERO {
+                let scale = rig.distance * DRAG_PAN_SCALE;
+                let right = rig.ground_right();
+                let forward = rig.ground_forward();
+                rig.target_focus -= right * delta.x * scale;
+                rig.target_focus += forward * delta.y * scale;
+            }
         }
     }
 
@@ -633,6 +672,31 @@ fn read_camera_input(
             .target_pitch
             .max(MIN_PITCH + (MAX_PITCH - MIN_PITCH) * leaving);
     }
+}
+
+/// Where the cursor's ray meets the planet's sea-level sphere, as a unit
+/// direction from the planet's centre — the handle the world-grab holds.
+/// `None` when the cursor is off the ball entirely.
+fn cursor_sphere_direction(
+    windows: &Query<&Window, With<PrimaryWindow>>,
+    cameras: &Query<(&Camera, &GlobalTransform), With<GodCamera>>,
+) -> Option<Vec3> {
+    let window = windows.single().ok()?;
+    let (camera, camera_transform) = cameras.single().ok()?;
+    let cursor = window.cursor_position()?;
+    let ray = camera.viewport_to_world(camera_transform, cursor).ok()?;
+    let centre = crate::globe::planet_centre();
+    let radius = crate::terrain::PLANET_RADIUS + WATER_LEVEL;
+    let to_centre = centre - ray.origin;
+    let along = to_centre.dot(*ray.direction);
+    let closest = ray.origin + *ray.direction * along - centre;
+    let off_axis = closest.length_squared();
+    if off_axis > radius * radius {
+        return None;
+    }
+    let depth = (radius * radius - off_axis).sqrt();
+    let hit = ray.origin + *ray.direction * (along - depth);
+    Some((hit - centre).normalize())
 }
 
 /// Keeps the focus point riding the ground, so orbiting over a hill does not

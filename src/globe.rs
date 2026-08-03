@@ -78,7 +78,7 @@ const REFINE_FLOOR: f32 = 300.0;
 /// maps ground onto the unit sphere with the reference point at +Z and the
 /// poles at ±Y, and this turns that frame so the reference point is UP,
 /// with the game's own north (-z on the ground) kept as north.
-fn planet_stance() -> Quat {
+pub(crate) fn planet_stance() -> Quat {
     Quat::from_rotation_x(-FRAC_PI_2)
 }
 
@@ -86,7 +86,7 @@ fn planet_stance() -> Quat {
 /// world at the origin, sunk a few units so the two surfaces — the same
 /// field, so they agree exactly at the tangent point — never fight over the
 /// same pixels while both are drawn.
-fn planet_centre() -> Vec3 {
+pub(crate) fn planet_centre() -> Vec3 {
     Vec3::new(0.0, -(PLANET_RADIUS + WATER_LEVEL) - 8.0, 0.0)
 }
 
