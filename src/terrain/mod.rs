@@ -104,6 +104,9 @@ pub fn planet_circumference() -> f32 {
 /// east and `x` comes back round to where it started, because sine and cosine
 /// do that for nothing.
 ///
+/// `x` is arc length east; `-z` is arc length north, matching the compass the
+/// game already walks by.
+///
 /// It is deliberately a scaffold and not a coordinate system. Near the
 /// reference point it is exact; far from it, east-west arc length stretches by
 /// the usual `1/cos(latitude)`, and walking over a pole keeps its longitude
@@ -112,7 +115,12 @@ pub fn planet_circumference() -> f32 {
 /// unit - and all of it goes away when positions themselves become spherical.
 pub fn direction_at(x: f32, z: f32) -> Vec3 {
     let lon = x / PLANET_RADIUS;
-    let lat = z / PLANET_RADIUS;
+    // Negated, because the game's compass points north along -z (that is the
+    // direction the pan-north key walks). With latitude growing along +z the
+    // globe came out a MIRROR of the ground: a village's mountains sat north
+    // of it from orbit and south of it from the air. Caught by looking, which
+    // is the only instrument that would ever have caught it.
+    let lat = -z / PLANET_RADIUS;
     let (sin_lat, cos_lat) = lat.sin_cos();
     let (sin_lon, cos_lon) = lon.sin_cos();
     Vec3::new(cos_lat * sin_lon, sin_lat, cos_lat * cos_lon)
@@ -216,7 +224,9 @@ struct FlatSpot {
 /// the villagers have levelled.
 #[derive(Resource, Clone)]
 pub struct Terrain {
-    seed: u32,
+    /// Public so the globe can remember which world its planet was carved
+    /// for, and never rebuild it for the world it already shows.
+    pub seed: u32,
     /// The memoised river network. Cloning a `Terrain` shares it.
     rivers: Arc<rivers::RiverIndex>,
     /// Ground worked level by hands. Shared like the rivers; grows rarely.
@@ -608,6 +618,12 @@ impl Terrain {
 
     /// Rough temperature in `[0, 1]`, falling with altitude.
     pub fn temperature_at(&self, x: f32, z: f32) -> f32 {
+        self.temperature_for(x, z, self.height_at(x, z))
+    }
+
+    /// [`temperature_at`](Self::temperature_at) with the height already in
+    /// hand, for the same bulk-sampling reason as [`biome_for`](Self::biome_for).
+    pub fn temperature_for(&self, x: f32, z: f32, height: f32) -> f32 {
         let base = fbm_3d(
             direction_at(x, z) * spherical(0.00042) + Vec3::new(-400.0, 250.0, 90.0),
             self.seed ^ 0x7e11,
@@ -615,18 +631,24 @@ impl Terrain {
             2.0,
             0.5,
         );
-        let altitude = ((self.height_at(x, z) - WATER_LEVEL) / 120.0).clamp(0.0, 1.0);
+        let altitude = ((height - WATER_LEVEL) / 120.0).clamp(0.0, 1.0);
         (base - altitude * 0.55).clamp(0.0, 1.0)
     }
 
     /// Which biome a position falls in.
     pub fn biome_at(&self, x: f32, z: f32) -> Biome {
-        let height = self.height_at(x, z);
+        self.biome_for(x, z, self.height_at(x, z))
+    }
+
+    /// [`biome_at`](Self::biome_at) for a height the caller already holds, so
+    /// a bulk sampler — the globe reads every vertex of a planet — does not
+    /// silently pay for each height twice.
+    pub fn biome_for(&self, x: f32, z: f32, height: f32) -> Biome {
         if height > WATER_LEVEL + 78.0 {
             return Biome::Alpine;
         }
 
-        let temperature = self.temperature_at(x, z);
+        let temperature = self.temperature_for(x, z, height);
         let moisture = self.moisture_at(x, z);
 
         if temperature < 0.34 {
@@ -824,7 +846,10 @@ pub fn raycast(terrain: &Terrain, ray: Ray3d) -> Option<Vec3> {
 }
 
 /// Chooses a surface colour from height, steepness and moisture.
-fn surface_color(
+///
+/// `pub(crate)` because the globe paints its planet with this exact function —
+/// the world seen from orbit must be the world the chunks paint up close.
+pub(crate) fn surface_color(
     height: f32,
     slope: f32,
     moisture: f32,

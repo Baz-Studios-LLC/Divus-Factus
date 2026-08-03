@@ -29,7 +29,13 @@ impl Plugin for CameraPlugin {
                     // anywhere to put a village.
                     read_camera_input.run_if(
                         crate::world_is_afoot
-                            .and_then(|dive: Option<Res<CameraDive>>| dive.is_none()),
+                            .and_then(|dive: Option<Res<CameraDive>>| dive.is_none())
+                            // In orbit the mouse belongs to the planet: wheel
+                            // and drag are read there, and the rig holds its
+                            // last grounded pose for the return.
+                            .and_then(|globe: Option<Res<crate::globe::GlobeView>>| {
+                                globe.is_none_or(|globe| !globe.shown)
+                            }),
                     ),
                     apply_follow,
                     fly_the_dive.run_if(crate::world_is_afoot),
@@ -278,7 +284,7 @@ const LOOK_JUMP: f32 = 160.0;
 const RIDDEN_PITCH: f32 = 1.35;
 
 const MIN_PITCH: f32 = 0.20;
-const MAX_PITCH: f32 = FRAC_PI_2 - 0.06;
+pub const MAX_PITCH: f32 = FRAC_PI_2 - 0.06;
 const MIN_DISTANCE: f32 = 12.0;
 const MAX_DISTANCE: f32 = 1400.0;
 
@@ -403,7 +409,7 @@ impl CameraRig {
 /// hundred times larger for the same gesture. Feeding the raw delta into the zoom
 /// meant every trackpad scroll slammed straight into the clamp and the camera
 /// jumped its maximum step regardless of how gently it was nudged.
-fn normalised_scroll(delta: f32, unit: MouseScrollUnit) -> f32 {
+pub(crate) fn normalised_scroll(delta: f32, unit: MouseScrollUnit) -> f32 {
     match unit {
         MouseScrollUnit::Line => delta,
         MouseScrollUnit::Pixel => delta / MouseScrollUnit::SCROLL_UNIT_CONVERSION_FACTOR,
@@ -454,9 +460,10 @@ fn spawn_camera(mut commands: Commands) {
             // look-at-a-model feeling the tilt-shift pass will build on.
             fov: 0.62,
             near: WIDE_NEAR,
-            // Past max zoom (1400) plus the widest fog band, so overlooking the
-            // world from the top of the zoom shows a world, not the clip plane.
-            far: 3000.0,
+            // Far enough to see the far limb of the planet from the top of the
+            // orbital zoom. Reverse-Z depth keeps the precision honest across
+            // a range this wide.
+            far: 70_000.0,
             ..default()
         }),
         Transform::from_translation(rig.eye()).looking_at(rig.focus, Vec3::Y),
@@ -590,12 +597,31 @@ fn read_camera_input(
     };
     if scroll != 0.0 {
         let factor = (1.0 - scroll * rig.zoom_sensitivity).clamp(0.5, 2.0);
-        rig.target_distance = (rig.target_distance * factor).clamp(MIN_DISTANCE, MAX_DISTANCE);
+        // The wheel runs past the play ceiling and on out to orbit: the globe
+        // takes over at its curtain, and `zoom_fraction` — which sizes the
+        // hand, the fog band and the pan speed — stays normalised to the play
+        // range so none of them stretch on the way up.
+        rig.target_distance =
+            (rig.target_distance * factor).clamp(MIN_DISTANCE, crate::globe::CEILING);
 
         // Zoom toward whatever is under the cursor rather than the centre of the
         // screen, so zooming doubles as aiming: you can drop onto one villager
         // without panning there first.
         rig.zoom_anchor = cursor_ground_point(&windows, &cameras, terrain.as_deref());
+    }
+
+    // Leaving for orbit. Between the play ceiling and the globe's curtain the
+    // view steepens toward straight down, because that is how the planet will
+    // be looked at — the handover then changes the scenery's resolution, not
+    // the direction of gaze, which is most of what makes it read as one
+    // continuous climb rather than a cut to a map.
+    if rig.target_distance > MAX_DISTANCE {
+        let leaving = ((rig.target_distance - MAX_DISTANCE)
+            / (crate::globe::CURTAIN - MAX_DISTANCE))
+            .clamp(0.0, 1.0);
+        rig.target_pitch = rig
+            .target_pitch
+            .max(MIN_PITCH + (MAX_PITCH - MIN_PITCH) * leaving);
     }
 }
 

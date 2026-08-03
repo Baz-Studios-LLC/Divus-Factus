@@ -354,6 +354,7 @@ fn setup_pipeline(
 fn focus_depth_of_field(
     mut commands: Commands,
     look: Res<LookSettings>,
+    globe: Option<Res<crate::globe::GlobeView>>,
     mut cameras: Query<(Entity, &CameraRig, Option<&mut DepthOfField>), With<GodCamera>>,
 ) {
     for (entity, rig, dof) in &mut cameras {
@@ -372,7 +373,10 @@ fn focus_depth_of_field(
         // comment in `apply_look_settings` about adding and removing the
         // component rather than leaving it at zero aperture was right, and
         // this is the second reason for it.
-        if rig.in_a_body || rig.distance < crate::camera::FIRST_PERSON {
+        // Nor is there one from orbit: the planet is a single mesh a long way
+        // off, and a lens focused at the frozen play distance would blur it.
+        let in_orbit = globe.as_ref().is_some_and(|globe| globe.shown);
+        if rig.in_a_body || rig.distance < crate::camera::FIRST_PERSON || in_orbit {
             if dof.is_some() {
                 commands.entity(entity).remove::<DepthOfField>();
             }
@@ -400,7 +404,7 @@ fn focus_depth_of_field(
 /// Keeps the fog band ahead of the camera as it zooms, and both fog and empty
 /// sky tracking the time of day. The two must stay identical — see
 /// [`horizon_color`] — so they are written together, from the same source.
-fn track_fog_to_zoom(
+pub(crate) fn track_fog_to_zoom(
     look: Res<LookSettings>,
     chunks: Option<Res<LoadedChunks>>,
     sky: Option<Res<crate::calendar::Sky>>,

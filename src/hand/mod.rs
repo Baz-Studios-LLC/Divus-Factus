@@ -47,6 +47,10 @@ const THROW_THRESHOLD: f32 = 2.5;
 /// Avatar - ever reaches it.
 const WITHDRAW_WITHIN: f32 = 6.0;
 
+/// Past this distance the hand fades out on the way to orbit — a little over
+/// the play zoom's ceiling, so it is gone before the planet takes the frame.
+const LEAVING_THE_WORLD: f32 = 1_600.0;
+
 /// How far in front of the camera the hand floats while it is the UI cursor.
 ///
 /// Close enough to clear every piece of world geometry, far enough past the near
@@ -324,8 +328,14 @@ fn update_hand_ray(
     windows: Query<&Window, With<PrimaryWindow>>,
     cameras: Query<(&Camera, &CameraRig), With<GodCamera>>,
     terrain: Option<Res<Terrain>>,
+    globe: Option<Res<crate::globe::GlobeView>>,
     mut hand: ResMut<DivineHand>,
 ) {
+    if among_the_stars(&globe) {
+        hand.cursor_ray = None;
+        hand.cursor_world = None;
+        return;
+    }
     let (Ok(window), Ok((camera, rig)), Some(terrain)) =
         (windows.single(), cameras.single(), terrain)
     else {
@@ -361,9 +371,17 @@ fn update_hand_ray(
     hand.cursor_world = terrain::raycast(&terrain, ray);
 }
 
+/// Whether the god is in orbit, where the hand has no world under it: no
+/// cursor point, no hover, no grabs, and nothing for an armed miracle to land
+/// on. One question, asked by every hand system that touches the world.
+fn among_the_stars(globe: &Option<Res<crate::globe::GlobeView>>) -> bool {
+    globe.as_ref().is_some_and(|globe| globe.shown)
+}
+
 fn update_hover(
     windows: Query<&Window, With<PrimaryWindow>>,
     cameras: Query<(&Camera, &GlobalTransform), With<GodCamera>>,
+    globe: Option<Res<crate::globe::GlobeView>>,
     rigs: Query<&CameraRig>,
     candidates: Query<(Entity, &GlobalTransform, &PickRadius), Without<Held>>,
     pointer: Res<PointerContext>,
@@ -376,7 +394,7 @@ fn update_hover(
     // touches nothing. Naming what is "beneath your hand" while the god has
     // no hand to speak of gives the whole thing away.
     let riding = rigs.single().is_ok_and(|rig| rig.in_a_body);
-    if hand.held.is_some() || pointer.over_ui || riding {
+    if hand.held.is_some() || pointer.over_ui || riding || among_the_stars(&globe) {
         hand.hovered = None;
         return;
     }
@@ -941,7 +959,11 @@ fn animate_hand(
     // waving its own hand in front of the face. Ordinary play never comes
     // closer than `MIN_DISTANCE`, twelve metres, so nothing but Avatar can
     // trip this. It fades away and back rather than popping.
-    let withdrawn = camera.distance < WITHDRAW_WITHIN && !held;
+    // Withdrawn at both ends of the zoom: inside a mortal's head, where it
+    // would fill the frame, and past the play ceiling on the way to orbit,
+    // where a fist the size of a county would hang over the shrinking world.
+    let withdrawn =
+        (camera.distance < WITHDRAW_WITHIN || camera.distance > LEAVING_THE_WORLD) && !held;
     let fade_ease = 1.0 - (-6.0 * dt).exp();
     rig.fade += ((!withdrawn as u32 as f32) - rig.fade) * fade_ease;
 

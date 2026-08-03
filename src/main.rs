@@ -10,6 +10,7 @@ mod debug;
 mod doings;
 mod fog;
 mod founding;
+mod globe;
 mod grass;
 mod hand;
 mod keymap;
@@ -202,6 +203,7 @@ fn main() {
             avatar::AvatarPlugin,
             founding::FoundingPlugin,
             fog::FogPlugin,
+            globe::GlobePlugin,
         ))
         .add_systems(Startup, spawn_lighting)
         .run();
