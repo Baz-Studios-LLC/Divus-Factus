@@ -45,6 +45,23 @@ pub const ASCENT: f32 = 1_500.0;
 /// in the frame with room to spare, like a held apple.
 pub const CEILING: f32 = 42_000.0;
 
+/// How far the patch surface is drawn BELOW the true ground.
+///
+/// The patches and the streamed chunks are now the same surface - both are
+/// the same height field seated on the same sphere - and coincident surfaces
+/// fight for every pixel. That fight was the grey striping across the whole
+/// landscape: the chunks painted green, the patches beneath them painted
+/// with the fog of war's slate, trading places pixel by pixel down to the
+/// depth buffer's last bit. Before the world was bent the chunks lay on a
+/// flat plane hundreds of units clear of the sphere and always won by being
+/// nearer; the bend took that accident away and nothing replaced it.
+///
+/// So the planet is sunk a couple of units, and the chunks win wherever they
+/// exist. The cost is a small step down at the streamed rim - the detail seam
+/// that is already the known price of two representations - and at the
+/// distance the rim is ever seen, two units is nothing.
+const PATCH_SINK: f32 = 2.5;
+
 /// Grid cells along each edge of every patch, whatever its depth. Depth is
 /// carried by the tree, not the grid: a deeper patch covers a quarter of the
 /// ground with the same count of cells, which is what sharpening IS.
@@ -698,7 +715,7 @@ pub(crate) fn ground_coordinates(dir: Vec3) -> (f32, f32) {
 /// the loaded ground, and an exaggerated mountain would tower up through
 /// the real ground above it.
 fn drawn_radial(h: f32, wet: f32) -> f32 {
-    PLANET_RADIUS + WATER_LEVEL + (h.max(wet) - WATER_LEVEL).max(0.0)
+    PLANET_RADIUS + WATER_LEVEL + (h.max(wet) - WATER_LEVEL).max(0.0) - PATCH_SINK
 }
 
 /// One vertex's colour: any standing water by depth in the water's own

@@ -60,6 +60,19 @@ const SEA_SHEET: f32 = 0.35;
 /// half milliseconds a frame: 48fps with the stack, 64 with the lid.
 const LID_BEYOND: f32 = 350.0;
 
+/// How far the lowest sheet floats over the ground it veils.
+///
+/// It was a tenth of a unit - "a hand's breadth", enough to win the depth
+/// test against the ground while looking like it lay on it. That was true of
+/// a world whose vertices were chunk-local, a few tens of units from their
+/// own origin. On a round world every vertex is a world-space seat some six
+/// thousand units from the planet's centre, and at that magnitude an `f32`
+/// resolves to about seven ten-thousandths - so the ground and the sheet
+/// stopped being reliably ordered and the whole landscape came out striped
+/// where they traded places pixel by pixel. A unit and a half is still
+/// nothing beside a tree, and it is two thousand times the precision floor.
+const LOWEST_SHEET: f32 = 1.5;
+
 /// Whether the veil is up. It is, from the first frame: the world a
 /// village has actually walked is the world the game is about, and the
 /// rest of the map is scenery the player was never meant to be reading.
@@ -282,9 +295,9 @@ fn drape_the_veil(
             let lift = if sea {
                 SEA_SHEET
             } else if lidded {
-                0.12 + VEIL_HIGH
+                LOWEST_SHEET + VEIL_HIGH
             } else {
-                0.12 + VEIL_HIGH * (sheet as f32 / (SHEETS - 1) as f32)
+                LOWEST_SHEET + VEIL_HIGH * (sheet as f32 / (SHEETS - 1) as f32)
             };
             commands.spawn((
                 Veil,
