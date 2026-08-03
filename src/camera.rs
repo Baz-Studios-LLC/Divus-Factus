@@ -36,6 +36,7 @@ impl Plugin for CameraPlugin {
                     follow_ground,
                     apply_camera_smoothing,
                     write_camera_transform,
+                    aim_the_near_plane,
                 )
                     .chain()
                     .in_set(CameraSet),
@@ -242,6 +243,45 @@ pub struct CameraSet;
 /// this so it has a camera to attach the offscreen target to.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CameraStartupSet;
+
+/// Sets the near plane from how high the god is, every frame.
+///
+/// This is a DEPTH PRECISION instrument, not a clipping one. The far plane
+/// had to grow to seventy thousand so the whole planet fits in the frame,
+/// and with a near plane of half a unit against that, the depth buffer can
+/// only separate surfaces about a tenth of a unit apart at a thousand units
+/// away - which is precisely how high the fog veil's lowest sheet floats
+/// over the ground. The whole landscape came out streaked in grey where the
+/// two fought for the same pixels.
+///
+/// Nothing is ever nearer the camera than the ground it is looking at, so
+/// the near plane can ride the zoom: a twelfth of the orbit distance, which
+/// at village height is some twenty-five units and buys two orders of
+/// magnitude of precision. Behind a mortal's eyes it drops to four
+/// centimetres, because there the god's own chest is a hand away - and that
+/// case owns the plane outright.
+fn aim_the_near_plane(
+    rigs: Query<&CameraRig>,
+    mut lenses: Query<&mut Projection, With<GodCamera>>,
+) {
+    let Ok(rig) = rigs.single() else {
+        return;
+    };
+    let Ok(mut lens) = lenses.single_mut() else {
+        return;
+    };
+    let Projection::Perspective(lens) = &mut *lens else {
+        return;
+    };
+    let wanted = if rig.in_a_body {
+        CLOSE_NEAR
+    } else {
+        (rig.distance / 12.0).clamp(WIDE_NEAR, 90.0)
+    };
+    if (lens.near - wanted).abs() > 1.0e-4 {
+        lens.near = wanted;
+    }
+}
 
 /// The near plane for the god's ordinary view of the world.
 ///

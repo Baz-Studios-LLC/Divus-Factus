@@ -129,7 +129,6 @@ fn take_a_body(
     mut notices: MessageWriter<crate::ui::Notice>,
     folk: Query<&Transform, (With<Villager>, Without<crate::creature::Corpse>)>,
     worn: Query<Entity, With<Ridden>>,
-    mut lens: Query<&mut Projection, With<crate::camera::GodCamera>>,
     mut rigs: Query<&mut CameraRig>,
     mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
@@ -173,17 +172,10 @@ fn take_a_body(
     ));
     follow.entity = Some(who);
     follow.style = FollowStyle::Eyes;
-    // The lens has to come in. Overhead, the near plane sits at half a
-    // metre because nothing is ever nearer than that; behind a mortal's
-    // eyes their own chest is a hand's width away, and at half a metre the
-    // whole body is clipped out of the frame. Looking down and finding
-    // yourself standing there is most of what sells this, so the plane
-    // comes in to a few centimetres for as long as the ride lasts.
-    if let Ok(mut lens) = lens.single_mut()
-        && let Projection::Perspective(lens) = &mut *lens
-    {
-        lens.near = crate::camera::CLOSE_NEAR;
-    }
+    // The near plane is not touched here. `aim_the_near_plane` owns it and
+    // reads `in_a_body` every frame, which is set the moment this follow
+    // style lands - two systems writing one plane is how it ended up at a
+    // stale value in the first place.
     // Level the look once, on the way in. Overhead the rig is pitched
     // steeply down at the ground; arriving in a body still pitched that way
     // would put the god's first mortal view at their own feet. A little
@@ -243,7 +235,6 @@ fn wear_it(
     mut notices: MessageWriter<crate::ui::Notice>,
     mut ridden: Query<(Entity, &mut Ridden)>,
     mut rigs: Query<&mut CameraRig>,
-    mut lens: Query<&mut Projection, With<crate::camera::GodCamera>>,
     mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
     let dt = time.delta_secs();
@@ -262,12 +253,6 @@ fn wear_it(
             .is_ok_and(|cursor| cursor.grab_mode != CursorGrabMode::None);
         if held {
             hold_the_pointer(&mut windows, false);
-        }
-        if let Ok(mut lens) = lens.single_mut()
-            && let Projection::Perspective(lens) = &mut *lens
-            && lens.near < crate::camera::WIDE_NEAR
-        {
-            lens.near = crate::camera::WIDE_NEAR;
         }
         if let Ok(mut rig) = rigs.single_mut()
             && rig.target_distance < crate::camera::FIRST_PERSON
@@ -321,11 +306,6 @@ fn wear_it(
             // inside the skull, this is the only thing that puts them back in
             // the world at all.
             commands.entity(who).insert(Visibility::Inherited);
-            if let Ok(mut lens) = lens.single_mut()
-                && let Projection::Perspective(lens) = &mut *lens
-            {
-                lens.near = crate::camera::WIDE_NEAR;
-            }
             hold_the_pointer(&mut windows, false);
             if follow.entity == Some(who) {
                 follow.entity = None;
