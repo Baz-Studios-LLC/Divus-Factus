@@ -204,7 +204,20 @@ struct HandRig {
     /// camera — a god watching through mortal eyes keeps its hands to itself —
     /// and it fades rather than pops.
     fade: f32,
+    /// How far into the flag-carrying pose the hand is, 0 to 1. Eased, so the
+    /// hand closes around the pole and turns on the way in rather than
+    /// snapping into a fist the instant the founding begins.
+    carry: f32,
 }
+
+/// The roll that turns the flat palm into a fist held sideways, as a hand
+/// holds a pole: knuckles to the camera, fingers wrapped round a vertical
+/// shaft rather than laid out over the ground.
+const CARRY_ROLL: f32 = FRAC_PI_2;
+
+/// And a little tip forward with it, so the fist reads as bearing weight
+/// rather than merely being turned over.
+const CARRY_PITCH: f32 = 0.35;
 
 /// Grip closure and hover height for each state of the hand.
 ///
@@ -843,6 +856,7 @@ fn spawn_hand_cursor(
     commands.entity(root).insert(HandRig {
         fingers,
         thumb: [thumb_base, thumb_tip],
+        carry: 0.0,
         grip: 0.1,
         bank: Vec2::ZERO,
         point: 0.0,
@@ -979,7 +993,16 @@ fn animate_hand(
         Visibility::Visible
     };
 
-    let (target_grip, hover) = pose(held, hovered.is_some());
+    // Carrying the flag: the whole of the choosing is one gesture, somebody
+    // walking the country with a standard in their fist. An open palm laid
+    // flat over the ground is the pose for picking things up, and it read as
+    // the god hovering a hand near a pole rather than holding it.
+    let carrying = matches!(state.get(), crate::GameState::Choosing);
+    rig.carry += ((carrying as u32 as f32) - rig.carry) * fade_ease;
+
+    let (open_grip, hover) = pose(held, hovered.is_some());
+    // A fist, and it wins outright over whatever the hover was doing.
+    let target_grip = open_grip.max(rig.carry);
     rig.grip += (target_grip - rig.grip) * ease;
 
     // Mild growth with zoom, so the hand neither vanishes from altitude nor
@@ -1032,8 +1055,8 @@ fn animate_hand(
     // Back of the hand to the camera, fingers up-screen, palm laid nearly flat —
     // tipped just enough toward the ground to show intent.
     let world_rotation = Quat::from_rotation_y(camera.yaw)
-        * Quat::from_rotation_x(-0.12 + sway_pitch + rig.bank.y)
-        * Quat::from_rotation_z(sway_roll - rig.bank.x);
+        * Quat::from_rotation_x(-0.12 + sway_pitch + rig.bank.y + CARRY_PITCH * rig.carry)
+        * Quat::from_rotation_z(sway_roll - rig.bank.x + CARRY_ROLL * rig.carry);
     transform.rotation = match ui_placement {
         Some((_, ui_rotation)) => world_rotation.slerp(ui_rotation, blend),
         None => world_rotation,
