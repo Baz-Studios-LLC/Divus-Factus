@@ -173,10 +173,36 @@ fn face_axes(face: u8) -> (Vec3, Vec3, Vec3) {
 #[derive(Resource, Default)]
 struct PlanetTree {
     root: Option<Entity>,
-    built: HashMap<PatchKey, Entity>,
+    built: HashMap<PatchKey, Patch2>,
     /// The seed the tree was grown for, so a new world fells the old tree.
     grown_for: Option<u32>,
+    /// Frames since the world began, for the forgetting below.
+    beat: u64,
 }
+
+/// A standing patch: its entity, its mesh, and the last frame it was on
+/// screen — the tree forgets what it has not shown for a while.
+struct Patch2 {
+    entity: Entity,
+    mesh: Handle<Mesh>,
+    last_shown: u64,
+}
+
+/// How long a hidden patch is kept before it is felled, in frames. Long
+/// enough that riding the wheel up and down does not rebuild the same
+/// ground, short enough that a long flight cannot hoard the planet.
+///
+/// It has to forget: every patch is a live mesh in memory whether drawn or
+/// not, and the first tree never dropped one — a session of flying grew it
+/// by four patches a frame until the whole game ran at eight frames a
+/// second, and the loudest clue was the quietest number on the overlay.
+const KEPT_FOR: u64 = 1_800;
+
+/// Patches below this depth are never felled: the six faces and their first
+/// splits are the whole planet from orbit, they are rebuilt at every world
+/// anyway, and the fallback for a still-growing patch must always find an
+/// ancestor standing.
+const EVERGREEN: u8 = 2;
 
 /// The one material every patch wears; the colours ride the vertices.
 #[derive(Resource)]
@@ -329,11 +355,11 @@ fn grow_patch(
     root: Entity,
     key: PatchKey,
 ) -> Entity {
-    let mesh = build_patch(terrain, key);
+    let mesh = meshes.add(build_patch(terrain, key));
     let entity = commands
         .spawn((
             Patch(key),
-            Mesh3d(meshes.add(mesh)),
+            Mesh3d(mesh.clone()),
             Transform::default(),
             Visibility::Hidden,
             RenderLayers::layer(GLOBE_LAYER),
@@ -342,7 +368,15 @@ fn grow_patch(
             ChildOf(root),
         ))
         .id();
-    tree.built.insert(key, entity);
+    let beat = tree.beat;
+    tree.built.insert(
+        key,
+        Patch2 {
+            entity,
+            mesh,
+            last_shown: beat,
+        },
+    );
     entity
 }
 
@@ -635,6 +669,13 @@ fn tend_the_tree(
             }
         }
     }
+    tree.beat += 1;
+    let beat = tree.beat;
+    for shown in &on_screen {
+        if let Some(patch) = tree.built.get_mut(shown) {
+            patch.last_shown = beat;
+        }
+    }
     for (patch, mut visibility) in &mut patches {
         let wanted = if on_screen.contains(&patch.0) {
             Visibility::Inherited
@@ -643,6 +684,25 @@ fn tend_the_tree(
         };
         if *visibility != wanted {
             *visibility = wanted;
+        }
+    }
+
+    // The forgetting. Every standing patch is a mesh in memory whether drawn
+    // or not; ones the view has not wanted for a while are felled, entity and
+    // mesh both, and the shallow levels are kept for ever as the floor the
+    // fallback can always land on.
+    let felled: Vec<PatchKey> = tree
+        .built
+        .iter()
+        .filter(|(key, patch)| {
+            key.level > EVERGREEN && beat.saturating_sub(patch.last_shown) > KEPT_FOR
+        })
+        .map(|(key, _)| *key)
+        .collect();
+    for key in felled {
+        if let Some(patch) = tree.built.remove(&key) {
+            commands.entity(patch.entity).despawn();
+            meshes.remove(&patch.mesh);
         }
     }
 }

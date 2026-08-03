@@ -348,7 +348,11 @@ fn toggle_the_sea(
     mut notices: MessageWriter<crate::ui::Notice>,
     mut water: Query<&mut Visibility, With<crate::terrain::WaterPlane>>,
 ) {
-    if !keys.just_pressed(KeyCode::F9) {
+    // F12, and not F9 as first shipped: F9 was already the exposure dial,
+    // and the collision meant every flip of the sea also silently pushed
+    // the exposure up - the diagnostic was contaminating the scene it was
+    // diagnosing.
+    if !keys.just_pressed(KeyCode::F12) {
         return;
     }
     for mut visibility in &mut water {
@@ -361,7 +365,7 @@ fn toggle_the_sea(
         notices.write(crate::ui::Notice::new(if hidden {
             "The sea is back".to_string()
         } else {
-            "The sea plane is off - F9 brings it back".to_string()
+            "The sea plane is off - F12 brings it back".to_string()
         }));
     }
 }

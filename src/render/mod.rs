@@ -311,6 +311,22 @@ fn setup_pipeline(
 /// Without this the focal plane sits at a fixed distance and the subject drifts out
 /// of focus as soon as the player zooms, which reads as a broken camera rather than
 /// as a stylistic choice.
+/// Whether the diorama lens belongs on the camera at all, in one place.
+///
+/// Two systems manage the lens — the per-frame aim below, and the look-
+/// settings apply — and when each held its own copy of this rule they
+/// disagreed at the edges: a look change could re-insert the component with
+/// Bevy's DEFAULT focal distance, a few units, which blurs the entire world
+/// into a grey mush until the other system notices. Every grey in that
+/// family answers to this one function now.
+pub(crate) fn lens_belongs(rig: &CameraRig, globe: &Option<Res<crate::globe::GlobeView>>) -> bool {
+    let in_orbit = globe.as_ref().is_some_and(|globe| globe.shown);
+    !(rig.in_a_body
+        || rig.distance < crate::camera::FIRST_PERSON
+        || rig.distance > crate::globe::ASCENT
+        || in_orbit)
+}
+
 fn focus_depth_of_field(
     mut commands: Commands,
     look: Res<LookSettings>,
@@ -337,12 +353,7 @@ fn focus_depth_of_field(
         // three thousand units smeared the whole climb - the band between
         // the play ceiling and orbit was a blur that read as a broken
         // renderer rather than a style.
-        let in_orbit = globe.as_ref().is_some_and(|globe| globe.shown);
-        if rig.in_a_body
-            || rig.distance < crate::camera::FIRST_PERSON
-            || rig.distance > crate::globe::ASCENT
-            || in_orbit
-        {
+        if !lens_belongs(rig, &globe) {
             if dof.is_some() {
                 commands.entity(entity).remove::<DepthOfField>();
             }
@@ -383,17 +394,32 @@ pub(crate) fn paint_the_sky(sky: Option<Res<crate::calendar::Sky>>, mut clear: R
 fn apply_look_settings(
     mut commands: Commands,
     look: Res<LookSettings>,
-    mut effects: Query<(Entity, &mut Bloom, &mut Vignette, &mut ColorGrading), With<GodCamera>>,
+    globe: Option<Res<crate::globe::GlobeView>>,
+    mut effects: Query<
+        (
+            Entity,
+            &CameraRig,
+            &mut Bloom,
+            &mut Vignette,
+            &mut ColorGrading,
+        ),
+        With<GodCamera>,
+    >,
     mut existing: Query<&mut DepthOfField, With<GodCamera>>,
 ) {
-    for (entity, mut bloom, mut vignette, mut color_grading) in &mut effects {
+    for (entity, rig, mut bloom, mut vignette, mut color_grading) in &mut effects {
         bloom.intensity = look.bloom;
         vignette.intensity = look.vignette;
         *color_grading = grading(&look);
 
         // Depth of field is added and removed as a component rather than left in
         // place at zero aperture, so switching it off costs nothing per frame.
-        if !look.depth_of_field_enabled() {
+        // And never inserted where the lens does not belong: this used to
+        // re-add it on any look change regardless of height, with the
+        // DEFAULT focal distance - a few units - and the whole world past
+        // arm's reach dissolved into featureless grey until it was hunted
+        // down by altitude, twice.
+        if !look.depth_of_field_enabled() || !lens_belongs(rig, &globe) {
             commands.entity(entity).remove::<DepthOfField>();
         } else if let Ok(mut dof) = existing.single_mut() {
             dof.aperture_f_stops = look.aperture;
@@ -401,6 +427,10 @@ fn apply_look_settings(
             commands.entity(entity).insert(DepthOfField {
                 mode: DepthOfFieldMode::Bokeh,
                 aperture_f_stops: look.aperture,
+                // Aimed on arrival, not defaulted: the default focal
+                // distance is a few units, and one frame of it is a grey
+                // flash across the whole world.
+                focal_distance: (rig.distance * look.focus_bias).max(0.1),
                 ..default()
             });
         }

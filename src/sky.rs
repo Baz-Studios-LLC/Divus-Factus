@@ -35,8 +35,16 @@ pub struct SkyPlugin;
 
 impl Plugin for SkyPlugin {
     fn build(&self, app: &mut App) {
+        // The dome is not raised. It was built in the fog's era with a radius
+        // of 2,700 and a rule — "only ever seen through full fog" — that the
+        // fog's removal quietly broke: a camera-riding sphere painted the
+        // sky's colour occludes everything past its radius, and once the
+        // planet stood behind the world, the dome blanketed it grey by day
+        // and navy by night. Every altitude where the world "turned grey"
+        // was exactly where the visible ground crossed 2,700 units. Removed
+        // to prove the diagnosis on screen; if the sky wants a dome again it
+        // must grow with altitude so the planet's limb always fits inside.
         app.add_plugins(MaterialPlugin::<SkyDomeMaterial>::default())
-            .add_systems(Startup, spawn_dome)
             .add_systems(Update, (follow_camera, follow_the_hours));
     }
 }
@@ -76,6 +84,7 @@ impl Material for SkyDomeMaterial {
 }
 
 /// Marks the dome entity.
+#[allow(dead_code)]
 #[derive(Component)]
 struct SkyDome;
 
@@ -84,6 +93,7 @@ fn linear(color: Color) -> Vec4 {
     Vec4::new(c.red, c.green, c.blue, 1.0)
 }
 
+#[allow(dead_code)]
 fn spawn_dome(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
