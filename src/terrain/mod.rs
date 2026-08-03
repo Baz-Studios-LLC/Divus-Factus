@@ -762,14 +762,6 @@ impl LoadedChunks {
         }
         taken
     }
-
-    /// How far the world currently streams, in world units.
-    ///
-    /// Fog reads this rather than the constant, so the horizon tracks the radius
-    /// that is actually loaded instead of the one that might be.
-    pub fn radius_units(&self) -> f32 {
-        self.radius.max(MIN_VIEW_CHUNKS) as f32 * CHUNK_SIZE
-    }
 }
 
 /// Chunk coordinates within `VIEW_CHUNKS` of `centre`, nearest first.
@@ -2020,9 +2012,11 @@ mod tests {
                     t.line_variation_at(x + round, z),
                 ),
                 (
+                    // At a fixed height, so the closure of the base field is
+                    // what is measured rather than the altitude term.
                     "temperature",
-                    t.temperature_at(x, z),
-                    t.temperature_at(x + round, z),
+                    t.temperature_for(x, z, 30.0),
+                    t.temperature_for(x + round, z, 30.0),
                 ),
             ];
             for (name, here, round_again) in fields {

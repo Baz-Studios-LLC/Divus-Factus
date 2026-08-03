@@ -39,7 +39,6 @@ pub(crate) enum HudValue {
     Teller,
     Aperture,
     Focus,
-    Visibility,
     Exposure,
     Saturation,
     DepthOfField,
@@ -126,7 +125,6 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
     let look_rows = [
         (HudValue::Aperture, "aperture", "F2/F3"),
         (HudValue::Focus, "focus", "F4/F5"),
-        (HudValue::Visibility, "visibility", "F6/F7"),
         (HudValue::Exposure, "exposure", "F8/F9"),
         (HudValue::Saturation, "saturation", "F11/shift-F11"),
         (HudValue::DepthOfField, "depth of field", "F10"),
@@ -264,13 +262,6 @@ pub(crate) fn handle_tuning_input(
     }
     if keys.just_pressed(KeyCode::F5) {
         changed |= nudge(&mut look.focus_bias, 0.05, 0.2, 3.0);
-    }
-
-    if keys.just_pressed(KeyCode::F6) {
-        changed |= nudge(&mut look.visibility, -0.04, 0.1, 1.0);
-    }
-    if keys.just_pressed(KeyCode::F7) {
-        changed |= nudge(&mut look.visibility, 0.04, 0.1, 1.0);
     }
 
     if keys.just_pressed(KeyCode::F8) {
@@ -426,7 +417,6 @@ pub(crate) fn update_hud(
                 .map_or_else(|| "silent".to_string(), |v| v.0.clone()),
             HudValue::Aperture => format!("f/{:.0}", look.aperture),
             HudValue::Focus => format!("{:.2}x", look.focus_bias),
-            HudValue::Visibility => format!("{:.2}", look.visibility),
             HudValue::Exposure => format!("{:+.1}", look.exposure),
             HudValue::Saturation => format!("{:.2}", look.saturation),
             HudValue::DepthOfField => if look.depth_of_field_enabled() {

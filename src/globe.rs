@@ -25,7 +25,6 @@
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::RenderLayers;
 use bevy::light::{NotShadowCaster, NotShadowReceiver};
-use bevy::pbr::DistanceFog;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
@@ -47,9 +46,10 @@ pub const CURTAIN: f32 = 5_200.0;
 /// two thresholds cannot chatter when the wheel hesitates between them.
 const RESURFACE: f32 = 4_600.0;
 
-/// From this camera distance up, the planet is drawn underneath the flat
-/// world. Above the play zoom's ceiling, so ordinary play never pays for it;
-/// low enough that the world behind the loaded disc is always more world.
+/// Where the climb starts telling: the sky begins turning from horizon to
+/// blue here, and the diorama lens retires. The planet itself is beneath the
+/// world at EVERY height now — there is no transition to gate — so this is a
+/// dial for the atmosphere, not a curtain for the scenery.
 pub const ASCENT: f32 = 1_500.0;
 
 /// How far out the wheel will take the god. From here the whole planet sits
@@ -233,10 +233,7 @@ impl Plugin for GlobePlugin {
                     .after(crate::camera::CameraSet)
                     .run_if(crate::world_is_afoot),
             )
-            .add_systems(
-                Update,
-                dress_for_space.after(crate::render::track_fog_to_zoom),
-            );
+            .add_systems(Update, dress_for_space.after(crate::render::paint_the_sky));
     }
 }
 
@@ -548,7 +545,6 @@ fn paint(terrain: &Terrain, x: f32, z: f32, h: f32, slope: f32) -> [f32; 4] {
 fn tend_the_tree(
     mut commands: Commands,
     terrain: Option<Res<Terrain>>,
-    view: Res<GlobeView>,
     mut tree: ResMut<PlanetTree>,
     mut meshes: ResMut<Assets<Mesh>>,
     windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
@@ -561,14 +557,9 @@ fn tend_the_tree(
     let Some(root) = tree.root else {
         return;
     };
-    let Ok((camera, rig)) = cameras.single() else {
+    let Ok((camera, _)) = cameras.single() else {
         return;
     };
-    // Nothing to tend while the planet is not drawn at all.
-    if !view.shown && rig.distance <= ASCENT {
-        return;
-    }
-
     // The camera, brought into the planet's own frame.
     let cam_mesh = planet_stance().inverse() * (camera.translation() - planet_centre());
     let px_per_radian = windows
@@ -660,32 +651,28 @@ fn stage_the_ascent(
     mut roots: Query<&mut Visibility, With<ThePlanet>>,
     cameras: Query<(Entity, &CameraRig), With<GodCamera>>,
 ) {
-    let Ok((camera, rig)) = cameras.single() else {
+    let Ok((camera, _rig)) = cameras.single() else {
         return;
     };
-    let planet_drawn = view.shown || rig.distance > ASCENT;
+    // The planet is simply always there. It was staged in and out by height
+    // for a while, and every threshold made a seam of one kind or another;
+    // the world behind the world is not an effect to be cued, it is the
+    // ground. The only staging left is orbit, where the flat world's layer
+    // bows out and the planet carries the frame alone.
     if let Some(root) = tree.root
         && let Ok(mut showing) = roots.get_mut(root)
+        && *showing != Visibility::Inherited
     {
-        let wanted = if planet_drawn {
-            Visibility::Inherited
-        } else {
-            Visibility::Hidden
-        };
-        if *showing != wanted {
-            *showing = wanted;
-        }
+        *showing = Visibility::Inherited;
     }
     if view.shown {
         commands
             .entity(camera)
             .insert(RenderLayers::layer(GLOBE_LAYER));
-    } else if planet_drawn {
+    } else {
         commands
             .entity(camera)
             .insert(RenderLayers::from_layers(&[0, GLOBE_LAYER]));
-    } else {
-        commands.entity(camera).remove::<RenderLayers>();
     }
 }
 
@@ -811,12 +798,12 @@ fn behold_the_world(
 fn dress_for_space(
     view: Option<Res<GlobeView>>,
     mut clear: ResMut<ClearColor>,
-    mut cameras: Query<(&CameraRig, &mut DistanceFog), With<GodCamera>>,
+    cameras: Query<&CameraRig, With<GodCamera>>,
 ) {
     let Some(view) = view else {
         return;
     };
-    let Ok((rig, mut fog)) = cameras.single_mut() else {
+    let Ok(rig) = cameras.single() else {
         return;
     };
 
@@ -824,39 +811,34 @@ fn dress_for_space(
     // handover: the rig's distance on the way up, the orbit's beyond it.
     let height = if view.shown { view.gaze } else { rig.distance };
 
-    let out = ((height - ASCENT) / (CEILING * 0.45 - ASCENT)).clamp(0.0, 1.0);
-    if out <= 0.0 {
+    if height <= ASCENT {
         return;
     }
 
-    let horizon = clear.0.to_linear();
-    let space = Color::srgb(0.004, 0.005, 0.012).to_linear();
-    // Eased: the first stretch of the climb only dusks the sky, and the
-    // true black is kept for genuine altitude.
-    let toward = out * out;
-    clear.0 = Color::LinearRgba(bevy::color::LinearRgba {
-        red: horizon.red + (space.red - horizon.red) * toward,
-        green: horizon.green + (space.green - horizon.green) * toward,
-        blue: horizon.blue + (space.blue - horizon.blue) * toward,
-        alpha: 1.0,
-    });
-
-    // The fog stretches out to brush only the planet's limb, blended in
-    // across the first six hundred units of the climb so it neither pops
-    // loose nor snaps back.
-    let eye_out = PLANET_RADIUS + WATER_LEVEL + height;
-    let limb = (eye_out * eye_out - PLANET_RADIUS * PLANET_RADIUS)
-        .max(0.0)
-        .sqrt();
-    let letting_go = ((height - ASCENT) / 600.0).clamp(0.0, 1.0);
-    if let bevy::pbr::FogFalloff::Linear { start, end } = fog.falloff {
-        let far_start = limb - PLANET_RADIUS * 0.18;
-        let far_end = limb + PLANET_RADIUS * 0.22;
-        fog.falloff = bevy::pbr::FogFalloff::Linear {
-            start: start + (far_start - start) * letting_go,
-            end: end + (far_end - end) * letting_go,
+    // The sky becomes a sky, and then becomes space. The clear colour below
+    // the ascent is a deliberately neutral grey - it has to match the fog so
+    // the flat world dissolves into it without a seam - but it was never
+    // meant to be LOOKED at, and above a genuinely curving horizon it read
+    // as a dead grey band lying on the world. Up here the fog has let go of
+    // the clear colour entirely, so it is free to do what the eye expects
+    // of a climb: deepen to blue first, and only then thin out to black.
+    let mix =
+        |a: bevy::color::LinearRgba, b: bevy::color::LinearRgba, t: f32| bevy::color::LinearRgba {
+            red: a.red + (b.red - a.red) * t,
+            green: a.green + (b.green - a.green) * t,
+            blue: a.blue + (b.blue - a.blue) * t,
+            alpha: 1.0,
         };
-    }
+    let horizon = clear.0.to_linear();
+    let sky_blue = palette::shade(&palette::SKY, 0.58).to_linear();
+    let space = Color::srgb(0.004, 0.005, 0.012).to_linear();
+    // Grey to blue across the first stretch of the climb...
+    let bluing = ((height - ASCENT) / 4_000.0).clamp(0.0, 1.0);
+    let skyed = mix(horizon, sky_blue, bluing);
+    // ...then blue to black with real altitude, eased so the deep black is
+    // kept for genuine orbit.
+    let thinning = ((height - 6_000.0) / 14_000.0).clamp(0.0, 1.0);
+    clear.0 = Color::LinearRgba(mix(skyed, space, thinning * thinning));
 }
 
 #[cfg(test)]
