@@ -11,6 +11,7 @@
 //! all gated on [`GameState::Playing`], and this is not it. There is no
 //! chronicle to read and nothing to survey until somebody plants.
 
+use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::text::FontSize;
 
@@ -160,12 +161,24 @@ fn raise_the_flag(
             Visibility::Hidden,
         ))
         .id();
+    // On the HAND's render layer, not the world's. The god's hand is drawn by
+    // an overlay camera above everything else so a cursor can never be
+    // occluded - which meant the pole, an ordinary world object, was drawn in
+    // the pass UNDERNEATH it and vanished behind the fist holding it. The
+    // shaft runs through the grip and a metre past it, and not one pixel of it
+    // could be seen. Same pass as the hand, and the two sort against each
+    // other properly.
+    //
+    // Nothing is lost by it: this flag exists only while the ground is being
+    // chosen, and is put away the moment it is planted, so it never needs to
+    // hide behind a hill.
     let mut part = |offset: Vec3, size: Vec3, stuff: &Handle<StandardMaterial>| -> Entity {
         commands
             .spawn((
                 Mesh3d(cube.clone()),
                 MeshMaterial3d(stuff.clone()),
                 Transform::from_translation(offset).with_scale(size),
+                RenderLayers::layer(crate::render::HAND_LAYER),
                 ChildOf(flag),
             ))
             .id()

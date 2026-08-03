@@ -213,7 +213,7 @@ struct HandRig {
 /// The roll that turns the flat palm into a fist held sideways, as a hand
 /// holds a pole: knuckles to the camera, fingers wrapped round a vertical
 /// shaft rather than laid out over the ground.
-const CARRY_ROLL: f32 = FRAC_PI_2;
+const CARRY_ROLL: f32 = -FRAC_PI_2;
 
 /// And a little tip forward with it, so the fist reads as bearing weight
 /// rather than merely being turned over.
