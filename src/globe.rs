@@ -22,9 +22,12 @@
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::RenderLayers;
 use bevy::light::{NotShadowCaster, NotShadowReceiver};
+use bevy::pbr::{ExtendedMaterial, MaterialExtension};
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
+use bevy::render::render_resource::AsBindGroup;
+use bevy::shader::ShaderRef;
 use std::f32::consts::FRAC_PI_2;
 
 use crate::camera::{CameraRig, GodCamera};
@@ -228,7 +231,35 @@ const EVERGREEN: u8 = 3;
 
 /// The one material every patch wears; the colours ride the vertices.
 #[derive(Resource)]
-struct PlanetSkin(Handle<StandardMaterial>);
+struct PlanetSkin(Handle<PlanetMaterial>);
+
+/// Ordinary ground, plus the fog of war mixed in AFTER the lighting.
+///
+/// The cloths that hide unknown ground at play height are unlit — their shader
+/// hands back its tint and that is the pixel. A patch is lit ground, so the
+/// same colour painted into its vertices came out somewhere else entirely: the
+/// sun's diffuse and its specular sheen both add to it, and the veil read half
+/// again as far toward white, less blue, and lighter still at a grazing angle
+/// near the limb. Three shades of one fog in a single frame. Worse, any tuning
+/// of it would only hold for the light it was tuned under.
+///
+/// So the mix happens in the fragment shader, past the lighting, and the answer
+/// is the cloth's colour under any sun at all.
+pub type PlanetMaterial = ExtendedMaterial<StandardMaterial, VeilExtension>;
+
+/// Which colour the veil is, and how much of it fully-veiled ground takes.
+#[derive(Asset, TypePath, AsBindGroup, Clone)]
+pub struct VeilExtension {
+    /// rgb the veil's colour; a the weight at full veil.
+    #[uniform(100)]
+    pub tint: Vec4,
+}
+
+impl MaterialExtension for VeilExtension {
+    fn fragment_shader() -> ShaderRef {
+        "shaders/planet_skin.wgsl".into()
+    }
+}
 
 /// Marks the planet's root entity and its sun.
 #[derive(Component)]
@@ -242,7 +273,8 @@ pub struct GlobePlugin;
 
 impl Plugin for GlobePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PlanetTree>()
+        app.add_plugins(MaterialPlugin::<PlanetMaterial>::default())
+            .init_resource::<PlanetTree>()
             .add_systems(
                 Update,
                 (plant_the_tree, dress_the_patches).run_if(resource_exists::<Terrain>),
@@ -444,7 +476,7 @@ fn plant_the_tree(
     ),
     mut tree: ResMut<PlanetTree>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<PlanetMaterial>>,
 ) {
     let shroud = veil_of(&veil.0, &veil.1);
     if tree.grown_for == Some(terrain.seed) {
@@ -483,10 +515,23 @@ fn plant_the_tree(
         ChildOf(root),
     ));
 
-    commands.insert_resource(PlanetSkin(materials.add(StandardMaterial {
-        base_color: Color::WHITE,
-        perceptual_roughness: 1.0,
-        ..default()
+    commands.insert_resource(PlanetSkin(materials.add(PlanetMaterial {
+        base: StandardMaterial {
+            base_color: Color::WHITE,
+            perceptual_roughness: 1.0,
+            ..default()
+        },
+        extension: VeilExtension {
+            // Nine parts in ten, the weight the cloths stack to at play
+            // height; the tenth that shows through keeps a coast reading as a
+            // coast under the shroud.
+            tint: Vec4::new(
+                crate::fog::VEIL_TINT[0],
+                crate::fog::VEIL_TINT[1],
+                crate::fog::VEIL_TINT[2],
+                0.9,
+            ),
+        },
     })));
 
     // One level past the evergreens: those patches may be evicted later if
@@ -568,7 +613,7 @@ fn grow_patch(
 fn dress_the_patches(
     mut commands: Commands,
     skin: Option<Res<PlanetSkin>>,
-    bare: Query<Entity, (With<Patch>, Without<MeshMaterial3d<StandardMaterial>>)>,
+    bare: Query<Entity, (With<Patch>, Without<MeshMaterial3d<PlanetMaterial>>)>,
 ) {
     let Some(skin) = skin else {
         return;
@@ -659,20 +704,21 @@ fn build_patch(
             positions.push(here.to_array());
             normals.push(normal.to_array());
             let mut color = paint(terrain, x, z, h, wet, slope);
-            // The fog of war wraps the whole planet: ground the village has
-            // not walked wears the veil's own slate, sea and land alike, at
-            // the six-sheet weight the cloths stack to at play height. The
-            // god does not see round the world; the god sees what has been
-            // SHOWN, and from orbit that is a handful of clearings on a
-            // shrouded ball.
+            // The fog of war wraps the whole planet: ground the village has not
+            // walked takes the veil, sea and land alike. The god does not see
+            // round the world; the god sees what has been SHOWN, and from orbit
+            // that is a handful of clearings on a shrouded ball.
+            //
+            // Carried in the ALPHA channel, and applied by the skin's shader
+            // after the lighting - see `PlanetMaterial`. Blending the veil's
+            // colour into the rgb here instead put a LIT version of it on the
+            // world, which is a different colour from the unlit cloths that
+              // hide the same ground at play height, and a different colour
+            // again where the sun grazes the limb.
             if let Some(known) = veil
                 && !known.knows(Vec3::new(x, h, z))
             {
-                const SLATE: [f32; 3] = [0.05, 0.07, 0.11];
-                const WEIGHT: f32 = 0.86;
-                for (channel, dark) in color.iter_mut().take(3).zip(SLATE) {
-                    *channel += (dark - *channel) * WEIGHT;
-                }
+                color[3] = 0.0;
             }
             colors.push(color);
         }

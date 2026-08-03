@@ -105,12 +105,41 @@ impl Plugin for FogPlugin {
             .add_systems(OnEnter(crate::GameState::Playing), the_veil_is_down)
             .add_systems(
                 Update,
-                (toggle_fog, drape_the_veil, follow_the_known, raise_the_veil)
+                (
+                    toggle_fog.run_if(in_state(crate::GameState::Playing)),
+                    // NOT state-gated, alone among these. Chunks are born
+                    // hidden and this is what reveals them, so on the title
+                    // screen and while the god is still choosing ground —
+                    // where there is no village, nothing known, and nothing
+                    // to hide — it is the only thing standing between the
+                    // player and an empty world.
+                    drape_the_veil,
+                    follow_the_known.run_if(in_state(crate::GameState::Playing)),
+                    raise_the_veil.run_if(in_state(crate::GameState::Playing)),
+                )
                     .chain()
-                    .run_if(in_state(crate::GameState::Playing)),
+                    // AFTER the ground streams, or the veil is always one
+                    // frame behind it. Twenty chunks arrive in a frame while
+                    // the god is moving, and dressing them next frame meant
+                    // twenty tiles of unveiled world in every frame of a pan
+                    // or a zoom - not a flicker, a permanent scattering of
+                    // bright squares for as long as the view kept changing.
+                    // Ordered after the spawn, the veil and the ground it
+                    // hides reach the renderer in the same frame.
+                    .after(crate::terrain::TerrainSet),
             );
     }
 }
+
+/// The veil's colour, in linear light: a cold slate blue rather than black,
+/// because unknown ground should read as unlit distance and not as a hole cut
+/// in the world.
+///
+/// Public because the PLANET wears the same fog of war — painted into its
+/// patches rather than draped in cloths, since from orbit there is no cloth
+/// small enough — and the two must be the same colour or the veil visibly
+/// changes shade as the god climbs. One fact, one place.
+pub(crate) const VEIL_TINT: [f32; 3] = [0.05, 0.07, 0.11];
 
 /// Uniform block handed to the fog shader.
 #[derive(Clone, ShaderType, Debug)]
@@ -128,12 +157,10 @@ pub struct FogParams {
 impl Default for FogParams {
     fn default() -> Self {
         FogParams {
-            // A cold slate blue rather than black: unknown ground should
-            // read as unlit distance, not as a hole cut in the world.
             // Each sheet is thin; six of them stacked come to nine parts
             // in ten, which is dark enough to hide a wood and light enough
             // that the bank's own depth still shows at its edge.
-            tint: Vec4::new(0.05, 0.07, 0.11, 0.32),
+            tint: Vec4::new(VEIL_TINT[0], VEIL_TINT[1], VEIL_TINT[2], 0.32),
             home: Vec4::new(0.0, 0.0, 0.0, 170.0),
             dials: Vec4::new(0.0, 9.0, 0.0, 0.0),
             pockets: [Vec4::ZERO; MAX_POCKETS],
@@ -199,22 +226,44 @@ fn toggle_fog(
 fn drape_the_veil(
     mut commands: Commands,
     mode: Res<FogMode>,
+    state: Res<State<crate::GameState>>,
     mut materials: ResMut<Assets<FogMaterial>>,
     mut cloth: Local<Option<(Handle<FogMaterial>, Handle<FogMaterial>)>>,
     mut was_lidded: Local<Option<bool>>,
     rising: Res<VeilRising>,
     rigs: Query<&crate::camera::CameraRig>,
     chunks: Query<
-        (Entity, &Mesh3d, Option<&Children>, Has<WaterPlane>),
+        (
+            Entity,
+            &Mesh3d,
+            Option<&Children>,
+            Has<WaterPlane>,
+            &Visibility,
+        ),
         Or<(With<TerrainChunk>, With<WaterPlane>)>,
     >,
     veils: Query<Entity, With<Veil>>,
 ) {
-    if !mode.0 {
+    // Chunks are born hidden so that no unveiled ground is ever seen. Whoever
+    // decides they may be seen has to be whoever knows the veil is on them —
+    // which is this system, and, when there is no veil to wait for, this
+    // branch. Without it a lifted fog would leave a world of hidden chunks.
+    let reveal = |commands: &mut Commands, chunk: Entity, showing: &Visibility| {
+        if *showing == Visibility::Hidden {
+            commands.entity(chunk).insert(Visibility::Inherited);
+        }
+    };
+
+    // No veil wanted — the key is off, or there is no village yet to have a
+    // knowledge to draw. Take any cloths down and let the world be seen.
+    if !mode.0 || *state.get() != crate::GameState::Playing {
         if !veils.is_empty() {
             for veil in &veils {
                 commands.entity(veil).despawn();
             }
+        }
+        for (chunk, _, _, _, showing) in &chunks {
+            reveal(&mut commands, chunk, showing);
         }
         *was_lidded = None;
         return;
@@ -253,17 +302,16 @@ fn drape_the_veil(
     {
         let sheer_full = FogParams::default().tint.w;
         let solid_full = 1.0 - (1.0 - sheer_full).powi(SHEETS as i32);
-        // The veil thins with altitude and is gone before the world becomes
-        // a ball. It is a play-height instrument - what the village knows,
-        // seen from where the village is watched - and the planet's own
-        // patches have never honoured it, so carried aloft it stopped being
-        // information and became scenery: its sea-sheet borrows the water
-        // quad's mesh, and from three thousand up it read as an inexplicable
-        // translucent square lying on the world.
-        let aloft = rigs.iter().next().map_or(0.0, |rig| {
-            ((rig.distance - 1_500.0) / 2_500.0).clamp(0.0, 1.0)
-        });
-        let standing = rising.risen * (1.0 - aloft);
+        // The veil does NOT thin with altitude. It used to, back when the
+        // planet's own patches painted no veil at all: carried aloft the
+        // cloths stopped being information and became scenery, a translucent
+        // slate quadrilateral lying over an otherwise open world with the
+        // loaded ring's own straight edge for a border. Now the patches wear
+        // the same fog in the same colour (`globe::PlanetMaterial`), so the
+        // cloths over the near ground and the paint beyond it are one
+        // continuous shroud, and fading either of them would put the seam
+        // back. What the village has not walked is hidden from every height.
+        let standing = rising.risen;
         let (cloth, deep) = (cloth.clone(), deep.clone());
         if let Some(mut stuff) = materials.get_mut(&cloth) {
             stuff.params.tint.w = sheer_full * standing;
@@ -272,7 +320,7 @@ fn drape_the_veil(
             stuff.params.tint.w = solid_full * standing;
         }
     }
-    for (chunk, mesh, children, sea) in &chunks {
+    for (chunk, mesh, children, sea, showing) in &chunks {
         let dressed = if fresh {
             // The children still hold this frame's despawned veils;
             // trusting them would dress nothing until next frame.
@@ -283,6 +331,12 @@ fn drape_the_veil(
             })
         };
         let wanted = if sea || lidded { 1 } else { SHEETS };
+        // Decent, and may be seen. One sheet is enough to be decent: a chunk
+        // wearing the first of six is already the veil's colour, and waiting
+        // for all six would hold the ground back a frame for nothing.
+        if dressed > 0 {
+            reveal(&mut commands, chunk, showing);
+        }
         if dressed >= wanted {
             continue;
         }

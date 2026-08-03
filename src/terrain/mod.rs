@@ -1470,7 +1470,17 @@ pub(crate) fn spawn_chunk(
             // Identity: the mesh's vertices are already seated on the
             // sphere in world space, so the entity places nothing.
             Transform::IDENTITY,
-            Visibility::default(),
+            // Born hidden, and revealed by `fog::drape_the_veil` once its
+            // veil is on it — see that system. Ground the village has not
+            // walked must never be seen, and a chunk that appears the frame
+            // before its veil does IS seen: twenty of them arrive in a frame
+            // while the god is moving, so the whole time the view was
+            // changing there were bright unveiled squares scattered over a
+            // shrouded world. Nothing is lost by waiting a frame; the
+            // planet's own patch surface lies under every chunk, already
+            // wearing the same veil, so an undressed chunk shows the right
+            // colour anyway.
+            Visibility::Hidden,
         ))
         .id();
     if let Some(river) = river {
