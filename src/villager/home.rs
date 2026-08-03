@@ -118,12 +118,6 @@ const GIVE_UP_ON_DOORS: f64 = 20.0;
 /// at the gap rather than at the jamb.
 const DOOR_CORRIDOR: f32 = 0.8;
 
-/// How far either side of the wall the two standing places sit. Far
-/// enough out that they straddle the shell without argument: a doorway
-/// sits in the THICKNESS of a wall, not on the line the shell is measured
-/// to, and a step too short puts both places on the same side of it.
-const DOOR_STAND: f32 = 1.6;
-
 /// The next standing place for a walk that has to cross this doorway,
 /// in the building's own space. `inside` is which side of the shell the
 /// walker is on now.

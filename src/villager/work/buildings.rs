@@ -1178,11 +1178,16 @@ pub(crate) fn rise_out_of_the_earth(
 /// drag half the world-building systems into the founding.
 ///
 /// Returns where its door stands, so the people can come out of it.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn raise_the_founding_hall(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
-    terrain: &Terrain,
+    terrain: &mut Terrain,
+    chunks: &mut crate::terrain::LoadedChunks,
+    chunk_assets: &crate::terrain::TerrainAssets,
+    stripped: &mut crate::scatter::StrippedGround,
+    standing: &[(Entity, Vec3)],
     settlement: Entity,
     centre: Vec3,
     rng: &mut Rng,
@@ -1190,14 +1195,14 @@ pub(crate) fn raise_the_founding_hall(
     let plan = Blueprint::roll(BuildingKind::Longhouse, rng);
     let reach = plan.half_w.max(plan.half_d);
 
-    // Off the square, so it does not stand on the banner - and on the
-    // flattest of a ring of candidates, since nothing here will level
-    // the ground for it.
-    let (at, yaw) = (0..12)
+    // Well off the square: its own half-length again beyond the ring, so
+    // the walls stand a good twenty strides clear of the banner rather
+    // than crowding it.
+    let (at, angle) = (0..12)
         .map(|i| {
             let angle = i as f32 / 12.0 * std::f32::consts::TAU;
             let (sin, cos) = angle.sin_cos();
-            let out = reach + 9.0;
+            let out = reach * 2.0 + 8.0;
             let (x, z) = (centre.x + cos * out, centre.z + sin * out);
             (Vec3::new(x, terrain.height_at(x, z), z), angle)
         })
@@ -1206,9 +1211,44 @@ pub(crate) fn raise_the_founding_hall(
             terrain
                 .slope_at(a.0.x, a.0.z)
                 .total_cmp(&terrain.slope_at(b.0.x, b.0.z))
-        })
-        // Facing the square it stands beside.
-        .map(|(at, angle)| (at, angle + std::f32::consts::PI))?;
+        })?;
+
+    // Facing the square. `Quat::from_rotation_y(yaw) * Vec3::X` is
+    // `(cos yaw, 0, -sin yaw)`, and the way home is `-(cos a, 0, sin a)`
+    // - so the turn that points a door at the banner is PI minus the
+    // bearing, not the bearing plus PI. Adding PI flips the x and leaves
+    // the z, which faced it a quarter of the way round the wrong way.
+    let yaw = std::f32::consts::PI - angle;
+
+    // And the ground is LEVELLED for it, the way it is for every other
+    // building. Skipping this on the grounds that the flag had already
+    // vetted the site was wrong: ground level enough for a village is
+    // nowhere near level enough for a hall twenty-five metres long, and
+    // the thing came up half buried.
+    let pad = reach + 2.0;
+    let worked = terrain.terrace(at.x, at.z, pad, 2.4, at.y);
+
+    // The clearing, BEFORE the chunks are swapped - a scattered tree is
+    // a child of its chunk, and a chunk despawn takes its children with
+    // it, which is the same ordering every other site-clearing obeys.
+    // Nobody roofs over a living oak, and the god least of all.
+    for (tree, tree_at) in standing {
+        if tree_at.distance(at) < worked + 4.0 {
+            stripped.strip(tree_at.x, tree_at.z);
+            commands.entity(*tree).despawn();
+        }
+    }
+    crate::terrain::rebuild_chunks_near(
+        commands,
+        meshes,
+        chunk_assets,
+        terrain,
+        chunks,
+        at.x,
+        at.z,
+        worked + 4.0,
+    );
+    let at = Vec3::new(at.x, terrain.height_at(at.x, at.z), at.z);
 
     // How deep it starts. The whole building is set below the ground and
     // comes up out of it, so what the player sees is the earth giving up

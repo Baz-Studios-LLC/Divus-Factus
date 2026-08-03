@@ -1260,7 +1260,16 @@ pub(crate) fn found_settlement(
 pub(crate) fn spawn_settlement(
     mut commands: Commands,
     assets: Res<CreatureAssets>,
-    terrain: Res<Terrain>,
+    // Bundled: this system is near Bevy's parameter ceiling, and the
+    // founding hall needs to level its plot and clear it, which is the
+    // same handful of world-building resources every other site uses.
+    mut ground: (
+        ResMut<Terrain>,
+        ResMut<crate::terrain::LoadedChunks>,
+        Res<crate::terrain::TerrainAssets>,
+        ResMut<crate::scatter::StrippedGround>,
+    ),
+    woods: Query<(Entity, &GlobalTransform), With<crate::scatter::FellableTree>>,
     world_seed: Res<crate::WorldSeed>,
     clock: Res<crate::calendar::WorldClock>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -1282,7 +1291,7 @@ pub(crate) fn spawn_settlement(
         .as_ref()
         .map(|r| r.centre)
         .or(chosen.0)
-        .unwrap_or_else(|| choose_settlement_site(&terrain, &mut rng));
+        .unwrap_or_else(|| choose_settlement_site(&ground.0, &mut rng));
 
     // The place is named in the same tongue as its people, because the people
     // named it.
@@ -1329,10 +1338,10 @@ pub(crate) fn spawn_settlement(
             let reach = rng.range(140.0, 460.0);
             let (sin, cos) = angle.sin_cos();
             let (x, z) = (centre.x + cos * reach, centre.z + sin * reach);
-            if !terrain.is_walkable(x, z) {
+            if !ground.0.is_walkable(x, z) {
                 continue;
             }
-            let height = terrain.height_at(x, z);
+            let height = ground.0.height_at(x, z);
             if height > crate::terrain::WATER_LEVEL + 20.0 {
                 crate::matter::spawn_deposit(
                     &mut commands,
@@ -1359,10 +1368,10 @@ pub(crate) fn spawn_settlement(
             let reach = rng.range(40.0, 700.0);
             let (sin, cos) = angle.sin_cos();
             let (x, z) = (centre.x + cos * reach, centre.z + sin * reach);
-            if !terrain.is_walkable(x, z) {
+            if !ground.0.is_walkable(x, z) {
                 continue;
             }
-            let height = terrain.height_at(x, z);
+            let height = ground.0.height_at(x, z);
             if !(crate::terrain::WATER_LEVEL + 0.5..crate::terrain::WATER_LEVEL + 3.5)
                 .contains(&height)
             {
@@ -1405,7 +1414,7 @@ pub(crate) fn spawn_settlement(
         &mut commands,
         &mut meshes,
         &mut materials,
-        &terrain,
+        &ground.0,
         centre,
         settlement,
         banner_ramp,
@@ -1427,17 +1436,29 @@ pub(crate) fn spawn_settlement(
     // The hall the god raised, and the doorstep the founders walk out
     // of. Only for a new world: a restored one already has its own.
     let doorstep = restoring.is_none().then(|| {
+        let standing: Vec<(Entity, Vec3)> = woods
+            .iter()
+            .map(|(tree, at)| (tree, at.translation()))
+            .collect();
+        let (terrain, chunks, chunk_assets, stripped) = &mut ground;
         work::raise_the_founding_hall(
             &mut commands,
             &mut meshes,
             &mut materials,
-            &terrain,
+            terrain,
+            chunks,
+            chunk_assets,
+            stripped,
+            &standing,
             settlement,
             centre,
             &mut rng,
         )
     });
     let doorstep = doorstep.flatten();
+    // The plot is levelled and cleared by now; everything below reads the
+    // land as it finally stands.
+    let terrain = &ground.0;
 
     // The light. It comes down BEFORE anything stands in it - that
     // ordering is what makes the founding read as an act by someone

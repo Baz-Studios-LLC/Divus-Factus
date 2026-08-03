@@ -189,6 +189,7 @@ fn drape_the_veil(
     mut materials: ResMut<Assets<FogMaterial>>,
     mut cloth: Local<Option<(Handle<FogMaterial>, Handle<FogMaterial>)>>,
     mut was_lidded: Local<Option<bool>>,
+    rising: Res<VeilRising>,
     rigs: Query<&crate::camera::CameraRig>,
     chunks: Query<
         (Entity, &Mesh3d, Option<&Children>, Has<WaterPlane>),
@@ -230,6 +231,23 @@ fn drape_the_veil(
         solid.params.tint.w = 1.0 - (1.0 - sheer.params.tint.w).powi(SHEETS as i32);
         (materials.add(sheer), materials.add(solid))
     });
+    // The rise is applied HERE, where both cloths and their own full
+    // weights are known. Doing it in a system that walked every fog
+    // material and wrote the default weight into each of them dragged
+    // the solid cloth from nine tenths down to a third and left it
+    // there - so the sea, and the single lid a zoomed-out world wears,
+    // both went three times too thin and stayed that way.
+    {
+        let sheer_full = FogParams::default().tint.w;
+        let solid_full = 1.0 - (1.0 - sheer_full).powi(SHEETS as i32);
+        let (cloth, deep) = (cloth.clone(), deep.clone());
+        if let Some(mut stuff) = materials.get_mut(&cloth) {
+            stuff.params.tint.w = sheer_full * rising.risen;
+        }
+        if let Some(mut stuff) = materials.get_mut(&deep) {
+            stuff.params.tint.w = solid_full * rising.risen;
+        }
+    }
     for (chunk, mesh, children, sea) in &chunks {
         let dressed = if fresh {
             // The children still hold this frame's despawned veils;
@@ -310,20 +328,14 @@ fn the_veil_is_down(mut rising: ResMut<VeilRising>, chosen: Res<crate::villager:
     }
 }
 
-/// And comes up behind them.
-fn raise_the_veil(
-    time: Res<Time>,
-    mut rising: ResMut<VeilRising>,
-    mut materials: ResMut<Assets<FogMaterial>>,
-) {
+/// And comes up behind them. Only the FRACTION lives here; the weight it
+/// is a fraction of belongs to each cloth, and `drape_the_veil` applies
+/// it where both are known.
+fn raise_the_veil(time: Res<Time>, mut rising: ResMut<VeilRising>) {
     if rising.risen >= 1.0 {
         return;
     }
     rising.risen = (rising.risen + time.delta_secs() / VEIL_RISES_OVER).min(1.0);
-    let full = FogParams::default().tint.w;
-    for (_, material) in materials.iter_mut() {
-        material.params.tint.w = full * rising.risen;
-    }
 }
 
 /// Keeps the veil's holes where the village's knowledge actually is.
