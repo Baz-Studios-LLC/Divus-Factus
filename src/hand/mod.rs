@@ -328,14 +328,8 @@ fn update_hand_ray(
     windows: Query<&Window, With<PrimaryWindow>>,
     cameras: Query<(&Camera, &CameraRig), With<GodCamera>>,
     terrain: Option<Res<Terrain>>,
-    globe: Option<Res<crate::globe::GlobeView>>,
     mut hand: ResMut<DivineHand>,
 ) {
-    if among_the_stars(&globe) {
-        hand.cursor_ray = None;
-        hand.cursor_world = None;
-        return;
-    }
     let (Ok(window), Ok((camera, rig)), Some(terrain)) =
         (windows.single(), cameras.single(), terrain)
     else {
@@ -371,17 +365,9 @@ fn update_hand_ray(
     hand.cursor_world = terrain::raycast(&terrain, ray);
 }
 
-/// Whether the god is in orbit, where the hand has no world under it: no
-/// cursor point, no hover, no grabs, and nothing for an armed miracle to land
-/// on. One question, asked by every hand system that touches the world.
-fn among_the_stars(globe: &Option<Res<crate::globe::GlobeView>>) -> bool {
-    globe.as_ref().is_some_and(|globe| globe.shown)
-}
-
 fn update_hover(
     windows: Query<&Window, With<PrimaryWindow>>,
     cameras: Query<(&Camera, &GlobalTransform), With<GodCamera>>,
-    globe: Option<Res<crate::globe::GlobeView>>,
     rigs: Query<&CameraRig>,
     candidates: Query<(Entity, &GlobalTransform, &PickRadius), Without<Held>>,
     pointer: Res<PointerContext>,
@@ -394,7 +380,12 @@ fn update_hover(
     // touches nothing. Naming what is "beneath your hand" while the god has
     // no hand to speak of gives the whole thing away.
     let riding = rigs.single().is_ok_and(|rig| rig.in_a_body);
-    if hand.held.is_some() || pointer.over_ui || riding || among_the_stars(&globe) {
+    // And nothing hovers from the upper air: the hand withdraws past the
+    // play zoom, and a withdrawn hand touches nothing.
+    let aloft = rigs
+        .single()
+        .is_ok_and(|rig| rig.distance > LEAVING_THE_WORLD);
+    if hand.held.is_some() || pointer.over_ui || riding || aloft {
         hand.hovered = None;
         return;
     }

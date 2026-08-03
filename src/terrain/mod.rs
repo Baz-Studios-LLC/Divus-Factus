@@ -72,10 +72,14 @@ const CHUNKS_PER_LOADING_FRAME: usize = 48;
 pub const WATER_LEVEL: f32 = 20.0;
 /// The world is a sphere, and this is how big it is.
 ///
-/// Fifteen thousand units of radius: a circumference of ninety-four kilometres
-/// and, at the continent wavelength below, some sixteen continent-scale
-/// landmasses around the equator. A world with geography worth learning rather
-/// than an endless plain.
+/// Six thousand units of radius: thirty-eight kilometres around and, at the
+/// continent wavelength below, about six continent-scale landmasses. Small
+/// enough that the whole world hangs in the frame at a fifth of the old
+/// orbital zoom and the ground's curve can be FELT from play height - the
+/// world is round, and says so - while every local wavelength underfoot is
+/// unchanged. It began at fifteen thousand; the smaller world was Brett's
+/// call, and it is the difference between a planet you visit and a planet
+/// you live on.
 ///
 /// The number was chosen against three things at once. Small enough that the
 /// land is FINITE and worth competing over. Large enough that the ground reads
@@ -87,7 +91,7 @@ pub const WATER_LEVEL: f32 = 20.0;
 /// millimetres - so none of this needs double precision or a moving world
 /// origin, which is what makes planet renderers miserable. An Earth-sized world
 /// would resolve to three quarters of a unit and everything would jitter.
-pub const PLANET_RADIUS: f32 = 15_000.0;
+pub const PLANET_RADIUS: f32 = 6_000.0;
 
 /// Once round the world, in units.
 pub fn planet_circumference() -> f32 {
@@ -1581,8 +1585,12 @@ mod tests {
             spans.push(highest - lowest);
         }
         let typical = spans.iter().sum::<f32>() / spans.len() as f32;
+        // Well above the ~0.1 a near-constant field would show, and far
+        // enough below the measured mean (0.3 to 0.4 across re-rollings of
+        // the world) that reparameterising the planet does not fail it by
+        // luck - which a threshold of 0.35 managed twice.
         assert!(
-            typical > 0.35,
+            typical > 0.28,
             "patch field typically spanned only {typical:.2} over 450 units: {spans:?}"
         );
     }
@@ -2065,18 +2073,19 @@ mod tests {
     }
 
     /// The scaffold is exact where the game actually happens. A settlement is
-    /// some three hundred units across; the sphere's curvature over one is
-    /// under a unit, which is why a flat simulation can stand on a round world
-    /// without knowing about it.
+    /// some three hundred units across; the sphere's curvature over one is a
+    /// couple of units at this radius - accepted with open eyes when the
+    /// world shrank, and worth re-measuring if buildings ever read as
+    /// floating at a settlement's far edge.
     #[test]
     fn a_settlement_sized_patch_is_flat_enough_to_ignore() {
         let half = 150.0;
         let drop = half * half / (2.0 * PLANET_RADIUS);
-        assert!(drop < 1.0, "curvature over a settlement is {drop} units");
+        assert!(drop < 2.5, "curvature over a settlement is {drop} units");
 
-        // And two directions a settlement apart are still very nearly parallel.
+        // And two directions a settlement apart are still nearly parallel.
         let a = direction_at(0.0, 0.0);
         let b = direction_at(300.0, 0.0);
-        assert!(a.angle_between(b) < 0.021, "{}", a.angle_between(b));
+        assert!(a.angle_between(b) < 0.06, "{}", a.angle_between(b));
     }
 }

@@ -319,18 +319,15 @@ fn setup_pipeline(
 /// Bevy's DEFAULT focal distance, a few units, which blurs the entire world
 /// into a grey mush until the other system notices. Every grey in that
 /// family answers to this one function now.
-pub(crate) fn lens_belongs(rig: &CameraRig, globe: &Option<Res<crate::globe::GlobeView>>) -> bool {
-    let in_orbit = globe.as_ref().is_some_and(|globe| globe.shown);
+pub(crate) fn lens_belongs(rig: &CameraRig) -> bool {
     !(rig.in_a_body
         || rig.distance < crate::camera::FIRST_PERSON
-        || rig.distance > crate::globe::ASCENT
-        || in_orbit)
+        || rig.distance > crate::globe::ASCENT)
 }
 
 fn focus_depth_of_field(
     mut commands: Commands,
     look: Res<LookSettings>,
-    globe: Option<Res<crate::globe::GlobeView>>,
     mut cameras: Query<(Entity, &CameraRig, Option<&mut DepthOfField>), With<GodCamera>>,
 ) {
     for (entity, rig, dof) in &mut cameras {
@@ -353,7 +350,7 @@ fn focus_depth_of_field(
         // three thousand units smeared the whole climb - the band between
         // the play ceiling and orbit was a blur that read as a broken
         // renderer rather than a style.
-        if !lens_belongs(rig, &globe) {
+        if !lens_belongs(rig) {
             if dof.is_some() {
                 commands.entity(entity).remove::<DepthOfField>();
             }
@@ -394,7 +391,6 @@ pub(crate) fn paint_the_sky(sky: Option<Res<crate::calendar::Sky>>, mut clear: R
 fn apply_look_settings(
     mut commands: Commands,
     look: Res<LookSettings>,
-    globe: Option<Res<crate::globe::GlobeView>>,
     mut effects: Query<
         (
             Entity,
@@ -419,7 +415,7 @@ fn apply_look_settings(
         // DEFAULT focal distance - a few units - and the whole world past
         // arm's reach dissolved into featureless grey until it was hunted
         // down by altitude, twice.
-        if !look.depth_of_field_enabled() || !lens_belongs(rig, &globe) {
+        if !look.depth_of_field_enabled() || !lens_belongs(rig) {
             commands.entity(entity).remove::<DepthOfField>();
         } else if let Ok(mut dof) = existing.single_mut() {
             dof.aperture_f_stops = look.aperture;

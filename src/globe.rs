@@ -9,18 +9,15 @@
 //! one picture is swapped for another. Google Earth is the honest comparison,
 //! and the deliberate one.
 //!
-//! The flat chunk world still exists below [`ASCENT`]: it is where villagers,
-//! trees and buildings live, and it draws ON TOP of the planet as the final
-//! layer of detail. From the moment the god rises past [`ASCENT`] the planet
-//! is always underneath — every ray that misses loaded ground lands on more
-//! world, never on void — and past [`CURTAIN`] the chunks bow out entirely,
-//! by which point the patches beneath them have refined to the same order of
-//! detail and their retirement changes almost nothing on screen.
-//!
-//! Orbit controls: grab the world with the left mouse and drag to turn it;
-//! the wheel rides from a doorstep to the whole planet and back; Escape is
-//! the other way home. Leaving orbit lands the camera on the ground that was
-//! under view.
+//! There is no orbit MODE. That is the point, arrived at the hard way: every
+//! threshold that staged the planet in or out - a curtain for the chunks, a
+//! layer swap for the camera, a separate orbital rig - made a seam someone
+//! could see, and the last of them made the planet feel like a different
+//! screen rather than the same world further away. Now the ordinary camera
+//! simply zooms: the flat chunk world (where villagers, trees and buildings
+//! live) draws on top of the planet as the final layer of detail, dwindles
+//! to a dot as the god rises, and the same wheel comes home again. One
+//! camera, one gesture, no handover anywhere in it.
 
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::RenderLayers;
@@ -37,14 +34,6 @@ use crate::terrain::{PLANET_RADIUS, Terrain, WATER_LEVEL};
 /// The globe's own render layer. The planet and its sun live here alone, so
 /// what the camera renders is staged with single component writes.
 pub const GLOBE_LAYER: usize = 2;
-
-/// Past this camera distance the flat chunk world bows out and the patch
-/// tree carries the frame alone.
-pub const CURTAIN: f32 = 5_200.0;
-
-/// Coming back in through this, the chunks return. Inside the curtain so the
-/// two thresholds cannot chatter when the wheel hesitates between them.
-const RESURFACE: f32 = 4_600.0;
 
 /// Where the climb starts telling: the sky begins turning from horizon to
 /// blue here, and the diorama lens retires. The planet itself is beneath the
@@ -70,19 +59,20 @@ const MAX_LEVEL: u8 = 8;
 /// Split while a patch's cells subtend more than this many pixels. The knob
 /// that trades sharpness for patch count; nine pixels keeps the low-poly
 /// look through every level rather than dissolving it into smoothness.
-const SPLIT_PX: f32 = 9.0;
+const SPLIT_PX: f32 = 7.0;
 
 /// Patches built per frame while the tree is chasing the camera. A build is
 /// a couple of milliseconds of noise sampling; four a frame chases a fast
 /// descent closely without stuttering the simulation, and a patch that
 /// arrives a beat late only means the ground is briefly coarser there —
 /// the same bargain streaming ground has always made.
-const BUILDS_PER_FRAME: usize = 4;
+const BUILDS_PER_FRAME: usize = 6;
 
 /// The camera never counts as closer to the surface than this when deciding
-/// how deep to refine — below it the flat world owns the detail, and a tree
-/// refining to centimetres under a world that hides it is pure waste.
-const REFINE_FLOOR: f32 = 900.0;
+/// how deep to refine. Low: the patches now stand in open view just past the
+/// loaded ground's edge at play zoom, and the sharper they hold that ring,
+/// the quieter the one seam this design has left.
+const REFINE_FLOOR: f32 = 300.0;
 
 /// The rotation that stands the planet up in the world: the terrain scaffold
 /// maps ground onto the unit sphere with the reference point at +Z and the
@@ -198,51 +188,19 @@ struct Patch2 {
 /// second, and the loudest clue was the quietest number on the overlay.
 const KEPT_FOR: u64 = 1_800;
 
-/// Patches below this depth are never felled: the six faces and their first
-/// splits are the whole planet from orbit, they are rebuilt at every world
-/// anyway, and the fallback for a still-growing patch must always find an
+/// Patches at or below this depth are never felled, and all of them are
+/// grown at world creation: at this depth the whole planet is sharp from
+/// orbit, so the far view is BAKED - zooming out never builds anything, and
+/// the streaming-in of finer ground happens only on the way down, close in,
+/// where streaming has always happened. Five hundred and ten patches at a
+/// six-thousand radius; the bake is a couple of seconds inside the loading
+/// screen, and the fallback for a still-growing patch always finds an
 /// ancestor standing.
-const EVERGREEN: u8 = 2;
+const EVERGREEN: u8 = 3;
 
 /// The one material every patch wears; the colours ride the vertices.
 #[derive(Resource)]
 struct PlanetSkin(Handle<StandardMaterial>);
-
-/// The state of the orbital view.
-#[derive(Resource)]
-pub struct GlobeView {
-    /// Whether the planet owns the frame outright (past the curtain).
-    pub shown: bool,
-    /// Unit direction from the planet's centre to the ground under view, in
-    /// world space. Dragging rotates this; leaving orbit turns it back into
-    /// the `(x, z)` the flat world speaks.
-    look: Vec3,
-    /// Present height above the sea-level sphere, smoothed toward `sought`.
-    gaze: f32,
-    /// Where the wheel has asked the height to go.
-    sought: f32,
-}
-
-impl GlobeView {
-    /// The height of the climb, whichever camera owns it: the orbit's own
-    /// height when the planet has the frame, the rig's distance otherwise.
-    /// One number for the overlay and the sky, continuous through the
-    /// handover.
-    pub fn height(&self, rig_distance: f32) -> f32 {
-        if self.shown { self.gaze } else { rig_distance }
-    }
-}
-
-impl Default for GlobeView {
-    fn default() -> Self {
-        GlobeView {
-            shown: false,
-            look: Vec3::Y,
-            gaze: CURTAIN,
-            sought: CURTAIN,
-        }
-    }
-}
 
 /// Marks the planet's root entity and its sun.
 #[derive(Component)]
@@ -256,16 +214,14 @@ pub struct GlobePlugin;
 
 impl Plugin for GlobePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<GlobeView>()
-            .init_resource::<PlanetTree>()
+        app.init_resource::<PlanetTree>()
             .add_systems(
                 Update,
                 (plant_the_tree, dress_the_patches).run_if(resource_exists::<Terrain>),
             )
             .add_systems(
                 Update,
-                (behold_the_world, stage_the_ascent, tend_the_tree)
-                    .chain()
+                tend_the_tree
                     .after(crate::camera::CameraSet)
                     .run_if(crate::world_is_afoot),
             )
@@ -299,7 +255,7 @@ fn plant_the_tree(
             Name::new("The Planet"),
             ThePlanet,
             Transform::from_translation(planet_centre()).with_rotation(planet_stance()),
-            Visibility::Hidden,
+            Visibility::Inherited,
         ))
         .id();
     tree.root = Some(root);
@@ -329,7 +285,7 @@ fn plant_the_tree(
 
     let mut grown = 0;
     for face in 0..6u8 {
-        for level in 0..=2u8 {
+        for level in 0..=EVERGREEN {
             let across = 1u32 << level;
             for y in 0..across {
                 for x in 0..across {
@@ -411,9 +367,12 @@ fn build_patch(terrain: &Terrain, key: PatchKey) -> Mesh {
     let step = side / n as f32;
 
     // Padded grids of drawn positions and ground answers, one cell beyond
-    // each edge for slopes and normals.
+    // each edge for slopes and normals. Water is asked about per vertex —
+    // the game's lakes sit in basins ABOVE sea level, and a planet that only
+    // wore its ocean painted every one of them as green land, which is most
+    // of what made the ball read as a different world from the ground.
     let mut grid: Vec<Vec3> = Vec::with_capacity(padded * padded);
-    let mut ground: Vec<(f32, f32, f32)> = Vec::with_capacity(padded * padded);
+    let mut ground: Vec<(f32, f32, f32, f32)> = Vec::with_capacity(padded * padded);
     for gj in 0..padded {
         for gi in 0..padded {
             let u = u0 + (gi as f32 - 1.0) * step;
@@ -421,8 +380,15 @@ fn build_patch(terrain: &Terrain, key: PatchKey) -> Mesh {
             let dir = (outward + along_u * u + along_v * v).normalize();
             let (x, z) = ground_coordinates(dir);
             let h = terrain.base_height_at(x, z);
-            grid.push(dir * drawn_radial(h));
-            ground.push((x, z, h));
+            // The water surface standing over this ground, if any: the sea,
+            // or a river or lake the courses know about.
+            let surface = match terrain.river_surface_at(x, z) {
+                Some(level) if level > h => level,
+                _ => WATER_LEVEL,
+            };
+            let wet = surface.max(WATER_LEVEL);
+            grid.push(dir * drawn_radial(h, wet));
+            ground.push((x, z, h, wet));
         }
     }
     let at = |gi: usize, gj: usize| grid[gj * padded + gi];
@@ -437,7 +403,7 @@ fn build_patch(terrain: &Terrain, key: PatchKey) -> Mesh {
             let (pi, pj) = (gi + 1, gj + 1);
             let here = at(pi, pj);
             let dir = here.normalize();
-            let (x, z, h) = ground[pj * padded + pi];
+            let (x, z, h, wet) = ground[pj * padded + pi];
 
             let across = at(pi + 1, pj) - at(pi - 1, pj);
             let down = at(pi, pj + 1) - at(pi, pj - 1);
@@ -449,7 +415,7 @@ fn build_patch(terrain: &Terrain, key: PatchKey) -> Mesh {
 
             positions.push(here.to_array());
             normals.push(normal.to_array());
-            colors.push(paint(terrain, x, z, h, slope));
+            colors.push(paint(terrain, x, z, h, wet, slope));
         }
     }
 
@@ -535,21 +501,24 @@ fn ground_coordinates(dir: Vec3) -> (f32, f32) {
     (lon * PLANET_RADIUS, -lat * PLANET_RADIUS)
 }
 
-/// Radial distance the surface is drawn at. The sea is a smooth ball at
-/// water level — a globe shows its oceans, not its seabeds — and the land is
-/// TRUE relief: the planet sits underneath the flat world whenever the god
-/// is high enough to see past the loaded ground, and an exaggerated mountain
-/// would tower up through the real ground above it.
-fn drawn_radial(h: f32) -> f32 {
-    PLANET_RADIUS + WATER_LEVEL + (h - WATER_LEVEL).max(0.0)
+/// Radial distance the surface is drawn at. Water is drawn AT its surface —
+/// the sea at sea level, a lake at the lake's own level — because a globe
+/// shows its waters, not its beds. Land is TRUE relief: the planet sits
+/// underneath the flat world whenever the god is high enough to see past
+/// the loaded ground, and an exaggerated mountain would tower up through
+/// the real ground above it.
+fn drawn_radial(h: f32, wet: f32) -> f32 {
+    PLANET_RADIUS + WATER_LEVEL + (h.max(wet) - WATER_LEVEL).max(0.0)
 }
 
-/// One vertex's colour: the sea by depth in the water's own ramp, the land
-/// by the chunk painter itself, so the planet at any height is recognisably
-/// the ground the game is played on.
-fn paint(terrain: &Terrain, x: f32, z: f32, h: f32, slope: f32) -> [f32; 4] {
-    if h <= WATER_LEVEL {
-        let depth = ((WATER_LEVEL - h) / 8.0).clamp(0.0, 1.0);
+/// One vertex's colour: any standing water by depth in the water's own
+/// ramp — the sea, and the lakes and rivers the courses know — the land by
+/// the chunk painter itself, darkened under deep woods the way the ground
+/// disappears under canopy from the air. The aim is that the planet at any
+/// height is recognisably the ground the game is played on.
+fn paint(terrain: &Terrain, x: f32, z: f32, h: f32, wet: f32, slope: f32) -> [f32; 4] {
+    if h < wet {
+        let depth = ((wet - h) / 8.0).clamp(0.0, 1.0);
         let shallow = palette::shade(&palette::WATER, 0.9).to_linear();
         let deep = palette::shade(&palette::WATER, 0.45).to_linear();
         return [
@@ -574,6 +543,22 @@ fn paint(terrain: &Terrain, x: f32, z: f32, h: f32, slope: f32) -> [f32; 4] {
         None,
     )
     .to_linear();
+
+    // Under dense woods the ground is canopy from above. The chunks carry
+    // actual trees; the planet carries their shade, from the same forest
+    // field the scatterer plants by, so a wooded valley is the same dark
+    // green at every height.
+    let woods = ((terrain.forest_at(x, z) - 0.5) * 2.0).clamp(0.0, 1.0);
+    if woods > 0.0 && h > WATER_LEVEL + 0.5 && h < WATER_LEVEL + 78.0 {
+        let canopy = palette::shade(&palette::GRASS, 0.34).to_linear();
+        let t = woods * 0.55;
+        return [
+            color.red + (canopy.red - color.red) * t,
+            color.green + (canopy.green - color.green) * t,
+            color.blue + (canopy.blue - color.blue) * t,
+            1.0,
+        ];
+    }
     [color.red, color.green, color.blue, 1.0]
 }
 
@@ -707,152 +692,6 @@ fn tend_the_tree(
     }
 }
 
-// -------------------------------------------------------------- the staging
-
-/// One owner for what the camera renders and whether the planet is drawn.
-/// Below [`ASCENT`], ordinary play: the world's layers, no planet. Between
-/// [`ASCENT`] and orbit, BOTH — the chunks in front, the planet beneath, so
-/// the ground past the streaming edge is more world rather than void. In
-/// orbit, the planet alone.
-fn stage_the_ascent(
-    mut commands: Commands,
-    view: Res<GlobeView>,
-    tree: Res<PlanetTree>,
-    mut roots: Query<&mut Visibility, With<ThePlanet>>,
-    cameras: Query<(Entity, &CameraRig), With<GodCamera>>,
-) {
-    let Ok((camera, _rig)) = cameras.single() else {
-        return;
-    };
-    // The planet is simply always there. It was staged in and out by height
-    // for a while, and every threshold made a seam of one kind or another;
-    // the world behind the world is not an effect to be cued, it is the
-    // ground. The only staging left is orbit, where the flat world's layer
-    // bows out and the planet carries the frame alone.
-    if let Some(root) = tree.root
-        && let Ok(mut showing) = roots.get_mut(root)
-        && *showing != Visibility::Inherited
-    {
-        *showing = Visibility::Inherited;
-    }
-    if view.shown {
-        commands
-            .entity(camera)
-            .insert(RenderLayers::layer(GLOBE_LAYER));
-    } else {
-        commands
-            .entity(camera)
-            .insert(RenderLayers::from_layers(&[0, GLOBE_LAYER]));
-    }
-}
-
-// --------------------------------------------------------------- the orbit
-
-/// Opens the orbital view when the zoom leaves the world, drives it while it
-/// is open — grab and drag to turn the planet, wheel to climb or come home —
-/// and lands the camera back on the ground that was under view.
-#[allow(clippy::too_many_arguments)]
-fn behold_the_world(
-    time: Res<Time<Real>>,
-    dive: Option<Res<crate::camera::CameraDive>>,
-    terrain: Option<Res<Terrain>>,
-    buttons: Res<ButtonInput<MouseButton>>,
-    keys: Res<ButtonInput<KeyCode>>,
-    mouse_motion: Res<bevy::input::mouse::AccumulatedMouseMotion>,
-    mouse_scroll: Res<bevy::input::mouse::AccumulatedMouseScroll>,
-    pointer: Res<crate::ui::PointerContext>,
-    windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
-    mut view: ResMut<GlobeView>,
-    mut cameras: Query<(&mut CameraRig, &mut Transform), With<GodCamera>>,
-) {
-    let Ok((mut rig, mut transform)) = cameras.single_mut() else {
-        return;
-    };
-
-    if !view.shown {
-        // The opening descent owns the rig; the handover waits for it.
-        if rig.distance > CURTAIN && dive.is_none() {
-            view.shown = true;
-            view.look = planet_stance() * crate::terrain::direction_at(rig.focus.x, rig.focus.z);
-            view.gaze = rig.distance;
-            view.sought = rig.distance;
-        } else {
-            return;
-        }
-    }
-
-    // The wheel, shaped like the ground's own zoom.
-    let scroll = if pointer.over_ui {
-        0.0
-    } else {
-        crate::camera::normalised_scroll(mouse_scroll.delta.y, mouse_scroll.unit)
-    };
-    if scroll != 0.0 {
-        let factor = (1.0 - scroll * rig.zoom_sensitivity).clamp(0.5, 2.0);
-        view.sought = (view.sought * factor).clamp(RESURFACE * 0.9, CEILING);
-    }
-    // Escape is the other way home.
-    if keys.just_pressed(KeyCode::Escape) {
-        view.sought = RESURFACE * 0.9;
-    }
-    let ease = 1.0 - (-6.0 * time.delta_secs()).exp();
-    view.gaze += (view.sought - view.gaze) * ease;
-
-    // The grab: dragging turns the planet under the hand, scaled so a pixel
-    // of mouse is about a pixel of ground.
-    let pole = planet_stance() * Vec3::Y;
-    let up_hint = (pole - view.look * pole.dot(view.look)).normalize_or(Vec3::X);
-    if buttons.pressed(MouseButton::Left) && !pointer.over_ui {
-        let delta = mouse_motion.delta;
-        if delta != Vec2::ZERO {
-            let height_px = windows
-                .single()
-                .map(|w| w.resolution.height())
-                .unwrap_or(1000.0)
-                .max(1.0);
-            let per_pixel = 2.0 * (0.31f32).tan() * view.gaze / height_px / PLANET_RADIUS;
-            let forward = -view.look;
-            let right = forward.cross(up_hint).normalize_or(Vec3::X);
-            let turned = Quat::from_axis_angle(up_hint, -delta.x * per_pixel)
-                * Quat::from_axis_angle(right, -delta.y * per_pixel)
-                * view.look;
-            // Short of the poles: a camera exactly over a pole has no north
-            // to hang its frame on.
-            let leaning = planet_stance().inverse() * turned;
-            if leaning.y.abs() < 0.985 {
-                view.look = turned.normalize();
-            }
-        }
-    }
-
-    // Coming home: the direction under view, in the ground's own words.
-    if view.gaze < RESURFACE {
-        let ground_dir = planet_stance().inverse() * view.look;
-        let (x, z) = ground_coordinates(ground_dir);
-        let y = terrain.as_ref().map_or(WATER_LEVEL, |t| t.height_at(x, z));
-        rig.focus = Vec3::new(x, y, z);
-        rig.target_focus = rig.focus;
-        rig.distance = view.gaze;
-        rig.target_distance = view.gaze * 0.96;
-        // Straight down and north-up — exactly how the planet was being
-        // looked at, so the handover changes nothing about the gaze.
-        rig.pitch = crate::camera::MAX_PITCH;
-        rig.target_pitch = rig.pitch;
-        rig.yaw = 0.0;
-        rig.target_yaw = 0.0;
-        rig.zoom_anchor = None;
-        view.shown = false;
-        *transform = Transform::from_translation(rig.eye()).looking_at(rig.focus, Vec3::Y);
-        return;
-    }
-
-    // The orbital camera: straight down at the point under view, north up.
-    let sea = PLANET_RADIUS + WATER_LEVEL;
-    let centre = planet_centre();
-    let eye = centre + view.look * (sea + view.gaze);
-    *transform = Transform::from_translation(eye).looking_at(centre + view.look * sea, up_hint);
-}
-
 // ----------------------------------------------------------------- the sky
 
 /// Space is dark, and the climb to it starts before the chunks bow out.
@@ -860,21 +699,11 @@ fn behold_the_world(
 /// The sky painter writes the horizon colour into the clear colour every
 /// frame; this runs after it and takes the sky through what a climb should
 /// look like — blue first, black only with real altitude.
-fn dress_for_space(
-    view: Option<Res<GlobeView>>,
-    mut clear: ResMut<ClearColor>,
-    cameras: Query<&CameraRig, With<GodCamera>>,
-) {
-    let Some(view) = view else {
-        return;
-    };
+fn dress_for_space(mut clear: ResMut<ClearColor>, cameras: Query<&CameraRig, With<GodCamera>>) {
     let Ok(rig) = cameras.single() else {
         return;
     };
-
-    // One number for the height of the climb, continuous through the
-    // handover: the rig's distance on the way up, the orbit's beyond it.
-    let height = if view.shown { view.gaze } else { rig.distance };
+    let height = rig.distance;
 
     if height <= ASCENT {
         return;
@@ -955,7 +784,7 @@ mod tests {
             let dir = Vec3::new(r * a.cos(), y, r * a.sin());
             let (x, z) = ground_coordinates(dir);
             let h = t.base_height_at(x, z);
-            let c = paint(&t, x, z, h, 0.05);
+            let c = paint(&t, x, z, h, WATER_LEVEL, 0.05);
             if h <= WATER_LEVEL {
                 sea = (sea.0 + c[2] - c[1].max(c[0]), sea.1 + 1);
             } else if h < WATER_LEVEL + 70.0 {

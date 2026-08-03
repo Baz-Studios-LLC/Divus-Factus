@@ -29,13 +29,7 @@ impl Plugin for CameraPlugin {
                     // anywhere to put a village.
                     read_camera_input.run_if(
                         crate::world_is_afoot
-                            .and_then(|dive: Option<Res<CameraDive>>| dive.is_none())
-                            // In orbit the mouse belongs to the planet: wheel
-                            // and drag are read there, and the rig holds its
-                            // last grounded pose for the return.
-                            .and_then(|globe: Option<Res<crate::globe::GlobeView>>| {
-                                globe.is_none_or(|globe| !globe.shown)
-                            }),
+                            .and_then(|dive: Option<Res<CameraDive>>| dive.is_none()),
                     ),
                     apply_follow,
                     fly_the_dive.run_if(crate::world_is_afoot),
@@ -467,6 +461,10 @@ fn spawn_camera(mut commands: Commands) {
             ..default()
         }),
         Transform::from_translation(rig.eye()).looking_at(rig.focus, Vec3::Y),
+        // The world's layers and the planet's, always both: the planet is
+        // not a view to switch to, it is the far ground of the only view
+        // there is.
+        bevy::camera::visibility::RenderLayers::from_layers(&[0, crate::globe::GLOBE_LAYER]),
         GodCamera,
         rig,
     ));
@@ -610,15 +608,13 @@ fn read_camera_input(
         rig.zoom_anchor = cursor_ground_point(&windows, &cameras, terrain.as_deref());
     }
 
-    // Leaving for orbit. Between the play ceiling and the globe's curtain the
-    // view steepens toward straight down, because that is how the planet will
-    // be looked at — the handover then changes the scenery's resolution, not
-    // the direction of gaze, which is most of what makes it read as one
-    // continuous climb rather than a cut to a map.
+    // Leaving for the sky. Past the play ceiling the view steepens toward
+    // straight down over a few thousand units of climb, so the whole planet
+    // arrives framed the way a world in space reads best — looked AT, not
+    // along. Gentle, and one-way per zoom: it never fights a pitch the god
+    // steers on the way back down.
     if rig.target_distance > MAX_DISTANCE {
-        let leaving = ((rig.target_distance - MAX_DISTANCE)
-            / (crate::globe::CURTAIN - MAX_DISTANCE))
-            .clamp(0.0, 1.0);
+        let leaving = ((rig.target_distance - MAX_DISTANCE) / (MAX_DISTANCE * 3.0)).clamp(0.0, 1.0);
         rig.target_pitch = rig
             .target_pitch
             .max(MIN_PITCH + (MAX_PITCH - MIN_PITCH) * leaving);

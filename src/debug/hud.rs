@@ -316,13 +316,7 @@ pub(crate) fn update_hud(
         Query<(), With<crate::villager::belief::Prayer>>,
     ),
     chunks: Option<Res<LoadedChunks>>,
-    // Tupled, not separate: this system stands at Bevy's sixteen-parameter
-    // line, and one more loose parameter pushes it over and silently breaks
-    // the debug set's `.chain()`.
-    climb: (
-        Option<Res<crate::globe::GlobeView>>,
-        Query<&crate::camera::CameraRig>,
-    ),
+    rigs: Query<&crate::camera::CameraRig>,
     villagers: Query<(&Needs, &Activity), With<Villager>>,
     corpses: Query<(), (With<crate::creature::Corpse>, With<Person>)>,
     reactions: Query<(), (With<Reaction>, With<Person>)>,
@@ -420,14 +414,7 @@ pub(crate) fn update_hud(
             // the round-world work, where every grey layer in the sky turned
             // out to live at a different altitude.
             HudValue::Altitude => {
-                let (globe, rigs) = &climb;
-                let distance = rigs.iter().next().map_or(0.0, |rig| rig.distance);
-                let height = globe.as_ref().map_or(distance, |g| g.height(distance));
-                if globe.as_ref().is_some_and(|g| g.shown) {
-                    format!("{height:.0} (orbit)")
-                } else {
-                    format!("{height:.0}")
-                }
+                format!("{:.0}", rigs.iter().next().map_or(0.0, |rig| rig.distance))
             }
             HudValue::Population => population.to_string(),
             HudValue::Dead => dead.to_string(),
