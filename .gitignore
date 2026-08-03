@@ -1,3 +1,9 @@
 /target
 .DS_Store
 divus-factus-*.png
+
+# The music generator's leavings: Python bytecode, and whatever loop was
+# last rendered to listen to. The script is worth keeping; these are not.
+__pycache__/
+*.pyc
+/scratch_test.wav

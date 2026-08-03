@@ -18,6 +18,9 @@ pub enum Air {
     PastoralDeity,
     SettlersHearth,
     DivinePresence,
+    WinterHymn,
+    GatheringStorm,
+    WildernessTrail,
 }
 
 impl Air {
@@ -26,6 +29,9 @@ impl Air {
             Air::PastoralDeity => "audio/pastoral_deity_theme.wav",
             Air::SettlersHearth => "audio/settlers_hearth.wav",
             Air::DivinePresence => "audio/divine_presence.wav",
+            Air::WinterHymn => "audio/winter_hymn.wav",
+            Air::GatheringStorm => "audio/gathering_storm.wav",
+            Air::WildernessTrail => "audio/wilderness_trail.wav",
         }
     }
 }
@@ -60,14 +66,31 @@ impl Plugin for MusicPlugin {
 }
 
 /// Decides which air the moment calls for.
-fn wanted(state: &crate::GameState, clock: Option<&crate::calendar::WorldClock>) -> Air {
+fn wanted(
+    state: &crate::GameState,
+    clock: Option<&crate::calendar::WorldClock>,
+    weather: Option<&crate::weather::Weather>,
+) -> Air {
     match state {
         crate::GameState::Playing => {
+            // Heavy rain or storm triggers the dramatic storm theme.
+            if let Some(w) = weather {
+                if w.intensity > 0.55 {
+                    return Air::GatheringStorm;
+                }
+            }
+
             let frac = clock.map(|c| c.time_of_day()).unwrap_or(0.3);
             // The hand starts to glow around 0.72; the presence rises with it
             // and hands back to the hearth a little after dawn breaks.
             if frac >= 0.72 || frac < 0.05 {
                 Air::DivinePresence
+            } else if let Some(c) = clock {
+                match c.season() {
+                    crate::calendar::Season::Winter => Air::WinterHymn,
+                    crate::calendar::Season::Autumn => Air::WildernessTrail,
+                    _ => Air::SettlersHearth,
+                }
             } else {
                 Air::SettlersHearth
             }
@@ -83,9 +106,10 @@ fn conduct(
     assets: Res<AssetServer>,
     state: Res<State<crate::GameState>>,
     clock: Option<Res<crate::calendar::WorldClock>>,
+    weather: Option<Res<crate::weather::Weather>>,
     mut channels: Query<&mut Channel>,
 ) {
-    let want = wanted(state.get(), clock.as_deref());
+    let want = wanted(state.get(), clock.as_deref(), weather.as_deref());
     let mut standing = false;
     for mut channel in &mut channels {
         if channel.air == want {
@@ -186,7 +210,14 @@ mod tests {
 
     #[test]
     fn every_air_has_a_file_on_disk() {
-        for air in [Air::PastoralDeity, Air::SettlersHearth, Air::DivinePresence] {
+        for air in [
+            Air::PastoralDeity,
+            Air::SettlersHearth,
+            Air::DivinePresence,
+            Air::WinterHymn,
+            Air::GatheringStorm,
+            Air::WildernessTrail,
+        ] {
             let path = std::path::Path::new("assets").join(air.path());
             assert!(
                 path.exists(),
