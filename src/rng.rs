@@ -112,6 +112,30 @@ pub fn hash_2d_f32(x: i32, y: i32, seed: u32) -> f32 {
     (hash_2d(x, y, seed) >> 8) as f32 / (1u32 << 24) as f32
 }
 
+/// The same hash with a third axis, for noise sampled in a volume.
+///
+/// A round world needs it: terrain on a sphere is a field over DIRECTIONS, and
+/// the honest way to sample that is a 3D field restricted to the unit sphere.
+/// Every 2D scheme — a heightmap per cube face, a latitude/longitude grid —
+/// pays for it with seams at the face edges or crowding at the poles. A volume
+/// has neither, because the sphere is simply a surface inside it.
+pub fn hash_3d(x: i32, y: i32, z: i32, seed: u32) -> u32 {
+    let mut h = seed;
+    h ^= (x as u32).wrapping_mul(0x8da6_b343);
+    h ^= (y as u32).wrapping_mul(0xd816_3841);
+    h ^= (z as u32).wrapping_mul(0xcb1a_b31f);
+    h = h ^ (h >> 15);
+    h = h.wrapping_mul(0x2c1b_3c6d);
+    h = h ^ (h >> 12);
+    h = h.wrapping_mul(0x2974_5b8d);
+    h ^ (h >> 16)
+}
+
+/// `hash_3d` mapped to `[0, 1)`.
+pub fn hash_3d_f32(x: i32, y: i32, z: i32, seed: u32) -> f32 {
+    (hash_3d(x, y, z, seed) >> 8) as f32 / (1u32 << 24) as f32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

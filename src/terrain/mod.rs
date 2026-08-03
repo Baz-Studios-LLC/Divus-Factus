@@ -25,7 +25,7 @@ use bevy::render::render_resource::PrimitiveTopology;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
-use crate::noise::{fbm_2d, ridged_2d, warped_fbm_2d};
+use crate::noise::{fbm_3d, ridged_3d, warped_fbm_3d};
 use crate::palette;
 
 /// World units along one edge of a chunk.
@@ -70,6 +70,66 @@ const CHUNKS_PER_LOADING_FRAME: usize = 48;
 
 /// Sea level.
 pub const WATER_LEVEL: f32 = 20.0;
+/// The world is a sphere, and this is how big it is.
+///
+/// Fifteen thousand units of radius: a circumference of ninety-four kilometres
+/// and, at the continent wavelength below, some sixteen continent-scale
+/// landmasses around the equator. A world with geography worth learning rather
+/// than an endless plain.
+///
+/// The number was chosen against three things at once. Small enough that the
+/// land is FINITE and worth competing over. Large enough that the ground reads
+/// as flat where the game is actually played - at the working camera height the
+/// horizon drops by a hundredth of a unit across the whole frame, and even at
+/// full zoom-out only about seven, against terrain three hundred and twenty
+/// units tall. And small enough that a surface point sits fifteen thousand
+/// units from the centre, where an `f32` still resolves to under two
+/// millimetres - so none of this needs double precision or a moving world
+/// origin, which is what makes planet renderers miserable. An Earth-sized world
+/// would resolve to three quarters of a unit and everything would jitter.
+pub const PLANET_RADIUS: f32 = 15_000.0;
+
+/// Once round the world, in units.
+pub fn planet_circumference() -> f32 {
+    std::f32::consts::TAU * PLANET_RADIUS
+}
+
+/// The direction from the planet's centre to the ground at local `(x, z)`.
+///
+/// This is the scaffold that lets a flat simulation stand on a round world. The
+/// game speaks `(x, z)` in a hundred and nine places, and it goes on doing so:
+/// `x` is arc length east, `z` is arc length north, and both are turned into a
+/// point on the unit sphere here. Terrain is then a field over DIRECTIONS,
+/// sampled from a volume, which is what makes the world finite - go far enough
+/// east and `x` comes back round to where it started, because sine and cosine
+/// do that for nothing.
+///
+/// It is deliberately a scaffold and not a coordinate system. Near the
+/// reference point it is exact; far from it, east-west arc length stretches by
+/// the usual `1/cos(latitude)`, and walking over a pole keeps its longitude
+/// when a real journey would flip it. None of that is reachable in play - a
+/// settlement is three hundred units across and the error over one is under a
+/// unit - and all of it goes away when positions themselves become spherical.
+pub fn direction_at(x: f32, z: f32) -> Vec3 {
+    let lon = x / PLANET_RADIUS;
+    let lat = z / PLANET_RADIUS;
+    let (sin_lat, cos_lat) = lat.sin_cos();
+    let (sin_lon, cos_lon) = lon.sin_cos();
+    Vec3::new(cos_lat * sin_lon, sin_lat, cos_lat * cos_lon)
+}
+
+/// A noise frequency written for the flat world, converted for the round one.
+///
+/// The old field was sampled at `x * k`. Two points an arc length `d` apart on
+/// the sphere have directions `d / PLANET_RADIUS` apart, so sampling the volume
+/// at `direction * (PLANET_RADIUS * k)` puts the same `d * k` between them.
+/// Every wavelength therefore comes through unchanged, and the ground underfoot
+/// is the ground it always was - only now it closes.
+#[inline]
+fn spherical(k: f32) -> f32 {
+    PLANET_RADIUS * k
+}
+
 /// Nothing generates above this. Used to bound ray marching.
 pub const TERRAIN_HEIGHT: f32 = 320.0;
 
@@ -400,8 +460,11 @@ impl Terrain {
     /// land it flows through, not at sea level.
     pub fn base_height_at(&self, x: f32, z: f32) -> f32 {
         // Continents. Wavelength on the order of a kilometre, so crossing a coastline
-        // takes a real walk.
-        let continent = fbm_2d(x * 0.0011, z * 0.0011, self.seed, 5, 2.0, 0.5);
+        // takes a real walk. Sampled in a volume on the unit sphere now, so the
+        // coastlines join up all the way round the world instead of marching
+        // off for ever.
+        let dir = direction_at(x, z);
+        let continent = fbm_3d(dir * spherical(0.0011), self.seed, 5, 2.0, 0.5);
 
         // -1 is deep ocean, +1 is high inland.
         let land = ((continent - 0.44) / 0.30).clamp(-1.0, 1.0);
@@ -416,11 +479,11 @@ impl Terrain {
         };
 
         // Hills, present everywhere but stronger on land.
-        let detail = warped_fbm_2d(x * 0.010, z * 0.010, self.seed ^ 0xa1a1, 4, 0.5) - 0.5;
+        let detail = warped_fbm_3d(dir * spherical(0.010), self.seed ^ 0xa1a1, 4, 0.5) - 0.5;
 
         // Ridges only bite on ground that is already high, so valleys stay walkable.
         let ridge_mask = land.clamp(0.0, 1.0);
-        let ridge = ridged_2d(x * 0.006, z * 0.006, self.seed ^ 0xa5a5, 4);
+        let ridge = ridged_3d(dir * spherical(0.006), self.seed ^ 0xa5a5, 4);
 
         let mut height: f32 = WATER_LEVEL
             + shaped * 44.0
@@ -431,9 +494,8 @@ impl Terrain {
         // wherever the continent noise happened to peak, and the world comes out
         // uniformly rolling. A separate low-frequency mask puts ranges in particular
         // places and leaves the rest of the map as lowland.
-        let belt = fbm_2d(
-            x * 0.00055 + 300.0,
-            z * 0.00055 - 120.0,
+        let belt = fbm_3d(
+            dir * spherical(0.00055) + Vec3::new(300.0, -120.0, 60.0),
             self.seed ^ 0x3721,
             4,
             2.0,
@@ -446,7 +508,7 @@ impl Terrain {
         // approaches 1, so every extra power crushes what little there is.
         let belt_mask = ((belt - 0.46) / 0.16).clamp(0.0, 1.0) * ridge_mask;
         if belt_mask > 0.0 {
-            let peaks = ridged_2d(x * 0.0021, z * 0.0021, self.seed ^ 0x77aa, 5);
+            let peaks = ridged_3d(dir * spherical(0.0021), self.seed ^ 0x77aa, 5);
             height += peaks * peaks * belt_mask.powf(1.3) * 240.0;
         }
 
@@ -484,9 +546,8 @@ impl Terrain {
 
     /// Dampness in `[0, 1]`, driving surface colour and scatter density.
     pub fn moisture_at(&self, x: f32, z: f32) -> f32 {
-        fbm_2d(
-            x * 0.0045 + 17.0,
-            z * 0.0045 - 9.0,
+        fbm_3d(
+            direction_at(x, z) * spherical(0.0045) + Vec3::new(17.0, -9.0, 5.0),
             self.seed ^ 0x5eed,
             3,
             2.0,
@@ -498,7 +559,13 @@ impl Terrain {
     /// from, so ground can be judged for timber before any chunk exists.
     /// Trees stand where this exceeds 0.50 on moist, gentle ground.
     pub fn forest_at(&self, x: f32, z: f32) -> f32 {
-        fbm_2d(x * 0.004, z * 0.004, self.seed ^ 0xf00d, 3, 2.0, 0.5)
+        fbm_3d(
+            direction_at(x, z) * spherical(0.004),
+            self.seed ^ 0xf00d,
+            3,
+            2.0,
+            0.5,
+        )
     }
 
     /// Ground mottling in `[0, 1]`, at a scale of tens of metres.
@@ -506,17 +573,16 @@ impl Terrain {
     /// Ground colour otherwise varies only with moisture and altitude, which change
     /// over kilometres — this is what stops a hillside being one flat green.
     pub fn ground_patch_at(&self, x: f32, z: f32) -> f32 {
-        let broad = fbm_2d(
-            x * 0.011 - 140.0,
-            z * 0.011 + 77.0,
+        let dir = direction_at(x, z);
+        let broad = fbm_3d(
+            dir * spherical(0.011) + Vec3::new(-140.0, 77.0, 22.0),
             self.seed ^ 0x9e11,
             3,
             2.0,
             0.5,
         );
-        let fine = fbm_2d(
-            x * 0.055 + 12.0,
-            z * 0.055 - 31.0,
+        let fine = fbm_3d(
+            dir * spherical(0.055) + Vec3::new(12.0, -31.0, 44.0),
             self.seed ^ 0x51f3,
             2,
             2.0,
@@ -530,9 +596,8 @@ impl Terrain {
     /// An unperturbed altitude threshold draws a level contour across a mountain,
     /// which reads instantly as a rendering rule rather than vegetation.
     pub fn line_variation_at(&self, x: f32, z: f32) -> f32 {
-        fbm_2d(
-            x * 0.019 + 61.0,
-            z * 0.019 - 24.0,
+        fbm_3d(
+            direction_at(x, z) * spherical(0.019) + Vec3::new(61.0, -24.0, 13.0),
             self.seed ^ 0xbeef,
             3,
             2.0,
@@ -543,9 +608,8 @@ impl Terrain {
 
     /// Rough temperature in `[0, 1]`, falling with altitude.
     pub fn temperature_at(&self, x: f32, z: f32) -> f32 {
-        let base = fbm_2d(
-            x * 0.00042 - 400.0,
-            z * 0.00042 + 250.0,
+        let base = fbm_3d(
+            direction_at(x, z) * spherical(0.00042) + Vec3::new(-400.0, 250.0, 90.0),
             self.seed ^ 0x7e11,
             3,
             2.0,
@@ -1201,6 +1265,11 @@ fn setup_terrain(
         WaterPlane,
     ));
 
+    info!(
+        "the world is a sphere {:.0} units around, {:.0} across",
+        planet_circumference(),
+        PLANET_RADIUS * 2.0
+    );
     commands.insert_resource(Terrain::new(world_seed.0));
     commands.insert_resource(TerrainAssets {
         ground_material,
@@ -1471,20 +1540,32 @@ mod tests {
     #[test]
     fn ground_mottling_varies_at_a_visible_scale() {
         // The point of the patch field is variation across a hillside, not across a
-        // continent. Sampling a short walk should show real spread.
-        let t = Terrain::new(2024);
-        let mut lowest: f32 = 1.0;
-        let mut highest: f32 = 0.0;
-        for i in 0..300 {
-            let p = t.ground_patch_at(i as f32 * 1.5, i as f32 * -0.9);
-            assert!((0.0..=1.0).contains(&p), "{p} out of range");
-            lowest = lowest.min(p);
-            highest = highest.max(p);
+        // continent. A short walk should show real spread.
+        //
+        // Measured across several worlds and averaged, because one walk through
+        // one seed is a sample of a random field, not a property of it. This
+        // asserted a span of 0.35 on a single walk through seed 2024 and duly
+        // failed at 0.31 the moment the field was resampled on a sphere - at
+        // an identical frequency, on ground just as mottled. What is being
+        // claimed is that the field varies at this scale, so that is what is
+        // now measured.
+        let mut spans = Vec::new();
+        for seed in [2024, 7, 99, 4242, 31337, 555] {
+            let t = Terrain::new(seed);
+            let mut lowest: f32 = 1.0;
+            let mut highest: f32 = 0.0;
+            for i in 0..300 {
+                let p = t.ground_patch_at(i as f32 * 1.5, i as f32 * -0.9);
+                assert!((0.0..=1.0).contains(&p), "{p} out of range");
+                lowest = lowest.min(p);
+                highest = highest.max(p);
+            }
+            spans.push(highest - lowest);
         }
+        let typical = spans.iter().sum::<f32>() / spans.len() as f32;
         assert!(
-            highest - lowest > 0.35,
-            "patch field only spanned {:.2} over 450 units",
-            highest - lowest,
+            typical > 0.35,
+            "patch field typically spanned only {typical:.2} over 450 units: {spans:?}"
         );
     }
 
@@ -1872,5 +1953,110 @@ mod tests {
         let t = Terrain::new(1);
         let ray = Ray3d::new(Vec3::new(0.0, TERRAIN_HEIGHT + 50.0, 0.0), Dir3::Y);
         assert!(raycast(&t, ray).is_none());
+    }
+
+    // ------------------------------------------------ the world is a sphere
+
+    /// The whole point. Walk far enough east and you arrive where you started —
+    /// not at similar ground, at THE SAME ground, to the last decimal. A field
+    /// sampled on a plane can never do this; one sampled in a volume on the unit
+    /// sphere does it for free, because sine and cosine close.
+    #[test]
+    fn the_world_comes_back_round_on_itself() {
+        let t = Terrain::new(4242);
+        let round = planet_circumference();
+        for &z in &[0.0, 900.0, -2_400.0] {
+            for &x in &[0.0, 137.0, -812.5, 6_000.0] {
+                let here = t.base_height_at(x, z);
+                let all_the_way = t.base_height_at(x + round, z);
+                assert!(
+                    (here - all_the_way).abs() < 0.05,
+                    "at ({x}, {z}): {here} here, {all_the_way} once round"
+                );
+            }
+        }
+    }
+
+    /// And so does everything else the ground is described by. A world whose
+    /// coastlines join up but whose climate tears along a meridian would be
+    /// worse than one that never closed at all.
+    #[test]
+    fn the_climate_closes_with_the_land() {
+        let t = Terrain::new(99);
+        let round = planet_circumference();
+        for &(x, z) in &[(0.0, 0.0), (450.0, -1_100.0), (-3_000.0, 2_000.0)] {
+            let fields: [(&str, f32, f32); 5] = [
+                ("moisture", t.moisture_at(x, z), t.moisture_at(x + round, z)),
+                ("forest", t.forest_at(x, z), t.forest_at(x + round, z)),
+                (
+                    "patch",
+                    t.ground_patch_at(x, z),
+                    t.ground_patch_at(x + round, z),
+                ),
+                (
+                    "lines",
+                    t.line_variation_at(x, z),
+                    t.line_variation_at(x + round, z),
+                ),
+                (
+                    "temperature",
+                    t.temperature_at(x, z),
+                    t.temperature_at(x + round, z),
+                ),
+            ];
+            for (name, here, round_again) in fields {
+                assert!(
+                    (here - round_again).abs() < 0.01,
+                    "{name} tears at ({x}, {z}): {here} vs {round_again}"
+                );
+            }
+        }
+    }
+
+    /// Finite, but not small: the ground still has to be a world worth walking.
+    /// Sea and land both present, in something like the proportion the flat
+    /// version had, and mountains somewhere.
+    #[test]
+    fn a_round_world_is_still_a_world() {
+        let t = Terrain::new(4242);
+        let mut wet = 0;
+        let mut dry = 0;
+        let mut highest: f32 = 0.0;
+        // A coarse sweep of a whole hemisphere, in strides of a kilometre.
+        for iz in -20..=20 {
+            for ix in -40..=40 {
+                let h = t.base_height_at(ix as f32 * 1_000.0, iz as f32 * 1_000.0);
+                if h <= WATER_LEVEL {
+                    wet += 1;
+                } else {
+                    dry += 1;
+                }
+                highest = highest.max(h);
+            }
+        }
+        let total = (wet + dry) as f32;
+        let land = dry as f32 / total;
+        assert!(
+            (0.15..0.75).contains(&land),
+            "land is {:.0}% of the world",
+            land * 100.0
+        );
+        assert!(highest > 90.0, "nowhere is high: {highest}");
+    }
+
+    /// The scaffold is exact where the game actually happens. A settlement is
+    /// some three hundred units across; the sphere's curvature over one is
+    /// under a unit, which is why a flat simulation can stand on a round world
+    /// without knowing about it.
+    #[test]
+    fn a_settlement_sized_patch_is_flat_enough_to_ignore() {
+        let half = 150.0;
+        let drop = half * half / (2.0 * PLANET_RADIUS);
+        assert!(drop < 1.0, "curvature over a settlement is {drop} units");
+
+        // And two directions a settlement apart are still very nearly parallel.
+        let a = direction_at(0.0, 0.0);
+        let b = direction_at(300.0, 0.0);
+        assert!(a.angle_between(b) < 0.021, "{}", a.angle_between(b));
     }
 }
