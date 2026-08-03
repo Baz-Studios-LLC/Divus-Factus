@@ -277,7 +277,9 @@ fn stream_grass(
     let (Some(terrain), Some(assets), Ok(rig)) = (terrain, assets, cameras.single()) else {
         return;
     };
-    let centre = terrain.chunk_of(rig.focus.x, rig.focus.z);
+    // Grass lives where the flat world lives - see `HOMELANDS`.
+    let heart = crate::terrain::homeland_heart(rig.focus);
+    let centre = terrain.chunk_of(heart.x, heart.y);
 
     // Hysteresis on unload so the boundary does not thrash as the camera drifts.
     let drop = (GRASS_RADIUS + 1) * (GRASS_RADIUS + 1);

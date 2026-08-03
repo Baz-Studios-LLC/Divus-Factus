@@ -46,6 +46,25 @@ const MIN_VIEW_CHUNKS: i32 = 6;
 /// radius the whole time means paying for a thousand chunks while looking at one
 /// village. Tying the radius to the zoom keeps close work cheap and still opens the
 /// world up when the player rises.
+/// Where the flat world is allowed to live: the streamed chunks stay within
+/// this arc of the world origin, whatever the camera does.
+///
+/// The chunks render in the flat tangent frame, and that frame is only
+/// honest near the origin - at two thousand units its ground already floats
+/// three hundred units off the sphere, and streamed around a focus that had
+/// been grabbed to the far side of the planet it hung in empty space like a
+/// postcard beside the world. The flat world exists to carry villagers,
+/// trees and buildings, and those live HERE; the rest of the planet belongs
+/// to the patches, which sit on the sphere correctly at every longitude.
+/// The tether moves the day the chunks themselves bend onto the ball.
+pub const HOMELANDS: f32 = 1_600.0;
+
+/// The streamed world's centre: the camera's focus, held within
+/// [`HOMELANDS`] of the origin.
+pub fn homeland_heart(focus: Vec3) -> Vec2 {
+    Vec2::new(focus.x, focus.z).clamp_length_max(HOMELANDS)
+}
+
 pub fn stream_radius(camera_distance: f32) -> i32 {
     let chunks = (camera_distance / CHUNK_SIZE) * 1.6 + MIN_VIEW_CHUNKS as f32;
     let wanted = (chunks.round() as i32).clamp(MIN_VIEW_CHUNKS, VIEW_CHUNKS);
@@ -1325,7 +1344,8 @@ fn stream_chunks(
     let Ok(rig) = cameras.single() else {
         return;
     };
-    let centre = terrain.chunk_of(rig.focus.x, rig.focus.z);
+    let heart = homeland_heart(rig.focus);
+    let centre = terrain.chunk_of(heart.x, heart.y);
 
     let radius = stream_radius(rig.distance);
     loaded.radius = radius;
@@ -1482,9 +1502,10 @@ fn follow_water_plane(
     // will follow the curve itself the day the chunks do; they share a
     // frame, and bending one without the other tears every shoreline.
     let fit = stream_radius(rig.distance) as f32 / VIEW_CHUNKS as f32;
+    let heart = homeland_heart(rig.focus);
     for mut transform in &mut water {
-        transform.translation.x = rig.focus.x;
-        transform.translation.z = rig.focus.z;
+        transform.translation.x = heart.x;
+        transform.translation.z = heart.y;
         transform.scale = Vec3::new(fit, 1.0, fit);
     }
 }
