@@ -240,12 +240,23 @@ fn drape_the_veil(
     {
         let sheer_full = FogParams::default().tint.w;
         let solid_full = 1.0 - (1.0 - sheer_full).powi(SHEETS as i32);
+        // The veil thins with altitude and is gone before the world becomes
+        // a ball. It is a play-height instrument - what the village knows,
+        // seen from where the village is watched - and the planet's own
+        // patches have never honoured it, so carried aloft it stopped being
+        // information and became scenery: its sea-sheet borrows the water
+        // quad's mesh, and from three thousand up it read as an inexplicable
+        // translucent square lying on the world.
+        let aloft = rigs.iter().next().map_or(0.0, |rig| {
+            ((rig.distance - 1_500.0) / 2_500.0).clamp(0.0, 1.0)
+        });
+        let standing = rising.risen * (1.0 - aloft);
         let (cloth, deep) = (cloth.clone(), deep.clone());
         if let Some(mut stuff) = materials.get_mut(&cloth) {
-            stuff.params.tint.w = sheer_full * rising.risen;
+            stuff.params.tint.w = sheer_full * standing;
         }
         if let Some(mut stuff) = materials.get_mut(&deep) {
-            stuff.params.tint.w = solid_full * rising.risen;
+            stuff.params.tint.w = solid_full * standing;
         }
     }
     for (chunk, mesh, children, sea) in &chunks {
