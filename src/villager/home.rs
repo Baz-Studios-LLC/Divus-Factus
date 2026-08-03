@@ -123,10 +123,15 @@ const DOOR_STAND: f32 = 1.6;
 /// only when a frame's step happened to jump the whole band. Sideways
 /// offset has no such edge — walking the corridor drives it to nothing,
 /// so the choice can never flip back.
-fn door_leg(here: Vec2, door: &super::work::Doorway, inside: bool) -> Vec3 {
-    let step = door.out * DOOR_STAND;
-    let outer = Vec3::new(door.at.x + step.x, 0.0, door.at.y + step.y);
-    let inner = Vec3::new(door.at.x - step.x, 0.0, door.at.y - step.y);
+fn door_leg(
+    here: Vec2,
+    shell: &super::work::Shell,
+    door: &super::work::Doorway,
+    inside: bool,
+) -> Vec3 {
+    let (in_at, out_at) = shell.door_stand(door);
+    let outer = Vec3::new(out_at.x, 0.0, out_at.y);
+    let inner = Vec3::new(in_at.x, 0.0, in_at.y);
     let (near, far) = if inside {
         (inner, outer)
     } else {
@@ -182,7 +187,7 @@ pub(super) fn use_doors(
             else {
                 continue;
             };
-            let world = site.translation + site.rotation * door_leg(here, door, im);
+            let world = site.translation + site.rotation * door_leg(here, shell, door, im);
             target.0 = Some(Vec3::new(world.x, goal.y, world.z));
             break;
         }
@@ -1691,6 +1696,11 @@ mod tests {
     /// run of waypoints it was given.
     fn walk_out(half_w: f32, from: Vec2, stride: f32) -> Vec<Vec3> {
         let door = crate::villager::work::Doorway::on_x_wall(half_w, 0.0);
+        let shell = crate::villager::work::Shell {
+            half_w,
+            half_d: half_w,
+            doors: vec![door],
+        };
         let mut me = from;
         let mut legs = Vec::new();
         for _ in 0..STEPS {
@@ -1699,7 +1709,7 @@ mod tests {
             if me.x.abs() >= half_w + 0.15 {
                 break;
             }
-            let leg = door_leg(me, &door, true);
+            let leg = door_leg(me, &shell, &door, true);
             legs.push(leg);
             let toward = (Vec2::new(leg.x, leg.z) - me).normalize_or_zero();
             me += toward * stride;
@@ -1764,21 +1774,32 @@ mod tests {
     #[test]
     fn the_corridor_is_what_commits_a_walker_not_a_radius() {
         let door = crate::villager::work::Doorway::on_x_wall(4.0, 0.0);
+        let shell = crate::villager::work::Shell {
+            half_w: 4.0,
+            half_d: 4.0,
+            doors: vec![door],
+        };
         // Lined up, deep inside: sent straight out, however far back in
         // the room they stand. The old radius held them to `inner` until
         // they were all but touching it.
-        assert!(is_outward(door_leg(Vec2::new(-6.0, 0.0), &door, true), 4.0));
+        assert!(is_outward(
+            door_leg(Vec2::new(-6.0, 0.0), &shell, &door, true),
+            4.0
+        ));
         // Off to one side: sent to the inner standing place first, to be
         // brought into line with the opening.
         assert!(!is_outward(
-            door_leg(Vec2::new(-1.0, 3.0), &door, true),
+            door_leg(Vec2::new(-1.0, 3.0), &shell, &door, true),
             4.0
         ));
         // And the same in reverse for someone on their way in.
         assert!(!is_outward(
-            door_leg(Vec2::new(9.0, 0.0), &door, false),
+            door_leg(Vec2::new(9.0, 0.0), &shell, &door, false),
             4.0
         ));
-        assert!(is_outward(door_leg(Vec2::new(6.0, 3.0), &door, false), 4.0));
+        assert!(is_outward(
+            door_leg(Vec2::new(6.0, 3.0), &shell, &door, false),
+            4.0
+        ));
     }
 }

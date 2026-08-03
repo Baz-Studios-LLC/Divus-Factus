@@ -747,6 +747,34 @@ impl Doorway {
     }
 }
 
+impl Shell {
+    /// The two standing places either side of a doorway, in the
+    /// building's own space: one indoors, one genuinely out.
+    ///
+    /// A fixed step outward is not enough, and the bench longhouse is
+    /// why: its door sits at x=3.65 while the shell reaches 9.65, so
+    /// "1.6 metres outside the door" was still six metres inside the
+    /// building. Every route out of it therefore ran from one indoor
+    /// point to another, nobody ever crossed the wall, and ten founders
+    /// starved in their beds with food in the store.
+    ///
+    /// So the outer place is FOUND rather than assumed: step along the
+    /// door's own facing until the shell is behind you, then one more
+    /// stride for daylight.
+    pub fn door_stand(&self, door: &Doorway) -> (Vec2, Vec2) {
+        let out = door.out.normalize_or(Vec2::X);
+        let inside = |p: Vec2| p.x.abs() < self.half_w + 0.15 && p.y.abs() < self.half_d + 0.15;
+        let mut clear = 1.6;
+        // Bounded: a doorway that never clears the shell is a doorway
+        // into the middle of the building, and a long step out is a
+        // better answer than an endless loop.
+        while clear < 40.0 && inside(door.at + out * clear) {
+            clear += 0.5;
+        }
+        (door.at - out * 1.6, door.at + out * (clear + 1.0))
+    }
+}
+
 /// The walls of a walkable interior: footprint half-extents in the
 /// building's own space, and every doorway through them. The router
 /// steers any walk that crosses these walls through a door instead —
@@ -1225,12 +1253,32 @@ pub(crate) fn raise_the_founding_hall(
 
     // The doorstep, in the world: where ten people are about to be
     // standing. Read off the drawing's own door when it has one.
-    let door = super::baked::drawing_at(BuildingKind::Longhouse, plan.plan)
-        .and_then(|work| work.marks.iter().find(|mark| mark.mark == "door"))
-        .map(|mark| Vec2::new(mark.at[0], mark.at[2]))
-        .unwrap_or(Vec2::new(plan.half_w, 0.0));
-    let out = Quat::from_rotation_y(yaw) * Vec3::new(door.x + 2.2, 0.0, door.y);
-    let step = at + out;
+    // Outside its door, found the same way every route out of it is
+    // found - the drawing's shell reaches further than its doorway does,
+    // and a fixed step put ten people indoors.
+    let shell = Shell {
+        half_w: plan.half_w,
+        half_d: plan.half_d,
+        doors: super::baked::drawing_at(BuildingKind::Longhouse, plan.plan)
+            .map(|work| {
+                work.marks
+                    .iter()
+                    .filter(|mark| mark.mark == "door")
+                    .map(|mark| Doorway {
+                        at: Vec2::new(mark.at[0], mark.at[2]),
+                        out: {
+                            let facing = Quat::from_rotation_y(mark.yaw) * Vec3::X;
+                            Vec2::new(facing.x, facing.z).normalize_or(Vec2::X)
+                        },
+                    })
+                    .collect()
+            })
+            .filter(|doors: &Vec<Doorway>| !doors.is_empty())
+            .unwrap_or_else(|| vec![Doorway::on_x_wall(plan.half_w, 0.0)]),
+    };
+    let door = *shell.doors.first()?;
+    let (_, outside) = shell.door_stand(&door);
+    let step = at + Quat::from_rotation_y(yaw) * Vec3::new(outside.x, 0.0, outside.y);
     Some(Vec3::new(step.x, terrain.height_at(step.x, step.z), step.z))
 }
 

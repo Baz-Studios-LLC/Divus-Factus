@@ -172,6 +172,21 @@ pub(crate) fn form_bonds(
 /// miracle for it to change them — they need to know someone who did. What a
 /// villager carries secondhand is counted apart from what they saw, because a
 /// faith built on rumour and a faith built on witness are different faiths,
+/// When this person last finished a conversation.
+///
+/// Talk has to be punctuation, not the day. Widening who may chat, and
+/// then standing the whole founding village around one hall, had them
+/// pairing off continuously: food and timber both flatlined inside a
+/// minute of the world starting and every one of them starved beside a
+/// full store, having spent the working day in conversation.
+#[derive(Component)]
+pub struct SpokeLately(pub f64);
+
+/// Seconds before somebody is up for another conversation. About a
+/// sixth of a working day, so a villager can have a few in a day and
+/// still get something done in between.
+const AGAIN_AFTER: f64 = 55.0;
+
 /// What two people are talking ABOUT.
 ///
 /// It used to be only ever a miracle: the whole conversation system hung
@@ -279,6 +294,7 @@ pub(crate) fn meet_to_talk(
             Without<Conversing>,
         ),
     >,
+    spoke: Query<&SpokeLately>,
     // What there is to talk about besides miracles: the work in their
     // hands, whether they have eaten, whether they have a bed.
     circumstances: Query<(
@@ -323,6 +339,14 @@ pub(crate) fn meet_to_talk(
         if !free_to_talk(activity) {
             continue;
         }
+        let rested = |who: Entity| {
+            spoke
+                .get(who)
+                .is_ok_and(|last| clock.elapsed - last.0 < AGAIN_AFTER)
+        };
+        if rested(teller) {
+            continue;
+        }
         // A story wears out in its own telling: each retelling cools the
         // urge until only the chattiest still bother — and a fresh sight
         // winds the whole square back up. Without this, one smite kept
@@ -352,7 +376,10 @@ pub(crate) fn meet_to_talk(
         let Some((listener, _)) = talkers
             .iter()
             .filter(|(other, _, other_activity, _, _)| {
-                *other != teller && !paired.contains(other) && free_to_talk(other_activity)
+                *other != teller
+                    && !paired.contains(other)
+                    && free_to_talk(other_activity)
+                    && !rested(*other)
             })
             .map(|(other, other_at, ..)| (other, other_at.translation.distance(at.translation)))
             .filter(|(_, d)| *d <= reach)
@@ -480,7 +507,10 @@ pub(crate) fn hold_conversations(
 
     for (entity, at, mut talk, mut activity, mut target) in &mut pairs {
         if *activity != Activity::Chatting || clock.elapsed > talk.until {
-            commands.entity(entity).remove::<Conversing>();
+            commands
+                .entity(entity)
+                .remove::<Conversing>()
+                .insert(SpokeLately(clock.elapsed));
             if *activity == Activity::Chatting {
                 *activity = Activity::Idle;
                 target.0 = None;

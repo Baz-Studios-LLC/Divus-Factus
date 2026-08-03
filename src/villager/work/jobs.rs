@@ -53,6 +53,17 @@ pub struct Shunned {
 /// How close to a shunned site a new job offer has to be to be refused too.
 const SHUN_RADIUS: f32 = 5.0;
 
+/// How far a trade will range for its own work once nothing is left
+/// within a working walk. Twice the working walk and no more.
+///
+/// Five hundred killed a village outright. A gatherer will walk any
+/// distance you allow, food trades are exempt from carrying rations
+/// because they eat what they harvest, and nothing else was stopping
+/// them - so ten people spent their days walking half a kilometre for
+/// one bush each and every one of them starved with food in the store.
+/// The walk has to be worth the load at the end of it.
+const RANGE_REACH: f32 = 330.0;
+
 /// When a hand first came up empty. A trade comes up empty for all sorts
 /// of ordinary reasons — a bush picked bare a moment ago, a footing being
 /// laid this very instant, a world whose scatter has not finished
@@ -715,8 +726,66 @@ pub(crate) fn take_up_work(
             }),
         };
 
-        // Their own trade had nothing for them. A pair of hands with
-        // nothing to do is the one thing the muster exists to prevent, so
+        // Nothing in reach for their own trade. Before they give the
+        // trade up, they RANGE: the same work they were doing, at
+        // whatever distance it is actually to be found, on ground the
+        // village may never have walked.
+        //
+        // This is the difference between a miner who runs out of rock and
+        // goes looking for more, and a miner who quietly stops being a
+        // miner - which is what happened before, within six seconds. The
+        // road is not free: the rations rule below charges the larder for
+        // a long walk and refuses the job outright when the village
+        // cannot provision it, so ranging is a thing a fed village does
+        // and a hungry one cannot afford.
+        let range_out = || -> Option<Job> {
+            // Not while the larder is thin. A village with nothing put by
+            // needs its food trades working the near ground, where the
+            // yield per hour is highest - the long walk is a thing a fed
+            // village can afford and a hungry one cannot, which is the
+            // same rule the rations already state for every other trade.
+            if larder_thin {
+                return None;
+            }
+            let far = |candidates: &mut dyn Iterator<Item = (Entity, Vec3)>| {
+                nearest_job(
+                    candidates,
+                    transform.translation,
+                    RANGE_REACH,
+                    |_, _| true,
+                    &permitted,
+                )
+            };
+            match vocation {
+                Vocation::Miner => far(&mut boulders
+                    .iter()
+                    .map(|(rock, t)| (rock, t.translation()))
+                    .chain(
+                        deposits
+                            .iter()
+                            .filter(|(_, _, deposit)| deposit.amount > 0.5)
+                            .map(|(vein, t, _)| (vein, t.translation())),
+                    )),
+                Vocation::Forester => far(&mut trees
+                    .iter()
+                    .filter(|(_, _, tree)| tree.harvestable())
+                    .map(|(tree, t, _)| (tree, t.translation()))),
+                Vocation::Gatherer => far(&mut bushes
+                    .iter()
+                    .filter(|(_, _, source)| source.amount > 0.5)
+                    .map(|(bush, t, _)| (bush, t.translation()))),
+                Vocation::Hunter => far(&mut game
+                    .iter()
+                    .filter(|(_, _, genome)| genome.species != Species::Human)
+                    .map(|(prey, t, _)| (prey, t.translation))),
+                _ => None,
+            }
+        };
+        let job = job.or_else(range_out);
+
+        // Their own trade had nothing for them anywhere. A pair of hands
+        // with nothing to do is the one thing the muster exists to
+        // prevent, so
         // instead of standing about until tomorrow morning they take up
         // whatever work the ground DOES offer, and become that trade
         // until the next muster deals them again. This is what keeps nine
