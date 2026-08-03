@@ -1234,13 +1234,18 @@ fn setup_terrain(
         ..default()
     });
 
-    // Water is one large quad that follows the camera. An endless world cannot have a
-    // single finite sea, and a quad per chunk would show a seam at every join.
+    // Water is one quad that follows the camera, drawing the sea INSIDE the
+    // loaded world; a quad per chunk would show a seam at every join.
     //
-    // Sized far past the furthest the fog can ever reach. The quad is two triangles,
-    // so being generous costs nothing — and being stingy puts a straight edge across
-    // the horizon, which is exactly the artefact the fog exists to prevent.
-    let extent = CHUNK_SIZE * VIEW_CHUNKS as f32 * 8.0;
+    // Sized to the streamed ground and no further. It used to be eight times
+    // this — "far past the furthest the fog can ever reach", in the fog's
+    // era, when whatever the quad covered was hidden anyway. With the fog
+    // gone and the planet drawn beneath the world, that oversize lay across
+    // the planet like a twenty-kilometre grey tarp: every acre of the world
+    // lower than sea level plus the curvature drop vanished under it, and
+    // from any height the god saw a loaded island in a dead grey sea of
+    // nothing. Past this quad's edge, the planet paints its own ocean.
+    let extent = CHUNK_SIZE * VIEW_CHUNKS as f32 * 1.15;
     let water_mesh = meshes.add(
         Mesh::new(
             PrimitiveTopology::TriangleList,

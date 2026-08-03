@@ -72,6 +72,7 @@ impl Plugin for DebugPlugin {
                     handle_tuning_input,
                     toggle_dev_overlay,
                     toggle_roofs,
+                    toggle_the_sea,
                     update_dev_overlay,
                     report_frames.run_if(|| std::env::var("DIVUS_FACTUS_FRAMES").is_ok()),
                     handle_toolbar,
@@ -335,5 +336,32 @@ mod tests {
             nudge(&mut value, -0.3, 0.0, 1.0);
             assert!((0.0..=1.0).contains(&value));
         }
+    }
+}
+
+/// F9 pulls the flat sea plane out of the world and puts it back — the
+/// diagnostic Brett asked for while the sky was full of unexplained greys,
+/// each of which turned out to be a different sheet. One key, flip it, and
+/// the argument about which layer is which settles itself on screen.
+fn toggle_the_sea(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut notices: MessageWriter<crate::ui::Notice>,
+    mut water: Query<&mut Visibility, With<crate::terrain::WaterPlane>>,
+) {
+    if !keys.just_pressed(KeyCode::F9) {
+        return;
+    }
+    for mut visibility in &mut water {
+        let hidden = *visibility == Visibility::Hidden;
+        *visibility = if hidden {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+        notices.write(crate::ui::Notice::new(if hidden {
+            "The sea is back".to_string()
+        } else {
+            "The sea plane is off - F9 brings it back".to_string()
+        }));
     }
 }

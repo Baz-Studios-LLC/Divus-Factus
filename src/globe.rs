@@ -197,6 +197,16 @@ pub struct GlobeView {
     sought: f32,
 }
 
+impl GlobeView {
+    /// The height of the climb, whichever camera owns it: the orbit's own
+    /// height when the planet has the frame, the rig's distance otherwise.
+    /// One number for the overlay and the sky, continuous through the
+    /// handover.
+    pub fn height(&self, rig_distance: f32) -> f32 {
+        if self.shown { self.gaze } else { rig_distance }
+    }
+}
+
 impl Default for GlobeView {
     fn default() -> Self {
         GlobeView {
