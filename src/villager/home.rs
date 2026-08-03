@@ -99,6 +99,20 @@ pub struct Abed {
     pub facing: Quat,
 }
 
+/// When this walk first started being routed through a doorway.
+///
+/// The router is a help, not a cage: past `GIVE_UP_ON_DOORS` it stops
+/// rewriting the leg and the walker simply goes where they were going.
+/// A wall is not solid in this game, so walking through one is a
+/// cosmetic fault; starving in a doorway is not.
+#[derive(Component)]
+pub struct Doorbound(pub f64);
+
+/// Seconds of being steered through a door before a walker is left to
+/// find their own way. Generous - a long hall takes a while to cross -
+/// and far short of the time it takes to starve.
+const GIVE_UP_ON_DOORS: f64 = 20.0;
+
 /// How far to either side of a doorway's axis still counts as lined up
 /// with it. Narrower than the opening, so a walker who commits is aimed
 /// at the gap rather than at the jamb.
@@ -151,9 +165,11 @@ fn door_leg(
 /// target-setter runs each frame, this runs after them and quietly rewrites
 /// the leg without any of them knowing.
 pub(super) fn use_doors(
+    clock: Res<crate::calendar::WorldClock>,
+    mut commands: Commands,
     shells: Query<(&Transform, &super::work::Shell), Without<Villager>>,
     mut walkers: Query<
-        (&Transform, &mut MoveTarget),
+        (Entity, &Transform, &mut MoveTarget, Option<&Doorbound>),
         (
             With<Villager>,
             Without<Held>,
@@ -163,10 +179,23 @@ pub(super) fn use_doors(
         ),
     >,
 ) {
-    for (at, mut target) in &mut walkers {
+    for (walker, at, mut target, bound) in &mut walkers {
         let Some(goal) = target.0 else {
+            if bound.is_some() {
+                commands.entity(walker).remove::<Doorbound>();
+            }
             continue;
         };
+        // Given up on. A shell whose doors do not serve the ground it
+        // covers will route somebody back and forth between two standing
+        // places forever, and they will starve doing it - which is
+        // exactly what the bench longhouse did, its shell reaching six
+        // metres past the doorway that is supposed to let you out of it.
+        // Whatever the geometry, a walk gets a bounded number of seconds
+        // of being helped and then goes straight there.
+        if bound.is_some_and(|bound| clock.elapsed - bound.0 > GIVE_UP_ON_DOORS) {
+            continue;
+        }
         for (site, shell) in &shells {
             let inv = site.rotation.inverse();
             let me = inv * (at.translation - site.translation);
@@ -189,6 +218,9 @@ pub(super) fn use_doors(
             };
             let world = site.translation + site.rotation * door_leg(here, shell, door, im);
             target.0 = Some(Vec3::new(world.x, goal.y, world.z));
+            if bound.is_none() {
+                commands.entity(walker).insert(Doorbound(clock.elapsed));
+            }
             break;
         }
     }
