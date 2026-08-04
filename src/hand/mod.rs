@@ -129,16 +129,6 @@ impl Plugin for HandPlugin {
             )
             .add_systems(Startup, spawn_hand_cursor)
             .add_systems(Update, breathe_hand_glow)
-            // The title's cradling hand: raised with the front door, taken away
-            // on the way down into the world.
-            .add_systems(OnEnter(crate::GameState::Title), raise_the_cradle)
-            .add_systems(OnExit(crate::GameState::Title), lower_the_cradle)
-            .add_systems(
-                Update,
-                hold_the_world
-                    .after(CameraSet)
-                    .run_if(in_state(crate::GameState::Title)),
-            )
             .add_systems(
                 Update,
                 (
@@ -815,46 +805,6 @@ fn spawn_hand_cursor(
         ChildOf(root),
     ));
 
-    let rig = build_a_hand(
-        &mut commands,
-        root,
-        &cube,
-        &skin,
-        &knuckle,
-        RenderLayers::layer(HAND_LAYER),
-        false,
-    );
-    commands.entity(root).insert(rig);
-}
-
-/// Builds a hand: palm, four fingers, a thumb, and the rig that poses them.
-///
-/// Shared, because the title screen holds the planet in one. That hand is not
-/// the cursor — it is scenery the size of a continent, standing in world space
-/// beside the globe — so it takes the world's own render layer and marks itself
-/// `globe::BentInPlace` rather than [`HandPart`]: its place is a world position
-/// the bend must leave alone, not a flat one waiting to be seated.
-fn build_a_hand(
-    commands: &mut Commands,
-    root: Entity,
-    cube: &Handle<Mesh>,
-    skin: &Handle<StandardMaterial>,
-    knuckle: &Handle<StandardMaterial>,
-    layer: RenderLayers,
-    seated: bool,
-) -> HandRig {
-    // One marker or the other on every part, never both: `HandPart` for the
-    // cursor, which places itself in seated space and must not be bent again,
-    // and `BentInPlace` for anything standing where it was put.
-    let mark = |commands: &mut Commands, entity: Entity| {
-        if seated {
-            commands.entity(entity).insert(crate::globe::BentInPlace);
-        } else {
-            commands.entity(entity).insert(HandPart);
-        }
-    };
-    mark(commands, root);
-
     // Palm. Fingers hang from its leading edge; forward is -Z, the same convention
     // as every creature. Every mesh goes on the hand's own render layer, drawn by
     // the overlay camera above both the world and the interface: a cursor must
@@ -863,7 +813,8 @@ fn build_a_hand(
         Mesh3d(cube.clone()),
         MeshMaterial3d(skin.clone()),
         Transform::from_xyz(0.0, 0.0, 0.12).with_scale(Vec3::new(1.0, 0.26, 1.08)),
-        layer.clone(),
+        RenderLayers::layer(HAND_LAYER),
+        HandPart,
         ChildOf(root),
     ));
 
@@ -880,7 +831,8 @@ fn build_a_hand(
             .spawn((
                 Transform::from_translation(joint).with_rotation(Quat::from_rotation_y(yaw)),
                 Visibility::default(),
-                        ChildOf(parent),
+                HandPart,
+                ChildOf(parent),
             ))
             .id();
         commands.spawn((
@@ -891,8 +843,9 @@ fn build_a_hand(
                 girth * 1.05,
                 length,
             )),
-            layer.clone(),
-                ChildOf(joint_entity),
+            RenderLayers::layer(HAND_LAYER),
+            HandPart,
+            ChildOf(joint_entity),
         ));
         joint_entity
     };
@@ -924,7 +877,7 @@ fn build_a_hand(
         &knuckle,
     );
 
-    HandRig {
+    commands.entity(root).insert(HandRig {
         fingers,
         thumb: [thumb_base, thumb_tip],
         carry: 0.0,
@@ -933,7 +886,7 @@ fn build_a_hand(
         point: 0.0,
         tap: 0.0,
         fade: 1.0,
-    }
+    });
 }
 
 /// Where the hand sits and how it is oriented while acting as the UI cursor:
@@ -1363,179 +1316,5 @@ mod tests {
         assert!(world_scale_at(12.0) < world_scale_at(90.0));
         // Continuous across the floor, so crossing it cannot pop.
         assert!((world_scale_at(99.9) - world_scale_at(100.1)).abs() < 0.01);
-    }
-}
-
-// ------------------------------------------------------------- the title's hand
-
-/// The hand that holds the world on the title screen.
-///
-/// Not the cursor. This one is scenery the size of a continent, standing out in
-/// space beside the planet with the whole globe resting in its palm — the first
-/// thing the game shows is what the player is being handed. The cursor goes on
-/// doing its own job over the menu at the same time, which is why this is a
-/// second hand rather than a pose of the first: [`animate_hand`] owns exactly
-/// one [`HandModel`] and would be ruined by a rival.
-#[derive(Component)]
-struct CradleHand;
-
-/// Where the palm sits and how big it is, in SCREEN terms.
-///
-/// Screen terms, and that is the whole lesson of getting this wrong four times.
-/// The obvious way to place it is in the camera's own frame — so far below the
-/// planet's middle, along the camera's up — and every attempt at that put the
-/// hand somewhere else: beside the globe, above it, buried inside it. Deriving a
-/// basis and trusting it is how you end up arguing with a picture. A viewport
-/// ray cannot disagree with the picture: name the fraction of the screen the
-/// palm should occupy, ask the camera which way that is, and walk out to the
-/// planet's own depth.
-const CRADLE_SCREEN: Vec2 = Vec2::new(0.5, 0.99);
-/// How wide the palm is as a fraction of the planet's radius.
-///
-/// Derived, because guessing gave a cage. The model is a little over two units
-/// across with its fingers open, it stands a fifth of the world's radius nearer
-/// the eye than the world does, and perspective magnifies it there — so for the
-/// hand to read a touch wider than the globe rather than three times it, the
-/// span works out at about four fifths of the radius.
-const CRADLE_SPAN: f32 = 0.62;
-
-fn raise_the_cradle(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    materials: Option<Res<HandMaterials>>,
-    existing: Query<Entity, With<CradleHand>>,
-) {
-    if !existing.is_empty() {
-        return;
-    }
-    let Some(materials) = materials else {
-        return;
-    };
-    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
-    let root = commands
-        .spawn((
-            Name::new("The Hand That Holds The World"),
-            CradleHand,
-            Transform::default(),
-            // Hidden until it has been placed. A hand at the origin the size of
-            // a continent is a wall across the whole screen for one frame.
-            Visibility::Hidden,
-        ))
-        .id();
-    // The WORLD's layer, not the cursor's: the globe has to be able to sit in
-    // front of the palm and behind the fingertips, and the overlay camera that
-    // draws the cursor draws over everything by design.
-    let mut rig = build_a_hand(
-        &mut commands,
-        root,
-        &cube,
-        &materials.skin,
-        &materials.knuckle,
-        RenderLayers::layer(0),
-        true,
-    );
-    rig.grip = 0.34;
-    commands.entity(root).insert(rig);
-}
-
-fn lower_the_cradle(mut commands: Commands, cradles: Query<Entity, With<CradleHand>>) {
-    for cradle in &cradles {
-        commands.entity(cradle).despawn();
-    }
-}
-
-/// Holds the world: puts the palm under the planet and keeps it there while the
-/// camera circles.
-fn hold_the_world(
-    time: Res<Time<Real>>,
-    cameras: Query<(&Camera, &GlobalTransform), With<GodCamera>>,
-    mut cradles: Query<(&mut Transform, &mut Visibility), With<CradleHand>>,
-    mut joints: Query<&mut Transform, (Without<CradleHand>, Without<HandModel>)>,
-    rigs: Query<&HandRig, With<CradleHand>>,
-) {
-    let (Ok((camera, pose)), Ok((mut transform, mut visibility))) =
-        (cameras.single(), cradles.single_mut())
-    else {
-        return;
-    };
-
-    let centre = crate::globe::planet_centre();
-    let radius = crate::terrain::PLANET_RADIUS;
-    // How far the planet's middle is from the eye, measured along the view, and
-    // then a good deal NEARER than that.
-    //
-    // A point below the planet on SCREEN but level with it in depth is not below
-    // the planet at all — it is behind it, and if the screen offset is less than
-    // the radius (which under the globe it always is) it is inside the world.
-    // The palm has to come toward the god, in front of the near surface, so that
-    // the ball sits into it.
-    let to_centre = (centre - pose.translation()).dot(pose.forward().as_vec3());
-    let depth = to_centre - radius * 0.9;
-
-    // The one question that matters, asked of the camera rather than answered
-    // from a basis: which way is the bottom middle of the screen?
-    // The CAMERA's viewport, not the window's. They are the same thing while
-    // somebody is playing and very much not during an unattended capture, where
-    // the camera draws into a full-resolution image twice the window's size — so
-    // a fraction taken from the window landed a quarter of the way across the
-    // picture, and four separate attempts at placing this hand were read off
-    // screenshots that were lying about where it was. The measurement that broke
-    // the deadlock was `world_to_viewport`: it said the seat was exactly where it
-    // had been asked to go, and that the planet's own middle was off the bottom
-    // corner of the window.
-    let Some(viewport) = camera.logical_viewport_size() else {
-        return;
-    };
-    let point = CRADLE_SCREEN * viewport;
-    let Ok(ray) = camera.viewport_to_world(pose, point) else {
-        return;
-    };
-    let seat = ray.origin + *ray.direction * depth;
-
-    // Scale from the planet, so the hand keeps its grip on the world whatever
-    // the vantage does: the palm's own model is one unit across.
-    let scale = radius * CRADLE_SPAN;
-
-    // The pose, given as two axes that are perpendicular by construction rather
-    // than as a direction and a hint. `looking_to` orthogonalises whatever it is
-    // handed, and handed a finger direction and a screen-up that were nearly the
-    // same vector it had nothing left to work with: the palm came out facing the
-    // lens and the hand lay flat against the world like a sticker.
-    //
-    // The palm looks UP and slightly away, so the eye sees across it; the fingers
-    // rise up and TOWARD the god, closing in front of the ball. Closing them the
-    // other way put every finger behind the world and left a plinth under it.
-    let up = pose.up().as_vec3();
-    let forward = pose.forward().as_vec3();
-    let palm = (up * 0.8 + forward * 0.55).normalize();
-    let fingers = (up * 0.55 - forward * 0.8).normalize();
-    *transform = Transform::from_translation(seat)
-        .looking_to(fingers, palm)
-        .with_scale(Vec3::splat(scale));
-
-    // The world breathes in the hand, slowly enough to read as being HELD
-    // rather than as an animation playing.
-    let t = time.elapsed_secs();
-    let breath = (t * 0.24).sin() * 0.012 + (t * 0.11 + 1.7).sin() * 0.008;
-    transform.translation += up * (breath * radius);
-    *visibility = Visibility::Inherited;
-
-    // The curl. Poses are written by `animate_hand` for the CURSOR's rig alone,
-    // so this hand sets its own.
-    if let Ok(rig) = rigs.single() {
-        for (index, [proximal, distal]) in rig.fingers.iter().enumerate() {
-            let curl = 0.62 + index as f32 * 0.07;
-            if let Ok(mut joint) = joints.get_mut(*proximal) {
-                joint.rotation = Quat::from_rotation_x(curl);
-            }
-            if let Ok(mut joint) = joints.get_mut(*distal) {
-                joint.rotation = Quat::from_rotation_x(curl * 0.85);
-            }
-        }
-        for (index, thumb) in rig.thumb.iter().enumerate() {
-            if let Ok(mut joint) = joints.get_mut(*thumb) {
-                joint.rotation = Quat::from_rotation_x(0.34 + index as f32 * 0.18);
-            }
-        }
     }
 }

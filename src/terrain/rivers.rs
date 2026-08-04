@@ -114,23 +114,50 @@ impl RiverIndex {
     pub fn nearest(&self, x: f32, z: f32) -> Option<(f32, f32, f32)> {
         let bin = IVec2::new((x / BIN).floor() as i32, (z / BIN).floor() as i32);
         let inner = self.inner.read().unwrap();
-        let segments = inner.bins.get(&bin)?;
-
+        // The NINE bins around the point, not the one it stands in.
+        //
+        // A segment is filed in the bins it passes through, so a point near a
+        // bin's edge could not see a course a few units away on the other side of
+        // that edge — and the answer changed the instant the point crossed the
+        // line. That is a river surface that steps at every bin boundary in the
+        // world, and it is why "level across the channel" kept failing at
+        // arbitrary places with no confluence anywhere near them.
         let point = Vec2::new(x, z);
+        // The nearest segment, for the banks — and separately the HIGHEST water
+        // among the segments whose channel actually holds this point, for the
+        // water itself.
+        //
+        // Nearest alone is what made a river's surface step. Where two channels
+        // overlap — a confluence, or a course doubling back on itself — the
+        // nearest segment flips from one to the other over a few units and the
+        // surface jumped with it, three units of water in three units of ground.
+        // Taking the higher level instead is both continuous (the greater of two
+        // continuous fields is continuous) and what water does: where two
+        // channels meet, the lower one backs up to the higher.
         let mut best: Option<(f32, f32, f32)> = None;
+        let mut holding: Option<(f32, f32, f32)> = None;
 
-        for segment in segments {
+        for segment in (-1..=1)
+            .flat_map(|dz| (-1..=1).map(move |dx| IVec2::new(dx, dz)))
+            .filter_map(|offset| inner.bins.get(&(bin + offset)))
+            .flatten()
+        {
             let ab = segment.b - segment.a;
             let t = ((point - segment.a).dot(ab) / ab.length_squared().max(1e-6)).clamp(0.0, 1.0);
             let distance = point.distance(segment.a + ab * t);
             let level = segment.level_a + (segment.level_b - segment.level_a) * t;
             let width = segment.width_a + (segment.width_b - segment.width_a) * t;
 
+            if distance < CHANNEL_HALF_WIDTH * width
+                && holding.is_none_or(|(highest, _, _)| level > highest)
+            {
+                holding = Some((level, distance, width));
+            }
             if best.is_none_or(|(_, d, _)| distance < d) {
                 best = Some((level, distance, width));
             }
         }
-        best
+        holding.or(best)
     }
 }
 

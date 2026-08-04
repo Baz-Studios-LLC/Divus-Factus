@@ -426,7 +426,18 @@ pub(crate) fn bent_camera_pose(rig: &CameraRig) -> Transform {
         } else {
             up
         };
-        Transform::from_translation(eye_seat).looking_at(focus_seat, up)
+        let mut pose = Transform::from_translation(eye_seat).looking_at(focus_seat, up);
+        // And then turned off its aim, if anything has asked it to — see
+        // `CameraRig::aim_offset`. About the camera's own axes, so the offset
+        // means the same thing at every attitude.
+        if rig.aim_offset != Vec2::ZERO {
+            let right = pose.right().as_vec3();
+            let above = pose.up().as_vec3();
+            pose.rotation = Quat::from_axis_angle(above, rig.aim_offset.x)
+                * Quat::from_axis_angle(right, rig.aim_offset.y)
+                * pose.rotation;
+        }
+        pose
     }
 }
 
@@ -1165,10 +1176,15 @@ fn dress_for_space(mut clear: ResMut<ClearColor>, cameras: Query<&CameraRig, Wit
     // Grey to blue across the first stretch of the climb...
     let bluing = ((height - ASCENT) / 4_000.0).clamp(0.0, 1.0);
     let skyed = mix(horizon, sky_blue, bluing);
-    // ...then blue to black with real altitude, eased so the deep black is
-    // kept for genuine orbit.
-    let thinning = ((height - 6_000.0) / 14_000.0).clamp(0.0, 1.0);
-    clear.0 = Color::LinearRgba(mix(skyed, space, thinning * thinning));
+    // ...then blue to black, and DONE by eleven thousand. It used to ramp to
+    // twenty thousand and square the result to hold the blue longer, which meant
+    // seventeen thousand units up — twice as high as any aircraft flies, with the
+    // whole planet in frame and stars out — the sky was still plainly blue.
+    // Smoothstepped rather than squared, so it eases at both ends instead of
+    // clinging to one.
+    let t = ((height - 3_500.0) / 7_500.0).clamp(0.0, 1.0);
+    let thinning = t * t * (3.0 - 2.0 * t);
+    clear.0 = Color::LinearRgba(mix(skyed, space, thinning));
 }
 
 #[cfg(test)]

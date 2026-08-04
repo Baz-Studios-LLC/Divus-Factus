@@ -485,15 +485,34 @@ impl Terrain {
     /// The river's own water surface is derived from this: water sits just below the
     /// land it flows through, not at sea level.
     pub fn base_height_at(&self, x: f32, z: f32) -> f32 {
-        // Continents. Wavelength on the order of a kilometre, so crossing a coastline
-        // takes a real walk. Sampled in a volume on the unit sphere now, so the
-        // coastlines join up all the way round the world instead of marching
-        // off for ever.
+        // Continents, and they have to be CONTINENTS. Two things had this field
+        // making a marsh instead: five octaves and a threshold that put land
+        // almost everywhere.
+        //
+        // Five octaves means the continent field carries detail sixteen times
+        // finer than a continent, so every landmass came out eaten through with
+        // ponds and every ocean speckled with islands — from orbit, a mottle
+        // rather than a world. Three octaves keeps the shape of a coastline
+        // without dissolving the shape of a continent, and the hills and ridges
+        // below add the fine relief anyway; that is their job, not this one's.
+        //
+        // And the wavelength is longer, because a planet this size at the old
+        // one had a dozen small landmasses rather than a few big ones.
         let dir = direction_at(x, z);
-        let continent = fbm_3d(dir * spherical(0.0011), self.seed, 5, 2.0, 0.5);
+        let continent = fbm_3d(dir * spherical(0.00075), self.seed, 3, 2.0, 0.5);
 
         // -1 is deep ocean, +1 is high inland.
-        let land = ((continent - 0.44) / 0.30).clamp(-1.0, 1.0);
+        //
+        // The threshold is where the sea level sits in the field, and it is the
+        // number that decides how much of the world is water. Three octaves of
+        // this noise sit around a half with a spread near an eighth, so the old
+        // 0.44 put roughly two thirds of the planet above water — Earth the
+        // wrong way round. Just over a half of a standard deviation up puts the
+        // ocean at about seventy percent, which is Earth's.
+        // The divisor is set from the field's own top end: a fifth takes the
+        // ninety-ninth percentile to a full one, so the deepest interiors of the
+        // biggest continents still stand as high as they ever did.
+        let land = ((continent - 0.565) / 0.20).clamp(-1.0, 1.0);
 
         // Steepen the curve either side of zero so ground climbs away from sea level
         // quickly. Left linear, the coastal band where height is barely above water
@@ -507,8 +526,19 @@ impl Terrain {
         // Hills, present everywhere but stronger on land.
         let detail = warped_fbm_3d(dir * spherical(0.010), self.seed ^ 0xa1a1, 4, 0.5) - 0.5;
 
-        // Ridges only bite on ground that is already high, so valleys stay walkable.
-        let ridge_mask = land.clamp(0.0, 1.0);
+        // Whether this is INLAND, which is a different question from how high the
+        // continent stands here — and getting those two confused is what emptied
+        // the world of mountains the moment the sea rose. The masks below used
+        // the continent's own height, so raising sea level shrank every one of
+        // them at once: hills, ridges and mountain belts all faded together and
+        // the highest ground within a mile and a half of home came out at
+        // seventy-eight units. A hill does not know how far above sea level its
+        // continent's middle is. It only needs to not be on a beach.
+        //
+        // Saturating a quarter of the way up from the coast, smoothly, so
+        // shorelines stay gentle and everything past them gets its full relief.
+        let inland = (land / 0.25).clamp(0.0, 1.0);
+        let ridge_mask = inland * inland * (3.0 - 2.0 * inland);
         let ridge = ridged_3d(dir * spherical(0.006), self.seed ^ 0xa5a5, 4);
 
         let mut height: f32 = WATER_LEVEL
@@ -2308,4 +2338,5 @@ mod tests {
         assert!(a.angle_between(b) < 0.06, "{}", a.angle_between(b));
     }
 }
+
 

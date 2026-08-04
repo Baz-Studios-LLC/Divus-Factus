@@ -109,7 +109,12 @@ fn fly_the_dive(
     rig.target_pitch = rig.pitch;
     rig.target_distance = rig.distance;
     rig.zoom_anchor = None;
+    // The title's lens shift unwinds as the god descends, so the world swings
+    // back square to the frame by the time the village arrives. Cleared
+    // outright at the end, since a decay never quite reaches nothing.
+    rig.aim_offset *= 1.0 - s;
     if dive.t >= 1.0 {
+        rig.aim_offset = Vec2::ZERO;
         commands.remove_resource::<CameraDive>();
     }
 }
@@ -347,6 +352,16 @@ pub struct CameraRig {
     pub target_focus: Vec3,
     pub yaw: f32,
     pub target_yaw: f32,
+    /// Turns the camera off its own aim, in radians of yaw and pitch, AFTER the
+    /// look-at is built.
+    ///
+    /// A lens shift, in effect, and the title screen's reason for existing: the
+    /// menu wants the right of the frame and the planet wants the left, and the
+    /// rig can only look AT things. Turning the camera a little to the right
+    /// slides the world left without moving the focus an inch — and because the
+    /// cursor's ray is built from the same pose (`globe::bent_camera_pose`), the
+    /// pointer goes on landing where it is pointed.
+    pub aim_offset: Vec2,
     pub pitch: f32,
     pub target_pitch: f32,
     pub distance: f32,
@@ -385,6 +400,7 @@ impl Default for CameraRig {
             target_focus: Vec3::ZERO,
             yaw: 0.6,
             target_yaw: 0.6,
+            aim_offset: Vec2::ZERO,
             pitch: 0.85,
             target_pitch: 0.85,
             distance: 62.0,

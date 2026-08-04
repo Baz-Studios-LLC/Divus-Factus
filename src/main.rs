@@ -31,6 +31,7 @@ mod save;
 mod scatter;
 mod sigil;
 mod sky;
+mod starfield;
 mod speed;
 mod survey;
 mod telling;
@@ -186,7 +187,12 @@ fn main() {
             // Nested: a plugin tuple holds sixteen, and the sky's three take
             // it over. The grouping is the honest one anyway — the clock, the
             // weather deck it lights and the sky behind them.
-            (calendar::CalendarPlugin, clouds::CloudPlugin, sky::SkyPlugin),
+            (
+                calendar::CalendarPlugin,
+                clouds::CloudPlugin,
+                sky::SkyPlugin,
+                starfield::StarfieldPlugin,
+            ),
             miracles::MiraclesPlugin,
             title::TitlePlugin,
             matter::MatterPlugin,

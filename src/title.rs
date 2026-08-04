@@ -275,6 +275,23 @@ fn despawn_splash(mut commands: Commands, screens: Query<Entity, With<SplashScre
 /// these sit over the living world now, and a translucent button reads as
 /// unfinished rather than elegant.
 fn menu_button(commands: &mut Commands, parent: Entity, label: &str) -> Entity {
+    button_of_size(commands, parent, label, 240.0, 15.0, 11.0)
+}
+
+/// A menu button at a chosen size.
+///
+/// The title's are half again the pause menu's: they are the front door, read
+/// from across a room, and against a whole planet the small ones looked like a
+/// debug panel. The pause menu keeps the size it had — it sits over a world the
+/// player is already in and has no business shouting.
+fn button_of_size(
+    commands: &mut Commands,
+    parent: Entity,
+    label: &str,
+    width: f32,
+    font: f32,
+    padding: f32,
+) -> Entity {
     let button = commands
         .spawn((
             ui::UiButton,
@@ -284,8 +301,8 @@ fn menu_button(commands: &mut Commands, parent: Entity, label: &str) -> Entity {
             ui::KeepFace,
             MenuFace,
             Node {
-                width: px(240),
-                padding: UiRect::axes(px(22), px(11)),
+                width: px(width),
+                padding: UiRect::axes(px(22), px(padding)),
                 justify_content: JustifyContent::Center,
                 border: UiRect::all(px(1)),
                 border_radius: BorderRadius::all(px(0)),
@@ -302,7 +319,7 @@ fn menu_button(commands: &mut Commands, parent: Entity, label: &str) -> Entity {
             Text::new(label.to_uppercase()),
             ui::DisplayFace,
             TextFont {
-                font_size: FontSize::Px(15.0),
+                font_size: FontSize::Px(font),
                 ..default()
             },
             TextColor(theme::accent()),
@@ -410,27 +427,38 @@ fn spawn_title(
         .spawn((
             Name::new("Title Menu"),
             Node {
+                // Anchored down the full height and centred within it, which is
+                // what "vertically centred" has to mean in a flex layout: a
+                // percentage `top` puts the column's TOP at the middle of the
+                // screen and hangs the rest below it.
+                // Centred between the foot of the logotype and the foot of the
+                // screen, rather than in the screen as a whole: the top third
+                // belongs to the lettering, and a menu centred against the whole
+                // frame sits up inside it.
                 position_type: PositionType::Absolute,
-                right: px(96),
-                top: percent(38),
+                right: px(110),
+                top: percent(24),
+                bottom: px(0),
+                width: px(340),
                 flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::Center,
                 align_items: AlignItems::Stretch,
-                row_gap: px(14),
+                row_gap: px(18),
                 ..default()
             },
             ChildOf(screen),
         ))
         .id();
 
-    let begin = menu_button(&mut commands, menu, "Begin");
+    let begin = button_of_size(&mut commands, menu, "Begin", 340.0, 21.0, 16.0);
     commands.entity(begin).insert((BeginButton, TitleMenu));
-    let load = menu_button(&mut commands, menu, "Load Game");
+    let load = button_of_size(&mut commands, menu, "Load Game", 340.0, 21.0, 16.0);
     commands.entity(load).insert((LoadGameButton, TitleMenu));
-    let settings = menu_button(&mut commands, menu, "Settings");
+    let settings = button_of_size(&mut commands, menu, "Settings", 340.0, 21.0, 16.0);
     commands
         .entity(settings)
         .insert((SettingsButton, TitleMenu));
-    let quit = menu_button(&mut commands, menu, "Quit");
+    let quit = button_of_size(&mut commands, menu, "Quit", 340.0, 21.0, 16.0);
     commands.entity(quit).insert((QuitButton, TitleMenu));
 
     // The build, small and out of the composition's way — the first thing a
@@ -742,7 +770,7 @@ fn handle_pause_menu(
 /// the village, drifting so slowly nobody caught it moving. That was the right
 /// screen for a world with no edge to see. This one has an edge, and the first
 /// thing the game should say is what the player is being handed.
-const DRIFT_DISTANCE: f32 = 23_000.0;
+const DRIFT_DISTANCE: f32 = 31_000.0;
 /// Nearly straight down, which is what CENTRES the ball.
 ///
 /// The rig aims at a point on the ground, not at the planet's middle, and from
@@ -759,6 +787,12 @@ const DRIFT_PITCH: f32 = 1.50;
 /// sphere, so spinning the planet would spin every village on it. Circling it
 /// instead is the same picture and costs nothing. A lap takes five minutes.
 const DRIFT_TURN: f32 = 0.021;
+
+/// How far the title turns the camera off its aim, in radians. NEGATIVE slides
+/// the world left, which is where the planet belongs while the menu has the
+/// right of the frame — turning the camera right is what moves the world left,
+/// and I had that back to front.
+const DRIFT_AIM: f32 = -0.16;
 
 /// Slowly circles the camera over the village while the pre-game screens are
 /// up. The world lives underneath — fires burning, villagers about their
@@ -781,6 +815,10 @@ fn drift_title_camera(
     }
     rig.target_distance = DRIFT_DISTANCE;
     rig.target_pitch = DRIFT_PITCH;
+    // The planet to the left, the menu to the right: the camera turns off its
+    // own aim rather than the world moving. Nothing else in the game shifts its
+    // aim, so this is set here and cleared on the way out.
+    rig.aim_offset = Vec2::new(DRIFT_AIM, 0.0);
     rig.target_yaw += DRIFT_TURN * time.delta_secs();
     rig.zoom_anchor = None;
 }
