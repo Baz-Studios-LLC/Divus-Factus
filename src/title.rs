@@ -33,6 +33,7 @@ impl Plugin for TitlePlugin {
                         .run_if(in_state(GameState::Splash).or_else(in_state(GameState::Title))),
                     drift_smoke,
                     play_farewell,
+                    play_welcome,
                     // Ungated by state: it spans the change from Playing to
                     // Title and has to keep running across the boundary.
                     draw_the_curtain,
@@ -456,6 +457,11 @@ fn spawn_title(
             GlobalZIndex(300),
         ))
         .id();
+
+    // The title comes up out of nothing rather than appearing whole — see
+    // [`TitleWelcome`]. Inserted here so it covers the splash's first arrival
+    // as well as a return from a game.
+    commands.insert_resource(TitleWelcome { t: 0.0 });
 
     // The smoke, spawned before the logotype so it drifts behind the
     // lettering rather than across it.
@@ -985,6 +991,75 @@ fn auto_title(
     }
 }
 
+/// The title's arrival, 0 to 1: the lettering and the smoke come up out of
+/// nothing.
+///
+/// The title had a farewell and no welcome. Leaving it was a fade and arriving
+/// was not — which nobody noticed while the only arrival was out of the splash's
+/// black, where there is nothing to fade FROM. Coming back from a game there is:
+/// Brett, on the curtain lifting, "the title screen popped in, it didnt fade in."
+///
+/// Deliberately AFTER the curtain rather than under it. The curtain lifting
+/// reveals the new world, and the lettering then comes up over it, so the two
+/// read as one movement — arriving somewhere, then being told where you are —
+/// instead of the whole screen appearing at once.
+#[derive(Resource)]
+struct TitleWelcome {
+    t: f32,
+}
+
+/// Seconds the welcome takes. Slower than the farewell: leaving is a dive and
+/// should feel like one, arriving is not.
+const WELCOME_SECONDS: f32 = 1.1;
+
+/// Brings the lettering and the smoke up, once anything covering them has gone.
+///
+/// Everything under the title's own root, found by walking down from it rather
+/// than by a marker on each piece. The title spawns a good deal — logotype,
+/// smoke, four buttons, their words — and tagging every one of them would mean a
+/// marker that must be remembered at each new spawn site or the new thing quietly
+/// fails to fade. The tree already knows what belongs to the title.
+///
+/// Only the images and the words. Alpha on a button's border and background
+/// would need each one's own resting alpha remembered to scale it, and those are
+/// faint against space to begin with; the lettering and the labels are what the
+/// eye follows up out of the black.
+fn play_welcome(
+    mut commands: Commands,
+    time: Res<Time<Real>>,
+    homeward: Option<Res<Homeward>>,
+    welcome: Option<ResMut<TitleWelcome>>,
+    screens: Query<Entity, With<TitleScreen>>,
+    kin: Query<&Children>,
+    mut arts: Query<&mut ImageNode>,
+    mut texts: Query<&mut TextColor>,
+) {
+    let Some(mut welcome) = welcome else {
+        return;
+    };
+    // While the curtain is still up, the title waits its turn at nothing.
+    if homeward.is_none() {
+        welcome.t = (welcome.t + time.delta_secs() / WELCOME_SECONDS).min(1.0);
+    }
+    let eased = welcome.t * welcome.t * (3.0 - 2.0 * welcome.t);
+
+    let mut walk: Vec<Entity> = screens.iter().collect();
+    while let Some(here) = walk.pop() {
+        if let Ok(mut art) = arts.get_mut(here) {
+            art.color = Color::srgba(1.0, 1.0, 1.0, eased);
+        }
+        if let Ok(mut text) = texts.get_mut(here) {
+            text.0 = text.0.with_alpha(eased);
+        }
+        if let Ok(children) = kin.get(here) {
+            walk.extend(children.iter());
+        }
+    }
+    if welcome.t >= 1.0 {
+        commands.remove_resource::<TitleWelcome>();
+    }
+}
+
 /// The curtain over the walk back to the title.
 ///
 /// Brett, on the pause menu's Title door: "I saw the world building in." He
@@ -1018,9 +1093,11 @@ struct HomewardCurtain;
 /// Seconds to darken the world, and to lift off the new one.
 ///
 /// Longer coming up than going down: dropping out of a world should be brisk,
-/// and arriving somewhere should not.
+/// and arriving somewhere should not. The lift was 0.9 and read as a pop —
+/// after several seconds of black, nine tenths of a second is not enough of a
+/// gradient for the eye to call it a fade.
 const HOMEWARD_DARKEN: f32 = 0.4;
-const HOMEWARD_LIFT: f32 = 0.9;
+const HOMEWARD_LIFT: f32 = 1.6;
 
 /// How long the curtain will wait for the planet to finish before lifting
 /// anyway.
