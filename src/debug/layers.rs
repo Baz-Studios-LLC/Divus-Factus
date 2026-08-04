@@ -43,16 +43,23 @@ pub enum Layer {
     /// The sun's shadows. Not a visibility layer — it reaches the light itself,
     /// through [`crate::calendar`].
     Shadows,
+    /// The streamed near ground: the ring of detailed chunks the sim walks on.
+    ///
+    /// Off, the planet's own surface shows through underneath, which is the
+    /// comparison worth having — the patches carry the same heights, the same
+    /// biome colour and the same veil, at a coarser grain.
+    Chunks,
 }
 
 impl Layer {
-    pub const ALL: [Layer; 6] = [
+    pub const ALL: [Layer; 7] = [
         Layer::Scenery,
         Layer::Patches,
         Layer::Water,
         Layer::Buildings,
         Layer::Folk,
         Layer::Shadows,
+        Layer::Chunks,
     ];
 
     /// What the switch is called.
@@ -64,6 +71,7 @@ impl Layer {
             Layer::Buildings => "buildings",
             Layer::Folk => "villagers",
             Layer::Shadows => "shadows",
+            Layer::Chunks => "near ground",
         }
     }
 
@@ -76,6 +84,7 @@ impl Layer {
             Layer::Buildings => "what the village has raised",
             Layer::Folk => "the people, and their bodies",
             Layer::Shadows => "cast by the sun",
+            Layer::Chunks => "the detailed ring underfoot",
         }
     }
 
@@ -92,6 +101,7 @@ impl Layer {
             Layer::Buildings => "BUILDINGS",
             Layer::Folk => "FOLK",
             Layer::Shadows => "SHADOWS",
+            Layer::Chunks => "CHUNKS",
         }
     }
 }
@@ -264,6 +274,7 @@ fn apply_layers(
             Has<crate::terrain::WaterPlane>,
             Has<crate::villager::work::buildings::Building>,
             Has<crate::villager::Villager>,
+            Has<crate::terrain::TerrainChunk>,
         ),
         Or<(
             With<GroveMesh>,
@@ -273,6 +284,7 @@ fn apply_layers(
             With<crate::terrain::WaterPlane>,
             With<crate::villager::work::buildings::Building>,
             With<crate::villager::Villager>,
+            With<crate::terrain::TerrainChunk>,
         )>,
     >,
 ) {
@@ -304,7 +316,7 @@ fn apply_layers(
         *slot = layers.hidden(layer);
     }
     *applied = Some(now);
-    for (entity, mut visibility, grove, foliage, boulder, patch, water, building, folk) in
+    for (entity, mut visibility, grove, foliage, boulder, patch, water, building, folk, chunk) in
         &mut governed
     {
         let layer = if grove || foliage || boulder {
@@ -317,6 +329,8 @@ fn apply_layers(
             Layer::Buildings
         } else if folk {
             Layer::Folk
+        } else if chunk {
+            Layer::Chunks
         } else {
             continue;
         };
@@ -395,6 +409,7 @@ mod tests {
     ///
     /// A seventh of the frame at play distances and a fortieth high up. The knee
     /// is between seven hundred and a thousand, which is where the ceiling sits.
+    #[allow(dead_code)]
     const MEASURED: [(f32, f32); 5] = [
         (200.0, 14.03),
         (400.0, 13.64),

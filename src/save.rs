@@ -787,6 +787,18 @@ fn raze(world: &mut World) {
     if let Some(mut follow) = world.get_resource_mut::<crate::camera::FollowTarget>() {
         follow.entity = None;
     }
+    // The RESOURCES that point into the world, not just the entities in it.
+    //
+    // Razing the settlement's entities while leaving `SettlementSite` behind
+    // left a resource holding a despawned entity, and the title screen reads
+    // exactly that resource to decide whether Begin resumes a game or starts
+    // one. So an abandoned world's site made the next Begin skip the founding
+    // altogether. Whoever razes the world owns clearing these too.
+    world.remove_resource::<SettlementSite>();
+    world.remove_resource::<crate::villager::DivineName>();
+    if let Some(mut chosen) = world.get_resource_mut::<crate::villager::ChosenGround>() {
+        chosen.0 = None;
+    }
 }
 
 /// Tears the current world down and founds a brand-new one on a fresh seed.
@@ -830,9 +842,20 @@ fn found_anew(world: &mut World) {
         manifest.arrive();
     }
 
-    // Found the new settlement the same way a fresh launch does — new site,
-    // new founders, new names, a new first page of the chronicle.
-    let _ = world.run_system_once(crate::villager::spawn_settlement);
+    // And NOTHING is founded. This is where the bug was: it used to found a
+    // settlement here, "the same way a fresh launch does", which was true when
+    // a fresh launch founded one at startup. It has not been true since the god
+    // started planting the first village themselves — a launch now opens on an
+    // empty world with a flag in hand.
+    //
+    // So going to the title and pressing Begin walked into a world that had
+    // already been founded, at the ABANDONED world's chosen ground (that
+    // resource outlived the raze too), and `Begin` seeing a settlement sent the
+    // player to `Playing` rather than `Choosing`. Brett: it should reset "as if
+    // its a new game."
+    //
+    // A new game is an empty world. The founding belongs to the flag, and the
+    // flag belongs to the player.
 }
 
 fn apply(world: &mut World, save: SaveGame) {
@@ -1715,6 +1738,53 @@ fn refresh_slot_labels(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A world with a village in it, near enough for the teardown to work on.
+    ///
+    /// Only what `raze` and `found_anew` actually reach for — the point is the
+    /// RESOURCES that outlive a razing, which is where the bug lived.
+    fn a_world_mid_game() -> World {
+        let mut world = World::new();
+        world.insert_resource(crate::terrain::LoadedChunks::default());
+        world.insert_resource(crate::grass::GrassChunks::default());
+        world.insert_resource(crate::hand::DivineHand::default());
+        world.insert_resource(crate::villager::ChosenGround(Some(Vec3::new(70.0, 0.0, 9.0))));
+        world.insert_resource(crate::villager::DivineName("Hesh".to_string()));
+        let settlement = world.spawn_empty().id();
+        world.insert_resource(SettlementSite {
+            centre: Vec3::new(70.0, 0.0, 9.0),
+            radius: 170.0,
+            woodpile: Vec3::new(74.0, 0.0, 11.0),
+            settlement,
+        });
+        world
+    }
+
+    #[test]
+    fn going_to_the_title_leaves_nothing_of_the_old_world_behind() {
+        let mut world = a_world_mid_game();
+        raze(&mut world);
+
+        // The bug, in one assertion. `SettlementSite` survived the razing, so it
+        // held a despawned entity - and the title reads exactly this to decide
+        // whether Begin resumes a game or starts one, which is why Begin used to
+        // skip the founding entirely.
+        assert!(
+            world.get_resource::<SettlementSite>().is_none(),
+            "the settlement's site outlived the world it was in, so the next \
+             Begin will resume the abandoned game instead of starting a new one"
+        );
+        assert_eq!(
+            world.resource::<crate::villager::ChosenGround>().0,
+            None,
+            "the ground the old god chose is still chosen, so a new world would \
+             be founded at the abandoned world's spot"
+        );
+        assert!(
+            world.get_resource::<crate::villager::DivineName>().is_none(),
+            "the new world's god inherited the old one's name"
+        );
+    }
 
     #[test]
     fn a_slot_with_a_world_in_it_never_reads_as_empty() {
