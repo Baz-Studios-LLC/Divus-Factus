@@ -27,51 +27,23 @@ const SHADER_PATH: &str = "shaders/fog.wgsl";
 /// fewer than this; the oldest simply stop being drawn if they ever do not.
 const MAX_POCKETS: usize = 128;
 
-/// How high the veil stands, and in how many sheets. The tallest tree in
-/// the world is a shade over eight metres, so a bank that reaches twelve
-/// swallows the woods whole.
+/// How high the veil's bank of mist stands.
 ///
-/// A single sheet on the ground was the first try and the trees stood
-/// straight through it. One sheet at treetop height would hide them, but a
-/// flat lid twelve metres up reads as a floating pane and slides against
-/// the ground it belongs to as the camera turns. A stack has real depth:
-/// its edge is a wall of mist, and each sheet drapes the terrain's own
-/// shape, so the bank rises and falls with the land under it.
-const SHEETS: usize = 6;
+/// The tallest tree in the world is a shade over eight metres, so a bank that
+/// reaches twelve swallows the woods whole. The sheet drawn at that height is
+/// the TOP of the bank; everything under it is inside the mist, and the shader
+/// weighs each pixel by how far its ray travels through that depth — see
+/// `fog.wgsl`. It used to be six thin sheets climbing to this height, which
+/// worked from above and read as six countable contour lines from the side.
 const VEIL_HIGH: f32 = 12.0;
 
-/// The sea takes ONE sheet, at full weight.
+/// The sea takes its sheet almost on the water.
 ///
-/// A stack works on land because every sheet drapes the ground's own
-/// shape and hangs parallel to it. Over water the sheets are FLAT, and a
-/// flat sheet cut by a shelving seabed draws a contour line - six of them
-/// drew six, and a low-poly seabed turned the six into a staircase
-/// marching out from every shore. Nothing floats on the sea that needs
-/// twelve metres of hiding, so the sea gets a single sheet carrying the
-/// whole weight, and the only line it can draw is the waterline itself -
-/// where the land's own veil takes over anyway.
+/// There is nothing floating on the sea that needs twelve metres of hiding, and
+/// a deep slab over a shelving seabed drew a contour line at every step of it.
+/// Low and thin, the only line it can draw is the waterline itself — where the
+/// land's own veil takes over anyway.
 const SEA_SHEET: f32 = 0.35;
-
-/// Past this camera distance the land's stack collapses to one solid lid
-/// at the top of the bank. The stack exists to give the veil's EDGE depth,
-/// and from a quarter mile up that depth is a single pixel - but the six
-/// sheets still cost six draws of every chunk in a view that is at its
-/// widest exactly then. The soak put the whole difference at five and a
-/// half milliseconds a frame: 48fps with the stack, 64 with the lid.
-const LID_BEYOND: f32 = 350.0;
-
-/// How far the lowest sheet floats over the ground it veils.
-///
-/// It was a tenth of a unit - "a hand's breadth", enough to win the depth
-/// test against the ground while looking like it lay on it. That was true of
-/// a world whose vertices were chunk-local, a few tens of units from their
-/// own origin. On a round world every vertex is a world-space seat some six
-/// thousand units from the planet's centre, and at that magnitude an `f32`
-/// resolves to about seven ten-thousandths - so the ground and the sheet
-/// stopped being reliably ordered and the whole landscape came out striped
-/// where they traded places pixel by pixel. A unit and a half is still
-/// nothing beside a tree, and it is two thousand times the precision floor.
-const LOWEST_SHEET: f32 = 1.5;
 
 /// Whether the veil is up. It is, from the first frame: the world a
 /// village has actually walked is the world the game is about, and the
@@ -157,12 +129,22 @@ pub struct FogParams {
 impl Default for FogParams {
     fn default() -> Self {
         FogParams {
-            // Each sheet is thin; six of them stacked come to nine parts
-            // in ten, which is dark enough to hide a wood and light enough
-            // that the bank's own depth still shows at its edge.
-            tint: Vec4::new(VEIL_TINT[0], VEIL_TINT[1], VEIL_TINT[2], 0.32),
+            // Nine parts in ten, looked at SQUARELY: dark enough to hide a
+            // wood, light enough that the ground's own shape still tells
+            // underneath it. The shader turns this into an extinction and every
+            // other angle follows from it, so a grazing look at the bank comes
+            // out heavier than this without being told to.
+            //
+            // It was 0.32 when the veil was six stacked sheets, because that is
+            // what one of six had to be for the six to come to nine tenths.
+            // Left at a sheet's weight while the sheets became a slab, the whole
+            // bank would be a third opaque from above and the unknown world
+            // would show through it.
+            tint: Vec4::new(VEIL_TINT[0], VEIL_TINT[1], VEIL_TINT[2], 0.9),
             home: Vec4::new(0.0, 0.0, 0.0, 170.0),
-            dials: Vec4::new(0.0, 9.0, 0.0, 0.0),
+            // z is how deep the bank stands, which the shader turns into an
+            // extinction: see `fog.wgsl`.
+            dials: Vec4::new(0.0, 9.0, VEIL_HIGH, 0.0),
             pockets: [Vec4::ZERO; MAX_POCKETS],
         }
     }
@@ -228,10 +210,8 @@ fn drape_the_veil(
     mode: Res<FogMode>,
     state: Res<State<crate::GameState>>,
     mut materials: ResMut<Assets<FogMaterial>>,
-    mut cloth: Local<Option<(Handle<FogMaterial>, Handle<FogMaterial>)>>,
-    mut was_lidded: Local<Option<bool>>,
+    mut cloth: Local<Option<Handle<FogMaterial>>>,
     rising: Res<VeilRising>,
-    rigs: Query<&crate::camera::CameraRig>,
     chunks: Query<
         (
             Entity,
@@ -265,102 +245,58 @@ fn drape_the_veil(
         for (chunk, _, _, _, showing) in &chunks {
             reveal(&mut commands, chunk, showing);
         }
-        *was_lidded = None;
         return;
     }
-    // Stack or lid, by zoom - and when the answer changes, every veil
-    // comes off so the right dress goes on. A frame of bare world at the
-    // moment of switching would show; despawn and respawn land the same
-    // frame, so nothing flickers.
-    let lidded = rigs
-        .iter()
-        .next()
-        .is_some_and(|rig| rig.distance > LID_BEYOND);
-    if *was_lidded != Some(lidded) {
-        for veil in &veils {
-            commands.entity(veil).despawn();
-        }
-    }
-    let fresh = *was_lidded != Some(lidded);
-    *was_lidded = Some(lidded);
-    // Two cloths, and both describe the whole world: one sheer, for
-    // stacking over the land, and one at full weight for the sea's single
-    // sheet. The holes in them are the same holes.
-    let (cloth, deep) = cloth.get_or_insert_with(|| {
-        let sheer = FogMaterial::default();
-        let mut solid = FogMaterial::default();
-        // What six sheer sheets come to, in one.
-        solid.params.tint.w = 1.0 - (1.0 - sheer.params.tint.w).powi(SHEETS as i32);
-        (materials.add(sheer), materials.add(solid))
-    });
-    // The rise is applied HERE, where both cloths and their own full
-    // weights are known. Doing it in a system that walked every fog
-    // material and wrote the default weight into each of them dragged
-    // the solid cloth from nine tenths down to a third and left it
-    // there - so the sea, and the single lid a zoomed-out world wears,
-    // both went three times too thin and stayed that way.
+    // ONE cloth, at the top of the bank, whatever the zoom. There used to be
+    // two - a sheer one stacked six deep over the land, and a full-weight one
+    // for the sea and for the lid a zoomed-out world wore - plus the machinery
+    // to swap between them without a bare frame showing. All of it is gone.
+    // The stack existed to give the veil's edge some depth, and it did, but
+    // looked along from a low camera you could COUNT the sheets: six pale
+    // contour lines lying across the distance. The flat world's distance fog
+    // used to dissolve them before they could be resolved; the round world does
+    // not have that fog and does not want it.
+    //
+    // So the sheet is the top of a slab now, and the shader takes its weight
+    // from how far the ray travels through that slab - squarely from above, a
+    // long way at a graze. The far edge thickens into a wall by itself, which
+    // is what the stack was faking, and it costs one draw per chunk instead of
+    // six.
+    let cloth = cloth.get_or_insert_with(|| materials.add(FogMaterial::default()));
     {
-        let sheer_full = FogParams::default().tint.w;
-        let solid_full = 1.0 - (1.0 - sheer_full).powi(SHEETS as i32);
         // The veil does NOT thin with altitude. It used to, back when the
         // planet's own patches painted no veil at all: carried aloft the
         // cloths stopped being information and became scenery, a translucent
         // slate quadrilateral lying over an otherwise open world with the
         // loaded ring's own straight edge for a border. Now the patches wear
         // the same fog in the same colour (`globe::PlanetMaterial`), so the
-        // cloths over the near ground and the paint beyond it are one
+        // cloth over the near ground and the paint beyond it are one
         // continuous shroud, and fading either of them would put the seam
         // back. What the village has not walked is hidden from every height.
-        let standing = rising.risen;
-        let (cloth, deep) = (cloth.clone(), deep.clone());
+        let full = FogParams::default().tint.w;
+        let cloth = cloth.clone();
         if let Some(mut stuff) = materials.get_mut(&cloth) {
-            stuff.params.tint.w = sheer_full * standing;
-        }
-        if let Some(mut stuff) = materials.get_mut(&deep) {
-            stuff.params.tint.w = solid_full * standing;
+            stuff.params.tint.w = full * rising.risen;
         }
     }
     for (chunk, mesh, children, sea, showing) in &chunks {
-        let dressed = if fresh {
-            // The children still hold this frame's despawned veils;
-            // trusting them would dress nothing until next frame.
-            0
-        } else {
-            children.map_or(0, |kids| {
-                kids.iter().filter(|kid| veils.contains(*kid)).count()
-            })
-        };
-        let wanted = if sea || lidded { 1 } else { SHEETS };
-        // Decent, and may be seen. One sheet is enough to be decent: a chunk
-        // wearing the first of six is already the veil's colour, and waiting
-        // for all six would hold the ground back a frame for nothing.
+        let dressed = children.map_or(0, |kids| {
+            kids.iter().filter(|kid| veils.contains(*kid)).count()
+        });
+        // Decent, and may be seen.
         if dressed > 0 {
             reveal(&mut commands, chunk, showing);
-        }
-        if dressed >= wanted {
             continue;
         }
-        for sheet in dressed..wanted {
-            // The lowest sits a hand's breadth up, so it never fights the
-            // ground it covers for the same pixel; the rest climb to the
-            // top of the bank - and the lid goes straight to the top,
-            // draping the ground's own shape so it draws no contours and
-            // still stands over the trees.
-            let lift = if sea {
-                SEA_SHEET
-            } else if lidded {
-                LOWEST_SHEET + VEIL_HIGH
-            } else {
-                LOWEST_SHEET + VEIL_HIGH * (sheet as f32 / (SHEETS - 1) as f32)
-            };
+        {
+            // The sea's veil lies almost on the water; the land's stands at the
+            // top of the bank, over the treetops, draping the ground's own
+            // shape so it draws no contours of its own.
+            let lift = if sea { SEA_SHEET } else { VEIL_HIGH };
             commands.spawn((
                 Veil,
                 Mesh3d(mesh.0.clone()),
-                MeshMaterial3d(if sea || lidded {
-                    deep.clone()
-                } else {
-                    cloth.clone()
-                }),
+                MeshMaterial3d(cloth.clone()),
                 // Lifted RADIALLY, not along world Y. The sheets copy the
                 // chunk's own mesh, and those vertices are seated on the
                 // sphere - so "up" is away from the planet's centre, and it

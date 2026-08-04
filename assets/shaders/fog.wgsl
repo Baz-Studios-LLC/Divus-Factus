@@ -5,18 +5,35 @@
 // stored, it is a distance field evaluated per pixel from a handful of
 // circles. Ground the village knows is clear; everything else takes the veil.
 //
-// This draws on a COPY of the terrain's own mesh, lifted a hand's breadth, so
+// This draws on a COPY of the terrain's own mesh, lifted over the treetops, so
 // the veil follows every hill and hollow instead of slicing through them the
 // way a flat plane would.
+//
+// ONE sheet, and its weight comes from how far the view ray travels through the
+// bank rather than from how many sheets it crosses. It used to be a stack of
+// six, each thin, and looking along them from a low camera you could count
+// them: six pale contour lines lying across the distance. On the flat world the
+// DISTANCE FOG hid that, by fading everything far away into the horizon before
+// the sheets could be resolved; the round world hides its own distance over the
+// horizon instead, the fog went with it, and the stack was left standing there
+// to be counted.
+//
+// A slab is the honest model of a bank of mist, and it is one draw rather than
+// six. Looking down through it the ray crosses the bank's own height; looking
+// along it the ray crosses a great deal more, so the far edge of the veil
+// thickens into a wall by itself — which is the thing the stack was built to
+// fake in the first place.
 
 #import bevy_pbr::forward_io::VertexOutput
+#import bevy_pbr::mesh_view_bindings::view
 
 struct FogParams {
     // rgb is the veil's colour, a is how heavy it gets at its thickest.
     tint: vec4<f32>,
     // xyz the home ground's centre, w its radius.
     home: vec4<f32>,
-    // x how many pockets are live, y how many metres the edge takes to fade.
+    // x how many pockets are live, y how many metres the edge takes to fade,
+    // z how deep the bank of mist stands, w unused.
     dials: vec4<f32>,
     // xyz each pocket's centre, w its radius.
     pockets: array<vec4<f32>, 128>,
@@ -66,5 +83,22 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     if veil < 0.004 {
         discard;
     }
-    return vec4<f32>(fog.tint.rgb, fog.tint.a * veil);
+
+    // How much bank this pixel's ray actually goes through. The sheet is the
+    // TOP of a slab standing `dials.z` deep on the ground, so a ray meeting it
+    // squarely crosses that depth and a ray meeting it at a graze crosses
+    // depth / cos(angle) — unbounded in the limit, which is why it is clamped
+    // to a few times the depth rather than allowed to run away at the horizon.
+    let to_eye = normalize(view.world_position.xyz - in.world_position.xyz);
+    let facing = max(abs(dot(normalize(in.world_normal), to_eye)), 0.0001);
+    let depth = max(fog.dials.z, 0.001);
+    let travelled = min(depth / facing, depth * 6.0);
+
+    // Beer-Lambert. `tint.a` is the weight of one depth of bank looked at
+    // squarely, so the extinction that reproduces it is -ln(1 - a) / depth, and
+    // every other angle follows from the same law instead of being tuned.
+    let extinction = -log(max(1.0 - fog.tint.a, 0.002)) / depth;
+    let density = 1.0 - exp(-extinction * travelled);
+
+    return vec4<f32>(fog.tint.rgb, density * veil);
 }

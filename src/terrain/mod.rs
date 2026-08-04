@@ -1287,7 +1287,6 @@ pub fn build_river_mesh(terrain: &Terrain, coord: IVec2) -> Option<Mesh> {
 #[derive(Resource)]
 pub struct TerrainAssets {
     pub ground_material: Handle<StandardMaterial>,
-    pub water_material: Handle<crate::water::WaterMaterial>,
     /// The same shader as the sea, so rivers and ocean are plainly the same
     /// substance — but its own settings, because they are not the same water.
     ///
@@ -1386,7 +1385,6 @@ fn setup_terrain(
     commands.insert_resource(Terrain::new(world_seed.0));
     commands.insert_resource(TerrainAssets {
         ground_material,
-        water_material,
         river_material,
     });
     commands.init_resource::<LoadedChunks>();
