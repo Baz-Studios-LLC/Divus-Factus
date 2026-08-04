@@ -1,22 +1,25 @@
-## The houses are built by hand now
+## The world is a sphere
 
-**The Atelier opens.** A standalone bench that stands beside the game: a shelf of parts on a lattice where every dimension is a sixteenth of a metre, walls and roofs that stretch to size, doors and windows that punch through a wall and heal it again when they leave, foundations, steps, chimneys, and a room's worth of furniture. Fifty steps of undo, copy and paste, a mirror key, snapping that respects what a piece is resting on, and the drafting angles on the number keys.
+**Zoom out far enough and you are holding a planet.** Not a view of one — the same world, further away. There is no orbit mode, no map screen and no threshold anywhere in the climb: the wheel that frames a longhouse keeps turning until the whole globe sits in the window, and turns back again to land wherever you were looking. The ground is a genuine sphere at every height, six continents and thirty-eight kilometres around, and it curves under your feet if you watch the horizon.
 
-**And what you build there stands in the world.** A house drawn on the bench is carried into the game whole — raised stage by stage as the village works, re-dyed so a street of one blueprint is still a street of different houses, and furnished out of its own marks. A bed comes with its sleeper laid on it, a seat with its sitter, a hearth with its fire and its smoke. Take a figure off and nobody sleeps there. What the bench shows is what the game reads.
+**A real sun, and a moon on the other side of the world.** The sun is a body with a place now, travelling a circuit of the planet each day — rising in the east, overhead at noon, under the world at midnight. Shadows swing through the day instead of merely shortening. The far side of the planet is dark for the honest reason that the sun is on the other side of it, and from high enough you can see the line between them. The moon stands opposite the sun, always full, and carries the night.
 
-**Homes gained their insides.** Rooms behind partitions, a numbered bed for every berth with the marriage bed knowing its own, a table the family gathers at. The day gained bells to go with them: work in shifts, the midday meal at the square, supper at the family hearth. Villagers find the door and walk through it, instead of at the wall beside it.
+**Weather you can see from space.** One deck of cloud wrapped round the whole planet: overhead from the village, lying over the continents from orbit, and the same cloud either way. It travels with the wind, thickens with the weather, and the terminator crosses it as it crosses the ground.
 
-**Knees and elbows.** Every limb learns its hinge — arms bend forward, knees back, and the recovery is timed rather than lagged. A load on the shoulder damps the swing; kneeling folds properly, and lets go when the body dies.
+**Stars, and a sky that ends.** Two thousand of them in three shells at real distances, so they sweep past one another as the view moves. They come out with the climb and at nightfall.
 
-**The world found its voice.** Three airs, played by the hour, crossfading into one another and rising under the title.
+**A new front door.** The planet turns slowly against the starfield with the menu beside it, and Begin dives from orbit down to the village you are about to found.
 
-**The keys learn to move.** A keymap that every hand of the game reads, and a settings page in the codex's own manners that rebinds any of them — with the hand's colours, and honest video and sound beside it. Two new ones worth knowing: **L** puts a label over every head saying what that soul is at, and **K** says what trade they were set to.
+**Bigger oceans, bigger land.** The world had been coming out a mottle of ponds and islands — its continent field carried detail sixteen times finer than a continent. Three quarters of the planet is ocean now, as Earth is, with landmasses to match and mountains where mountains belong.
 
 ## Under the hood
 
-- Gatherers, fishers and hunters stock the larder and everyone eats from it. A bush is a desperation measure now, not a diet.
-- A house plot banks back into the hill it was cut from, with the bank sized to the earth it actually has to move — no more standing on a mesa with a metre of cliff at the downhill edge.
-- Nobody without a roof waits out the rain during working hours. A ring of soaked people around a fire they are not under was never shelter.
-- The cutaway cycles whole, roof off, walls down — in the game and on the bench both — and what it hides, the hand cannot touch.
-- The teller speaks with the 1.5B again: a leftover choice file had been quietly holding it to the smaller voice, and the F1 panel now names the weights it took up.
-- Houses stand a neighbourhood apart instead of shoulder to shoulder, and the splash carries the studio's line.
+- The fog of war wraps the whole planet, in one colour at every height. It used to be three: dark slate near the ground, lighter and bluer on the globe, lighter still at a grazing angle. It is one bank of mist now rather than six stacked sheets — which you could count, from a low camera — and it costs a sixth of the drawing.
+- Chunks no longer arrive unveiled. Twenty stream in per frame while you move, and every one used to be dressed a frame late: a permanent scattering of bright squares over a shrouded world for as long as the view kept changing.
+- Rivers had sunk twenty-eight units into the ground, leaving their carved channels painted on dry valley floors. They are back, with water read over a river's own depth rather than the sea's.
+- The god's hand stopped vanishing on menus and stopped dwindling to nothing on the way out. It holds the size it has at a hundred units up, however far you climb.
+- The world turns past its poles. Grabbing the globe and dragging north used to stop dead a few degrees short of one.
+- The sky is blue by day. It had been a near-grey since the beginning, because it was the colour the old distance fog faded the world into and the two had to match exactly.
+- The planet stops rebuilding ground it had already built: five-hundred-unit tiles are resident for the life of the world now instead of being discarded and re-earned, and the detail catches up in under two seconds where it took five.
+- The F1 panel gained a `zoom level` row: which depths of the planet are drawn, how many patches stand, and how many are still owed.
+- Said plainly, because it is still true: rivers step where two courses meet at different levels, and a world three quarters ocean puts fewer of them near the first village than it used to. That is the next thing.
