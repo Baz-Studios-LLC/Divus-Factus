@@ -340,10 +340,10 @@ fn apply_layers(
         } else {
             None
         };
-        if let Some(wanted) = wanted {
-            if *visibility != wanted {
-                *visibility = wanted;
-            }
+        // Only on a real change: writing the same value back would mark every
+        // grove in the world as changed, every frame.
+        if let Some(wanted) = wanted.filter(|wanted| *visibility != *wanted) {
+            *visibility = wanted;
         }
     }
 }
@@ -442,7 +442,7 @@ mod tests {
 
     /// A thousand groves, standing in for a world's worth.
     fn a_forest() -> Vec<Entity> {
-        (0..1000).map(Entity::from_raw_u32).flatten().collect()
+        (0..1000).filter_map(Entity::from_raw_u32).collect()
     }
 
     fn share_gone(forest: &[Entity], distance: f32) -> f32 {
