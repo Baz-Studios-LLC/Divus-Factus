@@ -5,6 +5,7 @@ mod attention;
 mod avatar;
 mod calendar;
 mod camera;
+mod clouds;
 mod creature;
 mod debug;
 mod doings;
@@ -182,8 +183,10 @@ fn main() {
         ))
         .add_plugins((
             ui::UiPlugin,
-            calendar::CalendarPlugin,
-            sky::SkyPlugin,
+            // Nested: a plugin tuple holds sixteen, and the sky's three take
+            // it over. The grouping is the honest one anyway — the clock, the
+            // weather deck it lights and the sky behind them.
+            (calendar::CalendarPlugin, clouds::CloudPlugin, sky::SkyPlugin),
             miracles::MiraclesPlugin,
             title::TitlePlugin,
             matter::MatterPlugin,

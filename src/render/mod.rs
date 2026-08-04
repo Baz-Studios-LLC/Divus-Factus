@@ -169,8 +169,12 @@ impl LookSettings {
 /// luminance first, it survives the trip.
 pub fn horizon_color() -> Color {
     let sky = palette::shade(&palette::SKY, 0.85).to_linear();
-    const SATURATE: f32 = 2.1;
-    const GAIN: f32 = 1.5;
+    // Solved rather than guessed, from two measured points through the
+    // tonemapper: saturation alone gave a holiday-poster blue (62, 140, 201)
+    // and brightness alone gave grey, so these are the pair that land the
+    // rendered pixel on an airy daylight sky.
+    const SATURATE: f32 = 1.30;
+    const GAIN: f32 = 2.44;
     let luminance = 0.2126 * sky.red + 0.7152 * sky.green + 0.0722 * sky.blue;
     let push = |c: f32| ((luminance + (c - luminance) * SATURATE) * GAIN).max(0.0);
     Color::LinearRgba(LinearRgba {

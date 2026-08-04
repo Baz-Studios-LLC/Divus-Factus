@@ -407,6 +407,8 @@ fn bend_the_world(
             // The sun and the moon are out in space already; their places are
             // world positions, not flat ground waiting to be wrapped.
             Without<crate::calendar::Celestial>,
+            // And the weather is a shell already standing round the planet.
+            Without<crate::clouds::CloudShell>,
         ),
     >,
     mut eyes: Query<(&mut GlobalTransform, &CameraRig), Without<crate::render::HandCamera>>,
