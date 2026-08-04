@@ -324,7 +324,7 @@ struct ThePlanet;
 
 /// Marks one patch, by its name in the tree.
 #[derive(Component)]
-struct Patch(PatchKey);
+pub(crate) struct Patch(PatchKey);
 
 pub struct GlobePlugin;
 

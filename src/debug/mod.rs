@@ -23,6 +23,7 @@ mod capture;
 mod god;
 mod history;
 mod hud;
+pub(crate) mod layers;
 mod inspector;
 mod manifest;
 mod people;
@@ -43,7 +44,7 @@ pub struct DebugPlugin;
 
 impl Plugin for DebugPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(FrameTimeDiagnosticsPlugin::default())
+        app.add_plugins((FrameTimeDiagnosticsPlugin::default(), layers::LayerPlugin))
             .init_resource::<DebugState>()
             .init_resource::<SelectedPerson>()
             .init_resource::<RosterSort>()

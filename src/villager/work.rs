@@ -24,7 +24,7 @@ use crate::scatter::FoodSource;
 use crate::terrain::Terrain;
 
 pub(crate) mod baked;
-mod buildings;
+pub(crate) mod buildings;
 mod carry;
 mod fields;
 mod jobs;

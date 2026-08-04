@@ -590,6 +590,7 @@ fn apply_sky_to_lights(
         (With<MoonLight>, Without<SunLight>, Without<FillLight>),
     >,
     eyes: Query<&crate::camera::CameraRig, With<crate::camera::GodCamera>>,
+    layers: Res<crate::debug::layers::ViewLayers>,
 ) {
     ambient.color = sky.ambient_color;
     ambient.brightness = sky.ambient_brightness;
@@ -601,14 +602,15 @@ fn apply_sky_to_lights(
         // No shadows in the dark: with the sun's light at nothing, any
         // shadow it casts is pure artifact - and the artifacts move.
         //
-        // `DIVUS_FACTUS_SHADOWS=0` lifts them for measurement, beside the fog
-        // and cloud dials. The shadow pass is worth 2.8ms of a 27ms frame at the
-        // altitude where frames drop, so it is a number worth being able to take.
+        // And none when the switch is off: shadows are a layer like any other
+        // now (see `debug::layers`), reachable from the settings and from
+        // `DIVUS_FACTUS_LAYER_SHADOWS=0`, with the older `DIVUS_FACTUS_SHADOWS=0`
+        // still honoured so the numbers already recorded stay reproducible.
         // And no shadows from too far back, where the cascades cannot reach
         // the ground anyway: 3.5ms for a frame that measures identical.
         let pulled_back = eyes.iter().next().map(|rig| rig.distance);
         light.shadow_maps_enabled = sky.daylight > 0.02
-            && !std::env::var("DIVUS_FACTUS_SHADOWS").is_ok_and(|dial| dial == "0")
+            && layers.shown(crate::debug::layers::Layer::Shadows)
             && pulled_back
                 .is_none_or(|distance| shadows_can_land(distance, light.shadow_maps_enabled));
         // A grazing sun slides every shadow off its caster - the depth bias

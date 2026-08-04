@@ -14,6 +14,7 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::window::PrimaryWindow;
 
 use crate::GameState;
+use crate::debug::layers::Layer;
 use crate::ui::{self, theme};
 
 pub struct TitlePlugin;
@@ -122,14 +123,33 @@ struct BackButton;
 enum ViewSwitch {
     /// The weather deck. Off, and the god can see the ground.
     Clouds,
+    /// The fog of war over ground no village has walked.
+    Veil,
+    /// One of the world's own layers, held in [`ViewLayers`].
+    ///
+    /// Two switches above keep their state elsewhere because they had owners
+    /// before the layers existed, and giving either of them a second home would
+    /// mean a switch that reads one truth while the world reads another.
+    Layer(Layer),
 }
 
 impl ViewSwitch {
-    const ALL: [ViewSwitch; 1] = [ViewSwitch::Clouds];
+    const ALL: [ViewSwitch; 8] = [
+        ViewSwitch::Clouds,
+        ViewSwitch::Veil,
+        ViewSwitch::Layer(Layer::Scenery),
+        ViewSwitch::Layer(Layer::Patches),
+        ViewSwitch::Layer(Layer::Water),
+        ViewSwitch::Layer(Layer::Buildings),
+        ViewSwitch::Layer(Layer::Folk),
+        ViewSwitch::Layer(Layer::Shadows),
+    ];
 
     fn label(self) -> &'static str {
         match self {
             ViewSwitch::Clouds => "clouds",
+            ViewSwitch::Veil => "the veil",
+            ViewSwitch::Layer(layer) => layer.label(),
         }
     }
 
@@ -138,6 +158,8 @@ impl ViewSwitch {
     fn note(self) -> &'static str {
         match self {
             ViewSwitch::Clouds => "weather over the world",
+            ViewSwitch::Veil => "unwalked ground kept dark",
+            ViewSwitch::Layer(layer) => layer.note(),
         }
     }
 }
@@ -1220,6 +1242,8 @@ struct SwitchKnob(ViewSwitch);
 fn handle_view_switches(
     clicks: Query<(&Interaction, &ViewSwitch), Changed<Interaction>>,
     mut clear: ResMut<crate::clouds::TheSkyIsClear>,
+    mut fog: ResMut<crate::fog::FogMode>,
+    mut layers: ResMut<crate::debug::layers::ViewLayers>,
     mut tracks: Query<(&ViewSwitch, &mut BackgroundColor, &mut BorderColor)>,
     mut knobs: Query<(&SwitchKnob, &mut Node, &mut BackgroundColor), Without<ViewSwitch>>,
 ) {
@@ -1229,6 +1253,8 @@ fn handle_view_switches(
         }
         match switch {
             ViewSwitch::Clouds => clear.0 = !clear.0,
+            ViewSwitch::Veil => fog.0 = !fog.0,
+            ViewSwitch::Layer(layer) => layers.toggle(*layer),
         }
     }
 
@@ -1236,6 +1262,8 @@ fn handle_view_switches(
         // The switch reads as the THING, not as its absence: "clouds on" means
         // there is weather, so the sky being clear is the switch being off.
         ViewSwitch::Clouds => !clear.0,
+        ViewSwitch::Veil => fog.0,
+        ViewSwitch::Layer(layer) => layers.shown(*layer),
     };
     for (switch, mut fill, mut border) in &mut tracks {
         let lit = on(switch);
