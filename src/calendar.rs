@@ -556,7 +556,12 @@ fn apply_sky_to_lights(
         light.illuminance = sky.sun_illuminance.max(1.0);
         // No shadows in the dark: with the sun's light at nothing, any
         // shadow it casts is pure artifact - and the artifacts move.
-        light.shadow_maps_enabled = sky.daylight > 0.02;
+        //
+        // `DIVUS_FACTUS_SHADOWS=0` lifts them for measurement, beside the fog
+        // and cloud dials. The shadow pass is worth 2.8ms of a 27ms frame at the
+        // altitude where frames drop, so it is a number worth being able to take.
+        light.shadow_maps_enabled = sky.daylight > 0.02
+            && !std::env::var("DIVUS_FACTUS_SHADOWS").is_ok_and(|dial| dial == "0");
         // A grazing sun slides every shadow off its caster - the depth bias
         // that is right for a light overhead is nowhere near enough for one
         // coming in almost flat, and trees end up casting shadows that detach

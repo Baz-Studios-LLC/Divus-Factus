@@ -675,6 +675,21 @@ fn populate_chunks(
 const SCATTER_SPACING: f32 = 4.5;
 
 /// Side of the grove bucket: trees within one cell share a rendered mesh.
+///
+/// Fourteen units, and MEASURED rather than inherited. The obvious economy is to
+/// merge more per mesh — a chunk holds twenty-one groves at this span, so the
+/// world carries some twenty-six thousand grove meshes at the widest zoom, and
+/// merging them four to one looks like free money. It is the opposite. Swept at
+/// the altitude where frames actually drop, interleaved against thermal drift:
+///
+///   span 14 -> 30,693 meshes, 27.1ms      span 32 -> 23,620, 31.4ms
+///   span 64 -> 21,734 meshes, 31.5ms
+///
+/// Nine thousand fewer meshes cost four milliseconds. Draw calls are not the
+/// bottleneck here; VERTICES are, and a small mesh is culled where a big one is
+/// not — a sixty-four unit grove with one corner on screen draws every tree in
+/// it. Fine granularity is what keeps the vertex count down, so the bucket stays
+/// small.
 const GROVE_SPAN: f32 = 14.0;
 
 /// Within this range of the settlement, trees and rocks are entities rather
