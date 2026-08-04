@@ -404,6 +404,9 @@ fn bend_the_world(
             // And the camera that draws it, which is a child of the god's own
             // and must share its pose exactly; it gets that below.
             Without<crate::render::HandCamera>,
+            // The sun and the moon are out in space already; their places are
+            // world positions, not flat ground waiting to be wrapped.
+            Without<crate::calendar::Celestial>,
         ),
     >,
     mut eyes: Query<(&mut GlobalTransform, &CameraRig), Without<crate::render::HandCamera>>,
@@ -498,22 +501,13 @@ fn plant_the_tree(
         .id();
     tree.root = Some(root);
 
-    // The planet's own sun: the world's lights are confined to the world's
-    // layers, and a planet without one hangs in space unlit. Same colour and
-    // strength as the sun the ground knows, from the same direction.
-    commands.spawn((
-        Name::new("The Planet's Sun"),
-        ThePlanet,
-        DirectionalLight {
-            color: palette::shade(&palette::BONE, 1.0),
-            illuminance: 17_000.0,
-            shadow_maps_enabled: false,
-            ..default()
-        },
-        Transform::from_translation(crate::SUN_DIRECTION * 140.0).looking_at(Vec3::ZERO, Vec3::Y),
-        RenderLayers::layer(GLOBE_LAYER),
-        ChildOf(root),
-    ));
+    // No sun of its own any more. The planet used to carry a second one,
+    // because the world's lights covered only the world's layers and a planet
+    // without one hangs in space unlit - but it was fixed at a bearing and
+    // never told the hour, so the ball stayed in a permanent mid-morning while
+    // the ground ran through its day, and the terminator the round world
+    // should have had was nowhere. The real sun covers this layer now; see
+    // `main::setup` and `calendar::apply_sky_to_lights`.
 
     commands.insert_resource(PlanetSkin(materials.add(PlanetMaterial {
         base: StandardMaterial {

@@ -60,11 +60,14 @@ pub fn capture_path() -> Option<String> {
     std::env::var(CAPTURE_VAR).ok().filter(|p| !p.is_empty())
 }
 
-/// Direction toward the sun.
+/// Where the sun starts, for the one frame before the sky is computed.
 ///
-/// Shared so the water's specular highlight agrees with the light actually casting
-/// the world's shadows; a sea lit from a different angle than the land reads as
-/// wrong long before anyone can say why.
+/// It used to BE the sun: a single bearing the light, the water's highlight and
+/// the sky all agreed on, because a sea lit from a different angle than the
+/// land reads as wrong long before anyone can say why. The sun is a body with a
+/// place of its own now — see [`calendar::WorldClock::sun_position`] — and this
+/// is only the value the lights and the water's uniform are born holding until
+/// `drive_sky` first runs.
 pub const SUN_DIRECTION: Vec3 = Vec3::new(0.520266, 0.780399, 0.346844);
 
 /// Top-level flow. The world is generated before play begins rather than streamed in
@@ -224,10 +227,15 @@ fn spawn_lighting(mut commands: Commands) {
         ..default()
     });
 
-    // Both lights also cover render layer 1, where the Divine Hand lives so it can
+    // Every light covers render layer 1, where the Divine Hand lives so it can
     // draw above the interface. Without this the hand would be lit by nothing and
     // turn black the moment it moved to its own layer.
-    let lit_layers = RenderLayers::from_layers(&[0, 1]);
+    //
+    // And layer 2, the planet. It used to have a sun of its own, nailed to a
+    // fixed bearing and never told the hour, so the ball hung in a permanent
+    // mid-morning while the ground beneath the god ran through its day. There
+    // is one sun in this world and it lights everything the world is made of.
+    let lit_layers = RenderLayers::from_layers(&[0, 1, globe::GLOBE_LAYER]);
 
     commands.spawn((
         Name::new("Sun"),
@@ -266,6 +274,24 @@ fn spawn_lighting(mut commands: Commands) {
             ..default()
         },
         Transform::from_xyz(-50.0, 40.0, -70.0).looking_at(Vec3::ZERO, Vec3::Y),
+        lit_layers.clone(),
+    ));
+
+    // The moon, which is a real body on the far side of the planet from the
+    // sun. It carries the night now: the fill used to do that from a fixed
+    // bearing, so after dusk nothing in the world had a direction. No shadows —
+    // moonlight this weak casts nothing a player would read as one, and a
+    // second shadow map is not free.
+    commands.spawn((
+        Name::new("Moon"),
+        calendar::MoonLight,
+        DirectionalLight {
+            color: palette::shade(&palette::SKY, 0.95),
+            illuminance: 430.0,
+            shadow_maps_enabled: false,
+            ..default()
+        },
+        Transform::from_xyz(0.0, -140.0, 0.0).looking_at(Vec3::ZERO, Vec3::Z),
         lit_layers,
     ));
 }

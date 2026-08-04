@@ -10,6 +10,8 @@
 //! lighting consume `Sky` rather than the clock directly, so when seasons and
 //! weather arrive they only need to bend `Sky`, not every consumer.
 
+use bevy::camera::visibility::RenderLayers;
+use bevy::light::{NotShadowCaster, NotShadowReceiver};
 use bevy::prelude::*;
 use std::f32::consts::PI;
 
@@ -99,9 +101,17 @@ impl Plugin for CalendarPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<WorldClock>()
             .init_resource::<Sky>()
+            .add_systems(Startup, hang_the_sky)
             .add_systems(
                 Update,
-                (tick, drive_sky, apply_sky_to_lights, herald_seasons).chain(),
+                (
+                    tick,
+                    drive_sky,
+                    apply_sky_to_lights,
+                    carry_the_bodies,
+                    herald_seasons,
+                )
+                    .chain(),
             );
     }
 }
@@ -153,6 +163,43 @@ impl WorldClock {
         } else {
             -((t - DAYLIGHT_FRACTION) / (1.0 - DAYLIGHT_FRACTION) * PI).sin()
         }
+    }
+
+    /// Where the sun actually IS, as a unit vector from the planet's centre.
+    ///
+    /// The world is a sphere, so the sun can stop being a lighting trick and
+    /// become a body with a position. It travels one circuit of the planet a
+    /// day, rising in the east, passing overhead at noon, setting in the west —
+    /// and while it does, the far side of the world is genuinely in shadow,
+    /// because the light comes from where the sun is rather than from wherever
+    /// the ground happens to be standing. Everything the old fake did — a fixed
+    /// bearing, an elevation that swung but never set, a clamp holding it above
+    /// the horizon so its transform stayed defined — is gone with it.
+    ///
+    /// The circuit is not uniform in angle, and that is deliberate. Every hour
+    /// this game keeps — the work shifts, the midday meal, the evening, sleep —
+    /// is tuned against [`DAYLIGHT_FRACTION`], seven tenths of the day in the
+    /// light. A sun sweeping at a constant rate would give exactly half, and
+    /// villagers would be hoeing in the dark. So the angle is derived FROM the
+    /// elevation the clock already dictates: `elevation = cos θ` about the
+    /// planet's own axis, which puts the sun overhead at noon, under the world
+    /// at midnight, and on the right side of the sky at every hour between.
+    pub fn sun_position(&self) -> Vec3 {
+        // Home stands at the top of the world (see `globe::planet_stance`),
+        // its north pole a quarter turn away, and east the cross of the two.
+        let up = Vec3::Y;
+        let polar = crate::globe::planet_stance() * Vec3::Y;
+        let east = polar.cross(up).normalize_or(Vec3::X);
+
+        let t = self.time_of_day();
+        // Noon is the middle of the daylight, midnight the middle of the dark.
+        let noon = DAYLIGHT_FRACTION * 0.5;
+        let midnight = (DAYLIGHT_FRACTION + 1.0) * 0.5;
+        // East of the meridian before noon and after midnight, west between.
+        let easterly = t < noon || t >= midnight;
+        let angle = self.sun_elevation().clamp(-1.0, 1.0).acos() * if easterly { 1.0 } else { -1.0 };
+
+        (up * angle.cos() + east * angle.sin()).normalize_or(Vec3::Y)
     }
 
     /// Whether decent people are asleep.
@@ -253,8 +300,8 @@ fn tick(time: Res<Time>, mut clock: ResMut<WorldClock>) {
 /// consumed by the lights, the fog, the sky and the water.
 #[derive(Resource)]
 pub struct Sky {
-    /// Unit vector toward the sun (held just above the horizon through the
-    /// night so the transform it drives stays well-defined).
+    /// Unit vector from the planet's centre toward the sun — where the sun
+    /// actually is, and below the horizon for half of every day.
     pub sun_direction: Vec3,
     pub sun_color: Color,
     pub sun_illuminance: f32,
@@ -263,6 +310,13 @@ pub struct Sky {
     pub ambient_color: Color,
     pub ambient_brightness: f32,
     pub fill_illuminance: f32,
+    /// The moon's strength. It shines at a steady low weight and needs no
+    /// ramp: standing opposite the sun, it only ever falls on the half of the
+    /// world the sun has left.
+    pub moon_illuminance: f32,
+    /// Which way the sky's cool fill comes from. Local, not global — see
+    /// [`apply_sky_to_lights`].
+    pub fill_direction: Vec3,
     /// How much daylight there is, 0 at night to 1 at noon. For anything that
     /// needs to dim with the day — the water's body colour, for one.
     pub daylight: f32,
@@ -270,7 +324,7 @@ pub struct Sky {
 
 impl Default for Sky {
     fn default() -> Self {
-        sky_at(1.0)
+        sky_toward(Vec3::Y, 1.0)
     }
 }
 
@@ -291,22 +345,20 @@ pub fn mix_colors(a: Color, b: Color, t: f32) -> Color {
     })
 }
 
-/// The whole sky, as a function of the sun's elevation.
-fn sky_at(elevation: f32) -> Sky {
+/// The whole sky, as a function of the sun's elevation ABOVE THE GROUND BEING
+/// LOOKED AT, and of where the sun stands.
+///
+/// Two arguments now, because on a round world those are two different things:
+/// the sun has one position, and every place on the planet sees it at its own
+/// height above its own horizon. The elevation shapes the light's colour and
+/// weight — dawn, noon, dusk — while the position aims it, and the far side of
+/// the world is dark for the honest reason that the sun is on the other side of
+/// it.
+fn sky_toward(sun_direction: Vec3, elevation: f32) -> Sky {
     // How much daylight there is, easing in shortly after sunrise.
     let lit = smoothstep(-0.04, 0.30, elevation);
     // How close to the horizon the sun is while up — the golden-hour weight.
     let low_sun = (1.0 - smoothstep(0.12, 0.45, elevation)) * smoothstep(-0.10, 0.05, elevation);
-
-    // The sun keeps its azimuth and swings in elevation, clamped well above
-    // the horizon: below ~0.15 the light grazes the ground and the shadow
-    // map's depth bias slides every shadow off its caster - trees casting
-    // shadows that detach and sweep the land through dusk. The sky's own
-    // disc fades into the horizon glow before the clamp is visible.
-    let azimuth = Vec2::new(crate::SUN_DIRECTION.x, crate::SUN_DIRECTION.z).normalize();
-    let y = elevation.clamp(0.15, 1.0);
-    let flat = (1.0 - y * y).max(0.0).sqrt();
-    let sun_direction = Vec3::new(azimuth.x * flat, y, azimuth.y * flat).normalize();
 
     // Noon-white bending toward gold as the sun drops.
     let sun_color = mix_colors(
@@ -346,7 +398,17 @@ fn sky_at(elevation: f32) -> Sky {
         // Never fully dark: the player must always be able to read the world
         // they are god of. Night is a mood, not a lost turn.
         ambient_brightness: 36.0 + 94.0 * lit,
-        fill_illuminance: 900.0 + 2_500.0 * lit,
+        // The fill's night floor came down when the moon arrived. It used to
+        // carry the whole night by itself from a fixed bearing, which is why
+        // nothing had a direction after dusk; now the moon does that, and the
+        // fill is back to being what it is for — keeping shadowed faces blue
+        // rather than black.
+        fill_illuminance: 480.0 + 2_500.0 * lit,
+        // Flat, because the geometry does the work. See the field.
+        moon_illuminance: 430.0,
+        // Overwritten with the local bearing by `drive_sky`; this is the
+        // straight-up default for the one frame before it runs.
+        fill_direction: Vec3::Y,
         daylight: lit,
     }
 }
@@ -354,9 +416,34 @@ fn sky_at(elevation: f32) -> Sky {
 fn drive_sky(
     clock: Res<WorldClock>,
     weather: Option<Res<crate::weather::Weather>>,
+    cameras: Query<&crate::camera::CameraRig>,
     mut sky: ResMut<Sky>,
 ) {
-    *sky = sky_at(clock.sun_elevation());
+    let sun = clock.sun_position();
+    // How high the sun stands over the ground the god is LOOKING AT, which on
+    // a sphere is not the same question as what time it is. The clock is the
+    // village's hour and the simulation's — its people sleep and work by it —
+    // but the sky belongs to a place. Carry the view to the far side of the
+    // planet and it is night there, in the middle of the village's afternoon,
+    // because the sun is over the horizon they share.
+    let looking_at = cameras
+        .iter()
+        .next()
+        .map_or(Vec3::ZERO, |rig| rig.focus)
+        .with_y(0.0);
+    let (_, turn) = crate::globe::bend_frame(looking_at);
+    let up = turn * Vec3::Y;
+    *sky = sky_toward(sun, sun.dot(up));
+
+    // The cool fill is a SKY light, and a sky is local. Left at a fixed world
+    // bearing it lit the whole planet from one side at three thousand lux with
+    // no falloff, which is what flattened the terminator to nothing: the night
+    // half of the world came out very nearly as bright as the day half, and a
+    // sun that orbits a planet with no day and night line on it is a sun that
+    // may as well not. Turned into the frame of the ground being looked at, it
+    // is exactly the shaping light it always was where the player is, and it
+    // falls away to nothing over the horizon where a sky should.
+    sky.fill_direction = turn * FILL_BEARING;
     // The season casts the light before the weather does: winter pale and
     // cool, autumn gilded, summer faintly honeyed.
     if let Some((tint, strength)) = clock.season().light_tint() {
@@ -414,26 +501,146 @@ pub struct SunLight;
 #[derive(Component)]
 pub struct FillLight;
 
+/// Where the sky's cool fill comes from, in the frame of the ground below it:
+/// up and over the left shoulder. The bearing the world has always been lit
+/// from — it is only its frame that changed.
+const FILL_BEARING: Vec3 = Vec3::new(-0.50, 0.55, -0.67);
+
+/// Marks the moon: a dim cool light standing always opposite the sun.
+///
+/// It needs no schedule and gets none. Antipodal to the sun, it falls on
+/// exactly the half of the planet the sun has left, so the geometry alone puts
+/// moonlight on the night side and nothing on the day side — and a moon
+/// opposite its sun is a moon always full, which is the one phase this needs
+/// to be.
+#[derive(Component)]
+pub struct MoonLight;
+
+/// The sun and the moon THEMSELVES — the bodies, not their light.
+///
+/// Excluded from the world bend: their places are already world positions out
+/// in space, not flat ground waiting to be wrapped onto a sphere.
+#[derive(Component, PartialEq, Eq, Clone, Copy, Debug)]
+pub enum Celestial {
+    Sun,
+    Moon,
+}
+
+/// How far out the two bodies ride, and how big they are there.
+///
+/// Both well inside the camera's seventy-thousand-unit far plane, and far
+/// enough out that they read as sky rather than scenery: from the ground the
+/// sun is a disc a couple of degrees across, and from orbit you can watch it
+/// come round the planet.
+const SUN_ORBIT: f32 = 42_000.0;
+const SUN_SIZE: f32 = 760.0;
+const MOON_ORBIT: f32 = 26_000.0;
+const MOON_SIZE: f32 = 520.0;
+
 fn apply_sky_to_lights(
     sky: Res<Sky>,
     mut ambient: ResMut<GlobalAmbientLight>,
     mut suns: Query<(&mut DirectionalLight, &mut Transform), (With<SunLight>, Without<FillLight>)>,
-    mut fills: Query<&mut DirectionalLight, (With<FillLight>, Without<SunLight>)>,
+    mut fills: Query<(&mut DirectionalLight, &mut Transform), (With<FillLight>, Without<SunLight>)>,
+    mut moons: Query<
+        (&mut DirectionalLight, &mut Transform),
+        (With<MoonLight>, Without<SunLight>, Without<FillLight>),
+    >,
 ) {
     ambient.color = sky.ambient_color;
     ambient.brightness = sky.ambient_brightness;
 
+    let centre = crate::globe::planet_centre();
     for (mut light, mut transform) in &mut suns {
         light.color = sky.sun_color;
         light.illuminance = sky.sun_illuminance.max(1.0);
         // No shadows in the dark: with the sun's light at nothing, any
         // shadow it casts is pure artifact - and the artifacts move.
         light.shadow_maps_enabled = sky.daylight > 0.02;
-        *transform =
-            Transform::from_translation(sky.sun_direction * 140.0).looking_at(Vec3::ZERO, Vec3::Y);
+        // A grazing sun slides every shadow off its caster - the depth bias
+        // that is right for a light overhead is nowhere near enough for one
+        // coming in almost flat, and trees end up casting shadows that detach
+        // and sweep the land. The old sun never set, so it never met the
+        // problem; this one does, twice a day. The bias opens up as it drops.
+        let grazing = 1.0 - smoothstep(0.05, 0.5, sky.sun_direction.dot(Vec3::Y).abs());
+        light.shadow_depth_bias = 0.02 + grazing * 0.35;
+        light.shadow_normal_bias = 1.8 + grazing * 5.0;
+        // Aimed from where the sun IS. A directional light only cares about
+        // the direction, but the distance keeps the transform readable in the
+        // inspector and matches the body's own place.
+        *transform = Transform::from_translation(centre + sky.sun_direction * SUN_ORBIT)
+            .looking_at(centre, Vec3::Y);
     }
-    for mut light in &mut fills {
+    for (mut light, mut transform) in &mut fills {
         light.illuminance = sky.fill_illuminance;
+        *transform = Transform::from_translation(centre + sky.fill_direction * 9_000.0)
+            .looking_at(centre, Vec3::Y);
+    }
+
+    for (mut light, mut transform) in &mut moons {
+        light.illuminance = sky.moon_illuminance;
+        *transform = Transform::from_translation(centre - sky.sun_direction * MOON_ORBIT)
+            .looking_at(centre, Vec3::Y);
+    }
+}
+
+/// Carries the two bodies round with their light.
+fn carry_the_bodies(sky: Res<Sky>, mut bodies: Query<(&mut Transform, &Celestial)>) {
+    let centre = crate::globe::planet_centre();
+    for (mut transform, body) in &mut bodies {
+        transform.translation = match body {
+            Celestial::Sun => centre + sky.sun_direction * SUN_ORBIT,
+            Celestial::Moon => centre - sky.sun_direction * MOON_ORBIT,
+        };
+    }
+}
+
+/// Hangs the sun and the moon in the sky, once.
+///
+/// Unlit, both of them: a sun that took lighting would be lit by itself, and
+/// the moon has to glow at night, when by construction nothing else does. They
+/// cast and receive no shadows for the same reason.
+fn hang_the_sky(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let bodies = [
+        (
+            Celestial::Sun,
+            "The Sun",
+            SUN_SIZE,
+            palette::shade(&palette::BONE, 1.0),
+            palette::shade(&palette::CLOTH_GOLD, 1.0),
+            9.0,
+        ),
+        (
+            Celestial::Moon,
+            "The Moon",
+            MOON_SIZE,
+            palette::shade(&palette::BONE, 0.62),
+            palette::shade(&palette::SKY, 0.9),
+            1.4,
+        ),
+    ];
+    for (which, name, size, body, glow, strength) in bodies {
+        commands.spawn((
+            Name::new(name),
+            which,
+            Mesh3d(meshes.add(Sphere::new(size).mesh().ico(4).unwrap())),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: body,
+                emissive: LinearRgba::from(glow) * strength,
+                unlit: true,
+                ..default()
+            })),
+            Transform::from_translation(crate::globe::planet_centre() + Vec3::Y * SUN_ORBIT),
+            // Seen from the ground, from the air, and from orbit: the world's
+            // layer and the planet's both.
+            RenderLayers::from_layers(&[0, crate::globe::GLOBE_LAYER]),
+            NotShadowCaster,
+            NotShadowReceiver,
+        ));
     }
 }
 
@@ -483,25 +690,87 @@ mod tests {
 
     #[test]
     fn night_still_leaves_the_world_readable() {
-        let midnight = sky_at(-1.0);
+        let midnight = sky_toward(Vec3::NEG_Y, -1.0);
         assert!(midnight.ambient_brightness > 10.0, "night went pitch black");
         assert!(
             midnight.sun_illuminance < 100.0,
             "the sun shone at midnight"
         );
+        // And the moon is what carries it: a light with a direction, so a hill
+        // still has a lit side after dusk.
+        assert!(midnight.moon_illuminance > 100.0, "no moon at midnight");
 
-        let noon = sky_at(1.0);
+        let noon = sky_toward(Vec3::Y, 1.0);
         assert!(noon.sun_illuminance > 10_000.0);
         assert!(noon.ambient_brightness > midnight.ambient_brightness);
     }
 
+    /// The sun is a body with a place now, and its place is only ever a unit
+    /// vector from the planet's centre — including through the night, when it
+    /// is under the world and the direction has to stay usable.
     #[test]
     fn the_sun_direction_is_always_usable() {
-        for elevation in [-1.0, -0.3, 0.0, 0.2, 0.7, 1.0] {
-            let sky = sky_at(elevation);
-            assert!((sky.sun_direction.length() - 1.0).abs() < 1e-4);
-            assert!(sky.sun_direction.y > 0.0, "sun bearing dipped below ground");
+        for i in 0..240 {
+            let clock = WorldClock {
+                elapsed: (DAY_SECONDS * i as f32 / 120.0) as f64,
+            };
+            let sun = clock.sun_position();
+            assert!(
+                (sun.length() - 1.0).abs() < 1e-4,
+                "sun bearing is not a direction at {i}: {sun}"
+            );
         }
+    }
+
+    /// It rises in the east, stands overhead at noon, sets in the west, and
+    /// spends the night under the world. None of which the old one did: it
+    /// held one bearing all day and was clamped above the horizon so it could
+    /// never set at all.
+    #[test]
+    fn the_sun_crosses_the_sky_and_goes_under_the_world() {
+        let at = |t: f32| {
+            WorldClock {
+                elapsed: (DAY_SECONDS * t) as f64,
+            }
+            .sun_position()
+        };
+        // East at home is +x; see `globe::bend_frame`.
+        let morning = at(0.12);
+        let evening = at(0.60);
+        assert!(morning.x > 0.2, "the morning sun was not in the east");
+        assert!(evening.x < -0.2, "the evening sun was not in the west");
+        assert!(morning.y > 0.0 && evening.y > 0.0, "day is above ground");
+
+        let noon = at(DAYLIGHT_FRACTION * 0.5);
+        assert!(noon.dot(Vec3::Y) > 0.999, "noon is not overhead");
+
+        let midnight = at((DAYLIGHT_FRACTION + 1.0) * 0.5);
+        assert!(
+            midnight.dot(Vec3::Y) < -0.999,
+            "midnight is not under the world"
+        );
+    }
+
+    /// The whole point of the exercise: night is a PLACE. The same instant is
+    /// day at home and dark on the far side of the planet, because the sun is
+    /// somewhere rather than everywhere.
+    #[test]
+    fn the_far_side_is_dark_at_home_noon() {
+        let clock = WorldClock {
+            elapsed: (DAY_SECONDS * DAYLIGHT_FRACTION * 0.5) as f64,
+        };
+        let sun = clock.sun_position();
+
+        let home = sky_toward(sun, sun.dot(Vec3::Y));
+        let antipode = sky_toward(sun, sun.dot(Vec3::NEG_Y));
+        assert!(home.daylight > 0.95, "noon at home was not bright");
+        assert!(
+            antipode.daylight < 0.05,
+            "the far side of the world shared home's noon"
+        );
+        // And the moon shines on with no regard for either: opposite the sun,
+        // it lands where the sun does not, and the geometry sorts it out.
+        assert_eq!(home.moon_illuminance, antipode.moon_illuminance);
     }
 
     #[test]

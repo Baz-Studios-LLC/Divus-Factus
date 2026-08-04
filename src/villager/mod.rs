@@ -1758,6 +1758,18 @@ fn point_camera_at_settlement(
         rig.target_pitch = pitch;
     }
 
+    // Capture tooling: DIVUS_FACTUS_YAW turns the camera to a bearing, in
+    // radians. Its companion above can raise the eye to the sky, but until
+    // this there was no way to choose WHICH piece of sky - and an unattended
+    // run cannot look for the sun any more than it can reach the mouse wheel.
+    if let Some(yaw) = std::env::var("DIVUS_FACTUS_YAW")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+    {
+        rig.yaw = yaw;
+        rig.target_yaw = yaw;
+    }
+
     // Capture tooling: DIVUS_FACTUS_AIM_RIVER points the unattended screenshot at the
     // nearest river instead of the settlement.
     if crate::capture_path().is_some()
