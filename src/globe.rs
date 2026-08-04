@@ -89,6 +89,14 @@ const SPLIT_PX: f32 = 7.0;
 /// the same bargain streaming ground has always made.
 const BUILDS_PER_FRAME: usize = 6;
 
+/// The most per frame when there is a lot to do — the same bargain the chunk
+/// streamer already makes, and for the same reason: the point of rationing is
+/// to HIDE the arriving ground, and six a frame stops hiding anything the
+/// moment several hundred patches come due at once. Measured on a descent to
+/// the village, eighteen hundred patches fall due together and six a frame
+/// takes five seconds of watching the planet sharpen; this brings it under two.
+const BUILDS_PER_HURRIED_FRAME: usize = 26;
+
 /// The camera never counts as closer to the surface than this when deciding
 /// how deep to refine. Low: the patches now stand in open view just past the
 /// loaded ground's edge at play zoom, and the sharper they hold that ring,
@@ -223,11 +231,25 @@ const KEPT_FOR: u64 = 1_800;
 /// grown at world creation: at this depth the whole planet is sharp from
 /// orbit, so the far view is BAKED - zooming out never builds anything, and
 /// the streaming-in of finer ground happens only on the way down, close in,
-/// where streaming has always happened. Five hundred and ten patches at a
-/// six-thousand radius; the bake is a couple of seconds inside the loading
-/// screen, and the fallback for a still-growing patch always finds an
-/// ancestor standing.
-const EVERGREEN: u8 = 3;
+/// where streaming has always happened. The bake is a couple of seconds
+/// inside the loading screen, and the fallback for a still-growing patch
+/// always finds an ancestor standing.
+///
+/// Four rather than three, which is the fix for the tiles Brett watched
+/// generate on the way out. They were BUILT at creation already — the bake
+/// has always gone one level past the evergreens — but level four was
+/// evictable, so half an hour in the village felled the lot of them and the
+/// climb out had to make them again. Measured: eight hundred and twenty-four
+/// patches felled by a spell at play zoom, and level-four tiles are five
+/// hundred and eighty-nine units across, which is exactly the size of thing
+/// that was appearing. Now the whole planet at that grain is resident for the
+/// life of the world.
+///
+/// Not five. Level five alone is six thousand patches, ten times the bake and
+/// most of a gigabyte of vertex buffers, and its tiles are only wanted below
+/// about three thousand units — where the chunk world is drawing the detail
+/// anyway. Four is the grain the eye catches on the way out.
+const EVERGREEN: u8 = 4;
 
 /// The one material every patch wears; the colours ride the vertices.
 #[derive(Resource)]
@@ -530,11 +552,14 @@ fn plant_the_tree(
         },
     })));
 
-    // One level past the evergreens: those patches may be evicted later if
-    // long unseen, but growing them here means the first descent anywhere
-    // on the planet finds its middle distances already standing - Brett's
-    // "preload the chunks at creation", scoped to what memory affords.
-    const PREBAKED: u8 = EVERGREEN + 1;
+    // Exactly the evergreens, and no deeper. The bake used to go one level
+    // past them, on the theory that the extra level cost nothing permanent
+    // because it could be evicted - and then it WAS evicted, and the climb
+    // out rebuilt it in front of the player. That level is evergreen now, so
+    // the bake and the resident set are the same set: the whole planet at
+    // five-hundred-unit tiles, built once in the loading screen and never
+    // built again. One deeper is ten times the patches; see `EVERGREEN`.
+    const PREBAKED: u8 = EVERGREEN;
     let mut grown = 0;
     for face in 0..6u8 {
         for level in 0..=PREBAKED {
@@ -958,7 +983,9 @@ fn tend_the_tree(
         let db = cam_mesh.distance(b.centre_dir() * PLANET_RADIUS);
         da.total_cmp(&db)
     });
-    for key in missing.iter().take(BUILDS_PER_FRAME) {
+    // A big backlog earns a bigger budget.
+    let budget = (BUILDS_PER_FRAME + missing.len() / 24).min(BUILDS_PER_HURRIED_FRAME);
+    for key in missing.iter().take(budget) {
         grow_patch(
             &mut commands,
             &terrain,
