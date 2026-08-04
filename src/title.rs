@@ -33,6 +33,9 @@ impl Plugin for TitlePlugin {
                         .run_if(in_state(GameState::Splash).or_else(in_state(GameState::Title))),
                     drift_smoke,
                     play_farewell,
+                    // Ungated by state: it spans the change from Playing to
+                    // Title and has to keep running across the boundary.
+                    draw_the_curtain,
                     sync_hud.run_if(state_changed::<GameState>),
                     handle_choice.run_if(in_state(GameState::Title)),
                     auto_begin.run_if(in_state(GameState::Title)),
@@ -750,7 +753,6 @@ fn handle_pause_menu(
     open_settings: Query<Entity, With<SettingsScreen>>,
     menus: Query<Entity, With<PauseMenu>>,
     mut time: ResMut<Time<Virtual>>,
-    mut next: ResMut<NextState<GameState>>,
     (mut survey, mut markers, mut armed): (
         ResMut<crate::survey::Survey>,
         ResMut<crate::markers::MarkerMode>,
@@ -780,9 +782,9 @@ fn handle_pause_menu(
             markers.0 = false;
             armed.0 = None;
             // The world itself is replaced with a freshly-founded one, so
-            // Begin from the title is a true new game.
-            commands.insert_resource(crate::save::PendingNewWorld);
-            next.set(GameState::Title);
+            // Begin from the title is a true new game — behind a curtain, so
+            // the building of it is not a thing the player watches.
+            go_homeward(&mut commands);
         }
     }
     for interaction in &resume {
@@ -963,7 +965,6 @@ fn auto_title(
         ResMut<crate::markers::MarkerMode>,
         ResMut<crate::miracles::SelectedMiracle>,
     ),
-    mut next: ResMut<NextState<GameState>>,
 ) {
     if *fired {
         return;
@@ -980,8 +981,121 @@ fn auto_title(
         survey.on = false;
         markers.0 = false;
         armed.0 = None;
-        commands.insert_resource(crate::save::PendingNewWorld);
-        next.set(GameState::Title);
+        go_homeward(&mut commands);
+    }
+}
+
+/// The curtain over the walk back to the title.
+///
+/// Brett, on the pause menu's Title door: "I saw the world building in." He
+/// could — the old world is razed and a new one grown on a fresh seed, and until
+/// this the title arrived at once and the player watched the planet assemble
+/// itself patch by patch behind the lettering.
+///
+/// So the way home is covered. The world darkens, the swap happens behind a
+/// black screen, and the curtain lifts only once the new world has actually
+/// FINISHED — `PlanetDetail::owed` is the number of patches the planet still
+/// owes, and nought is the honest signal that there is nothing left to see
+/// appear. Not a duration guessed at: on a slow machine a fixed wait would lift
+/// on a half-built world, and on a fast one it would sit on black for no reason.
+///
+/// With a cap all the same, because a curtain that never lifts is worse than
+/// the thing it was hiding.
+#[derive(Resource)]
+struct Homeward {
+    /// 0 in the world, 1 fully black.
+    t: f32,
+    /// Whether the old world has been razed and the new one begun.
+    swapped: bool,
+    /// Seconds spent holding black, against [`HOMEWARD_PATIENCE`].
+    held: f32,
+}
+
+/// The black itself.
+#[derive(Component)]
+struct HomewardCurtain;
+
+/// Seconds to darken the world, and to lift off the new one.
+///
+/// Longer coming up than going down: dropping out of a world should be brisk,
+/// and arriving somewhere should not.
+const HOMEWARD_DARKEN: f32 = 0.4;
+const HOMEWARD_LIFT: f32 = 0.9;
+
+/// How long the curtain will wait for the planet to finish before lifting
+/// anyway.
+///
+/// Measured rather than picked: growing a fresh planet took 4.5 seconds here,
+/// with `owed` falling steadily from 2,185 patches to nought. Six seconds left
+/// almost no room, and a machine slower than this one would have lifted onto a
+/// half-built world — which is the very thing being hidden. Nine gives it half
+/// again as long as it needed, and still bounds the black.
+const HOMEWARD_PATIENCE: f32 = 9.0;
+
+/// Starts for the title, behind a curtain. The one door home, so the pause
+/// menu and the capture tooling take the same route.
+fn go_homeward(commands: &mut Commands) {
+    commands.spawn((
+        Name::new("The Way Home"),
+        HomewardCurtain,
+        Node {
+            width: percent(100),
+            height: percent(100),
+            ..default()
+        },
+        BackgroundColor(Color::BLACK.with_alpha(0.0)),
+        // Over everything, the loading screen included: this covers a state
+        // change, and whatever else is on screen is what we are hiding.
+        GlobalZIndex(400),
+    ));
+    commands.insert_resource(Homeward {
+        t: 0.0,
+        swapped: false,
+        held: 0.0,
+    });
+}
+
+/// Darkens, swaps the world, waits for it to stand, then lifts.
+fn draw_the_curtain(
+    mut commands: Commands,
+    time: Res<Time<Real>>,
+    detail: Res<crate::globe::PlanetDetail>,
+    mut next: ResMut<NextState<GameState>>,
+    homeward: Option<ResMut<Homeward>>,
+    mut curtains: Query<(Entity, &mut BackgroundColor), With<HomewardCurtain>>,
+) {
+    let Some(mut homeward) = homeward else {
+        return;
+    };
+    let step = time.delta_secs();
+    if !homeward.swapped {
+        homeward.t = (homeward.t + step / HOMEWARD_DARKEN).min(1.0);
+        if homeward.t >= 1.0 {
+            // Black. Now, and not a frame before, the world is taken away.
+            homeward.swapped = true;
+            commands.insert_resource(crate::save::PendingNewWorld);
+            next.set(GameState::Title);
+        }
+    } else {
+        homeward.held += step;
+        // `owed` climbs the moment the tree is felled, so a patient frame or two
+        // is needed before nought means finished rather than not-yet-started.
+        let standing = homeward.held > HOMEWARD_DARKEN && detail.owed == 0;
+        if standing || homeward.held > HOMEWARD_PATIENCE {
+            homeward.t = (homeward.t - step / HOMEWARD_LIFT).max(0.0);
+        }
+        if homeward.t <= 0.0 {
+            for (curtain, _) in &curtains {
+                commands.entity(curtain).despawn();
+            }
+            commands.remove_resource::<Homeward>();
+            return;
+        }
+    }
+    // Eased, so neither end of the fade has a corner in it.
+    let eased = homeward.t * homeward.t * (3.0 - 2.0 * homeward.t);
+    for (_, mut curtain) in &mut curtains {
+        *curtain = BackgroundColor(Color::BLACK.with_alpha(eased));
     }
 }
 

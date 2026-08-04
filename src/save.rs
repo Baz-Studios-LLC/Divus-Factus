@@ -796,6 +796,12 @@ fn raze(world: &mut World) {
     // altogether. Whoever razes the world owns clearing these too.
     world.remove_resource::<SettlementSite>();
     world.remove_resource::<crate::villager::DivineName>();
+    // The surveyed vantage belongs to the terrain it was surveyed ON. It is
+    // computed once, guarded by its own absence, so leaving it behind meant the
+    // new world never got surveyed at all and the opening dive came down on the
+    // OLD world's likeliest ground - which in a fresh world is wherever that
+    // happens to be. Brett arrived in the middle of an ocean.
+    world.remove_resource::<crate::founding::OpeningVantage>();
     if let Some(mut chosen) = world.get_resource_mut::<crate::villager::ChosenGround>() {
         chosen.0 = None;
     }
