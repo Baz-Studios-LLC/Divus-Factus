@@ -37,6 +37,7 @@ impl Plugin for TitlePlugin {
                     auto_begin.run_if(in_state(GameState::Title)),
                     auto_title.run_if(in_state(GameState::Playing)),
                     handle_settings,
+                    handle_view_switches,
                     style_menu_buttons,
                     // Before the codex's own Escape handling, so the frame
                     // that shuts the book sees it still open and yields -
@@ -110,6 +111,36 @@ struct SettingsScreen;
 
 #[derive(Component)]
 struct BackButton;
+
+/// A toggle switch in the settings, and which view it governs.
+///
+/// Switches rather than keybindings, on Brett's call and it is the right one: a
+/// hotkey is for something a player reaches for mid-thought, and most of what
+/// this game can turn on and off is not that. The keyboard was filling up with
+/// letters nobody would remember.
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+enum ViewSwitch {
+    /// The weather deck. Off, and the god can see the ground.
+    Clouds,
+}
+
+impl ViewSwitch {
+    const ALL: [ViewSwitch; 1] = [ViewSwitch::Clouds];
+
+    fn label(self) -> &'static str {
+        match self {
+            ViewSwitch::Clouds => "clouds",
+        }
+    }
+
+    /// What it says when it is on — the state a player wants to read, not the
+    /// name of a flag.
+    fn note(self) -> &'static str {
+        match self {
+            ViewSwitch::Clouds => "weather over the world",
+        }
+    }
+}
 
 /// A hand-colour swatch, holding its place in [`crate::hand::HAND_STYLES`].
 #[derive(Component)]
@@ -1098,8 +1129,151 @@ fn spawn_settings(mut commands: Commands) {
         let _ = swatch;
     }
 
+    // The view switches.
+    let label = commands
+        .spawn((
+            ui::dim("what the world shows you"),
+            Node {
+                margin: UiRect::top(px(4)),
+                ..default()
+            },
+        ))
+        .id();
+    commands.entity(label).insert(ChildOf(screen));
+
+    for switch in ViewSwitch::ALL {
+        let row = commands
+            .spawn((
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: px(14),
+                    width: px(360),
+                    margin: UiRect::vertical(px(4)),
+                    ..default()
+                },
+                ChildOf(screen),
+            ))
+            .id();
+
+        // The switch itself: a track with a knob, which is the one shape
+        // everybody already knows how to read.
+        let track = commands
+            .spawn((
+                switch,
+                ui::UiButton,
+                ui::KeepFace,
+                Node {
+                    width: px(52),
+                    height: px(26),
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::all(px(13)),
+                    align_items: AlignItems::Center,
+                    padding: UiRect::horizontal(px(3)),
+                    ..default()
+                },
+                BackgroundColor(theme::title_bg()),
+                BorderColor::all(theme::panel_border().with_alpha(0.5)),
+                Interaction::default(),
+                ChildOf(row),
+            ))
+            .id();
+        commands.spawn((
+            SwitchKnob(switch),
+            Node {
+                width: px(18),
+                height: px(18),
+                border_radius: BorderRadius::all(px(9)),
+                ..default()
+            },
+            BackgroundColor(theme::accent()),
+            ChildOf(track),
+        ));
+
+        let words = commands
+            .spawn((
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    row_gap: px(1),
+                    ..default()
+                },
+                ChildOf(row),
+            ))
+            .id();
+        let name = commands
+            .spawn((
+                Text::new(switch.label()),
+                ui::DisplayFace,
+                TextFont {
+                    font_size: FontSize::Px(15.0),
+                    ..default()
+                },
+                TextColor(theme::accent()),
+            ))
+            .id();
+        commands.entity(name).insert(ChildOf(words));
+        let note = commands.spawn(ui::dim(switch.note())).id();
+        commands.entity(note).insert(ChildOf(words));
+    }
+
     let back = menu_button(&mut commands, screen, "Back");
     commands.entity(back).insert(BackButton);
+}
+
+/// The knob inside a switch's track, which slides to say which way it is set.
+#[derive(Component)]
+struct SwitchKnob(ViewSwitch);
+
+/// Clicks flip a switch; the knob and the track then say so.
+///
+/// Reads the same state the world reads, so the switch cannot drift out of step
+/// with what it governs — there is one truth and the switch is a window onto it.
+fn handle_view_switches(
+    clicks: Query<(&Interaction, &ViewSwitch), Changed<Interaction>>,
+    mut clear: ResMut<crate::clouds::TheSkyIsClear>,
+    mut tracks: Query<(&ViewSwitch, &mut BackgroundColor, &mut BorderColor)>,
+    mut knobs: Query<(&SwitchKnob, &mut Node, &mut BackgroundColor), Without<ViewSwitch>>,
+) {
+    for (interaction, switch) in &clicks {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        match switch {
+            ViewSwitch::Clouds => clear.0 = !clear.0,
+        }
+    }
+
+    let on = |switch: &ViewSwitch| match switch {
+        // The switch reads as the THING, not as its absence: "clouds on" means
+        // there is weather, so the sky being clear is the switch being off.
+        ViewSwitch::Clouds => !clear.0,
+    };
+    for (switch, mut fill, mut border) in &mut tracks {
+        let lit = on(switch);
+        *fill = BackgroundColor(if lit {
+            theme::accent().with_alpha(0.30)
+        } else {
+            theme::title_bg()
+        });
+        *border = BorderColor::all(if lit {
+            theme::accent()
+        } else {
+            theme::panel_border().with_alpha(0.5)
+        });
+    }
+    for (knob, mut node, mut fill) in &mut knobs {
+        let lit = on(&knob.0);
+        node.margin = if lit {
+            UiRect::left(px(26))
+        } else {
+            UiRect::left(px(0))
+        };
+        *fill = BackgroundColor(if lit {
+            theme::accent()
+        } else {
+            theme::panel_border()
+        });
+    }
 }
 
 /// Swatch clicks restyle the hand; the chosen swatch wears the gold border.

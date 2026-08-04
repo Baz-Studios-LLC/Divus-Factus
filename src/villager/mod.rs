@@ -853,15 +853,42 @@ pub(crate) fn choose_settlement_site(terrain: &Terrain, rng: &mut Rng) -> Vec3 {
     // in the building repertoire, inland is a real life, not a death.
     let coastal_yearning = rng.range(0.0, 1.5);
 
-    for _ in 0..6_000 {
-        let x = rng.range(-SETTLEMENT_SEARCH_RADIUS, SETTLEMENT_SEARCH_RADIUS);
-        let z = rng.range(-SETTLEMENT_SEARCH_RADIUS, SETTLEMENT_SEARCH_RADIUS);
+    // Outward until there is somewhere to stand.
+    //
+    // Half of this world is ocean, and the founders begin at the world's
+    // reference point whether or not that point is dry. A single search box
+    // round the origin used to be the whole of it, with a fallback that planted
+    // the village at the origin AT SEA LEVEL if nothing in the box scored — so
+    // one seed in several founded a town in open water, on the seabed, with the
+    // waves closing over the longhouse. (Seed 3, caught by
+    // `settlement_site_is_not_a_sandbar`: not one sample of its surroundings was
+    // land.)
+    //
+    // So the search widens instead. Each ring is four times the area of the last
+    // and gets its own sampling, and the first that finds ground wins — which
+    // keeps the usual case exactly as it was, a village within a few hundred
+    // units of the origin, and only walks further when the origin is at sea.
+    for widening in 0..5 {
+        let reach = SETTLEMENT_SEARCH_RADIUS * (1u32 << widening) as f32;
+        for _ in 0..6_000 {
+            let x = rng.range(-reach, reach);
+            let z = rng.range(-reach, reach);
 
-        let Some(candidate) = score_town_ground(terrain, x, z, coastal_yearning) else {
-            continue;
-        };
-        if best.is_none_or(|(b, ..)| candidate.0 > b) {
-            best = Some(candidate);
+            let Some(candidate) = score_town_ground(terrain, x, z, coastal_yearning) else {
+                continue;
+            };
+            if best.is_none_or(|(b, ..)| candidate.0 > b) {
+                best = Some(candidate);
+            }
+        }
+        if best.is_some() {
+            if widening > 0 {
+                info!(
+                    "the founders walked further than usual for their ground: {:.0} units of sea to cross",
+                    reach
+                );
+            }
+            break;
         }
     }
 
@@ -871,10 +898,28 @@ pub(crate) fn choose_settlement_site(terrain: &Terrain, rng: &mut Rng) -> Vec3 {
             timberland * 100.0,
             stoneland * 100.0
         );
-        site
-    } else {
-        Vec3::new(0.0, WATER_LEVEL, 0.0)
+        return site;
     }
+
+    // Nothing scored anywhere within fifteen kilometres, which on a world half
+    // dry should not happen. Take the highest ground found rather than the
+    // origin: a poor village on a hill is recoverable, a village underwater is
+    // not.
+    let mut driest = Vec3::new(0.0, WATER_LEVEL, 0.0);
+    for _ in 0..20_000 {
+        let reach = SETTLEMENT_SEARCH_RADIUS * 16.0;
+        let x = rng.range(-reach, reach);
+        let z = rng.range(-reach, reach);
+        let height = terrain.height_at(x, z);
+        if height > driest.y {
+            driest = Vec3::new(x, height, z);
+        }
+    }
+    warn!(
+        "no ground would take a village; the founders settle for the driest land found, {:.0} up",
+        driest.y
+    );
+    driest
 }
 
 /// Set before re-running [`spawn_settlement`] during a save load: fixtures

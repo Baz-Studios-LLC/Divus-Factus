@@ -56,6 +56,48 @@ const DECK_SCALE: f32 = 22.0;
 const CALM_WIND: f32 = 0.00065;
 const STORM_WIND: f32 = 0.0031;
 
+/// Whether the god has sent the weather away.
+///
+/// Its own resource rather than a hidden debug dial, because a god who cannot
+/// see the ground is a god who cannot judge it — and because the deck is the one
+/// thing in this world that stands between the eye and everything else.
+#[derive(Resource)]
+pub struct TheSkyIsClear(pub bool);
+
+impl Default for TheSkyIsClear {
+    /// `DIVUS_FACTUS_CLOUDS=0` sends the weather away at startup, for
+    /// photographing the ground itself. Its own dial because I spent three
+    /// captures unable to tell cloud from snow.
+    fn default() -> Self {
+        TheSkyIsClear(std::env::var("DIVUS_FACTUS_CLOUDS").is_ok_and(|dial| dial == "0"))
+    }
+}
+
+/// Draws the deck back when the god asks for a clear sky, and returns it when
+/// they are done looking.
+///
+/// Driven by the RESOURCE and not by a key. A view toggle like this does not
+/// earn a hotkey — the keyboard is for things a player reaches for mid-thought,
+/// and there is a settings page for the rest (see `title::spawn_settings`).
+fn part_the_clouds(
+    clear: Res<TheSkyIsClear>,
+    mut decks: Query<(&mut Visibility, Ref<CloudShell>), With<CloudShell>>,
+) {
+    // On a change, and also on the frame a deck first appears — otherwise a
+    // startup dial would be read before there was anything to hide.
+    let fresh = decks.iter().any(|(_, shell)| shell.is_added());
+    if !clear.is_changed() && !fresh {
+        return;
+    }
+    for (mut visibility, _) in &mut decks {
+        *visibility = if clear.0 {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
+    }
+}
+
 /// Marks the deck. Excluded from the world bend: it is a sphere already
 /// standing in world space around the planet's centre, not a flat thing waiting
 /// to be wrapped onto one.
@@ -67,8 +109,9 @@ pub struct CloudPlugin;
 impl Plugin for CloudPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(MaterialPlugin::<CloudMaterial>::default())
+            .init_resource::<TheSkyIsClear>()
             .add_systems(Startup, raise_the_deck)
-            .add_systems(Update, drive_the_deck);
+            .add_systems(Update, (part_the_clouds, drive_the_deck).chain());
     }
 }
 

@@ -946,6 +946,7 @@ fn paint(terrain: &Terrain, x: f32, z: f32, h: f32, wet: f32, slope: f32) -> [f3
         terrain.line_variation_at(x, z),
         terrain.ground_patch_at(x, z),
         None,
+        crate::terrain::polarity_at(z),
     )
     .to_linear();
 
