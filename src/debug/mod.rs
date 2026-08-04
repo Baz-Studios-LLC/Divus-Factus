@@ -26,7 +26,7 @@ mod hud;
 mod inspector;
 mod manifest;
 mod people;
-mod village;
+pub(crate) mod village;
 mod world;
 
 pub(crate) use capture::*;

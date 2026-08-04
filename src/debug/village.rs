@@ -1760,8 +1760,19 @@ pub(crate) struct Rebinding(pub Option<Deed>);
 /// colour, brought in from the title screen, then what little video and
 /// sound there is to speak of. The model picker is gone; the teller keeps
 /// its voice from the models folder without asking.
-fn build_settings_page(commands: &mut Commands, page: Entity) {
-    let tabs = ui::tab_bar(commands, page, &["KEYBINDS", "THE HAND", "VIDEO & SOUND"]);
+/// Builds the settings, into whatever parent is handed to it.
+///
+/// `pub(crate)` because there is ONE settings panel in this game and the title
+/// screen shows that one. It used to have a little settings screen of its own —
+/// hand colours and nothing else — which meant two places to add a setting to
+/// and two chances to forget the second. This is the panel; the title just hosts
+/// it in a different frame.
+pub(crate) fn build_settings_page(commands: &mut Commands, page: Entity) {
+    let tabs = ui::tab_bar(
+        commands,
+        page,
+        &["KEYBINDS", "THE HAND", "VIDEO & SOUND", "THE VIEW"],
+    );
     for (index, tab_page) in tabs.iter().copied().enumerate() {
         commands.entity(tab_page).insert((
             Node {
@@ -2069,6 +2080,11 @@ fn build_settings_page(commands: &mut Commands, page: Entity) {
     nudge(commands, "<", -1);
     commands.spawn((MusicVolumeText, ui::body(""), ChildOf(row)));
     nudge(commands, ">", 1);
+
+    // THE VIEW: switches for what the world shows, which is the fourth tab
+    // rather than four more letters on the keyboard. A hotkey is for something
+    // reached for mid-thought; none of these are.
+    crate::title::build_view_switches(commands, tabs[3]);
 }
 
 /// The music volume readout on the sound card.

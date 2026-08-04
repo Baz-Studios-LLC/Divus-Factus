@@ -1053,6 +1053,13 @@ fn sync_hud(state: Res<State<GameState>>, mut huds: Query<&mut Visibility, With<
 /// The settings overlay: for now, one setting — the colour of the hand.
 /// The hand itself hangs over this screen in its pointing pose, so every
 /// swatch click is previewed on the actual instrument.
+/// The settings, on the title screen and in the pause menu.
+///
+/// It shows the CODEX's settings panel, which is the only settings panel in this
+/// game. It used to have its own — hand colours and nothing else — so there were
+/// two places to add a setting to and two chances to forget the second, and the
+/// two had already drifted. Brett's call, and plainly right: one panel, hosted in
+/// whichever frame is on screen.
 fn spawn_settings(mut commands: Commands) {
     let screen = commands
         .spawn((
@@ -1066,7 +1073,7 @@ fn spawn_settings(mut commands: Commands) {
                 flex_direction: FlexDirection::Column,
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                row_gap: px(16),
+                row_gap: px(14),
                 ..default()
             },
             BackgroundColor(theme::panel_bg().with_alpha(1.0)),
@@ -1086,49 +1093,33 @@ fn spawn_settings(mut commands: Commands) {
         .id();
     commands.entity(heading).insert(ChildOf(screen));
 
-    let label = commands
+    // The panel itself, in a frame the size of the codex's own page so the
+    // tabs and their tables have the room they were laid out for.
+    let frame = commands
         .spawn((
-            ui::dim("the colour of your hand"),
             Node {
-                margin: UiRect::top(px(10)),
+                width: px(940),
+                height: percent(66),
+                flex_direction: FlexDirection::Column,
+                row_gap: px(10),
+                padding: UiRect::all(px(18)),
+                border: UiRect::all(px(1)),
                 ..default()
             },
+            BackgroundColor(theme::title_bg()),
+            BorderColor::all(theme::panel_border().with_alpha(0.5)),
+            ChildOf(screen),
         ))
         .id();
-    commands.entity(label).insert(ChildOf(screen));
+    crate::debug::village::build_settings_page(&mut commands, frame);
 
-    let row = commands
-        .spawn((Node {
-            flex_direction: FlexDirection::Row,
-            column_gap: px(10),
-            margin: UiRect::bottom(px(18)),
-            ..default()
-        },))
-        .id();
-    commands.entity(row).insert(ChildOf(screen));
+    let back = menu_button(&mut commands, screen, "Back");
+    commands.entity(back).insert(BackButton);
+}
 
-    for (index, (_, ramp)) in crate::hand::HAND_STYLES.iter().enumerate() {
-        let swatch = commands
-            .spawn((
-                HandSwatch(index),
-                ui::UiButton,
-                ui::KeepFace,
-                Node {
-                    width: px(40),
-                    height: px(40),
-                    border: UiRect::all(px(2)),
-                    border_radius: BorderRadius::all(px(6)),
-                    ..default()
-                },
-                BackgroundColor(crate::palette::shade(ramp, 0.9)),
-                BorderColor::all(theme::panel_border()),
-                Interaction::default(),
-                ChildOf(row),
-            ))
-            .id();
-        let _ = swatch;
-    }
-
+/// Builds the view switches into a parent, for whoever is showing the settings.
+pub(crate) fn build_view_switches(commands: &mut Commands, parent: Entity) {
+    let screen = parent;
     // The view switches.
     let label = commands
         .spawn((
@@ -1216,8 +1207,6 @@ fn spawn_settings(mut commands: Commands) {
         commands.entity(note).insert(ChildOf(words));
     }
 
-    let back = menu_button(&mut commands, screen, "Back");
-    commands.entity(back).insert(BackButton);
 }
 
 /// The knob inside a switch's track, which slides to say which way it is set.
