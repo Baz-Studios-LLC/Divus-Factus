@@ -363,18 +363,22 @@ fn spawn_title(
                 width: percent(100),
                 height: percent(100),
                 flex_direction: FlexDirection::Column,
-                justify_content: JustifyContent::Center,
+                // The logotype rides at the top and the menu sits on the right;
+                // the middle of the screen belongs to the planet, which is the
+                // one thing a title for this game has to say.
+                justify_content: JustifyContent::FlexStart,
                 align_items: AlignItems::Center,
                 row_gap: px(14),
-                // The block sits a touch above true centre — the classic
-                // title composition — instead of the menu grazing the
-                // bottom of the screen.
-                padding: UiRect::bottom(px(70)),
+                padding: UiRect::top(px(46)),
                 ..default()
             },
-            // A veil, not a wall: the world drifts by underneath, blurred by
-            // the dreaming lens, alive before anyone has chosen to descend.
-            BackgroundColor(theme::panel_bg().with_alpha(SCRIM_ALPHA)),
+            // No scrim. It was a veil over a world drifting past underneath -
+            // the right idea when the title looked down at a valley from a
+            // hundred and seventy-five units and the menu needed to be legible
+            // over grass. The title now looks at the whole planet against
+            // space, and there is nothing to dim: the background IS black, and
+            // a scrim over it only takes the light off the world.
+            BackgroundColor(Color::NONE),
             // Above the world, the HUD and the loading screen alike.
             GlobalZIndex(300),
         ))
@@ -400,15 +404,33 @@ fn spawn_title(
         .id();
     commands.entity(title).insert(ChildOf(screen));
 
-    let begin = menu_button(&mut commands, screen, "Begin");
+    // The menu, off to the right and level with the middle of the screen, so
+    // the planet has the middle of the frame to itself.
+    let menu = commands
+        .spawn((
+            Name::new("Title Menu"),
+            Node {
+                position_type: PositionType::Absolute,
+                right: px(96),
+                top: percent(38),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Stretch,
+                row_gap: px(14),
+                ..default()
+            },
+            ChildOf(screen),
+        ))
+        .id();
+
+    let begin = menu_button(&mut commands, menu, "Begin");
     commands.entity(begin).insert((BeginButton, TitleMenu));
-    let load = menu_button(&mut commands, screen, "Load Game");
+    let load = menu_button(&mut commands, menu, "Load Game");
     commands.entity(load).insert((LoadGameButton, TitleMenu));
-    let settings = menu_button(&mut commands, screen, "Settings");
+    let settings = menu_button(&mut commands, menu, "Settings");
     commands
         .entity(settings)
         .insert((SettingsButton, TitleMenu));
-    let quit = menu_button(&mut commands, screen, "Quit");
+    let quit = menu_button(&mut commands, menu, "Quit");
     commands.entity(quit).insert((QuitButton, TitleMenu));
 
     // The build, small and out of the composition's way — the first thing a
@@ -713,11 +735,29 @@ fn handle_pause_menu(
 // The drift, the farewell, and the descent.
 // ---------------------------------------------------------------------------
 
-/// The god's-height vantage the title looks down from.
-const DRIFT_DISTANCE: f32 = 175.0;
-const DRIFT_PITCH: f32 = 0.47;
-/// Radians per second the vantage circles the village. A full lap takes five
-/// minutes; nobody should catch it moving, only notice that it has.
+/// Where the title looks from: far enough out that the whole planet sits in
+/// the frame, held in the god's hand.
+///
+/// It used to be a god's-height vantage a hundred and seventy-five units over
+/// the village, drifting so slowly nobody caught it moving. That was the right
+/// screen for a world with no edge to see. This one has an edge, and the first
+/// thing the game should say is what the player is being handed.
+const DRIFT_DISTANCE: f32 = 23_000.0;
+/// Nearly straight down, which is what CENTRES the ball.
+///
+/// The rig aims at a point on the ground, not at the planet's middle, and from
+/// a low pitch those are two very different directions: the first try looked at
+/// the village from off to one side and the planet hung off the bottom of the
+/// frame like a hill. Overhead, the aim runs almost through the centre and the
+/// whole sphere sits in the middle of the screen. It costs nothing in light —
+/// the sun is where the sun is, whatever the camera does — and the yaw drift
+/// becomes a globe turning on its own axis rather than a camera flying round a
+/// world.
+const DRIFT_PITCH: f32 = 1.36;
+/// Radians per second the vantage circles the planet. The camera turns and the
+/// world does not: the simulation's whole coordinate system is pinned to this
+/// sphere, so spinning the planet would spin every village on it. Circling it
+/// instead is the same picture and costs nothing. A lap takes five minutes.
 const DRIFT_TURN: f32 = 0.021;
 
 /// Slowly circles the camera over the village while the pre-game screens are

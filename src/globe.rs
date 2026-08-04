@@ -341,7 +341,15 @@ impl Plugin for GlobePlugin {
                 Update,
                 tend_the_tree
                     .after(crate::camera::CameraSet)
-                    .run_if(crate::world_is_afoot),
+                    // The TITLE too, and not only the world afoot. Patches are
+                    // spawned hidden and this is what shows them, so while the
+                    // condition was `Choosing | Playing` the planet was simply
+                    // not drawn on the title screen - which mattered not at all
+                    // when the title looked down at a valley from a hundred and
+                    // seventy-five units, and matters entirely now that the
+                    // title IS the planet. What was on screen was the cloud
+                    // shell hanging in empty space.
+                    .run_if(crate::world_is_afoot.or_else(in_state(crate::GameState::Title))),
             )
             .add_systems(Update, dress_for_space.after(crate::render::paint_the_sky))
             // The bend runs at the very end of the transform pipeline: after
@@ -542,8 +550,9 @@ fn plant_the_tree(
     mut tree: ResMut<PlanetTree>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<PlanetMaterial>>,
+    state: Res<State<crate::GameState>>,
 ) {
-    let shroud = veil_of(&veil.0, &veil.1);
+    let shroud = veil_of(&veil.0, &veil.1, state.get());
     if tree.grown_for == Some(terrain.seed) {
         return;
     }
@@ -684,11 +693,24 @@ fn dress_the_patches(
     }
 }
 
-/// The veil to paint with, if the fog of war is on and a known world exists.
+/// The veil to paint with, if the fog of war is on, a known world exists, and
+/// there is a village whose knowledge it could be.
+///
+/// That last condition is not pedantry. The fog of war is what a VILLAGE has
+/// walked, and before one is founded there is nobody to have walked anything —
+/// which is why the cloths over the near ground have always waited for
+/// `Playing` (see `fog::drape_the_veil`). The planet's own paint did not, so the
+/// title screen showed a world shrouded pole to pole with one small clearing
+/// where the village was going to be: the first thing the game said to the
+/// player was that they could not see it.
 fn veil_of<'k>(
     mode: &Option<Res<crate::fog::FogMode>>,
     known: &'k Option<Res<crate::villager::explore::KnownWorld>>,
+    state: &crate::GameState,
 ) -> Option<&'k crate::villager::explore::KnownWorld> {
+    if *state != crate::GameState::Playing {
+        return None;
+    }
     let veiled = mode.as_ref().is_none_or(|mode| mode.0);
     if !veiled {
         return None;
@@ -948,6 +970,7 @@ fn tend_the_tree(
     windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
     cameras: Query<(&GlobalTransform, &CameraRig), With<GodCamera>>,
     mut patches: Query<(&Patch, &mut Visibility)>,
+    state: Res<State<crate::GameState>>,
 ) {
     let Some(terrain) = terrain else {
         return;
@@ -992,7 +1015,7 @@ fn tend_the_tree(
 
     // Notice the veil changing — the F key, or the known world growing —
     // and mark every standing patch's painting stale by bumping the beat.
-    let shroud = veil_of(&veil.0, &veil.1);
+    let shroud = veil_of(&veil.0, &veil.1, state.get());
     let print = (
         shroud.is_some(),
         shroud.map_or(0, |k| k.radius as u32),
