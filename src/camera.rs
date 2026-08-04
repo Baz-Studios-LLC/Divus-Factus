@@ -576,10 +576,15 @@ fn read_camera_input(
             + (rig.target_distance - MAX_DISTANCE).max(0.0) * 0.012;
         let speed = rig.pan_speed * zoom_scale * time.delta_secs();
         rig.target_focus += pan.normalize() * speed;
-        // East-west wraps with the world; north-south stops short of the
-        // poles, where the scaffold's one-longitude-per-point breaks down.
-        let brim = crate::terrain::planet_circumference() * 0.24;
-        rig.target_focus.z = rig.target_focus.z.clamp(-brim, brim);
+        // And then folded back onto the sphere. Panning walks the flat
+        // scaffold, and the scaffold runs off the end of the world: keep going
+        // north and `z` grows past the pole for ever, which the terrain field
+        // survives but an f32 does not. Sent through the sphere and back, the
+        // coordinates come home canonical — and going over the top of the
+        // world comes out on the far side, the way it should. It used to stop
+        // dead a few degrees short of the pole, which zoomed out reads as a
+        // wall in the middle of the sky.
+        rig.target_focus = fold_onto_the_sphere(rig.target_focus);
     }
 
     // The middle mouse GRABS THE WORLD. Not a camera pan: the ground under
@@ -598,30 +603,7 @@ fn read_camera_input(
     if buttons.pressed(MouseButton::Middle) {
         if let Some(held) = *grabbed {
             if let Some(now) = cursor_sphere_direction(&windows, &cameras) {
-                // Turn the world so the grabbed ground comes back under the
-                // cursor: rotate the focus by the arc from where the grab
-                // is now to where the hand holds it.
-                let turn = Quat::from_rotation_arc(now, held);
-                let stance = crate::globe::planet_stance();
-                let focus_dir =
-                    stance * crate::terrain::direction_at(rig.target_focus.x, rig.target_focus.z);
-                let turned = stance.inverse() * (turn * focus_dir);
-                let lat = turned.y.clamp(-1.0, 1.0).asin();
-                let lon = turned.x.atan2(turned.z);
-                let radius = crate::terrain::PLANET_RADIUS;
-                // Longitude unwraps toward the focus it came from, so a grab
-                // never teleports the coordinates across the date line.
-                let round = crate::terrain::planet_circumference();
-                let mut x = lon * radius;
-                while x - rig.target_focus.x > round * 0.5 {
-                    x -= round;
-                }
-                while rig.target_focus.x - x > round * 0.5 {
-                    x += round;
-                }
-                let brim = round * 0.24;
-                rig.target_focus.x = x;
-                rig.target_focus.z = (-lat * radius).clamp(-brim, brim);
+                rig.target_focus = turn_the_world(rig.target_focus, held, now);
             }
         } else {
             // The grab began on the sky: fall back to the old drag-pan so
@@ -719,6 +701,50 @@ fn read_camera_input(
             .target_pitch
             .max(MIN_PITCH + (MAX_PITCH - MIN_PITCH) * leaving);
     }
+}
+
+/// The focus, turned so the piece of ground the hand is holding comes back
+/// under the cursor.
+///
+/// `held` is the direction the grab seized; `now` is where the cursor points at
+/// this instant. Rotating the focus by the arc from `now` back to `held` puts
+/// that ground under the hand again — the whole world-grab, in one rotation.
+///
+/// Pure, and separately tested, because the axes of this are easy to get wrong
+/// and impossible to see wrong from a screenshot.
+pub(crate) fn turn_the_world(focus: Vec3, held: Vec3, now: Vec3) -> Vec3 {
+    let turn = Quat::from_rotation_arc(now, held);
+    let stance = crate::globe::planet_stance();
+    let focus_dir = stance * crate::terrain::direction_at(focus.x, focus.z);
+    let turned = stance.inverse() * (turn * focus_dir);
+    canonical_near(focus, turned)
+}
+
+/// A flat position, sent out to the sphere and brought back as the canonical
+/// coordinates for the place it names.
+///
+/// The scaffold is a plane wrapped round a ball, so it has more names than it
+/// has places: `x` repeats every circumference, and every `x` at all meets at
+/// each pole. Walking in a straight line eventually leaves the canonical range
+/// entirely. This brings a position home without moving it an inch.
+pub(crate) fn fold_onto_the_sphere(focus: Vec3) -> Vec3 {
+    let direction = crate::terrain::direction_at(focus.x, focus.z);
+    canonical_near(focus, direction)
+}
+
+/// The canonical `(x, z)` for a direction, with longitude unwrapped toward the
+/// position it came from — so a step never teleports the coordinates across the
+/// date line, even though the place either side of it is the same place.
+fn canonical_near(was: Vec3, direction: Vec3) -> Vec3 {
+    let (mut x, z) = crate::globe::ground_coordinates(direction);
+    let round = crate::terrain::planet_circumference();
+    while x - was.x > round * 0.5 {
+        x -= round;
+    }
+    while was.x - x > round * 0.5 {
+        x += round;
+    }
+    Vec3::new(x, was.y, z)
 }
 
 /// Where the cursor's ray meets the planet's sea-level sphere, as a unit
@@ -858,6 +884,103 @@ fn write_camera_transform(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Where a cursor at `ndc` lands on the planet, for a rig — the grab's
+    /// whole input, computed the way the renderer computes it, so the test is
+    /// driving the real geometry rather than a story about it.
+    fn cursor_on_the_ball(rig: &CameraRig, ndc: Vec2) -> Option<Vec3> {
+        let pose = crate::globe::bent_camera_pose(rig);
+        let half = (0.62f32 * 0.5).tan();
+        let aspect = 16.0 / 9.0;
+        let direction = (pose.forward().as_vec3()
+            + pose.right().as_vec3() * ndc.x * half * aspect
+            + pose.up().as_vec3() * ndc.y * half)
+            .normalize();
+
+        let centre = crate::globe::planet_centre();
+        let radius = crate::terrain::PLANET_RADIUS + WATER_LEVEL;
+        let to_centre = centre - pose.translation;
+        let along = to_centre.dot(direction);
+        let closest = pose.translation + direction * along - centre;
+        let off_axis = closest.length_squared();
+        if off_axis > radius * radius {
+            return None;
+        }
+        let depth = (radius * radius - off_axis).sqrt();
+        Some((pose.translation + direction * (along - depth) - centre).normalize())
+    }
+
+    /// The world-grab has to work in BOTH screen axes, at every height, and it
+    /// did not: dragging north or south stopped dead a few degrees short of the
+    /// pole, because the focus's `z` was clamped to a brim inside it. Zoomed
+    /// out far enough to see the whole planet, a single short drag crosses that
+    /// brim, so the vertical axis simply stopped — which is exactly what Brett
+    /// reported, and what this measures.
+    #[test]
+    fn the_world_grab_turns_in_both_axes_from_any_height() {
+        for distance in [80.0, 1_400.0, 20_000.0] {
+            let rig = CameraRig {
+                distance,
+                target_distance: distance,
+                ..default()
+            };
+            let held = cursor_on_the_ball(&rig, Vec2::ZERO)
+                .unwrap_or_else(|| panic!("the middle of the screen missed the planet at {distance}"));
+
+            for (axis, drag) in [
+                ("sideways", Vec2::new(0.35, 0.0)),
+                ("up-screen", Vec2::new(0.0, 0.35)),
+                ("down-screen", Vec2::new(0.0, -0.35)),
+            ] {
+                let Some(now) = cursor_on_the_ball(&rig, drag) else {
+                    continue;
+                };
+                let moved = turn_the_world(rig.target_focus, held, now);
+                let step = (moved - rig.target_focus).length();
+                assert!(
+                    step > 0.5,
+                    "a {axis} grab at {distance} up moved the focus {step}"
+                );
+            }
+        }
+    }
+
+    /// And it keeps turning over the top of the world. The flat scaffold has a
+    /// genuine singularity at the pole — every longitude meets there — so the
+    /// coordinates jump half a circumference as the focus crosses it, but the
+    /// PLACE is continuous, and that is what the camera is actually pointing
+    /// at. A clamp short of the pole was a wall in the middle of the sky.
+    #[test]
+    fn the_grab_carries_on_over_the_pole() {
+        let quarter = crate::terrain::planet_circumference() * 0.25;
+        // A focus a whisker short of the north pole, and a nudge further north.
+        let near_pole = Vec3::new(0.0, 0.0, -quarter + 60.0);
+        let stance = crate::globe::planet_stance();
+        let held = stance * crate::terrain::direction_at(0.0, near_pole.z);
+        let now = stance * crate::terrain::direction_at(0.0, near_pole.z + 200.0);
+
+        let moved = turn_the_world(near_pole, held, now);
+        let seat_before = crate::globe::bend_frame(near_pole).0;
+        let seat_after = crate::globe::bend_frame(moved).0;
+        // The grab turns the world by the arc it was dragged, so the focus
+        // travels that arc: two hundred units, sixty of them to the pole and
+        // the rest down the far side. Asserted as a LENGTH and not merely as
+        // "it moved", because the clamp this replaced moved it too — three
+        // hundred units backwards, away from the pole it would not cross.
+        let travelled = (seat_after - seat_before).length();
+        assert!(
+            (travelled - 200.0).abs() < 40.0,
+            "the focus travelled {travelled} where the drag was 200"
+        );
+        // And the signature of having crossed: every longitude meets at a
+        // pole, so coming down the other side is half a world away in `x`.
+        let round = crate::terrain::planet_circumference();
+        assert!(
+            ((moved.x - near_pole.x).abs() - round * 0.5).abs() < round * 0.02,
+            "the focus did not come out on the far side: x moved {}",
+            moved.x - near_pole.x
+        );
+    }
 
     #[test]
     fn eye_sits_at_the_requested_distance() {

@@ -148,24 +148,35 @@ impl LookSettings {
     }
 }
 
-/// The colour the world fades into, used for both the fog and the empty sky.
+/// The colour of the daytime sky.
 ///
-/// These two *must* be the same. Geometry past the end of the fog is drawn in the
-/// fog colour; if the sky behind it is a different colour, the boundary between them
-/// draws a hard line — which is what made the square edge of the sea show up as a
-/// grey band across the horizon. Matching them means fully-fogged ground is
-/// indistinguishable from no ground at all.
+/// It used to be a near-grey, and deliberately: it was the colour the DISTANCE
+/// FOG faded the world into, and the two had to match exactly or the boundary
+/// between fogged ground and empty sky drew a hard line across the horizon. A
+/// blue that strong tinted every mid-distance hill blue rather than hazy, so it
+/// was pulled almost half way to bone white — which is why the sky has been
+/// grey ever since.
 ///
-/// Sky blue on its own tints everything it touches, so mid-distance ground reads as
-/// blue rather than hazy. Pulling it toward neutral keeps it reading as air.
+/// There is no distance fog any more (a round world hides its own distance over
+/// the horizon, which is what fog was faking) and nothing left that has to
+/// match. So the sky is allowed to be the sky. A touch of neutral still takes
+/// the edge off the palette's flat blue and reads as air rather than paint.
+/// The sky is a LIGHT and not a surface, so it is written to the buffer both
+/// brighter AND more saturated than the palette step it wants to end up as.
+/// The tonemapper pulls bright colours toward white — hand it the palette's own
+/// blue and it comes back (100, 123, 151), grey by the time anyone sees it, and
+/// simply brightening it makes that worse, not better. Pushed out from its own
+/// luminance first, it survives the trip.
 pub fn horizon_color() -> Color {
-    let sky = palette::shade(&palette::SKY, 0.62).to_linear();
-    let neutral = palette::shade(&palette::BONE, 0.95).to_linear();
-    let t = 0.42;
+    let sky = palette::shade(&palette::SKY, 0.85).to_linear();
+    const SATURATE: f32 = 2.1;
+    const GAIN: f32 = 1.5;
+    let luminance = 0.2126 * sky.red + 0.7152 * sky.green + 0.0722 * sky.blue;
+    let push = |c: f32| ((luminance + (c - luminance) * SATURATE) * GAIN).max(0.0);
     Color::LinearRgba(LinearRgba {
-        red: sky.red + (neutral.red - sky.red) * t,
-        green: sky.green + (neutral.green - sky.green) * t,
-        blue: sky.blue + (neutral.blue - sky.blue) * t,
+        red: push(sky.red),
+        green: push(sky.green),
+        blue: push(sky.blue),
         alpha: 1.0,
     })
 }
