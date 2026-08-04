@@ -124,7 +124,7 @@ fn scenery_ceiling() -> f32 {
         .unwrap_or(1000.0)
 }
 
-/// Whether the scenery should still be drawn, given how far back the eye is.
+/// Whether ANY scenery is still drawn, given how far back the eye is.
 ///
 /// Hysteresis for the same reason the shadows have it (see
 /// [`crate::calendar::shadows_can_land`]): a god hovering exactly on the line
@@ -136,6 +136,50 @@ pub fn scenery_within_reach(distance: f32, currently_drawn: bool) -> bool {
     } else {
         distance < ceiling
     }
+}
+
+/// Where the forests begin to thin, as a share of the ceiling.
+///
+/// The first cut was the whole ceiling with nothing below it, and every forest
+/// in the world went out on one frame. Brett: "the popout is jarring."
+const DISSOLVE_FROM: f32 = 0.72;
+
+/// Whether this particular piece of scenery has gone yet.
+///
+/// The scenery does not leave all at once — each grove has its OWN altitude,
+/// spread evenly across the band below the ceiling, so a forest thins out
+/// instead of being switched off. Two hundred and eighty units of zoom to empty
+/// the world at the default ceiling.
+///
+/// A dissolve rather than a true fade, and that is a deliberate choice about
+/// cost. Fading needs either transparency - the scenery shares the ground's
+/// opaque material, and see-through trees look worse than absent ones - or a
+/// per-frame transform on thirty thousand entities, which re-propagates and
+/// re-bends every one of them and would buy a smooth fade with a stutter. The
+/// dissolve is a comparison against a hash, and it is what the renderer's own
+/// crossfade does underneath anyway.
+///
+/// Keyed to the entity so a grove's place in the queue is FIXED. Hashing the
+/// altitude instead, or drawing at random, would make the same forest flicker in
+/// and out while the camera hung still.
+///
+/// The distance is quantised before it is compared, which is the anti-shimmer:
+/// hovering on a boundary cannot flip anything until the god actually moves a few
+/// units, so a hand resting on the scroll wheel does not strobe one grove.
+pub fn scenery_dissolved(entity: Entity, distance: f32) -> bool {
+    let ceiling = scenery_ceiling();
+    let from = ceiling * DISSOLVE_FROM;
+    let stepped = (distance / 4.0).floor() * 4.0;
+    if stepped <= from {
+        return false;
+    }
+    // A cheap integer hash, spread over [0, 1): the grove's own place in the
+    // queue, stable for as long as it stands.
+    let mut bits = entity.to_bits();
+    bits = (bits ^ 0x9E37_79B9_7F4A_7C15).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    bits ^= bits >> 27;
+    let place = (bits % 4096) as f32 / 4096.0;
+    stepped > from + (ceiling - from) * place
 }
 
 /// Which layers are currently taken away.
@@ -208,8 +252,10 @@ fn apply_layers(
     layers: Res<ViewLayers>,
     eyes: Query<&crate::camera::CameraRig, With<crate::camera::GodCamera>>,
     mut scenery_drawn: Local<Option<bool>>,
+    mut applied: Local<Option<[bool; Layer::ALL.len()]>>,
     mut governed: Query<
         (
+            Entity,
             &mut Visibility,
             Has<GroveMesh>,
             Has<Foliage>,
@@ -244,11 +290,23 @@ fn apply_layers(
         .next()
         .map(|rig| scenery_within_reach(rig.distance, was_drawn))
         .unwrap_or(true);
-    let scenery_changed = *scenery_drawn != Some(draw_scenery);
     *scenery_drawn = Some(draw_scenery);
+    let distance = eyes.iter().next().map_or(0.0, |rig| rig.distance);
 
-    let restoring = layers.is_changed() || scenery_changed;
-    for (mut visibility, grove, foliage, boulder, patch, water, building, folk) in &mut governed {
+    // Which switches moved since the last pass. PER LAYER, and that is a fix
+    // rather than a refinement: handing every hidden entity back to `Inherited`
+    // whenever anything changed also handed it to the patches the quadtree had
+    // deliberately hidden - refined away, or waiting to be repainted - and a
+    // patch shown before it is painted is WHITE. Brett saw the terrain flash.
+    let last = applied.unwrap_or([false; Layer::ALL.len()]);
+    let mut now = [false; Layer::ALL.len()];
+    for (slot, layer) in now.iter_mut().zip(Layer::ALL) {
+        *slot = layers.hidden(layer);
+    }
+    *applied = Some(now);
+    for (entity, mut visibility, grove, foliage, boulder, patch, water, building, folk) in
+        &mut governed
+    {
         let layer = if grove || foliage || boulder {
             Layer::Scenery
         } else if patch {
@@ -262,13 +320,30 @@ fn apply_layers(
         } else {
             continue;
         };
-        let hidden = layers.hidden(layer) || (layer == Layer::Scenery && !draw_scenery);
-        if hidden {
-            if *visibility != Visibility::Hidden {
-                *visibility = Visibility::Hidden;
+        // The scenery is judged per entity and may be given back freely: nothing
+        // else in the game hides a grove, so there is no other system's decision
+        // to trample. Every other layer is enforced when off and restored only
+        // on the frame its own switch moved.
+        let wanted = if layer == Layer::Scenery {
+            let gone = layers.hidden(layer)
+                || !draw_scenery
+                || scenery_dissolved(entity, distance);
+            Some(if gone {
+                Visibility::Hidden
+            } else {
+                Visibility::Inherited
+            })
+        } else if layers.hidden(layer) {
+            Some(Visibility::Hidden)
+        } else if last[ViewLayers::slot(layer)] {
+            Some(Visibility::Inherited)
+        } else {
+            None
+        };
+        if let Some(wanted) = wanted {
+            if *visibility != wanted {
+                *visibility = wanted;
             }
-        } else if restoring && *visibility == Visibility::Hidden {
-            *visibility = Visibility::Inherited;
         }
     }
 }
@@ -361,6 +436,76 @@ mod tests {
                 "the scenery is only {share}% of the frame at distance \
                  {distance} and costs two milliseconds of twenty-four, yet is \
                  still being drawn"
+            );
+        }
+    }
+
+    /// A thousand groves, standing in for a world's worth.
+    fn a_forest() -> Vec<Entity> {
+        (0..1000).map(Entity::from_raw_u32).flatten().collect()
+    }
+
+    fn share_gone(forest: &[Entity], distance: f32) -> f32 {
+        let gone = forest
+            .iter()
+            .filter(|entity| scenery_dissolved(**entity, distance))
+            .count();
+        gone as f32 / forest.len() as f32
+    }
+
+    #[test]
+    fn the_forest_thins_out_rather_than_switching_off() {
+        let forest = a_forest();
+        let ceiling = scenery_ceiling();
+        let from = ceiling * DISSOLVE_FROM;
+
+        assert_eq!(
+            share_gone(&forest, from - 10.0),
+            0.0,
+            "nothing may go before the band starts, or the thinning eats into \
+             altitudes where the scenery is still a seventh of the frame"
+        );
+        assert_eq!(
+            share_gone(&forest, ceiling + 10.0),
+            1.0,
+            "everything must be gone by the ceiling, or the frames measured \
+             above it are not the frames that will be delivered"
+        );
+
+        // The point of the whole exercise: the middle of the band is a PARTLY
+        // standing forest. A switch would read 0.0 then 1.0 with nothing between.
+        let middle = share_gone(&forest, from + (ceiling - from) * 0.5);
+        assert!(
+            (0.35..0.65).contains(&middle),
+            "half way through the band {middle:.2} of the forest is gone - the \
+             dissolve is not spread evenly, so it will read as a pop"
+        );
+
+        // And it only ever goes one way as the god pulls back.
+        let mut last = 0.0;
+        for step in 0..=20 {
+            let distance = from + (ceiling - from) * step as f32 / 20.0;
+            let gone = share_gone(&forest, distance);
+            assert!(
+                gone >= last - f32::EPSILON,
+                "at {distance} the forest came BACK as the god pulled further \
+                 away: {gone:.2} after {last:.2}"
+            );
+            last = gone;
+        }
+    }
+
+    #[test]
+    fn a_grove_keeps_its_place_in_the_queue() {
+        // Asked twice at the same distance, a grove must answer the same way, or
+        // a still camera watches the forest strobe.
+        let forest = a_forest();
+        let distance = scenery_ceiling() * 0.85;
+        for entity in forest {
+            assert_eq!(
+                scenery_dissolved(entity, distance),
+                scenery_dissolved(entity, distance),
+                "{entity} is not making up its mind"
             );
         }
     }
