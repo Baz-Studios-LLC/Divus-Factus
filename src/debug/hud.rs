@@ -30,6 +30,7 @@ pub(crate) enum HudValue {
     PrayersOpen,
     Chunks,
     Altitude,
+    Detail,
     Population,
     Store,
     Dead,
@@ -107,6 +108,7 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
         (HudValue::PrayersOpen, "prayers"),
         (HudValue::Chunks, "chunks"),
         (HudValue::Altitude, "altitude"),
+        (HudValue::Detail, "zoom level"),
         (HudValue::Population, "population"),
         (HudValue::Store, "store"),
         (HudValue::Dead, "dead"),
@@ -315,7 +317,10 @@ pub(crate) fn update_hud(
         Option<Res<crate::villager::belief::Legend>>,
         Query<(), With<crate::villager::belief::Prayer>>,
     ),
-    chunks: Option<Res<LoadedChunks>>,
+    // Paired: update_hud sits exactly on Bevy's sixteen-parameter limit, so
+    // a new one has to ride with a relative. These two are the same kind of
+    // fact — how much world is standing.
+    loaded: (Option<Res<LoadedChunks>>, Res<crate::globe::PlanetDetail>),
     rigs: Query<&crate::camera::CameraRig>,
     villagers: Query<(&Needs, &Activity), With<Villager>>,
     corpses: Query<(), (With<crate::creature::Corpse>, With<Person>)>,
@@ -351,6 +356,7 @@ pub(crate) fn update_hud(
     }
     let fps = fps_cache.1;
 
+    let (chunks, detail) = loaded;
     let chunk_count = chunks.map_or(0, |c| c.count());
     let population = villagers.iter().count();
     let dead = corpses.iter().count();
@@ -415,6 +421,22 @@ pub(crate) fn update_hud(
             // out to live at a different altitude.
             HudValue::Altitude => {
                 format!("{:.0}", rigs.iter().next().map_or(0.0, |rig| rig.distance))
+            }
+            // What the altitude bought. The planet is a quadtree, so "zoom
+            // level" is literally a level: which depths of it are on screen,
+            // how many patches that is, how many are resident, and — while the
+            // tree is still catching up — how many are owed. The last number
+            // is the one that says "you are watching it build".
+            HudValue::Detail => {
+                let owed = if detail.owed > 0 {
+                    format!(" / {} owed", detail.owed)
+                } else {
+                    String::new()
+                };
+                format!(
+                    "L{}-{} / {} shown / {} standing{owed}",
+                    detail.coarsest, detail.finest, detail.shown, detail.built
+                )
             }
             HudValue::Population => population.to_string(),
             HudValue::Dead => dead.to_string(),

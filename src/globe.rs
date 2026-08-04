@@ -206,6 +206,23 @@ struct PlanetTree {
     veil_print: (bool, u32, usize),
 }
 
+/// What the planet is drawn at, right now, for the developer's panel.
+///
+/// The altitude row answers how high the god is; this answers what that HEIGHT
+/// bought — which depths of the tree are on screen, how many patches that is,
+/// and whether any of them are still being built. Which is the number to have
+/// in front of you while judging how the world sharpens.
+#[derive(Resource, Default, Debug)]
+pub struct PlanetDetail {
+    /// Shallowest and deepest levels currently shown.
+    pub coarsest: u8,
+    pub finest: u8,
+    /// Patches on screen, patches resident, and patches still owed.
+    pub shown: usize,
+    pub built: usize,
+    pub owed: usize,
+}
+
 /// A standing patch: its entity, its mesh, the last frame it was on screen —
 /// the tree forgets what it has not shown for a while — and which painting
 /// of the veil it wears, so the fog of war can sweep across a planet that
@@ -297,6 +314,7 @@ impl Plugin for GlobePlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(MaterialPlugin::<PlanetMaterial>::default())
             .init_resource::<PlanetTree>()
+            .init_resource::<PlanetDetail>()
             .add_systems(
                 Update,
                 (plant_the_tree, dress_the_patches).run_if(resource_exists::<Terrain>),
@@ -905,6 +923,7 @@ fn tend_the_tree(
         Option<Res<crate::villager::explore::KnownWorld>>,
     ),
     mut tree: ResMut<PlanetTree>,
+    mut detail: ResMut<PlanetDetail>,
     mut meshes: ResMut<Assets<Mesh>>,
     windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
     cameras: Query<(&GlobalTransform, &CameraRig), With<GodCamera>>,
@@ -1015,6 +1034,13 @@ fn tend_the_tree(
             }
         }
     }
+    // What all that resolved to, for the panel.
+    detail.coarsest = on_screen.iter().map(|k| k.level).min().unwrap_or(0);
+    detail.finest = on_screen.iter().map(|k| k.level).max().unwrap_or(0);
+    detail.shown = on_screen.len();
+    detail.built = tree.built.len();
+    detail.owed = missing.len();
+
     tree.beat += 1;
     let beat = tree.beat;
     for shown in &on_screen {
