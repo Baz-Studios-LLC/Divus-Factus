@@ -688,8 +688,20 @@ const SCATTER_SPACING: f32 = 4.5;
 /// Nine thousand fewer meshes cost four milliseconds. Draw calls are not the
 /// bottleneck here; VERTICES are, and a small mesh is culled where a big one is
 /// not — a sixty-four unit grove with one corner on screen draws every tree in
-/// it. Fine granularity is what keeps the vertex count down, so the bucket stays
-/// small.
+/// it. Fine granularity is what keeps the vertex count down.
+///
+/// Which invites the opposite question, and Brett asked it: if smaller is
+/// faster, why merge at all? Swept downward too, and the valley has a floor —
+/// spans 4.5, 7 and 10 come out at 27.7, 27.6 and 27.5 against 14's 27.3, so
+/// nothing is won below this. The AVERAGE barely moves; what moves is the
+/// HITCH. At a span of 4.5 a tree is nearly its own mesh — 51,450 of them —
+/// and the worst steady frame goes to 61/88/73ms at play zoom where a span of
+/// 14 holds 58/47/38, six comparisons across two altitudes and all six worse.
+/// Every mesh is a GPU upload when its chunk streams in, and chunk streaming is
+/// where this game's stutter actually lives. So the grove is not a tax on frame
+/// rate that we tolerate for tidiness — it is what keeps streaming smooth, and
+/// fourteen sits at the bottom of the valley with a cliff on one side and flat
+/// ground on the other.
 const GROVE_SPAN: f32 = 14.0;
 
 /// Within this range of the settlement, trees and rocks are entities rather
@@ -781,14 +793,31 @@ pub struct GroveMesh;
 #[derive(Resource, Default)]
 pub struct DirtyGroves(pub Vec<Entity>);
 
-/// Groves waiting out their debounce: entity → seconds left until the bake.
+/// How long a CHURNING grove stays quiet before it bakes.
 ///
 /// A burning grove is re-marked with every spread, and each finished bake
 /// costs a real GPU upload — rebaking eagerly meant paying that upload over
-/// and over while the fire crawled. A grove bakes only after it has stayed
-/// QUIET this long; the fallen tree's ghost stands in its old merged mesh a
-/// beat longer, which is invisible next to a burning stand.
+/// and over while the fire crawled, so a grove under repeated change waits
+/// until the change stops.
 const GROVE_QUIET: f32 = 2.0;
+
+/// How long a grove marked ONCE waits: not at all.
+///
+/// The debounce above was charged to every caller, and Brett caught what that
+/// costs: fell one tree with the axe and its ghost stands in the merged mesh
+/// for two full seconds after it has finished falling. A single fell is not
+/// churn — it is one bake, and one bake is affordable at once. So the wait is
+/// no longer a constant but a judgement about what marked the grove: a first
+/// mark bakes on the next frame, and only a grove marked AGAIN while it is
+/// still warm falls back to the long quiet. A fire therefore pays one prompt
+/// bake as it catches and then debounces properly for the rest of its spread,
+/// and the axe pays nothing.
+const GROVE_PROMPT: f32 = 0.0;
+
+/// How long a grove counts as warm. Slightly longer than the quiet itself, so
+/// a grove that has only just finished baking still recognises the next mark
+/// as churn rather than treating it as a fresh single fell.
+const GROVE_WARM: f32 = 2.5;
 
 /// A grove mesh being rebuilt on the compute pool, to be collected when done.
 #[derive(Component)]
@@ -809,14 +838,24 @@ pub(crate) fn rebake_groves(
     mut commands: Commands,
     time: Res<Time>,
     mut waiting: Local<std::collections::HashMap<Entity, f32>>,
+    mut last_marked: Local<std::collections::HashMap<Entity, f32>>,
     mut dirty: ResMut<DirtyGroves>,
     trees: Query<(&Transform, &TreeBody, &InGrove)>,
     groves: Query<&Transform, (With<GroveMesh>, Without<RebakingGrove>)>,
 ) {
-    // Fresh marks (re)start their grove's quiet clock.
+    // Fresh marks (re)start their grove's clock — promptly for a lone fell,
+    // at the full quiet for a grove that is still warm from the last one.
+    let now = time.elapsed_secs();
     for grove in dirty.0.drain(..) {
-        waiting.insert(grove, GROVE_QUIET);
+        let churning = last_marked
+            .get(&grove)
+            .is_some_and(|marked| now - marked < GROVE_WARM);
+        last_marked.insert(grove, now);
+        waiting.insert(grove, if churning { GROVE_QUIET } else { GROVE_PROMPT });
     }
+    // Groves nobody has touched in a while are cold: forget them, or the map
+    // would remember every grove the world ever felled a tree in.
+    last_marked.retain(|_, marked| now - *marked < GROVE_WARM);
     if waiting.is_empty() {
         return;
     }
@@ -1223,6 +1262,65 @@ pub fn regrow_food(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Drives [`rebake_groves`] with a grove holding one tree, and reports
+    /// whether the bake was started this frame.
+    ///
+    /// Real app, real system, real `Local` state carried across frames — the
+    /// wait is decided by state that only exists BETWEEN runs, so a unit test
+    /// on a pure function could not have caught the bug this guards.
+    fn grove_bench() -> (App, Entity) {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .init_resource::<DirtyGroves>()
+            .add_systems(Update, rebake_groves);
+        let grove = app
+            .world_mut()
+            .spawn((GroveMesh, Transform::default()))
+            .id();
+        // Two trees, so a fell leaves a survivor and the grove is rebaked
+        // rather than buried.
+        for offset in [0.0, 3.0] {
+            app.world_mut().spawn((
+                Transform::from_xyz(offset, 0.0, 0.0),
+                TreeBody::at(TreeKind::Broadleaf, offset, 0.0),
+                InGrove(grove),
+            ));
+        }
+        (app, grove)
+    }
+
+    fn mark_and_run(app: &mut App, grove: Entity) -> bool {
+        app.world_mut().resource_mut::<DirtyGroves>().0.push(grove);
+        app.update();
+        app.world().get::<RebakingGrove>(grove).is_some()
+    }
+
+    #[test]
+    fn one_felled_tree_rebakes_its_grove_at_once() {
+        let (mut app, grove) = grove_bench();
+        // A lone mark: the axe. The ghost may not stand for two seconds.
+        assert!(
+            mark_and_run(&mut app, grove),
+            "a grove marked once must start its bake on the same frame, or a \
+             felled tree's ghost stands in the merged mesh until the debounce \
+             expires - which is the bug this test exists for"
+        );
+    }
+
+    #[test]
+    fn a_churning_grove_still_waits_out_its_quiet() {
+        let (mut app, grove) = grove_bench();
+        assert!(mark_and_run(&mut app, grove), "first mark bakes promptly");
+        // Take the bake away as `collect_groves` would, then mark again while
+        // the grove is still warm: this is fire, and it must debounce or a
+        // spreading burn pays a GPU upload per tree.
+        app.world_mut().entity_mut(grove).remove::<RebakingGrove>();
+        assert!(
+            !mark_and_run(&mut app, grove),
+            "a grove re-marked while warm must wait, not bake again at once"
+        );
+    }
 
     #[test]
     fn food_regrowth_is_capped() {
