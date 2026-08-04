@@ -262,9 +262,21 @@ fn spawn_lighting(mut commands: Commands) {
         // units, which on a map this size means shadows simply stop a short way from
         // the camera — one of the things that reads as "flat".
         CascadeShadowConfigBuilder {
+            // FOUR cascades, and measured rather than assumed. Two is a
+            // millisecond cheaper at the altitudes where frames drop, and at
+            // dawn it is pixel-identical - which is exactly how a bad decision
+            // gets made. At NOON, with the sun high and shadow edges hard, two
+            // cascades differ from four over 2.89% of the frame at play zoom.
+            // The dawn test had no teeth because a grazing sun's long soft
+            // shadows hide the resolution loss. Four stays.
+            //
+            // Shadow map SIZE, by contrast, is worth nothing at all: 1024
+            // against 2048 measured 17.7ms against 17.7ms. This game is
+            // geometry-bound, not fill-bound - the cost is how many times the
+            // world is re-drawn into the shadow passes, not how big the map is.
             num_cascades: 4,
             first_cascade_far_bound: 40.0,
-            maximum_distance: 900.0,
+            maximum_distance: crate::calendar::SHADOW_REACH,
             ..default()
         }
         .build(),

@@ -508,6 +508,21 @@ pub(crate) fn update_dev_overlay(
 /// the worst frame of the window, in the log where a soak can grep them.
 /// `DIVUS_FACTUS_FRAMES=1`. The scrub's before-and-after numbers come from
 /// here, so a change's cost is a diff of two greps rather than an impression.
+///
+/// READ THIS BEFORE TRUSTING A NUMBER FROM HERE. This machine's frame time
+/// drifts between BATCHES of runs by three milliseconds and sometimes six —
+/// larger than most of the effects worth hunting. It has been caught twice:
+/// once as a run that held a flat 16.7ms across four windows and then measured
+/// 22.6ms three times running from a byte-identical command line, and once as a
+/// four-way comparison where every configuration in the first pass came out at
+/// 27.3ms and every one in the second at 24.4ms — the pass, not the setting.
+///
+/// So a single run proves nothing and two runs in sequence prove nothing. The
+/// only measurement that survives is A and B ALTERNATED inside one batch, read
+/// as the average gap between adjacent pairs, three alternations minimum. Every
+/// number written into this codebase as a measured fact was taken that way; the
+/// ones that were not are how two hours went into chasing a cost that turned out
+/// to be the GPU's clock speed.
 pub(crate) fn report_frames(
     time: Res<Time<Real>>,
     mut window: Local<(f32, u32, f32)>,

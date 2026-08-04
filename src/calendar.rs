@@ -25,6 +25,49 @@ pub const DAY_SECONDS: f32 = 600.0;
 /// Fraction of the day the sun is up.
 const DAYLIGHT_FRACTION: f32 = 0.72;
 
+/// How far from the eye the sun's cascades reach, and so how far shadows can
+/// possibly land. Sized to the world: the default configuration covers a few
+/// dozen units, which on a map this size means shadows stop a short way from the
+/// camera, which reads as flat.
+///
+/// The number is public because it decides more than the cascades. Beyond this
+/// distance a shadow cannot land at all, which makes it the honest altitude to
+/// stop PAYING for them (see [`shadows_can_land`]).
+pub const SHADOW_REACH: f32 = 900.0;
+
+/// Whether shadows can still land anywhere the camera can see, given how far
+/// back it has pulled.
+///
+/// Brett asked whether shadow quality could come down, and the measurement said
+/// something better: past a certain height they are already gone. The same scene
+/// with shadows and without, differing pixels as a share of the frame —
+///
+///   alt   60: 0.74%      alt  400: 0.46%      alt 1000: 0.01%
+///   alt  200: 1.47%      alt  700: 0.10%      alt 1400: 0.00%
+///
+/// — while costing 3.5ms of a 26ms frame at the top of that range. They fade on
+/// their own because the cascades END at [`SHADOW_REACH`]: pull back further than
+/// that and the ground the camera is looking at lies beyond the last cascade, so
+/// nothing can be cast onto it. Nobody built that fade; it falls out of the
+/// reach. All this does is stop paying for what has already faded.
+///
+/// Which is why the threshold is derived from the reach and not written as an
+/// altitude — move one and the other follows. Confirmed at DAWN, where a grazing
+/// sun throws the longest shadows in the day, and again at NOON, where they are
+/// shortest and hardest: 0.01% either way. The margin above the reach covers
+/// ground nearer than the focus, a peak between the eye and the village.
+///
+/// Hysteresis, because a god hovering exactly on the line would otherwise
+/// flicker the whole world's shadows on and off every frame.
+pub fn shadows_can_land(distance: f32, currently_cast: bool) -> bool {
+    const MARGIN: f32 = 1.05;
+    if currently_cast {
+        distance < SHADOW_REACH * MARGIN
+    } else {
+        distance < SHADOW_REACH
+    }
+}
+
 /// Days in one season, Stardew-fashion: long enough to live a stretch of
 /// life in, short enough that the turn is always coming.
 pub const DAYS_PER_SEASON: u32 = 28;
@@ -546,6 +589,7 @@ fn apply_sky_to_lights(
         (&mut DirectionalLight, &mut Transform),
         (With<MoonLight>, Without<SunLight>, Without<FillLight>),
     >,
+    eyes: Query<&crate::camera::CameraRig, With<crate::camera::GodCamera>>,
 ) {
     ambient.color = sky.ambient_color;
     ambient.brightness = sky.ambient_brightness;
@@ -560,8 +604,13 @@ fn apply_sky_to_lights(
         // `DIVUS_FACTUS_SHADOWS=0` lifts them for measurement, beside the fog
         // and cloud dials. The shadow pass is worth 2.8ms of a 27ms frame at the
         // altitude where frames drop, so it is a number worth being able to take.
+        // And no shadows from too far back, where the cascades cannot reach
+        // the ground anyway: 3.5ms for a frame that measures identical.
+        let pulled_back = eyes.iter().next().map(|rig| rig.distance);
         light.shadow_maps_enabled = sky.daylight > 0.02
-            && !std::env::var("DIVUS_FACTUS_SHADOWS").is_ok_and(|dial| dial == "0");
+            && !std::env::var("DIVUS_FACTUS_SHADOWS").is_ok_and(|dial| dial == "0")
+            && pulled_back
+                .is_none_or(|distance| shadows_can_land(distance, light.shadow_maps_enabled));
         // A grazing sun slides every shadow off its caster - the depth bias
         // that is right for a light overhead is nowhere near enough for one
         // coming in almost flat, and trees end up casting shadows that detach
@@ -651,6 +700,28 @@ fn hang_the_sky(
 
 #[cfg(test)]
 mod tests {
+    /// The measured visibility ladder: camera distance against how much of the
+    /// frame changed when shadows were taken away, at dawn and at noon both.
+    ///
+    /// This is the evidence the cutoff rests on, kept as data so the code cannot
+    /// drift from it. Lower [`SHADOW_REACH`] without re-measuring and this fails,
+    /// because shadows would stop being drawn at a height where the pixels say
+    /// they are still plainly there.
+    pub(super) const MEASURED: [(f32, f32); 6] = [
+        (60.0, 0.74),
+        (200.0, 1.47),
+        (400.0, 0.46),
+        (700.0, 0.10),
+        (1000.0, 0.01),
+        (1400.0, 0.00),
+    ];
+
+    /// Below what share of the frame a difference is indistinguishable from
+    /// run-to-run noise. Measured, not chosen: two runs of the same scene whose
+    /// only difference was shadows at an altitude where shadows cannot land came
+    /// out 0.03%-0.06% apart, villagers having walked in between.
+    pub(super) const NOISE: f32 = 0.06;
+
     use super::*;
 
     #[test]
@@ -786,5 +857,51 @@ mod tests {
             };
             assert!(!clock.phase_name().is_empty());
         }
+    }
+}
+#[cfg(test)]
+mod shadow_cutoff_tests {
+    use super::tests::{MEASURED, NOISE};
+    use super::*;
+
+    #[test]
+    fn shadows_are_kept_wherever_they_can_be_seen() {
+        for (distance, visible) in MEASURED {
+            if visible <= NOISE {
+                continue;
+            }
+            assert!(
+                shadows_can_land(distance, true),
+                "shadows change {visible}% of the frame at distance {distance} -                  far above the {NOISE}% noise floor - so they must still be cast                  there. SHADOW_REACH is {SHADOW_REACH}, which is too short for                  what was measured."
+            );
+        }
+    }
+
+    #[test]
+    fn shadows_are_dropped_where_they_cannot_land() {
+        for (distance, visible) in MEASURED {
+            if visible > NOISE {
+                continue;
+            }
+            assert!(
+                !shadows_can_land(distance, true),
+                "shadows change only {visible}% of the frame at distance                  {distance} - noise - yet are still being paid for, at 3.5ms of                  a 26ms frame."
+            );
+        }
+    }
+
+    #[test]
+    fn the_threshold_does_not_flicker_when_hovering_on_it() {
+        // Just inside the margin: a god drifting across the line holds whatever
+        // state they arrived in rather than switching every frame.
+        let on_the_line = SHADOW_REACH * 1.02;
+        assert!(
+            shadows_can_land(on_the_line, true),
+            "shadows already cast must survive a small drift outward"
+        );
+        assert!(
+            !shadows_can_land(on_the_line, false),
+            "shadows already dropped must not come back on the same drift, or              the two states chase each other every frame"
+        );
     }
 }
