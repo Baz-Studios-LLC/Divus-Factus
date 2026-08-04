@@ -1287,8 +1287,18 @@ pub fn build_river_mesh(terrain: &Terrain, coord: IVec2) -> Option<Mesh> {
 #[derive(Resource)]
 pub struct TerrainAssets {
     pub ground_material: Handle<StandardMaterial>,
-    /// Shared with the sea, so rivers and ocean look like the same substance.
     pub water_material: Handle<crate::water::WaterMaterial>,
+    /// The same shader as the sea, so rivers and ocean are plainly the same
+    /// substance — but its own settings, because they are not the same water.
+    ///
+    /// The sea's body comes from how much of it there is: its alpha rises over
+    /// the first seven units of depth, which is what makes a shoreline fade
+    /// instead of ending on a line. A river carved three units into its valley
+    /// never reaches half of that, so rivers have always been a faint sheen on
+    /// a brown channel — Brett's "rivers were never good". Reading the depth
+    /// over a couple of units instead gives a river a surface while leaving the
+    /// sea's shallows exactly as they were.
+    pub river_material: Handle<crate::water::WaterMaterial>,
 }
 
 fn setup_terrain(
@@ -1342,6 +1352,17 @@ fn setup_terrain(
     );
 
     let water_material = water_materials.add(crate::water::WaterMaterial::default());
+    let river_material = water_materials.add({
+        let mut river = crate::water::WaterMaterial::default();
+        // A river is shallow, so it has to say what it is in less depth.
+        river.params.depth_fade = 1.6;
+        river.params.foam_width = 0.5;
+        // And its own scale of ripple: the sea's fourteen-metre swell across a
+        // channel a few metres wide is one flat facet of a wave.
+        river.params.wave_scale = 1.9;
+        river.params.wave_strength = 0.3;
+        river
+    });
 
     commands.spawn((
         Name::new("Water"),
@@ -1366,6 +1387,7 @@ fn setup_terrain(
     commands.insert_resource(TerrainAssets {
         ground_material,
         water_material,
+        river_material,
     });
     commands.init_resource::<LoadedChunks>();
 }
@@ -1487,8 +1509,14 @@ pub(crate) fn spawn_chunk(
         commands.spawn((
             Name::new("River"),
             Mesh3d(river),
-            MeshMaterial3d(assets.water_material.clone()),
+            MeshMaterial3d(assets.river_material.clone()),
             Transform::default(),
+            // Its vertices are world-space seats already, like its chunk's.
+            // Without this the bend seated the transform as well - and an
+            // identity transform seats the origin twenty-eight units under the
+            // ground, so every river in the world sank out of sight and left
+            // its carved channel painted on a dry valley floor.
+            crate::globe::BentInPlace,
             NotShadowCaster,
             ChildOf(entity),
         ));
@@ -2282,3 +2310,4 @@ mod tests {
         assert!(a.angle_between(b) < 0.06, "{}", a.angle_between(b));
     }
 }
+

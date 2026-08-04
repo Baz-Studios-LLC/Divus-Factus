@@ -206,6 +206,24 @@ struct PlanetTree {
     veil_print: (bool, u32, usize),
 }
 
+/// "My vertices are already seated on the sphere — leave my transform alone."
+///
+/// The bend's whole contract is that it seats FLAT things, and a growing number
+/// of meshes in this world are built already-bent, vertex by vertex: the chunks,
+/// their rivers, the veil's cloths. Those get their positions from
+/// [`bend_frame`] at build time, so bending them again seats a position that was
+/// never flat. Chunks and cloths each earned their own exclusion by name as
+/// they were caught; this is the concept those names were groping at, so
+/// anything built in world space can say so once.
+///
+/// The river said it in a comment and not in the world, which is how it came to
+/// be buried: a river is a CHILD of its chunk, the chunk is excluded but the
+/// child was not, and bending an identity transform seats the origin at
+/// twenty-eight units below the ground. Every river in the world sank out of
+/// sight, leaving its carved channel painted on an empty valley floor.
+#[derive(Component)]
+pub struct BentInPlace;
+
 /// What the planet is drawn at, right now, for the developer's panel.
 ///
 /// The altitude row answers how high the god is; this answers what that HEIGHT
@@ -449,6 +467,8 @@ fn bend_the_world(
             Without<crate::calendar::Celestial>,
             // And the weather is a shell already standing round the planet.
             Without<crate::clouds::CloudShell>,
+            // Anything else built already-bent; see `BentInPlace`.
+            Without<BentInPlace>,
         ),
     >,
     mut eyes: Query<(&mut GlobalTransform, &CameraRig), Without<crate::render::HandCamera>>,
@@ -1135,6 +1155,33 @@ mod tests {
         assert!(seat.length() < 9.0, "home moved to {seat}");
         let up = turn * Vec3::Y;
         assert!(up.dot(Vec3::Y) > 0.9999, "up leans to {up}");
+    }
+
+    /// Anything built already-bent keeps the transform it was given.
+    ///
+    /// A river is a child of its chunk. The chunk is excluded from the bend
+    /// because its vertices are seated one by one; the river's are too, and it
+    /// said so in a comment instead of in the world — so the bend seated its
+    /// transform as well, and an identity transform seats the origin at
+    /// twenty-eight units BELOW the ground. Every river in the world sank out of
+    /// sight and left its carved channel painted on a dry valley floor.
+    #[test]
+    fn the_bend_leaves_already_bent_geometry_alone() {
+        let mut app = App::new();
+        app.add_systems(Update, bend_the_world);
+
+        let placed = GlobalTransform::IDENTITY;
+        let river = app.world_mut().spawn((BentInPlace, placed)).id();
+        app.update();
+
+        let after = *app.world().get::<GlobalTransform>(river).unwrap();
+        assert_eq!(after, placed, "the river was seated and buried");
+        // And the burial was real: this is where an identity transform lands.
+        let sunk = bend_frame(Vec3::ZERO).0;
+        assert!(
+            sunk.y < -20.0,
+            "the bend used to put the origin at {sunk}, which was the whole bug"
+        );
     }
 
     /// The god's hand, and everything hanging off it, is left exactly where it
