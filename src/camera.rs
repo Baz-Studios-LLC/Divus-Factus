@@ -427,7 +427,7 @@ impl CameraRig {
     }
 
     /// Ground-plane forward direction, for panning relative to the view.
-    fn ground_forward(&self) -> Vec3 {
+    pub(crate) fn ground_forward(&self) -> Vec3 {
         let (sy, cy) = self.yaw.sin_cos();
         Vec3::new(-sy, 0.0, -cy)
     }

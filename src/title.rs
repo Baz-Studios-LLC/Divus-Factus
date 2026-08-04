@@ -753,7 +753,7 @@ const DRIFT_DISTANCE: f32 = 23_000.0;
 /// the sun is where the sun is, whatever the camera does — and the yaw drift
 /// becomes a globe turning on its own axis rather than a camera flying round a
 /// world.
-const DRIFT_PITCH: f32 = 1.36;
+const DRIFT_PITCH: f32 = 1.50;
 /// Radians per second the vantage circles the planet. The camera turns and the
 /// world does not: the simulation's whole coordinate system is pinned to this
 /// sphere, so spinning the planet would spin every village on it. Circling it

@@ -410,7 +410,23 @@ pub(crate) fn bent_camera_pose(rig: &CameraRig) -> Transform {
         }
     } else {
         let (focus_seat, focus_turn) = bend_frame(rig.focus);
-        Transform::from_translation(eye_seat).looking_at(focus_seat, focus_turn * Vec3::Y)
+        let up = focus_turn * Vec3::Y;
+        let gaze = (focus_seat - eye_seat).normalize_or(-up);
+        // Looking almost STRAIGHT DOWN, the local up is no use as a hint - it is
+        // nearly antiparallel to the gaze, `looking_at` has no plane left to
+        // work in, and the camera's roll becomes whatever the fallback inside it
+        // happens to pick. On a sphere that is invisible, which is how it went
+        // unnoticed: nothing in the picture told, until the title screen tried to
+        // put a hand UNDER the planet and the hand came out at ten o'clock.
+        //
+        // From near the vertical, the honest screen-up is the bearing the rig is
+        // facing - the convention every top-down map keeps.
+        let up = if gaze.dot(up).abs() > 0.985 {
+            focus_turn * rig.ground_forward()
+        } else {
+            up
+        };
+        Transform::from_translation(eye_seat).looking_at(focus_seat, up)
     }
 }
 
@@ -502,22 +518,14 @@ fn bend_the_world(
     // focus where the focus now is, with the focus's own outward as up.
     let mut seated_eye = None;
     for (mut global, rig) in &mut eyes {
-        let (eye_seat, eye_turn) = bend_frame(global.translation());
-        let (focus_seat, focus_turn) = bend_frame(rig.focus);
-        let up = focus_turn * Vec3::Y;
-        let bent = if rig.distance < crate::camera::FIRST_PERSON {
-            // Behind a mortal's eyes there is no separation to preserve, and
-            // `looking_at` has no direction to work from: carry the flat
-            // forward into the seat's own frame instead.
-            let (_, rotation, _) = global.to_scale_rotation_translation();
-            Transform {
-                translation: eye_seat,
-                rotation: eye_turn * rotation,
-                scale: Vec3::ONE,
-            }
-        } else {
-            Transform::from_translation(eye_seat).looking_at(focus_seat, up)
-        };
+        // Through `bent_camera_pose`, which is the ONE definition of where the
+        // camera is. This loop used to compute it again inline - the same
+        // arithmetic, written twice - and the copies drifted the moment one of
+        // them was fixed: the top-down roll was corrected in the shared version
+        // for the title screen's sake while the RENDERER went on using this one,
+        // so the hand placed itself in a frame the picture did not share and
+        // came out beside the planet instead of under it.
+        let bent = crate::globe::bent_camera_pose(rig);
         *global.bypass_change_detection() = GlobalTransform::from(bent);
         seated_eye = Some(bent);
     }
