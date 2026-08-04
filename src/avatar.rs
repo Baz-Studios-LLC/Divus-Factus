@@ -221,7 +221,21 @@ fn hold_the_pointer(windows: &mut Query<&mut CursorOptions, With<PrimaryWindow>>
     } else {
         CursorGrabMode::None
     };
-    cursor.visible = !hold;
+    // Hidden either way. The god's hand IS the pointer — the window is created
+    // with the system arrow switched off precisely so it never floats over the
+    // hand — and this function is the only thing in the game that touches that
+    // switch. Handing the arrow BACK when the grab was released meant one Avatar
+    // ride, or one possessed villager eaten by a wolf, left two cursors for the
+    // rest of the session.
+    //
+    // Releasing the GRAB is the whole of what letting go means here.
+    //
+    // Found while chasing a different fault, and worth recording as such: the
+    // two-cursors report that led here turned out to be stale WindowServer state
+    // — a reboot cleared it, after a dozen hard kills of the game and a crash in
+    // Mail. This bug is real and separate, and it would have bitten the first
+    // time anybody used Avatar.
+    cursor.visible = false;
 }
 
 /// The ride: it costs belief every second, and it ends.
