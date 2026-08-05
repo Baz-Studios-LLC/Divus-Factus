@@ -72,6 +72,7 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
         (crate::gizmo::ToolMode::Normal, "NORMAL"),
         (crate::gizmo::ToolMode::Move, "MOVE"),
         (crate::gizmo::ToolMode::Resize, "RESIZE"),
+        (crate::gizmo::ToolMode::Paint, "PAINT"),
     ] {
         let button = commands
             .spawn((
@@ -302,6 +303,13 @@ of an L",
         ("Q / E", "lift and lower"),
         ("[ ]", "repaint through the ramps"),
         ("- =", "darker and brighter"),
+        (
+            "PAINT",
+            "colour what is already
+standing: click a part,
+shift-click the lot,
+\\ empties the brush",
+        ),
         ("esc / del", "empty the hand"),
         (
             "1 - 6",
@@ -438,6 +446,7 @@ off, walls down as well",
 /// Mode presses set the tool; the standing mode wears the gold.
 fn work_mode_bar(
     palette: Res<Palette>,
+    brush: Res<crate::builder::Brush>,
     mut mode: ResMut<crate::gizmo::ToolMode>,
     mut buttons: Query<(
         &Interaction,
@@ -461,10 +470,20 @@ fn work_mode_bar(
         if *border != dress {
             *border = dress;
         }
-        let wanted = BackgroundColor(if standing {
-            Color::srgb(0.075, 0.082, 0.102)
-        } else {
-            Color::BLACK.with_alpha(0.18)
+        // The paint button wears the brush, so the colour about to be laid
+        // down is on screen rather than in the maker's head. An empty brush
+        // strips paint rather than adding it, and looks like the other buttons.
+        let wanted = BackgroundColor(match (button.0, brush.ramp.as_deref()) {
+            (crate::gizmo::ToolMode::Paint, Some(ramp)) => {
+                let colour = palette.shade(ramp, brush.shade);
+                if standing {
+                    colour
+                } else {
+                    colour.with_alpha(0.55)
+                }
+            }
+            _ if standing => Color::srgb(0.075, 0.082, 0.102),
+            _ => Color::BLACK.with_alpha(0.18),
         });
         if fill.0 != wanted.0 {
             *fill = wanted;

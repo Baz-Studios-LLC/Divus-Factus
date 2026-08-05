@@ -19,6 +19,9 @@ pub enum ToolMode {
     Normal,
     Move,
     Resize,
+    /// Colour what is already standing: clicking a part paints it with the
+    /// brush rather than merely selecting it.
+    Paint,
 }
 
 /// The part currently wearing handles.
@@ -134,7 +137,8 @@ fn walk_modes(
         *mode = match *mode {
             ToolMode::Normal => ToolMode::Move,
             ToolMode::Move => ToolMode::Resize,
-            ToolMode::Resize => ToolMode::Normal,
+            ToolMode::Resize => ToolMode::Paint,
+            ToolMode::Paint => ToolMode::Normal,
         };
     }
     if mode.is_changed() && *mode == ToolMode::Normal {
@@ -188,6 +192,9 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
     // edge instead of lengthening the roof, and a 45 looks like it bends.
     let spin = builder::pose(record.yaw, record.tilt, record.flip);
     match mode {
+        // Painting wears no handles: the part IS the handle, and a shaft in the
+        // way would only be something to click by mistake.
+        ToolMode::Paint => Vec::new(),
         ToolMode::Move => vec![
             (Vec3::X, Vec3::ZERO, "cloth-red", Grip::Slide),
             (Vec3::Y, Vec3::ZERO, "cloth-gold", Grip::Slide),
