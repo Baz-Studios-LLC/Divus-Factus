@@ -1840,6 +1840,9 @@ enum Deed {
     /// Say what a part IS - which decides what comes off with the roof, what
     /// the walls are made of, and what the village can walk through.
     Nature(&'static str),
+    /// Bring a part back until it stops at the roof instead of coming through
+    /// it.
+    TrimToRoof,
 }
 
 impl Deed {
@@ -1851,8 +1854,121 @@ impl Deed {
             Deed::Nature("frame") => "PART OF THE FRAME",
             Deed::Nature("footing") => "PART OF THE FOOTING",
             Deed::Nature(_) => "FURNISHING",
+            Deed::TrimToRoof => "TRIM TO THE ROOF",
         }
     }
+}
+
+/// Brings a part back along its own length until it stops at the roof.
+///
+/// Brett wanted the option rather than the rule, and was right to: "Somethings
+/// like Chimneys I would want to clip through, thats why I would like an
+/// option." A chimney's whole purpose is to come out the other side.
+///
+/// It moves the GEOMETRY rather than hiding pixels, and that is the whole
+/// constraint. The bench's promise is that what is saved is what the village
+/// raises, and the bake emits plain boxes - so a beam clipped only in the
+/// picture would sit right here and stand proud of the roof out in the world,
+/// which is a worse bug than the one being fixed because it cannot be seen from
+/// the bench at all.
+///
+/// Each end is cast at the roof separately and only the end that meets one comes
+/// in. The other stays exactly where the maker put it, because a part that
+/// shortened from both ends would walk out of the joint it was seated in.
+///
+/// The end stays SQUARE. A mitre is what a carpenter would cut, and a mitre is
+/// not a box - the baked format speaks boxes, wedges and ridges, and nothing
+/// that is a box with one corner off. At a steep pitch that leaves a gap about
+/// the beam's own thickness, which in a world built of boxes reads as ordinary
+/// framing.
+fn trim_to_roof(
+    kind: &PartKind,
+    record: &Placed,
+    roofs: &[(Vec3, Vec3, Quat)],
+) -> Option<(PartKind, Placed)> {
+    let (long, rebuild) = length_of(kind)?;
+    let spin = pose(record.yaw, record.tilt, record.flip);
+    let along = spin * Vec3::X;
+    let at = Vec3::from(record.at);
+    let half = long * 0.5;
+
+    // How far each end may reach before it is inside the roof.
+    let mut reach = [half, half];
+    for (end, way) in [(0usize, 1.0_f32), (1, -1.0)] {
+        for (box_at, box_half, box_turn) in roofs {
+            if let Some(hit) =
+                ray_meets_box(at, along * way, half, *box_at, *box_half, *box_turn)
+            {
+                reach[end] = reach[end].min(hit);
+            }
+        }
+    }
+    if (reach[0] - half).abs() < 1e-3 && (reach[1] - half).abs() < 1e-3 {
+        return None;
+    }
+    let trimmed = reach[0] + reach[1];
+    if trimmed < 0.125 {
+        return None;
+    }
+    // The middle walks to stay between the two ends.
+    let middle = at + along * (reach[0] - reach[1]) * 0.5;
+    let made = rebuild(((trimmed * 16.0).round() / 16.0).max(0.125));
+    let mut moved = record.clone();
+    moved.part = part_name(&made);
+    moved.at = middle.into();
+    Some((made, moved))
+}
+
+/// The length a part is drawn to, if it has one, and the kind it becomes at
+/// another length.
+///
+/// The `long` family: everything a maker draws by pulling it out to size along
+/// its own X. Trimming is only meaningful for these — a part with no length has
+/// no direction to come back along.
+fn length_of(kind: &PartKind) -> Option<(f32, fn(f32) -> PartKind)> {
+    match *kind {
+        PartKind::Beam(long) => Some((long, |n| PartKind::Beam(n))),
+        PartKind::Wall(long) => Some((long, |n| PartKind::Wall(n))),
+        PartKind::Ridge(long) => Some((long, |n| PartKind::Ridge(n))),
+        _ => None,
+    }
+}
+
+/// Where a ray first meets an oriented box, if it does within `reach`.
+///
+/// The slab method, in the box's own frame - which is why the box may be turned
+/// any way at all, and a roof's slopes are turned every way there is.
+fn ray_meets_box(
+    from: Vec3,
+    along: Vec3,
+    reach: f32,
+    box_at: Vec3,
+    box_half: Vec3,
+    box_turn: Quat,
+) -> Option<f32> {
+    let inverse = box_turn.inverse();
+    let origin = inverse * (from - box_at);
+    let heading = inverse * along;
+    let (mut near, mut far) = (0.0_f32, reach);
+    for axis in 0..3 {
+        let (o, d, h) = (origin[axis], heading[axis], box_half[axis]);
+        if d.abs() < 1e-6 {
+            if o.abs() > h {
+                return None;
+            }
+            continue;
+        }
+        let (mut t0, mut t1) = ((-h - o) / d, (h - o) / d);
+        if t0 > t1 {
+            std::mem::swap(&mut t0, &mut t1);
+        }
+        near = near.max(t0);
+        far = far.min(t1);
+        if near > far {
+            return None;
+        }
+    }
+    (near <= far && near >= 0.0).then_some(near)
 }
 
 /// The natures a maker can hand a part, in the order they are offered.
@@ -1955,6 +2071,14 @@ fn raise_part_menu(
         return;
     };
     let mut deeds = deeds_for(&kind);
+    // Only where there is a roof to trim to, and a length to trim.
+    if length_of(&kind).is_some()
+        && placed
+            .iter()
+            .any(|(_, _, other)| other.stage == "roof" && other.part != record.part)
+    {
+        deeds.insert(0, Deed::TrimToRoof);
+    }
     // Carrying a mark is reason enough to offer it, whatever the part is.
     if !deeds.contains(&Deed::Ungroup) {
         let held: Vec<(Entity, Vec3, &Placed)> = placed
@@ -2046,7 +2170,7 @@ fn work_part_menu(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut lines: Query<(&MenuLine, &Interaction, &mut BackgroundColor)>,
     menus: Query<Entity, With<PartMenu>>,
-    mut placed: Query<(Entity, &Transform, &mut Placed), Without<Ghost>>,
+    mut placed: Query<(Entity, &mut Transform, &mut Placed), Without<Ghost>>,
 ) {
     if menus.is_empty() {
         return;
@@ -2106,6 +2230,51 @@ fn work_part_menu(
                         part,
                     );
                 }
+            }
+        }
+        Some((Deed::TrimToRoof, part)) => {
+            // Every box the roof is made of, in world space, so the part's own
+            // ends can be cast at them.
+            let roofs: Vec<(Vec3, Vec3, Quat)> = placed
+                .iter()
+                .filter(|(other, _, record)| *other != part && record.stage == "roof")
+                .filter_map(|(_, at, record)| {
+                    kind_from_name(&record.part).map(|kind| (at, record, kind))
+                })
+                .flat_map(|(at, record, kind)| {
+                    let spin = pose(record.yaw, record.tilt, record.flip);
+                    body_of(&kind, None)
+                        .into_iter()
+                        .map(move |Slab(offset, size, _, _, _, _, lean)| {
+                            // A slab may lean inside its own part - a roof's
+                            // slopes do nothing else - so its turn is the part's
+                            // and then its own.
+                            let turn = spin * Quat::from_rotation_x(lean);
+                            (at.translation + spin * offset, size * 0.5, turn)
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            let trimmed = placed.get(part).ok().and_then(|(_, _, record)| {
+                kind_from_name(&record.part)
+                    .and_then(|kind| trim_to_roof(&kind, record, &roofs))
+            });
+            if let Some((made, moved)) = trimmed
+                && let Ok((_, mut transform, mut record)) = placed.get_mut(part)
+            {
+                transform.translation = Vec3::from(moved.at);
+                *record = moved.clone();
+                commands.entity(part).despawn_related::<Children>();
+                dress_part(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    &palette,
+                    &made,
+                    &moved,
+                    part,
+                    false,
+                );
             }
         }
         Some((Deed::Nature(nature), part)) => {
@@ -6279,6 +6448,70 @@ mod roof_tests {
             .iter()
             .map(|Slab(_, size, ..)| size.y)
             .fold(f32::MIN, f32::max)
+    }
+
+    fn a_record(part: String, at: [f32; 3], yaw: f32) -> Placed {
+        Placed {
+            part,
+            at,
+            yaw,
+            tilt: 0.0,
+            ramp: None,
+            shade: 0.5,
+            stage: "frame".to_string(),
+            flip: false,
+            loose: false,
+        }
+    }
+
+    #[test]
+    fn a_trimmed_beam_stops_at_the_roof_and_keeps_its_far_end() {
+        // A four metre beam running along X through its own middle, and a wall
+        // of roof standing across it at x = 1. The beam must come back to that
+        // wall, and its far end must not budge - a part that shortened from both
+        // ends would walk out of whatever joint it was seated in.
+        let kind = PartKind::Beam(4.0);
+        let record = a_record("beam-4".to_string(), [0.0, 0.0, 0.0], 0.0);
+        let roofs = vec![(
+            Vec3::new(1.5, 0.1875, 0.0),
+            Vec3::new(0.5, 2.0, 2.0),
+            Quat::IDENTITY,
+        )];
+        let (made, moved) = trim_to_roof(&kind, &record, &roofs).expect("it should trim");
+        let PartKind::Beam(long) = made else {
+            panic!("a beam trims to a beam");
+        };
+        // The far end was at -2 and stays there; the near end stops at +1.
+        let far = moved.at[0] - long * 0.5;
+        let near = moved.at[0] + long * 0.5;
+        assert!((far + 2.0).abs() < 0.07, "the far end moved to {far}");
+        assert!((near - 1.0).abs() < 0.07, "the near end stopped at {near}");
+        assert!(long < 4.0, "it did not come back at all: {long}");
+    }
+
+    #[test]
+    fn a_beam_that_reaches_no_roof_is_left_alone() {
+        // Nothing to trim to is not a trim of nothing: the menu should have
+        // offered it, and offering a deed that does nothing is the fault.
+        let kind = PartKind::Beam(4.0);
+        let record = a_record("beam-4".to_string(), [0.0, 0.0, 0.0], 0.0);
+        let far_off = vec![(
+            Vec3::new(40.0, 0.0, 0.0),
+            Vec3::splat(1.0),
+            Quat::IDENTITY,
+        )];
+        assert!(trim_to_roof(&kind, &record, &far_off).is_none());
+        assert!(trim_to_roof(&kind, &record, &[]).is_none());
+    }
+
+    #[test]
+    fn only_parts_with_a_length_can_be_trimmed() {
+        // A chimney is the case Brett named: it is meant to come through, and
+        // it has no length to come back along either.
+        assert!(length_of(&PartKind::Beam(3.0)).is_some());
+        assert!(length_of(&PartKind::Wall(2.0)).is_some());
+        assert!(length_of(&PartKind::Chimney(1.75)).is_none());
+        assert!(length_of(&PartKind::Prop("pole")).is_none());
     }
 
     #[test]
