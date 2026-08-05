@@ -1472,8 +1472,15 @@ impl Plugin for BuilderPlugin {
                     work_shelf,
                     work_templates,
                     steer_hand,
-                    paint_the_work,
-                    work_palette,
+                    // The painting tools and the part menu as one group: this
+                    // tuple is at Bevy's own limit for how many systems it will
+                    // take in a row, and a nested tuple counts as one.
+                    (
+                        paint_the_work,
+                        work_palette,
+                        raise_part_menu,
+                        work_part_menu,
+                    ),
                     toggle_snap_mode,
                     disarm_on_mode,
                     turn_part,
@@ -1828,6 +1835,301 @@ fn dress_ghost(
     {
         spawn_part(commands, meshes, materials, palette, &kind, &record, true);
     }
+}
+
+// ------------------------------------------------------------ the part menu
+
+/// Something a right-click can do to the part under the cursor.
+///
+/// One entry today. The menu exists as much for the ones after it — Brett:
+/// "that way we could add other things to the menu later" — and a menu is the
+/// right home for the deeds that are neither a tool nor a key: rare enough not
+/// to earn a letter, specific enough to belong to one part.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Deed {
+    /// Break a made part into the parts it is made of.
+    Ungroup,
+}
+
+impl Deed {
+    fn label(self) -> &'static str {
+        match self {
+            Deed::Ungroup => "UNGROUP",
+        }
+    }
+}
+
+/// What may be done to this part.
+///
+/// Ungrouping is offered only where the pieces have somewhere to GO. A gable
+/// roof is two slopes and two ends, and the bench already has a part for each -
+/// a roof panel and a gable - so breaking one up leaves four parts a maker can
+/// go on working with. A door is jambs and a leaf and a latch, and the bench has
+/// no part for a jamb, so breaking one up would leave nothing but a hole where a
+/// door used to be.
+fn deeds_for(kind: &PartKind) -> Vec<Deed> {
+    match kind {
+        PartKind::GableRoof(..) => vec![Deed::Ungroup],
+        _ => Vec::new(),
+    }
+}
+
+/// The menu itself, and which part raised it.
+#[derive(Component)]
+struct PartMenu(Entity);
+
+/// One line of it.
+#[derive(Component)]
+struct MenuLine {
+    deed: Deed,
+    part: Entity,
+}
+
+/// Right-click a part to raise its menu.
+///
+/// On the RELEASE, and only if the mouse barely moved: the right button already
+/// orbits the camera, so a right DRAG has to stay an orbit and only a right
+/// CLICK is a menu. Every three-dimensional tool resolves it this way and a
+/// maker will not notice the rule at all, which is the point of it.
+#[allow(clippy::too_many_arguments)]
+fn raise_part_menu(
+    mut commands: Commands,
+    fonts: Res<Fonts>,
+    palette: Res<Palette>,
+    buttons: Res<ButtonInput<MouseButton>>,
+    mut motion: MessageReader<bevy::input::mouse::MouseMotion>,
+    windows: Query<&Window>,
+    hovered: Res<Hovered>,
+    naming: Res<Naming>,
+    hand: Res<Hand>,
+    placed: Query<&Placed, Without<Ghost>>,
+    menus: Query<Entity, With<PartMenu>>,
+    mut drift: Local<f32>,
+) {
+    let stirred: f32 = motion.read().map(|moved| moved.delta.length()).sum();
+    if buttons.pressed(MouseButton::Right) {
+        *drift += stirred;
+    }
+    if buttons.just_pressed(MouseButton::Right) {
+        *drift = 0.0;
+    }
+    if !buttons.just_released(MouseButton::Right) {
+        return;
+    }
+    let travelled = std::mem::take(&mut *drift);
+    for menu in &menus {
+        commands.entity(menu).despawn();
+    }
+    // Four pixels of slop: a hand resting on a mouse is never quite still, and
+    // an orbit that happens to end where it started is still an orbit.
+    if travelled > 4.0 || naming.0.is_some() || hand.kind.is_some() {
+        return;
+    }
+    let Some(part) = hovered.grab else {
+        return;
+    };
+    let Ok(record) = placed.get(part) else {
+        return;
+    };
+    let Some(kind) = kind_from_name(&record.part) else {
+        return;
+    };
+    let deeds = deeds_for(&kind);
+    if deeds.is_empty() {
+        return;
+    }
+    let Some(at) = windows.iter().next().and_then(|window| window.cursor_position()) else {
+        return;
+    };
+
+    let menu = commands
+        .spawn((
+            PartMenu(part),
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(at.x),
+                top: Val::Px(at.y),
+                flex_direction: FlexDirection::Column,
+                padding: UiRect::all(Val::Px(3.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(theme::panel_bg()),
+            BorderColor::all(theme::panel_border(&palette)),
+            GlobalZIndex(60),
+        ))
+        .id();
+    for deed in deeds {
+        let line = commands
+            .spawn((
+                MenuLine { deed, part },
+                Interaction::default(),
+                Node {
+                    padding: UiRect::axes(Val::Px(12.0), Val::Px(5.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::NONE),
+                ChildOf(menu),
+            ))
+            .id();
+        commands.spawn((
+            Text::new(deed.label()),
+            TextFont {
+                font: fonts.display.clone().into(),
+                font_size: FontSize::Px(11.0),
+                ..default()
+            },
+            TextColor(theme::accent(&palette)),
+            ChildOf(line),
+        ));
+    }
+}
+
+/// Carries a chosen deed out, and shuts the menu on anything else.
+#[allow(clippy::too_many_arguments)]
+fn work_part_menu(
+    mut commands: Commands,
+    keys: Res<ButtonInput<KeyCode>>,
+    buttons: Res<ButtonInput<MouseButton>>,
+    palette: Res<Palette>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut lines: Query<(&MenuLine, &Interaction, &mut BackgroundColor)>,
+    menus: Query<Entity, With<PartMenu>>,
+    placed: Query<&Placed, Without<Ghost>>,
+) {
+    if menus.is_empty() {
+        return;
+    }
+    let mut chosen = None;
+    let mut over = false;
+    for (line, interaction, mut fill) in &mut lines {
+        if *interaction != Interaction::None {
+            over = true;
+        }
+        if *interaction == Interaction::Pressed {
+            chosen = Some((line.deed, line.part));
+        }
+        let wanted = BackgroundColor(if *interaction == Interaction::None {
+            Color::NONE
+        } else {
+            theme::accent(&palette).with_alpha(0.18)
+        });
+        if fill.0 != wanted.0 {
+            *fill = wanted;
+        }
+    }
+    // A click anywhere but on the menu closes it, which is what a menu does.
+    let dismissed =
+        keys.just_pressed(KeyCode::Escape) || (buttons.just_pressed(MouseButton::Left) && !over);
+    if chosen.is_none() && !dismissed {
+        return;
+    }
+    if let Some((Deed::Ungroup, part)) = chosen
+        && let Ok(record) = placed.get(part)
+        && let Some(kind) = kind_from_name(&record.part)
+    {
+        ungroup(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &palette,
+            &kind,
+            record,
+            part,
+        );
+    }
+    for menu in &menus {
+        commands.entity(menu).despawn();
+    }
+}
+
+/// Breaks a made part into the parts it is made of, standing exactly where its
+/// own pieces stood.
+///
+/// A gable roof is four things the bench can already draw: two slopes, which are
+/// roof panels, and two ends, which are gables. So it comes apart into four
+/// parts a maker can pull, pitch, paint and delete one at a time — which is the
+/// whole point, and the reason a door cannot do this (see [`deeds_for`]).
+///
+/// The offsets are read off the same arithmetic that draws the roof, because a
+/// piece that lands even slightly off is worse than no ungroup at all: a maker
+/// would have to notice, and then correct something they did not move.
+///
+/// Undo needs no help here. The bench remembers whole states rather than deeds,
+/// so four parts appearing and one leaving is one step back like anything else.
+fn ungroup(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    palette: &Palette,
+    kind: &PartKind,
+    record: &Placed,
+    part: Entity,
+) {
+    let PartKind::GableRoof(long, span, over, degrees) = *kind else {
+        return;
+    };
+    let pitch = degrees.clamp(PITCH_LEAST, PITCH_MOST).to_radians();
+    let half = span * 0.5;
+    let rise = half * pitch.tan();
+    let slope = (half * half + rise * rise).sqrt();
+    let thick = 0.125;
+    let at = Vec3::from(record.at);
+    let spin = pose(record.yaw, record.tilt, record.flip);
+
+    let mut born: Vec<(PartKind, Placed)> = Vec::new();
+    for way in [-1.0_f32, 1.0] {
+        // Where the slope's own slab sits inside the roof.
+        let middle = Vec3::new(
+            0.0,
+            rise * 0.5 + thick * 0.5 - over * 0.5 * pitch.sin(),
+            way * (half * 0.5 + over * 0.5 * pitch.cos()),
+        );
+        // A roof panel is drawn standing ON its origin - its slab is half a
+        // thickness up - while the slope's offset is the slab's MIDDLE. So the
+        // panel is seated half a thickness back down its own face, which is not
+        // straight down once it is pitched.
+        let lean = record.tilt + way * pitch;
+        let face = pose(record.yaw, lean, record.flip) * Vec3::Y;
+        let panel = PartKind::Roof(long + over * 2.0, slope + over);
+        born.push((
+            panel,
+            Placed {
+                part: part_name(&panel),
+                at: (at + spin * middle - face * (thick * 0.5)).into(),
+                yaw: record.yaw,
+                tilt: lean,
+                ramp: record.ramp.clone(),
+                shade: record.shade,
+                stage: record.stage.clone(),
+                flip: record.flip,
+            },
+        ));
+
+        // The ends. A gable is drawn with its width along its own X and the
+        // roof's ends stand across the span, so each one is turned a quarter
+        // circle to face down the building.
+        let gable = PartKind::Gable(span, degrees);
+        born.push((
+            gable,
+            Placed {
+                part: part_name(&gable),
+                at: (at + spin * Vec3::new(way * (long * 0.5 - 0.125), 0.0, 0.0)).into(),
+                yaw: record.yaw + std::f32::consts::FRAC_PI_2,
+                tilt: record.tilt,
+                ramp: record.ramp.clone(),
+                shade: record.shade,
+                stage: record.stage.clone(),
+                flip: record.flip,
+            },
+        ));
+    }
+
+    for (kind, record) in born {
+        spawn_part(commands, meshes, materials, palette, &kind, &record, false);
+    }
+    commands.entity(part).despawn();
 }
 
 // -------------------------------------------------------------- the palette
@@ -5517,6 +5819,24 @@ mod roof_tests {
             .iter()
             .map(|Slab(_, size, ..)| size.y)
             .fold(f32::MIN, f32::max)
+    }
+
+    #[test]
+    fn a_roof_comes_apart_into_parts_that_exist() {
+        // Ungroup is only offered where the pieces have somewhere to go. If a
+        // kind is ever added here without a part to become, this is where it
+        // shows up rather than in a maker's hands.
+        assert_eq!(
+            deeds_for(&PartKind::GableRoof(6.0, 4.0, 0.25, 45.0)).len(),
+            1,
+            "a gable roof is two roof panels and two gables, so it comes apart"
+        );
+        assert!(
+            deeds_for(&PartKind::Prop("door")).is_empty(),
+            "a door is jambs and a leaf and the bench has a part for neither: \
+             breaking one up would leave a hole where a door used to be"
+        );
+        assert!(deeds_for(&PartKind::Wall(2.0)).is_empty(), "a wall is a wall");
     }
 
     #[test]
