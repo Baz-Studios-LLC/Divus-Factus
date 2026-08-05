@@ -65,63 +65,8 @@ enum Shape {
     /// A ridge cap's prism: the triangle stands ACROSS the part, which
     /// runs lengthwise under it, apex up.
     Ridge,
-    /// A round pole running the part's length: the ridge log, and
-    /// whatever else wants to be a log.
-    Log,
 }
 
-/// A triangular prism: an isosceles gable end, base to apex, extruded
-/// across its thickness. Unit-sized, so a part scales it like any box.
-fn log_mesh() -> Mesh {
-    // An eight-sided pole along X: round enough to read as a log at this
-    // scale, cheap enough to lay a hundred of.
-    let sides = 8usize;
-    let mut positions: Vec<[f32; 3]> = Vec::new();
-    let mut normals: Vec<[f32; 3]> = Vec::new();
-    let mut indices: Vec<u32> = Vec::new();
-    let ring: Vec<(f32, f32)> = (0..sides)
-        .map(|i| {
-            let angle = i as f32 / sides as f32 * std::f32::consts::TAU;
-            (angle.cos() * 0.5, angle.sin() * 0.5)
-        })
-        .collect();
-    for i in 0..sides {
-        let (y0, z0) = ring[i];
-        let (y1, z1) = ring[(i + 1) % sides];
-        let (my, mz) = ((y0 + y1) * 0.5, (z0 + z1) * 0.5);
-        let len = (my * my + mz * mz).sqrt().max(1e-5);
-        let normal = [0.0, my / len, mz / len];
-        let first = positions.len() as u32;
-        for corner in [[-0.5, y0, z0], [0.5, y0, z0], [0.5, y1, z1], [-0.5, y1, z1]] {
-            positions.push(corner);
-            normals.push(normal);
-        }
-        indices.extend_from_slice(&[first, first + 1, first + 2, first, first + 2, first + 3]);
-    }
-    for (end, facing) in [(-0.5_f32, [-1.0, 0.0, 0.0]), (0.5, [1.0, 0.0, 0.0])] {
-        let first = positions.len() as u32;
-        for (y, z) in &ring {
-            positions.push([end, *y, *z]);
-            normals.push(facing);
-        }
-        for step in 1..(sides as u32 - 1) {
-            if end < 0.0 {
-                indices.extend_from_slice(&[first, first + step + 1, first + step]);
-            } else {
-                indices.extend_from_slice(&[first, first + step, first + step + 1]);
-            }
-        }
-    }
-    let uvs: Vec<[f32; 2]> = positions.iter().map(|_| [0.0, 0.0]).collect();
-    Mesh::new(
-        bevy::render::mesh::PrimitiveTopology::TriangleList,
-        bevy::asset::RenderAssetUsages::default(),
-    )
-    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
-    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
-    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
-    .with_inserted_indices(bevy::render::mesh::Indices::U32(indices))
-}
 
 fn wedge_mesh(lengthwise: bool) -> Mesh {
     let mut positions: Vec<[f32; 3]> = Vec::new();
@@ -218,6 +163,10 @@ pub enum PartKind {
     /// The stepped triangle that closes a pitched roof's end: courses of
     /// wall narrowing to a peak at the roof's own thirty degrees.
     Gable(f32, f32),
+    /// A squared timber laid along its own length: the corner post's section,
+    /// on its side and as long as it is drawn.
+    Beam(f32),
+    BeamRun,
     /// The cap that hides the seam where two slopes meet.
     Ridge(f32),
     /// A chimney stack: the number is how far its shaft reaches DOWN
@@ -226,7 +175,6 @@ pub enum PartKind {
     Chimney(f32),
     /// A ridge pole: a round log along the spine, the older way of
     /// closing a roof.
-    RidgeLog(f32),
     /// A whole gable roof: both slopes and the ridge between them, drawn
     /// once over the walls instead of lined up slope by slope.
     GableRoof(f32, f32, f32, f32),
@@ -252,7 +200,6 @@ pub enum PartKind {
     },
     GableRun,
     RidgeRun,
-    RidgeLogRun,
     GableRoofRun,
     FloorRun,
     FoundationRun,
@@ -270,7 +217,7 @@ impl PartKind {
             | PartKind::SegRun { .. }
             | PartKind::GableRun
             | PartKind::RidgeRun
-            | PartKind::RidgeLogRun => Some(1),
+            | PartKind::BeamRun => Some(1),
             PartKind::FloorRun
             | PartKind::FoundationRun
             | PartKind::RoofRun
@@ -289,7 +236,7 @@ impl PartKind {
             },
             PartKind::GableRun => PartKind::Gable(w, ROOF_PITCH_DEGREES),
             PartKind::RidgeRun => PartKind::Ridge(w),
-            PartKind::RidgeLogRun => PartKind::RidgeLog(w),
+            PartKind::BeamRun => PartKind::Beam(w),
             // A hand's breadth of overhang to begin with; the gold
             // handles pull it further without moving the gables.
             PartKind::GableRoofRun => PartKind::GableRoof(w, d, 0.25, ROOF_PITCH_DEGREES),
@@ -328,24 +275,15 @@ const fn prop(label: &'static str, name: &'static str) -> CatalogEntry {
 
 /// The shelf's drawers: each section opens and closes on its header.
 pub const STRUCTURE: &[CatalogEntry] = &[
-    structure("WALL, STRETCH", PartKind::WallRun, "walls"),
-    structure("WALL, 2M", PartKind::Wall(2.0), "walls"),
-    structure("CORNER POLE", PartKind::Prop("pole"), "frame"),
-    structure("TRIM, STRETCH", PartKind::TrimRun { stone: false }, "walls"),
-    structure(
-        "TRIM STONE, STRETCH",
-        PartKind::TrimRun { stone: true },
-        "walls",
-    ),
-    structure("TRIM CORNER", PartKind::Prop("trim-corner"), "walls"),
-    structure(
-        "TRIM CORNER, STONE",
-        PartKind::Prop("trim-corner-stone"),
-        "walls",
-    ),
+    structure("BEAM, STRETCH", PartKind::BeamRun, "frame"),
     structure("DOOR", PartKind::Prop("door"), "walls"),
     structure("DOOR, DOUBLE", PartKind::Prop("door-double"), "walls"),
     structure("DOORWAY", PartKind::Prop("doorway"), "walls"),
+    structure("FLOOR, 2M", PartKind::Floor(2.0, 2.0), "footing"),
+    structure("FLOOR, STRETCH", PartKind::FloorRun, "footing"),
+    structure("FOUNDATION, 2M", PartKind::Foundation(2.0, 2.0), "footing"),
+    structure("FOUNDATION, STRETCH", PartKind::FoundationRun, "footing"),
+    structure("GABLE, STRETCH", PartKind::GableRun, "roof"),
     structure(
         "HEADER, STRETCH",
         PartKind::SegRun {
@@ -354,6 +292,11 @@ pub const STRUCTURE: &[CatalogEntry] = &[
         },
         "walls",
     ),
+    structure("POLE, CORNER", PartKind::Prop("pole"), "frame"),
+    structure("RIDGE, STRETCH", PartKind::RidgeRun, "roof"),
+    structure("ROOF, GABLE, STRETCH", PartKind::GableRoofRun, "roof"),
+    structure("ROOF, PANEL", PartKind::Roof(2.2, 2.2), "roof"),
+    structure("ROOF, STRETCH", PartKind::RoofRun, "roof"),
     structure(
         "SILL, STRETCH",
         PartKind::SegRun {
@@ -362,58 +305,56 @@ pub const STRUCTURE: &[CatalogEntry] = &[
         },
         "walls",
     ),
+    structure("STEPS, STONE", PartKind::Prop("steps"), "footing"),
+    structure(
+        "TRIM, STONE, STRETCH",
+        PartKind::TrimRun { stone: true },
+        "walls",
+    ),
+    structure("TRIM, STRETCH", PartKind::TrimRun { stone: false }, "walls"),
+    structure("WALL, 2M", PartKind::Wall(2.0), "walls"),
+    structure("WALL, STRETCH", PartKind::WallRun, "walls"),
     structure("WINDOW", PartKind::Prop("window"), "walls"),
-    structure("FOUNDATION, STRETCH", PartKind::FoundationRun, "footing"),
-    structure("FOUNDATION, 2M", PartKind::Foundation(2.0, 2.0), "footing"),
-    structure("STONE STEPS", PartKind::Prop("steps"), "footing"),
-    structure("FLOOR, STRETCH", PartKind::FloorRun, "footing"),
-    structure("FLOOR, 2M", PartKind::Floor(2.0, 2.0), "footing"),
-    structure("GABLE, STRETCH", PartKind::GableRun, "roof"),
-    structure("ROOF GABLE, STRETCH", PartKind::GableRoofRun, "roof"),
-    structure("ROOF, STRETCH", PartKind::RoofRun, "roof"),
-    structure("RIDGE, STRETCH", PartKind::RidgeRun, "roof"),
-    structure("RIDGE LOG, STRETCH", PartKind::RidgeLogRun, "roof"),
-    structure("ROOF PANEL", PartKind::Roof(2.2, 2.2), "roof"),
 ];
 
 pub const FURNITURE: &[CatalogEntry] = &[
     prop("BED", "bed"),
     prop("BED, DOUBLE", "bed-double"),
-    prop("CRADLE", "cradle"),
-    prop("WARDROBE", "wardrobe"),
-    prop("SIDE TABLE", "side-table"),
-    prop("TABLE", "table"),
-    prop("STOOL", "stool"),
-    prop("CHAIR", "chair"),
     prop("BENCH", "bench"),
-    prop("COUCH", "couch"),
-    prop("HEARTH", "hearth"),
+    prop("CHAIR", "chair"),
+    prop("CHEST", "chest"),
     CatalogEntry {
         label: "CHIMNEY",
         kind: PartKind::Chimney(1.75),
         stage: "roof",
     },
-    prop("CHEST", "chest"),
-    prop("SHELVES", "shelves"),
+    prop("COUCH", "couch"),
+    prop("CRADLE", "cradle"),
     prop("CUPBOARD", "cupboard"),
+    prop("HEARTH", "hearth"),
+    prop("SHELVES", "shelves"),
+    prop("STOOL", "stool"),
+    prop("TABLE", "table"),
+    prop("TABLE, SIDE", "side-table"),
+    prop("WARDROBE", "wardrobe"),
 ];
 
 pub const DECOR: &[CatalogEntry] = &[
-    prop("MANNEQUIN", "mannequin"),
     prop("ANVIL", "anvil"),
-    prop("LOOM", "loom"),
-    prop("PLANTER", "planter"),
+    prop("BARREL", "barrel"),
+    prop("BASKET", "basket"),
+    prop("CRATE", "crate"),
     prop("FENCE", "fence"),
     prop("LADDER", "ladder"),
-    prop("BARREL", "barrel"),
-    prop("CRATE", "crate"),
-    prop("COOKING POT", "pot"),
-    prop("BASKET", "basket"),
+    prop("LOOM", "loom"),
+    prop("MANNEQUIN", "mannequin"),
+    prop("PLANTER", "planter"),
+    prop("POT, COOKING", "pot"),
     prop("RUG", "rug"),
-    prop("WOODPILE", "woodpile"),
-    prop("CANDLE STAND", "candle"),
     prop("SACK", "sack"),
+    prop("STAND, CANDLE", "candle"),
     prop("TROUGH", "trough"),
+    prop("WOODPILE", "woodpile"),
 ];
 
 pub const WIDGETS: &[(&str, &str, f32)] = &[
@@ -453,18 +394,6 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             shade,
             1.0,
             Shape::Wedge,
-            0.0,
-        )
-    };
-    // A log: a round pole running the part's length.
-    let log = |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32| {
-        Slab(
-            Vec3::new(x, y, z),
-            Vec3::new(sx, sy, sz),
-            ramp.to_string(),
-            shade,
-            1.0,
-            Shape::Log,
             0.0,
         )
     };
@@ -676,13 +605,15 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 0.0, 0.0625, 0.0, 0.25, 0.125, 0.25, "earth", 0.4, 0.0,
             )]
         }
-        PartKind::RidgeLog(long) => {
-            // A pole a quarter-metre through, sitting in the V where the
-            // slopes meet, so its belly is a touch below the apex.
-            vec![log(0.0, -0.0625, 0.0, *long, 0.375, 0.375, "wood", 0.45)]
+        PartKind::Beam(long) => {
+            // The corner post's own timber, laid over. It rests ON its origin
+            // rather than straddling it, the way the post stands on its foot -
+            // so a beam dropped on a wall top sits on the wall rather than half
+            // inside it.
+            vec![slab(0.0, 0.1875, 0.0, *long, 0.375, 0.375, "wood", 0.45)]
         }
-        PartKind::RidgeLogRun => {
-            vec![log(0.0, -0.0625, 0.0, 0.25, 0.375, 0.375, "wood", 0.45)]
+        PartKind::BeamRun => {
+            vec![slab(0.0, 0.1875, 0.0, 0.25, 0.375, 0.375, "wood", 0.45)]
         }
         PartKind::Trim { long, stone } => {
             let (ramp, shade) = if *stone {
@@ -1001,17 +932,6 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(0.0, 1.9375, 0.0, 1.25, 0.125, 0.375, "wood", 0.45),
             slab(0.0, 1.375, -0.03125, 0.125, 1.0, 0.1875, "wood", 0.4),
             slab(0.0, 1.375, -0.03125, 1.0, 0.125, 0.1875, "wood", 0.4),
-        ],
-        PartKind::Prop("trim-corner") => vec![
-            // An L that wraps an outside corner: two legs meeting at the
-            // origin, turned to face with R. Runs of straight trim meet
-            // its ends on the grid.
-            slab(0.1875, 0.15625, 0.0, 0.375, 0.3125, 0.125, "wood", 0.5),
-            slab(0.0, 0.15625, 0.1875, 0.125, 0.3125, 0.375, "wood", 0.5),
-        ],
-        PartKind::Prop("trim-corner-stone") => vec![
-            slab(0.1875, 0.15625, 0.0, 0.375, 0.3125, 0.125, "stone", 0.55),
-            slab(0.0, 0.15625, 0.1875, 0.125, 0.3125, 0.375, "stone", 0.55),
         ],
         PartKind::Prop("steps") => vec![
             // Three treads rising the foundation's 0.375, from +X.
@@ -1541,9 +1461,10 @@ pub fn part_name(kind: &PartKind) -> String {
             }
         }
         PartKind::Gable(long, pitch) => format!("gable-{long}x{pitch}"),
+        PartKind::Beam(long) => format!("beam-{long}"),
+        PartKind::BeamRun => "beamrun".to_string(),
         PartKind::Ridge(long) => format!("ridge-{long}"),
         PartKind::Chimney(drop) => format!("chimney-{drop}"),
-        PartKind::RidgeLog(long) => format!("ridgelog-{long}"),
         PartKind::GableRoof(long, span, over, pitch) => {
             format!("gableroof-{long}x{span}x{over}x{pitch}")
         }
@@ -1556,7 +1477,6 @@ pub fn part_name(kind: &PartKind) -> String {
         | PartKind::SegRun { .. }
         | PartKind::GableRun
         | PartKind::RidgeRun
-        | PartKind::RidgeLogRun
         | PartKind::GableRoofRun
         | PartKind::FloorRun
         | PartKind::FoundationRun
@@ -1592,11 +1512,11 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
         // The first chimneys, from before the shaft could reach.
         return Some(PartKind::Chimney(0.0));
     }
-    if let Some(rest) = name.strip_prefix("ridgelog-") {
-        return rest.parse::<f32>().ok().map(PartKind::RidgeLog);
-    }
     if let Some(rest) = name.strip_prefix("ridge-") {
         return rest.parse::<f32>().ok().map(PartKind::Ridge);
+    }
+    if let Some(rest) = name.strip_prefix("beam-") {
+        return rest.parse::<f32>().ok().map(PartKind::Beam);
     }
     if let Some(rest) = name.strip_prefix("gable-") {
         // Two numbers now, its width and its pitch. One is a gable from before
@@ -1812,7 +1732,6 @@ pub fn dress_part(
             Mesh3d(match shape {
                 Shape::Wedge => meshes.add(wedge_mesh(false)),
                 Shape::Ridge => meshes.add(wedge_mesh(true)),
-                Shape::Log => meshes.add(log_mesh()),
                 Shape::Box => meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
             }),
             MeshMaterial3d(materials.add(StandardMaterial {
@@ -1865,15 +1784,37 @@ fn dress_ghost(
 enum Deed {
     /// Break a made part into the parts it is made of.
     Ungroup,
+    /// Say what a part IS - which decides what comes off with the roof, what
+    /// the walls are made of, and what the village can walk through.
+    Nature(&'static str),
 }
 
 impl Deed {
     fn label(self) -> &'static str {
         match self {
             Deed::Ungroup => "UNGROUP",
+            Deed::Nature("roof") => "PART OF THE ROOF",
+            Deed::Nature("walls") => "PART OF THE WALLS",
+            Deed::Nature("frame") => "PART OF THE FRAME",
+            Deed::Nature("footing") => "PART OF THE FOOTING",
+            Deed::Nature(_) => "FURNISHING",
         }
     }
 }
+
+/// The natures a maker can hand a part, in the order they are offered.
+///
+/// Brett's idea, and it takes a rule the bench was enforcing by TYPE and hands
+/// it to the maker: "we could tag an item as a roof peice... then I dont need
+/// special peices for the roof...any peice could be a roof piece." A plank laid
+/// as a canopy is a roof, and until now only the parts the bench thought of as
+/// roofs came off when H was pressed.
+///
+/// Nothing new had to be stored for it. A part already carries what it is — the
+/// cutaway reads it, the game reads it to learn a building's wall and roof
+/// cloth, and the walkable shell is what stands on `walls` or `frame`. It was
+/// simply never something a maker could change after placing.
+const NATURES: [&str; 5] = ["footing", "frame", "walls", "roof", "furnishing"];
 
 /// What may be done to this part.
 ///
@@ -1884,10 +1825,13 @@ impl Deed {
 /// no part for a jamb, so breaking one up would leave nothing but a hole where a
 /// door used to be.
 fn deeds_for(kind: &PartKind) -> Vec<Deed> {
-    match kind {
+    let mut deeds = match kind {
         PartKind::GableRoof(..) => vec![Deed::Ungroup],
         _ => Vec::new(),
-    }
+    };
+    // Every part can be told what it is; only some can be broken up.
+    deeds.extend(NATURES.iter().map(|nature| Deed::Nature(nature)));
+    deeds
 }
 
 /// The menu itself. Which part raised it rides on each LINE, since that is
@@ -1977,7 +1921,11 @@ fn raise_part_menu(
             GlobalZIndex(60),
         ))
         .id();
+    let wearing = record.stage.clone();
     for deed in deeds {
+        // The nature it already has is marked, so the menu answers "what is
+        // this?" as well as offering to change it.
+        let standing = matches!(deed, Deed::Nature(nature) if nature == wearing);
         let line = commands
             .spawn((
                 MenuLine { deed, part },
@@ -1991,13 +1939,21 @@ fn raise_part_menu(
             ))
             .id();
         commands.spawn((
-            Text::new(deed.label()),
+            Text::new(if standing {
+                format!("- {}", deed.label())
+            } else {
+                format!("  {}", deed.label())
+            }),
             TextFont {
                 font: fonts.display.clone().into(),
                 font_size: FontSize::Px(11.0),
                 ..default()
             },
-            TextColor(theme::accent(&palette)),
+            TextColor(if standing {
+                theme::accent(&palette)
+            } else {
+                theme::text_dim(&palette)
+            }),
             ChildOf(line),
         ));
     }
@@ -2014,7 +1970,7 @@ fn work_part_menu(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut lines: Query<(&MenuLine, &Interaction, &mut BackgroundColor)>,
     menus: Query<Entity, With<PartMenu>>,
-    placed: Query<&Placed, Without<Ghost>>,
+    mut placed: Query<&mut Placed, Without<Ghost>>,
 ) {
     if menus.is_empty() {
         return;
@@ -2043,19 +1999,31 @@ fn work_part_menu(
     if chosen.is_none() && !dismissed {
         return;
     }
-    if let Some((Deed::Ungroup, part)) = chosen
-        && let Ok(record) = placed.get(part)
-        && let Some(kind) = kind_from_name(&record.part)
-    {
-        ungroup(
-            &mut commands,
-            &mut meshes,
-            &mut materials,
-            &palette,
-            &kind,
-            record,
-            part,
-        );
+    match chosen {
+        Some((Deed::Ungroup, part)) => {
+            if let Ok(record) = placed.get(part)
+                && let Some(kind) = kind_from_name(&record.part)
+            {
+                let record = record.clone();
+                ungroup(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    &palette,
+                    &kind,
+                    &record,
+                    part,
+                );
+            }
+        }
+        Some((Deed::Nature(nature), part)) => {
+            // Nothing to redraw: a part's nature changes what the bench and the
+            // village make of it, not what it looks like.
+            if let Ok(mut record) = placed.get_mut(part) {
+                record.stage = nature.to_string();
+            }
+        }
+        None => {}
     }
     for menu in &menus {
         commands.entity(menu).despawn();
@@ -3191,8 +3159,6 @@ fn is_structure(kind: &PartKind) -> bool {
             | PartKind::Ridge(..)
             | PartKind::Chimney(..)
             | PartKind::RidgeRun
-            | PartKind::RidgeLog(..)
-            | PartKind::RidgeLogRun
             | PartKind::GableRoof(..)
             | PartKind::GableRoofRun
             | PartKind::Prop("steps")
@@ -5777,33 +5743,19 @@ pub(crate) fn lift_roofs(
         };
     }
     for (record, mut visibility) in &mut parts {
-        let kind = kind_from_name(&record.part);
-        let roofish = record.stage == "roof"
-            || matches!(
-                kind,
-                Some(
-                    PartKind::Gable(..)
-                        | PartKind::Ridge(..)
-                        | PartKind::RidgeLog(..)
-                        | PartKind::GableRoof(..)
-                        | PartKind::Roof(..)
-                        | PartKind::Chimney(..)
-                )
-            );
-        // The walls, and everything set INTO the walls: a door with no
-        // wall around it is a door standing in a field.
-        let wallish = !roofish
-            && (record.stage == "walls"
-                || matches!(
-                    kind,
-                    Some(
-                        PartKind::Wall(..)
-                            | PartKind::Seg { .. }
-                            | PartKind::Prop(
-                                "door" | "door-double" | "doorway" | "window" | "pole"
-                            )
-                    )
-                ));
+        // What a part IS, and nothing else. This used to ask the part's KIND as
+        // well - a gable roof was roof-ish whatever it had been told, a wall was
+        // wall-ish - which was a sensible net while nobody could say otherwise
+        // and became an override the moment they could. Brett: "any peice could
+        // be a roof piece", and the other way about for walls. So the tag is the
+        // only word: a plank tagged as roof comes off with the roof, and a roof
+        // panel tagged as walls stays until the walls come down.
+        //
+        // The frame comes down with the walls. What WallsDown means is "show me
+        // the ground it stands on", and a hall's posts left standing over bare
+        // footings is not that.
+        let roofish = record.stage == "roof";
+        let wallish = record.stage == "walls" || record.stage == "frame";
         let cut = match lifted.0 {
             Cutaway::Whole => true,
             Cutaway::RoofOff => !roofish,
@@ -5939,12 +5891,10 @@ mod bake {
                         Shape::Box => "box",
                         Shape::Wedge => "wedge",
                         Shape::Ridge => "ridge",
-                        Shape::Log => "log",
                     };
                     let stage = match kind {
                         PartKind::Gable(..)
                         | PartKind::Ridge(..)
-                        | PartKind::RidgeLog(..)
                         | PartKind::GableRoof(..)
                         | PartKind::Roof(..)
                         | PartKind::Chimney(..) => "roof",
@@ -6199,6 +6149,34 @@ mod roof_tests {
     }
 
     #[test]
+    fn the_shelf_reads_in_order_and_says_the_noun_first() {
+        // Two rules, and a test rather than good intentions: a shelf drifts one
+        // well-meant entry at a time, and nobody notices until it is a jumble.
+        for (drawer, entries) in [
+            ("STRUCTURE", STRUCTURE),
+            ("FURNITURE", FURNITURE),
+            ("DECOR", DECOR),
+        ] {
+            let labels: Vec<&str> = entries.iter().map(|entry| entry.label).collect();
+            let mut sorted = labels.clone();
+            sorted.sort_unstable();
+            assert_eq!(labels, sorted, "{drawer} is out of order");
+
+            for label in labels {
+                // The noun first, its qualifiers after commas: TRIM, STONE,
+                // STRETCH - never STONE TRIM. So a family sorts together, which
+                // is the whole reason for the order.
+                let head = label.split(',').next().unwrap_or_default();
+                assert!(
+                    !head.contains(' '),
+                    "{drawer}: \"{label}\" leads with something other than its \
+                     noun; qualifiers go after a comma"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn a_work_from_before_stages_becomes_the_steps_it_already_rose_in() {
         // The migration is the whole risk of this format change: every building
         // on disk is a flat list, and it has to come back as exactly the steps
@@ -6259,17 +6237,28 @@ mod roof_tests {
         // Ungroup is only offered where the pieces have somewhere to go. If a
         // kind is ever added here without a part to become, this is where it
         // shows up rather than in a maker's hands.
-        assert_eq!(
-            deeds_for(&PartKind::GableRoof(6.0, 4.0, 0.25, 45.0)).len(),
-            1,
+        let comes_apart =
+            |kind: &PartKind| deeds_for(kind).iter().any(|deed| *deed == Deed::Ungroup);
+        assert!(
+            comes_apart(&PartKind::GableRoof(6.0, 4.0, 0.25, 45.0)),
             "a gable roof is two roof panels and two gables, so it comes apart"
         );
         assert!(
-            deeds_for(&PartKind::Prop("door")).is_empty(),
+            !comes_apart(&PartKind::Prop("door")),
             "a door is jambs and a leaf and the bench has a part for neither: \
              breaking one up would leave a hole where a door used to be"
         );
-        assert!(deeds_for(&PartKind::Wall(2.0)).is_empty(), "a wall is a wall");
+        assert!(!comes_apart(&PartKind::Wall(2.0)), "a wall is a wall");
+
+        // And every part can be told what it is, whether or not it comes apart.
+        for kind in [PartKind::Wall(2.0), PartKind::GableRoof(6.0, 4.0, 0.25, 30.0)] {
+            for nature in NATURES {
+                assert!(
+                    deeds_for(&kind).contains(&Deed::Nature(nature)),
+                    "{nature} is not on offer for every part"
+                );
+            }
+        }
     }
 
     #[test]
