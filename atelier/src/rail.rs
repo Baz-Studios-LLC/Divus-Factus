@@ -123,6 +123,24 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
         ));
     }
 
+    // The build steps, on their own row under the modes. Empty here and filled
+    // by `hang_the_stage_bar`, because how many steps there are is a property of
+    // the work on the bench rather than of the bench itself: a work opens with
+    // as many as its file declares, and a maker adds and drops them while
+    // working.
+    commands.spawn((
+        StageBar,
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(0.0),
+            top: Val::Px(38.0),
+            width: Val::Percent(100.0),
+            flex_direction: FlexDirection::Row,
+            justify_content: JustifyContent::Center,
+            column_gap: Val::Px(4.0),
+            ..default()
+        },
+    ));
 
     let rail = commands
         .spawn((
@@ -585,7 +603,6 @@ fn work_stage_bar(
 /// Mode presses set the tool; the standing mode wears the gold.
 fn work_mode_bar(
     palette: Res<Palette>,
-    brush: Res<crate::builder::Brush>,
     mut mode: ResMut<crate::gizmo::ToolMode>,
     mut buttons: Query<(
         &Interaction,
@@ -609,20 +626,18 @@ fn work_mode_bar(
         if *border != dress {
             *border = dress;
         }
-        // The paint button wears the brush, so the colour about to be laid
-        // down is on screen rather than in the maker's head. An empty brush
-        // strips paint rather than adding it, and looks like the other buttons.
-        let wanted = BackgroundColor(match (button.0, brush.ramp.as_deref()) {
-            (crate::gizmo::ToolMode::Paint, Some(ramp)) => {
-                let colour = palette.shade(ramp, brush.shade);
-                if standing {
-                    colour
-                } else {
-                    colour.with_alpha(0.55)
-                }
-            }
-            _ if standing => Color::srgb(0.075, 0.082, 0.102),
-            _ => Color::BLACK.with_alpha(0.18),
+        // Every mode button says the same thing the same way: the fill means
+        // STANDING and nothing else. PAINT used to wear the brush's own colour,
+        // which made it look chosen while another tool was in hand - Brett:
+        // "Paint wasnt active, but the button isnt following the other buttons
+        // conventions". The brush has a square of its own at the head of the
+        // palette, which is a better place for it anyway: it is only wanted
+        // while painting, and there it can be the size of a colour rather than
+        // the size of a word.
+        let wanted = BackgroundColor(if standing {
+            Color::srgb(0.075, 0.082, 0.102)
+        } else {
+            Color::BLACK.with_alpha(0.18)
         });
         if fill.0 != wanted.0 {
             *fill = wanted;
