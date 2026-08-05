@@ -2617,9 +2617,13 @@ fn saved_work_row(
     path: std::path::PathBuf,
     label: &'static str,
 ) {
+    // Bounded by the shelf it hangs in. A row with no width of its own takes
+    // the width of the longest name in it, and a long one carried the delete
+    // button clean off the panel - Brett: "Long names hang off the shelf."
     let row = commands
         .spawn((
             Node {
+                width: Val::Percent(100.0),
                 flex_direction: FlexDirection::Row,
                 column_gap: Val::Px(3.0),
                 align_items: AlignItems::Stretch,
@@ -2634,6 +2638,9 @@ fn saved_work_row(
             Interaction::default(),
             Node {
                 flex_grow: 1.0,
+                // A flex child will not shrink below the width of its own
+                // contents unless it is told it may, and a name is contents.
+                min_width: Val::Px(0.0),
                 padding: UiRect::axes(Val::Px(9.0), Val::Px(4.0)),
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
@@ -2653,6 +2660,9 @@ fn saved_work_row(
             },
             Interaction::default(),
             Node {
+                // Never squeezed: the way to be rid of a work should not get
+                // harder to hit as its name gets longer.
+                flex_shrink: 0.0,
                 padding: UiRect::axes(Val::Px(7.0), Val::Px(4.0)),
                 border: UiRect::all(Val::Px(1.0)),
                 align_items: AlignItems::Center,
@@ -2699,6 +2709,10 @@ fn button_label(
 ) {
     commands.spawn((
         Text::new(label),
+        // Wrapped ANYWHERE, not at spaces. "LONGHOUSE1-10PEOPLE" is one word to
+        // a line breaker, and a word that does not fit is a word that hangs off
+        // the panel.
+        TextLayout::new(bevy::text::Justify::Left, bevy::text::LineBreak::AnyCharacter),
         TextFont {
             font: fonts.text.clone().into(),
             font_size: FontSize::Px(12.0),
