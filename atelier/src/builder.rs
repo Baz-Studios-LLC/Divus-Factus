@@ -1442,7 +1442,10 @@ impl Plugin for BuilderPlugin {
             .init_resource::<SnapGrid>()
             .init_resource::<Clipboard>()
             .init_resource::<RoofsLifted>()
-            .add_systems(Startup, raise_shelf.after(crate::rail::raise_rail))
+            .add_systems(
+                Startup,
+                (raise_shelf, raise_palette).after(crate::rail::raise_rail),
+            )
             // Two chains, because a tuple of systems stops at twenty:
             // the hand's work, then the bench's bookkeeping after it.
             .add_systems(
@@ -1454,6 +1457,7 @@ impl Plugin for BuilderPlugin {
                     work_templates,
                     steer_hand,
                     paint_the_work,
+                    work_palette,
                     toggle_snap_mode,
                     disarm_on_mode,
                     turn_part,
@@ -1802,6 +1806,196 @@ fn dress_ghost(
     }
 }
 
+// -------------------------------------------------------------- the palette
+
+/// The palette panel, shown only while painting.
+#[derive(Component)]
+struct PalettePanel;
+
+/// One colour a maker can arm. `ramp` empty is the bare swatch: painting with
+/// it strips a part back to its own colours.
+#[derive(Component, Clone)]
+struct Swatch {
+    ramp: Option<String>,
+    shade: f32,
+}
+
+/// The shades a swatch row offers, which are the shades the keys step through —
+/// so a colour picked with the mouse can be nudged with `-` and `=` and land on
+/// another swatch rather than between two of them.
+const SWATCHES: [f32; 5] = [0.0, 0.25, 0.5, 0.75, 1.0];
+
+/// Builds the palette once, standing hidden until the paint tool is chosen.
+///
+/// Brett: "a palet comes up on the screen. You have an armed color and click a
+/// part to paint it." Which is the right shape and better than what the keys
+/// alone could do — walking `[` and `]` through twenty-four ramps is guessing at
+/// a colour, and a palette is looking at one. The keys stay for nudging a shade
+/// once the eye is close.
+fn raise_palette(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>) {
+    let panel = commands
+        .spawn((
+            PalettePanel,
+            // In the SHELF's place, not beside it. The shelf holds what a
+            // building is made of and this holds what it is coloured with, and a
+            // maker who is painting is not placing - so one panel stands at a
+            // time and neither has to be squeezed to make room for the other.
+            // (The left edge is spoken for: the key rail lives there.)
+            Node {
+                position_type: PositionType::Absolute,
+                right: Val::Px(0.0),
+                top: Val::Px(0.0),
+                bottom: Val::Px(0.0),
+                width: Val::Px(202.0),
+                flex_direction: FlexDirection::Column,
+                padding: UiRect::all(Val::Px(10.0)),
+                row_gap: Val::Px(2.0),
+                border: UiRect::left(Val::Px(1.0)),
+                overflow: Overflow::scroll_y(),
+                ..default()
+            },
+            BackgroundColor(theme::panel_bg()),
+            BorderColor::all(theme::panel_border(&palette)),
+            Visibility::Hidden,
+        ))
+        .id();
+    commands.spawn((
+        Text::new("THE PALETTE"),
+        TextFont {
+            font: fonts.display.clone().into(),
+            font_size: FontSize::Px(13.0),
+            ..default()
+        },
+        TextColor(theme::accent(&palette)),
+        Node {
+            margin: UiRect::bottom(Val::Px(6.0)),
+            ..default()
+        },
+        ChildOf(panel),
+    ));
+
+    // The bare swatch first, because stripping a part is the one stroke a maker
+    // cannot reach any other way once a part has been painted.
+    let bare = commands
+        .spawn((
+            Swatch {
+                ramp: None,
+                shade: 0.5,
+            },
+            Interaction::default(),
+            Node {
+                padding: UiRect::axes(Val::Px(8.0), Val::Px(4.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                margin: UiRect::bottom(Val::Px(6.0)),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.18)),
+            BorderColor::all(theme::panel_border(&palette)),
+            ChildOf(panel),
+        ))
+        .id();
+    commands.spawn((
+        Text::new("BARE - its own colours"),
+        TextFont {
+            font: fonts.display.clone().into(),
+            font_size: FontSize::Px(10.0),
+            ..default()
+        },
+        TextColor(theme::text_dim(&palette)),
+        ChildOf(bare),
+    ));
+
+    let names: Vec<String> = palette.names().map(|n| n.to_string()).collect();
+    for name in names {
+        let row = commands
+            .spawn((
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(2.0),
+                    ..default()
+                },
+                ChildOf(panel),
+            ))
+            .id();
+        commands.spawn((
+            Text::new(name.clone()),
+            TextFont {
+                font: fonts.display.clone().into(),
+                font_size: FontSize::Px(9.0),
+                ..default()
+            },
+            TextColor(theme::text_dim(&palette)),
+            Node {
+                width: Val::Px(74.0),
+                ..default()
+            },
+            ChildOf(row),
+        ));
+        for shade in SWATCHES {
+            commands.spawn((
+                Swatch {
+                    ramp: Some(name.clone()),
+                    shade,
+                },
+                Interaction::default(),
+                Node {
+                    width: Val::Px(20.0),
+                    height: Val::Px(18.0),
+                    border: UiRect::all(Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(palette.shade(&name, shade)),
+                BorderColor::all(Color::BLACK.with_alpha(0.35)),
+                ChildOf(row),
+            ));
+        }
+    }
+}
+
+/// Shows the palette while painting, arms whatever is clicked, and rings the
+/// armed colour in gold.
+fn work_palette(
+    palette: Res<Palette>,
+    mode: Res<crate::gizmo::ToolMode>,
+    mut brush: ResMut<Brush>,
+    mut panels: Query<&mut Visibility, With<PalettePanel>>,
+    mut swatches: Query<(&Swatch, &Interaction, &mut BorderColor)>,
+) {
+    let painting = *mode == crate::gizmo::ToolMode::Paint;
+    for mut visibility in &mut panels {
+        let wanted = if painting {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+        if *visibility != wanted {
+            *visibility = wanted;
+        }
+    }
+    if !painting {
+        return;
+    }
+    for (swatch, interaction, _) in &swatches {
+        if *interaction == Interaction::Pressed {
+            brush.ramp = swatch.ramp.clone();
+            brush.shade = swatch.shade;
+        }
+    }
+    for (swatch, _, mut border) in &mut swatches {
+        let armed = swatch.ramp.as_deref() == brush.ramp.as_deref()
+            && (swatch.ramp.is_none() || (swatch.shade - brush.shade).abs() < 1e-4);
+        let dress = BorderColor::all(if armed {
+            theme::accent(&palette)
+        } else {
+            Color::BLACK.with_alpha(0.35)
+        });
+        if *border != dress {
+            *border = dress;
+        }
+    }
+}
+
 // ---------------------------------------------------------------- the shelf
 
 fn raise_shelf(
@@ -2115,12 +2309,23 @@ fn button_label(
 }
 
 /// The shelf belongs to the Builder bench alone.
-fn show_shelf(bench: Res<Bench>, mut shelves: Query<&mut Visibility, With<Shelf>>) {
-    if !bench.is_changed() {
+/// Which of the two right-hand panels is standing.
+///
+/// The shelf and the palette share an edge, and this is the ONE place that says
+/// which is on it: a second system reaching for either one would be two writers
+/// on one value, and they would take turns hiding each other's panel.
+fn show_shelf(
+    bench: Res<Bench>,
+    mode: Res<crate::gizmo::ToolMode>,
+    mut shelves: Query<&mut Visibility, With<Shelf>>,
+) {
+    if !bench.is_changed() && !mode.is_changed() {
         return;
     }
+    // Painting is not placing: the parts go away while the colours are out.
+    let standing = *bench == Bench::Builder && *mode != crate::gizmo::ToolMode::Paint;
     for mut visibility in &mut shelves {
-        *visibility = if *bench == Bench::Builder {
+        *visibility = if standing {
             Visibility::Inherited
         } else {
             Visibility::Hidden
