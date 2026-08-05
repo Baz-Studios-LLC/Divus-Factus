@@ -589,7 +589,13 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             for way in [-1.0_f32, 1.0] {
                 sides.push(leaning(
                     0.0,
-                    rise * 0.5 + thick * 0.5,
+                    // Down the slope as well as out along it. The panel grows
+                    // by the overhang and its middle has to travel half that
+                    // distance ALONG its own pitch to keep the ridge end where
+                    // it was - the outward half was here and the downward half
+                    // was not, so every pull on the eaves lifted the whole roof
+                    // off the gable it was sitting on. Brett found it at once.
+                    rise * 0.5 + thick * 0.5 - over * 0.5 * pitch.sin(),
                     way * (half * 0.5 + over * 0.5 * pitch.cos()),
                     long + over * 2.0,
                     thick,
@@ -5146,6 +5152,38 @@ mod roof_tests {
             panic!("the oldest roofs no longer open");
         };
         assert_eq!((long, span, over, pitch), (6.0, 4.0, 0.25, ROOF_PITCH));
+    }
+
+    /// The highest point anything in a roof reaches: the ridge.
+    ///
+    /// Measured through each piece's own lean, because the slopes are tilted
+    /// boxes and half their height is not their top.
+    fn ridge_top(span: f32, over: f32, pitch: f32) -> f32 {
+        body_of(&PartKind::GableRoof(6.0, span, over, pitch), None)
+            .iter()
+            .map(|Slab(at, size, _, _, _, _, lean)| {
+                let reach = (size.y * lean.cos()).abs() + (size.z * lean.sin()).abs();
+                at.y + reach * 0.5
+            })
+            .fold(f32::MIN, f32::max)
+    }
+
+    #[test]
+    fn pulling_the_eaves_does_not_lift_the_roof() {
+        // The overhang reaches further DOWN the slope; it does not raise the
+        // ridge. A roof that climbed as its eaves were pulled left daylight
+        // between itself and the gable it sits on.
+        for pitch in [20.0, 30.0, 45.0, 60.0] {
+            let seated = ridge_top(7.0, 0.0, pitch);
+            for over in [0.25, 0.5, 1.0, 2.0] {
+                let lifted = ridge_top(7.0, over, pitch);
+                assert!(
+                    (lifted - seated).abs() < 1e-3,
+                    "at {pitch} degrees an overhang of {over} moved the ridge \
+                     from {seated} to {lifted}"
+                );
+            }
+        }
     }
 
     #[test]
