@@ -21,7 +21,7 @@ pub struct Box3 {
     pub rgb: [u8; 3],
     #[serde(default = "opaque")]
     pub alpha: f32,
-    /// "box", "wedge", "ridge" or "mitre" - the bench's own shapes.
+    /// "box", "wedge", "ridge", "mitre" or "mitre-back" - the bench's shapes.
     #[serde(default)]
     pub form: String,
     /// The cloth this piece was painted in, named: "wood:0.7". The
@@ -201,13 +201,24 @@ pub fn beds(kind: super::BuildingKind) -> Option<usize> {
 /// The vertices are the Atelier's, corner for corner. The two programs share no
 /// code and never will, so the only thing keeping a shape the same shape in both
 /// is that somebody wrote it out twice and said so - see `FORMATS.md`.
-fn mitre() -> Mesh {
+fn mitre(mirrored: bool) -> Mesh {
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut normals: Vec<[f32; 3]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
+    // Mirrored, it is full at +X instead - the other hand of the same cut, for
+    // the other end of a beam.
     let mut face = |corners: &[[f32; 3]], normal: [f32; 3]| {
         let first = positions.len() as u32;
-        for corner in corners {
+        let mut corners: Vec<[f32; 3]> = corners.to_vec();
+        let mut normal = normal;
+        if mirrored {
+            for corner in &mut corners {
+                corner[0] = -corner[0];
+            }
+            corners.reverse();
+            normal[0] = -normal[0];
+        }
+        for corner in &corners {
             positions.push(*corner);
             normals.push(normal);
         }
@@ -370,7 +381,8 @@ pub fn raise_baked(
     let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
     let wedge = meshes.add(prism(false));
     let ridge = meshes.add(prism(true));
-    let mitred = meshes.add(mitre());
+    let mitred = meshes.add(mitre(false));
+    let mitred_back = meshes.add(mitre(true));
     let framed = has_frame(work);
     for piece in work
         .boxes
@@ -392,6 +404,7 @@ pub fn raise_baked(
             "wedge" => wedge.clone(),
             "ridge" => ridge.clone(),
             "mitre" => mitred.clone(),
+            "mitre-back" => mitred_back.clone(),
             _ => cube.clone(),
         };
         let mut raised = commands.spawn((

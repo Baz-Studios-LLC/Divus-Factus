@@ -68,6 +68,9 @@ enum Shape {
     /// A right-angle prism: a box with one end cut through at an angle, full
     /// height at -X and falling away to +X. What a saw leaves.
     Mitre,
+    /// The same cut the other way about: full height at +X. Which hand is
+    /// wanted depends on which end of a beam is being capped.
+    MitreBack,
 }
 
 
@@ -82,13 +85,28 @@ enum Shape {
 /// slab's own proportions make it: a mitre one long and one high is
 /// forty-five degrees, and squashing it flatter or steeper is what sizing it
 /// does. The full-height end stands at -X and the cut falls away to +X.
-fn mitre_mesh() -> Mesh {
+fn mitre_mesh(mirrored: bool) -> Mesh {
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut normals: Vec<[f32; 3]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
+    // Mirrored, the cut faces the other way: full height at +X instead. Which
+    // hand a mitre needs depends on which END of a beam it caps, so both exist -
+    // a slab may lean about its own X, and a lean can turn the material to the
+    // other SIDE but cannot swap which end is full.
     let mut face = |corners: &[[f32; 3]], normal: [f32; 3]| {
         let first = positions.len() as u32;
-        for corner in corners {
+        let mut corners: Vec<[f32; 3]> = corners.to_vec();
+        let mut normal = normal;
+        if mirrored {
+            for corner in &mut corners {
+                corner[0] = -corner[0];
+            }
+            // Mirroring turns a face inside out; walking it the other way puts
+            // it right again.
+            corners.reverse();
+            normal[0] = -normal[0];
+        }
+        for corner in &corners {
             positions.push(*corner);
             normals.push(normal);
         }
@@ -241,8 +259,14 @@ pub enum PartKind {
     /// wall narrowing to a peak at the roof's own thirty degrees.
     Gable(f32, f32),
     /// A squared timber laid along its own length: the corner post's section,
-    /// on its side and as long as it is drawn.
-    Beam(f32),
+    /// on its side and as long as it is drawn — and how far each end is cut
+    /// back at an angle, nought for a square end.
+    ///
+    /// The cut is a RUN, not an angle: how far along the beam the saw travels
+    /// while crossing its full height. That is the number the roof hands over —
+    /// the difference between where the top corner meets the slope and where the
+    /// bottom does — and it needs no trigonometry at either end.
+    Beam(f32, f32, f32),
     BeamRun,
     /// The cap that hides the seam where two slopes meet.
     Ridge(f32),
@@ -313,7 +337,7 @@ impl PartKind {
             },
             PartKind::GableRun => PartKind::Gable(w, ROOF_PITCH_DEGREES),
             PartKind::RidgeRun => PartKind::Ridge(w),
-            PartKind::BeamRun => PartKind::Beam(w),
+            PartKind::BeamRun => PartKind::Beam(w, 0.0, 0.0),
             // A hand's breadth of overhang to begin with; the gold
             // handles pull it further without moving the gables.
             PartKind::GableRoofRun => PartKind::GableRoof(w, d, 0.25, ROOF_PITCH_DEGREES),
@@ -682,12 +706,46 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 0.0, 0.0625, 0.0, 0.25, 0.125, 0.25, "earth", 0.4, 0.0,
             )]
         }
-        PartKind::Beam(long) => {
+        PartKind::Beam(long, cut_high, cut_low) => {
             // The corner post's own timber, laid over. It rests ON its origin
             // rather than straddling it, the way the post stands on its foot -
             // so a beam dropped on a wall top sits on the wall rather than half
             // inside it.
-            vec![slab(0.0, 0.1875, 0.0, *long, 0.375, 0.375, "wood", 0.45)]
+            //
+            // A cut end is the square box stopping short and a prism finishing
+            // the job: full height where it joins, tapering to nothing where the
+            // saw came out. The two ends want opposite hands of that prism,
+            // since the full face points inward at both.
+            let thick = 0.375;
+            let (high, low) = (cut_high.max(0.0), cut_low.max(0.0));
+            let square = (long - high - low).max(0.0625);
+            let middle = (low - high) * 0.5;
+            let mut body = vec![slab(
+                middle, 0.1875, 0.0, square, thick, thick, "wood", 0.45,
+            )];
+            if high > 0.0 {
+                body.push(Slab(
+                    Vec3::new(middle + square * 0.5 + high * 0.5, 0.1875, 0.0),
+                    Vec3::new(high, thick, thick),
+                    "wood".to_string(),
+                    0.45,
+                    1.0,
+                    Shape::Mitre,
+                    0.0,
+                ));
+            }
+            if low > 0.0 {
+                body.push(Slab(
+                    Vec3::new(middle - square * 0.5 - low * 0.5, 0.1875, 0.0),
+                    Vec3::new(low, thick, thick),
+                    "wood".to_string(),
+                    0.45,
+                    1.0,
+                    Shape::MitreBack,
+                    0.0,
+                ));
+            }
+            body
         }
         PartKind::BeamRun => {
             vec![slab(0.0, 0.1875, 0.0, 0.25, 0.375, 0.375, "wood", 0.45)]
@@ -1590,7 +1648,7 @@ pub fn part_name(kind: &PartKind) -> String {
             }
         }
         PartKind::Gable(long, pitch) => format!("gable-{long}x{pitch}"),
-        PartKind::Beam(long) => format!("beam-{long}"),
+        PartKind::Beam(long, high, low) => format!("beam-{long}x{high}x{low}"),
         PartKind::BeamRun => "beamrun".to_string(),
         PartKind::Ridge(long) => format!("ridge-{long}"),
         PartKind::Chimney(drop) => format!("chimney-{drop}"),
@@ -1645,7 +1703,13 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
         return rest.parse::<f32>().ok().map(PartKind::Ridge);
     }
     if let Some(rest) = name.strip_prefix("beam-") {
-        return rest.parse::<f32>().ok().map(PartKind::Beam);
+        // Three numbers: its length and the cut at each end. One is a beam from
+        // before ends could be cut, and opens square at both.
+        let mut parts = rest.split('x');
+        let long = parts.next()?.parse().ok()?;
+        let high = parts.next().and_then(|n| n.parse().ok()).unwrap_or(0.0);
+        let low = parts.next().and_then(|n| n.parse().ok()).unwrap_or(0.0);
+        return Some(PartKind::Beam(long, high, low));
     }
     if let Some(rest) = name.strip_prefix("gable-") {
         // Two numbers now, its width and its pitch. One is a gable from before
@@ -1862,7 +1926,8 @@ pub fn dress_part(
             Mesh3d(match shape {
                 Shape::Wedge => meshes.add(wedge_mesh(false)),
                 Shape::Ridge => meshes.add(wedge_mesh(true)),
-                Shape::Mitre => meshes.add(mitre_mesh()),
+                Shape::Mitre => meshes.add(mitre_mesh(false)),
+                Shape::MitreBack => meshes.add(mitre_mesh(true)),
                 Shape::Box => meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
             }),
             MeshMaterial3d(materials.add(StandardMaterial {
@@ -2004,7 +2069,15 @@ fn trim_to_roof(
         Vec3::new(0.0, high.y, high.z),
     ];
 
-    let mut reach = [half, half];
+    // Every corner is cast, and BOTH the nearest and the furthest are kept. The
+    // near one is where the saw goes in and the far one is where it comes out -
+    // and the difference between them is the cut. A square end can only stop at
+    // the near one, which is why it stood off the slope by the beam's own
+    // thickness; Brett: "get the angle of the roof and cut the beam at that
+    // angle and delete the escess".
+    let mut nearest = [half, half];
+    let mut furthest = [0.0_f32, 0.0];
+    let mut met = [false, false];
     for (end, way) in [(0usize, 1.0_f32), (1, -1.0)] {
         for corner in corners {
             let from = at + spin * corner;
@@ -2012,21 +2085,38 @@ fn trim_to_roof(
                 if let Some(hit) =
                     ray_meets_box(from, along * way, half, *box_at, *box_half, *box_turn)
                 {
-                    reach[end] = reach[end].min(hit);
+                    nearest[end] = nearest[end].min(hit);
+                    furthest[end] = furthest[end].max(hit);
+                    met[end] = true;
                 }
             }
         }
+        if !met[end] {
+            furthest[end] = half;
+        }
     }
-    if (reach[0] - half).abs() < 1e-3 && (reach[1] - half).abs() < 1e-3 {
+    if !met[0] && !met[1] {
         return None;
     }
+    // The beam reaches as far as the LAST corner to meet the roof; the cut takes
+    // back the wedge between that and the first.
+    let reach = furthest;
+    let cut = [
+        (furthest[0] - nearest[0]).max(0.0),
+        (furthest[1] - nearest[1]).max(0.0),
+    ];
     let trimmed = reach[0] + reach[1];
     if trimmed < 0.125 {
         return None;
     }
-    // The middle walks to stay between the two ends.
     let middle = at + along * (reach[0] - reach[1]) * 0.5;
-    let made = rebuild(((trimmed * 16.0).round() / 16.0).max(0.125));
+    let lattice = |n: f32| (n * 16.0).round() / 16.0;
+    let made = match rebuild(lattice(trimmed).max(0.125)) {
+        // A beam takes its cuts; anything else can only be shortened, since
+        // nothing else has an end to cut.
+        PartKind::Beam(long, ..) => PartKind::Beam(long, lattice(cut[0]), lattice(cut[1])),
+        other => other,
+    };
     let mut moved = record.clone();
     moved.part = part_name(&made);
     moved.at = middle.into();
@@ -2039,11 +2129,13 @@ fn trim_to_roof(
 /// The `long` family: everything a maker draws by pulling it out to size along
 /// its own X. Trimming is only meaningful for these — a part with no length has
 /// no direction to come back along.
-fn length_of(kind: &PartKind) -> Option<(f32, fn(f32) -> PartKind)> {
+fn length_of(kind: &PartKind) -> Option<(f32, Box<dyn Fn(f32) -> PartKind>)> {
     match *kind {
-        PartKind::Beam(long) => Some((long, |n| PartKind::Beam(n))),
-        PartKind::Wall(long) => Some((long, |n| PartKind::Wall(n))),
-        PartKind::Ridge(long) => Some((long, |n| PartKind::Ridge(n))),
+        PartKind::Beam(long, high, low) => {
+            Some((long, Box::new(move |n| PartKind::Beam(n, high, low))))
+        }
+        PartKind::Wall(long) => Some((long, Box::new(PartKind::Wall))),
+        PartKind::Ridge(long) => Some((long, Box::new(PartKind::Ridge))),
         _ => None,
     }
 }
@@ -6314,6 +6406,7 @@ mod bake {
                         Shape::Wedge => "wedge",
                         Shape::Ridge => "ridge",
                         Shape::Mitre => "mitre",
+                        Shape::MitreBack => "mitre-back",
                     };
                     let stage = match kind {
                         PartKind::Gable(..)
@@ -6591,7 +6684,7 @@ mod roof_tests {
         // of roof standing across it at x = 1. The beam must come back to that
         // wall, and its far end must not budge - a part that shortened from both
         // ends would walk out of whatever joint it was seated in.
-        let kind = PartKind::Beam(4.0);
+        let kind = PartKind::Beam(4.0, 0.0, 0.0);
         let record = a_record("beam-4".to_string(), [0.0, 0.0, 0.0], 0.0);
         let roofs = vec![(
             Vec3::new(1.5, 0.1875, 0.0),
@@ -6599,7 +6692,7 @@ mod roof_tests {
             Quat::IDENTITY,
         )];
         let (made, moved) = trim_to_roof(&kind, &record, &roofs).expect("it should trim");
-        let PartKind::Beam(long) = made else {
+        let PartKind::Beam(long, ..) = made else {
             panic!("a beam trims to a beam");
         };
         // The far end was at -2 and stays there; the near end stops at +1.
@@ -6650,7 +6743,7 @@ mod roof_tests {
         // length, so tilting a beam spins it on its axis and leaves it pointing
         // exactly where it was - which is how the first draft of this test came
         // to run a beam along the ground and conclude the roof was unreachable.
-        let kind = PartKind::Beam(8.0);
+        let kind = PartKind::Beam(8.0, 0.0, 0.0);
         let beam = a_record(
             "beam-8".to_string(),
             [0.0, 4.0, 0.0],
@@ -6671,7 +6764,7 @@ mod roof_tests {
         // gable end, running out through the slope on one side. It SITS in the
         // gable - that is what a tie beam does - and the gable must not be
         // mistaken for something it is coming through.
-        let kind = PartKind::Beam(6.4375);
+        let kind = PartKind::Beam(6.4375, 0.0, 0.0);
         let beam = a_record("beam-6.4375".to_string(), [0.72, 2.88, 6.06], 0.0);
         // The file says 3.142; that is pi, and clippy would rather it be said so.
         let gable_turn = Quat::from_rotation_y(std::f32::consts::PI);
@@ -6698,7 +6791,7 @@ mod roof_tests {
         ];
         let (made, moved) = trim_to_roof(&kind, &beam, &roofs)
             .expect("the beam runs out through a slope and must come back to it");
-        let PartKind::Beam(long) = made else {
+        let PartKind::Beam(long, ..) = made else {
             panic!("a beam trims to a beam");
         };
         assert!(
@@ -6714,10 +6807,44 @@ mod roof_tests {
         // that cannot see the reported fault is worse than no test.
         let spin = pose(moved.yaw, moved.tilt, moved.flip);
         let middle = Vec3::from(moved.at);
-        for reach in [-long * 0.5, long * 0.5] {
-            for up in [-0.1875_f32, 0.1875] {
-                for side in [-0.1875_f32, 0.1875] {
-                    let corner = middle + spin * Vec3::new(reach, 0.1875 + up, side);
+        // Walked out of the beam's OWN BODY, corner by real corner. Assuming a
+        // rectangle would fail now that a beam's ends are cut, because a mitre's
+        // box takes in the very wood the saw removed.
+        let mut points: Vec<Vec3> = Vec::new();
+        for Slab(offset, size, _, _, _, shape, _) in body_of(&made, None) {
+            let corners: Vec<Vec3> = match shape {
+                // The prism's own six, not the eight of the box it came from.
+                Shape::Mitre | Shape::MitreBack => {
+                    let full = if shape == Shape::Mitre { -0.5 } else { 0.5 };
+                    vec![
+                        Vec3::new(full, -0.5, -0.5),
+                        Vec3::new(full, -0.5, 0.5),
+                        Vec3::new(full, 0.5, -0.5),
+                        Vec3::new(full, 0.5, 0.5),
+                        Vec3::new(-full, -0.5, -0.5),
+                        Vec3::new(-full, -0.5, 0.5),
+                    ]
+                }
+                _ => (0..8)
+                    .map(|n| {
+                        Vec3::new(
+                            if n & 1 == 0 { -0.5 } else { 0.5 },
+                            if n & 2 == 0 { -0.5 } else { 0.5 },
+                            if n & 4 == 0 { -0.5 } else { 0.5 },
+                        )
+                    })
+                    .collect(),
+            };
+            points.extend(
+                corners
+                    .into_iter()
+                    .map(|corner| middle + spin * (offset + corner * size)),
+            );
+        }
+        assert!(!points.is_empty(), "the beam has no body at all");
+        for corner in points {
+            {
+                {
                     for (box_at, box_half, box_turn) in &roofs {
                         // The gable it sits in is not a fault; the slopes are.
                         if point_in_box(middle, *box_at, *box_half, *box_turn) {
@@ -6741,7 +6868,7 @@ mod roof_tests {
     fn a_beam_that_reaches_no_roof_is_left_alone() {
         // Nothing to trim to is not a trim of nothing: the menu should have
         // offered it, and offering a deed that does nothing is the fault.
-        let kind = PartKind::Beam(4.0);
+        let kind = PartKind::Beam(4.0, 0.0, 0.0);
         let record = a_record("beam-4".to_string(), [0.0, 0.0, 0.0], 0.0);
         let far_off = vec![(
             Vec3::new(40.0, 0.0, 0.0),
@@ -6756,7 +6883,7 @@ mod roof_tests {
     fn only_parts_with_a_length_can_be_trimmed() {
         // A chimney is the case Brett named: it is meant to come through, and
         // it has no length to come back along either.
-        assert!(length_of(&PartKind::Beam(3.0)).is_some());
+        assert!(length_of(&PartKind::Beam(3.0, 0.0, 0.0)).is_some());
         assert!(length_of(&PartKind::Wall(2.0)).is_some());
         assert!(length_of(&PartKind::Chimney(1.75)).is_none());
         assert!(length_of(&PartKind::Prop("pole")).is_none());

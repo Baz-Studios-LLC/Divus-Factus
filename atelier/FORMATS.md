@@ -142,6 +142,9 @@ its colour already looked up, plus the marks that say what the place is FOR.
     nothing at +X. What a saw leaves, and what a beam meeting a roof wants: a
     wedge cannot do it, being symmetric, and a tilted box cannot do it either,
     because the far end of a tilted box is still square.
+  - `mitre-back`: the same cut the other way about, full height at +X. Which
+    hand is wanted depends on which END of a beam is being capped, and a beam
+    running between two slopes wants one of each.
 - `half_w`/`half_d` are the FINISHED building's footprint: the plot the village
   clears, the obstacle while it is being raised, and the walkable shell when it
   is done.
