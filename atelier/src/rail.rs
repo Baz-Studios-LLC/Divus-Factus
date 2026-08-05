@@ -133,11 +133,10 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
         Node {
             position_type: PositionType::Absolute,
             left: Val::Px(0.0),
-            top: Val::Px(38.0),
+            bottom: Val::Px(0.0),
             width: Val::Percent(100.0),
             flex_direction: FlexDirection::Row,
             justify_content: JustifyContent::Center,
-            column_gap: Val::Px(4.0),
             ..default()
         },
     ));
@@ -471,7 +470,7 @@ fn stage_face(
         .spawn((
             Interaction::default(),
             Node {
-                padding: UiRect::axes(Val::Px(wide), Val::Px(3.0)),
+                padding: UiRect::axes(Val::Px(wide), Val::Px(5.0)),
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
@@ -484,10 +483,10 @@ fn stage_face(
         Text::new(label),
         TextFont {
             font: fonts.display.clone().into(),
-            font_size: FontSize::Px(10.0),
+            font_size: FontSize::Px(12.0),
             ..default()
         },
-        TextColor(theme::text_dim(palette)),
+        TextColor(theme::accent(palette)),
         ChildOf(button),
     ));
     button
@@ -513,10 +512,33 @@ fn hang_the_stage_bar(
         return;
     }
     *hung = count;
-    let Some(bar) = bars.iter().next() else {
+    let Some(row) = bars.iter().next() else {
         return;
     };
-    commands.entity(bar).despawn_related::<Children>();
+    commands.entity(row).despawn_related::<Children>();
+    // The same panel the modes wear, on the floor rather than the ceiling: one
+    // border along the edge it does not touch, and the buttons inside it. A row
+    // of bare buttons on the background was the odd one out on this screen.
+    let bar = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::Center,
+                column_gap: Val::Px(4.0),
+                padding: UiRect::all(Val::Px(6.0)),
+                border: UiRect {
+                    left: Val::Px(1.0),
+                    right: Val::Px(1.0),
+                    top: Val::Px(1.0),
+                    ..default()
+                },
+                ..default()
+            },
+            BackgroundColor(theme::panel_bg()),
+            BorderColor::all(theme::panel_border(&palette)),
+            ChildOf(row),
+        ))
+        .id();
 
     for step in 0..count {
         let button = stage_face(
@@ -525,7 +547,7 @@ fn hang_the_stage_bar(
             &palette,
             bar,
             format!("STAGE {}", step + 1),
-            10.0,
+            14.0,
         );
         commands.entity(button).insert(StageButton(step));
     }
@@ -542,12 +564,12 @@ fn hang_the_stage_bar(
             &palette,
             bar,
             label.to_string(),
-            8.0,
+            10.0,
         );
         commands.entity(button).insert((
             StageDeedButton(deed),
             Node {
-                padding: UiRect::axes(Val::Px(8.0), Val::Px(3.0)),
+                padding: UiRect::axes(Val::Px(10.0), Val::Px(5.0)),
                 border: UiRect::all(Val::Px(1.0)),
                 // A gap before the first of them, so a miss lands on nothing
                 // rather than on a step being deleted.
@@ -564,7 +586,7 @@ fn work_stage_bar(
     stages: Res<crate::builder::Stages>,
     mut wish: ResMut<crate::builder::StageWish>,
     deeds: Query<(&Interaction, &StageDeedButton)>,
-    mut buttons: Query<(&Interaction, &StageButton, &mut BorderColor, &mut TextColor)>,
+    mut buttons: Query<(&Interaction, &StageButton, &mut BorderColor, &mut BackgroundColor)>,
 ) {
     for (interaction, button) in &deeds {
         if *interaction == Interaction::Pressed && wish.0.is_none() {
@@ -579,7 +601,7 @@ fn work_stage_bar(
             wish.0 = Some(crate::builder::StageDeed::Show(button.0));
         }
     }
-    for (_, button, mut border, mut label) in &mut buttons {
+    for (_, button, mut border, mut fill) in &mut buttons {
         let standing = button.0 == stages.showing();
         let dress = BorderColor::all(if standing {
             theme::accent(&palette)
@@ -589,13 +611,13 @@ fn work_stage_bar(
         if *border != dress {
             *border = dress;
         }
-        let word = TextColor(if standing {
-            theme::accent(&palette)
+        let wanted = BackgroundColor(if standing {
+            Color::srgb(0.075, 0.082, 0.102)
         } else {
-            theme::text_dim(&palette)
+            Color::BLACK.with_alpha(0.18)
         });
-        if label.0 != word.0 {
-            *label = word;
+        if fill.0 != wanted.0 {
+            *fill = wanted;
         }
     }
 }
