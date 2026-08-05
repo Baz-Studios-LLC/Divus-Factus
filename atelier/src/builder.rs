@@ -1908,13 +1908,34 @@ fn trim_to_roof(
         })
         .collect();
 
+    // The part's own cross-section, so its CORNERS are cast and not its centre
+    // line. A square beam meeting a slanted roof touches with a corner first, so
+    // trimming to where the middle meets the slope leaves that corner standing
+    // proud of it - a small stub above the roof, which is what Brett
+    // photographed after the first trim worked.
+    let mut low = Vec3::splat(f32::INFINITY);
+    let mut high = Vec3::splat(f32::NEG_INFINITY);
+    for Slab(offset, size, ..) in body_of(kind, None) {
+        low = low.min(offset - size * 0.5);
+        high = high.max(offset + size * 0.5);
+    }
+    let corners = [
+        Vec3::new(0.0, low.y, low.z),
+        Vec3::new(0.0, low.y, high.z),
+        Vec3::new(0.0, high.y, low.z),
+        Vec3::new(0.0, high.y, high.z),
+    ];
+
     let mut reach = [half, half];
     for (end, way) in [(0usize, 1.0_f32), (1, -1.0)] {
-        for (box_at, box_half, box_turn) in &seated {
-            if let Some(hit) =
-                ray_meets_box(at, along * way, half, *box_at, *box_half, *box_turn)
-            {
-                reach[end] = reach[end].min(hit);
+        for corner in corners {
+            let from = at + spin * corner;
+            for (box_at, box_half, box_turn) in &seated {
+                if let Some(hit) =
+                    ray_meets_box(from, along * way, half, *box_at, *box_half, *box_turn)
+                {
+                    reach[end] = reach[end].min(hit);
+                }
             }
         }
     }
@@ -6605,13 +6626,36 @@ mod roof_tests {
             long < 6.4375,
             "it kept its whole length: the gable it sits in swallowed the answer"
         );
-        // The slope stands 2.78 from the beam's middle; the other end reaches
-        // nothing, so it stays where it was.
-        let low = moved.at[0] - long * 0.5;
-        assert!(
-            (low - (0.72 - 2.781)).abs() < 0.07,
-            "the trimmed end landed at {low}, not at the slope"
-        );
+
+        // The property rather than the number: no corner of the trimmed beam may
+        // stand ABOVE the roof's outer face. Not "inside the roof" - that was
+        // the first version of this check and it passed while the bug was
+        // present, because a stub poking through a panel an eighth of a metre
+        // thick is on the far SIDE of it rather than within it. A green test
+        // that cannot see the reported fault is worse than no test.
+        let spin = pose(moved.yaw, moved.tilt, moved.flip);
+        let middle = Vec3::from(moved.at);
+        for reach in [-long * 0.5, long * 0.5] {
+            for up in [-0.1875_f32, 0.1875] {
+                for side in [-0.1875_f32, 0.1875] {
+                    let corner = middle + spin * Vec3::new(reach, 0.1875 + up, side);
+                    for (box_at, box_half, box_turn) in &roofs {
+                        // The gable it sits in is not a fault; the slopes are.
+                        if point_in_box(middle, *box_at, *box_half, *box_turn) {
+                            continue;
+                        }
+                        let out = *box_turn * Vec3::Y;
+                        let face = *box_at + out * box_half.y;
+                        let above = (corner - face).dot(out);
+                        assert!(
+                            above <= 0.001,
+                            "a corner stands {above:.3} above the roof: that is \
+                             the stub on the outside of the slope"
+                        );
+                    }
+                }
+            }
+        }
     }
 
     #[test]
