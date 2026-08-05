@@ -13,10 +13,22 @@ use crate::Bench;
 use crate::look::{Fonts, Palette, theme};
 use crate::stage::BuilderFurniture;
 
-/// The bench's standard roof pitch: thirty degrees. Forty-five stood
-/// too tall over a village of this scale - the houses read as steeples.
-/// Roofs arm already pitched; T walks away from it in fifteens.
-const ROOF_PITCH: f32 = std::f32::consts::FRAC_PI_6;
+/// The pitch a roof arms at, in degrees, before anybody pulls on it.
+///
+/// Thirty was the bench's ONE pitch for every roof of every building - forty-five
+/// stood too tall over a village of this scale and the houses read as steeples.
+/// It is still the right place to start, and it is no longer the only place: a
+/// roof carries its own pitch now and the gold handle at its ridge sets it, which
+/// is the difference between a village that reads modern and one that does not.
+/// Steep is medieval; shallow is not.
+const ROOF_PITCH: f32 = 30.0;
+
+/// What a roof's pitch may be pulled to, in degrees, and the step it moves in.
+/// Ten is nearly flat and sixty is a steeple; two and a half is fine enough to
+/// tune by eye and coarse enough that two roofs meant to match will match.
+const PITCH_LEAST: f32 = 10.0;
+const PITCH_MOST: f32 = 60.0;
+pub const PITCH_STEP: f32 = 2.5;
 
 /// The Atelier's own measurements - the source of truth now; the game
 /// conforms to these when its buildings are replaced. A quarter-metre
@@ -204,7 +216,7 @@ pub enum PartKind {
     RidgeLog(f32),
     /// A whole gable roof: both slopes and the ridge between them, drawn
     /// once over the walls instead of lined up slope by slope.
-    GableRoof(f32, f32, f32),
+    GableRoof(f32, f32, f32, f32),
     /// What a whole roof looks like while it is being sized: the ground
     /// it will cover, with a gold line down the way the ridge will run.
     /// It is never placed - the record beneath it names the roof.
@@ -267,7 +279,7 @@ impl PartKind {
             PartKind::RidgeLogRun => PartKind::RidgeLog(w),
             // A hand's breadth of overhang to begin with; the gold
             // handles pull it further without moving the gables.
-            PartKind::GableRoofRun => PartKind::GableRoof(w, d, 0.25),
+            PartKind::GableRoofRun => PartKind::GableRoof(w, d, 0.25, ROOF_PITCH),
             PartKind::SegRun { high, lift } => PartKind::Seg {
                 long: w,
                 high: *high,
@@ -562,11 +574,11 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             vec![ridge(0.0, 0.0625, 0.0, *long, 0.125, 0.5, "earth", 0.35)]
         }
         PartKind::RidgeRun => vec![ridge(0.0, 0.0625, 0.0, 0.25, 0.125, 0.5, "earth", 0.35)],
-        PartKind::GableRoof(long, span, over) => {
+        PartKind::GableRoof(long, span, over, degrees) => {
             // Both slopes at once, meeting over the middle: no lining up
             // two panels and hoping. The eaves rest at y=0, so the part
             // seats straight onto the wall tops.
-            let pitch = ROOF_PITCH;
+            let pitch = degrees.clamp(PITCH_LEAST, PITCH_MOST).to_radians();
             let half = span * 0.5;
             let rise = half * pitch.tan();
             let slope = (half * half + rise * rise).sqrt();
@@ -1475,7 +1487,9 @@ pub fn part_name(kind: &PartKind) -> String {
         PartKind::Ridge(long) => format!("ridge-{long}"),
         PartKind::Chimney(drop) => format!("chimney-{drop}"),
         PartKind::RidgeLog(long) => format!("ridgelog-{long}"),
-        PartKind::GableRoof(long, span, over) => format!("gableroof-{long}x{span}x{over}"),
+        PartKind::GableRoof(long, span, over, pitch) => {
+            format!("gableroof-{long}x{span}x{over}x{pitch}")
+        }
         PartKind::RoofPlan(w, d) => format!("roofplan-{w}x{d}"),
         PartKind::Floor(w, d) => format!("floor-{w}x{d}"),
         PartKind::Foundation(w, d) => format!("foundation-{w}x{d}"),
@@ -1500,13 +1514,19 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
         return rest.parse::<f32>().ok().map(PartKind::Wall);
     }
     if let Some(rest) = name.strip_prefix("gableroof-") {
-        // Three numbers now: the building it covers, and the overhang.
-        // Two is an older roof, from before the eaves could be pulled.
+        // Four numbers now: the building it covers, the overhang, and the
+        // pitch. Three is a roof from before the pitch could be pulled and two
+        // from before the eaves could; both still open, at the pitch every roof
+        // in the world had when they were drawn.
         let mut parts = rest.split('x');
         let long = parts.next()?.parse().ok()?;
         let span = parts.next()?.parse().ok()?;
         let over = parts.next().and_then(|o| o.parse().ok()).unwrap_or(0.25);
-        return Some(PartKind::GableRoof(long, span, over));
+        let pitch = parts
+            .next()
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(ROOF_PITCH);
+        return Some(PartKind::GableRoof(long, span, over, pitch));
     }
     if let Some(rest) = name.strip_prefix("chimney-") {
         return rest.parse::<f32>().ok().map(PartKind::Chimney);
@@ -2694,7 +2714,7 @@ fn move_ghost(
         // second click lands. Far easier to judge than two slopes
         // swinging about in the air.
         let shown = match made {
-            PartKind::GableRoof(w, d, _) => PartKind::RoofPlan(w, d),
+            PartKind::GableRoof(w, d, _, _) => PartKind::RoofPlan(w, d),
             other => other,
         };
         // Redraw only when the drawn size changed; otherwise carry the
@@ -4174,7 +4194,7 @@ pub(crate) fn dims_panel(
             PartKind::Wall(long) => Some((part, long, None)),
             PartKind::Seg { long, .. } => Some((part, long, None)),
             PartKind::Trim { long, .. } => Some((part, long, None)),
-            PartKind::GableRoof(w, d, _) => Some((part, w, Some(d))),
+            PartKind::GableRoof(w, d, _, _) => Some((part, w, Some(d))),
             PartKind::Chimney(drop) => Some((part, drop, None)),
             PartKind::Floor(w, d) | PartKind::Foundation(w, d) | PartKind::Roof(w, d) => {
                 Some((part, w, Some(d)))
@@ -4244,8 +4264,11 @@ pub(crate) fn dims_panel(
                             Some(PartKind::Foundation(w, d.unwrap_or(old)))
                         }
                         PartKind::Roof(_, old) => Some(PartKind::Roof(w, d.unwrap_or(old))),
-                        PartKind::GableRoof(_, old, over) => {
-                            Some(PartKind::GableRoof(w, d.unwrap_or(old), over))
+                        // The pitch rides through a resize: a roof HAS a pitch,
+                        // so a wider building wants a taller roof and not a
+                        // flatter one.
+                        PartKind::GableRoof(_, old, over, pitch) => {
+                            Some(PartKind::GableRoof(w, d.unwrap_or(old), over, pitch))
                         }
                         PartKind::Chimney(_) => Some(PartKind::Chimney(w)),
                         _ => None,
@@ -5064,4 +5087,77 @@ fn turn_part(
     };
     record.yaw = (record.yaw + std::f32::consts::FRAC_PI_2).rem_euclid(std::f32::consts::TAU);
     transform.rotation = pose(record.yaw, record.tilt, record.flip);
+}
+
+#[cfg(test)]
+mod roof_tests {
+    use super::*;
+
+    /// Roofs saved before the pitch could be pulled, taken from the buildings
+    /// actually on disk when it was added.
+    const ELDERS: [&str; 3] = [
+        "gableroof-7.625x7.875x0.25",
+        "gableroof-10.797664x7.625x0.5625",
+        "gableroof-9x9x0.3125",
+    ];
+
+    #[test]
+    fn a_roof_drawn_before_pitch_existed_still_opens() {
+        // The whole risk of adding a number to a part's name: every building
+        // already saved carries the old spelling, and a maker's work is not
+        // something to lose to a format change.
+        for name in ELDERS {
+            let Some(PartKind::GableRoof(long, span, over, pitch)) = kind_from_name(name) else {
+                panic!("{name} no longer opens at all");
+            };
+            assert!(
+                long > 0.0 && span > 0.0 && over >= 0.0,
+                "{name} came back wrong"
+            );
+            assert_eq!(
+                pitch, ROOF_PITCH,
+                "{name} must open at the pitch every roof in the world had when \
+                 it was drawn, or every saved building changes shape"
+            );
+        }
+    }
+
+    #[test]
+    fn a_roof_with_a_pitch_survives_the_round_trip() {
+        for degrees in [10.0, 22.5, 30.0, 45.0, 60.0] {
+            let made = PartKind::GableRoof(8.0, 6.0, 0.375, degrees);
+            let name = part_name(&made);
+            let Some(PartKind::GableRoof(long, span, over, back)) = kind_from_name(&name) else {
+                panic!("{name} did not come back");
+            };
+            assert_eq!(
+                (long, span, over, back),
+                (8.0, 6.0, 0.375, degrees),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_older_roof_still_opens_without_its_eaves() {
+        // Two numbers: from before the eaves could be pulled either.
+        let Some(PartKind::GableRoof(long, span, over, pitch)) = kind_from_name("gableroof-6x4")
+        else {
+            panic!("the oldest roofs no longer open");
+        };
+        assert_eq!((long, span, over, pitch), (6.0, 4.0, 0.25, ROOF_PITCH));
+    }
+
+    #[test]
+    fn the_pitch_a_handle_can_reach_is_the_pitch_a_roof_can_hold() {
+        // The drag clamps to ten and sixty and the geometry clamps to the same
+        // pair. If they ever disagreed, a roof pulled to the end of its handle
+        // would draw itself at a different angle than the one it recorded.
+        assert!(PITCH_LEAST <= ROOF_PITCH && ROOF_PITCH <= PITCH_MOST);
+        assert!(
+            ((PITCH_MOST - PITCH_LEAST) / PITCH_STEP).fract() < 1e-6,
+            "the range is not a whole number of steps, so the steepest pitch \
+             cannot be reached by stepping from the shallowest"
+        );
+    }
 }

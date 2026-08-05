@@ -44,6 +44,9 @@ enum Grip {
     /// Pull a whole roof's eaves out past the walls, leaving the gables
     /// where the building is.
     Over { o0: f32 },
+    /// Pull a roof's ridge up or down: its pitch, in degrees when the grip
+    /// closed. The eaves do not move, so a roof steepens where it stands.
+    Pitch { p0: f32 },
 }
 
 #[derive(Resource, Default)]
@@ -205,7 +208,7 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                 PartKind::Floor(w, d) => Some((w, d, true)),
                 PartKind::Foundation(w, d) => Some((w, d, true)),
                 PartKind::Roof(w, d) => Some((w, d, true)),
-                PartKind::GableRoof(w, d, _) => Some((w, d, true)),
+                PartKind::GableRoof(w, d, _, _) => Some((w, d, true)),
                 _ => None,
             });
             let Some((w, d, both)) = sized else {
@@ -243,7 +246,8 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
             // A whole roof carries two more, in gold: the eaves, which
             // reach out past the walls without taking the gables with
             // them.
-            if let Some(PartKind::GableRoof(_, span, over)) = builder::kind_from_name(&record.part)
+            if let Some(PartKind::GableRoof(_, span, over, pitch)) =
+                builder::kind_from_name(&record.part)
             {
                 for end in [-1.0f32, 1.0] {
                     let dir = spin * (Vec3::Z * end);
@@ -254,6 +258,16 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                         Grip::Over { o0: over },
                     ));
                 }
+                // And one at the ridge, straight up: the pitch. Pull the ridge
+                // and the roof steepens about its eaves, which stay on the
+                // walls where they were set.
+                let rise = span * 0.5 * pitch.to_radians().tan();
+                handles.push((
+                    spin * Vec3::Y,
+                    spin * (Vec3::Y * (rise + 0.4)),
+                    "cloth-gold",
+                    Grip::Pitch { p0: pitch },
+                ));
             }
             handles
         }
@@ -476,19 +490,54 @@ fn work_gizmo(
             transform.translation = state.start_at + state.dir * step;
             record.at = transform.translation.into();
         }
+        Grip::Pitch { p0 } => {
+            // The drag is a ridge HEIGHT and the stored number is an angle:
+            // pulling a ridge is what a roof looks like being made steeper,
+            // while degrees are what a builder means by a pitch, so the handle
+            // speaks the first and records the second.
+            let Some(PartKind::GableRoof(long, span, over, was)) =
+                builder::kind_from_name(&record.part)
+            else {
+                return;
+            };
+            let half = (span * 0.5).max(0.125);
+            let rise = (half * p0.to_radians().tan() + (t - state.t0)).max(0.02);
+            // Snapped in degrees rather than at the ridge, so two roofs meant
+            // to match match exactly however differently they were dragged.
+            let pitch = ((rise / half).atan().to_degrees() / builder::PITCH_STEP).round()
+                * builder::PITCH_STEP;
+            let pitch = pitch.clamp(10.0, 60.0);
+            if (pitch - was).abs() < 1e-4 {
+                return;
+            }
+            let made = PartKind::GableRoof(long, span, over, pitch);
+            record.part = builder::part_name(&made);
+            commands.entity(part).despawn_related::<Children>();
+            builder::dress_part(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &palette,
+                &made,
+                &record,
+                part,
+                false,
+            );
+        }
         Grip::Over { o0 } => {
             // The eaves reach out in whole units; the walls beneath and
             // the gables at the ends do not move at all.
             let pull = ((t - state.t0) * 16.0).round() / 16.0;
             let over = (o0 + pull).clamp(0.0, 3.0);
-            let Some(PartKind::GableRoof(long, span, was)) = builder::kind_from_name(&record.part)
+            let Some(PartKind::GableRoof(long, span, was, pitch)) =
+                builder::kind_from_name(&record.part)
             else {
                 return;
             };
             if (over - was).abs() < 1e-4 {
                 return;
             }
-            let made = PartKind::GableRoof(long, span, over);
+            let made = PartKind::GableRoof(long, span, over, pitch);
             record.part = builder::part_name(&made);
             commands.entity(part).despawn_related::<Children>();
             builder::dress_part(
@@ -531,7 +580,7 @@ fn work_gizmo(
                 PartKind::Floor(..) => PartKind::Floor(w, d),
                 PartKind::Foundation(..) => PartKind::Foundation(w, d),
                 PartKind::Roof(..) => PartKind::Roof(w, d),
-                PartKind::GableRoof(_, _, over) => PartKind::GableRoof(w, d, over),
+                PartKind::GableRoof(_, _, over, pitch) => PartKind::GableRoof(w, d, over, pitch),
                 _ => return,
             };
             let fresh = builder::part_name(&made);
