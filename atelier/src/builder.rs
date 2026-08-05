@@ -1477,7 +1477,13 @@ impl Plugin for BuilderPlugin {
                     // The painting tools and the part menu as one group: this
                     // tuple is at Bevy's own limit for how many systems it will
                     // take in a row, and a nested tuple counts as one.
-                    (paint_the_work, work_palette, raise_part_menu, turn_to_stage),
+                    (
+                        paint_the_work,
+                        work_palette,
+                        raise_part_menu,
+                        turn_to_stage,
+                        bury_the_chosen,
+                    ),
                     toggle_snap_mode,
                     disarm_on_mode,
                     turn_part,
@@ -5585,6 +5591,52 @@ pub struct RoofsLifted(pub Cutaway);
 
 /// H lifts the roof off and sets it back - everything raised at the
 /// roof stage goes with it, panels and ridge caps alike.
+/// Delete takes away whatever is chosen, in whichever tool is in hand.
+///
+/// Being rid of a part used to mean going back to NORMAL, picking the part up,
+/// and pressing escape to throw away what you were holding - three steps, one of
+/// which is a mode change, to undo one placement. Brett asked for the obvious
+/// thing instead: choose it and press delete.
+///
+/// BACKSPACE as well as Delete, and on this bench that is the important half:
+/// the key labelled "delete" on a Mac keyboard IS backspace, and the forward
+/// Delete these keyboards do not have is the one Bevy calls `Delete`.
+///
+/// It stands aside while anything is being TYPED. Backspace belongs to whoever
+/// is taking letters - the name card, the dimensions box - and a part quietly
+/// vanishing while a maker corrects a typo would be a bad way to learn that.
+///
+/// Nothing to do about undo: the bench remembers whole states, so a part
+/// removed is one step back like anything else.
+fn bury_the_chosen(
+    mut commands: Commands,
+    keys: Res<ButtonInput<KeyCode>>,
+    bench: Res<Bench>,
+    naming: Res<Naming>,
+    dims: Res<DimsEntry>,
+    hand: Res<Hand>,
+    mut selected: ResMut<crate::gizmo::Selected>,
+    parts: Query<Entity, (With<Placed>, Without<Ghost>)>,
+) {
+    if *bench != Bench::Builder || naming.0.is_some() || dims.0.is_some() {
+        return;
+    }
+    // A full hand answers these keys already, by throwing away what it holds.
+    if hand.kind.is_some() {
+        return;
+    }
+    if !keys.just_pressed(KeyCode::Delete) && !keys.just_pressed(KeyCode::Backspace) {
+        return;
+    }
+    let Some(chosen) = selected.0 else {
+        return;
+    };
+    if parts.contains(chosen) {
+        commands.entity(chosen).despawn();
+    }
+    selected.0 = None;
+}
+
 /// A request to show another step, or to add or drop one.
 ///
 /// Held as a resource rather than done where it is asked for, because setting a

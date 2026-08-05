@@ -326,6 +326,11 @@ shift-click the lot,
         ),
         ("esc / del", "empty the hand"),
         (
+            "del",
+            "with a part chosen and
+an empty hand: bury it",
+        ),
+        (
             "1 - 6",
             "front, right, back, left,\noverhead, and the perch",
         ),
