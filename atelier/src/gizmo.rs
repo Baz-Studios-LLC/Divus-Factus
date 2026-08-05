@@ -207,7 +207,7 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                 // like them - only their height and lift stay put.
                 PartKind::Seg { long, .. } => Some((long, 0.0, false)),
                 PartKind::Trim { long, .. } => Some((long, 0.0, false)),
-                PartKind::Gable(long) => Some((long, 0.0, false)),
+                PartKind::Gable(long, _) => Some((long, 0.0, false)),
                 // The chimney sizes its own reach downward.
                 PartKind::Chimney(drop) => Some((drop, 0.0, false)),
                 PartKind::Ridge(long) => Some((long, 0.0, false)),
@@ -280,6 +280,17 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                 // and the roof steepens about its eaves, which stay on the
                 // walls where they were set.
                 let rise = span * 0.5 * pitch.to_radians().tan();
+                handles.push((
+                    spin * Vec3::Y,
+                    spin * (Vec3::Y * (rise + 0.4)),
+                    "cloth-gold",
+                    Grip::Pitch { p0: pitch },
+                ));
+            }
+            // A gable is pulled by its peak the same way, so the wall under a
+            // steepened roof can be steepened to meet it.
+            if let Some(PartKind::Gable(long, pitch)) = builder::kind_from_name(&record.part) {
+                let rise = long * 0.5 * pitch.to_radians().tan();
                 handles.push((
                     spin * Vec3::Y,
                     spin * (Vec3::Y * (rise + 0.4)),
@@ -513,12 +524,22 @@ fn work_gizmo(
             // pulling a ridge is what a roof looks like being made steeper,
             // while degrees are what a builder means by a pitch, so the handle
             // speaks the first and records the second.
-            let Some(PartKind::GableRoof(long, span, over, was)) =
-                builder::kind_from_name(&record.part)
-            else {
-                return;
-            };
-            let half = (span * 0.5).max(0.125);
+            // A roof is pitched about its span and a gable about its width;
+            // beyond that the gesture is the same, so the arithmetic is written
+            // once and only the part it rebuilds differs.
+            let (across, rebuild): (f32, &dyn Fn(f32) -> PartKind) =
+                match builder::kind_from_name(&record.part) {
+                    Some(PartKind::GableRoof(long, span, over, _)) => (
+                        span,
+                        &move |pitch| PartKind::GableRoof(long, span, over, pitch),
+                    ),
+                    Some(PartKind::Gable(long, _)) => {
+                        (long, &move |pitch| PartKind::Gable(long, pitch))
+                    }
+                    _ => return,
+                };
+            let was = p0;
+            let half = (across * 0.5).max(0.125);
             let rise = (half * p0.to_radians().tan() + (t - state.t0)).max(0.02);
             // Snapped in degrees rather than at the ridge, so two roofs meant
             // to match match exactly however differently they were dragged.
@@ -528,7 +549,7 @@ fn work_gizmo(
             if (pitch - was).abs() < 1e-4 {
                 return;
             }
-            let made = PartKind::GableRoof(long, span, over, pitch);
+            let made = rebuild(pitch);
             record.part = builder::part_name(&made);
             commands.entity(part).despawn_related::<Children>();
             builder::dress_part(
@@ -591,7 +612,7 @@ fn work_gizmo(
                     lift,
                 },
                 PartKind::Trim { stone, .. } => PartKind::Trim { long: w, stone },
-                PartKind::Gable(_) => PartKind::Gable(w),
+                PartKind::Gable(_, pitch) => PartKind::Gable(w, pitch),
                 PartKind::Chimney(_) => PartKind::Chimney(w.max(0.0)),
                 PartKind::Ridge(_) => PartKind::Ridge(w),
                 PartKind::RidgeLog(_) => PartKind::RidgeLog(w),

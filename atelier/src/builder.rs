@@ -217,7 +217,7 @@ pub enum PartKind {
     },
     /// The stepped triangle that closes a pitched roof's end: courses of
     /// wall narrowing to a peak at the roof's own thirty degrees.
-    Gable(f32),
+    Gable(f32, f32),
     /// The cap that hides the seam where two slopes meet.
     Ridge(f32),
     /// A chimney stack: the number is how far its shaft reaches DOWN
@@ -287,7 +287,7 @@ impl PartKind {
                 long: w,
                 stone: *stone,
             },
-            PartKind::GableRun => PartKind::Gable(w),
+            PartKind::GableRun => PartKind::Gable(w, ROOF_PITCH_DEGREES),
             PartKind::RidgeRun => PartKind::Ridge(w),
             PartKind::RidgeLogRun => PartKind::RidgeLog(w),
             // A hand's breadth of overhang to begin with; the gold
@@ -562,11 +562,20 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         }
         PartKind::Roof(w, d) => vec![slab(0.0, 0.0625, 0.0, *w, 0.125, *d, "earth", 0.4)],
         PartKind::RoofRun => vec![slab(0.0, 0.0625, 0.0, 0.25, 0.125, 0.25, "earth", 0.4)],
-        PartKind::Gable(long) => {
-            // One clean slope each way: the peak rises at the bench's own
-            // pitch, so a 45 degree gable stands half as tall as it is
-            // wide and meets the roof panels exactly.
-            let high = ((long * 0.5 * ROOF_PITCH_DEGREES.to_radians().tan()) * 16.0).round() / 16.0;
+        PartKind::Gable(long, degrees) => {
+            // One clean slope each way, at the gable's OWN pitch.
+            //
+            // It used to be the bench's one pitch, with a comment promising that
+            // a gable "meets the roof panels exactly" - true while every roof in
+            // the world stood at thirty degrees, and false from the moment a
+            // roof could be pulled steeper. A steep roof on a thirty degree
+            // gable is a wall with daylight over it, which is the opposite of
+            // the medieval look the pitch was added for.
+            //
+            // Snapped to the lattice like everything else, so a gable's peak is
+            // somewhere another part can meet it.
+            let pitch = degrees.clamp(PITCH_LEAST, PITCH_MOST).to_radians();
+            let high = ((long * 0.5 * pitch.tan()) * 16.0).round() / 16.0;
             vec![wedge(
                 0.0,
                 high * 0.5,
@@ -1508,7 +1517,7 @@ pub fn part_name(kind: &PartKind) -> String {
                 format!("trim-{long}")
             }
         }
-        PartKind::Gable(long) => format!("gable-{long}"),
+        PartKind::Gable(long, pitch) => format!("gable-{long}x{pitch}"),
         PartKind::Ridge(long) => format!("ridge-{long}"),
         PartKind::Chimney(drop) => format!("chimney-{drop}"),
         PartKind::RidgeLog(long) => format!("ridgelog-{long}"),
@@ -1567,7 +1576,15 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
         return rest.parse::<f32>().ok().map(PartKind::Ridge);
     }
     if let Some(rest) = name.strip_prefix("gable-") {
-        return rest.parse::<f32>().ok().map(PartKind::Gable);
+        // Two numbers now, its width and its pitch. One is a gable from before
+        // gables had a pitch of their own, and opens at the one they all had.
+        let mut parts = rest.split('x');
+        let long = parts.next()?.parse().ok()?;
+        let pitch = parts
+            .next()
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(ROOF_PITCH_DEGREES);
+        return Some(PartKind::Gable(long, pitch));
     }
     if let Some(rest) = name.strip_prefix("trimstone-") {
         return rest
@@ -5494,10 +5511,49 @@ mod roof_tests {
         );
     }
 
+    /// How tall a gable of this width stands at this pitch.
+    fn gable_peak(long: f32, pitch: f32) -> f32 {
+        body_of(&PartKind::Gable(long, pitch), None)
+            .iter()
+            .map(|Slab(_, size, ..)| size.y)
+            .fold(f32::MIN, f32::max)
+    }
+
+    #[test]
+    fn a_gable_meets_the_roof_it_stands_under() {
+        // The promise the old comment made and could no longer keep. A gable's
+        // peak has to rise as far as the roof's ridge over the same width, or a
+        // steepened roof leaves daylight over the wall beneath it.
+        for pitch in [20.0f32, 30.0, 45.0, 60.0] {
+            for long in [4.0f32, 7.0, 9.5] {
+                let roof = long * 0.5 * pitch.to_radians().tan();
+                let gable = gable_peak(long, pitch);
+                assert!(
+                    (gable - roof).abs() < 0.07,
+                    "a {long} metre gable at {pitch} degrees stands {gable} \
+                     against a ridge at {roof}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_gable_drawn_before_pitch_existed_still_opens() {
+        let Some(PartKind::Gable(long, pitch)) = kind_from_name("gable-7.5") else {
+            panic!("the older gables no longer open");
+        };
+        assert_eq!((long, pitch), (7.5, ROOF_PITCH_DEGREES));
+        let name = part_name(&PartKind::Gable(7.5, 45.0));
+        let Some(PartKind::Gable(back, degrees)) = kind_from_name(&name) else {
+            panic!("{name} did not come back");
+        };
+        assert_eq!((back, degrees), (7.5, 45.0));
+    }
+
     #[test]
     fn a_gable_stands_the_right_way_up() {
         // Straight from the body, so it catches the sign as well as the size.
-        let tall = body_of(&PartKind::Gable(4.0), None)
+        let tall = body_of(&PartKind::Gable(4.0, ROOF_PITCH_DEGREES), None)
             .iter()
             .map(|Slab(_, size, ..)| size.y)
             .fold(f32::MIN, f32::max);
