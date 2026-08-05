@@ -1893,9 +1893,24 @@ fn trim_to_roof(
     let half = long * 0.5;
 
     // How far each end may reach before it is inside the roof.
+    // A box the part's MIDDLE already lies inside is a part it is SEATED IN,
+    // not one it is coming through, and trimming to it would be nonsense: a tie
+    // beam across a gable end sits in that gable by design. Left in, such a box
+    // reports a hit at no distance at all in both directions, the trim comes out
+    // as nothing, and the deed silently declines - which is exactly what Brett
+    // saw. His beam sits in its gable and pokes out through a slope; the slope
+    // was two and three quarter metres along the very ray that had already
+    // given up.
+    let seated: Vec<&(Vec3, Vec3, Quat)> = roofs
+        .iter()
+        .filter(|(box_at, box_half, box_turn)| {
+            !point_in_box(at, *box_at, *box_half, *box_turn)
+        })
+        .collect();
+
     let mut reach = [half, half];
     for (end, way) in [(0usize, 1.0_f32), (1, -1.0)] {
-        for (box_at, box_half, box_turn) in roofs {
+        for (box_at, box_half, box_turn) in &seated {
             if let Some(hit) =
                 ray_meets_box(at, along * way, half, *box_at, *box_half, *box_turn)
             {
@@ -1932,6 +1947,12 @@ fn length_of(kind: &PartKind) -> Option<(f32, fn(f32) -> PartKind)> {
         PartKind::Ridge(long) => Some((long, |n| PartKind::Ridge(n))),
         _ => None,
     }
+}
+
+/// Whether a point is inside an oriented box.
+fn point_in_box(p: Vec3, box_at: Vec3, box_half: Vec3, box_turn: Quat) -> bool {
+    let local = box_turn.inverse() * (p - box_at);
+    (0..3).all(|axis| local[axis].abs() <= box_half[axis])
 }
 
 /// Where a ray first meets an oriented box, if it does within `reach`.
@@ -6487,6 +6508,110 @@ mod roof_tests {
         assert!((far + 2.0).abs() < 0.07, "the far end moved to {far}");
         assert!((near - 1.0).abs() < 0.07, "the near end stopped at {near}");
         assert!(long < 4.0, "it did not come back at all: {long}");
+    }
+
+    /// The roof's boxes in world space, gathered exactly as the menu gathers
+    /// them - so a fault in that gathering shows up here rather than in a
+    /// maker's hands.
+    fn roof_boxes(record: &Placed) -> Vec<(Vec3, Vec3, Quat)> {
+        let kind = kind_from_name(&record.part).expect("a roof");
+        let spin = pose(record.yaw, record.tilt, record.flip);
+        body_of(&kind, None)
+            .into_iter()
+            .map(|Slab(offset, size, _, _, _, _, lean)| {
+                let turn = spin * Quat::from_rotation_x(lean);
+                (Vec3::from(record.at) + spin * offset, size * 0.5, turn)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_beam_is_trimmed_by_a_real_gable_roof() {
+        // The case Brett actually has: a beam running up through the slope of a
+        // gable roof, not through a box somebody wrote out by hand.
+        let roof = Placed {
+            part: part_name(&PartKind::GableRoof(8.0, 6.0, 0.25, 45.0)),
+            at: [0.0, 2.5, 0.0],
+            yaw: 0.0,
+            tilt: 0.0,
+            ramp: None,
+            shade: 0.5,
+            stage: "roof".to_string(),
+            flip: false,
+            loose: false,
+        };
+        let boxes = roof_boxes(&roof);
+        assert!(!boxes.is_empty(), "the roof gathered no boxes at all");
+
+        // A beam laid ACROSS the building, high enough to be inside the roof:
+        // it runs out through the near slope, which is the thing to trim.
+        //
+        // Turned by yaw, not tilt. Tilt is a rotation ABOUT the part's own
+        // length, so tilting a beam spins it on its axis and leaves it pointing
+        // exactly where it was - which is how the first draft of this test came
+        // to run a beam along the ground and conclude the roof was unreachable.
+        let kind = PartKind::Beam(8.0);
+        let beam = a_record(
+            "beam-8".to_string(),
+            [0.0, 4.0, 0.0],
+            std::f32::consts::FRAC_PI_2,
+        );
+        let trimmed = trim_to_roof(&kind, &beam, &boxes);
+        assert!(
+            trimmed.is_some(),
+            "a beam run up through the slope was not trimmed: the roof has \
+             {} boxes and none of them were met",
+            boxes.len()
+        );
+    }
+
+    #[test]
+    fn a_tie_beam_trims_to_the_slope_and_not_to_the_gable_it_sits_in() {
+        // Brett's longhouse, by its own numbers. A tie beam laid across the
+        // gable end, running out through the slope on one side. It SITS in the
+        // gable - that is what a tie beam does - and the gable must not be
+        // mistaken for something it is coming through.
+        let kind = PartKind::Beam(6.4375);
+        let beam = a_record("beam-6.4375".to_string(), [0.72, 2.88, 6.06], 0.0);
+        // The file says 3.142; that is pi, and clippy would rather it be said so.
+        let gable_turn = Quat::from_rotation_y(std::f32::consts::PI);
+        let slope = |x: f32, lean: f32| {
+            (
+                Vec3::new(x, 4.3, 0.0),
+                Vec3::new(13.375, 0.125, 5.1145) * 0.5,
+                Quat::from_rotation_y(std::f32::consts::FRAC_PI_2) * Quat::from_rotation_x(lean),
+            )
+        };
+        let roofs = vec![
+            (
+                Vec3::new(1.03, 2.88, 6.0),
+                Vec3::new(6.4375, 3.21875, 0.25) * 0.5,
+                gable_turn,
+            ),
+            (
+                Vec3::new(1.03, 2.88, -6.0),
+                Vec3::new(6.4375, 3.21875, 0.25) * 0.5,
+                gable_turn,
+            ),
+            slope(-0.73, -0.785),
+            slope(2.8, 0.785),
+        ];
+        let (made, moved) = trim_to_roof(&kind, &beam, &roofs)
+            .expect("the beam runs out through a slope and must come back to it");
+        let PartKind::Beam(long) = made else {
+            panic!("a beam trims to a beam");
+        };
+        assert!(
+            long < 6.4375,
+            "it kept its whole length: the gable it sits in swallowed the answer"
+        );
+        // The slope stands 2.78 from the beam's middle; the other end reaches
+        // nothing, so it stays where it was.
+        let low = moved.at[0] - long * 0.5;
+        assert!(
+            (low - (0.72 - 2.781)).abs() < 0.07,
+            "the trimmed end landed at {low}, not at the slope"
+        );
     }
 
     #[test]
