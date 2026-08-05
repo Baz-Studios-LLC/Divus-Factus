@@ -173,6 +173,7 @@ fn main() {
             terrain::TerrainPlugin,
             creature::CreaturePlugin,
             scatter::ScatterPlugin,
+            navigation::NavigationPlugin,
             villager::VillagerPlugin,
             hand::HandPlugin,
             render::RenderPlugin,

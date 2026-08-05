@@ -27,6 +27,138 @@ pub const CELL: f32 = 2.5;
 /// Maximum cells a single search may expand.
 pub const DEFAULT_BUDGET: usize = 3_000;
 
+pub struct NavigationPlugin;
+
+impl Plugin for NavigationPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<Walls>()
+            // Before the routes that read it, and in the same frame a building
+            // finishes: a hall that is standing but not yet an obstacle is a
+            // hall people walk through for as long as their current route
+            // lasts.
+            .add_systems(
+                Update,
+                survey_the_walls.before(crate::creature::plan_routes),
+            );
+    }
+}
+
+/// Gathers every standing building's footprint, once, when the village changes
+/// shape.
+///
+/// Rebuilt only when a shell appears or moves rather than every frame: a
+/// village's walls are the most static thing in the world, and walking the
+/// whole list each tick to rediscover that nothing had changed would be the
+/// cheapest possible way to spend a millisecond.
+fn survey_the_walls(
+    mut walls: ResMut<Walls>,
+    // `Transform`, and this matters more than it looks: the search runs in the
+    // sim's FLAT coordinates, and a building's `GlobalTransform` has been seated
+    // on the sphere by the bend. Surveying the walls from the global would have
+    // put every footprint thousands of units from the ground it stands on, and
+    // blocked a patch of empty world instead. `home::use_doors` reads the same
+    // component for the same reason.
+    shells: Query<(&Transform, &crate::villager::work::Shell)>,
+    changed: Query<
+        Entity,
+        (
+            With<crate::villager::work::Shell>,
+            Or<(Changed<Transform>, Added<crate::villager::work::Shell>)>,
+        ),
+    >,
+    mut standing: Local<usize>,
+) {
+    let count = shells.iter().count();
+    if changed.is_empty() && count == *standing {
+        return;
+    }
+    *standing = count;
+    walls.buildings.clear();
+    walls.buildings.extend(shells.iter().map(|(at, shell)| {
+        Footprint {
+            at: Vec2::new(at.translation.x, at.translation.z),
+            // A shoulder's width in from the wall itself, so a walk routed
+            // around a building does not graze it - and, more importantly, so
+            // that standing a hair inside the wall is still a place a route can
+            // begin from.
+            half: Vec2::new(shell.half_w - 0.35, shell.half_d - 0.35).max(Vec2::splat(0.2)),
+            yaw: at.rotation.to_euler(EulerRot::YXZ).0,
+        }
+    }));
+}
+
+/// A building's footprint on the ground, in world space.
+///
+/// Walls were never in the search. It knew about water and cliffs and nothing
+/// built, so a villager crossing the village walked through the hall — the door
+/// router only ever bent a walk with one end INSIDE a building and one outside,
+/// and a walk that merely passes through has both ends outside. Brett saw people
+/// and animals alike stroll through walls.
+#[derive(Clone, Copy)]
+pub struct Footprint {
+    pub at: Vec2,
+    pub half: Vec2,
+    /// The building's turn about Y, so a hall at an angle blocks its own
+    /// rectangle rather than the box that contains it.
+    pub yaw: f32,
+}
+
+impl Footprint {
+    pub fn contains(&self, p: Vec2) -> bool {
+        let (sin, cos) = (-self.yaw).sin_cos();
+        let local = p - self.at;
+        let turned = Vec2::new(
+            local.x * cos - local.y * sin,
+            local.x * sin + local.y * cos,
+        );
+        turned.x.abs() < self.half.x && turned.y.abs() < self.half.y
+    }
+}
+
+/// Every building the search must walk around.
+#[derive(Resource, Default)]
+pub struct Walls {
+    pub buildings: Vec<Footprint>,
+}
+
+impl Walls {
+    /// Which buildings this journey is allowed to be inside.
+    ///
+    /// The rule, and it is the same for a villager and for a wolf: YOU MAY ENTER
+    /// THE BUILDING YOU ARE GOING TO, AND LEAVE THE ONE YOU ARE IN. You may not
+    /// cut through one you are merely passing.
+    ///
+    /// It has to be a rule about the journey rather than about the walker,
+    /// because the grid is two and a half metres to a cell and a door is one
+    /// metre wide: no search on this grid can thread a doorway, so a building
+    /// blocked outright would be a building nobody could ever enter and no bed
+    /// anyone could reach. The door itself is steered by `home::use_doors`, which
+    /// is the right tool at that scale; this only has to stop people walking
+    /// through the walls on their way past.
+    fn excused(&self, start: Vec2, goal: Vec2) -> [bool; MOST_BUILDINGS] {
+        let mut excused = [false; MOST_BUILDINGS];
+        for (slot, building) in self.buildings.iter().enumerate().take(MOST_BUILDINGS) {
+            excused[slot] = building.contains(start) || building.contains(goal);
+        }
+        excused
+    }
+
+    fn blocks(&self, p: Vec2, excused: &[bool; MOST_BUILDINGS]) -> bool {
+        self.buildings
+            .iter()
+            .enumerate()
+            .any(|(slot, building)| {
+                !excused.get(slot).copied().unwrap_or(false) && building.contains(p)
+            })
+    }
+}
+
+/// How many buildings one search can hold excuses for. A village outgrowing
+/// this does not break — the excess simply cannot be entered on that journey,
+/// and the ones a walk actually starts or ends in are the early ones in the
+/// list far more often than not.
+const MOST_BUILDINGS: usize = 256;
+
 /// A cell in the navigation grid.
 type Cell = IVec2;
 
@@ -109,7 +241,13 @@ fn step_cost(terrain: &Terrain, from: Cell, to: Cell) -> Option<f32> {
 /// within the budget.
 ///
 /// The returned path excludes the starting cell and ends at the goal.
-pub fn find_path(terrain: &Terrain, start: Vec3, goal: Vec3, budget: usize) -> Option<Vec<Vec3>> {
+pub fn find_path(
+    terrain: &Terrain,
+    walls: &Walls,
+    start: Vec3,
+    goal: Vec3,
+    budget: usize,
+) -> Option<Vec<Vec3>> {
     let start_cell = to_cell(start);
     let goal_cell = to_cell(goal);
 
@@ -119,6 +257,10 @@ pub fn find_path(terrain: &Terrain, start: Vec3, goal: Vec3, budget: usize) -> O
     if !terrain.is_walkable(goal.x, goal.z) {
         return None;
     }
+    let excused = walls.excused(
+        Vec2::new(start.x, start.z),
+        Vec2::new(goal.x, goal.z),
+    );
 
     let mut open = BinaryHeap::new();
     let mut came_from: HashMap<Cell, Cell> = HashMap::default();
@@ -135,7 +277,7 @@ pub fn find_path(terrain: &Terrain, start: Vec3, goal: Vec3, budget: usize) -> O
 
     while let Some(Candidate { cell, .. }) = open.pop() {
         if cell == goal_cell {
-            return Some(reconstruct(terrain, &came_from, cell));
+            return Some(reconstruct(terrain, walls, &excused, &came_from, cell));
         }
         if !closed.insert(cell) {
             continue;
@@ -159,6 +301,11 @@ pub fn find_path(terrain: &Terrain, start: Vec3, goal: Vec3, budget: usize) -> O
                 let Some(step) = step_cost(terrain, cell, next) else {
                     continue;
                 };
+                // Through a wall is not a step.
+                let stands = to_world(next, terrain);
+                if walls.blocks(Vec2::new(stands.x, stands.z), &excused) {
+                    continue;
+                }
 
                 let candidate = here + step;
                 if candidate < *cost.get(&next).unwrap_or(&f32::MAX) {
@@ -177,7 +324,13 @@ pub fn find_path(terrain: &Terrain, start: Vec3, goal: Vec3, budget: usize) -> O
 }
 
 /// Walks the parent chain back to the start and straightens the result.
-fn reconstruct(terrain: &Terrain, came_from: &HashMap<Cell, Cell>, end: Cell) -> Vec<Vec3> {
+fn reconstruct(
+    terrain: &Terrain,
+    walls: &Walls,
+    excused: &[bool; MOST_BUILDINGS],
+    came_from: &HashMap<Cell, Cell>,
+    end: Cell,
+) -> Vec<Vec3> {
     let mut cells = vec![end];
     let mut cursor = end;
     while let Some(previous) = came_from.get(&cursor) {
@@ -193,7 +346,7 @@ fn reconstruct(terrain: &Terrain, came_from: &HashMap<Cell, Cell>, end: Cell) ->
     let mut anchor = 0;
     let mut index = 1;
     while index < cells.len() {
-        if !walkable_line(terrain, cells[anchor], cells[index]) {
+        if !walkable_line(terrain, walls, excused, cells[anchor], cells[index]) {
             path.push(to_world(cells[index - 1], terrain));
             anchor = index - 1;
         }
@@ -207,7 +360,13 @@ fn reconstruct(terrain: &Terrain, came_from: &HashMap<Cell, Cell>, end: Cell) ->
 }
 
 /// Whether a straight line between two cells stays on walkable ground.
-fn walkable_line(terrain: &Terrain, from: Cell, to: Cell) -> bool {
+fn walkable_line(
+    terrain: &Terrain,
+    walls: &Walls,
+    excused: &[bool; MOST_BUILDINGS],
+    from: Cell,
+    to: Cell,
+) -> bool {
     let a = to_world(from, terrain);
     let b = to_world(to, terrain);
     let distance = a.distance(b);
@@ -217,6 +376,12 @@ fn walkable_line(terrain: &Terrain, from: Cell, to: Cell) -> bool {
         let t = i as f32 / steps as f32;
         let p = a.lerp(b, t);
         if !terrain.is_walkable(p.x, p.z) {
+            return false;
+        }
+        // Straightening must not cut the corner off a building: the staircase
+        // A* produced went round it, and a straight line between two of its
+        // steps can go straight back through.
+        if walls.blocks(Vec2::new(p.x, p.z), excused) {
             return false;
         }
     }
@@ -239,11 +404,125 @@ mod tests {
         panic!("no walkable ground near the origin");
     }
 
+    /// Two points with open ground between them, far enough apart to put a
+    /// building in the middle of.
+    fn a_clear_walk(terrain: &Terrain) -> Option<(Vec3, Vec3)> {
+        let start = walkable_near(terrain);
+        for step in 8..40 {
+            for turn in 0..16 {
+                let angle = turn as f32 * std::f32::consts::TAU / 16.0;
+                let reach = step as f32 * 2.0;
+                let goal = start + Vec3::new(angle.cos() * reach, 0.0, angle.sin() * reach);
+                if !terrain.is_walkable(goal.x, goal.z) {
+                    continue;
+                }
+                let straight = (0..=40).all(|i| {
+                    let p = start.lerp(goal, i as f32 / 40.0);
+                    terrain.is_walkable(p.x, p.z)
+                });
+                if straight && reach > 24.0 {
+                    return Some((start, goal));
+                }
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn a_building_is_not_a_shortcut() {
+        // The bug, as a test: open ground, a hall dropped squarely in the
+        // middle of the only sensible line, and a walk from one side to the
+        // other. Every waypoint must be outside it.
+        let t = Terrain::new(77);
+        let Some((start, goal)) = a_clear_walk(&t) else {
+            return;
+        };
+        let middle = (start + goal) * 0.5;
+        let hall = Footprint {
+            at: Vec2::new(middle.x, middle.z),
+            half: Vec2::splat(5.0),
+            yaw: 0.0,
+        };
+        // The test only means something if the straight line really does go
+        // through the building.
+        assert!(
+            hall.contains(Vec2::new(middle.x, middle.z)),
+            "the hall is not on the line, so this proves nothing"
+        );
+        let walls = Walls {
+            buildings: vec![hall],
+        };
+        let path = find_path(&t, &walls, start, goal, DEFAULT_BUDGET).expect("a way round");
+        for leg in &path {
+            assert!(
+                !hall.contains(Vec2::new(leg.x, leg.z)),
+                "the route goes through the hall at {leg:?}"
+            );
+        }
+        // And the straightening must not put it back: walk the whole route.
+        let mut cursor = start;
+        for leg in path.iter().chain(std::iter::once(&goal)) {
+            for i in 0..=20 {
+                let p = cursor.lerp(*leg, i as f32 / 20.0);
+                assert!(
+                    !hall.contains(Vec2::new(p.x, p.z)),
+                    "a straightened leg cuts the corner off the hall"
+                );
+            }
+            cursor = *leg;
+        }
+    }
+
+    #[test]
+    fn the_building_you_are_going_to_is_the_one_you_may_enter() {
+        // A door is one metre and a cell is two and a half, so a building
+        // blocked outright is a building with no way in and a bed nobody can
+        // reach. The journey's own destination is always excused.
+        let t = Terrain::new(77);
+        let Some((start, goal)) = a_clear_walk(&t) else {
+            return;
+        };
+        let home = Footprint {
+            at: Vec2::new(goal.x, goal.z),
+            half: Vec2::splat(4.0),
+            yaw: 0.0,
+        };
+        let walls = Walls {
+            buildings: vec![home],
+        };
+        assert!(
+            find_path(&t, &walls, start, goal, DEFAULT_BUDGET).is_some(),
+            "nobody can walk home: the house they are going to is blocking them"
+        );
+        // And the reverse, so somebody indoors can leave.
+        assert!(
+            find_path(&t, &walls, goal, start, DEFAULT_BUDGET).is_some(),
+            "nobody can leave the house they are standing in"
+        );
+    }
+
+    #[test]
+    fn a_turned_building_blocks_its_own_rectangle() {
+        // Not the axis-aligned box around it: a hall at forty-five degrees
+        // leaves its corners open ground.
+        let hall = Footprint {
+            at: Vec2::ZERO,
+            half: Vec2::new(6.0, 2.0),
+            yaw: std::f32::consts::FRAC_PI_4,
+        };
+        assert!(hall.contains(Vec2::new(3.0, 3.0)), "along its own length");
+        assert!(
+            !hall.contains(Vec2::new(-3.5, 3.5)),
+            "across it: this is inside the box that contains the hall, and \
+             outside the hall"
+        );
+    }
+
     #[test]
     fn a_path_to_where_you_stand_is_empty() {
         let t = Terrain::new(77);
         let here = walkable_near(&t);
-        assert_eq!(find_path(&t, here, here, DEFAULT_BUDGET), Some(Vec::new()));
+        assert_eq!(find_path(&t, &Walls::default(), here, here, DEFAULT_BUDGET), Some(Vec::new()));
     }
 
     #[test]
@@ -262,7 +541,7 @@ mod tests {
             }
         }
         let sea = sea.expect("no water found");
-        assert_eq!(find_path(&t, start, sea, DEFAULT_BUDGET), None);
+        assert_eq!(find_path(&t, &Walls::default(), start, sea, DEFAULT_BUDGET), None);
     }
 
     #[test]
@@ -280,14 +559,14 @@ mod tests {
             }
             let goal = Vec3::new(goal_xz.x, t.height_at(goal_xz.x, goal_xz.y), goal_xz.y);
 
-            let Some(path) = find_path(&t, start, goal, DEFAULT_BUDGET) else {
+            let Some(path) = find_path(&t, &Walls::default(), start, goal, DEFAULT_BUDGET) else {
                 continue;
             };
 
             let mut cursor = start;
             for step in &path {
                 assert!(
-                    walkable_line(&t, to_cell(cursor), to_cell(*step)),
+                    walkable_line(&t, &Walls::default(), &[false; MOST_BUILDINGS], to_cell(cursor), to_cell(*step)),
                     "path crosses unwalkable ground",
                 );
                 cursor = *step;
@@ -308,7 +587,7 @@ mod tests {
         }
         let goal = Vec3::new(goal_xz.x, t.height_at(goal_xz.x, goal_xz.y), goal_xz.y);
 
-        let path = find_path(&t, start, goal, DEFAULT_BUDGET).expect("no path");
+        let path = find_path(&t, &Walls::default(), start, goal, DEFAULT_BUDGET).expect("no path");
         let end = *path.last().expect("empty path");
         assert!(end.distance(goal) < CELL * 1.5, "ended at {end:?}");
     }
@@ -325,7 +604,7 @@ mod tests {
         }
         let goal = Vec3::new(goal_xz.x, t.height_at(goal_xz.x, goal_xz.y), goal_xz.y);
 
-        if let Some(path) = find_path(&t, start, goal, DEFAULT_BUDGET) {
+        if let Some(path) = find_path(&t, &Walls::default(), start, goal, DEFAULT_BUDGET) {
             let diagonal_cells = (30.0 / CELL) as usize;
             assert!(
                 path.len() < diagonal_cells,
@@ -342,6 +621,6 @@ mod tests {
         let t = Terrain::new(77);
         let start = walkable_near(&t);
         let far = Vec3::new(start.x + 40_000.0, 0.0, start.z + 40_000.0);
-        assert_eq!(find_path(&t, start, far, 400), None);
+        assert_eq!(find_path(&t, &Walls::default(), start, far, 400), None);
     }
 }

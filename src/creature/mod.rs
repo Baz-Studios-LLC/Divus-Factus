@@ -260,8 +260,9 @@ pub fn spawn_creature(
 ///
 /// Bounded per frame: pathfinding is the most expensive thing the simulation does,
 /// and a settlement all deciding to eat at once would otherwise stall the tick.
-fn plan_routes(
+pub(crate) fn plan_routes(
     terrain: Option<Res<Terrain>>,
+    walls: Res<crate::navigation::Walls>,
     mut creatures: Query<
         (&Transform, &MoveTarget, &mut Route),
         (
@@ -307,6 +308,7 @@ fn plan_routes(
         route.goal = Some(goal);
         match crate::navigation::find_path(
             &terrain,
+            &walls,
             transform.translation,
             goal,
             crate::navigation::DEFAULT_BUDGET,
