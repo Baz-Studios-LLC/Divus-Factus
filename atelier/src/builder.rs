@@ -1475,20 +1475,7 @@ impl Plugin for BuilderPlugin {
                     // The painting tools and the part menu as one group: this
                     // tuple is at Bevy's own limit for how many systems it will
                     // take in a row, and a nested tuple counts as one.
-                    (
-                        paint_the_work,
-                        work_palette,
-                        raise_part_menu,
-                        // AFTER the grab, and it has to be. A click on the menu
-                        // is the menu's business, and `place_grab_remove` knows
-                        // that - it steps aside for any click that lands on
-                        // interface. But this despawns the menu the moment a
-                        // line is chosen, so running first left the grab looking
-                        // for interface under the cursor and finding none: the
-                        // click fell through to the world and picked the roof up
-                        // as it came apart. Brett saw exactly that.
-                        work_part_menu.after(place_grab_remove),
-                    ),
+                    (paint_the_work, work_palette, raise_part_menu),
                     toggle_snap_mode,
                     disarm_on_mode,
                     turn_part,
@@ -1500,7 +1487,20 @@ impl Plugin for BuilderPlugin {
                     mirror_part,
                     feel_ahead,
                     move_ghost,
-                    place_grab_remove,
+                    // The menu acts AFTER the grab has had its look, and takes
+                    // the ordering from this chain rather than asking for it: an
+                    // `after` inside an already-chained tuple states the
+                    // opposite of what the chain states, which Bevy cannot solve
+                    // and will not start with.
+                    //
+                    // The order matters because a click on the menu is the
+                    // menu's business, and the grab knows that - it steps aside
+                    // for any click landing on interface. But choosing a line
+                    // despawns the menu that same frame, so with the menu first
+                    // the grab looked for interface under the cursor, found it
+                    // already gone, and took the click for the world: it picked
+                    // the roof up as it came apart.
+                    (place_grab_remove, work_part_menu).chain(),
                 )
                     .chain(),
             )
@@ -1882,9 +1882,11 @@ fn deeds_for(kind: &PartKind) -> Vec<Deed> {
     }
 }
 
-/// The menu itself, and which part raised it.
+/// The menu itself. Which part raised it rides on each LINE, since that is
+/// where it is read - keeping a second copy up here only invited the two to
+/// disagree.
 #[derive(Component)]
-struct PartMenu(Entity);
+struct PartMenu;
 
 /// One line of it.
 #[derive(Component)]
@@ -1952,7 +1954,7 @@ fn raise_part_menu(
 
     let menu = commands
         .spawn((
-            PartMenu(part),
+            PartMenu,
             Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(at.x),
