@@ -1479,7 +1479,15 @@ impl Plugin for BuilderPlugin {
                         paint_the_work,
                         work_palette,
                         raise_part_menu,
-                        work_part_menu,
+                        // AFTER the grab, and it has to be. A click on the menu
+                        // is the menu's business, and `place_grab_remove` knows
+                        // that - it steps aside for any click that lands on
+                        // interface. But this despawns the menu the moment a
+                        // line is chosen, so running first left the grab looking
+                        // for interface under the cursor and finding none: the
+                        // click fell through to the world and picked the roof up
+                        // as it came apart. Brett saw exactly that.
+                        work_part_menu.after(place_grab_remove),
                     ),
                     toggle_snap_mode,
                     disarm_on_mode,
