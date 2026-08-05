@@ -21,9 +21,6 @@ struct ModeButton(crate::gizmo::ToolMode);
 pub struct FileHome(pub Entity);
 
 /// The button on the top bar that lifts the roof off.
-#[derive(Component)]
-struct RoofButton;
-
 /// The gear at the rail's foot, and the settings panel it opens.
 #[derive(Component)]
 struct SettingsButton;
@@ -37,21 +34,34 @@ impl Plugin for RailPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, raise_rail).add_systems(
             Update,
-            (work_buttons, work_mode_bar, work_settings, work_roof_button),
+            (work_buttons, work_mode_bar, work_settings),
         );
     }
 }
 
 pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>) {
     // The mode bar, top centre, the way the big programs wear it.
+    //
+    // Centred by a full-width row rather than by arithmetic. It used to be three
+    // hundred and twenty pixels wide with a hundred and sixty of negative margin
+    // pulling it back over the middle - true only while the buttons happened to
+    // add up to that, and the fourth one spilled straight out of the panel it
+    // was supposed to be inside. A hard-coded width is a measurement of the
+    // contents kept somewhere the contents cannot reach.
+    let centring = commands
+        .spawn(Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(0.0),
+            top: Val::Px(0.0),
+            width: Val::Percent(100.0),
+            flex_direction: FlexDirection::Row,
+            justify_content: JustifyContent::Center,
+            ..default()
+        })
+        .id();
     let bar = commands
         .spawn((
             Node {
-                position_type: PositionType::Absolute,
-                left: Val::Percent(50.0),
-                top: Val::Px(0.0),
-                margin: UiRect::left(Val::Px(-160.0)),
-                width: Val::Px(320.0),
                 flex_direction: FlexDirection::Row,
                 justify_content: JustifyContent::Center,
                 column_gap: Val::Px(4.0),
@@ -66,6 +76,7 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
             },
             BackgroundColor(theme::panel_bg()),
             BorderColor::all(theme::panel_border(&palette)),
+            ChildOf(centring),
         ))
         .id();
     for (mode, label) in [
@@ -100,32 +111,6 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
         ));
     }
 
-    // The roof toggle rides the bar's own right hand.
-    let roof = commands
-        .spawn((
-            RoofButton,
-            Interaction::default(),
-            Node {
-                margin: UiRect::left(Val::Px(12.0)),
-                padding: UiRect::axes(Val::Px(14.0), Val::Px(5.0)),
-                border: UiRect::all(Val::Px(1.0)),
-                ..default()
-            },
-            BackgroundColor(Color::BLACK.with_alpha(0.18)),
-            BorderColor::all(theme::panel_border(&palette)),
-            ChildOf(bar),
-        ))
-        .id();
-    commands.spawn((
-        Text::new("ROOF"),
-        TextFont {
-            font: fonts.display.clone().into(),
-            font_size: FontSize::Px(12.0),
-            ..default()
-        },
-        TextColor(theme::text_dim(&palette)),
-        ChildOf(roof),
-    ));
 
     let rail = commands
         .spawn((
@@ -542,54 +527,3 @@ fn work_settings(
     }
 }
 
-/// The ROOF button lifts the roof off with the same hand H does, and
-/// wears the gold while it is up.
-fn work_roof_button(
-    palette: Res<Palette>,
-    mut lifted: ResMut<crate::builder::RoofsLifted>,
-    // Only the MOMENT of pressing: a plain Pressed lingers while the
-    // button is held, and a toggle read that way flips every frame.
-    pressed: Query<&Interaction, (Changed<Interaction>, With<RoofButton>)>,
-    mut buttons: Query<&mut BorderColor, With<RoofButton>>,
-    mut labels: Query<&mut TextColor>,
-    children: Query<&Children>,
-    marks: Query<Entity, With<RoofButton>>,
-) {
-    if pressed
-        .iter()
-        .any(|interaction| *interaction == Interaction::Pressed)
-    {
-        lifted.0 = match lifted.0 {
-            crate::builder::Cutaway::Whole => crate::builder::Cutaway::RoofOff,
-            crate::builder::Cutaway::RoofOff => crate::builder::Cutaway::WallsDown,
-            crate::builder::Cutaway::WallsDown => crate::builder::Cutaway::Whole,
-        };
-    }
-    let cut = lifted.0 != crate::builder::Cutaway::Whole;
-    for mut border in &mut buttons {
-        let dress = BorderColor::all(if cut {
-            theme::accent(&palette)
-        } else {
-            theme::panel_border(&palette)
-        });
-        if *border != dress {
-            *border = dress;
-        }
-    }
-    for button in &marks {
-        if let Ok(kids) = children.get(button) {
-            for &kid in kids {
-                if let Ok(mut colour) = labels.get_mut(kid) {
-                    let wanted = if cut {
-                        theme::accent(&palette)
-                    } else {
-                        theme::text_dim(&palette)
-                    };
-                    if colour.0 != wanted {
-                        colour.0 = wanted;
-                    }
-                }
-            }
-        }
-    }
-}

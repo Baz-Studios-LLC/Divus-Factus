@@ -30,6 +30,12 @@ const PITCH_LEAST: f32 = 10.0;
 const PITCH_MOST: f32 = 60.0;
 pub const PITCH_STEP: f32 = 2.5;
 
+/// The pitch a roof arms at has to be one a handle can reach, or a roof would
+/// draw itself at an angle its own tool could not return it to. Checked when the
+/// bench is BUILT rather than when it is tested, because there is no arrangement
+/// of these three numbers worth compiling that fails it.
+const _: () = assert!(PITCH_LEAST <= ROOF_PITCH && ROOF_PITCH <= PITCH_MOST);
+
 /// The Atelier's own measurements - the source of truth now; the game
 /// conforms to these when its buildings are replaced. A quarter-metre
 /// wall on a quarter-metre grid means centrelines always land on snaps.
@@ -5316,10 +5322,9 @@ mod roof_tests {
 
     #[test]
     fn the_pitch_a_handle_can_reach_is_the_pitch_a_roof_can_hold() {
-        // The drag clamps to ten and sixty and the geometry clamps to the same
-        // pair. If they ever disagreed, a roof pulled to the end of its handle
-        // would draw itself at a different angle than the one it recorded.
-        assert!(PITCH_LEAST <= ROOF_PITCH && ROOF_PITCH <= PITCH_MOST);
+        // That the arming pitch is reachable is checked at compile time, beside
+        // the constants. This is the other half: that the reachable pitches are
+        // a whole number of steps apart.
         assert!(
             ((PITCH_MOST - PITCH_LEAST) / PITCH_STEP).fract() < 1e-6,
             "the range is not a whole number of steps, so the steepest pitch \
