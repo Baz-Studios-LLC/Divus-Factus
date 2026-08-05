@@ -2148,6 +2148,10 @@ fn ungroup(
 #[derive(Component)]
 struct PalettePanel;
 
+/// The big square at the head of the palette: the colour now armed.
+#[derive(Component)]
+struct BrushFace;
+
 /// One colour a maker can arm. `ramp` empty is the bare swatch: painting with
 /// it strips a part back to its own colours.
 #[derive(Component, Clone)]
@@ -2207,6 +2211,23 @@ fn raise_palette(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette
             margin: UiRect::bottom(Val::Px(6.0)),
             ..default()
         },
+        ChildOf(panel),
+    ));
+
+    // The armed colour, large, at the head of the panel. A swatch ringed in gold
+    // says which one is armed but says it in the size of a swatch; this says
+    // what is actually on the brush, at a size worth glancing at.
+    commands.spawn((
+        BrushFace,
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Px(44.0),
+            border: UiRect::all(Val::Px(1.0)),
+            margin: UiRect::bottom(Val::Px(8.0)),
+            ..default()
+        },
+        BackgroundColor(palette.shade("wood", 0.5)),
+        BorderColor::all(theme::accent(&palette)),
         ChildOf(panel),
     ));
 
@@ -2299,6 +2320,7 @@ fn work_palette(
     placed: Query<&Placed, Without<Ghost>>,
     mut brush: ResMut<Brush>,
     mut panels: Query<&mut Visibility, With<PalettePanel>>,
+    mut face: Query<&mut BackgroundColor, With<BrushFace>>,
     mut swatches: Query<(&Swatch, &Interaction, &mut BorderColor)>,
 ) {
     let painting = *mode == crate::gizmo::ToolMode::Paint;
@@ -2321,6 +2343,18 @@ fn work_palette(
             brush.shade = swatch.shade;
         }
     }
+    // The brush's own face. An empty brush strips rather than paints, and shows
+    // as the panel's own dark rather than as a colour it does not have.
+    let showing = match brush.ramp.as_deref() {
+        Some(ramp) => palette.shade(ramp, brush.shade),
+        None => Color::BLACK.with_alpha(0.30),
+    };
+    for mut fill in &mut face {
+        if fill.0 != showing {
+            *fill = BackgroundColor(showing);
+        }
+    }
+
     // What the part under the cursor is wearing, so the palette can point at
     // it. Brett's idea, and better than the eyedropper he first reached for:
     // there is no tool to arm and no modifier to hold, and once the swatch has
@@ -2953,10 +2987,12 @@ fn paint_the_work(
         brush.ramp = None;
     }
 
-    // A stroke is a fresh selection, or the brush changing under a standing one
-    // — so a maker can hold a wall and walk the ramps to see it change.
-    let stroke = selected.is_changed() || brush.is_changed();
-    if !stroke {
+    // A stroke is a CLICK ON A PART, and nothing else. Changing the brush used
+    // to repaint whatever was standing selected - meant as a way to hold a wall
+    // and walk the ramps watching it change, and wrong: arming a colour is
+    // choosing, not doing, and a maker choosing a colour has not said where they
+    // want it yet. Brett: "Arming a color shouldnt paint."
+    if !selected.is_changed() {
         return;
     }
     let Some(chosen) = selected.0 else {
