@@ -643,6 +643,7 @@ fn spawn_smoke(commands: &mut Commands, images: &mut Assets<Image>, screen: Enti
 fn drift_smoke(
     time: Res<Time<Real>>,
     farewell: Option<Res<TitleFarewell>>,
+    welcome: Option<Res<TitleWelcome>>,
     windows: Query<&Window, With<PrimaryWindow>>,
     mut puffs: Query<(&SmokePuff, &mut Node, &mut ImageNode)>,
 ) {
@@ -655,6 +656,9 @@ fn drift_smoke(
     let (width, height) = (window.width(), window.height());
     let t = time.elapsed_secs();
     let blow = farewell.map_or(0.0, |f| f.t);
+    // Comes up with the lettering, and owns the whole of its own colour while
+    // doing it — one writer per value.
+    let risen = welcome.map_or(1.0, |welcome| welcome.risen());
 
     for (puff, mut node, mut image) in &mut puffs {
         // The crawl along the lane, plus a slow private wander around it.
@@ -685,7 +689,7 @@ fn drift_smoke(
         node.top = px(y * height - puff.size * 0.5);
         node.width = px(puff.size);
         node.height = px(puff.size);
-        image.color = SMOKE_TINT.with_alpha(alpha);
+        image.color = SMOKE_TINT.with_alpha(alpha * risen);
     }
 }
 
@@ -1008,6 +1012,15 @@ struct TitleWelcome {
     t: f32,
 }
 
+impl TitleWelcome {
+    /// How far up, eased. The ONE definition: the smoke scales its own alpha by
+    /// this and so does everything else, and a second copy of the easing would
+    /// drift the moment one of them was tuned.
+    fn risen(&self) -> f32 {
+        self.t * self.t * (3.0 - 2.0 * self.t)
+    }
+}
+
 /// Seconds the welcome takes. Slower than the farewell: leaving is a dive and
 /// should feel like one, arriving is not.
 const WELCOME_SECONDS: f32 = 1.1;
@@ -1031,7 +1044,13 @@ fn play_welcome(
     welcome: Option<ResMut<TitleWelcome>>,
     screens: Query<Entity, With<TitleScreen>>,
     kin: Query<&Children>,
-    mut arts: Query<&mut ImageNode>,
+    // NOT the smoke. Every puff sets its own colour every frame — a tint and an
+    // alpha that breathe along its lane — and writing plain white over it from
+    // here left the two systems trading the same value once a frame. Brett saw
+    // it immediately: "the smoke flashes for a few seconds before stopping",
+    // which is exactly the length of this fade. The smoke scales itself by
+    // [`TitleWelcome::risen`] instead; see `drift_smoke`.
+    mut arts: Query<&mut ImageNode, Without<SmokePuff>>,
     mut texts: Query<&mut TextColor>,
 ) {
     let Some(mut welcome) = welcome else {
@@ -1041,7 +1060,7 @@ fn play_welcome(
     if homeward.is_none() {
         welcome.t = (welcome.t + time.delta_secs() / WELCOME_SECONDS).min(1.0);
     }
-    let eased = welcome.t * welcome.t * (3.0 - 2.0 * welcome.t);
+    let eased = welcome.risen();
 
     let mut walk: Vec<Entity> = screens.iter().collect();
     while let Some(here) = walk.pop() {
@@ -1217,6 +1236,10 @@ fn begin_farewell(
         commands.entity(screen).remove::<(Interaction, ui::Panel)>();
     }
     if leaving {
+        // And the arrival is over, whatever it had reached. Begin pressed within
+        // a second of the title appearing would otherwise leave the welcome
+        // fading things IN while the farewell faded the same things out.
+        commands.remove_resource::<TitleWelcome>();
         commands.insert_resource(TitleFarewell { t: 0.0 });
     }
 }
