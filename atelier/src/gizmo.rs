@@ -246,14 +246,25 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
             // A whole roof carries two more, in gold: the eaves, which
             // reach out past the walls without taking the gables with
             // them.
-            if let Some(PartKind::GableRoof(_, span, over, pitch)) =
+            if let Some(PartKind::GableRoof(long, span, over, pitch)) =
                 builder::kind_from_name(&record.part)
             {
+                // Stood off along the ridge, not straight out past the blue
+                // ones. A handle is a shaft one and a third long with a head on
+                // the end, and these sat on the SAME LINE as the depth handles
+                // with only the overhang between the two feet - so the gold lay
+                // inside the blue for three quarters of its length and took
+                // every click meant for it. Brett: "these yellow and blue
+                // handles overlap so i cant use the blue handles."
+                //
+                // A quarter of the roof's length to one side, and never less
+                // than a stride, so a short roof separates them too.
+                let aside = spin * Vec3::X * (long * 0.25).max(0.9);
                 for end in [-1.0f32, 1.0] {
                     let dir = spin * (Vec3::Z * end);
                     handles.push((
                         dir,
-                        dir * (span * 0.5 + over + 0.35),
+                        dir * (span * 0.5 + over + 0.35) + aside,
                         "cloth-gold",
                         Grip::Over { o0: over },
                     ));
