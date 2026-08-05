@@ -11,7 +11,6 @@
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use bevy::window::PrimaryWindow;
 
 use crate::GameState;
 use crate::debug::layers::Layer;
@@ -569,7 +568,19 @@ struct SmokePuff {
 const SMOKE_TINT: Color = Color::srgb(0.72, 0.76, 0.86);
 
 /// Where on screen the blow-away radiates from: the heart of the lettering.
-const SMOKE_HEART: Vec2 = Vec2::new(0.5, 0.3);
+/// How far past the lettering the smoke reaches, and how much of its height the
+/// band occupies.
+///
+/// Fractions of the LOGOTYPE rather than of the window, which is the whole point
+/// of them: the band used to be written in screen fractions - 14% to 86% across,
+/// 21% to 38% down - and screen fractions were right until the title was rebuilt
+/// around the planet. The lettering moved to the top of the frame and the smoke
+/// stayed where it had been, sitting below the words it was meant to be behind.
+/// Brett: "it was before we redid the title screen and we never fixed it."
+///
+/// Measured from the art now, so the next layout carries it along.
+const SMOKE_SPREAD: f32 = 1.28;
+const SMOKE_BAND: f32 = 0.72;
 
 /// A soft, wispy blob: radial falloff carved by value noise. One texture
 /// serves every puff — flips, scale and overlap hide the reuse.
@@ -610,9 +621,9 @@ fn spawn_smoke(commands: &mut Commands, images: &mut Assets<Image>, screen: Enti
         // rhythm, and no random draws to burn.
         let puff = SmokePuff {
             lane: (f * 0.618034).fract(),
-            // Hugging the cropped logotype's band rather than the tall
-            // canvas it once shipped inside.
-            home_y: 0.21 + 0.17 * (f * 0.377).fract(),
+            // Where in the band this puff rides, 0 at the top of the lettering
+            // and 1 at the foot of it.
+            home_y: (f * 0.377).fract(),
             drift: 0.0045 + 0.006 * (f * 0.529).fract(),
             phase: f * 1.947,
             size: 260.0 + 360.0 * (f * 0.732).fract(),
@@ -644,16 +655,45 @@ fn drift_smoke(
     time: Res<Time<Real>>,
     farewell: Option<Res<TitleFarewell>>,
     welcome: Option<Res<TitleWelcome>>,
-    windows: Query<&Window, With<PrimaryWindow>>,
+    // The title's own root, which is the FRAME for everything here — and not
+    // the window, which is a different space in capture mode. The window
+    // reports its logical 1512 while an unattended capture lays the interface
+    // out across the render target's 3024, so a position divided by the window
+    // came out at twice the fraction it should be and the smoke sat off the
+    // right-hand edge. The same mismatch cost hours on the god's hand once.
+    // Measure the frame with the same ruler as the thing inside it.
+    frames: Query<&ComputedNode, With<TitleScreen>>,
+    lettering: Query<(&ComputedNode, &UiGlobalTransform), With<TitleArt>>,
     mut puffs: Query<(&SmokePuff, &mut Node, &mut ImageNode)>,
 ) {
     if puffs.is_empty() {
         return;
     }
-    let Ok(window) = windows.single() else {
+    let Some(frame) = frames
+        .iter()
+        .next()
+        .map(|computed| computed.size() * computed.inverse_scale_factor())
+        .filter(|frame| frame.x > 1.0 && frame.y > 1.0)
+    else {
         return;
     };
-    let (width, height) = (window.width(), window.height());
+
+    // The lettering's own rectangle, in the same fractions the drift is written
+    // in. Skipped entirely until the layout has measured it — on the first frame
+    // or two a node's computed size is nought, and a band of nothing would put
+    // every puff in the top-left corner in full view of the player.
+    let Some((heart, reach)) = lettering.iter().next().and_then(|(computed, at)| {
+        let scale = computed.inverse_scale_factor();
+        let half = computed.size() * scale * 0.5;
+        (half.x > 1.0 && half.y > 1.0).then(|| {
+            (
+                Vec2::new(at.translation.x, at.translation.y) * scale / frame,
+                half / frame,
+            )
+        })
+    }) else {
+        return;
+    };
     let t = time.elapsed_secs();
     let blow = farewell.map_or(0.0, |f| f.t);
     // Comes up with the lettering, and owns the whole of its own colour while
@@ -661,12 +701,18 @@ fn drift_smoke(
     let risen = welcome.map_or(1.0, |welcome| welcome.risen());
 
     for (puff, mut node, mut image) in &mut puffs {
-        // The crawl along the lane, plus a slow private wander around it.
+        // The crawl along the lane, plus a slow private wander around it — the
+        // lane being the lettering's own width, spilling a little past each end.
         let along = (puff.lane + t * puff.drift).fract();
-        let mut x = 0.14 + 0.72 * along + 0.02 * (t * 0.043 + puff.phase).sin();
-        let mut y = puff.home_y
-            + 0.016 * (t * 0.053 + puff.phase * 1.7).sin()
-            + 0.010 * (t * 0.031 + puff.phase * 2.3).cos();
+        let span = reach.x * 2.0 * SMOKE_SPREAD;
+        let band = reach.y * 2.0 * SMOKE_BAND;
+        let mut x = heart.x
+            + (along - 0.5) * span
+            + 0.03 * span * (t * 0.043 + puff.phase).sin();
+        let mut y = heart.y
+            + (puff.home_y - 0.5) * band
+            + 0.10 * band * (t * 0.053 + puff.phase * 1.7).sin()
+            + 0.06 * band * (t * 0.031 + puff.phase * 2.3).cos();
 
         // Born thin at one end of the lane, dying thin at the other, so the
         // wrap-around never pops.
@@ -679,14 +725,14 @@ fn drift_smoke(
             // from the lettering, with the wind's own slant, thinning to
             // nothing as the descent gets under way.
             let s = blow * blow;
-            let away = (Vec2::new(x, y) - SMOKE_HEART) * 2.6 + Vec2::new(0.35, -0.18);
+            let away = (Vec2::new(x, y) - heart) * 2.6 + Vec2::new(0.35, -0.18);
             x += away.x * s * 0.55;
             y += away.y * s * 0.55;
             alpha *= (1.0 - blow).max(0.0);
         }
 
-        node.left = px(x * width - puff.size * 0.5);
-        node.top = px(y * height - puff.size * 0.5);
+        node.left = px(x * frame.x - puff.size * 0.5);
+        node.top = px(y * frame.y - puff.size * 0.5);
         node.width = px(puff.size);
         node.height = px(puff.size);
         image.color = SMOKE_TINT.with_alpha(alpha * risen);
