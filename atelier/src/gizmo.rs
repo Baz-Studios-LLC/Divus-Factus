@@ -434,7 +434,7 @@ fn work_gizmo(
     palette: Res<Palette>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut parts: Query<(&mut Transform, &mut Placed), Without<Handle>>,
+    mut parts: Query<(Entity, &mut Transform, &mut Placed), Without<Handle>>,
 ) {
     let Some(part) = selected.0 else {
         drag.0 = None;
@@ -488,7 +488,7 @@ fn work_gizmo(
 
     if buttons.just_pressed(MouseButton::Left)
         && let Some((dir, grip)) = touched
-        && let Ok((transform, _)) = parts.get_mut(part)
+        && let Ok((_, transform, _)) = parts.get_mut(part)
         && let Some(t0) = along_axis(&ray, transform.translation, dir)
     {
         drag.0 = Some(DragState {
@@ -505,7 +505,7 @@ fn work_gizmo(
     let Some(state) = drag.0.as_ref() else {
         return;
     };
-    let Ok((mut transform, mut record)) = parts.get_mut(part) else {
+    let Ok((_, mut transform, mut record)) = parts.get_mut(part) else {
         return;
     };
     let Some(t) = along_axis(&ray, state.start_at, state.dir) else {
@@ -516,8 +516,31 @@ fn work_gizmo(
             // A sixteenth of a metre: the universal lattice's own step,
             // so a fine move can always be undone by a coarse snap.
             let step = ((t - state.t0) * 16.0).round() / 16.0;
+            let was = transform.translation;
             transform.translation = state.start_at + state.dir * step;
             record.at = transform.translation.into();
+            let moved = transform.translation - was;
+
+            // And the marks it carries travel with it. A door slid along a wall
+            // that left its routing mark behind would put the village's doorway
+            // where the door used to be.
+            if moved.length_squared() > 0.0 {
+                let held: Vec<(Entity, Vec3, builder::Placed)> = parts
+                    .iter()
+                    .map(|(entity, at, record)| (entity, at.translation, record.clone()))
+                    .collect();
+                let carried = builder::carried_marks(
+                    part,
+                    was,
+                    held.iter().map(|(e, at, record)| (*e, *at, record)),
+                );
+                for mark in carried {
+                    if let Ok((_, mut mark_at, mut mark_record)) = parts.get_mut(mark) {
+                        mark_at.translation += moved;
+                        mark_record.at = mark_at.translation.into();
+                    }
+                }
+            }
         }
         Grip::Pitch { p0 } => {
             // The drag is a ridge HEIGHT and the stored number is an angle:

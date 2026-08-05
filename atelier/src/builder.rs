@@ -1175,6 +1175,57 @@ pub struct Placed {
     /// of an L.
     #[serde(default)]
     pub flip: bool,
+    /// A widget that has been cut loose from whatever it was standing in.
+    ///
+    /// A door arrives with its routing mark, a bed could arrive with its sleep
+    /// mark, and Brett's rule is that they travel together: "they should stay
+    /// grouped like the stretch gable roofs unless you right click and ungroup".
+    /// So a mark belongs to the part it sits inside, and moving or burying that
+    /// part takes the mark with it - until somebody says otherwise here.
+    ///
+    /// Defaulting to false means every mark in every saved work is bundled,
+    /// which is what a maker who placed one inside a door meant by it.
+    #[serde(default)]
+    pub loose: bool,
+}
+
+/// How far a mark may sit from a part and still be carried by it.
+///
+/// A metre: a double door's two marks stand half a metre either side of its
+/// middle, and nothing else a maker places sits that close to a part it does
+/// not belong to.
+const CARRIES_WITHIN: f32 = 1.0;
+
+/// The marks a part carries: its own, bundled with it.
+///
+/// Nearest owner wins, so a mark between two parts belongs to the one it is
+/// actually in rather than to both. Loose marks belong to nobody.
+pub(crate) fn carried_marks<'a>(
+    owner: Entity,
+    owner_at: Vec3,
+    everything: impl Iterator<Item = (Entity, Vec3, &'a Placed)> + Clone,
+) -> Vec<Entity> {
+    let mut carried = Vec::new();
+    for (mark, mark_at, record) in everything.clone() {
+        if record.loose || record.stage != "widget" {
+            continue;
+        }
+        let reach = mark_at.distance(owner_at);
+        if reach > CARRIES_WITHIN {
+            continue;
+        }
+        // Whoever is nearest. A mark inside a door and beside a wall belongs to
+        // the door.
+        let nearer = everything.clone().any(|(other, other_at, other_record)| {
+            other != mark
+                && other_record.stage != "widget"
+                && other_at.distance(mark_at) < reach - 1e-4
+        });
+        if !nearer && owner != mark {
+            carried.push(mark);
+        }
+    }
+    carried
 }
 
 /// A part's turn: yaw, then tilt - which leans the other way when the
@@ -1235,6 +1286,7 @@ impl Hand {
             shade: self.shade,
             stage: self.stage.clone(),
             flip: self.flip,
+            loose: false,
         })
     }
 }
@@ -1690,6 +1742,7 @@ pub fn seat_the_figures(
             shade: 0.7,
             stage: "widget".to_string(),
             flip: false,
+            loose: false,
         };
         spawn_part(commands, meshes, materials, palette, &widget, &mark, false);
     }
@@ -1825,6 +1878,11 @@ const NATURES: [&str; 5] = ["footing", "frame", "walls", "roof", "furnishing"];
 /// no part for a jamb, so breaking one up would leave nothing but a hole where a
 /// door used to be.
 fn deeds_for(kind: &PartKind) -> Vec<Deed> {
+    // Only what the KIND can answer. Whether a part is also carrying marks is a
+    // question about this bench rather than about the kind, so the menu asks
+    // that one itself and adds the entry if the answer is yes - an UNGROUP that
+    // would do nothing is worse than no UNGROUP, because it has to be tried
+    // before a maker learns it is nothing.
     let mut deeds = match kind {
         PartKind::GableRoof(..) => vec![Deed::Ungroup],
         _ => Vec::new(),
@@ -1864,7 +1922,7 @@ fn raise_part_menu(
     hovered: Res<Hovered>,
     naming: Res<Naming>,
     hand: Res<Hand>,
-    placed: Query<&Placed, Without<Ghost>>,
+    placed: Query<(Entity, &Transform, &Placed), Without<Ghost>>,
     menus: Query<Entity, With<PartMenu>>,
     mut drift: Local<f32>,
 ) {
@@ -1890,13 +1948,31 @@ fn raise_part_menu(
     let Some(part) = hovered.grab else {
         return;
     };
-    let Ok(record) = placed.get(part) else {
+    let Ok((_, _, record)) = placed.get(part) else {
         return;
     };
     let Some(kind) = kind_from_name(&record.part) else {
         return;
     };
-    let deeds = deeds_for(&kind);
+    let mut deeds = deeds_for(&kind);
+    // Carrying a mark is reason enough to offer it, whatever the part is.
+    if !deeds.contains(&Deed::Ungroup) {
+        let held: Vec<(Entity, Vec3, &Placed)> = placed
+            .iter()
+            .map(|(entity, at, record)| (entity, at.translation, record))
+            .collect();
+        let carrying = placed.get(part).is_ok_and(|(_, at, _)| {
+            !carried_marks(
+                part,
+                at.translation,
+                held.iter().map(|(e, at, record)| (*e, *at, *record)),
+            )
+            .is_empty()
+        });
+        if carrying {
+            deeds.insert(0, Deed::Ungroup);
+        }
+    }
     if deeds.is_empty() {
         return;
     }
@@ -1970,7 +2046,7 @@ fn work_part_menu(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut lines: Query<(&MenuLine, &Interaction, &mut BackgroundColor)>,
     menus: Query<Entity, With<PartMenu>>,
-    mut placed: Query<&mut Placed, Without<Ghost>>,
+    mut placed: Query<(Entity, &Transform, &mut Placed), Without<Ghost>>,
 ) {
     if menus.is_empty() {
         return;
@@ -2001,25 +2077,41 @@ fn work_part_menu(
     }
     match chosen {
         Some((Deed::Ungroup, part)) => {
-            if let Ok(record) = placed.get(part)
-                && let Some(kind) = kind_from_name(&record.part)
-            {
-                let record = record.clone();
-                ungroup(
-                    &mut commands,
-                    &mut meshes,
-                    &mut materials,
-                    &palette,
-                    &kind,
-                    &record,
+            // First the marks it carries, which any part may have; then the
+            // part's own pieces, which only some parts can be broken into.
+            let held: Vec<(Entity, Vec3, Placed)> = placed
+                .iter()
+                .map(|(entity, at, record)| (entity, at.translation, record.clone()))
+                .collect();
+            if let Some((_, owner_at, record)) = held.iter().find(|(e, ..)| *e == part) {
+                let carried = carried_marks(
                     part,
+                    *owner_at,
+                    held.iter().map(|(e, at, record)| (*e, *at, record)),
                 );
+                for mark in &carried {
+                    if let Ok((_, _, mut loosed)) = placed.get_mut(*mark) {
+                        loosed.loose = true;
+                    }
+                }
+                if let Some(kind) = kind_from_name(&record.part) {
+                    let record = record.clone();
+                    ungroup(
+                        &mut commands,
+                        &mut meshes,
+                        &mut materials,
+                        &palette,
+                        &kind,
+                        &record,
+                        part,
+                    );
+                }
             }
         }
         Some((Deed::Nature(nature), part)) => {
             // Nothing to redraw: a part's nature changes what the bench and the
             // village make of it, not what it looks like.
-            if let Ok(mut record) = placed.get_mut(part) {
+            if let Ok((_, _, mut record)) = placed.get_mut(part) {
                 record.stage = nature.to_string();
             }
         }
@@ -2090,6 +2182,7 @@ fn ungroup(
                 shade: record.shade,
                 stage: record.stage.clone(),
                 flip: record.flip,
+                loose: false,
             },
         ));
 
@@ -2108,6 +2201,7 @@ fn ungroup(
                 shade: record.shade,
                 stage: record.stage.clone(),
                 flip: record.flip,
+                loose: false,
             },
         ));
     }
@@ -3468,6 +3562,7 @@ fn move_ghost(
             shade: hand.shade,
             stage: hand.stage.clone(),
             flip: hand.flip,
+            loose: false,
         };
         // A whole roof draws as a flat plane while it is being sized -
         // the footprint it will cover - and becomes a roof when the
@@ -4287,6 +4382,7 @@ fn heal_wall_at(
         shade: dressed.shade,
         stage: "walls".to_string(),
         flip: false,
+        loose: false,
     };
     for piece in doomed {
         commands.entity(piece).despawn();
@@ -4485,6 +4581,7 @@ fn punch_wall(
             shade: record.shade,
             stage: record.stage.clone(),
             flip: false,
+            loose: false,
         };
         spawn_part(commands, meshes, materials, palette, &kind, &piece, false);
     }
@@ -4505,6 +4602,7 @@ fn punch_wall(
         shade: hand.shade,
         stage: "walls".to_string(),
         flip: hand.flip,
+        loose: false,
     };
     spawn_part(
         commands,
@@ -4541,6 +4639,7 @@ fn punch_wall(
                 shade: 0.7,
                 stage: "widget".to_string(),
                 flip: false,
+                loose: false,
             };
             spawn_part(commands, meshes, materials, palette, &widget, &mark, false);
         }
@@ -5609,7 +5708,18 @@ fn bury_the_chosen(
     let Some(chosen) = selected.0 else {
         return;
     };
-    if parts.get(chosen).is_ok() {
+    if let Ok((_, chosen_at, _, _)) = parts.get(chosen) {
+        // The marks it carries go with it. A door's routing mark left standing
+        // in a wall with no door is worse than either: the village reads it and
+        // sends people to walk through masonry.
+        let carried = carried_marks(
+            chosen,
+            chosen_at.translation,
+            parts.iter().map(|(e, at, record, _)| (e, at.translation, record)),
+        );
+        for mark in carried {
+            commands.entity(mark).despawn();
+        }
         // A door taken out leaves the wall whole again. The older path through
         // X has always done this; a second way to remove a part that did not
         // would leave holes nobody could account for.
@@ -6222,6 +6332,7 @@ mod roof_tests {
             shade: 0.5,
             stage: stage.to_string(),
             flip: false,
+            loose: false,
         })
         .collect();
 
