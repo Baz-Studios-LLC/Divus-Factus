@@ -15,6 +15,10 @@ struct BenchButton(Bench);
 #[derive(Component)]
 struct ModeButton(crate::gizmo::ToolMode);
 
+/// A step of the build, or the finished work. `None` is WHOLE.
+#[derive(Component, Clone, Copy)]
+struct StageButton(Option<u8>);
+
 /// Where the file work lives on the rail: builder parents its save and
 /// load drawers here instead of crowding the shelf.
 #[derive(Resource)]
@@ -34,7 +38,7 @@ impl Plugin for RailPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, raise_rail).add_systems(
             Update,
-            (work_buttons, work_mode_bar, work_settings),
+            (work_buttons, work_mode_bar, work_settings, work_stage_bar),
         );
     }
 }
@@ -426,6 +430,38 @@ off, walls down as well",
         },
         ChildOf(foot),
     ));
+}
+
+/// Step presses set what the bench is showing; the standing step wears the gold.
+fn work_stage_bar(
+    palette: Res<Palette>,
+    mut staged: ResMut<crate::builder::StageView>,
+    mut buttons: Query<(&Interaction, &StageButton, &mut BorderColor, &mut TextColor)>,
+) {
+    for (interaction, button, _, _) in &buttons {
+        if *interaction == Interaction::Pressed && staged.0 != button.0 {
+            staged.0 = button.0;
+        }
+    }
+    for (_, button, mut border, mut label) in &mut buttons {
+        let standing = staged.0 == button.0;
+        let dress = BorderColor::all(if standing {
+            theme::accent(&palette)
+        } else {
+            theme::panel_border(&palette)
+        });
+        if *border != dress {
+            *border = dress;
+        }
+        let word = TextColor(if standing {
+            theme::accent(&palette)
+        } else {
+            theme::text_dim(&palette)
+        });
+        if label.0 != word.0 {
+            *label = word;
+        }
+    }
 }
 
 /// Mode presses set the tool; the standing mode wears the gold.

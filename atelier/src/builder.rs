@@ -1448,6 +1448,7 @@ pub struct BuilderPlugin;
 impl Plugin for BuilderPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Hand>()
+            .init_resource::<StageView>()
             .init_resource::<Brush>()
             .init_resource::<Naming>()
             .init_resource::<Hovered>()
@@ -5456,11 +5457,41 @@ pub struct RoofsLifted(pub Cutaway);
 
 /// H lifts the roof off and sets it back - everything raised at the
 /// roof stage goes with it, panels and ridge caps alike.
+/// Which build step the bench is showing, or the whole finished work.
+///
+/// A maker already authors the build order — a post on `frame` rises before a
+/// wall on `walls` — and until now had no way to WATCH it. This plays it back:
+/// the same steps, in the same order, that the village will raise on the day.
+#[derive(Resource, Default, PartialEq, Eq, Clone, Copy)]
+pub struct StageView(pub Option<u8>);
+
+/// How many steps a work rises in, and which step a part belongs to.
+///
+/// This is the GAME's rule, written out again here because the bench and the
+/// game share no code — see FORMATS.md. It has to match exactly or the playback
+/// is a lie, and a lie in a preview is worse than no preview: the maker would
+/// trust it. The rule, including the awkward part:
+///
+///   footing 0, frame 1, walls 2, everything else 3 — unless the work has no
+///   frame at all, in which case walls and the rest each move DOWN a step,
+///   because a build with nothing to raise at step 1 never reaches step 3.
+fn step_of(stage: &str, framed: bool) -> u8 {
+    match (stage, framed) {
+        ("footing", _) => 0,
+        ("frame", _) => 1,
+        ("walls", true) => 2,
+        ("walls", false) => 1,
+        (_, true) => 3,
+        (_, false) => 2,
+    }
+}
+
 pub(crate) fn lift_roofs(
     keys: Res<ButtonInput<KeyCode>>,
     bench: Res<Bench>,
     naming: Res<Naming>,
     dims: Res<DimsEntry>,
+    staged: Res<StageView>,
     mut lifted: ResMut<RoofsLifted>,
     mut parts: Query<(&Placed, &mut Visibility), Without<Ghost>>,
 ) {
@@ -5475,6 +5506,11 @@ pub(crate) fn lift_roofs(
             Cutaway::WallsDown => Cutaway::Whole,
         };
     }
+    // A work with no frame rises in three steps rather than four, and every
+    // part has to be judged against the same answer - so it is settled once,
+    // over the whole work, before anything is judged at all.
+    let framed = parts.iter().any(|(record, _)| record.stage == "frame");
+
     for (record, mut visibility) in &mut parts {
         let kind = kind_from_name(&record.part);
         let roofish = record.stage == "roof"
@@ -5503,11 +5539,20 @@ pub(crate) fn lift_roofs(
                             )
                     )
                 ));
-        let showing = match lifted.0 {
+        let cut = match lifted.0 {
             Cutaway::Whole => true,
             Cutaway::RoofOff => !roofish,
             Cutaway::WallsDown => !roofish && !wallish,
         };
+        // And risen far enough to be there yet. The widgets are the maker's own
+        // marks rather than anything the village builds, so they stand
+        // throughout - hiding them mid-playback would only make a maker hunt
+        // for a door that had not gone missing.
+        let risen = match staged.0 {
+            None => true,
+            Some(step) => record.stage == "widget" || step_of(&record.stage, framed) <= step,
+        };
+        let showing = cut && risen;
         let wanted = if showing {
             Visibility::Inherited
         } else {
