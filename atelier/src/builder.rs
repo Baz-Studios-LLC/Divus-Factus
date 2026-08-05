@@ -1448,7 +1448,8 @@ pub struct BuilderPlugin;
 impl Plugin for BuilderPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Hand>()
-            .init_resource::<StageView>()
+            .init_resource::<Stages>()
+            .init_resource::<StageWish>()
             .init_resource::<Brush>()
             .init_resource::<Naming>()
             .init_resource::<Hovered>()
@@ -1476,7 +1477,7 @@ impl Plugin for BuilderPlugin {
                     // The painting tools and the part menu as one group: this
                     // tuple is at Bevy's own limit for how many systems it will
                     // take in a row, and a nested tuple counts as one.
-                    (paint_the_work, work_palette, raise_part_menu),
+                    (paint_the_work, work_palette, raise_part_menu, turn_to_stage),
                     toggle_snap_mode,
                     disarm_on_mode,
                     turn_part,
@@ -2827,6 +2828,7 @@ fn dress_shelf_border(palette: &Palette, standing: bool, border: &mut BorderColo
 #[allow(clippy::too_many_arguments)]
 fn work_templates(
     mut commands: Commands,
+    mut stages: ResMut<Stages>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     palette: Res<Palette>,
@@ -2878,8 +2880,19 @@ fn work_templates(
         .and_then(|text| serde_json::from_str::<Workbench>(&text).ok())
     {
         Some(bench) => {
-            let count = bench.parts.len();
-            for record in bench.parts {
+            // A work from before stages becomes stages on the way in, by the
+            // rule the game used to infer them with - so an old building opens
+            // with exactly the steps the village was already raising it in.
+            let drawings = if bench.stages.is_empty() {
+                stages_from_flat(&bench.parts)
+            } else {
+                bench.stages
+            };
+            // The LAST step: a maker opening a building wants the building,
+            // not its footings.
+            let showing = drawings.len().saturating_sub(1);
+            let count = drawings[showing].len();
+            for record in &drawings[showing] {
                 if let Some(kind) = kind_from_name(&record.part) {
                     spawn_part(
                         &mut commands,
@@ -2887,12 +2900,19 @@ fn work_templates(
                         &mut materials,
                         &palette,
                         &kind,
-                        &record,
+                        record,
                         false,
                     );
                 }
             }
-            info!("set out {}: {count} parts", path.display());
+            let steps = drawings.len();
+            stages.drawings = drawings;
+            stages.showing = showing;
+            info!(
+                "set out {}: {count} parts, step {} of {steps}",
+                path.display(),
+                showing + 1
+            );
         }
         None => warn!("nothing readable at {}", path.display()),
     }
@@ -4539,7 +4559,80 @@ fn punch_wall(
 struct Workbench {
     format: u32,
     name: String,
+    /// A work from before stages: one flat list, which is the finished
+    /// building. Kept readable forever - a maker's work is not something to
+    /// lose to a format change - and turned into stages on the way in.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     parts: Vec<Placed>,
+    /// One COMPLETE drawing per step of the build.
+    ///
+    /// Complete, and not a set of additions: raising step two clears step one
+    /// off the ground and puts step two there instead. Brett's call, and the
+    /// reason is authoring rather than rendering — "replacing the building each
+    /// stage allows me to be more creative during the stages". A frame drawn at
+    /// step one is a PICTURE of a frame, and by the time the walls are up it
+    /// should be gone, because the walls are solid boxes that never needed it.
+    /// Stages that accumulate would make that the awkward case; stages that
+    /// replace make it the ordinary one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    stages: Vec<Vec<Placed>>,
+}
+
+/// Every step of the work, and which one the bench is showing.
+///
+/// Only the shown step exists as entities; the rest are records waiting their
+/// turn. Switching gathers the standing parts back into their step and sets the
+/// next one out, which is why a stage IS the bench rather than a filter over it.
+#[derive(Resource)]
+pub struct Stages {
+    drawings: Vec<Vec<Placed>>,
+    showing: usize,
+}
+
+impl Default for Stages {
+    fn default() -> Self {
+        Stages {
+            drawings: vec![Vec::new()],
+            showing: 0,
+        }
+    }
+}
+
+impl Stages {
+    pub fn count(&self) -> usize {
+        self.drawings.len()
+    }
+
+    pub fn showing(&self) -> usize {
+        self.showing
+    }
+}
+
+/// Turns a work from before stages into stages, by the rule the game used to
+/// infer them with.
+///
+/// Which makes the change invisible where it should be: an old building comes
+/// back with exactly the steps the village was already raising it in. The rule
+/// is `step_of`, and the last stage is the whole finished work.
+fn stages_from_flat(parts: &[Placed]) -> Vec<Vec<Placed>> {
+    if parts.is_empty() {
+        return vec![Vec::new()];
+    }
+    let framed = parts.iter().any(|record| record.stage == "frame");
+    let steps = if framed { 4 } else { 3 };
+    (0..steps)
+        .map(|step| {
+            parts
+                .iter()
+                .filter(|record| {
+                    // The maker's own marks belong to the finished work, and
+                    // stand throughout it besides.
+                    record.stage == "widget" || step_of(&record.stage, framed) <= step as u8
+                })
+                .cloned()
+                .collect()
+        })
+        .collect()
 }
 
 fn bench_path() -> std::path::PathBuf {
@@ -4687,6 +4780,7 @@ fn raise_naming_card(commands: &mut Commands, fonts: &Fonts, palette: &Palette) 
 #[allow(clippy::too_many_arguments)]
 fn take_the_name(
     mut commands: Commands,
+    stages: Res<Stages>,
     mut keystrokes: MessageReader<bevy::input::keyboard::KeyboardInput>,
     mut naming: ResMut<Naming>,
     time: Res<Time>,
@@ -4776,13 +4870,22 @@ fn take_the_name(
                     n += 1;
                 }
             }
+            // The shown step is standing as entities; the rest are already
+            // records. Gather the one before writing, or a maker's last few
+            // minutes go missing from whichever step they were on.
+            let mut drawings = stages.drawings.clone();
+            let showing = stages.showing.min(drawings.len().saturating_sub(1));
+            if let Some(slot) = drawings.get_mut(showing) {
+                *slot = placed.iter().cloned().collect();
+            }
             let bench = Workbench {
-                format: 1,
+                format: 2,
                 name: stem.clone(),
-                parts: placed.iter().cloned().collect(),
+                parts: Vec::new(),
+                stages: drawings,
             };
             if let Ok(json) = serde_json::to_string_pretty(&bench) {
-                let count = bench.parts.len();
+                let count = bench.stages.get(showing).map_or(0, Vec::len);
                 let _ = std::fs::write(&path, json);
                 info!("saved {count} parts to {}", path.display());
                 work_name.0 = Some(stem.clone());
@@ -5095,6 +5198,17 @@ pub struct History {
     future: Vec<Vec<Placed>>,
     current: Vec<Placed>,
     primed: bool,
+}
+
+impl History {
+    /// Forgets everything, for a change no hand could have made — setting out
+    /// another step of the build swaps every part on the bench at once.
+    fn forget(&mut self) {
+        self.past.clear();
+        self.future.clear();
+        self.current.clear();
+        self.primed = false;
+    }
 }
 
 fn state_signature(list: &[Placed]) -> String {
@@ -5457,13 +5571,104 @@ pub struct RoofsLifted(pub Cutaway);
 
 /// H lifts the roof off and sets it back - everything raised at the
 /// roof stage goes with it, panels and ridge caps alike.
-/// Which build step the bench is showing, or the whole finished work.
+/// A request to show another step, or to add or drop one.
 ///
-/// A maker already authors the build order — a post on `frame` rises before a
-/// wall on `walls` — and until now had no way to WATCH it. This plays it back:
-/// the same steps, in the same order, that the village will raise on the day.
-#[derive(Resource, Default, PartialEq, Eq, Clone, Copy)]
-pub struct StageView(pub Option<u8>);
+/// Held as a resource rather than done where it is asked for, because setting a
+/// step out means despawning and respawning the whole work, and exactly one
+/// place should be allowed to do that.
+#[derive(Resource, Default)]
+pub struct StageWish(pub Option<StageDeed>);
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum StageDeed {
+    /// Show this step.
+    Show(usize),
+    /// A new step after the last, holding a copy of it.
+    ///
+    /// A copy rather than bare ground: most steps are the one before with
+    /// something changed, and a maker who wanted bare ground can clear it in
+    /// one press. Starting empty would make the common case the laborious one.
+    AddCopying,
+    /// A new empty step after the last.
+    AddBare,
+    /// Drop the step being shown.
+    Drop,
+}
+
+/// Sets out another step of the work.
+///
+/// The bench holds one step as entities and the rest as records, so this is the
+/// only place a step changes hands: gather what is standing back into the step
+/// it belongs to, then set the wanted one out. Doing it anywhere else would lose
+/// whichever step the maker was on.
+#[allow(clippy::too_many_arguments)]
+fn turn_to_stage(
+    mut commands: Commands,
+    mut wish: ResMut<StageWish>,
+    mut stages: ResMut<Stages>,
+    mut history: ResMut<History>,
+    palette: Res<Palette>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut selected: ResMut<crate::gizmo::Selected>,
+    standing: Query<(Entity, &Placed), Without<Ghost>>,
+) {
+    let Some(deed) = wish.0.take() else {
+        return;
+    };
+    // Whatever is on the bench belongs to the step it was drawn on.
+    let showing = stages.showing.min(stages.drawings.len().saturating_sub(1));
+    let gathered: Vec<Placed> = standing.iter().map(|(_, record)| record.clone()).collect();
+    if let Some(slot) = stages.drawings.get_mut(showing) {
+        *slot = gathered;
+    }
+
+    let wanted = match deed {
+        StageDeed::Show(step) => step.min(stages.drawings.len() - 1),
+        StageDeed::AddCopying => {
+            let copy = stages.drawings[showing].clone();
+            stages.drawings.push(copy);
+            stages.drawings.len() - 1
+        }
+        StageDeed::AddBare => {
+            stages.drawings.push(Vec::new());
+            stages.drawings.len() - 1
+        }
+        StageDeed::Drop => {
+            // Never the last one standing: a building with no steps is not a
+            // building anybody can raise.
+            if stages.drawings.len() <= 1 {
+                return;
+            }
+            stages.drawings.remove(showing);
+            showing.min(stages.drawings.len() - 1)
+        }
+    };
+
+    for (part, _) in &standing {
+        commands.entity(part).despawn();
+    }
+    selected.0 = None;
+    for record in &stages.drawings[wanted] {
+        if let Some(kind) = kind_from_name(&record.part) {
+            spawn_part(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &palette,
+                &kind,
+                record,
+                false,
+            );
+        }
+    }
+    stages.showing = wanted;
+    // Undo does not reach across a step. Every part on the bench has just been
+    // swapped for another step's, and a history that let someone undo INTO that
+    // would put one step's parts down on another - which is not a thing a maker
+    // could have done by hand, and so not a thing undo should be able to do.
+    history.forget();
+}
 
 /// How many steps a work rises in, and which step a part belongs to.
 ///
@@ -5491,7 +5696,6 @@ pub(crate) fn lift_roofs(
     bench: Res<Bench>,
     naming: Res<Naming>,
     dims: Res<DimsEntry>,
-    staged: Res<StageView>,
     mut lifted: ResMut<RoofsLifted>,
     mut parts: Query<(&Placed, &mut Visibility), Without<Ghost>>,
 ) {
@@ -5506,11 +5710,6 @@ pub(crate) fn lift_roofs(
             Cutaway::WallsDown => Cutaway::Whole,
         };
     }
-    // A work with no frame rises in three steps rather than four, and every
-    // part has to be judged against the same answer - so it is settled once,
-    // over the whole work, before anything is judged at all.
-    let framed = parts.iter().any(|(record, _)| record.stage == "frame");
-
     for (record, mut visibility) in &mut parts {
         let kind = kind_from_name(&record.part);
         let roofish = record.stage == "roof"
@@ -5544,15 +5743,7 @@ pub(crate) fn lift_roofs(
             Cutaway::RoofOff => !roofish,
             Cutaway::WallsDown => !roofish && !wallish,
         };
-        // And risen far enough to be there yet. The widgets are the maker's own
-        // marks rather than anything the village builds, so they stand
-        // throughout - hiding them mid-playback would only make a maker hunt
-        // for a door that had not gone missing.
-        let risen = match staged.0 {
-            None => true,
-            Some(step) => record.stage == "widget" || step_of(&record.stage, framed) <= step,
-        };
-        let showing = cut && risen;
+        let showing = cut;
         let wanted = if showing {
             Visibility::Inherited
         } else {
@@ -5939,6 +6130,62 @@ mod roof_tests {
             .iter()
             .map(|Slab(_, size, ..)| size.y)
             .fold(f32::MIN, f32::max)
+    }
+
+    #[test]
+    fn a_work_from_before_stages_becomes_the_steps_it_already_rose_in() {
+        // The migration is the whole risk of this format change: every building
+        // on disk is a flat list, and it has to come back as exactly the steps
+        // the village was already raising it in - not one more, not one fewer,
+        // and with the finished work last.
+        let flat: Vec<Placed> = [
+            ("prop:foundation", "footing"),
+            ("prop:pole", "frame"),
+            ("wall-2", "walls"),
+            ("gableroof-6x4x0.25x30", "roof"),
+            ("widget:door", "widget"),
+        ]
+        .iter()
+        .map(|(part, stage)| Placed {
+            part: part.to_string(),
+            at: [0.0, 0.0, 0.0],
+            yaw: 0.0,
+            tilt: 0.0,
+            ramp: None,
+            shade: 0.5,
+            stage: stage.to_string(),
+            flip: false,
+        })
+        .collect();
+
+        let stages = stages_from_flat(&flat);
+        assert_eq!(stages.len(), 4, "a framed work rises in four steps");
+        // Each step holds everything raised so far, and the marks throughout.
+        let counts: Vec<usize> = stages.iter().map(Vec::len).collect();
+        assert_eq!(counts, vec![2, 3, 4, 5], "steps: {counts:?}");
+        assert!(
+            stages.last().unwrap().len() == flat.len(),
+            "the last step must be the whole finished work"
+        );
+        for (step, drawing) in stages.iter().enumerate() {
+            assert!(
+                drawing.iter().any(|record| record.stage == "widget"),
+                "the maker's marks are missing from step {step}"
+            );
+        }
+
+        // And with no frame drawn, three steps rather than four - the case the
+        // game had to special-case, and the reason this rule is copied exactly.
+        let unframed: Vec<Placed> = flat
+            .iter()
+            .filter(|record| record.stage != "frame")
+            .cloned()
+            .collect();
+        assert_eq!(
+            stages_from_flat(&unframed).len(),
+            3,
+            "a work with no frame rises in three"
+        );
     }
 
     #[test]

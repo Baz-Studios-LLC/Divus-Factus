@@ -15,9 +15,17 @@ struct BenchButton(Bench);
 #[derive(Component)]
 struct ModeButton(crate::gizmo::ToolMode);
 
-/// A step of the build, or the finished work. `None` is WHOLE.
+/// A step of the build to set out, by its place in the list.
 #[derive(Component, Clone, Copy)]
-struct StageButton(Option<u8>);
+struct StageButton(usize);
+
+/// The buttons that change how many steps there are.
+#[derive(Component, Clone, Copy)]
+struct StageDeedButton(crate::builder::StageDeed);
+
+/// The row itself, rebuilt whenever the number of steps changes.
+#[derive(Component)]
+struct StageBar;
 
 /// Where the file work lives on the rail: builder parents its save and
 /// load drawers here instead of crowding the shelf.
@@ -38,7 +46,7 @@ impl Plugin for RailPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, raise_rail).add_systems(
             Update,
-            (work_buttons, work_mode_bar, work_settings, work_stage_bar),
+            (work_buttons, work_mode_bar, work_settings, work_stage_bar, hang_the_stage_bar),
         );
     }
 }
@@ -432,19 +440,129 @@ off, walls down as well",
     ));
 }
 
-/// Step presses set what the bench is showing; the standing step wears the gold.
+/// One button of the step row.
+fn stage_face(
+    commands: &mut Commands,
+    fonts: &Fonts,
+    palette: &Palette,
+    parent: Entity,
+    label: String,
+    wide: f32,
+) -> Entity {
+    let button = commands
+        .spawn((
+            Interaction::default(),
+            Node {
+                padding: UiRect::axes(Val::Px(wide), Val::Px(3.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.30)),
+            BorderColor::all(theme::panel_border(palette)),
+            ChildOf(parent),
+        ))
+        .id();
+    commands.spawn((
+        Text::new(label),
+        TextFont {
+            font: fonts.display.clone().into(),
+            font_size: FontSize::Px(10.0),
+            ..default()
+        },
+        TextColor(theme::text_dim(palette)),
+        ChildOf(button),
+    ));
+    button
+}
+
+/// Rebuilds the row when the number of steps changes.
+///
+/// A work opens with as many steps as its file says, and a maker adds and drops
+/// them while working, so the row cannot be built once at startup and left.
+fn hang_the_stage_bar(
+    mut commands: Commands,
+    fonts: Res<Fonts>,
+    palette: Res<Palette>,
+    stages: Res<crate::builder::Stages>,
+    bars: Query<Entity, With<StageBar>>,
+    mut hung: Local<usize>,
+) {
+    let count = stages.count();
+    if count == *hung && !stages.is_changed() {
+        return;
+    }
+    if count == *hung {
+        return;
+    }
+    *hung = count;
+    let Some(bar) = bars.iter().next() else {
+        return;
+    };
+    commands.entity(bar).despawn_related::<Children>();
+
+    for step in 0..count {
+        let button = stage_face(
+            &mut commands,
+            &fonts,
+            &palette,
+            bar,
+            format!("STAGE {}", step + 1),
+            10.0,
+        );
+        commands.entity(button).insert(StageButton(step));
+    }
+    // Adding and dropping sit apart from the steps, so a miss lands on nothing
+    // rather than on a step being deleted.
+    for (deed, label) in [
+        (crate::builder::StageDeed::AddCopying, "+ COPY"),
+        (crate::builder::StageDeed::AddBare, "+ BARE"),
+        (crate::builder::StageDeed::Drop, "-"),
+    ] {
+        let button = stage_face(
+            &mut commands,
+            &fonts,
+            &palette,
+            bar,
+            label.to_string(),
+            8.0,
+        );
+        commands.entity(button).insert((
+            StageDeedButton(deed),
+            Node {
+                padding: UiRect::axes(Val::Px(8.0), Val::Px(3.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                // A gap before the first of them, so a miss lands on nothing
+                // rather than on a step being deleted.
+                margin: UiRect::left(Val::Px(if label == "+ COPY" { 12.0 } else { 0.0 })),
+                ..default()
+            },
+        ));
+    }
+}
+
+/// Step presses set out that step; the standing step wears the gold.
 fn work_stage_bar(
     palette: Res<Palette>,
-    mut staged: ResMut<crate::builder::StageView>,
+    stages: Res<crate::builder::Stages>,
+    mut wish: ResMut<crate::builder::StageWish>,
+    deeds: Query<(&Interaction, &StageDeedButton)>,
     mut buttons: Query<(&Interaction, &StageButton, &mut BorderColor, &mut TextColor)>,
 ) {
+    for (interaction, button) in &deeds {
+        if *interaction == Interaction::Pressed && wish.0.is_none() {
+            wish.0 = Some(button.0);
+        }
+    }
     for (interaction, button, _, _) in &buttons {
-        if *interaction == Interaction::Pressed && staged.0 != button.0 {
-            staged.0 = button.0;
+        if *interaction == Interaction::Pressed
+            && button.0 != stages.showing()
+            && wish.0.is_none()
+        {
+            wish.0 = Some(crate::builder::StageDeed::Show(button.0));
         }
     }
     for (_, button, mut border, mut label) in &mut buttons {
-        let standing = staged.0 == button.0;
+        let standing = button.0 == stages.showing();
         let dress = BorderColor::all(if standing {
             theme::accent(&palette)
         } else {
