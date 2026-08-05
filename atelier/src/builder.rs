@@ -13,7 +13,14 @@ use crate::Bench;
 use crate::look::{Fonts, Palette, theme};
 use crate::stage::BuilderFurniture;
 
-/// The pitch a roof arms at, in degrees, before anybody pulls on it.
+/// The pitch a roof arms at, in DEGREES, before anybody pulls on it.
+///
+/// The unit is in the name because it changed. This was radians until roofs
+/// carried their own pitch, and two other readers went on treating it as
+/// radians afterwards: a gable took the tangent of thirty RADIANS and came out
+/// inverted and eleven times too tall, and a roof panel arrived in the hand
+/// tilted two hundred and seventy-nine degrees. Both compiled perfectly, because
+/// an angle has no type. A name is the only thing that would have stopped it.
 ///
 /// Thirty was the bench's ONE pitch for every roof of every building - forty-five
 /// stood too tall over a village of this scale and the houses read as steeples.
@@ -21,7 +28,7 @@ use crate::stage::BuilderFurniture;
 /// roof carries its own pitch now and the gold handle at its ridge sets it, which
 /// is the difference between a village that reads modern and one that does not.
 /// Steep is medieval; shallow is not.
-const ROOF_PITCH: f32 = 30.0;
+const ROOF_PITCH_DEGREES: f32 = 30.0;
 
 /// What a roof's pitch may be pulled to, in degrees, and the step it moves in.
 /// Ten is nearly flat and sixty is a steeple; two and a half is fine enough to
@@ -34,7 +41,7 @@ pub const PITCH_STEP: f32 = 2.5;
 /// draw itself at an angle its own tool could not return it to. Checked when the
 /// bench is BUILT rather than when it is tested, because there is no arrangement
 /// of these three numbers worth compiling that fails it.
-const _: () = assert!(PITCH_LEAST <= ROOF_PITCH && ROOF_PITCH <= PITCH_MOST);
+const _: () = assert!(PITCH_LEAST <= ROOF_PITCH_DEGREES && ROOF_PITCH_DEGREES <= PITCH_MOST);
 
 /// The Atelier's own measurements - the source of truth now; the game
 /// conforms to these when its buildings are replaced. A quarter-metre
@@ -285,7 +292,7 @@ impl PartKind {
             PartKind::RidgeLogRun => PartKind::RidgeLog(w),
             // A hand's breadth of overhang to begin with; the gold
             // handles pull it further without moving the gables.
-            PartKind::GableRoofRun => PartKind::GableRoof(w, d, 0.25, ROOF_PITCH),
+            PartKind::GableRoofRun => PartKind::GableRoof(w, d, 0.25, ROOF_PITCH_DEGREES),
             PartKind::SegRun { high, lift } => PartKind::Seg {
                 long: w,
                 high: *high,
@@ -559,7 +566,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // One clean slope each way: the peak rises at the bench's own
             // pitch, so a 45 degree gable stands half as tall as it is
             // wide and meets the roof panels exactly.
-            let high = ((long * 0.5 * ROOF_PITCH.tan()) * 16.0).round() / 16.0;
+            let high = ((long * 0.5 * ROOF_PITCH_DEGREES.to_radians().tan()) * 16.0).round() / 16.0;
             vec![wedge(
                 0.0,
                 high * 0.5,
@@ -1273,7 +1280,7 @@ impl Hand {
         // A roof comes to hand already pitched: a flat panel is the
         // exception, not the starting point.
         let tilt = if matches!(kind, PartKind::Roof(..) | PartKind::RoofRun) {
-            ROOF_PITCH
+            ROOF_PITCH_DEGREES.to_radians()
         } else {
             0.0
         };
@@ -1543,7 +1550,7 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
         let pitch = parts
             .next()
             .and_then(|p| p.parse().ok())
-            .unwrap_or(ROOF_PITCH);
+            .unwrap_or(ROOF_PITCH_DEGREES);
         return Some(PartKind::GableRoof(long, span, over, pitch));
     }
     if let Some(rest) = name.strip_prefix("chimney-") {
@@ -5460,11 +5467,49 @@ mod roof_tests {
                 "{name} came back wrong"
             );
             assert_eq!(
-                pitch, ROOF_PITCH,
+                pitch, ROOF_PITCH_DEGREES,
                 "{name} must open at the pitch every roof in the world had when \
                  it was drawn, or every saved building changes shape"
             );
         }
+    }
+
+    #[test]
+    fn an_angle_is_in_the_unit_its_name_says() {
+        // Both halves of a units bug that compiled perfectly. A gable's peak is
+        // the tangent of the pitch, and thirty RADIANS has a negative tangent -
+        // the wedge came out upside down and eleven times too tall. A roof panel
+        // arms at the same pitch, and thirty radians is two hundred and
+        // seventy-nine degrees.
+        let peak = 0.5 * ROOF_PITCH_DEGREES.to_radians().tan();
+        assert!(
+            (peak - 0.2887).abs() < 1e-3,
+            "a gable half as wide should rise 0.2887 of its width, not {peak}"
+        );
+        // Against the constant itself: thirty degrees IS a sixth of pi, and
+        // writing 0.5236 here would be writing it out by hand.
+        assert!(
+            (ROOF_PITCH_DEGREES.to_radians() - std::f32::consts::FRAC_PI_6).abs() < 1e-4,
+            "the arming tilt is not thirty degrees in radians"
+        );
+    }
+
+    #[test]
+    fn a_gable_stands_the_right_way_up() {
+        // Straight from the body, so it catches the sign as well as the size.
+        let tall = body_of(&PartKind::Gable(4.0), None)
+            .iter()
+            .map(|Slab(_, size, ..)| size.y)
+            .fold(f32::MIN, f32::max);
+        assert!(
+            tall > 0.0,
+            "a gable of four metres has a height of {tall}: it is inside out"
+        );
+        assert!(
+            (tall - 1.125).abs() < 0.1,
+            "a four metre gable at thirty degrees should stand about 1.15 tall, \
+             not {tall}"
+        );
     }
 
     #[test]
@@ -5490,7 +5535,7 @@ mod roof_tests {
         else {
             panic!("the oldest roofs no longer open");
         };
-        assert_eq!((long, span, over, pitch), (6.0, 4.0, 0.25, ROOF_PITCH));
+        assert_eq!((long, span, over, pitch), (6.0, 4.0, 0.25, ROOF_PITCH_DEGREES));
     }
 
     /// The highest point anything in a roof reaches: the ridge.
