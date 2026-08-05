@@ -319,6 +319,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
         "walls",
     ),
     structure("DOOR", PartKind::Prop("door"), "walls"),
+    structure("DOOR, DOUBLE", PartKind::Prop("door-double"), "walls"),
     structure("DOORWAY", PartKind::Prop("doorway"), "walls"),
     structure(
         "HEADER, STRETCH",
@@ -922,6 +923,26 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(0.0, 2.0625, 0.0, 1.25, 0.125, 0.375, "wood", 0.45),
             slab(0.0, 1.0, 0.0625, 1.0, 2.0, 0.125, "wood", 0.35),
             slab(0.375, 1.0, 0.125, 0.125, 0.125, 0.125, "cloth-gold", 0.8),
+        ],
+        PartKind::Prop("door-double") => vec![
+            // The hall door: two leaves meeting in the middle, for the
+            // buildings a village walks into rather than through - a hall, a
+            // barn, a granary taking a cart. Two full metres of clear opening
+            // against the single door's one.
+            //
+            // The single door's own construction, widened: jambs on the
+            // lattice, a lintel board across both leaves, and each leaf the
+            // same width as the single's, so a double reads as two of the
+            // doors already in the world rather than as a different thing.
+            slab(-1.0625, 1.0, 0.0, 0.125, 2.0, 0.375, "wood", 0.45),
+            slab(1.0625, 1.0, 0.0, 0.125, 2.0, 0.375, "wood", 0.45),
+            slab(0.0, 2.0625, 0.0, 2.25, 0.125, 0.375, "wood", 0.45),
+            slab(-0.5, 1.0, 0.0625, 1.0, 2.0, 0.125, "wood", 0.35),
+            slab(0.5, 1.0, 0.0625, 1.0, 2.0, 0.125, "wood", 0.35),
+            // Latches where the leaves meet, an eighth in from each free
+            // edge - the same hand's reach as the single door's.
+            slab(-0.125, 1.0, 0.125, 0.125, 0.125, 0.125, "cloth-gold", 0.8),
+            slab(0.125, 1.0, 0.125, 0.125, 0.125, 0.125, "cloth-gold", 0.8),
         ],
         PartKind::Prop("doorway") => vec![
             // An opening with no leaf: jambs and a lintel, for the ways
@@ -3402,9 +3423,14 @@ fn heal_wall_at(
     let Ok((_, _, frame_record, _)) = placed.get(frame) else {
         return false;
     };
-    let width = match kind_from_name(&frame_record.part) {
-        Some(PartKind::Prop("door" | "doorway" | "window")) => 1.25,
-        _ => return false,
+    // Through `opening_of`, not a literal beside it. This was written as a
+    // bare 1.25 - correct while every opening in the shelf happened to be one
+    // and a quarter wide, and wrong the moment a double door existed.
+    let Some(width) = kind_from_name(&frame_record.part)
+        .and_then(|kind| opening_of(&kind))
+        .map(|(wide, ..)| wide)
+    else {
+        return false;
     };
     let along = Quat::from_rotation_y(frame_record.yaw) * Vec3::X;
     let base = spot;
@@ -3500,11 +3526,30 @@ fn heal_wall_at(
 pub fn opening_of(kind: &PartKind) -> Option<(f32, f32, f32, bool)> {
     match kind {
         PartKind::Prop("door") => Some((1.25, 2.125, 0.0, true)),
+        // Twice the leaf, so twice the hole.
+        PartKind::Prop("door-double") => Some((2.25, 2.125, 0.0, true)),
         // A bare doorway needs no widget: the gap itself is the portal,
         // and a widget would only say it twice.
         PartKind::Prop("doorway") => Some((1.25, 2.125, 0.0, false)),
         PartKind::Prop("window") => Some((1.25, 2.0, 0.75, false)),
         _ => None,
+    }
+}
+
+/// Where the routing widgets stand in an opening, measured along the wall from
+/// its middle: one lane per leaf.
+///
+/// Brett's idea, and it needs nothing new anywhere else: the game reads EVERY
+/// mark called "door" into a building's list of doorways and steers each walker
+/// to the nearest one, so two marks a metre apart in one opening are two lanes,
+/// and two villagers meeting at a double door take one each instead of queueing
+/// through the same point. The part that knows it has two leaves is the part that
+/// should say where they are.
+pub fn door_lanes(kind: &PartKind) -> &'static [f32] {
+    match kind {
+        // One lane per leaf, each on its own leaf's centre.
+        PartKind::Prop("door-double") => &[-0.5, 0.5],
+        _ => &[0.0],
     }
 }
 
@@ -3701,17 +3746,22 @@ fn punch_wall(
             .unwrap_or_else(|| Vec3::Y.cross(along).normalize_or_zero());
         // A widget's nose is its local +X.
         let facing = (-outward.z).atan2(outward.x);
-        let mark = Placed {
-            part: part_name(&widget),
-            at: [frame_at.x, base.y, frame_at.z],
-            yaw: facing,
-            tilt: 0.0,
-            ramp: None,
-            shade: 0.7,
-            stage: "widget".to_string(),
-            flip: false,
-        };
-        spawn_part(commands, meshes, materials, palette, &widget, &mark, false);
+        // One per leaf: a double door gets two, so two people can use it at
+        // once. See [`door_lanes`].
+        for lane in door_lanes(&frame_kind) {
+            let stands = frame_at + along * *lane;
+            let mark = Placed {
+                part: part_name(&widget),
+                at: [stands.x, base.y, stands.z],
+                yaw: facing,
+                tilt: 0.0,
+                ramp: None,
+                shade: 0.7,
+                stage: "widget".to_string(),
+                flip: false,
+            };
+            spawn_part(commands, meshes, materials, palette, &widget, &mark, false);
+        }
     }
     true
 }
@@ -4547,18 +4597,18 @@ fn reflow_openings(
     mut materials: ResMut<Assets<StandardMaterial>>,
     palette: Res<Palette>,
 ) {
-    let opening_of = |record: &Placed| match kind_from_name(&record.part) {
-        Some(PartKind::Prop("door")) => Some((1.25, 2.125, 0.0_f32, true)),
-        Some(PartKind::Prop("doorway")) => Some((1.25, 2.125, 0.0, false)),
-        Some(PartKind::Prop("window")) => Some((1.25, 2.0, 0.75, false)),
-        _ => None,
-    };
+    // The one table, reached through the one function. This was a SECOND copy
+    // of it, with the same three rows written out again - so a new opening added
+    // to the shelf punched its hole correctly when placed and reverted to a
+    // door's dimensions the moment the wall under it was reflowed.
+    let opening_for =
+        |record: &Placed| kind_from_name(&record.part).and_then(|kind| opening_of(&kind));
 
     if buttons.just_pressed(MouseButton::Left) {
         *came_from = selected
             .0
             .and_then(|part| placed.get(part).ok())
-            .filter(|(_, _, record, _)| opening_of(record).is_some())
+            .filter(|(_, _, record, _)| opening_for(record).is_some())
             .map(|(entity, at, _, _)| (entity, at.translation));
         return;
     }
@@ -4575,7 +4625,7 @@ fn reflow_openings(
     if now.distance(old_spot) < 0.03 {
         return;
     }
-    let Some((wide, head, sill, is_door)) = opening_of(record) else {
+    let Some((wide, head, sill, is_door)) = opening_for(record) else {
         return;
     };
 
@@ -4679,7 +4729,9 @@ pub(crate) fn lift_roofs(
                     Some(
                         PartKind::Wall(..)
                             | PartKind::Seg { .. }
-                            | PartKind::Prop("door" | "doorway" | "window" | "pole")
+                            | PartKind::Prop(
+                                "door" | "door-double" | "doorway" | "window" | "pole"
+                            )
                     )
                 ));
         let showing = match lifted.0 {
