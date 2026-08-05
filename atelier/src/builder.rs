@@ -65,8 +65,85 @@ enum Shape {
     /// A ridge cap's prism: the triangle stands ACROSS the part, which
     /// runs lengthwise under it, apex up.
     Ridge,
+    /// A right-angle prism: a box with one end cut through at an angle, full
+    /// height at -X and falling away to +X. What a saw leaves.
+    Mitre,
 }
 
+
+/// A right-angle prism: a box with one end cut clean through at an angle.
+///
+/// The shape a saw makes. A wedge is a GABLE's prism - two slopes meeting at a
+/// peak - and there was nothing in the bench for the far commoner cut, so a beam
+/// meeting a roof had to stop square and stand off it. Brett: "There has to be a
+/// way to cut the end of the beam at an angle. Keeping it square wont work."
+///
+/// Built in a unit box like every other shape, so its angle is whatever the
+/// slab's own proportions make it: a mitre one long and one high is
+/// forty-five degrees, and squashing it flatter or steeper is what sizing it
+/// does. The full-height end stands at -X and the cut falls away to +X.
+fn mitre_mesh() -> Mesh {
+    let mut positions: Vec<[f32; 3]> = Vec::new();
+    let mut normals: Vec<[f32; 3]> = Vec::new();
+    let mut indices: Vec<u32> = Vec::new();
+    let mut face = |corners: &[[f32; 3]], normal: [f32; 3]| {
+        let first = positions.len() as u32;
+        for corner in corners {
+            positions.push(*corner);
+            normals.push(normal);
+        }
+        for step in 1..(corners.len() as u32 - 1) {
+            indices.extend_from_slice(&[first, first + step, first + step + 1]);
+        }
+    };
+    // The two triangles, one at each side: full height at -X, nothing at +X.
+    face(
+        &[[-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [-0.5, 0.5, 0.5]],
+        [0.0, 0.0, 1.0],
+    );
+    face(
+        &[[0.5, -0.5, -0.5], [-0.5, -0.5, -0.5], [-0.5, 0.5, -0.5]],
+        [0.0, 0.0, -1.0],
+    );
+    // The floor.
+    face(
+        &[
+            [-0.5, -0.5, 0.5],
+            [0.5, -0.5, 0.5],
+            [0.5, -0.5, -0.5],
+            [-0.5, -0.5, -0.5],
+        ],
+        [0.0, -1.0, 0.0],
+    );
+    // The square end it was cut from.
+    face(
+        &[
+            [-0.5, -0.5, -0.5],
+            [-0.5, -0.5, 0.5],
+            [-0.5, 0.5, 0.5],
+            [-0.5, 0.5, -0.5],
+        ],
+        [-1.0, 0.0, 0.0],
+    );
+    // And the cut itself.
+    let slant = (1.0f32 / 2.0f32.sqrt(), 1.0 / 2.0f32.sqrt());
+    face(
+        &[
+            [0.5, -0.5, 0.5],
+            [0.5, -0.5, -0.5],
+            [-0.5, 0.5, -0.5],
+            [-0.5, 0.5, 0.5],
+        ],
+        [slant.0, slant.1, 0.0],
+    );
+    Mesh::new(
+        bevy::render::mesh::PrimitiveTopology::TriangleList,
+        bevy::asset::RenderAssetUsages::default(),
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+    .with_inserted_indices(bevy::render::mesh::Indices::U32(indices))
+}
 
 fn wedge_mesh(lengthwise: bool) -> Mesh {
     let mut positions: Vec<[f32; 3]> = Vec::new();
@@ -1785,6 +1862,7 @@ pub fn dress_part(
             Mesh3d(match shape {
                 Shape::Wedge => meshes.add(wedge_mesh(false)),
                 Shape::Ridge => meshes.add(wedge_mesh(true)),
+                Shape::Mitre => meshes.add(mitre_mesh()),
                 Shape::Box => meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
             }),
             MeshMaterial3d(materials.add(StandardMaterial {
@@ -6235,6 +6313,7 @@ mod bake {
                         Shape::Box => "box",
                         Shape::Wedge => "wedge",
                         Shape::Ridge => "ridge",
+                        Shape::Mitre => "mitre",
                     };
                     let stage = match kind {
                         PartKind::Gable(..)

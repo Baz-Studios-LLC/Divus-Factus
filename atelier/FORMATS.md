@@ -114,6 +114,40 @@ game already understands, so the carrying-in is mechanical:
 - Parts are the rig names above. Clips carry rotations only — the game
   retargets them across every genome's proportions.
 
+### The baked building: `assets/buildings/<name>.json`
+
+What the bench hands the game, written by `cargo test bake_the_works --
+--ignored`. Not parts any more but the plain boxes they resolve to, each with
+its colour already looked up, plus the marks that say what the place is FOR.
+
+```json
+{
+  "format": 1, "name": "longhouse1-10people",
+  "half_w": 3.65, "half_d": 6.7, "high": 5.2,
+  "boxes": [ { "at": [0,1.25,0], "size": [4,2.5,0.25], "turn": [0,0,0,1],
+               "form": "box", "rgb": [110,92,70], "alpha": 1.0, "cloth": "wood",
+               "stage": "walls" } ],
+  "marks": [ { "mark": "door", "at": [3.65,0.375,0.0], "yaw": 0.0 } ]
+}
+```
+
+- `form` is the box's shape, and there are four. Both programs draw each one
+  from its own code — they share none — so a shape is only the same shape in
+  both because it is written out twice and named here:
+  - `box`: the plain cuboid, which is most of everything.
+  - `wedge`: a GABLE's prism. A triangle with its peak in the middle, standing
+    across the part's length. Symmetric.
+  - `ridge`: the same prism turned to run lengthwise, apex up — a ridge cap.
+  - `mitre`: a right-angle prism, full height at -X and cut clean away to
+    nothing at +X. What a saw leaves, and what a beam meeting a roof wants: a
+    wedge cannot do it, being symmetric, and a tilted box cannot do it either,
+    because the far end of a tilted box is still square.
+- `half_w`/`half_d` are the FINISHED building's footprint: the plot the village
+  clears, the obstacle while it is being raised, and the walkable shell when it
+  is done.
+- `cloth` names the ramp a box was painted from, so a village can re-dye a
+  street of one blueprint into a street of different houses.
+
 ## Versioning
 
 Every file carries `"format": 1`. When a format grows, the number moves and

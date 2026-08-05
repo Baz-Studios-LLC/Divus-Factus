@@ -21,7 +21,7 @@ pub struct Box3 {
     pub rgb: [u8; 3],
     #[serde(default = "opaque")]
     pub alpha: f32,
-    /// "box", "wedge", "ridge" or "log" - the bench's own shapes.
+    /// "box", "wedge", "ridge" or "mitre" - the bench's own shapes.
     #[serde(default)]
     pub form: String,
     /// The cloth this piece was painted in, named: "wood:0.7". The
@@ -192,6 +192,75 @@ pub fn beds(kind: super::BuildingKind) -> Option<usize> {
 
 /// A gable's prism, and the ridge cap's, cut the way the bench cuts
 /// them: unit-sized, so a box's scale shapes them.
+/// A right-angle prism: a box with one end cut clean through at an angle.
+///
+/// The saw's own shape, and the newest word in the file contract. A wedge is a
+/// GABLE's prism, two slopes meeting at a peak; this is the far commoner cut,
+/// and without it a beam meeting a roof had to stop square and stand off it.
+///
+/// The vertices are the Atelier's, corner for corner. The two programs share no
+/// code and never will, so the only thing keeping a shape the same shape in both
+/// is that somebody wrote it out twice and said so - see `FORMATS.md`.
+fn mitre() -> Mesh {
+    let mut positions: Vec<[f32; 3]> = Vec::new();
+    let mut normals: Vec<[f32; 3]> = Vec::new();
+    let mut indices: Vec<u32> = Vec::new();
+    let mut face = |corners: &[[f32; 3]], normal: [f32; 3]| {
+        let first = positions.len() as u32;
+        for corner in corners {
+            positions.push(*corner);
+            normals.push(normal);
+        }
+        for step in 1..(corners.len() as u32 - 1) {
+            indices.extend_from_slice(&[first, first + step, first + step + 1]);
+        }
+    };
+    // Full height at -X, falling away to nothing at +X.
+    face(
+        &[[-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [-0.5, 0.5, 0.5]],
+        [0.0, 0.0, 1.0],
+    );
+    face(
+        &[[0.5, -0.5, -0.5], [-0.5, -0.5, -0.5], [-0.5, 0.5, -0.5]],
+        [0.0, 0.0, -1.0],
+    );
+    face(
+        &[
+            [-0.5, -0.5, 0.5],
+            [0.5, -0.5, 0.5],
+            [0.5, -0.5, -0.5],
+            [-0.5, -0.5, -0.5],
+        ],
+        [0.0, -1.0, 0.0],
+    );
+    face(
+        &[
+            [-0.5, -0.5, -0.5],
+            [-0.5, -0.5, 0.5],
+            [-0.5, 0.5, 0.5],
+            [-0.5, 0.5, -0.5],
+        ],
+        [-1.0, 0.0, 0.0],
+    );
+    let slant = 1.0 / 2.0f32.sqrt();
+    face(
+        &[
+            [0.5, -0.5, 0.5],
+            [0.5, -0.5, -0.5],
+            [-0.5, 0.5, -0.5],
+            [-0.5, 0.5, 0.5],
+        ],
+        [slant, slant, 0.0],
+    );
+    Mesh::new(
+        bevy::render::mesh::PrimitiveTopology::TriangleList,
+        bevy::asset::RenderAssetUsages::default(),
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+    .with_inserted_indices(bevy::render::mesh::Indices::U32(indices))
+}
+
 fn prism(lengthwise: bool) -> Mesh {
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut normals: Vec<[f32; 3]> = Vec::new();
@@ -301,6 +370,7 @@ pub fn raise_baked(
     let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
     let wedge = meshes.add(prism(false));
     let ridge = meshes.add(prism(true));
+    let mitred = meshes.add(mitre());
     let framed = has_frame(work);
     for piece in work
         .boxes
@@ -321,6 +391,7 @@ pub fn raise_baked(
         let mesh = match piece.form.as_str() {
             "wedge" => wedge.clone(),
             "ridge" => ridge.clone(),
+            "mitre" => mitred.clone(),
             _ => cube.clone(),
         };
         let mut raised = commands.spawn((
