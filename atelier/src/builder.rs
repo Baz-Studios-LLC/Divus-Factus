@@ -3051,7 +3051,14 @@ fn steer_hand(
     if hand.kind.is_none() || naming.0.is_some() {
         return;
     }
-    if keys.just_pressed(KeyCode::Escape) || keys.just_pressed(KeyCode::Delete) {
+    // Backspace as well, which is what the key marked "delete" reports on a
+    // Mac. Without it, the one key a maker would try to empty their hand with
+    // did nothing at all, and escape was the only way - which is exactly the
+    // roundabout Brett described.
+    if keys.just_pressed(KeyCode::Escape)
+        || keys.just_pressed(KeyCode::Delete)
+        || keys.just_pressed(KeyCode::Backspace)
+    {
         if hand.anchor.is_some() {
             hand.anchor = None;
         } else {
@@ -4146,7 +4153,9 @@ fn place_grab_remove(
         }
     }
 
-    if (keys.just_pressed(KeyCode::KeyX) || keys.just_pressed(KeyCode::Delete))
+    if (keys.just_pressed(KeyCode::KeyX)
+        || keys.just_pressed(KeyCode::Delete)
+        || keys.just_pressed(KeyCode::Backspace))
         && let Some(doomed) = hovered.grab
         && placed.contains(doomed)
     {
@@ -5581,8 +5590,11 @@ fn bury_the_chosen(
     naming: Res<Naming>,
     dims: Res<DimsEntry>,
     hand: Res<Hand>,
+    palette: Res<Palette>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     mut selected: ResMut<crate::gizmo::Selected>,
-    parts: Query<Entity, (With<Placed>, Without<Ghost>)>,
+    parts: Query<(Entity, &Transform, &Placed, &Visibility), Without<Ghost>>,
 ) {
     if *bench != Bench::Builder || naming.0.is_some() || dims.0.is_some() {
         return;
@@ -5597,7 +5609,18 @@ fn bury_the_chosen(
     let Some(chosen) = selected.0 else {
         return;
     };
-    if parts.contains(chosen) {
+    if parts.get(chosen).is_ok() {
+        // A door taken out leaves the wall whole again. The older path through
+        // X has always done this; a second way to remove a part that did not
+        // would leave holes nobody could account for.
+        heal_wall(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &palette,
+            &parts,
+            chosen,
+        );
         commands.entity(chosen).despawn();
     }
     selected.0 = None;
