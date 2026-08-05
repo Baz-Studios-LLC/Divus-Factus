@@ -2291,9 +2291,12 @@ fn raise_palette(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette
 
 /// Shows the palette while painting, arms whatever is clicked, and rings the
 /// armed colour in gold.
+#[allow(clippy::too_many_arguments)]
 fn work_palette(
     palette: Res<Palette>,
     mode: Res<crate::gizmo::ToolMode>,
+    hovered: Res<Hovered>,
+    placed: Query<&Placed, Without<Ghost>>,
     mut brush: ResMut<Brush>,
     mut panels: Query<&mut Visibility, With<PalettePanel>>,
     mut swatches: Query<(&Swatch, &Interaction, &mut BorderColor)>,
@@ -2318,13 +2321,39 @@ fn work_palette(
             brush.shade = swatch.shade;
         }
     }
+    // What the part under the cursor is wearing, so the palette can point at
+    // it. Brett's idea, and better than the eyedropper he first reached for:
+    // there is no tool to arm and no modifier to hold, and once the swatch has
+    // lit up, clicking it is the whole of picking the colour up. It also tells a
+    // maker where in the ramps a colour they liked actually lives, which an
+    // eyedropper never would.
+    let worn = hovered
+        .grab
+        .and_then(|part| placed.get(part).ok())
+        .map(|record| (record.ramp.clone(), record.shade));
+
     for (swatch, _, mut border) in &mut swatches {
-        let armed = swatch.ramp.as_deref() == brush.ramp.as_deref()
-            && (swatch.ramp.is_none() || (swatch.shade - brush.shade).abs() < 1e-4);
-        let dress = BorderColor::all(if armed {
-            theme::accent(&palette)
-        } else {
-            Color::BLACK.with_alpha(0.35)
+        let same_as = |ramp: &Option<String>, shade: f32| {
+            swatch.ramp.as_deref() == ramp.as_deref()
+                // The bare swatch stands for a part with no paint at all, and a
+                // part like that has a shade the maker never chose.
+                && (swatch.ramp.is_none()
+                    // Half a step, because a shade set before the swatches
+                    // existed - or nudged from an odd starting point - can sit
+                    // between two of them, and the nearer one is the honest
+                    // answer.
+                    || (swatch.shade - shade).abs() < 0.13)
+        };
+        let armed = same_as(&brush.ramp, brush.shade);
+        let shown = worn
+            .as_ref()
+            .is_some_and(|(ramp, shade)| same_as(ramp, *shade));
+        let dress = BorderColor::all(match (armed, shown) {
+            // Armed wins the gold: what the next click will lay down matters
+            // more than what the cursor happens to be over.
+            (true, _) => theme::accent(&palette),
+            (false, true) => Color::WHITE.with_alpha(0.85),
+            (false, false) => Color::BLACK.with_alpha(0.35),
         });
         if *border != dress {
             *border = dress;
