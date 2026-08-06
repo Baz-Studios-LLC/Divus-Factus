@@ -297,6 +297,9 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                 PartKind::Beam(long, ..) => Some((long, 0.0, false)),
                 // The chimney sizes its own reach downward.
                 PartKind::Chimney(drop) => Some((drop, 0.0, false)),
+                // A flight is sized by what it CLIMBS: pulling the handle asks
+                // for more height, and the treads divide it evenly again.
+                PartKind::Stairs(rise) => Some((rise, 0.0, false)),
                 PartKind::Ridge(long) => Some((long, 0.0, false)),
                 PartKind::Floor(w, d) => Some((w, d, true)),
                 PartKind::Foundation(w, d) => Some((w, d, true)),
@@ -739,6 +742,7 @@ fn work_gizmo(
                 PartKind::Gable(_, pitch) => PartKind::Gable(w, pitch),
                 PartKind::Beam(_, high, low) => PartKind::Beam(w, high, low),
                 PartKind::Chimney(_) => PartKind::Chimney(w.max(0.0)),
+                PartKind::Stairs(_) => PartKind::Stairs(w.max(0.375)),
                 PartKind::Ridge(_) => PartKind::Ridge(w),
                 PartKind::Floor(..) => PartKind::Floor(w, d),
                 PartKind::Foundation(..) => PartKind::Foundation(w, d),

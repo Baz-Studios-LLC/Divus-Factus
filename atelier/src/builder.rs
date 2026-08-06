@@ -279,6 +279,15 @@ pub enum PartKind {
     /// from where it stands, so it can be buried in a roof's slope or
     /// run all the way to the hearth below.
     Chimney(f32),
+    /// A wooden flight with a rail on each side, climbing by the height given.
+    ///
+    /// It climbs along its own +Z rather than +X, which is the one thing about
+    /// it a maker might notice and only if they were looking for it: a slab can
+    /// lean about X and no other axis, so a rail that RUNS at the stair's own
+    /// angle - which is what Brett asked for, "We can use angles for the railing
+    /// now that we have angles right?" - has to climb the axis that leaning
+    /// answers to. Turn it with R like anything else.
+    Stairs(f32),
     /// A ridge pole: a round log along the spine, the older way of
     /// closing a roof.
     /// A whole gable roof: both slopes and the ridge between them, drawn
@@ -411,6 +420,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
         },
         "walls",
     ),
+    structure("STAIRS, WOOD", PartKind::Stairs(0.75), "footing"),
     structure("STEPS, STONE", PartKind::Prop("steps"), "footing"),
     structure(
         "TRIM, STONE, STRETCH",
@@ -1086,6 +1096,78 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(0.0, 1.375, -0.03125, 0.125, 1.0, 0.1875, "wood", 0.4),
             slab(0.0, 1.375, -0.03125, 1.0, 0.125, 0.1875, "wood", 0.4),
         ],
+        PartKind::Stairs(rise) => {
+            // A stair is a rhythm, not a size: pick the number of steps that
+            // gets nearest the rise asked for, then let every tread be equal.
+            // Uneven steps are the one thing a foot notices.
+            let riser = 0.1875_f32;
+            let tread = 0.25_f32;
+            let steps = ((rise / riser).round() as i32).clamp(2, 24);
+            let rise = steps as f32 * riser;
+            let run = steps as f32 * tread;
+            let wide = 1.25_f32;
+            let mut body: Vec<Slab> = Vec::new();
+            // Treads, each a solid block from the ground - the way the stone
+            // steps are drawn, and the way a mason would actually build it.
+            for step in 0..steps {
+                let high = (step + 1) as f32 * riser;
+                body.push(slab(
+                    0.0,
+                    high * 0.5,
+                    -run * 0.5 + (step as f32 + 0.5) * tread,
+                    wide,
+                    high,
+                    tread,
+                    "wood",
+                    0.45,
+                ));
+            }
+            // A newel at each corner, and a rail between each pair, running at
+            // the flight's own angle.
+            let post = 0.1875_f32;
+            let hand = 0.875_f32;
+            let inset = wide * 0.5 - post * 0.5;
+            let foot_z = -run * 0.5 + post * 0.5;
+            let head_z = run * 0.5 - post * 0.5;
+            let rail_len = (run - post).hypot(rise);
+            // A slab's length lies along Z, and leaning about X carries its far
+            // end UP when the angle is negative - see `dress_part`.
+            let lean = -(rise / (run - post)).atan();
+            for side in [-1.0_f32, 1.0] {
+                body.push(slab(
+                    side * inset,
+                    hand * 0.5,
+                    foot_z,
+                    post,
+                    hand,
+                    post,
+                    "wood",
+                    0.4,
+                ));
+                body.push(slab(
+                    side * inset,
+                    rise + hand * 0.5,
+                    head_z,
+                    post,
+                    hand,
+                    post,
+                    "wood",
+                    0.4,
+                ));
+                body.push(leaning(
+                    side * inset,
+                    rise * 0.5 + hand,
+                    0.0,
+                    post * 0.75,
+                    post * 0.75,
+                    rail_len,
+                    "wood",
+                    0.5,
+                    lean,
+                ));
+            }
+            body
+        }
         PartKind::Prop("steps") => vec![
             // Three treads rising the foundation's 0.375, from +X.
             slab(0.375, 0.0625, 0.0, 0.375, 0.125, 1.25, "stone", 0.6),
@@ -2454,7 +2536,16 @@ impl Plugin for BuilderPlugin {
                     choose_the_kind,
                     // The pieces as one group: a tuple of systems stops at
                     // twenty, and a nested tuple counts as one.
-                    (hang_the_carried, hang_the_pieces, name_the_piece),
+                    (
+                        hang_the_carried,
+                        hang_the_pieces,
+                        name_the_piece,
+                        // The one that puts a piece IN THE HAND. It was written
+                        // and never added to the schedule, so a piece could be
+                        // kept and listed and never picked up - the whole
+                        // feature, compiling cleanly and doing nothing.
+                        wield_a_piece,
+                    ),
                     take_one_back_out,
                     take_the_name,
                     dims_panel,
@@ -2484,6 +2575,7 @@ pub fn part_name(kind: &PartKind) -> String {
         PartKind::BeamRun => "beamrun".to_string(),
         PartKind::Ridge(long) => format!("ridge-{long}"),
         PartKind::Chimney(drop) => format!("chimney-{drop}"),
+        PartKind::Stairs(rise) => format!("stairs-{rise}"),
         PartKind::GableRoof(long, span, over, pitch) => {
             format!("gableroof-{long}x{span}x{over}x{pitch}")
         }
@@ -2530,6 +2622,9 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
     if name == "prop:chimney" {
         // The first chimneys, from before the shaft could reach.
         return Some(PartKind::Chimney(0.0));
+    }
+    if let Some(rest) = name.strip_prefix("stairs-") {
+        return rest.parse::<f32>().ok().map(PartKind::Stairs);
     }
     if let Some(rest) = name.strip_prefix("ridge-") {
         return rest.parse::<f32>().ok().map(PartKind::Ridge);
@@ -4448,6 +4543,7 @@ fn is_structure(kind: &PartKind) -> bool {
             | PartKind::RidgeRun
             | PartKind::GableRoof(..)
             | PartKind::GableRoofRun
+            | PartKind::Stairs(_)
             | PartKind::Prop("steps")
             | PartKind::Prop("pole")
     )
@@ -6876,6 +6972,7 @@ pub(crate) fn dims_panel(
                             Some(PartKind::GableRoof(w, d.unwrap_or(old), over, pitch))
                         }
                         PartKind::Chimney(_) => Some(PartKind::Chimney(w)),
+                        PartKind::Stairs(_) => Some(PartKind::Stairs(w)),
                         _ => None,
                     };
                     if let Some(made) = made {
@@ -7944,6 +8041,56 @@ fn turn_part(
 #[cfg(test)]
 mod roof_tests {
     use super::*;
+
+    /// A flight climbs by whole treads, and its rail runs from newel to newel at
+    /// the angle the flight actually has. A rail written to a fixed angle is a
+    /// rail that floats at every height but one.
+    #[test]
+    fn a_stair_carries_a_rail_at_its_own_pitch() {
+        for asked in [0.375_f32, 0.75, 1.5, 2.25] {
+            let body = body_of(&PartKind::Stairs(asked), None);
+            let riser = 0.1875_f32;
+            let steps = ((asked / riser).round() as i32).clamp(2, 24);
+            let rise = steps as f32 * riser;
+
+            // The treads: as many as the rhythm asked for, the tallest reaching
+            // the full rise. A tread is the full width of the flight, which the
+            // newels and rails are not - and the newels stand a hand's height
+            // ABOVE the top tread, so measuring the whole body measures a post.
+            let tallest = body
+                .iter()
+                .filter(|Slab(_, size, ..)| (size.x - 1.25).abs() < 1e-4)
+                .map(|Slab(at, size, ..)| at.y + size.y * 0.5)
+                .fold(0.0_f32, f32::max);
+            assert!(
+                (tallest - rise).abs() < 1e-4,
+                "a flight asked for {asked} climbed to {tallest} rather than {rise}"
+            );
+
+            // The rails: two of them, leaning, and leaning the way the flight
+            // climbs rather than at some angle of their own.
+            let rails: Vec<&Slab> = body.iter().filter(|Slab(.., lean)| *lean != 0.0).collect();
+            assert_eq!(rails.len(), 2, "a flight wants a rail on each side");
+            let run = steps as f32 * 0.25 - 0.1875;
+            let wanted = -(rise / run).atan();
+            for Slab(.., lean) in &rails {
+                assert!(
+                    (lean - wanted).abs() < 1e-3,
+                    "a rail leans {lean} where the flight climbs at {wanted}"
+                );
+            }
+            // And a rail is as long as the slope it covers, or it stops short of
+            // the newel it is supposed to meet.
+            let want_len = run.hypot(rise);
+            for Slab(_, size, ..) in &rails {
+                assert!(
+                    (size.z - want_len).abs() < 1e-3,
+                    "a rail {} long spans a slope of {want_len}",
+                    size.z
+                );
+            }
+        }
+    }
 
     /// The folder the button opens is the folder the works are in - the same one
     /// the bench saves into and lists from, not merely near it.
