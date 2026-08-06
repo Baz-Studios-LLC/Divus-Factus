@@ -6660,11 +6660,17 @@ mod bake {
             };
             let name = path.file_stem().unwrap().to_string_lossy().to_string();
 
+            // The FINISHED building, which is the last step - steps replace one
+            // another rather than adding up, so the last one is the whole thing
+            // and no other one is. A work drawn before there were steps keeps
+            // its one flat list, which is the same thing said the older way.
+            let parts: &[Placed] = work.stages.last().map_or(&work.parts[..], |last| &last[..]);
+
             // The bounds of everything that is not a scale reference, so
             // the building can be recentred on its own footprint.
             let mut low = Vec3::splat(f32::INFINITY);
             let mut high = Vec3::splat(f32::NEG_INFINITY);
-            for record in &work.parts {
+            for record in parts {
                 if record.part == "prop:mannequin" {
                     continue;
                 }
@@ -6689,7 +6695,7 @@ mod bake {
             let mut marks: Vec<(String, Vec3, f32, bool)> = Vec::new();
             let say = |v: Vec3| format!("[{:.4}, {:.4}, {:.4}]", v.x, v.y, v.z);
 
-            for record in &work.parts {
+            for record in parts {
                 if record.part == "prop:mannequin" {
                     continue;
                 }
