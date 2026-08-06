@@ -1,5 +1,3 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-    6  (worn pool) chat:followup told wavering
-    2  (worn pool) chat:reply wavering
-    1  (worn pool) chat:reply trade:guard
+    5  (worn pool) chat:reply wavering
