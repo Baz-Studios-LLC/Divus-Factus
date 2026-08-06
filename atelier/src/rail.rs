@@ -479,20 +479,33 @@ off, walls down as well",
 }
 
 /// One button of the step row.
+/// The width every button on the stage bar takes, step or deed alike. Wide
+/// enough for STAGE 10, which is further than any building has needed to go.
+///
+/// One width, because the row is one row: buttons sized to their own words step
+/// in and out as the eye runs along them, and "-" beside "+ COPY" made the
+/// smallest and the largest of them neighbours.
+const STAGE_BUTTON_WIDTH: f32 = 80.0;
+
 fn stage_face(
     commands: &mut Commands,
     fonts: &Fonts,
     palette: &Palette,
     parent: Entity,
     label: String,
-    wide: f32,
+    lead: f32,
 ) -> Entity {
     let button = commands
         .spawn((
             Interaction::default(),
             Node {
-                padding: UiRect::axes(Val::Px(wide), Val::Px(5.0)),
+                width: Val::Px(STAGE_BUTTON_WIDTH),
+                padding: UiRect::vertical(Val::Px(5.0)),
                 border: UiRect::all(Val::Px(1.0)),
+                justify_content: JustifyContent::Center,
+                // A gap before the deeds, so a miss lands on nothing rather
+                // than on a step being deleted.
+                margin: UiRect::left(Val::Px(lead)),
                 ..default()
             },
             BackgroundColor(Color::BLACK.with_alpha(0.30)),
@@ -568,7 +581,7 @@ fn hang_the_stage_bar(
             &palette,
             bar,
             format!("STAGE {}", step + 1),
-            14.0,
+            0.0,
         );
         commands.entity(button).insert(StageButton(step));
     }
@@ -590,19 +603,9 @@ fn hang_the_stage_bar(
             &palette,
             bar,
             label.to_string(),
-            10.0,
+            if label == "+ COPY" { 12.0 } else { 0.0 },
         );
-        commands.entity(button).insert((
-            StageDeedButton(deed),
-            Node {
-                padding: UiRect::axes(Val::Px(10.0), Val::Px(5.0)),
-                border: UiRect::all(Val::Px(1.0)),
-                // A gap before the first of them, so a miss lands on nothing
-                // rather than on a step being deleted.
-                margin: UiRect::left(Val::Px(if label == "+ COPY" { 12.0 } else { 0.0 })),
-                ..default()
-            },
-        ));
+        commands.entity(button).insert(StageDeedButton(deed));
     }
 }
 
