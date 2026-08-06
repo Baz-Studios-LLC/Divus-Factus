@@ -1,56 +1,45 @@
-## Windows draws through Direct3D 12
+## The veil lifts where the village actually is
 
-**The game asked Windows for the wrong graphics path.** Windows offers two, and
-whichever turned up first was taken — which on a Legion with an RTX 4060 was
-Vulkan, the path that gets the least attention there. It asks for Direct3D 12
-now, which is what a Windows game is expected to speak and what NVIDIA's driver
-is tuned hardest for. Setting `WGPU_BACKEND` still overrides it, for anyone whose
-card prefers otherwise.
+**Plant your flag on the far side of the world and the fog now clears around
+it.** It did not before: the veil is drawn on the bent world while what a village
+knows is written in flat ground coordinates, and those two agree only near the
+top of the globe — where a first village usually stands, which is why it took a
+long walk to find. The shader undoes the bend now before it asks whether a pixel
+is known.
 
-## Stairs
+And the home clearing follows the flag. `KnownWorld`'s centre was never written
+by anything: it sat at the world's origin for the life of a run, so the fog lifted
+over the middle of the map however far away you actually settled.
 
-**A proper flight, in timber or stone.** Treads on an even rhythm, newel posts,
-balusters standing on the steps, and a handrail that runs at the flight's own
-angle rather than stepping up in blocks. It replaces a three-tread stone doorstep
-that had no rail at all — and buildings already drawn keep their old steps.
+## Whole atoms only
 
-- **Three handles.** Across for its width, along for its run — and a longer run
-  is a taller flight, since the treads stay even and only their number changes —
-  and a gold one for the height of the rail.
-- **The treads and the rail take their own materials**, so a stone stair can
-  carry a timber handrail. Right-click a standing flight to change its rail.
-- **A flight is a rhythm, not a size.** Ask for any height and it takes the
-  number of even treads that comes nearest: uneven steps are the one thing a foot
-  notices.
+**Everything in the bench is drawn in whole sixteenths of a metre**, and a test
+now fails on any part that is not. That rule is what makes pieces line up: a
+sixteenth is a power of two, so two parts meeting on the lattice work out the
+same edge exactly and there is nothing left to leave a seam.
 
-**Foundations can be raised.** A pad has a height now, on its own gold handle,
-and it grows upward from where it sits — so a footing can reach the ground on a
-slope instead of hovering over the low side of it.
+It mended three things at once that had looked like three different bugs — a
+punched wall standing taller than its neighbours, a lip at the corner where a
+door had been cut in, and a stair rail that could never quite meet a flat one.
+All three were the same half-atom, added years apart in different places to close
+seams the lattice closes by itself.
+
+Decor keeps its freedom, and so does anything a roof's pitch derives — a slope's
+length is a hypotenuse, and no rule about a grid can ask an angle to be a whole
+number of sixteenths.
+
+## Stairs and railings
+
+- **A flat railing** to carry on from a flight: newels, handrail and balusters,
+  drawn out along the ground like a wall, in timber or stone. Every measurement
+  is the flight's own, so a landing continues a staircase exactly.
+- **Rails end inside their newels**, so nothing pokes out of a post.
+- **The barrel stops flickering.** Its hoops were drawn exactly as wide as the
+  barrel, so their sides sat in the same planes as its staves — two surfaces at
+  one depth, which no renderer can settle.
 
 ## The bench
 
-- **Parts stop climbing walls.** A part rested on the highest thing under any
-  corner of it, so one corner brushing a wall carried the whole piece onto the
-  wall and a maker could never set a thing against one. It rests on what most of
-  it stands on now, and a tie settles low.
-- **Chosen parts are lit**, and stay lit when the cursor wanders off. Hovering
-  and choosing were both writing the same glow, so shift-clicking a second thing
-  looked exactly like unchoosing the first.
-- **A panel says what is in your hand** — how many parts, whether they are a
-  group, and what they are, counting alike things rather than repeating them.
-- **Shift-click gathers in placement mode too**, so grouping no longer means
-  leaving the mode you are drawing in.
-- **Pieces**: keep a group as a piece and set it down in any other work. The
-  system that puts one in your hand had never been switched on.
-- **One step added, one step dropped.** `+ COPY` and `+ BARE` were a question
-  nobody wanted asked; a new step copies the one showing and lands beside it.
-- **The bench clears when the rig comes out.** The roof cutaway was putting the
-  whole building back on the floor the instant the rig had put it away.
-
-## Under the hood
-
-- Parts no longer wander sideways when a handle sizes something other than their
-  own width — a chimney's drop, a flight's rise. A part moves by half of what it
-  truly grew, measured from the boxes it is made of.
-- The stairs keep every face out of every other face's plane, which is what the
-  shimmer along a newel was.
+- **Trim to the roof works on everything with a length** — wall pieces, trim,
+  gables, whole gable roofs, floors, foundations and roof panels — rather than
+  the three parts it happened to be written for.
