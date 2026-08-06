@@ -1323,6 +1323,7 @@ pub(crate) fn spawn_settlement(
     mut notices: MessageWriter<crate::ui::Notice>,
     restoring: Option<Res<RestoringSeed>>,
     chosen: Res<ChosenGround>,
+    mut known: ResMut<crate::villager::explore::KnownWorld>,
 ) {
     let mut rng = Rng::stream(world_seed.0 as u64, "settlement");
 
@@ -1473,6 +1474,15 @@ pub(crate) fn spawn_settlement(
         woodpile,
         settlement,
     };
+    // The village knows the ground it stands on, and the veil lifts from THERE.
+    //
+    // `KnownWorld::centre` was never written by anybody: it defaulted to the
+    // world's origin and stayed there, so the fog cleared over the middle of the
+    // map however far away the flag was actually planted. Brett: "if you go to
+    // the other side of the world to plant your flag it works but the fog of war
+    // doesnt clear around the settlement." Near the origin the two happened to
+    // be the same place, which is why it took a walk to the far side to see.
+    known.centre = centre;
     // The same ground, on the town itself. One source of truth: the resource
     // says which town the player is looking at, the component says where that
     // town is — and every other town carries its own.

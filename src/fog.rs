@@ -122,6 +122,16 @@ pub struct FogParams {
     pub home: Vec4,
     /// x how many pockets are live, y how many metres the edge takes.
     pub dials: Vec4,
+    /// The planet: xyz its centre, w its radius.
+    ///
+    /// The veil is drawn on the BENT world, and what it knows is written in
+    /// FLAT ground coordinates - so the shader has to undo the bend before it
+    /// can ask whether a pixel is known. Near the village the two agree closely
+    /// enough that nobody noticed for months; walk to the far side of the world
+    /// and they have nothing to do with one another. Brett: "if you go to the
+    /// other side of the world to plant your flag it works but the fog of war
+    /// doesnt clear around the settlement."
+    pub planet: Vec4,
     /// Each known pocket: xyz its centre, w its radius.
     pub pockets: [Vec4; MAX_POCKETS],
 }
@@ -145,6 +155,7 @@ impl Default for FogParams {
             // z is how deep the bank stands, which the shader turns into an
             // extinction: see `fog.wgsl`.
             dials: Vec4::new(0.0, 9.0, VEIL_HIGH, 0.0),
+            planet: crate::globe::planet_centre().extend(crate::terrain::PLANET_RADIUS),
             pockets: [Vec4::ZERO; MAX_POCKETS],
         }
     }
@@ -390,6 +401,8 @@ fn follow_the_known(
     let live = known.pockets.len().min(MAX_POCKETS);
     for (_, material) in materials.iter_mut() {
         material.params.home = known.centre.extend(known.radius);
+        material.params.planet = crate::globe::planet_centre()
+            .extend(crate::terrain::PLANET_RADIUS);
         material.params.dials.x = live as f32;
         for (slot, pocket) in known.pockets.iter().take(live).enumerate() {
             material.params.pockets[slot] = pocket.at.extend(pocket.radius);

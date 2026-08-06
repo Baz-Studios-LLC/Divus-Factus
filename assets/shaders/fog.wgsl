@@ -35,6 +35,8 @@ struct FogParams {
     // x how many pockets are live, y how many metres the edge takes to fade,
     // z how deep the bank of mist stands, w unused.
     dials: vec4<f32>,
+    // xyz the planet's centre, w its radius.
+    planet: vec4<f32>,
     // xyz each pocket's centre, w its radius.
     pockets: array<vec4<f32>, 128>,
 }
@@ -65,7 +67,25 @@ fn wobble(at: vec2<f32>) -> f32 {
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    let ground = in.world_position.xz;
+    // The FLAT ground this pixel stands on, which is not where it is drawn.
+    //
+    // The veil is a sheet on the bent world; what the village knows is written
+    // in the flat coordinates the simulation runs in. Taking the drawn position
+    // as the flat one works near the tangent point - the top of the globe, where
+    // home usually is - and falls apart everywhere else, so a village planted on
+    // the far side of the world never lifted its own fog.
+    //
+    // Undoing the bend is the mapping read backwards: longitude and latitude are
+    // arc lengths over the radius, and the planet is turned a quarter turn about
+    // X to stand it up. See `terrain::direction_at` and `globe::bend_frame`.
+    let from_centre = in.world_position.xyz - fog.planet.xyz;
+    // The stance, inverted: a rotation of -90 degrees about X takes the world
+    // back to the frame the map was written in, so (x, y, z) becomes (x, -z, y).
+    let unturned = vec3<f32>(from_centre.x, -from_centre.z, from_centre.y);
+    let dir = normalize(unturned);
+    let lat = asin(clamp(dir.y, -1.0, 1.0));
+    let lon = atan2(dir.x, dir.z);
+    let ground = vec2<f32>(lon * fog.planet.w, -lat * fog.planet.w);
     let soft = max(fog.dials.y, 0.001);
 
     // How far INSIDE the known world this pixel lies, in metres. Negative is

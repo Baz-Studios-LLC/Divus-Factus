@@ -1190,6 +1190,51 @@ fn dress_for_space(mut clear: ResMut<ClearColor>, cameras: Query<&CameraRig, Wit
 
 #[cfg(test)]
 mod tests {
+
+    /// The fog shader undoes the bend to ask what ground a pixel stands on, and
+    /// it has to come back to the ground the simulation is actually using.
+    ///
+    /// The formula lives twice - here and in `fog.wgsl` - because a shader
+    /// cannot be called from a test. Written out the same way in both, so that
+    /// this failing is a warning the other is wrong.
+    #[test]
+    fn the_bend_can_be_undone() {
+        use crate::terrain::PLANET_RADIUS;
+        for flat in [
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(120.0, 3.0, -80.0),
+            Vec3::new(-758.0, 0.0, -329.0),
+            // The far side of the world, which is where the fault showed.
+            Vec3::new(PLANET_RADIUS * 2.0, 0.0, 400.0),
+            Vec3::new(-PLANET_RADIUS * 1.5, 12.0, PLANET_RADIUS * 0.4),
+        ] {
+            let (seat, _) = bend_frame(flat);
+            // What the shader does, in the same order.
+            let from_centre = seat - planet_centre();
+            let unturned = Vec3::new(from_centre.x, -from_centre.z, from_centre.y);
+            let dir = unturned.normalize();
+            let lat = dir.y.clamp(-1.0, 1.0).asin();
+            let lon = dir.x.atan2(dir.z);
+            let ground = Vec2::new(lon * PLANET_RADIUS, -lat * PLANET_RADIUS);
+
+            // Longitude wraps, so compare the ANGLE rather than the arc: a
+            // village at x = 2R and one at x = 2R - 2*pi*R stand on the same
+            // ground and the fog must treat them as one place.
+            let wrap = std::f32::consts::TAU * PLANET_RADIUS;
+            let mut dx = ground.x - flat.x;
+            dx -= (dx / wrap).round() * wrap;
+            assert!(
+                dx.abs() < 0.5,
+                "a pixel at {flat} came back {} out along x",
+                dx.abs()
+            );
+            assert!(
+                (ground.y - flat.z).abs() < 0.5,
+                "a pixel at {flat} came back {} out along z",
+                (ground.y - flat.z).abs()
+            );
+        }
+    }
     use super::*;
 
     /// The bend is a RENDER map, and its first duty is to leave the ground
