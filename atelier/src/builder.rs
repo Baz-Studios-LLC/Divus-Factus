@@ -56,7 +56,7 @@ const WALL_THICK: f32 = 0.25;
 /// Every measurement in a part is a whole number of these. Brett's rule, and the
 /// one that makes the bench's seams close by themselves - a sixteenth is a power
 /// of two, so parts that meet on the lattice agree on the edge exactly.
-const ATOM: f32 = 0.0625;
+pub const ATOM: f32 = 0.0625;
 
 /// The railing's own measurements, shared by the stairs and the flat rail so a
 /// landing carries straight on from a flight.
@@ -83,6 +83,15 @@ const RAIL_GAP: f32 = ATOM * 8.0;
 /// that we have default to the same height as the default stairs?" Twelve atoms
 /// is four treads of three, which is what the rhythm makes of it anyway.
 const STEP_UP: f32 = ATOM * 12.0;
+
+/// The nearest whole atom to a measurement.
+///
+/// Everything a hand pulls goes through here, so a part cannot be left between
+/// two atoms by a drag - and a part drawn before the rule existed comes back
+/// onto the lattice the first time anybody touches it.
+pub fn on_the_lattice(measure: f32) -> f32 {
+    (measure / ATOM).round() * ATOM
+}
 const WALL_HIGH: f32 = 2.5;
 
 /// One piece of a part's body: offset from the part origin, size, ramp,
@@ -723,7 +732,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         PartKind::Floor(w, d) => vec![slab(0.0, 0.0625, 0.0, *w, 0.125, *d, "wood", 0.5)],
         PartKind::FloorRun => vec![slab(0.0, 0.0625, 0.0, 0.25, 0.125, 0.25, "wood", 0.5)],
         PartKind::Foundation(w, d, high) => {
-            let high = high.max(0.0625);
+            let high = on_the_lattice(*high).max(ATOM);
             vec![slab(0.0, high * 0.5, 0.0, *w, high, *d, "stone", 0.55)]
         }
         PartKind::FoundationRun => {
@@ -1060,7 +1069,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             } else {
                 ("wood", 0.4, 0.5, 0.45)
             };
-            let hand = hand.clamp(0.375, 2.0);
+            let hand = on_the_lattice(*hand).clamp(0.375, 2.0);
             let cap = RAIL_POST;
             let long = long.max(RAIL_POST * 2.0);
             let mut body = vec![
@@ -8609,6 +8618,35 @@ fn turn_part(
 #[cfg(test)]
 mod roof_tests {
     use super::*;
+
+    /// A height that a hand can pull comes back on the lattice, wherever it
+    /// started - including a part drawn before the rule existed.
+    #[test]
+    fn a_pulled_height_lands_on_an_atom() {
+        for start in [0.375_f32, 0.4, 0.71, 1.0 / 3.0, 2.0] {
+            let landed = on_the_lattice(start);
+            let atoms = landed / ATOM;
+            assert!(
+                (atoms - atoms.round()).abs() < 1e-4,
+                "{start} landed at {landed}, which is {atoms} atoms"
+            );
+            assert!(
+                (landed - start).abs() <= ATOM * 0.5 + 1e-5,
+                "{start} moved to {landed}, further than half an atom"
+            );
+        }
+        // And a footing drawn off the lattice comes back on it when it is drawn.
+        let odd = PartKind::Foundation(2.0, 2.0, 0.4);
+        let tall = body_of(&odd, None)
+            .iter()
+            .map(|Slab(at, size, ..)| at.y + size.y * 0.5)
+            .fold(0.0_f32, f32::max);
+        let atoms = tall / ATOM;
+        assert!(
+            (atoms - atoms.round()).abs() < 1e-4,
+            "a footing asked for 0.4 stands {tall}, which is {atoms} atoms"
+        );
+    }
 
     /// A footing off the shelf stands exactly as high as a flight off the shelf
     /// climbs, so the two meet without measuring.

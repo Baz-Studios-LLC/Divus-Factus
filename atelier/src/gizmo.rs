@@ -782,10 +782,10 @@ fn work_gizmo(
             );
         }
         Grip::Rail { h0 } => {
-            // In whole sixteenths, like everything else a hand pulls, and never
-            // below a step's own height or above a chest.
-            let pull = ((t - state.t0) * 16.0).round() / 16.0;
-            let hand = (h0 + pull).clamp(0.375, 2.0);
+            // Whole atoms, and never below a step's own height or above a
+            // chest. The result is snapped rather than the pull: see `Grip::Rise`.
+            let pull = t - state.t0;
+            let hand = builder::on_the_lattice(h0 + pull).clamp(0.375, 2.0);
             // The same handle serves a flight's rail and a flat one's.
             let made = match builder::kind_from_name(&record.part) {
                 Some(PartKind::Stairs {
