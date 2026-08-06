@@ -230,8 +230,15 @@ struct Play {
 #[derive(Resource, Default)]
 struct Held {
     joint: Option<String>,
-    /// The plane the drag runs on, and where the joint stands on it.
-    from: Option<(Vec3, Vec3)>,
+    /// Which way the held box lies FROM its joint, in the joint's own frame.
+    ///
+    /// Read off the box that was pressed rather than assumed. A limb hangs on
+    /// -Y and a head sits on +Y, so a rule that aimed everything's -Y at the
+    /// cursor turned the head to look at the floor the instant it was touched -
+    /// Brett: "Simply clicking on the head flips it completly upside down."
+    aim: Vec3,
+    /// The plane the drag runs on: set once, when the drag begins.
+    plane: Option<Vec3>,
 }
 
 pub struct RigPlugin;
@@ -433,8 +440,7 @@ fn pose_by_dragging(
     windows: Query<&Window>,
     hovers: Query<&Interaction>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    boxes: Query<(&RigBox, &GlobalTransform)>,
-    places: Query<&GlobalTransform>,
+    boxes: Query<(&RigBox, &GlobalTransform, &Transform), Without<RigJoint>>,
     mut joints: Query<(&mut Transform, &GlobalTransform), With<RigJoint>>,
 ) {
     if *bench != Bench::Rig {
@@ -442,7 +448,7 @@ fn pose_by_dragging(
     }
     if buttons.just_released(MouseButton::Left) {
         held.joint = None;
-        held.from = None;
+        held.plane = None;
         return;
     }
     let over_ui = hovers
@@ -452,23 +458,25 @@ fn pose_by_dragging(
         return;
     };
 
-    // Taking hold: the nearest box under the cursor hands over its joint.
+    // Taking hold: the nearest box under the cursor hands over its joint, and
+    // the way it lies from that joint.
     if buttons.just_pressed(MouseButton::Left) && !over_ui {
-        let mut nearest: Option<(f32, String)> = None;
-        for (slab, at) in &boxes {
+        let mut nearest: Option<(f32, String, Vec3)> = None;
+        for (slab, at, local) in &boxes {
             let (scale, turn, middle) = at.to_scale_rotation_translation();
             if let Some(hit) = meets_box(ray.0, ray.1, middle, scale * 0.5, turn)
-                && nearest.as_ref().is_none_or(|(had, _)| hit < *had)
+                && nearest.as_ref().is_none_or(|(had, ..)| hit < *had)
             {
-                nearest = Some((hit, slab.0.clone()));
+                nearest = Some((hit, slab.0.clone(), local.translation));
             }
         }
-        if let Some((_, joint)) = nearest {
+        if let Some((_, joint, offset)) = nearest {
             // Posing by hand stops the clock. A body turning under the hand
             // while the maker is trying to put it somewhere is a fight.
             play.running = false;
             held.joint = Some(joint);
-            held.from = None;
+            held.aim = offset.normalize_or(Vec3::NEG_Y);
+            held.plane = None;
         }
         return;
     }
@@ -489,34 +497,53 @@ fn pose_by_dragging(
     // The plane is set ONCE, when the drag starts, and faces the camera. Setting
     // it every frame would let the plane turn with the bone it is turning, and a
     // slow drag would wander round the joint on its own.
-    let (normal, _) = *held.from.get_or_insert_with(|| {
-        let normal = cameras
+    let normal = *held.plane.get_or_insert_with(|| {
+        cameras
             .iter()
             .next()
             .map(|(_, eye)| eye.rotation() * Vec3::Z)
-            .unwrap_or(Vec3::Z);
-        (normal, pivot)
+            .unwrap_or(Vec3::Z)
     });
     let Some(point) = ray_meets_plane(ray.0, ray.1, pivot, normal) else {
         return;
     };
+    // A cursor sitting on the joint itself says nothing about where the bone
+    // should point, and asking anyway is how a limb starts to shiver.
+    let reach = point - pivot;
+    if reach.length() < 0.02 {
+        return;
+    }
 
-    // Where the bone points now: down its own -Y, which is how every box on a
-    // baked body hangs from its joint.
     let Ok((mut local, world)) = joints.get_mut(joint) else {
         return;
     };
-    let along = (world.rotation() * Vec3::NEG_Y).normalize_or(Vec3::NEG_Y);
-    let wanted = (point - pivot).normalize_or(along);
-    let swing = Quat::from_rotation_arc(along, wanted);
+    let aim = held.aim;
+    let along = (world.rotation() * aim).normalize_or(Vec3::NEG_Y);
+    let wanted = reach.normalize();
+    // Turning something to face the way it already faces is nothing; turning it
+    // to face BACKWARDS has no single answer, and `from_rotation_arc` picks a
+    // perpendicular of its own - a different one each frame as the numbers
+    // wobble, which is a limb shaking in the maker's hand. Half a turn about the
+    // plane the drag is running on is the answer a hand would expect, and it is
+    // the same one every frame.
+    let facing = along.dot(wanted).clamp(-1.0, 1.0);
+    let swing = if facing < -0.9995 {
+        Quat::from_axis_angle(normal.normalize_or(Vec3::Z), std::f32::consts::PI)
+    } else if facing > 0.9999 {
+        return;
+    } else {
+        Quat::from_rotation_arc(along, wanted)
+    };
     // The turn is worked out in the world and worn in the parent's frame, or a
     // shoulder already turned would answer to the wrong axes.
-    let parent_turn = places
-        .get(joint)
-        .ok()
-        .map(|_| world.rotation() * local.rotation.inverse())
-        .unwrap_or(Quat::IDENTITY);
-    local.rotation = parent_turn.inverse() * swing * world.rotation();
+    //
+    // And it is NORMALISED before it is worn. A rotation is only a rotation
+    // while it is a unit quaternion; drag long enough without saying so and the
+    // rounding piles up, the matrix it becomes carries a scale, and the arm the
+    // maker is holding swells - "sometimes they shake violently and thats what
+    // they warp and change size".
+    let parent_turn = world.rotation() * local.rotation.inverse();
+    local.rotation = (parent_turn.inverse() * swing * world.rotation()).normalize();
 }
 
 /// The cursor's ray into the world: where it starts and where it heads.
@@ -878,12 +905,15 @@ fn work_the_bar(
         if *touch != Interaction::Pressed {
             continue;
         }
-        // The node's own frame, in the window's units - a capture renders at a
-        // different scale than the window reports, so the node is asked rather
-        // than the window.
-        let width = node.size().x / node.inverse_scale_factor().max(0.001);
-        let left = place.translation().x / node.inverse_scale_factor().max(0.001) - width * 0.5;
-        let along = ((at.x - left) / width.max(1.0)).clamp(0.0, 1.0);
+        // A node measures itself in PHYSICAL pixels and the cursor reports
+        // LOGICAL ones, so the node's own inverse scale carries it across.
+        // Dividing by it instead - which is what this did - squares the screen's
+        // scale into the answer, and on a retina bench every press landed at
+        // four times the distance along, which is to say off the end.
+        let scale = node.inverse_scale_factor();
+        let width = node.size().x * scale;
+        let middle = place.translation().x * scale;
+        let along = ((at.x - (middle - width * 0.5)) / width.max(1.0)).clamp(0.0, 1.0);
         play.running = false;
         play.t = along * clip.length;
     }

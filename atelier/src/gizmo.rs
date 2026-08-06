@@ -142,12 +142,12 @@ impl Plugin for GizmoPlugin {
                 // And the modes go back to NORMAL on the way out, so a maker who
                 // left the builder in RESIZE does not come back to a bench that
                 // has been in RESIZE all the while they were somewhere else.
-                (|bench: Res<crate::Bench>, mut mode: ResMut<ToolMode>, mut chosen: ResMut<Selected>| {
+                |bench: Res<crate::Bench>, mut mode: ResMut<ToolMode>, mut chosen: ResMut<Selected>| {
                     if bench.is_changed() && *bench != crate::Bench::Builder {
                         *mode = ToolMode::Normal;
                         chosen.clear();
                     }
-                })
+                }
             );
     }
 }
