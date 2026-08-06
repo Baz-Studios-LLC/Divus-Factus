@@ -3301,7 +3301,7 @@ fn work_templates(
     standing: Query<Entity, (With<Placed>, Without<Ghost>)>,
     mut work_name: ResMut<WorkName>,
 ) {
-    let base = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let base = bench_home();
     let mut from_file = false;
     let wanted = templates
         .iter()
@@ -5129,9 +5129,39 @@ fn is_a_work(path: &std::path::Path) -> bool {
         .is_some_and(|kind| kind == WORK_KIND || kind == "json")
 }
 
+/// Where the bench keeps everything: its own folder in a source tree, and the
+/// maker's own Application Support beside the game's saves otherwise.
+///
+/// It used to be `CARGO_MANIFEST_DIR` or, failing that, the working directory —
+/// which was right while the only way to run the bench was `cargo run` from its
+/// own crate. It is opened from the game's title screen now, and a bundled bench
+/// would have taken "the working directory" to mean INSIDE the `.app`: a place
+/// that is read-only where it is installed properly, and that breaks the
+/// signature where it is not.
+///
+/// A maker working in the tree still writes to `atelier/out/buildings`, which is
+/// where their buildings already are and where git can see them.
+pub fn bench_home() -> std::path::PathBuf {
+    if let Ok(tree) = std::env::var("CARGO_MANIFEST_DIR") {
+        return std::path::PathBuf::from(tree);
+    }
+    // Beside the game's saves, under the same roof the launcher already uses
+    // for this game's things.
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    let base = if cfg!(target_os = "macos") {
+        format!("{home}/Library/Application Support/Divus Factus/atelier")
+    } else if cfg!(target_os = "windows") {
+        std::env::var("APPDATA")
+            .map(|roaming| format!("{roaming}/Divus Factus/atelier"))
+            .unwrap_or_else(|_| "atelier".into())
+    } else {
+        format!("{home}/.local/share/divus-factus/atelier")
+    };
+    std::path::PathBuf::from(base)
+}
+
 fn bench_path() -> std::path::PathBuf {
-    let base = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    std::path::PathBuf::from(base).join(format!("out/buildings/workbench.{WORK_KIND}"))
+    bench_home().join(format!("out/buildings/workbench.{WORK_KIND}"))
 }
 
 /// The save button asks the work its name; the writing happens when the
@@ -5511,9 +5541,11 @@ pub(crate) fn dims_panel(
                 Node {
                     position_type: PositionType::Absolute,
                     left: Val::Percent(50.0),
-                    bottom: Val::Px(10.0),
-                    margin: UiRect::left(Val::Px(-110.0)),
-                    width: Val::Px(220.0),
+                    // Clear of the step row, which took the floor when the
+                    // stages arrived and hid this underneath itself.
+                    bottom: Val::Px(52.0),
+                    margin: UiRect::left(Val::Px(-130.0)),
+                    width: Val::Px(260.0),
                     justify_content: JustifyContent::Center,
                     padding: UiRect::axes(Val::Px(12.0), Val::Px(6.0)),
                     border: UiRect::all(Val::Px(1.0)),
@@ -5543,13 +5575,20 @@ pub(crate) fn dims_panel(
         let (_, record) = parts.get(part).ok()?;
         let kind = kind_from_name(&record.part)?;
         match kind {
-            PartKind::Wall(long) => Some((part, long, None)),
-            PartKind::Seg { long, .. } => Some((part, long, None)),
-            PartKind::Trim { long, .. } => Some((part, long, None)),
-            PartKind::GableRoof(w, d, _, _) => Some((part, w, Some(d))),
-            PartKind::Chimney(drop) => Some((part, drop, None)),
+            PartKind::Wall(long) => Some((part, long, None, None)),
+            PartKind::Seg { long, .. } => Some((part, long, None, None)),
+            PartKind::Trim { long, .. } => Some((part, long, None, None)),
+            PartKind::Beam(long, ..) => Some((part, long, None, None)),
+            PartKind::Ridge(long) => Some((part, long, None, None)),
+            // A roof's PITCH rides along with its size. Brett: "incase I want
+            // to make multiple buildings with the same sized roof peak" - and a
+            // number you can read off one roof is a number you can pull another
+            // to, where an angle you can only judge by eye is not.
+            PartKind::GableRoof(w, d, _, pitch) => Some((part, w, Some(d), Some(pitch))),
+            PartKind::Gable(long, pitch) => Some((part, long, None, Some(pitch))),
+            PartKind::Chimney(drop) => Some((part, drop, None, None)),
             PartKind::Floor(w, d) | PartKind::Foundation(w, d) | PartKind::Roof(w, d) => {
-                Some((part, w, Some(d)))
+                Some((part, w, Some(d), None))
             }
             _ => None,
         }
@@ -5586,7 +5625,7 @@ pub(crate) fn dims_panel(
         said = Some(format!("{text}_"));
         if let Some(saving) = done {
             if saving
-                && let Some((part, _, had_d)) = sized
+                && let Some((part, _, had_d, _)) = sized
                 && let Ok((mut transform, mut record)) = parts.get_mut(part)
                 && let Some(kind) = kind_from_name(&record.part)
             {
@@ -5659,12 +5698,13 @@ pub(crate) fn dims_panel(
             _ => None,
         };
     } else if *tool == crate::gizmo::ToolMode::Resize
-        && let Some((_, w, d)) = sized
+        && let Some((_, w, d, pitch)) = sized
     {
         let units = |value: f32| format!("{}", (value * 16.0).round() as i64);
+        let angle = pitch.map_or(String::new(), |degrees| format!("  {degrees:.1}°"));
         said = Some(match d {
-            Some(d) => format!("{} x {} - D to type", units(w), units(d)),
-            None => format!("{} - D to type", units(w)),
+            Some(d) => format!("{} x {}{angle} - D to type", units(w), units(d)),
+            None => format!("{}{angle} - D to type", units(w)),
         });
         if keys.just_pressed(KeyCode::KeyD) {
             entry.0 = Some(String::new());
