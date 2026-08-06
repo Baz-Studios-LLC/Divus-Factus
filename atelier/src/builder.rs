@@ -1511,14 +1511,18 @@ struct TemplateButton(&'static str);
 #[derive(Component)]
 struct LoadFileButton(std::path::PathBuf);
 
-/// The small x beside a saved work: pressed once it asks, pressed again
-/// while asking it deletes the file and the row.
+/// What a right-click on a saved work needs to know to be rid of it.
+///
+/// It rides on the row's own button, where the file's name already lives. There
+/// used to be an `x` beside every name that armed on one press and buried on the
+/// next - a whole second button, on every row, to ask a question a menu asks
+/// better. Brett: "Can we put the delete under the right click and remove the X.
+/// That should save some space." The room it frees goes to the names, which is
+/// what a shelf of saved work is actually for.
 #[derive(Component)]
-struct DeleteFileButton {
+struct SavedWork {
     path: std::path::PathBuf,
     row: Entity,
-    /// Pressed once, the button stays armed until this moment passes.
-    armed_until: f32,
 }
 
 /// The button that sweeps the bench bare.
@@ -1657,6 +1661,8 @@ impl Plugin for BuilderPlugin {
                         paint_the_work,
                         work_palette,
                         raise_part_menu,
+                        raise_work_menu,
+                        work_work_menu,
                         turn_to_stage,
                         bury_the_chosen,
                     ),
@@ -1696,7 +1702,6 @@ impl Plugin for BuilderPlugin {
                     dims_panel,
                     recall,
                     remember,
-                    bury_saved_work,
                     settle_words,
                 )
                     .chain()
@@ -2036,6 +2041,158 @@ fn dress_ghost(
     {
         spawn_part(commands, meshes, materials, palette, &kind, &record, true);
     }
+}
+
+// ------------------------------------------------------------ the work menu
+
+/// The menu a saved work raises, and the file it stands for.
+#[derive(Component)]
+struct WorkMenu {
+    path: std::path::PathBuf,
+    row: Entity,
+}
+
+/// Right-click a saved work to be rid of it.
+///
+/// On the release and only if the mouse barely moved, the same rule the part
+/// menu keeps, and for the same reason: the right button orbits the camera, so a
+/// right DRAG has to stay an orbit.
+///
+/// No arming, no "sure?". Raising a menu and choosing from it IS the second
+/// thought that the two-press `x` was asking for, and it does not need a button
+/// on every row to ask it.
+#[allow(clippy::too_many_arguments)]
+fn raise_work_menu(
+    mut commands: Commands,
+    fonts: Res<Fonts>,
+    palette: Res<Palette>,
+    buttons: Res<ButtonInput<MouseButton>>,
+    mut motion: MessageReader<bevy::input::mouse::MouseMotion>,
+    windows: Query<&Window>,
+    works: Query<(&Interaction, &SavedWork)>,
+    menus: Query<Entity, With<WorkMenu>>,
+    mut drift: Local<f32>,
+) {
+    let stirred: f32 = motion.read().map(|moved| moved.delta.length()).sum();
+    if buttons.pressed(MouseButton::Right) {
+        *drift += stirred;
+    }
+    if buttons.just_pressed(MouseButton::Right) {
+        *drift = 0.0;
+    }
+    if !buttons.just_released(MouseButton::Right) {
+        return;
+    }
+    let travelled = std::mem::take(&mut *drift);
+    for menu in &menus {
+        commands.entity(menu).despawn();
+    }
+    if travelled > 4.0 {
+        return;
+    }
+    let Some((_, work)) = works
+        .iter()
+        .find(|(interaction, _)| **interaction != Interaction::None)
+    else {
+        return;
+    };
+    let Some(at) = windows.iter().next().and_then(|window| window.cursor_position()) else {
+        return;
+    };
+    let named = work
+        .path
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().to_uppercase())
+        .unwrap_or_default();
+
+    let menu = commands
+        .spawn((
+            WorkMenu {
+                path: work.path.clone(),
+                row: work.row,
+            },
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(at.x),
+                top: Val::Px(at.y),
+                flex_direction: FlexDirection::Column,
+                padding: UiRect::all(Val::Px(3.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(theme::panel_bg()),
+            BorderColor::all(theme::panel_border(&palette)),
+            GlobalZIndex(60),
+        ))
+        .id();
+    let line = commands
+        .spawn((
+            Interaction::default(),
+            Node {
+                padding: UiRect::axes(Val::Px(12.0), Val::Px(5.0)),
+                ..default()
+            },
+            BackgroundColor(Color::NONE),
+            ChildOf(menu),
+        ))
+        .id();
+    commands.spawn((
+        // The work's own name, so nobody buries the wrong one.
+        Text::new(format!("BURY {named}")),
+        TextFont {
+            font: fonts.display.clone().into(),
+            font_size: FontSize::Px(11.0),
+            ..default()
+        },
+        TextColor(theme::accent(&palette)),
+        ChildOf(line),
+    ));
+}
+
+/// Buries the work when its line is chosen, and shuts on anything else.
+fn work_work_menu(
+    mut commands: Commands,
+    keys: Res<ButtonInput<KeyCode>>,
+    buttons: Res<ButtonInput<MouseButton>>,
+    palette: Res<Palette>,
+    menus: Query<(Entity, &WorkMenu)>,
+    kin: Query<&Children>,
+    mut lines: Query<(&Interaction, &mut BackgroundColor)>,
+) {
+    let Some((menu, work)) = menus.iter().next() else {
+        return;
+    };
+    let mut chosen = false;
+    let mut over = false;
+    for line in kin.get(menu).into_iter().flatten() {
+        if let Ok((interaction, mut fill)) = lines.get_mut(*line) {
+            if *interaction != Interaction::None {
+                over = true;
+            }
+            if *interaction == Interaction::Pressed {
+                chosen = true;
+            }
+            let wanted = BackgroundColor(if *interaction == Interaction::None {
+                Color::NONE
+            } else {
+                theme::accent(&palette).with_alpha(0.18)
+            });
+            if fill.0 != wanted.0 {
+                *fill = wanted;
+            }
+        }
+    }
+    let dismissed =
+        keys.just_pressed(KeyCode::Escape) || (buttons.just_pressed(MouseButton::Left) && !over);
+    if !chosen && !dismissed {
+        return;
+    }
+    if chosen {
+        let _ = std::fs::remove_file(&work.path);
+        info!("buried {}", work.path.display());
+        commands.entity(work.row).despawn();
+    }
+    commands.entity(menu).despawn();
 }
 
 // ------------------------------------------------------------ the part menu
@@ -3221,6 +3378,10 @@ fn saved_work_row(
     let load = commands
         .spawn((
             LoadFileButton(path.clone()),
+            SavedWork {
+                path: path.clone(),
+                row,
+            },
             Interaction::default(),
             Node {
                 flex_grow: 1.0,
@@ -3243,37 +3404,6 @@ fn saved_work_row(
     commands.entity(name).insert(TextLayout::new(
         bevy::text::Justify::Left,
         bevy::text::LineBreak::AnyCharacter,
-    ));
-    let bury = commands
-        .spawn((
-            DeleteFileButton {
-                path,
-                row,
-                armed_until: 0.0,
-            },
-            Interaction::default(),
-            Node {
-                // Never squeezed: the way to be rid of a work should not get
-                // harder to hit as its name gets longer.
-                flex_shrink: 0.0,
-                padding: UiRect::axes(Val::Px(7.0), Val::Px(4.0)),
-                border: UiRect::all(Val::Px(1.0)),
-                align_items: AlignItems::Center,
-                ..default()
-            },
-            BackgroundColor(Color::BLACK.with_alpha(0.18)),
-            BorderColor::all(theme::panel_border(palette).with_alpha(0.25)),
-            ChildOf(row),
-        ))
-        .id();
-    commands.spawn((
-        Text::new("x"),
-        TextFont {
-            font_size: FontSize::Px(10.0),
-            ..default()
-        },
-        TextColor(theme::text_dim(palette).with_alpha(0.7)),
-        ChildOf(bury),
     ));
 }
 
@@ -5597,52 +5727,6 @@ fn take_the_name(
     }
 }
 
-/// The x beside a saved work: the first press asks, the second buries.
-/// An unanswered question calms back down on its own.
-fn bury_saved_work(
-    mut commands: Commands,
-    time: Res<Time>,
-    palette: Res<Palette>,
-    mut buttons: Query<(
-        &mut DeleteFileButton,
-        &Interaction,
-        &mut BorderColor,
-        &Children,
-    )>,
-    mut labels: Query<&mut Text>,
-) {
-    let now = time.elapsed_secs();
-    for (mut bury, interaction, mut border, children) in &mut buttons {
-        let armed = now < bury.armed_until;
-        let pressed = *interaction == Interaction::Pressed;
-        if pressed && armed {
-            let _ = std::fs::remove_file(&bury.path);
-            info!("buried {}", bury.path.display());
-            commands.entity(bury.row).despawn();
-            continue;
-        }
-        if pressed && !armed {
-            bury.armed_until = now + 2.5;
-        }
-        let asking = now < bury.armed_until;
-        let (word, dress) = if asking {
-            ("sure?", theme::accent(&palette))
-        } else {
-            ("x", theme::panel_border(&palette).with_alpha(0.25))
-        };
-        let fresh = BorderColor::all(dress);
-        if *border != fresh {
-            *border = fresh;
-        }
-        for &child in children {
-            if let Ok(mut text) = labels.get_mut(child)
-                && text.0 != word
-            {
-                *text = Text::new(word);
-            }
-        }
-    }
-}
 
 /// Passing words return to their old text when their moment ends.
 fn settle_words(

@@ -327,6 +327,9 @@ standing: click a part,
 shift-click the lot,
 \\ empties the brush",
         ),
+        ("right-click", "a part's menu, or a saved
+work's - group, ungroup,
+trim, bury"),
         ("shift-click", "choose several; right-
 click to group them"),
         ("esc / del", "empty the hand"),
