@@ -1335,14 +1335,19 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             let reveal = 0.0625_f32;
             let inset = wide * 0.5 - post * 0.5 - reveal;
             let foot_z = -run * 0.5 + post * 0.5 + reveal;
-            // The HEAD newel goes the other way: a lap PAST the top tread rather
-            // than a reveal short of it. A flight almost always meets something
-            // at the top - Brett: "the railing on the steps in the back should
-            // flush to the wall behind it" - and a newel set in from the back
-            // leaves a slot between the rail and whatever it arrives at. Past
-            // the tread it simply disappears into the wall, and its faces still
-            // share a plane with nothing.
-            let head_z = run * 0.5 + ATOM - post * 0.5;
+            // The head newel's back is FLUSH with the flight's back, so the two
+            // make one face that meets a wall together - Brett: "If the back of
+            // the stair and the pole are alinged it will hit the wall perfect."
+            //
+            // Flush is safe here and nowhere else on this part, because the
+            // newel stands ON the top tread rather than in it: the two share the
+            // plane but never the space, so there is nothing for a renderer to
+            // settle. Which is the same rule the face audit uses.
+            //
+            // It hung an ATOM past for a while, to meet a wall without a slot,
+            // and bought that with a post hanging in the air whenever there was
+            // no wall - which Brett saw at once.
+            let head_z = run * 0.5 - post * 0.5;
             let span = head_z - foot_z;
             // The rail stops INSIDE the newels rather than at their centres.
             //
@@ -8596,6 +8601,38 @@ fn turn_part(
 mod roof_tests {
     use super::*;
 
+    /// The back of a flight is ONE face: the top tread and the head newel end in
+    /// the same plane, so a flight pushed against a wall meets it with both.
+    #[test]
+    fn a_flight_meets_a_wall_with_its_whole_back() {
+        for rise in [0.375_f32, 0.75, 2.0] {
+            for wide in [1.25_f32, 2.0] {
+                let body = body_of(
+                    &PartKind::Stairs {
+                        rise,
+                        wide,
+                        stone: false,
+                        rail_stone: false,
+                        hand: RAIL_HIGH,
+                    },
+                    None,
+                );
+                let back = |pick: &dyn Fn(&Slab) -> bool| {
+                    body.iter()
+                        .filter(|slab| pick(slab))
+                        .map(|Slab(at, size, ..)| at.z + size.z * 0.5)
+                        .fold(f32::NEG_INFINITY, f32::max)
+                };
+                let treads = back(&|Slab(_, size, ..): &Slab| (size.x - wide).abs() < 1e-5);
+                let newels = back(&|Slab(_, size, ..): &Slab| (size.x - RAIL_POST).abs() < 1e-5);
+                assert!(
+                    (treads - newels).abs() < 1e-5,
+                    "the treads end at {treads} and the newels at {newels}"
+                );
+            }
+        }
+    }
+
     /// A flight's rail ends inside its newels: nothing of it shows past a post,
     /// at any pitch a flight can be drawn at.
     #[test]
@@ -9288,8 +9325,8 @@ mod roof_tests {
         );
 
         // The flight: its run grows in whole treads, so the measured extent
-        // moves in the same steps the geometry does. The head newel hangs a lap
-        // past the top tread on purpose, so the body measures that much longer.
+        // moves in the same steps the geometry does - and nothing hangs past the
+        // treads, since both newels stand on the flight.
         let (steps, _, tread) = stair_rhythm(0.75);
         let flight = extent_of(&PartKind::Stairs {
             rise: 0.75,
@@ -9300,7 +9337,7 @@ mod roof_tests {
         });
         let treads = steps as f32 * tread;
         assert!(
-            flight.y > treads && flight.y <= treads + 0.0625 + 1e-4,
+            (flight.y - treads).abs() < 1e-4,
             "a flight of {steps} treads measured {} along its run",
             flight.y
         );
@@ -9365,10 +9402,10 @@ mod roof_tests {
             // hangs a lap PAST the top one so the rail meets the wall. The rail
             // itself is shorter than that - it ends inside the newels - but it
             // lies along the same line at the same pitch.
-            let (post, reveal, lap) = (RAIL_POST, ATOM, ATOM);
+            let (post, reveal) = (RAIL_POST, ATOM);
             let full = steps as f32 * tread;
             let foot = -full * 0.5 + post * 0.5 + reveal;
-            let head = full * 0.5 + lap - post * 0.5;
+            let head = full * 0.5 - post * 0.5;
             let run = head - foot;
             let wanted = -(rise / run).atan();
             for Slab(.., lean) in &rails {
