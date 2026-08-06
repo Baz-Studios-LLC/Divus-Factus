@@ -1554,6 +1554,23 @@ struct RemovalYes(CarriedRow);
 #[derive(Component)]
 struct RemovalNo;
 
+/// Where the drawings that SHIPPED are, from the bench's side of the fence.
+///
+/// In a bundle the bench stands in the same folder as the game, so the game's
+/// assets are beside it. In a source tree the bench is its own crate one level
+/// down, so they are one level up.
+fn shipped_buildings() -> Option<std::path::PathBuf> {
+    let mut roads: Vec<std::path::PathBuf> = Vec::new();
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(beside) = exe.parent()
+    {
+        roads.push(beside.join("assets/buildings"));
+    }
+    roads.push(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../assets/buildings"));
+    roads.push("assets/buildings".into());
+    roads.into_iter().find(|road| road.is_dir())
+}
+
 /// Just enough of a baked file to list it.
 #[derive(serde::Deserialize)]
 struct CarriedFile {
@@ -1579,20 +1596,41 @@ fn hang_the_carried(
     stale.0 = false;
     commands.entity(drawer.0).despawn_related::<Children>();
 
-    let home = carried_home("buildings");
-    let mut carried: Vec<(std::path::PathBuf, CarriedFile)> = std::fs::read_dir(&home)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .map(|entry| entry.path())
-        .filter(|path| path.extension().is_some_and(|kind| kind == "json"))
-        .filter_map(|path| {
-            std::fs::read_to_string(&path)
+    // EVERYTHING the game will raise, not merely what this maker put there.
+    // Brett, looking at a drawer that said nothing while two of his own
+    // buildings stood in the village: "I dont see it?" - because those shipped
+    // inside the app, and a list of what the game will raise that leaves out
+    // most of what the game will raise is a list nobody can trust.
+    let mut carried: Vec<(std::path::PathBuf, CarriedFile, bool)> = Vec::new();
+    for (home, mine) in [
+        (shipped_buildings(), false),
+        (Some(carried_home("buildings")), true),
+    ] {
+        let Some(home) = home else {
+            continue;
+        };
+        for path in std::fs::read_dir(&home)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().is_some_and(|kind| kind == "json"))
+        {
+            let Some(file) = std::fs::read_to_string(&path)
                 .ok()
                 .and_then(|text| serde_json::from_str::<CarriedFile>(&text).ok())
-                .map(|file| (path, file))
-        })
-        .collect();
+            else {
+                continue;
+            };
+            // The game's own rule, said here too: a maker's drawing of a given
+            // name replaces the one that shipped under it, so the list shows
+            // one row and it is the one that will actually be raised.
+            match carried.iter().position(|(_, had, _)| had.name == file.name) {
+                Some(standing) => carried[standing] = (path, file, mine),
+                None => carried.push((path, file, mine)),
+            }
+        }
+    }
     carried.sort_by(|a, b| a.1.name.cmp(&b.1.name));
 
     if carried.is_empty() {
@@ -1608,7 +1646,7 @@ fn hang_the_carried(
         ));
         return;
     }
-    for (path, file) in carried {
+    for (path, file, mine) in carried {
         let row = CarriedRow {
             path,
             name: file.name.clone(),
@@ -1649,7 +1687,11 @@ fn hang_the_carried(
             .map(|(_, label)| *label)
             .unwrap_or("BY ITS NAME");
         commands.spawn((
-            Text::new(said),
+            Text::new(if mine {
+                said.to_string()
+            } else {
+                format!("{said}  -  shipped")
+            }),
             TextFont {
                 font: fonts.text.clone().into(),
                 font_size: FontSize::Px(10.0),
@@ -1659,9 +1701,19 @@ fn hang_the_carried(
             ChildOf(button),
         ));
         commands.spawn((
-            crate::rail::Word("Take it back out of the game"),
+            crate::rail::Word(if mine {
+                "Take it back out of the game"
+            } else {
+                "This one shipped inside the game - carry in your own of the same name to replace it"
+            }),
             ChildOf(button),
         ));
+        // Only a maker's own can be taken out. What shipped lives inside the
+        // app, is replaced whole by the next update, and deleting it would be a
+        // hole rather than a choice.
+        if !mine {
+            commands.entity(button).remove::<CarriedRow>();
+        }
     }
 }
 
