@@ -1357,11 +1357,17 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // are then buried in the posts, where nothing can see whether they
             // are square, and the rail keeps its own line and pitch exactly -
             // both ends move along it by the same amount.
-            // Never more than half of it: a two-tread flight is barely longer
-            // than its own newels, and pulling a whole post out of each end left
-            // it with no rail at all.
-            let held = ((span - post.min(span * 0.5)) / span).max(0.5);
-            let rail_len = span.hypot(rise) * held;
+            // Half a newel off each end, measured ALONG the rail rather than
+            // across the ground. Scaling the slope length by a ratio of z spans
+            // took far more off a steep flight than a post's worth, and left the
+            // rail floating between its posts.
+            let line = span.hypot(rise);
+            let rail_len = (line - post).max(line * 0.5);
+            // And it lies on the middle of its own LINE. The head newel hangs a
+            // lap past the top tread, which moved the line's midpoint off the
+            // part's origin - and the rail stayed at the origin, an atom adrift
+            // of the posts it is supposed to join.
+            let rail_mid = (foot_z + head_z) * 0.5;
             // A slab's length lies along Z, and leaning about X carries its far
             // end UP when the angle is negative - see `dress_part`.
             let lean = -(rise / span).atan();
@@ -1396,7 +1402,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 body.push(leaning(
                     side * inset,
                     rise * 0.5 + hand,
-                    0.0,
+                    rail_mid,
                     rail_thick,
                     rail_thick,
                     rail_len,
@@ -1408,7 +1414,9 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 // and reaches the rail's underside, so they shorten and lengthen
                 // with the slope the way real ones do. Brett: "a verticle pole
                 // gets added every so often to look more like real railing".
-                for step in (1..steps).step_by(2) {
+                // One on every tread now that a tread is six atoms deep. At
+                // four they stood a hand apart and had to be thinned out.
+                for step in 1..steps {
                     let z = -run * 0.5 + (step as f32 + 0.5) * tread;
                     // Clear of the newels by half a post, rather than a whole
                     // one: a wider newel had swallowed the window entirely, and
@@ -4995,8 +5003,13 @@ pub fn extent_of(kind: &PartKind) -> Vec2 {
 /// number of EVEN steps that comes nearest - uneven steps are the one thing a
 /// foot notices - and the run follows from the count.
 pub fn stair_rhythm(rise: f32) -> (i32, f32, f32) {
-    let riser = 0.1875_f32;
-    let tread = 0.25_f32;
+    let riser = ATOM * 3.0;
+    // Six atoms of tread to three of rise: about twenty-seven degrees, which is
+    // a stair somebody could carry a sack up. Four atoms made a ladder at
+    // forty-nine, and it left no room between the newels for the rail to be
+    // anything but a stub - Brett: "we can make the stair treads deeper if that
+    // helps." It does, and it looks like a stair.
+    let tread = ATOM * 6.0;
     (((rise / riser).round() as i32).clamp(2, 24), riser, tread)
 }
 
@@ -9326,8 +9339,7 @@ mod roof_tests {
                 },
                 None,
             );
-            let riser = 0.1875_f32;
-            let steps = ((asked / riser).round() as i32).clamp(2, 24);
+            let (steps, riser, tread) = stair_rhythm(asked);
             let rise = steps as f32 * riser;
 
             // The treads: as many as the rhythm asked for, the tallest reaching
@@ -9354,11 +9366,10 @@ mod roof_tests {
             // itself is shorter than that - it ends inside the newels - but it
             // lies along the same line at the same pitch.
             let (post, reveal, lap) = (RAIL_POST, ATOM, ATOM);
-            let full = steps as f32 * 0.25;
+            let full = steps as f32 * tread;
             let foot = -full * 0.5 + post * 0.5 + reveal;
             let head = full * 0.5 + lap - post * 0.5;
             let run = head - foot;
-            let held = ((run - post.min(run * 0.5)) / run).max(0.5);
             let wanted = -(rise / run).atan();
             for Slab(.., lean) in &rails {
                 assert!(
@@ -9367,7 +9378,8 @@ mod roof_tests {
                 );
             }
             // And a rail spans its own line, less the newels it ends inside.
-            let want_len = run.hypot(rise) * held;
+            let line = run.hypot(rise);
+            let want_len = (line - post).max(line * 0.5);
             for Slab(_, size, ..) in &rails {
                 assert!(
                     (size.z - want_len).abs() < 1e-3,
