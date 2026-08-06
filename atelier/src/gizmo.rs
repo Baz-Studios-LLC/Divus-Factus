@@ -98,6 +98,8 @@ enum Grip {
     /// Pull a roof's ridge up or down: its pitch, in degrees when the grip
     /// closed. The eaves do not move, so a roof steepens where it stands.
     Pitch { p0: f32 },
+    /// Raise or lower a flight's handrail. The treads do not move.
+    Rail { h0: f32 },
 }
 
 #[derive(Resource, Default)]
@@ -358,6 +360,19 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                         },
                     ));
                 }
+            }
+            // A flight carries one more, in gold: the rail's own height, since
+            // both of the red-and-blue pair are spoken for by its width and its
+            // run. Brett: "maybe we can add a handle for rail height?"
+            if let Some(PartKind::Stairs { rise, hand, .. }) =
+                builder::kind_from_name(&record.part)
+            {
+                handles.push((
+                    spin * Vec3::Y,
+                    spin * Vec3::new(0.0, rise + hand, 0.0),
+                    "cloth-gold",
+                    Grip::Rail { h0: hand },
+                ));
             }
             // A whole roof carries two more, in gold: the eaves, which
             // reach out past the walls without taking the gables with
@@ -710,6 +725,44 @@ fn work_gizmo(
                 false,
             );
         }
+        Grip::Rail { h0 } => {
+            // In whole sixteenths, like everything else a hand pulls, and never
+            // below a step's own height or above a chest.
+            let pull = ((t - state.t0) * 16.0).round() / 16.0;
+            let hand = (h0 + pull).clamp(0.375, 2.0);
+            let Some(PartKind::Stairs {
+                rise,
+                wide,
+                stone,
+                rail_stone,
+                hand: was,
+            }) = builder::kind_from_name(&record.part)
+            else {
+                return;
+            };
+            if (hand - was).abs() < 1e-4 {
+                return;
+            }
+            let made = PartKind::Stairs {
+                rise,
+                wide,
+                stone,
+                rail_stone,
+                hand,
+            };
+            record.part = builder::part_name(&made);
+            commands.entity(part).despawn_related::<Children>();
+            builder::dress_part(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &palette,
+                &made,
+                &record,
+                part,
+                false,
+            );
+        }
         Grip::Over { o0 } => {
             // The eaves reach out in whole units; the walls beneath and
             // the gables at the ends do not move at all.
@@ -764,7 +817,10 @@ fn work_gizmo(
                 PartKind::Beam(_, high, low) => PartKind::Beam(w, high, low),
                 PartKind::Chimney(_) => PartKind::Chimney(w.max(0.0)),
                 PartKind::Stairs {
-                    stone, rail_stone, ..
+                    stone,
+                    rail_stone,
+                    hand,
+                    ..
                 } => {
                     let (_, riser, tread) = builder::stair_rhythm(0.0);
                     let steps = (d / tread).round().clamp(2.0, 24.0);
@@ -773,6 +829,7 @@ fn work_gizmo(
                         wide: w.max(0.375),
                         stone,
                         rail_stone,
+                        hand,
                     }
                 }
                 PartKind::Ridge(_) => PartKind::Ridge(w),

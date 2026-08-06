@@ -302,6 +302,8 @@ pub enum PartKind {
         wide: f32,
         stone: bool,
         rail_stone: bool,
+        /// How high the rail stands above each tread.
+        hand: f32,
     },
     /// A ridge pole: a round log along the spine, the older way of
     /// closing a roof.
@@ -445,6 +447,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
             wide: 1.25,
             stone: true,
             rail_stone: true,
+            hand: 0.875,
         },
         "footing",
     ),
@@ -455,6 +458,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
             wide: 1.25,
             stone: false,
             rail_stone: false,
+            hand: 0.875,
         },
         "footing",
     ),
@@ -1137,6 +1141,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             wide,
             stone,
             rail_stone,
+            hand,
         } => {
             // A stair is a rhythm, not a size: pick the number of steps that
             // gets nearest the rise asked for, then let every tread be equal.
@@ -1176,10 +1181,17 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // A newel at each corner, a rail between each pair running at the
             // flight's own angle, and balusters standing on the treads.
             let post = 0.1875_f32;
-            let hand = 0.875_f32;
+            let hand = hand.clamp(0.375, 2.0);
             let cap = post;
             let rail_thick = post * 0.75;
-            let inset = wide * 0.5 - post * 0.5;
+            // The rail assembly stands PROUD of the treads by a sixteenth
+            // rather than flush with them. Flush put the newel's outer face in
+            // exactly the same plane as the tread's, and two faces in one plane
+            // is a fight no renderer can settle - Brett: "We have a z ordering
+            // issue. I feel the stairs should win." Nobody wins a coplanar
+            // fight; the answer is not to have one. A newel bolted to the
+            // outside of a stringer is what a carpenter would do anyway.
+            let inset = wide * 0.5 - post * 0.5 + LAP;
             let foot_z = -run * 0.5 + post * 0.5;
             let head_z = run * 0.5 - post * 0.5;
             let span = head_z - foot_z;
@@ -2667,11 +2679,16 @@ pub fn part_name(kind: &PartKind) -> String {
             wide,
             stone,
             rail_stone,
+            hand,
         } => {
             // Two letters for two materials: the treads, then the rail. The
             // older spellings said one thing about a flight and are still read.
             let say = |stone: &bool| if *stone { "s" } else { "w" };
-            format!("stairs-{rise}x{wide}x{}{}", say(stone), say(rail_stone))
+            format!(
+                "stairs-{rise}x{wide}x{}{}x{hand}",
+                say(stone),
+                say(rail_stone)
+            )
         }
         PartKind::GableRoof(long, span, over, pitch) => {
             format!("gableroof-{long}x{span}x{over}x{pitch}")
@@ -2735,11 +2752,15 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
             let letter = |at: usize, was: bool| {
                 cloth.chars().nth(at).map_or(was, |letter| letter == 's')
             };
+            // And the rail's own height, on the end. A flight from before the
+            // rail could be raised opens at the height they all had.
+            let hand = parts.next().and_then(|n| n.parse().ok()).unwrap_or(0.875);
             return Some(PartKind::Stairs {
                 rise,
                 wide,
                 stone: letter(0, was_stone),
                 rail_stone: letter(1, was_stone),
+                hand,
             });
         }
     }
@@ -3607,6 +3628,7 @@ fn work_part_menu(
                     rise,
                     wide,
                     stone: treads,
+                    hand,
                     ..
                 }) = kind_from_name(&record.part)
             {
@@ -3615,6 +3637,7 @@ fn work_part_menu(
                     wide,
                     stone: treads,
                     rail_stone: stone,
+                    hand,
                 };
                 record.part = part_name(&made);
                 let copy = record.clone();
@@ -7176,12 +7199,14 @@ pub(crate) fn dims_panel(
                             rise,
                             stone,
                             rail_stone,
+                            hand,
                             ..
                         } => Some(PartKind::Stairs {
                             rise: d.unwrap_or(rise),
                             wide: w,
                             stone,
                             rail_stone,
+                            hand,
                         }),
                         _ => None,
                     };
@@ -8261,6 +8286,49 @@ fn turn_part(
 mod roof_tests {
     use super::*;
 
+    /// No two boxes of a flight may share a face in the same plane. Two surfaces
+    /// at one depth is a fight the renderer settles differently frame to frame,
+    /// which is the shimmer Brett saw along the newels.
+    #[test]
+    fn a_flight_has_no_two_faces_in_one_plane() {
+        for stone in [false, true] {
+            for wide in [1.25_f32, 2.0, 0.5] {
+                let body = body_of(
+                    &PartKind::Stairs {
+                        rise: 0.75,
+                        wide,
+                        stone,
+                        rail_stone: !stone,
+                        hand: 0.875,
+                    },
+                    None,
+                );
+                // The outer faces along X: the treads', and everything else's.
+                let mut faces: Vec<f32> = body
+                    .iter()
+                    .filter(|Slab(.., lean)| *lean == 0.0)
+                    .map(|Slab(at, size, ..)| at.x + size.x * 0.5)
+                    .collect();
+                faces.sort_by(f32::total_cmp);
+                for pair in faces.windows(2) {
+                    let gap = pair[1] - pair[0];
+                    assert!(
+                        gap < 1e-5 || gap > 1e-3,
+                        "two faces sit {gap} apart at {}, which is a fight rather than a joint",
+                        pair[0]
+                    );
+                }
+                // And the newels stand outside the treads rather than level with
+                // them, which is what keeps those two out of one plane.
+                let widest = faces.last().copied().unwrap_or_default();
+                assert!(
+                    widest > wide * 0.5 + 1e-4,
+                    "the rail is flush with the tread edge at {widest}"
+                );
+            }
+        }
+    }
+
     /// One flight in two materials: the same boxes in the same places, and the
     /// stone one written down as stone rather than as a timber flight whose name
     /// happens to begin with the word.
@@ -8271,12 +8339,14 @@ mod roof_tests {
             wide: 1.5,
             stone: false,
             rail_stone: false,
+            hand: 0.875,
         };
         let stone = PartKind::Stairs {
             rise: 1.125,
             wide: 1.5,
             stone: true,
             rail_stone: true,
+            hand: 0.875,
         };
         let a = body_of(&timber, None);
         let b = body_of(&stone, None);
@@ -8309,6 +8379,7 @@ mod roof_tests {
             wide: 1.25,
             stone: true,
             rail_stone: false,
+            hand: 0.875,
         };
         let body = body_of(&mixed, None);
         let treads: Vec<&Slab> = body
@@ -8370,6 +8441,7 @@ mod roof_tests {
             wide: 1.25,
             stone: false,
             rail_stone: false,
+            hand: 0.875,
         });
         assert!(
             (flight.y - steps as f32 * tread).abs() < 1e-4,
@@ -8382,6 +8454,7 @@ mod roof_tests {
             wide: 2.0,
             stone: false,
             rail_stone: false,
+            hand: 0.875,
         });
         assert!(
             (wider.x - flight.x - 0.75).abs() < 1e-4,
@@ -8403,6 +8476,7 @@ mod roof_tests {
                     wide: 1.25,
                     stone: false,
                     rail_stone: false,
+                    hand: 0.875,
                 },
                 None,
             );
