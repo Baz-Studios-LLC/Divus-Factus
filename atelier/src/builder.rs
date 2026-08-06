@@ -2747,7 +2747,10 @@ fn raise_palette(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette
                 right: Val::Px(0.0),
                 top: Val::Px(0.0),
                 bottom: Val::Px(0.0),
-                width: Val::Px(202.0),
+                // The shelf's own width: the two share an edge and only one
+                // stands at a time, so a differing width would make the panel
+                // jump as a maker changes tool.
+                width: Val::Px(212.0),
                 flex_direction: FlexDirection::Column,
                 padding: UiRect::all(Val::Px(10.0)),
                 row_gap: Val::Px(2.0),
@@ -2972,7 +2975,10 @@ fn raise_shelf(
                 right: Val::Px(0.0),
                 top: Val::Px(0.0),
                 bottom: Val::Px(0.0),
-                width: Val::Px(176.0),
+                // Wide enough for the longest thing on it - ROOF, GABLE,
+                // STRETCH - on one line. A shelf that wraps its own names is a
+                // shelf a maker reads twice.
+                width: Val::Px(212.0),
                 flex_direction: FlexDirection::Column,
                 padding: UiRect::all(Val::Px(12.0)),
                 row_gap: Val::Px(3.0),
@@ -3209,7 +3215,14 @@ fn saved_work_row(
             ChildOf(row),
         ))
         .id();
-    button_label(commands, fonts, palette, load, label);
+    // A saved work's name breaks ANYWHERE, because it is usually one word:
+    // "LONGHOUSE1-10PEOPLE" has nothing a line breaker would call a gap, and a
+    // word that will not break is a word that hangs off the shelf.
+    let name = button_label(commands, fonts, palette, load, label);
+    commands.entity(name).insert(TextLayout::new(
+        bevy::text::Justify::Left,
+        bevy::text::LineBreak::AnyCharacter,
+    ));
     let bury = commands
         .spawn((
             DeleteFileButton {
@@ -3259,19 +3272,17 @@ fn plain_button(commands: &mut Commands, palette: &Palette, parent: Entity) -> E
         .id()
 }
 
+/// A word on a button. Returns the text so a caller can say more about how it
+/// should break — most should not, since breaking at spaces is what reading is.
 fn button_label(
     commands: &mut Commands,
     fonts: &Fonts,
     palette: &Palette,
     button: Entity,
     label: &'static str,
-) {
+) -> Entity {
     commands.spawn((
         Text::new(label),
-        // Wrapped ANYWHERE, not at spaces. "LONGHOUSE1-10PEOPLE" is one word to
-        // a line breaker, and a word that does not fit is a word that hangs off
-        // the panel.
-        TextLayout::new(bevy::text::Justify::Left, bevy::text::LineBreak::AnyCharacter),
         TextFont {
             font: fonts.text.clone().into(),
             font_size: FontSize::Px(12.0),
@@ -3279,7 +3290,8 @@ fn button_label(
         },
         TextColor(theme::text_dim(palette)),
         ChildOf(button),
-    ));
+    ))
+    .id()
 }
 
 /// The shelf belongs to the Builder bench alone.

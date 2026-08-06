@@ -56,12 +56,6 @@ impl Selected {
         self.0.clear();
     }
 
-    /// This one alone.
-    pub fn only(&mut self, part: Entity) {
-        self.0.clear();
-        self.0.push(part);
-    }
-
     /// In or out - a shift-click on something already chosen lets it go.
     pub fn toggle(&mut self, part: Entity) {
         if let Some(at) = self.0.iter().position(|held| *held == part) {
