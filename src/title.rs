@@ -83,6 +83,44 @@ struct SettingsButton;
 #[derive(Component)]
 struct QuitButton;
 
+/// The door to the maker's bench.
+#[derive(Component)]
+struct AtelierButton;
+
+/// Where the Atelier stands, if it stands anywhere.
+///
+/// Beside the game first, which is where a packaged build puts it: one bundle
+/// holding both, so the bench a player opens is always the one that matches the
+/// game it feeds. That matters more here than tidiness — the two share a file
+/// contract, and a bench a release behind the game writes buildings the game
+/// reads differently.
+///
+/// Then the source tree, because the bench is its own crate with its own target
+/// directory and does NOT sit beside the game while either is being worked on.
+///
+/// `None` means it is not installed, and the button does not appear at all. A
+/// door that opens onto nothing is worse than no door.
+fn atelier_beside_us() -> Option<std::path::PathBuf> {
+    let named = if cfg!(windows) {
+        "divus-factus-atelier.exe"
+    } else {
+        "divus-factus-atelier"
+    };
+    let us = std::env::current_exe().ok()?;
+    let here = us.parent()?;
+    let beside = here.join(named);
+    if beside.is_file() {
+        return Some(beside);
+    }
+    // A source tree: the game runs from `target/release`, the bench builds into
+    // `atelier/target/release`.
+    let workspace = here.parent()?.parent()?;
+    let in_tree = workspace
+        .join("atelier/target/release")
+        .join(named);
+    in_tree.is_file().then_some(in_tree)
+}
+
 /// Opens the saves window as a load menu.
 #[derive(Component)]
 struct LoadGameButton;
@@ -519,6 +557,12 @@ fn spawn_title(
     commands
         .entity(settings)
         .insert((SettingsButton, TitleMenu));
+    // Only when there is a bench to open. A button that does nothing teaches a
+    // player that buttons here might do nothing.
+    if atelier_beside_us().is_some() {
+        let bench = button_of_size(&mut commands, menu, "Atelier", 340.0, 21.0, 16.0);
+        commands.entity(bench).insert((AtelierButton, TitleMenu));
+    }
     let quit = button_of_size(&mut commands, menu, "Quit", 340.0, 21.0, 16.0);
     commands.entity(quit).insert((QuitButton, TitleMenu));
 
@@ -1597,6 +1641,7 @@ fn handle_choice(
     mut saves_panels: Query<&mut Visibility, With<crate::save::SavesPanel>>,
     settings: Query<&Interaction, (Changed<Interaction>, With<SettingsButton>)>,
     quit: Query<&Interaction, (Changed<Interaction>, With<QuitButton>)>,
+    bench: Query<&Interaction, (Changed<Interaction>, With<AtelierButton>)>,
     open_settings: Query<Entity, With<SettingsScreen>>,
     chunks: Option<Res<crate::terrain::LoadedChunks>>,
     site: Option<Res<crate::villager::SettlementSite>>,
@@ -1615,6 +1660,37 @@ fn handle_choice(
             );
         }
     }
+    // The Atelier takes over: the bench opens and the game stands down.
+    //
+    // Two programs at once would be two programs fighting over one machine's
+    // graphics for no reason - nobody draws a building and plays at the same
+    // time - and the bench's whole promise is that what is saved there is
+    // carried in by hand afterwards, which is a thing you do on the way BACK.
+    for interaction in &bench {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        let Some(path) = atelier_beside_us() else {
+            continue;
+        };
+        // From its own folder, so it finds its palette and its fonts the way it
+        // does when a maker runs it themselves.
+        let home = path.parent().map(std::path::Path::to_path_buf);
+        let mut opening = std::process::Command::new(&path);
+        if let Some(home) = home {
+            opening.current_dir(home);
+        }
+        match opening.spawn() {
+            Ok(_) => {
+                info!("the bench is open: {}", path.display());
+                exit.write(AppExit::Success);
+            }
+            // Left standing rather than quitting into nothing: a game that
+            // closed and opened neither would look like a crash.
+            Err(why) => warn!("the bench would not open ({why}): {}", path.display()),
+        }
+    }
+
     // Load Game opens the saves window over the title; picking a slot there
     // restores the world and walks through the same door Begin uses.
     for interaction in &loads {
