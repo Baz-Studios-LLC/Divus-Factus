@@ -91,6 +91,8 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
             ChildOf(centring),
         ))
         .id();
+    /// The width every mode button takes, whatever its word.
+    const MODE_BUTTON_WIDTH: f32 = 88.0;
     for (mode, label) in [
         (crate::gizmo::ToolMode::Normal, "NORMAL"),
         (crate::gizmo::ToolMode::Move, "MOVE"),
@@ -102,8 +104,14 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
                 ModeButton(mode),
                 Interaction::default(),
                 Node {
-                    padding: UiRect::axes(Val::Px(14.0), Val::Px(5.0)),
+                    // One width for all four, rather than each sized to its own
+                    // word - a row of buttons that step in and out as the eye
+                    // runs along them reads as four unrelated things. Wide
+                    // enough for NORMAL, which is the longest of them.
+                    width: Val::Px(MODE_BUTTON_WIDTH),
+                    padding: UiRect::vertical(Val::Px(5.0)),
                     border: UiRect::all(Val::Px(1.0)),
+                    justify_content: JustifyContent::Center,
                     ..default()
                 },
                 BackgroundColor(Color::BLACK.with_alpha(0.18)),
