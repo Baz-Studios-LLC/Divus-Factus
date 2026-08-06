@@ -1520,7 +1520,7 @@ struct SavedWork {
 
 /// The button that sweeps the bench bare.
 #[derive(Component)]
-struct ClearButton;
+pub(crate) struct ClearButton;
 
 /// A drawer header: pressing it opens and closes the drawer body.
 #[derive(Component)]
@@ -1537,18 +1537,18 @@ struct Shelf;
 
 /// The export/save button.
 #[derive(Component)]
-struct SaveButton;
+pub(crate) struct SaveButton;
 
 /// Opens the folder the works live in, in whatever the desktop calls a window
 /// of files. Brett asked for it and it is the sort of thing a bench should have
 /// had from the start: the bench writes `.baz` files somewhere sensible, and
 /// "somewhere sensible" is a path nobody should have to be told.
 #[derive(Component)]
-struct OpenFolderButton;
+pub(crate) struct OpenFolderButton;
 
 /// The save button's label, so it can say what just happened.
 #[derive(Component)]
-struct SaveLabel;
+pub(crate) struct SaveLabel;
 
 /// The name this work goes by, once it has been given one. Saving again
 /// updates the same file instead of scattering copies.
@@ -1557,7 +1557,7 @@ pub struct WorkName(pub Option<String>);
 
 /// A label speaking a passing word; it returns to its old text at `until`.
 #[derive(Component)]
-struct PassingWord {
+pub(crate) struct PassingWord {
     back: &'static str,
     until: f32,
 }
@@ -3261,93 +3261,6 @@ fn raise_shelf(
         );
     }
 
-    // The save at the shelf's foot.
-    let save = commands
-        .spawn((
-            SaveButton,
-            Interaction::default(),
-            Node {
-                margin: UiRect::top(Val::Px(12.0)),
-                padding: UiRect::axes(Val::Px(10.0), Val::Px(7.0)),
-                border: UiRect::all(Val::Px(1.0)),
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            BackgroundColor(Color::BLACK.with_alpha(0.18)),
-            BorderColor::all(theme::accent(&palette).with_alpha(0.7)),
-            ChildOf(files),
-        ))
-        .id();
-    commands.spawn((
-        SaveLabel,
-        Text::new("SAVE THE WORK"),
-        TextFont {
-            font: fonts.display.clone().into(),
-            font_size: FontSize::Px(12.0),
-            ..default()
-        },
-        TextColor(theme::accent(&palette)),
-        ChildOf(save),
-    ));
-    // And the way to the works themselves, under it.
-    let folder = commands
-        .spawn((
-            OpenFolderButton,
-            Interaction::default(),
-            Node {
-                margin: UiRect::top(Val::Px(6.0)),
-                padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
-                border: UiRect::all(Val::Px(1.0)),
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            BackgroundColor(Color::BLACK.with_alpha(0.18)),
-            BorderColor::all(theme::text_dim(&palette).with_alpha(0.5)),
-            ChildOf(files),
-        ))
-        .id();
-    commands.spawn((
-        Text::new("OPEN THE FOLDER"),
-        TextFont {
-            font: fonts.display.clone().into(),
-            font_size: FontSize::Px(11.0),
-            ..default()
-        },
-        TextColor(theme::text_dim(&palette)),
-        ChildOf(folder),
-    ));
-
-    // The broom, last. It used to live with the two ready-made starts, which
-    // Brett has done with - "We can remove the ready made stuff and section" -
-    // and it was never one of them: those put a building ON the bench and this
-    // takes everything off it. Down here it sits with the other ways in and out
-    // of a work, which is what it is.
-    let sweep = commands
-        .spawn((
-            ClearButton,
-            Interaction::default(),
-            Node {
-                margin: UiRect::top(Val::Px(6.0)),
-                padding: UiRect::vertical(Val::Px(6.0)),
-                border: UiRect::all(Val::Px(1.0)),
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            BackgroundColor(Color::BLACK.with_alpha(0.18)),
-            BorderColor::all(theme::text_dim(&palette).with_alpha(0.5)),
-            ChildOf(files),
-        ))
-        .id();
-    commands.spawn((
-        Text::new("CLEAR THE BENCH"),
-        TextFont {
-            font: fonts.display.clone().into(),
-            font_size: FontSize::Px(11.0),
-            ..default()
-        },
-        TextColor(theme::text_dim(&palette)),
-        ChildOf(sweep),
-    ));
     commands.spawn((
         Text::new(
             "build anywhere: the door\nwidget decides the front.\nthe gold marks +X if you\nlike to work oriented.",
@@ -5795,7 +5708,7 @@ fn take_the_name(
                 for (entity, mut text) in &mut save_labels {
                     *text = Text::new(format!("SAVED {} - {count} PARTS", stem.to_uppercase()));
                     commands.entity(entity).insert(PassingWord {
-                        back: "SAVE THE WORK",
+                        back: crate::rail::FOOT_SAYING,
                         until: time.elapsed_secs() + 2.5,
                     });
                 }

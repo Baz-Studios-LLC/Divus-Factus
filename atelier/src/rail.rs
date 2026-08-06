@@ -46,7 +46,14 @@ impl Plugin for RailPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, raise_rail).add_systems(
             Update,
-            (work_buttons, work_mode_bar, work_settings, work_stage_bar, hang_the_stage_bar),
+            (
+                work_buttons,
+                work_mode_bar,
+                work_settings,
+                work_stage_bar,
+                hang_the_stage_bar,
+                speak_at_the_foot,
+            ),
         );
     }
 }
@@ -416,26 +423,23 @@ off, walls down as well",
             ChildOf(row),
         ));
     }
-    // The gear: a drawn sliders glyph, since the fonts keep no gear.
-    let gear = commands
+    // The tools that act on the WORK rather than on the bench, along the foot
+    // beside the gear. Brett: "Cluld these buttons be iconized and down by the
+    // settings button?" - they were three of the widest words on the rail and
+    // none of them is a part, which is what the shelf above is for.
+    let tools = commands
         .spawn((
-            SettingsButton,
-            Interaction::default(),
             Node {
-                width: Val::Px(34.0),
-                height: Val::Px(30.0),
-                flex_direction: FlexDirection::Column,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                row_gap: Val::Px(4.0),
-                border: UiRect::all(Val::Px(1.0)),
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(6.0),
                 ..default()
             },
-            BackgroundColor(Color::BLACK.with_alpha(0.18)),
-            BorderColor::all(theme::panel_border(&palette)),
             ChildOf(foot),
         ))
         .id();
+    // The gear: a drawn sliders glyph, since the fonts keep no gear.
+    let gear = icon_face(&mut commands, &palette, tools);
+    commands.entity(gear).insert(SettingsButton);
     for offset in [-5.0f32, 3.0, -2.0] {
         let bar = commands
             .spawn((
@@ -462,8 +466,69 @@ off, walls down as well",
         ));
     }
 
+    // SAVE: a chest with its plate, the one glyph everybody already reads as
+    // keeping a thing.
+    let save = icon_face(&mut commands, &palette, tools);
+    commands
+        .entity(save)
+        .insert(crate::builder::SaveButton)
+        .insert(BorderColor::all(theme::accent(&palette).with_alpha(0.7)));
+    let body = pane(&mut commands, save, 18.0, 16.0, true, &palette);
+    commands.entity(body).insert(Node {
+        width: Val::Px(18.0),
+        height: Val::Px(16.0),
+        border: UiRect::all(Val::Px(1.0)),
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::FlexEnd,
+        padding: UiRect::bottom(Val::Px(2.0)),
+        ..default()
+    });
+    plate(&mut commands, body, 10.0, 5.0, theme::accent(&palette));
+
+    // THE FOLDER: a tab and a body, which is what a folder has been since
+    // before any of this.
+    let folder = icon_face(&mut commands, &palette, tools);
+    commands.entity(folder).insert(crate::builder::OpenFolderButton);
+    let stack = commands
+        .spawn((
+            Node {
+                width: Val::Px(18.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::FlexStart,
+                ..default()
+            },
+            ChildOf(folder),
+        ))
+        .id();
+    plate(&mut commands, stack, 8.0, 3.0, theme::accent(&palette));
+    pane(&mut commands, stack, 18.0, 11.0, true, &palette);
+
+    // THE BROOM: a handle and a head. It sweeps the bench, and it is the one
+    // here that takes something away, so it wears the dimmest border of the
+    // four - nothing about it should invite a stray hand.
+    let broom = icon_face(&mut commands, &palette, tools);
+    commands.entity(broom).insert(crate::builder::ClearButton);
+    let stack = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(1.0),
+                ..default()
+            },
+            ChildOf(broom),
+        ))
+        .id();
+    plate(&mut commands, stack, 2.0, 10.0, theme::text_dim(&palette));
+    plate(&mut commands, stack, 12.0, 4.0, theme::accent(&palette));
+
+    // The line under them says what the hand is over, and the bench's own word
+    // when it is over nothing. Which is where the save's answer lands too: a
+    // button with no writing on it cannot tell anybody what it just did.
     commands.spawn((
-        Text::new("what you save here, the god carries into the world by hand."),
+        crate::builder::SaveLabel,
+        FootWord,
+        Text::new(FOOT_SAYING),
         TextFont {
             font: fonts.text.clone().into(),
             font_size: FontSize::Px(11.0),
@@ -476,6 +541,107 @@ off, walls down as well",
         },
         ChildOf(foot),
     ));
+}
+
+/// What the foot says when nothing is under the hand.
+pub const FOOT_SAYING: &str = "what you save here, the god carries into the world by hand.";
+
+/// The line at the foot of the rail.
+#[derive(Component)]
+struct FootWord;
+
+/// One icon button's frame: the gear's own, so the four read as one row.
+fn icon_face(commands: &mut Commands, palette: &Palette, parent: Entity) -> Entity {
+    commands
+        .spawn((
+            Interaction::default(),
+            Node {
+                width: Val::Px(34.0),
+                height: Val::Px(30.0),
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(4.0),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.18)),
+            BorderColor::all(theme::panel_border(palette)),
+            ChildOf(parent),
+        ))
+        .id()
+}
+
+/// A drawn rectangle, filled.
+fn plate(commands: &mut Commands, parent: Entity, w: f32, h: f32, dye: Color) -> Entity {
+    commands
+        .spawn((
+            Node {
+                width: Val::Px(w),
+                height: Val::Px(h),
+                ..default()
+            },
+            BackgroundColor(dye),
+            ChildOf(parent),
+        ))
+        .id()
+}
+
+/// A drawn rectangle, outlined.
+fn pane(
+    commands: &mut Commands,
+    parent: Entity,
+    w: f32,
+    h: f32,
+    lined: bool,
+    palette: &Palette,
+) -> Entity {
+    commands
+        .spawn((
+            Node {
+                width: Val::Px(w),
+                height: Val::Px(h),
+                border: UiRect::all(Val::Px(if lined { 1.0 } else { 0.0 })),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.35)),
+            BorderColor::all(theme::accent(palette).with_alpha(0.8)),
+            ChildOf(parent),
+        ))
+        .id()
+}
+
+/// The foot says what the hand is over.
+///
+/// An icon with no word on it is a guess until somebody has pressed it once,
+/// and the one that clears the bench is not a button anybody should learn by
+/// pressing. The line was already there, saying nothing that changes.
+fn speak_at_the_foot(
+    saves: Query<&Interaction, With<crate::builder::SaveButton>>,
+    folders: Query<&Interaction, With<crate::builder::OpenFolderButton>>,
+    brooms: Query<&Interaction, With<crate::builder::ClearButton>>,
+    gears: Query<&Interaction, With<SettingsButton>>,
+    // A word passing through - the save's own answer - has the floor until it
+    // has had its moment.
+    mut word: Query<&mut Text, (With<FootWord>, Without<crate::builder::PassingWord>)>,
+) {
+    let touched = |touch: &Interaction| *touch != Interaction::None;
+    let saying = if saves.iter().any(touched) {
+        "save the work, under a name you give it."
+    } else if folders.iter().any(touched) {
+        "open the folder the works are kept in."
+    } else if brooms.iter().any(touched) {
+        "clear the bench: every part comes off it."
+    } else if gears.iter().any(touched) {
+        "the keys, and what they do."
+    } else {
+        FOOT_SAYING
+    };
+    for mut text in &mut word {
+        if text.0 != saying {
+            *text = Text::new(saying);
+        }
+    }
 }
 
 /// One button of the step row.
