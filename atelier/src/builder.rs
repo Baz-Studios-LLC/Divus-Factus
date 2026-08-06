@@ -60,7 +60,16 @@ const ATOM: f32 = 0.0625;
 
 /// The railing's own measurements, shared by the stairs and the flat rail so a
 /// landing carries straight on from a flight.
-const RAIL_POST: f32 = ATOM * 3.0;
+/// Four atoms, not three, and the reason is the whole point of the lattice.
+///
+/// A three-atom post is an ODD number of atoms, so its centre falls half an atom
+/// off the grid - and the flight's rail line, which is measured in from the
+/// tread edge by a post's half-width, landed at seven and a half atoms. A flat
+/// rail placed on the grid could not reach it however carefully it was set down.
+/// Brett: "the new railing looks great but it doesn't line up with the railing
+/// post, I painted it blue to be able to see the difference." An even post puts
+/// the line at a whole seven, and the two meet.
+const RAIL_POST: f32 = ATOM * 4.0;
 const RAIL_THICK: f32 = ATOM * 2.0;
 const RAIL_HIGH: f32 = ATOM * 14.0;
 /// About a pace between balusters, and a whole number of atoms.
@@ -1306,10 +1315,12 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             }
             // A newel at each corner, a rail between each pair running at the
             // flight's own angle, and balusters standing on the treads.
-            let post = 0.1875_f32;
+            // The railing's own measurements, shared with the flat rail so a
+            // landing carries straight on from a flight.
+            let post = RAIL_POST;
             let hand = hand.clamp(0.375, 2.0);
-            let cap = post;
-            let rail_thick = ATOM * 2.0;
+            let cap = RAIL_POST;
+            let rail_thick = RAIL_THICK;
             // The TREADS stand proud of the rail by a sixteenth, on every side.
             //
             // Flush is the one thing that cannot be: a newel's face in exactly
@@ -1382,7 +1393,10 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 // gets added every so often to look more like real railing".
                 for step in (1..steps).step_by(2) {
                     let z = -run * 0.5 + (step as f32 + 0.5) * tread;
-                    if z <= foot_z + post || z >= head_z - post {
+                    // Clear of the newels by half a post, rather than a whole
+                    // one: a wider newel had swallowed the window entirely, and
+                    // a short flight came out with a rail and nothing under it.
+                    if z <= foot_z + post * 0.5 || z >= head_z - post * 0.5 {
                         continue;
                     }
                     let stood = (step + 1) as f32 * riser;
@@ -8552,6 +8566,108 @@ fn turn_part(
 mod roof_tests {
     use super::*;
 
+    /// A flight's rail line stands a WHOLE number of atoms from its middle.
+    ///
+    /// This is what lets a flat rail, placed on the grid like everything else,
+    /// carry on from a flight. Half an atom out and the two can never meet,
+    /// however carefully either is set down - which is exactly what Brett saw
+    /// when he painted one blue to compare them.
+    #[test]
+    fn a_flight_puts_its_rail_on_the_lattice() {
+        for wide in [1.25_f32, 1.0, 2.0, 0.75] {
+            let body = body_of(
+                &PartKind::Stairs {
+                    rise: 0.75,
+                    wide,
+                    stone: false,
+                    rail_stone: false,
+                    hand: RAIL_HIGH,
+                },
+                None,
+            );
+            let line = body
+                .iter()
+                .find(|Slab(_, size, ..)| (size.x - RAIL_POST).abs() < 1e-5)
+                .map(|Slab(at, ..)| at.x.abs())
+                .expect("a flight has newels");
+            let atoms = line / ATOM;
+            assert!(
+                (atoms - atoms.round()).abs() < 1e-3,
+                "a flight {wide} wide puts its rail {atoms:.2} atoms off centre"
+            );
+            // And the flat rail's own line is its origin, so the two meet when
+            // the flat one is set down that many atoms across.
+            let rail = body_of(
+                &PartKind::Rail {
+                    long: 2.0,
+                    hand: RAIL_HIGH,
+                    stone: false,
+                },
+                None,
+            );
+            let flat_line = rail
+                .iter()
+                .find(|Slab(_, size, ..)| (size.x - RAIL_POST).abs() < 1e-5)
+                .map(|Slab(at, ..)| at.z.abs())
+                .expect("a rail has newels");
+            assert!(
+                flat_line < 1e-5,
+                "a flat rail's line stands {flat_line} off its own origin"
+            );
+        }
+    }
+
+    /// And a flight keeps balusters at every height it can be drawn.
+    #[test]
+    fn a_flight_keeps_its_balusters() {
+        // A two-tread flight is half a metre of run and a newel at each end of
+        // it: there is no room between them and no baluster to be had. Ask of
+        // the ones that have room.
+        for rise in [0.75_f32, 1.5, 3.0] {
+            let body = body_of(
+                &PartKind::Stairs {
+                    rise,
+                    wide: 1.25,
+                    stone: false,
+                    rail_stone: false,
+                    hand: RAIL_HIGH,
+                },
+                None,
+            );
+            let pins = body
+                .iter()
+                .filter(|Slab(_, size, ..)| (size.x - ATOM).abs() < 1e-5)
+                .count();
+            assert!(pins >= 2, "a flight rising {rise} carries {pins} balusters");
+        }
+    }
+
+    #[test]
+    #[ignore = "a measuring stick, not a check"]
+    fn measure_the_two_rails() {
+        let flight = PartKind::Stairs {
+            rise: 0.75,
+            wide: 1.25,
+            stone: false,
+            rail_stone: false,
+            hand: RAIL_HIGH,
+        };
+        let rail = PartKind::Rail {
+            long: 2.0,
+            hand: RAIL_HIGH,
+            stone: false,
+        };
+        for (what, kind) in [("FLIGHT", flight), ("RAIL", rail)] {
+            println!("--- {what}");
+            for Slab(at, size, ramp, _, _, _, lean) in body_of(&kind, None) {
+                println!(
+                    "  at ({:.4}, {:.4}, {:.4}) size ({:.4}, {:.4}, {:.4}) {ramp} lean {lean:.3}",
+                    at.x, at.y, at.z, size.x, size.y, size.z
+                );
+            }
+        }
+    }
+
     /// A flat rail is the flight's rail on level ground: the same post, the same
     /// handrail, the same height. A landing that met a flight a hair off would
     /// be worse than no landing at all.
@@ -9166,7 +9282,7 @@ mod roof_tests {
             // The span the rail actually covers: from the foot newel's centre,
             // a reveal in from the bottom tread, to the head newel's centre,
             // which hangs a lap PAST the top one so the rail meets the wall.
-            let (post, reveal, lap) = (0.1875_f32, 0.0625_f32, 0.0625_f32);
+            let (post, reveal, lap) = (RAIL_POST, ATOM, ATOM);
             let full = steps as f32 * 0.25;
             let foot = -full * 0.5 + post * 0.5 + reveal;
             let head = full * 0.5 + lap - post * 0.5;
