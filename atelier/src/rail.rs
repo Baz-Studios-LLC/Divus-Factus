@@ -858,9 +858,8 @@ fn hang_the_stage_bar(
     // Adding and dropping sit apart from the steps, so a miss lands on nothing
     // rather than on a step being deleted.
     for (deed, label) in [
-        (crate::builder::StageDeed::AddCopying, "+ COPY"),
-        (crate::builder::StageDeed::AddBare, "+ BARE"),
-        (crate::builder::StageDeed::Drop, "-"),
+        (crate::builder::StageDeed::Add, "+ STEP"),
+        (crate::builder::StageDeed::Drop, "- STEP"),
         // A step taken from here and put on another. The `+` pair make a NEW
         // step; these two change one that already stands, which is a different
         // job and reads as one.

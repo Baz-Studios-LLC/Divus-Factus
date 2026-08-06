@@ -7721,14 +7721,15 @@ pub struct StageWish(pub Option<StageDeed>);
 pub enum StageDeed {
     /// Show this step.
     Show(usize),
-    /// A new step after the last, holding a copy of it.
+    /// One more step, right after the one showing, holding a copy of it.
     ///
-    /// A copy rather than bare ground: most steps are the one before with
-    /// something changed, and a maker who wanted bare ground can clear it in
-    /// one press. Starting empty would make the common case the laborious one.
-    AddCopying,
-    /// A new empty step after the last.
-    AddBare,
+    /// A copy rather than an empty floor, because a step is what the building
+    /// looks like at that moment and the next moment is nearly always this one
+    /// with something added. There were two buttons for this, `+ COPY` and
+    /// `+ BARE`, and Brett found what anybody would: "the copy and bare buttons
+    /// are confusing". An empty step is a step with everything taken off it,
+    /// which is a thing a maker can do with their hands.
+    Add,
     /// Drop the step being shown.
     Drop,
     /// Remember this step, to put on another.
@@ -7792,14 +7793,13 @@ fn turn_to_stage(
             stages.drawings[showing] = kept;
             showing
         }
-        StageDeed::AddCopying => {
+        StageDeed::Add => {
+            // Beside the one showing, not at the end. A maker adding a step
+            // while looking at step two means a step between two and three -
+            // "we need to be able to add one stage at a time".
             let copy = stages.drawings[showing].clone();
-            stages.drawings.push(copy);
-            stages.drawings.len() - 1
-        }
-        StageDeed::AddBare => {
-            stages.drawings.push(Vec::new());
-            stages.drawings.len() - 1
+            stages.drawings.insert(showing + 1, copy);
+            showing + 1
         }
         StageDeed::Drop => {
             // Never the last one standing: a building with no steps is not a
