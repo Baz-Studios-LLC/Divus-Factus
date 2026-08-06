@@ -1184,16 +1184,21 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             let hand = hand.clamp(0.375, 2.0);
             let cap = post;
             let rail_thick = post * 0.75;
-            // The rail assembly stands PROUD of the treads by a sixteenth
-            // rather than flush with them. Flush put the newel's outer face in
-            // exactly the same plane as the tread's, and two faces in one plane
-            // is a fight no renderer can settle - Brett: "We have a z ordering
-            // issue. I feel the stairs should win." Nobody wins a coplanar
-            // fight; the answer is not to have one. A newel bolted to the
-            // outside of a stringer is what a carpenter would do anyway.
-            let inset = wide * 0.5 - post * 0.5 + LAP;
-            let foot_z = -run * 0.5 + post * 0.5;
-            let head_z = run * 0.5 - post * 0.5;
+            // The TREADS stand proud of the rail by a sixteenth, on every side.
+            //
+            // Flush is the one thing that cannot be: a newel's face in exactly
+            // the same plane as a tread's is a fight the renderer settles
+            // differently frame to frame - Brett: "We have a z ordering issue."
+            // The first answer stood the rail proud instead, and he was right to
+            // send it back - "i would like the stairs to stick out a 1/16 not
+            // the rail" - because the flight is the thing and the rail is
+            // fitted to it. Set in at the front and back as well as the sides,
+            // "so that that z fighting is gone" everywhere rather than along one
+            // pair of faces.
+            let reveal = 0.0625_f32;
+            let inset = wide * 0.5 - post * 0.5 - reveal;
+            let foot_z = -run * 0.5 + post * 0.5 + reveal;
+            let head_z = run * 0.5 - post * 0.5 - reveal;
             let span = head_z - foot_z;
             let rail_len = span.hypot(rise);
             // A slab's length lies along Z, and leaning about X carries its far
@@ -8303,27 +8308,39 @@ mod roof_tests {
                     },
                     None,
                 );
-                // The outer faces along X: the treads', and everything else's.
-                let mut faces: Vec<f32> = body
-                    .iter()
-                    .filter(|Slab(.., lean)| *lean == 0.0)
-                    .map(|Slab(at, size, ..)| at.x + size.x * 0.5)
-                    .collect();
-                faces.sort_by(f32::total_cmp);
-                for pair in faces.windows(2) {
-                    let gap = pair[1] - pair[0];
-                    assert!(
-                        gap < 1e-5 || gap > 1e-3,
-                        "two faces sit {gap} apart at {}, which is a fight rather than a joint",
-                        pair[0]
-                    );
+                // Every outward face, on both axes a hand can see along.
+                for axis in 0..3 {
+                    if axis == 1 {
+                        continue;
+                    }
+                    let mut faces: Vec<f32> = body
+                        .iter()
+                        .filter(|Slab(.., lean)| *lean == 0.0)
+                        .flat_map(|Slab(at, size, ..)| {
+                            [at[axis] - size[axis] * 0.5, at[axis] + size[axis] * 0.5]
+                        })
+                        .collect();
+                    faces.sort_by(f32::total_cmp);
+                    for pair in faces.windows(2) {
+                        let gap = pair[1] - pair[0];
+                        assert!(
+                            gap < 1e-5 || gap > 1e-3,
+                            "two faces sit {gap} apart at {} on axis {axis} - a fight, not a joint",
+                            pair[0]
+                        );
+                    }
                 }
-                // And the newels stand outside the treads rather than level with
-                // them, which is what keeps those two out of one plane.
-                let widest = faces.last().copied().unwrap_or_default();
+                // And the TREADS are the outermost thing on every side, which is
+                // what keeps the rail out of their planes.
+                let tread_edge = wide * 0.5;
+                let rail_edge = body
+                    .iter()
+                    .filter(|Slab(_, size, ..)| (size.x - wide).abs() > 1e-4)
+                    .map(|Slab(at, size, ..)| at.x.abs() + size.x * 0.5)
+                    .fold(0.0_f32, f32::max);
                 assert!(
-                    widest > wide * 0.5 + 1e-4,
-                    "the rail is flush with the tread edge at {widest}"
+                    rail_edge < tread_edge - 1e-3,
+                    "the rail reaches {rail_edge} where the tread edge is {tread_edge}"
                 );
             }
         }
