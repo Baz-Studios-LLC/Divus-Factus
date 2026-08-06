@@ -48,6 +48,26 @@ pub fn roads(under: &str) -> Vec<PathBuf> {
     roads
 }
 
+/// Where a maker's OWN work goes: the drawings and clips they bake out of the
+/// Atelier, under the same roof as their saves.
+///
+/// It is not the bundle. A bundle is replaced whole on the next update and is
+/// not writable besides, so anything a player makes has to live where their
+/// saves do. This is the folder that makes the shipped pair self-sufficient:
+/// the bench bakes into it and the game reads out of it, with no source tree
+/// and no cargo anywhere in the story.
+pub fn made_by_hand(under: &str) -> Option<PathBuf> {
+    let home = std::env::var("HOME").ok();
+    let base = if cfg!(target_os = "macos") {
+        PathBuf::from(home?).join("Library/Application Support/Divus Factus")
+    } else if cfg!(target_os = "windows") {
+        PathBuf::from(std::env::var("APPDATA").ok()?).join("Divus Factus")
+    } else {
+        PathBuf::from(home?).join(".local/share/divus-factus")
+    };
+    Some(base.join(under))
+}
+
 /// The first of them that is a folder worth reading.
 #[cfg_attr(not(test), allow(dead_code))]
 pub fn folder(under: &str) -> Option<PathBuf> {

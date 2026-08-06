@@ -1521,6 +1521,105 @@ struct Shelf;
 #[derive(Component)]
 pub(crate) struct SaveButton;
 
+/// A button that carries the work into the game.
+#[derive(Component)]
+pub(crate) struct BakeButton;
+
+/// Where a maker's own baked work goes: beside the game's saves, under the roof
+/// the game already reads out of.
+///
+/// NOT the bundle. A bundle is replaced whole on the next update and is not
+/// writable besides, so a building baked into it would last until Tuesday.
+pub(crate) fn carried_home(under: &str) -> std::path::PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    let base = if cfg!(target_os = "macos") {
+        format!("{home}/Library/Application Support/Divus Factus")
+    } else if cfg!(target_os = "windows") {
+        std::env::var("APPDATA")
+            .map(|roaming| format!("{roaming}/Divus Factus"))
+            .unwrap_or_else(|_| ".".into())
+    } else {
+        format!("{home}/.local/share/divus-factus")
+    };
+    std::path::PathBuf::from(base).join(under)
+}
+
+/// Bakes what is on the bench into the game.
+///
+/// The bake used to be a `cargo test`, which meant a building could only be
+/// carried in from a source tree - so the Atelier in the launcher build was a
+/// sketchpad whose work had nowhere to go. Brett: "At what point does it install
+/// its own files?" It goes here now, in one press, and the game reads this
+/// folder alongside the drawings that shipped with it.
+///
+/// It bakes the WHOLE work under its own name, which is the name it was saved
+/// as. A work never saved has no name to bake under, and says so rather than
+/// inventing one.
+fn bake_into_the_game(
+    bench: Res<Bench>,
+    palette: Res<Palette>,
+    stages: Res<Stages>,
+    work_name: Res<WorkName>,
+    mut commands: Commands,
+    time: Res<Time>,
+    placed: Query<&Placed, Without<Ghost>>,
+    bakes: Query<&Interaction, (Changed<Interaction>, With<BakeButton>)>,
+    mut words: Query<(Entity, &mut Text), With<SaveLabel>>,
+) {
+    if *bench != Bench::Builder
+        || !bakes
+            .iter()
+            .any(|interaction| *interaction == Interaction::Pressed)
+    {
+        return;
+    }
+    let mut say = |word: String| {
+        for (entity, mut text) in &mut words {
+            *text = Text::new(word.clone());
+            commands.entity(entity).insert(PassingWord {
+                back: crate::rail::FOOT_SAYING,
+                until: time.elapsed_secs() + 3.5,
+            });
+        }
+    };
+    let Some(name) = work_name.0.clone() else {
+        say("SAVE THE WORK FIRST - A BAKE NEEDS ITS NAME".to_string());
+        return;
+    };
+    // The bench as it stands, in the shape the baker reads.
+    let mut drawings = stages.drawings.to_vec();
+    if let Some(showing) = drawings.get_mut(stages.showing) {
+        *showing = placed.iter().cloned().collect();
+    }
+    let work = Workbench {
+        format: 1,
+        name: name.clone(),
+        parts: Vec::new(),
+        stages: drawings,
+    };
+    let (json, boxes, marks) = bake_a_work(&work, &palette, &name);
+    let home = carried_home("buildings");
+    if let Err(why) = std::fs::create_dir_all(&home) {
+        warn!("could not make {}: {why}", home.display());
+        say("THE GAME'S FOLDER COULD NOT BE MADE".to_string());
+        return;
+    }
+    let out = home.join(format!("{name}.json"));
+    match std::fs::write(&out, json) {
+        Ok(()) => {
+            info!("baked {name} into {}", out.display());
+            say(format!(
+                "CARRIED {} INTO THE GAME - {boxes} BOXES, {marks} MARKS",
+                name.to_uppercase()
+            ));
+        }
+        Err(why) => {
+            warn!("could not write {}: {why}", out.display());
+            say("THE GAME'S FOLDER COULD NOT BE WRITTEN".to_string());
+        }
+    }
+}
+
 /// A button that asks the desktop for a work to open.
 ///
 /// Brett wanted `.baz` files associated with the bench so a double click opened
@@ -1685,6 +1784,7 @@ impl Plugin for BuilderPlugin {
                 (
                     save_workbench,
                     pick_a_work,
+                    bake_into_the_game,
                     take_the_name,
                     dims_panel,
                     recall,
@@ -6352,6 +6452,184 @@ pub(crate) fn lift_roofs(
     }
 }
 
+/// Bakes one work into what the game can eat: plain boxes with resolved
+/// colours, and the marks that say what the place is FOR.
+///
+/// This used to live inside a `#[test]`, which meant a maker could only carry a
+/// building into the game from a source tree with cargo on it. The bench in the
+/// launcher had nowhere to send its work at all - Brett: "At what point does it
+/// install its own files?" - so the bake is ordinary code now, and the test and
+/// the BAKE button both go through it.
+pub(crate) fn bake_a_work(
+    work: &Workbench,
+    palette: &Palette,
+    name: &str,
+) -> (String, usize, usize) {
+    // The FINISHED building, which is the last step - steps replace one
+    // another rather than adding up, so the last one is the whole thing
+    // and no other one is. A work drawn before there were steps keeps
+    // its one flat list, which is the same thing said the older way.
+    let parts: &[Placed] = work.stages.last().map_or(&work.parts[..], |last| &last[..]);
+
+    // The bounds of everything that is not a scale reference, so
+    // the building can be recentred on its own footprint.
+    let mut low = Vec3::splat(f32::INFINITY);
+    let mut high = Vec3::splat(f32::NEG_INFINITY);
+    for record in parts {
+        if record.part == "prop:mannequin" {
+            continue;
+        }
+        let Some(kind) = kind_from_name(&record.part) else {
+            continue;
+        };
+        let turn = pose(record.yaw, record.tilt, record.flip);
+        for Slab(mut at, size, ..) in body_of(&kind, None) {
+            if record.flip {
+                at.x = -at.x;
+            }
+            let centre = Vec3::from(record.at) + turn * at;
+            let reach = (turn * (size * 0.5)).abs();
+            low = low.min(centre - reach);
+            high = high.max(centre + reach);
+        }
+    }
+    let middle = Vec3::new((low.x + high.x) * 0.5, 0.0, (low.z + high.z) * 0.5);
+
+    let mut boxes: Vec<String> = Vec::new();
+    // What, where, which way - and whether a hand put it there.
+    let mut marks: Vec<(String, Vec3, f32, bool)> = Vec::new();
+    let say = |v: Vec3| format!("[{:.4}, {:.4}, {:.4}]", v.x, v.y, v.z);
+
+    for record in parts {
+        if record.part == "prop:mannequin" {
+            continue;
+        }
+        let Some(kind) = kind_from_name(&record.part) else {
+            continue;
+        };
+        let turn = pose(record.yaw, record.tilt, record.flip);
+        let anchor = Vec3::from(record.at) - middle;
+
+        // What the place is for, read from the widgets that say
+        // so and from the furniture that means it.
+        let mark = |what: &str, at: Vec3, yaw: f32| (what.to_string(), at, yaw, false);
+        match kind {
+            PartKind::Widget(what) => {
+                marks.push((what.to_string(), anchor, record.yaw, true));
+                continue;
+            }
+            // Beds and seats say nothing on their own: their
+            // figures are set down WITH them and can be taken
+            // away, so a chair with no sitter on it is a chair
+            // nobody sits in. Only furniture with no figure to
+            // show still speaks for itself.
+            PartKind::Prop("cradle") => marks.push(mark("sleep", anchor, record.yaw)),
+            PartKind::Prop("hearth") => {
+                marks.push(mark("fire", anchor, record.yaw));
+                marks.push(mark("smoke", anchor, record.yaw));
+            }
+            PartKind::Prop("table") => marks.push(mark("table", anchor, record.yaw)),
+            PartKind::Prop("chest" | "cupboard" | "wardrobe" | "shelves") => {
+                marks.push(mark("store", anchor, record.yaw))
+            }
+            PartKind::Prop("anvil" | "loom") => {
+                marks.push(mark("work", anchor, record.yaw))
+            }
+            PartKind::Prop("candle") => marks.push(mark("light", anchor, record.yaw)),
+            _ => {}
+        }
+
+        // The body itself, as boxes the game can simply draw.
+        let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
+        for Slab(mut at, size, ramp, shade, clarity, shape, mut lean) in
+            body_of(&kind, repaint)
+        {
+            if record.flip {
+                at.x = -at.x;
+                lean = -lean;
+            }
+            let centre = anchor + turn * at;
+            // A piece that leans carries its own angle into the
+            // turn the game will draw it with.
+            let turn = turn * Quat::from_rotation_x(lean);
+            let colour = palette.shade(&ramp, shade).to_srgba();
+            let form = match shape {
+                Shape::Box => "box",
+                Shape::Wedge => "wedge",
+                Shape::Ridge => "ridge",
+                Shape::Mitre => "mitre",
+                Shape::MitreBack => "mitre-back",
+            };
+            let stage = match kind {
+                PartKind::Gable(..)
+                | PartKind::Ridge(..)
+                | PartKind::GableRoof(..)
+                | PartKind::Roof(..)
+                | PartKind::Chimney(..) => "roof",
+                _ => record.stage.as_str(),
+            };
+            // The cloth is named as well as resolved: the game
+            // re-dyes a house's own walls and roof per building,
+            // the way it always rolled its own, and leaves every
+            // other piece exactly as it was painted.
+            boxes.push(format!(
+                "    {{\"at\": {}, \"size\": {}, \"turn\": [{:.5}, {:.5}, {:.5}, {:.5}], \
+                 \"rgb\": [{}, {}, {}], \"alpha\": {:.2}, \"form\": \"{form}\", \
+                 \"cloth\": \"{ramp}:{shade}\", \"stage\": \"{}\"}}",
+                say(centre),
+                say(size),
+                turn.x,
+                turn.y,
+                turn.z,
+                turn.w,
+                (colour.red * 255.0).round() as u8,
+                (colour.green * 255.0).round() as u8,
+                (colour.blue * 255.0).round() as u8,
+                clarity,
+                stage,
+            ));
+        }
+    }
+
+    // A widget laid by hand overrules the same meaning derived
+    // from the furniture under it: a sleeping figure set on a bed
+    // to check the fit is that bed's sleeping place, not a second
+    // one beside it.
+    let by_hand: Vec<(String, Vec3)> = marks
+        .iter()
+        .filter(|(.., hand)| *hand)
+        .map(|(what, at, ..)| (what.clone(), *at))
+        .collect();
+    marks.retain(|(what, at, _, hand)| {
+        *hand
+            || !by_hand.iter().any(|(other, spot)| {
+                other == what && (spot.x - at.x).hypot(spot.z - at.z) < 0.8
+            })
+    });
+    let marks: Vec<String> = marks
+        .iter()
+        .map(|(what, at, yaw, _)| {
+            format!(
+                "    {{\"mark\": \"{what}\", \"at\": {}, \"yaw\": {yaw:.4}}}",
+                say(*at)
+            )
+        })
+        .collect();
+
+    let span = high - low;
+    let json = format!(
+        "{{\n  \"format\": 1,\n  \"name\": \"{name}\",\n  \
+         \"half_w\": {:.4},\n  \"half_d\": {:.4},\n  \"high\": {:.4},\n  \
+         \"boxes\": [\n{}\n  ],\n  \"marks\": [\n{}\n  ]\n}}\n",
+        span.x * 0.5,
+        span.z * 0.5,
+        high.y,
+        boxes.join(",\n"),
+        marks.join(",\n"),
+    );
+    (json, boxes.len(), marks.len())
+}
+
 #[cfg(test)]
 mod bake {
     use super::*;
@@ -6384,178 +6662,10 @@ mod bake {
             };
             let name = path.file_stem().unwrap().to_string_lossy().to_string();
 
-            // The FINISHED building, which is the last step - steps replace one
-            // another rather than adding up, so the last one is the whole thing
-            // and no other one is. A work drawn before there were steps keeps
-            // its one flat list, which is the same thing said the older way.
-            let parts: &[Placed] = work.stages.last().map_or(&work.parts[..], |last| &last[..]);
-
-            // The bounds of everything that is not a scale reference, so
-            // the building can be recentred on its own footprint.
-            let mut low = Vec3::splat(f32::INFINITY);
-            let mut high = Vec3::splat(f32::NEG_INFINITY);
-            for record in parts {
-                if record.part == "prop:mannequin" {
-                    continue;
-                }
-                let Some(kind) = kind_from_name(&record.part) else {
-                    continue;
-                };
-                let turn = pose(record.yaw, record.tilt, record.flip);
-                for Slab(mut at, size, ..) in body_of(&kind, None) {
-                    if record.flip {
-                        at.x = -at.x;
-                    }
-                    let centre = Vec3::from(record.at) + turn * at;
-                    let reach = (turn * (size * 0.5)).abs();
-                    low = low.min(centre - reach);
-                    high = high.max(centre + reach);
-                }
-            }
-            let middle = Vec3::new((low.x + high.x) * 0.5, 0.0, (low.z + high.z) * 0.5);
-
-            let mut boxes: Vec<String> = Vec::new();
-            // What, where, which way - and whether a hand put it there.
-            let mut marks: Vec<(String, Vec3, f32, bool)> = Vec::new();
-            let say = |v: Vec3| format!("[{:.4}, {:.4}, {:.4}]", v.x, v.y, v.z);
-
-            for record in parts {
-                if record.part == "prop:mannequin" {
-                    continue;
-                }
-                let Some(kind) = kind_from_name(&record.part) else {
-                    continue;
-                };
-                let turn = pose(record.yaw, record.tilt, record.flip);
-                let anchor = Vec3::from(record.at) - middle;
-
-                // What the place is for, read from the widgets that say
-                // so and from the furniture that means it.
-                let mark = |what: &str, at: Vec3, yaw: f32| (what.to_string(), at, yaw, false);
-                match kind {
-                    PartKind::Widget(what) => {
-                        marks.push((what.to_string(), anchor, record.yaw, true));
-                        continue;
-                    }
-                    // Beds and seats say nothing on their own: their
-                    // figures are set down WITH them and can be taken
-                    // away, so a chair with no sitter on it is a chair
-                    // nobody sits in. Only furniture with no figure to
-                    // show still speaks for itself.
-                    PartKind::Prop("cradle") => marks.push(mark("sleep", anchor, record.yaw)),
-                    PartKind::Prop("hearth") => {
-                        marks.push(mark("fire", anchor, record.yaw));
-                        marks.push(mark("smoke", anchor, record.yaw));
-                    }
-                    PartKind::Prop("table") => marks.push(mark("table", anchor, record.yaw)),
-                    PartKind::Prop("chest" | "cupboard" | "wardrobe" | "shelves") => {
-                        marks.push(mark("store", anchor, record.yaw))
-                    }
-                    PartKind::Prop("anvil" | "loom") => {
-                        marks.push(mark("work", anchor, record.yaw))
-                    }
-                    PartKind::Prop("candle") => marks.push(mark("light", anchor, record.yaw)),
-                    _ => {}
-                }
-
-                // The body itself, as boxes the game can simply draw.
-                let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-                for Slab(mut at, size, ramp, shade, clarity, shape, mut lean) in
-                    body_of(&kind, repaint)
-                {
-                    if record.flip {
-                        at.x = -at.x;
-                        lean = -lean;
-                    }
-                    let centre = anchor + turn * at;
-                    // A piece that leans carries its own angle into the
-                    // turn the game will draw it with.
-                    let turn = turn * Quat::from_rotation_x(lean);
-                    let colour = palette.shade(&ramp, shade).to_srgba();
-                    let form = match shape {
-                        Shape::Box => "box",
-                        Shape::Wedge => "wedge",
-                        Shape::Ridge => "ridge",
-                        Shape::Mitre => "mitre",
-                        Shape::MitreBack => "mitre-back",
-                    };
-                    let stage = match kind {
-                        PartKind::Gable(..)
-                        | PartKind::Ridge(..)
-                        | PartKind::GableRoof(..)
-                        | PartKind::Roof(..)
-                        | PartKind::Chimney(..) => "roof",
-                        _ => record.stage.as_str(),
-                    };
-                    // The cloth is named as well as resolved: the game
-                    // re-dyes a house's own walls and roof per building,
-                    // the way it always rolled its own, and leaves every
-                    // other piece exactly as it was painted.
-                    boxes.push(format!(
-                        "    {{\"at\": {}, \"size\": {}, \"turn\": [{:.5}, {:.5}, {:.5}, {:.5}], \
-                         \"rgb\": [{}, {}, {}], \"alpha\": {:.2}, \"form\": \"{form}\", \
-                         \"cloth\": \"{ramp}:{shade}\", \"stage\": \"{}\"}}",
-                        say(centre),
-                        say(size),
-                        turn.x,
-                        turn.y,
-                        turn.z,
-                        turn.w,
-                        (colour.red * 255.0).round() as u8,
-                        (colour.green * 255.0).round() as u8,
-                        (colour.blue * 255.0).round() as u8,
-                        clarity,
-                        stage,
-                    ));
-                }
-            }
-
-            // A widget laid by hand overrules the same meaning derived
-            // from the furniture under it: a sleeping figure set on a bed
-            // to check the fit is that bed's sleeping place, not a second
-            // one beside it.
-            let by_hand: Vec<(String, Vec3)> = marks
-                .iter()
-                .filter(|(.., hand)| *hand)
-                .map(|(what, at, ..)| (what.clone(), *at))
-                .collect();
-            marks.retain(|(what, at, _, hand)| {
-                *hand
-                    || !by_hand.iter().any(|(other, spot)| {
-                        other == what && (spot.x - at.x).hypot(spot.z - at.z) < 0.8
-                    })
-            });
-            let marks: Vec<String> = marks
-                .iter()
-                .map(|(what, at, yaw, _)| {
-                    format!(
-                        "    {{\"mark\": \"{what}\", \"at\": {}, \"yaw\": {yaw:.4}}}",
-                        say(*at)
-                    )
-                })
-                .collect();
-
-            let span = high - low;
-            let json = format!(
-                "{{\n  \"format\": 1,\n  \"name\": \"{name}\",\n  \
-                 \"half_w\": {:.4},\n  \"half_d\": {:.4},\n  \"high\": {:.4},\n  \
-                 \"boxes\": [\n{}\n  ],\n  \"marks\": [\n{}\n  ]\n}}\n",
-                span.x * 0.5,
-                span.z * 0.5,
-                high.y,
-                boxes.join(",\n"),
-                marks.join(",\n"),
-            );
+            let (json, boxes, marks) = bake_a_work(&work, &palette, &name);
             let out = baked_dir.join(format!("{name}.json"));
             std::fs::write(&out, json).expect("write baked");
-            println!(
-                "baked {name}: {} boxes, {} marks, {:.2} x {:.2} x {:.2}",
-                boxes.len(),
-                marks.len(),
-                span.x,
-                span.z,
-                high.y
-            );
+            println!("baked {name}: {boxes} boxes, {marks} marks");
         }
     }
 }

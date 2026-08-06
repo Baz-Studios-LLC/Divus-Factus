@@ -133,7 +133,13 @@ static CARRIED: std::sync::OnceLock<Vec<Clip>> = std::sync::OnceLock::new();
 fn carried() -> &'static Vec<Clip> {
     CARRIED.get_or_init(|| {
         let mut clips: Vec<Clip> = Vec::new();
-        for dir in crate::carried::roads("assets/clips") {
+        for dir in [
+            crate::carried::folder("assets/clips"),
+            crate::carried::made_by_hand("clips"),
+        ]
+        .into_iter()
+        .flatten()
+        {
             let Ok(entries) = std::fs::read_dir(&dir) else {
                 continue;
             };
@@ -146,6 +152,7 @@ fn carried() -> &'static Vec<Clip> {
                     .ok()
                     .and_then(|text| serde_json::from_str::<Clip>(&text).ok())
                 {
+                    // A maker's clip of the same name replaces the shipped one.
                     Some(clip) if clip.kind == "clip" && !clip.keys.is_empty() => {
                         info!(
                             "carried in the clip {}: {} keys over {:.2}s",
@@ -153,17 +160,17 @@ fn carried() -> &'static Vec<Clip> {
                             clip.keys.len(),
                             clip.length
                         );
-                        clips.push(clip);
+                        match clips.iter().position(|had| had.name == clip.name) {
+                            Some(standing) => clips[standing] = clip,
+                            None => clips.push(clip),
+                        }
                     }
                     Some(_) => warn!("{} is not a clip", path.display()),
                     None => warn!("could not read the clip at {}", path.display()),
                 }
             }
-            if !clips.is_empty() {
-                clips.sort_by(|a, b| a.name.cmp(&b.name));
-                break;
-            }
         }
+        clips.sort_by(|a, b| a.name.cmp(&b.name));
         clips
     })
 }

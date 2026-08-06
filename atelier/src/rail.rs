@@ -501,6 +501,29 @@ off, walls down as well",
         plate(&mut commands, page, 11.0, 2.0, theme::text_dim(&palette));
     }
 
+    // BAKE: a house going down into a tray, which is what carrying a work into
+    // the game is. It sits beside the save because it is the other half of
+    // keeping a thing: one for the bench, one for the world.
+    let bake = icon_face(&mut commands, &palette, tools);
+    commands.entity(bake).insert((
+        crate::builder::BakeButton,
+        Word("Carry this building into the game"),
+    ));
+    let stack = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(2.0),
+                ..default()
+            },
+            ChildOf(bake),
+        ))
+        .id();
+    plate(&mut commands, stack, 12.0, 8.0, theme::accent(&palette));
+    plate(&mut commands, stack, 4.0, 5.0, theme::text_dim(&palette));
+    pane(&mut commands, stack, 22.0, 6.0, true, &palette);
+
     // THE BROOM: a handle and a head. It sweeps the bench, and it is the one
     // here that takes something away, so it wears the dimmest border of the
     // four - nothing about it should invite a stray hand.

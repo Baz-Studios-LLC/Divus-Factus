@@ -131,7 +131,17 @@ static CARRIED: std::sync::OnceLock<Vec<Baked>> = std::sync::OnceLock::new();
 fn carried() -> &'static Vec<Baked> {
     CARRIED.get_or_init(|| {
         let mut works: Vec<Baked> = Vec::new();
-        for dir in crate::carried::roads("assets/buildings") {
+        // What shipped, and then the maker's own on top of it. That second
+        // folder is what makes the shipped pair self-sufficient: a building
+        // baked out of the bench in the launcher build has somewhere to land,
+        // with no source tree anywhere in the story.
+        for dir in [
+            crate::carried::folder("assets/buildings"),
+            crate::carried::made_by_hand("buildings"),
+        ]
+        .into_iter()
+        .flatten()
+        {
             let Ok(entries) = std::fs::read_dir(&dir) else {
                 continue;
             };
@@ -151,18 +161,19 @@ fn carried() -> &'static Vec<Baked> {
                             work.boxes.len(),
                             work.marks.len()
                         );
-                        works.push(work);
+                        // A maker's drawing of the same name replaces the one
+                        // that shipped: they drew it second, and meant it.
+                        match works.iter().position(|had| had.name == work.name) {
+                            Some(standing) => works[standing] = work,
+                            None => works.push(work),
+                        }
                     }
                     None => warn!("could not read the baked building at {}", path.display()),
                 }
             }
-            if !works.is_empty() {
-                // read_dir's order is the filesystem's business; a world
-                // seed's is ours.
-                works.sort_by(|a, b| a.name.cmp(&b.name));
-                break;
-            }
         }
+        // read_dir's order is the filesystem's business; a world seed's is ours.
+        works.sort_by(|a, b| a.name.cmp(&b.name));
         works
     })
 }
