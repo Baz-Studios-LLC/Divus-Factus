@@ -314,7 +314,7 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                 // real measurement of it. Along is its RUN - and a longer run is
                 // a taller flight, because the treads are even and the count is
                 // what changes, so pulling it out really is climbing higher.
-                PartKind::Stairs(rise, wide) => {
+                PartKind::Stairs { rise, wide, .. } => {
                     let (steps, _, tread) = builder::stair_rhythm(rise);
                     Some((wide, steps as f32 * tread, true))
                 }
@@ -763,10 +763,14 @@ fn work_gizmo(
                 PartKind::Gable(_, pitch) => PartKind::Gable(w, pitch),
                 PartKind::Beam(_, high, low) => PartKind::Beam(w, high, low),
                 PartKind::Chimney(_) => PartKind::Chimney(w.max(0.0)),
-                PartKind::Stairs(..) => {
+                PartKind::Stairs { stone, .. } => {
                     let (_, riser, tread) = builder::stair_rhythm(0.0);
                     let steps = (d / tread).round().clamp(2.0, 24.0);
-                    PartKind::Stairs(steps * riser, w.max(0.375))
+                    PartKind::Stairs {
+                        rise: steps * riser,
+                        wide: w.max(0.375),
+                        stone,
+                    }
                 }
                 PartKind::Ridge(_) => PartKind::Ridge(w),
                 PartKind::Floor(..) => PartKind::Floor(w, d),

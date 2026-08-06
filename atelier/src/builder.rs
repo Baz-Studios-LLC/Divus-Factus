@@ -286,9 +286,12 @@ pub enum PartKind {
     /// lean about X and no other axis, so a rail that RUNS at the stair's own
     /// angle - which is what Brett asked for, "We can use angles for the railing
     /// now that we have angles right?" - has to climb the axis that leaning
-    /// answers to. Turn it with R like anything else. The two numbers are what
-    /// it CLIMBS and how WIDE it is.
-    Stairs(f32, f32),
+    /// answers to. Turn it with R like anything else.
+    ///
+    /// One part in two materials, the way TRIM and TRIM, STONE are one part:
+    /// the flight is the same flight, and stone or timber is a fact about it
+    /// rather than a different thing to draw.
+    Stairs { rise: f32, wide: f32, stone: bool },
     /// A ridge pole: a round log along the spine, the older way of
     /// closing a roof.
     /// A whole gable roof: both slopes and the ridge between them, drawn
@@ -424,8 +427,24 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     // One noun for the family, the material after it - the way TRIM, STONE and
     // TRIM sit together. Two words for one thing, "stairs" and "steps", meant
     // knowing which of them we had happened to use.
-    structure("STAIRS, STONE", PartKind::Prop("steps"), "footing"),
-    structure("STAIRS, WOOD", PartKind::Stairs(0.75, 1.25), "footing"),
+    structure(
+        "STAIRS, STONE",
+        PartKind::Stairs {
+            rise: 0.75,
+            wide: 1.25,
+            stone: true,
+        },
+        "footing",
+    ),
+    structure(
+        "STAIRS, WOOD",
+        PartKind::Stairs {
+            rise: 0.75,
+            wide: 1.25,
+            stone: false,
+        },
+        "footing",
+    ),
     structure(
         "TRIM, STONE, STRETCH",
         PartKind::TrimRun { stone: true },
@@ -1100,11 +1119,17 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(0.0, 1.375, -0.03125, 0.125, 1.0, 0.1875, "wood", 0.4),
             slab(0.0, 1.375, -0.03125, 1.0, 0.125, 0.1875, "wood", 0.4),
         ],
-        PartKind::Stairs(rise, wide) => {
+        PartKind::Stairs { rise, wide, stone } => {
             // A stair is a rhythm, not a size: pick the number of steps that
             // gets nearest the rise asked for, then let every tread be equal.
             // Uneven steps are the one thing a foot notices.
             let (steps, riser, tread) = stair_rhythm(*rise);
+            // The one difference between a timber flight and a stone one.
+            let (ramp, tread_shade, post_shade, rail_shade, pin_shade) = if *stone {
+                ("stone", 0.6, 0.5, 0.55, 0.58)
+            } else {
+                ("wood", 0.45, 0.4, 0.5, 0.45)
+            };
             let rise = steps as f32 * riser;
             let run = steps as f32 * tread;
             let wide = wide.max(0.375);
@@ -1120,8 +1145,8 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     wide,
                     high,
                     tread,
-                    "wood",
-                    0.45,
+                    ramp,
+                    tread_shade,
                 ));
             }
             // A newel at each corner, a rail between each pair running at the
@@ -1153,8 +1178,8 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     post,
                     hand + cap,
                     post,
-                    "wood",
-                    0.4,
+                    ramp,
+                    post_shade,
                 ));
                 body.push(slab(
                     side * inset,
@@ -1163,8 +1188,8 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     post,
                     hand + cap,
                     post,
-                    "wood",
-                    0.4,
+                    ramp,
+                    post_shade,
                 ));
                 body.push(leaning(
                     side * inset,
@@ -1173,8 +1198,8 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     rail_thick,
                     rail_thick,
                     rail_len,
-                    "wood",
-                    0.5,
+                    ramp,
+                    rail_shade,
                     lean,
                 ));
                 // Balusters, every other tread: each stands on the step under it
@@ -1199,8 +1224,8 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                         post * 0.5,
                         tall,
                         post * 0.5,
-                        "wood",
-                        0.45,
+                        ramp,
+                        pin_shade,
                     ));
                 }
             }
@@ -2613,7 +2638,13 @@ pub fn part_name(kind: &PartKind) -> String {
         PartKind::BeamRun => "beamrun".to_string(),
         PartKind::Ridge(long) => format!("ridge-{long}"),
         PartKind::Chimney(drop) => format!("chimney-{drop}"),
-        PartKind::Stairs(rise, wide) => format!("stairs-{rise}x{wide}"),
+        PartKind::Stairs { rise, wide, stone } => {
+            if *stone {
+                format!("stairsstone-{rise}x{wide}")
+            } else {
+                format!("stairs-{rise}x{wide}")
+            }
+        }
         PartKind::GableRoof(long, span, over, pitch) => {
             format!("gableroof-{long}x{span}x{over}x{pitch}")
         }
@@ -2661,14 +2692,18 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
         // The first chimneys, from before the shaft could reach.
         return Some(PartKind::Chimney(0.0));
     }
-    if let Some(rest) = name.strip_prefix("stairs-") {
-        // Two numbers now, what it climbs and how wide it is. One is a flight
-        // from before a maker could widen them, and opens at the width they all
-        // had.
-        let mut parts = rest.split('x');
-        let rise = parts.next()?.parse().ok()?;
-        let wide = parts.next().and_then(|n| n.parse().ok()).unwrap_or(1.25);
-        return Some(PartKind::Stairs(rise, wide));
+    // Stone first: `stairs-` is a prefix of nothing else, but `stairsstone-`
+    // begins with `stairs` and would be read as a timber flight called `stone…`.
+    for (word, stone) in [("stairsstone-", true), ("stairs-", false)] {
+        if let Some(rest) = name.strip_prefix(word) {
+            // Two numbers, what it climbs and how wide it is. One is a flight
+            // from before a maker could widen them, and opens at the width they
+            // all had.
+            let mut parts = rest.split('x');
+            let rise = parts.next()?.parse().ok()?;
+            let wide = parts.next().and_then(|n| n.parse().ok()).unwrap_or(1.25);
+            return Some(PartKind::Stairs { rise, wide, stone });
+        }
     }
     if let Some(rest) = name.strip_prefix("ridge-") {
         return rest.parse::<f32>().ok().map(PartKind::Ridge);
@@ -4630,7 +4665,7 @@ fn is_structure(kind: &PartKind) -> bool {
             | PartKind::RidgeRun
             | PartKind::GableRoof(..)
             | PartKind::GableRoofRun
-            | PartKind::Stairs(..)
+            | PartKind::Stairs { .. }
             | PartKind::Prop("steps")
             | PartKind::Prop("pole")
     )
@@ -7060,9 +7095,11 @@ pub(crate) fn dims_panel(
                         }
                         PartKind::Chimney(_) => Some(PartKind::Chimney(w)),
                         // Typed: width, and the height it climbs after the x.
-                        PartKind::Stairs(rise, _) => {
-                            Some(PartKind::Stairs(d.unwrap_or(rise), w))
-                        }
+                        PartKind::Stairs { rise, stone, .. } => Some(PartKind::Stairs {
+                            rise: d.unwrap_or(rise),
+                            wide: w,
+                            stone,
+                        }),
                         _ => None,
                     };
                     if let Some(made) = made {
@@ -8132,6 +8169,42 @@ fn turn_part(
 mod roof_tests {
     use super::*;
 
+    /// One flight in two materials: the same boxes in the same places, and the
+    /// stone one written down as stone rather than as a timber flight whose name
+    /// happens to begin with the word.
+    #[test]
+    fn a_stone_flight_is_the_same_flight() {
+        let timber = PartKind::Stairs {
+            rise: 1.125,
+            wide: 1.5,
+            stone: false,
+        };
+        let stone = PartKind::Stairs {
+            rise: 1.125,
+            wide: 1.5,
+            stone: true,
+        };
+        let a = body_of(&timber, None);
+        let b = body_of(&stone, None);
+        assert_eq!(a.len(), b.len(), "the two flights are built differently");
+        for (Slab(at, size, ramp, ..), Slab(other_at, other_size, other_ramp, ..)) in
+            a.iter().zip(&b)
+        {
+            assert!(at.distance(*other_at) < 1e-4 && size.distance(*other_size) < 1e-4);
+            assert_eq!(ramp, "wood");
+            assert_eq!(other_ramp, "stone");
+        }
+        // And the names read back as what they are. `stairsstone-` begins with
+        // `stairs`, so the order the two are tried in is the whole trick.
+        for kind in [timber, stone] {
+            let name = part_name(&kind);
+            assert_eq!(
+                part_name(&kind_from_name(&name).expect("a flight reads back")),
+                name
+            );
+        }
+    }
+
     /// A part whose handle asks for something other than its own width must not
     /// WANDER when that handle is pulled. A chimney's handle asks for its drop,
     /// which is a height; a flight's asks for a run that only comes in whole
@@ -8150,14 +8223,22 @@ mod roof_tests {
         // The flight: its run grows in whole treads, so the measured extent
         // moves in the same steps the geometry does.
         let (steps, _, tread) = stair_rhythm(0.75);
-        let flight = extent_of(&PartKind::Stairs(0.75, 1.25));
+        let flight = extent_of(&PartKind::Stairs {
+            rise: 0.75,
+            wide: 1.25,
+            stone: false,
+        });
         assert!(
             (flight.y - steps as f32 * tread).abs() < 1e-4,
             "a flight of {steps} treads measured {} along its run",
             flight.y
         );
         // Widening is a true X change, and the only one.
-        let wider = extent_of(&PartKind::Stairs(0.75, 2.0));
+        let wider = extent_of(&PartKind::Stairs {
+            rise: 0.75,
+            wide: 2.0,
+            stone: false,
+        });
         assert!(
             (wider.x - flight.x - 0.75).abs() < 1e-4,
             "widening by 0.75 moved the footprint by {}",
@@ -8172,7 +8253,14 @@ mod roof_tests {
     #[test]
     fn a_stair_carries_a_rail_at_its_own_pitch() {
         for asked in [0.375_f32, 0.75, 1.5, 2.25] {
-            let body = body_of(&PartKind::Stairs(asked, 1.25), None);
+            let body = body_of(
+                &PartKind::Stairs {
+                    rise: asked,
+                    wide: 1.25,
+                    stone: false,
+                },
+                None,
+            );
             let riser = 0.1875_f32;
             let steps = ((asked / riser).round() as i32).clamp(2, 24);
             let rise = steps as f32 * riser;
