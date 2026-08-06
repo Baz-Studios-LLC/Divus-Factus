@@ -1886,6 +1886,251 @@ pub(crate) fn carried_home(under: &str) -> std::path::PathBuf {
 /// needs two things said about it and only one of them was ever in the file
 /// name: what it is CALLED, and what it IS.
 #[allow(clippy::too_many_arguments)]
+/// Raises the card for a piece that has just been gathered.
+fn name_the_piece(
+    mut commands: Commands,
+    fonts: Res<Fonts>,
+    palette: Res<Palette>,
+    mut wants: ResMut<PieceWantsAName>,
+    mut naming: ResMut<Naming>,
+) {
+    if !wants.0 {
+        return;
+    }
+    wants.0 = false;
+    if naming.0.is_some() {
+        return;
+    }
+    naming.0 = Some(String::new());
+    naming.1 = NamingFor::AsAPiece;
+    raise_naming_card(&mut commands, &fonts, &palette, NamingFor::AsAPiece, 0);
+}
+
+/// Hangs the drawer of kept pieces, and hangs it again when one is added.
+fn hang_the_pieces(
+    mut commands: Commands,
+    fonts: Res<Fonts>,
+    palette: Res<Palette>,
+    drawer: Option<Res<PieceDrawer>>,
+    mut stale: ResMut<PiecesStale>,
+) {
+    if !stale.0 {
+        return;
+    }
+    let Some(drawer) = drawer else {
+        return;
+    };
+    stale.0 = false;
+    commands.entity(drawer.0).despawn_related::<Children>();
+
+    let home = pieces_home();
+    let mut kept: Vec<(std::path::PathBuf, String, usize)> = std::fs::read_dir(&home)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| is_a_work(path))
+        .filter_map(|path| {
+            std::fs::read_to_string(&path)
+                .ok()
+                .and_then(|text| serde_json::from_str::<Piece>(&text).ok())
+                .filter(|piece| piece.kind == "piece")
+                .map(|piece| (path, piece.name, piece.parts.len()))
+        })
+        .collect();
+    kept.sort_by(|a, b| a.1.cmp(&b.1));
+
+    if kept.is_empty() {
+        commands.spawn((
+            Text::new("choose a few parts, right-click, keep as a piece"),
+            TextFont {
+                font: fonts.text.clone().into(),
+                font_size: FontSize::Px(10.0),
+                ..default()
+            },
+            TextColor(theme::text_dim(&palette).with_alpha(0.7)),
+            TextLayout::new(bevy::text::Justify::Left, bevy::text::LineBreak::WordBoundary),
+            ChildOf(drawer.0),
+        ));
+        return;
+    }
+    for (path, name, parts) in kept {
+        let button = commands
+            .spawn((
+                PieceButton(path),
+                Interaction::default(),
+                Node {
+                    width: Val::Percent(100.0),
+                    min_width: Val::Px(0.0),
+                    padding: UiRect::axes(Val::Px(9.0), Val::Px(4.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::BLACK.with_alpha(0.18)),
+                BorderColor::all(theme::panel_border(&palette)),
+                ChildOf(drawer.0),
+            ))
+            .id();
+        let label = button_label(
+            &mut commands,
+            &fonts,
+            &palette,
+            button,
+            Box::leak(format!("{} - {parts}", name.to_uppercase()).into_boxed_str()),
+        );
+        commands.entity(label).insert(TextLayout::new(
+            bevy::text::Justify::Left,
+            bevy::text::LineBreak::AnyCharacter,
+        ));
+        commands.spawn((
+            crate::rail::Word("Take it in hand - click to set it down, R turns it, esc drops it"),
+            ChildOf(button),
+        ));
+    }
+}
+
+/// The drawer the pieces hang in.
+#[derive(Resource)]
+struct PieceDrawer(Entity);
+
+/// Whether that drawer is out of date.
+#[derive(Resource)]
+struct PiecesStale(bool);
+
+impl Default for PiecesStale {
+    fn default() -> Self {
+        PiecesStale(true)
+    }
+}
+
+/// Takes a kept piece into the hand, turns it, sets it down, or drops it.
+#[allow(clippy::too_many_arguments)]
+fn wield_a_piece(
+    mut commands: Commands,
+    // Bundled: Bevy's parameter ceiling is sixteen, and holding a whole cluster
+    // takes more than one hand.
+    told: (
+        Res<Bench>,
+        Res<ButtonInput<KeyCode>>,
+        Res<ButtonInput<MouseButton>>,
+        Res<Naming>,
+        Res<Palette>,
+        Res<SnapGrid>,
+    ),
+    windows: Query<&Window>,
+    cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    hovers: Query<&Interaction>,
+    taken: Query<(&Interaction, &PieceButton), Changed<Interaction>>,
+    mut held: ResMut<PieceInHand>,
+    mut hand: ResMut<Hand>,
+    ghosts: Query<Entity, With<PieceGhost>>,
+    plain_ghosts: Query<Entity, With<Ghost>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut standing: Query<&mut Transform, With<PieceGhost>>,
+    already: Query<&Placed, Without<Ghost>>,
+) {
+    let (bench, keys, buttons, naming, palette, snap_grid) = told;
+    if *bench != Bench::Builder || naming.0.is_some() {
+        return;
+    }
+    // Taking one up. The ordinary hand empties: two things held at once is two
+    // things placed by one click.
+    if let Some((_, piece)) = taken.iter().find(|(touch, _)| **touch == Interaction::Pressed) {
+        if let Some(read) = std::fs::read_to_string(&piece.0)
+            .ok()
+            .and_then(|text| serde_json::from_str::<Piece>(&text).ok())
+        {
+            *hand = Hand::default();
+            for ghost in &plain_ghosts {
+                commands.entity(ghost).despawn();
+            }
+            held.parts = read.parts;
+            held.name = read.name;
+            held.yaw = 0.0;
+            for ghost in &ghosts {
+                commands.entity(ghost).despawn();
+            }
+            for record in &held.parts {
+                if let Some(kind) = kind_from_name(&record.part) {
+                    let ghost = spawn_part(
+                        &mut commands,
+                        &mut meshes,
+                        &mut materials,
+                        &palette,
+                        &kind,
+                        record,
+                        true,
+                    );
+                    commands.entity(ghost).insert(PieceGhost);
+                }
+            }
+        }
+        return;
+    }
+    if held.parts.is_empty() {
+        return;
+    }
+    // Dropping it.
+    if keys.just_pressed(KeyCode::Escape) {
+        held.parts.clear();
+        for ghost in &ghosts {
+            commands.entity(ghost).despawn();
+        }
+        return;
+    }
+    // Turning it, in quarter turns, the way everything else turns.
+    if keys.just_pressed(KeyCode::KeyR) {
+        held.yaw = (held.yaw + std::f32::consts::FRAC_PI_2).rem_euclid(std::f32::consts::TAU);
+    }
+    let Some(point) = cursor_point(&windows, &cameras, 0.0) else {
+        return;
+    };
+    let grid = 16.0 / snap_grid.0 as f32;
+    let at = Vec3::new(
+        (point.x * grid).round() / grid,
+        0.0,
+        (point.z * grid).round() / grid,
+    );
+    let spin = Quat::from_rotation_y(held.yaw);
+    // The ghost follows, turned and snapped, so what a maker sees is what will
+    // stand there.
+    for (mut transform, record) in standing.iter_mut().zip(held.parts.iter()) {
+        transform.translation = at + spin * Vec3::from(record.at);
+        transform.rotation = pose(record.yaw + held.yaw, record.tilt, record.flip);
+    }
+    let over_ui = hovers
+        .iter()
+        .any(|interaction| *interaction != Interaction::None);
+    if !buttons.just_pressed(MouseButton::Left) || over_ui {
+        return;
+    }
+    // Setting it down: every part at once, as ONE fresh group, so what was one
+    // thing where it was kept is one thing where it lands.
+    // Fresh in THIS work: a piece kept beside a longhouse knows nothing about
+    // the groups on the bench it is being set down on.
+    let together = a_fresh_group(already.iter());
+    for record in held.parts.clone() {
+        let Some(kind) = kind_from_name(&record.part) else {
+            continue;
+        };
+        let mut set = record.clone();
+        set.at = (at + spin * Vec3::from(record.at)).into();
+        set.yaw = (record.yaw + held.yaw).rem_euclid(std::f32::consts::TAU);
+        set.group = Some(together);
+        spawn_part(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &palette,
+            &kind,
+            &set,
+            false,
+        );
+    }
+    info!("set down the piece {} - {} parts", held.name, held.parts.len());
+}
+
 fn bake_into_the_game(
     mut commands: Commands,
     bench: Res<Bench>,
@@ -2026,6 +2271,8 @@ pub enum NamingFor {
     Keeping,
     /// Carrying it into the game, as a building of a named kind.
     Carrying,
+    /// Keeping what is chosen as a piece, to bring into other works.
+    AsAPiece,
 }
 
 /// The kinds of building the village knows, and the word each takes in a baked
@@ -2130,6 +2377,10 @@ impl Plugin for BuilderPlugin {
             .init_resource::<WorkWanted>()
             .init_resource::<CarryingKind>()
             .init_resource::<CarriedStale>()
+            .init_resource::<PieceKept>()
+            .init_resource::<PieceWantsAName>()
+            .init_resource::<PieceInHand>()
+            .init_resource::<PiecesStale>()
             .init_resource::<Brush>()
             .init_resource::<Naming>()
             .init_resource::<Hovered>()
@@ -2201,7 +2452,9 @@ impl Plugin for BuilderPlugin {
                     pick_a_work,
                     bake_into_the_game,
                     choose_the_kind,
-                    hang_the_carried,
+                    // The pieces as one group: a tuple of systems stops at
+                    // twenty, and a nested tuple counts as one.
+                    (hang_the_carried, hang_the_pieces, name_the_piece),
                     take_one_back_out,
                     take_the_name,
                     dims_panel,
@@ -2566,6 +2819,12 @@ enum Deed {
     TrimToRoof,
     /// Make one thing of everything chosen.
     Group,
+    /// Keep everything chosen as a PIECE, to bring into other works.
+    ///
+    /// Brett: "if I could save groups that I could bring into other builds."
+    /// A group is one thing within a work; a piece is that same thing kept as a
+    /// file, so a porch drawn on a longhouse can be set down on a tavern.
+    KeepAsPiece,
 }
 
 impl Deed {
@@ -2579,6 +2838,7 @@ impl Deed {
             Deed::Nature(_) => "FURNISHING",
             Deed::TrimToRoof => "TRIM TO THE ROOF",
             Deed::Group => "GROUP",
+            Deed::KeepAsPiece => "KEEP AS A PIECE",
         }
     }
 }
@@ -2886,6 +3146,7 @@ fn raise_part_menu(
     // Grouping needs company: one part is already as gathered as it gets.
     if selected.0.len() > 1 {
         deeds.insert(0, Deed::Group);
+        deeds.insert(1, Deed::KeepAsPiece);
     }
     // Only where there is a roof to trim to, and a length to trim.
     if length_of(&kind).is_some()
@@ -2988,6 +3249,8 @@ fn work_part_menu(
     buttons: Res<ButtonInput<MouseButton>>,
     palette: Res<Palette>,
     selected: Res<crate::gizmo::Selected>,
+    mut keeping: ResMut<PieceKept>,
+    mut wants_naming: ResMut<PieceWantsAName>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut lines: Query<(&MenuLine, &Interaction, &mut BackgroundColor)>,
@@ -3115,6 +3378,19 @@ fn work_part_menu(
                     part,
                     false,
                 );
+            }
+        }
+        Some((Deed::KeepAsPiece, _)) => {
+            // The parts themselves ride in the resource; the card only asks
+            // what to call them.
+            let kept: Vec<Placed> = selected
+                .iter()
+                .filter_map(|part| placed.get(part).ok())
+                .map(|(_, _, record)| record.clone())
+                .collect();
+            if kept.len() > 1 {
+                keeping.0 = kept;
+                wants_naming.0 = true;
             }
         }
         Some((Deed::Group, _)) => {
@@ -3571,6 +3847,10 @@ fn raise_shelf(
     // Application Support, which is not a place anybody browses by accident.
     let carried = drawer(&mut commands, &fonts, &palette, shelf, "IN THE GAME", false);
     commands.insert_resource(CarriedDrawer(carried));
+
+    // Pieces: whole clusters kept for any work, not just this one.
+    let pieces = drawer(&mut commands, &fonts, &palette, shelf, "PIECES", false);
+    commands.insert_resource(PieceDrawer(pieces));
 
     let widgets = drawer(&mut commands, &fonts, &palette, shelf, "WIDGETS", false);
     for (name, _, _) in WIDGETS {
@@ -4954,6 +5234,73 @@ fn feel_ahead(
     hovered.grab = fresh;
 }
 
+/// What a piece is on disk, and in the hand: a cluster of parts with their own
+/// little world, whose middle is where a maker points.
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct Piece {
+    format: u32,
+    kind: String,
+    name: String,
+    parts: Vec<Placed>,
+}
+
+/// The parts a maker has just asked to keep, waiting for a name.
+#[derive(Resource, Default)]
+pub struct PieceKept(pub Vec<Placed>);
+
+/// Whether the card should go up for them.
+#[derive(Resource, Default)]
+pub struct PieceWantsAName(pub bool);
+
+/// The piece the hand is holding, if it holds one.
+#[derive(Resource, Default)]
+pub struct PieceInHand {
+    parts: Vec<Placed>,
+    name: String,
+    /// Quarter turns, the way every other placement turns.
+    yaw: f32,
+}
+
+/// A ghost box belonging to the held piece.
+#[derive(Component)]
+struct PieceGhost;
+
+/// A button that takes a kept piece into the hand.
+#[derive(Component)]
+struct PieceButton(std::path::PathBuf);
+
+/// Where pieces are kept.
+fn pieces_home() -> std::path::PathBuf {
+    bench_home().join("out/pieces")
+}
+
+/// Centres a cluster on its own middle, so a piece is set down where the cursor
+/// is rather than wherever it happened to be drawn.
+///
+/// Middle on the ground, FOOT in the air: a porch put down at head height would
+/// be a puzzle. The lowest part of a piece is what meets the ground the maker
+/// is pointing at.
+fn piece_from(parts: &[Placed]) -> Vec<Placed> {
+    let mut low = Vec3::splat(f32::INFINITY);
+    let mut high = Vec3::splat(f32::NEG_INFINITY);
+    for record in parts {
+        low = low.min(Vec3::from(record.at));
+        high = high.max(Vec3::from(record.at));
+    }
+    if !low.x.is_finite() {
+        return parts.to_vec();
+    }
+    let middle = Vec3::new((low.x + high.x) * 0.5, low.y, (low.z + high.z) * 0.5);
+    parts
+        .iter()
+        .map(|record| {
+            let mut moved = record.clone();
+            moved.at = (Vec3::from(record.at) - middle).into();
+            moved
+        })
+        .collect()
+}
+
 /// The panel that says what is chosen, and offers to make one thing of it.
 #[derive(Component)]
 struct ChosenPanel;
@@ -5967,10 +6314,10 @@ fn raise_naming_card(
         ))
         .id();
     commands.spawn((
-        Text::new(if carrying {
-            "CARRY IT INTO THE GAME"
-        } else {
-            "NAME THE WORK"
+        Text::new(match what_for {
+            NamingFor::Carrying => "CARRY IT INTO THE GAME",
+            NamingFor::AsAPiece => "KEEP IT AS A PIECE",
+            NamingFor::Keeping => "NAME THE WORK",
         }),
         TextFont {
             font: fonts.display.clone().into(),
@@ -6000,10 +6347,10 @@ fn raise_naming_card(
         ChildOf(card),
     ));
     commands.spawn((
-        Text::new(if carrying {
-            "the village raises it under this name - esc thinks better of it"
-        } else {
-            "enter saves - esc thinks better of it"
+        Text::new(match what_for {
+            NamingFor::Carrying => "the village raises it under this name - esc thinks better of it",
+            NamingFor::AsAPiece => "kept for any work, not just this one - esc thinks better of it",
+            NamingFor::Keeping => "enter saves - esc thinks better of it",
         }),
         TextFont {
             font: fonts.text.clone().into(),
@@ -6089,7 +6436,14 @@ fn raise_naming_card(
         ))
         .id();
     for (label, accent) in [
-        (if carrying { "CARRY IN" } else { "SAVE" }, true),
+        (
+            match what_for {
+                NamingFor::Carrying => "CARRY IN",
+                NamingFor::AsAPiece => "KEEP IT",
+                NamingFor::Keeping => "SAVE",
+            },
+            true,
+        ),
         ("CANCEL", false),
     ] {
         let button = commands
@@ -6138,8 +6492,13 @@ fn take_the_name(
     mut commands: Commands,
     stages: Res<Stages>,
     palette: Res<Palette>,
-    kind: Res<CarryingKind>,
-    mut stale: ResMut<CarriedStale>,
+    // Bundled: the ceiling is sixteen, and this card has three errands now.
+    errands: (
+        Res<CarryingKind>,
+        ResMut<CarriedStale>,
+        ResMut<PieceKept>,
+        ResMut<PiecesStale>,
+    ),
     mut keystrokes: MessageReader<bevy::input::keyboard::KeyboardInput>,
     mut naming: ResMut<Naming>,
     time: Res<Time>,
@@ -6151,6 +6510,7 @@ fn take_the_name(
     mut shown: Query<&mut Text, With<NameText>>,
     mut save_labels: Query<(Entity, &mut Text), (With<SaveLabel>, Without<NameText>)>,
 ) {
+    let (kind, mut stale, mut kept, mut pieces_stale) = errands;
     let what_for = naming.1;
     let Some(name) = naming.0.as_mut() else {
         return;
@@ -6204,10 +6564,51 @@ fn take_the_name(
     let Some(saving) = done else {
         return;
     };
-    // The same card, two errands. Carrying in writes a building the village can
-    // raise; keeping writes the work itself, which is the maker's own copy and
-    // the only one they can go on drawing.
-    if saving && what_for == NamingFor::Carrying {
+    // The same card, three errands now.
+    if saving && what_for == NamingFor::AsAPiece {
+        let called = if name.is_empty() {
+            "piece".to_string()
+        } else {
+            name.clone()
+        };
+        let home = pieces_home();
+        let _ = std::fs::create_dir_all(&home);
+        let piece = Piece {
+            format: 1,
+            kind: "piece".to_string(),
+            name: called.clone(),
+            // Centred on its own middle, so it is set down where the cursor is
+            // rather than wherever it happened to be drawn.
+            parts: piece_from(&kept.0),
+        };
+        let said = match serde_json::to_string_pretty(&piece)
+            .map_err(|why| why.to_string())
+            .and_then(|text| {
+                let out = home.join(format!("{called}.{WORK_KIND}"));
+                std::fs::write(&out, text).map_err(|why| why.to_string())
+            }) {
+            Ok(()) => {
+                pieces_stale.0 = true;
+                format!(
+                    "KEPT {} AS A PIECE - {} PARTS",
+                    called.to_uppercase(),
+                    piece.parts.len()
+                )
+            }
+            Err(why) => {
+                warn!("could not keep the piece {called}: {why}");
+                "THE PIECE COULD NOT BE WRITTEN".to_string()
+            }
+        };
+        kept.0.clear();
+        for (entity, mut text) in &mut save_labels {
+            *text = Text::new(said.clone());
+            commands.entity(entity).insert(PassingWord {
+                back: crate::rail::FOOT_SAYING,
+                until: time.elapsed_secs() + 3.0,
+            });
+        }
+    } else if saving && what_for == NamingFor::Carrying {
         let called = if name.is_empty() {
             "untitled".to_string()
         } else {
@@ -7602,6 +8003,9 @@ mod roof_tests {
         app.init_resource::<ButtonInput<KeyCode>>();
         app.init_resource::<ButtonInput<MouseButton>>();
         app.init_resource::<crate::gizmo::Selected>();
+        // The menu can keep a piece now, and a piece needs somewhere to wait.
+        app.init_resource::<PieceKept>();
+        app.init_resource::<PieceWantsAName>();
         app.add_systems(Update, work_part_menu);
 
         let trimmed = "beam-6.375x0.375x0.375";
