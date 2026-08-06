@@ -24,11 +24,6 @@ pub struct Box3 {
     /// "box", "wedge", "ridge", "mitre" or "mitre-back" - the bench's shapes.
     #[serde(default)]
     pub form: String,
-    /// The cloth this piece was painted in, named: "wood:0.7". The
-    /// house's own wall and roof cloths are re-dyed per building, so a
-    /// street of one blueprint is still a street of different houses.
-    #[serde(default)]
-    pub cloth: String,
     /// footing, walls, roof, furnishing.
     pub stage: String,
 }
@@ -56,27 +51,75 @@ pub struct Baked {
     pub high: f32,
     pub boxes: Vec<Box3>,
     pub marks: Vec<Mark>,
-    /// The cloths that cover the most of this building at each stage -
-    /// its walls and its roof. Worked out when the file is read, by
-    /// VOLUME rather than by count: a house wears more window frames
-    /// than walls, and the frames are not what a village re-dyes.
-    #[serde(skip)]
-    pub wall_cloth: String,
-    #[serde(skip)]
-    pub roof_cloth: String,
 }
 
-/// The cloth covering the most of a stage, by volume.
-fn dominant(boxes: &[Box3], stage: &str) -> String {
-    let mut bulk: std::collections::HashMap<&str, f32> = std::collections::HashMap::new();
-    for piece in boxes.iter().filter(|b| b.stage == stage) {
-        let volume = piece.size[0] * piece.size[1] * piece.size[2];
-        *bulk.entry(piece.cloth.as_str()).or_default() += volume;
+/// A building can be raised as drawn or as its own reflection, and half of them
+/// are. Brett: "would it be hard to have it rng between placing it and placing
+/// it as a mirror for variety?" - one drawing becomes two buildings for nothing
+/// but a sign change, and a street of one blueprint stops reading as a row of
+/// stamps.
+///
+/// The mirror runs along the building's LENGTH, not across it. Every building is
+/// turned so its own +X faces the square, because that is the way its front door
+/// looks - so reflecting x is the one reflection that cannot be used: it carries
+/// the door round to the back wall, and Brett saw it straightaway - "it mirroed
+/// it but now the door is facing the wrong way". Reflecting z leaves the front
+/// wall the front wall and swaps the building's hands, which is the variety that
+/// was wanted.
+///
+/// Mirroring by SCALE would be the easy way and the wrong one besides: a
+/// negative scale turns every triangle inside out, and the whole building would
+/// light as though lit from within. So the reflection is done to the numbers -
+/// each box's place, each box's turn, each mark's place and facing - and the
+/// geometry stays wound the way it was built. Along z, no shape even changes
+/// hands: a mitre's cut runs across x, and a gable prism peaks in its middle.
+fn reflect_at(at: Vec3, mirrored: bool) -> Vec3 {
+    if mirrored {
+        Vec3::new(at.x, at.y, -at.z)
+    } else {
+        at
     }
-    bulk.into_iter()
-        .max_by(|a, b| a.1.total_cmp(&b.1))
-        .map(|(cloth, _)| cloth.to_string())
-        .unwrap_or_default()
+}
+
+/// A turn seen in the same mirror: the axis reflected and the angle reversed,
+/// which for a quaternion is exactly this.
+fn reflect_turn(turn: Quat, mirrored: bool) -> Quat {
+    if mirrored {
+        Quat::from_xyzw(-turn.x, -turn.y, turn.z, turn.w)
+    } else {
+        turn
+    }
+}
+
+/// Which way a mark faces, on the other hand. A mark's nose is its own +X, so
+/// reflecting the direction it points and reading the angle back off it gives
+/// this - a door in the front wall stays in the front wall, and a bed's sleeper
+/// lies with their head the other way about.
+fn reflect_yaw(yaw: f32, mirrored: bool) -> f32 {
+    if mirrored {
+        -yaw
+    } else {
+        yaw
+    }
+}
+
+/// Every door the maker marked, where they marked it, facing the way its nose
+/// points - out of the building. Read in one place because three of them need
+/// it: the shell a villager is routed through, the hall's doorstep, and the
+/// reflection has to reach all of them or people walk at a wall.
+pub fn doorways(work: &Baked, mirrored: bool) -> Vec<Doorway> {
+    work.marks
+        .iter()
+        .filter(|m| m.mark == "door")
+        .map(|m| {
+            let at = reflect_at(Vec3::from(m.at), mirrored);
+            let out = Quat::from_rotation_y(reflect_yaw(m.yaw, mirrored)) * Vec3::X;
+            Doorway {
+                at: Vec2::new(at.x, at.z),
+                out: Vec2::new(out.x, out.z).normalize_or(Vec2::X),
+            }
+        })
+        .collect()
 }
 
 /// The buildings carried in, read once and held for the life of the
@@ -105,9 +148,7 @@ fn carried() -> &'static Vec<Baked> {
                     .ok()
                     .and_then(|text| serde_json::from_str::<Baked>(&text).ok())
                 {
-                    Some(mut work) => {
-                        work.wall_cloth = dominant(&work.boxes, "walls");
-                        work.roof_cloth = dominant(&work.boxes, "roof");
+                    Some(work) => {
                         info!(
                             "carried in {}: {} boxes, {} marks",
                             work.name,
@@ -374,9 +415,7 @@ pub fn raise_baked(
     site: Entity,
     stage: u8,
     work: &Baked,
-    // The cloths this particular house wears, rolled with its plan.
-    wall_dye: Color,
-    roof_dye: Color,
+    mirrored: bool,
 ) {
     let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
     let wedge = meshes.add(prism(false));
@@ -389,16 +428,17 @@ pub fn raise_baked(
         .iter()
         .filter(|b| stage_of(&b.stage, framed) == stage)
     {
-        // The house's own walls and roof take this building's cloth;
-        // every frame, sill, floorboard and stick of furniture keeps
-        // exactly what the maker painted it.
-        let colour = if !piece.cloth.is_empty() && piece.cloth == work.wall_cloth {
-            wall_dye
-        } else if !piece.cloth.is_empty() && piece.cloth == work.roof_cloth {
-            roof_dye
-        } else {
-            Color::srgb_u8(piece.rgb[0], piece.rgb[1], piece.rgb[2])
-        };
+        // Exactly the colour it was painted, everywhere, always.
+        //
+        // The village used to re-dye each house's dominant wall and roof cloth
+        // with a colour rolled from its plan, so a street of one blueprint was
+        // still a street of different houses. That was the right answer while a
+        // drawing arrived in whatever colours the catalogue happened to hold and
+        // nobody had chosen them. There is a brush on the bench now, and Brett
+        // used it - "we can remove the old painting system now that I can paint
+        // in atelier" - so the roll had become a thing that painted OVER the
+        // maker, and on precisely the pieces they cared most about.
+        let colour = Color::srgb_u8(piece.rgb[0], piece.rgb[1], piece.rgb[2]);
         let clear = piece.alpha < 0.999;
         let mesh = match piece.form.as_str() {
             "wedge" => wedge.clone(),
@@ -419,8 +459,8 @@ pub fn raise_baked(
                 },
                 ..default()
             })),
-            Transform::from_translation(Vec3::from(piece.at))
-                .with_rotation(Quat::from_array(piece.turn))
+            Transform::from_translation(reflect_at(Vec3::from(piece.at), mirrored))
+                .with_rotation(reflect_turn(Quat::from_array(piece.turn), mirrored))
                 .with_scale(Vec3::from(piece.size)),
             ChildOf(site),
         ));
@@ -437,23 +477,22 @@ pub fn raise_baked(
 
 /// Turns the marks into what the village reads: beds it can claim, a
 /// shell with doors to walk through, the family table.
-pub fn furnish_baked(commands: &mut Commands, site: Entity, work: &Baked) {
+pub fn furnish_baked(commands: &mut Commands, site: Entity, work: &Baked, mirrored: bool) {
     let mut slot = 0u8;
     let sleeps: Vec<&Mark> = work.marks.iter().filter(|m| m.mark == "sleep").collect();
     for (index, mark) in sleeps.iter().enumerate() {
         // Two sleeping places lying alongside each other are the two
         // halves of one marriage bed - the pair sleeps there and the
         // children do not, whoever set them down.
-        let at = Vec3::from(mark.at);
-        let double = sleeps
-            .iter()
-            .enumerate()
-            .any(|(other, twin)| other != index && Vec3::from(twin.at).distance(at) < 1.4);
+        let at = reflect_at(Vec3::from(mark.at), mirrored);
+        let double = sleeps.iter().enumerate().any(|(other, twin)| {
+            other != index && Vec3::from(twin.at).distance(Vec3::from(mark.at)) < 1.4
+        });
         // A mark faces its own +X, the way every mark does: for a
         // sleeper that is the way their head lies. Tipped onto its back a
         // body's head points along -Z, so the turn that carries it to the
         // pillow is read straight off that direction.
-        let head_way = Quat::from_rotation_y(mark.yaw) * Vec3::X;
+        let head_way = Quat::from_rotation_y(reflect_yaw(mark.yaw, mirrored)) * Vec3::X;
         let lie = super::buildings::lie_toward(head_way);
         commands.spawn((
             Bed { slot, lie, double },
@@ -466,25 +505,12 @@ pub fn furnish_baked(commands: &mut Commands, site: Entity, work: &Baked) {
     for mark in work.marks.iter().filter(|m| m.mark == "table") {
         commands.spawn((
             Table,
-            Transform::from_translation(Vec3::from(mark.at)),
+            Transform::from_translation(reflect_at(Vec3::from(mark.at), mirrored)),
             Visibility::Hidden,
             ChildOf(site),
         ));
     }
-    // Every door the maker marked, where they marked it, facing the way
-    // its nose points - out of the building.
-    let doors: Vec<Doorway> = work
-        .marks
-        .iter()
-        .filter(|m| m.mark == "door")
-        .map(|m| {
-            let out = Quat::from_rotation_y(m.yaw) * Vec3::X;
-            Doorway {
-                at: Vec2::new(m.at[0], m.at[2]),
-                out: Vec2::new(out.x, out.z).normalize_or(Vec2::X),
-            }
-        })
-        .collect();
+    let doors = doorways(work, mirrored);
     // The shell is the WALLS, not the whole building. The file's own
     // half-extents take in the roof, which on a house with eaves reaches
     // most of a metre past the wall it shelters - and a doorway that
@@ -547,6 +573,86 @@ mod tests {
             // The plot is cut for whichever one turns up.
             let widest = widest(kind).expect("a drawing has a width");
             assert!(all.iter().all(|w| w.half_w.max(w.half_d) <= widest + 1e-3));
+        }
+    }
+
+    /// A reflected box has to end up where its reflection is, not merely
+    /// somewhere on the other side. Turning the place and forgetting the turn
+    /// puts every leaning piece - every rafter, every mitred beam - back the way
+    /// it was, in a building that has moved out from under it.
+    #[test]
+    fn a_mirrored_box_stands_where_the_mirror_puts_it() {
+        let corners: Vec<Vec3> = (0..8)
+            .map(|i| {
+                Vec3::new(
+                    if i & 1 == 0 { -0.5 } else { 0.5 },
+                    if i & 2 == 0 { -0.5 } else { 0.5 },
+                    if i & 4 == 0 { -0.5 } else { 0.5 },
+                )
+            })
+            .collect();
+        // A leaning, turned, off-centre piece: the case a sign flip gets wrong.
+        let at = Vec3::new(1.7, 2.3, -0.9);
+        let size = Vec3::new(3.0, 0.25, 0.8);
+        let turn = Quat::from_rotation_y(0.7) * Quat::from_rotation_x(-0.45);
+
+        let mut stood: Vec<Vec3> = corners
+            .iter()
+            .map(|c| at + turn * (*c * size))
+            .map(|w| Vec3::new(w.x, w.y, -w.z))
+            .collect();
+        let mirror_at = reflect_at(at, true);
+        let mirror_turn = reflect_turn(turn, true);
+        let mut mirrored: Vec<Vec3> = corners
+            .iter()
+            .map(|c| mirror_at + mirror_turn * (*c * size))
+            .collect();
+        let order = |a: &Vec3, b: &Vec3| {
+            a.x.total_cmp(&b.x)
+                .then(a.y.total_cmp(&b.y))
+                .then(a.z.total_cmp(&b.z))
+        };
+        stood.sort_by(order);
+        mirrored.sort_by(order);
+        for (want, got) in stood.iter().zip(&mirrored) {
+            assert!(
+                want.distance(*got) < 1e-4,
+                "the mirrored box stands at {got} where its reflection is {want}"
+            );
+        }
+    }
+
+    /// A mirrored building still fronts the same way. The village turns every
+    /// building so its +X looks at the square, so a reflection that moved the
+    /// door round the back would leave every mirrored house facing away - which
+    /// is what the first one did, and what Brett saw within a minute of it.
+    #[test]
+    fn a_mirrored_building_keeps_its_front_door_in_front() {
+        for work in drawings(BuildingKind::House)
+            .into_iter()
+            .chain(drawings(BuildingKind::Longhouse))
+        {
+            let plain = doorways(work, false);
+            let mirrored = doorways(work, true);
+            assert_eq!(plain.len(), mirrored.len(), "{}", work.name);
+            for (door, seen) in plain.iter().zip(&mirrored) {
+                assert!(
+                    (door.out.x - seen.out.x).abs() < 1e-4,
+                    "{}: a door facing {} faces {} in the mirror - it has turned \
+                     round rather than moved along its wall",
+                    work.name,
+                    door.out,
+                    seen.out
+                );
+                // It may slide along the wall; it may not leave it.
+                assert!(
+                    (door.at.x - seen.at.x).abs() < 1e-4,
+                    "{}: a door in the wall at x={} came out at x={}",
+                    work.name,
+                    door.at.x,
+                    seen.at.x
+                );
+            }
         }
     }
 

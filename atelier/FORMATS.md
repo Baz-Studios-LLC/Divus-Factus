@@ -151,8 +151,16 @@ its colour already looked up, plus the marks that say what the place is FOR.
 - `half_w`/`half_d` are the FINISHED building's footprint: the plot the village
   clears, the obstacle while it is being raised, and the walkable shell when it
   is done.
-- `cloth` names the ramp a box was painted from, so a village can re-dye a
-  street of one blueprint into a street of different houses.
+- `cloth` names the ramp a box was painted from. The bench writes it and the
+  game no longer reads it: villages used to re-dye a drawing's dominant wall and
+  roof cloth so a street of one blueprint was a street of different houses,
+  which was the right answer while a drawing wore whatever the catalogue handed
+  it. There is a brush on the bench now, so the colour in `rgb` is a choice, and
+  the game paints exactly what it is given. Variety comes from the mirror
+  instead: half of every kind is raised as its own reflection along z, which the
+  game does to the numbers rather than by scaling, so nothing turns inside out.
+  Along z no shape changes hands, and the front door - which is what a
+  building's +X means to the village - stays in the front wall.
 
 ## Versioning
 

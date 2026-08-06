@@ -414,10 +414,24 @@ pub struct Blueprint {
     /// that finishes is the house whose ground was broken.
     #[serde(default)]
     pub plan: usize,
+    /// Whether this one stands as its drawing's own reflection. Rolled with the
+    /// plan and kept for the same reason: the building that finishes has to be
+    /// the building whose doorway the plot was cut for.
+    #[serde(default)]
+    pub mirrored: bool,
 }
 
 impl Blueprint {
     pub fn roll(kind: BuildingKind, rng: &mut Rng) -> Blueprint {
+        let mut plan = Self::rolled(kind, rng);
+        // A coin for which way round it stands, thrown for every kind so the
+        // dice fall the same way whatever is being built - and thrown last, so
+        // that adding it did not move any of the rolls that came before.
+        plan.mirrored = rng.chance(0.5);
+        plan
+    }
+
+    fn rolled(kind: BuildingKind, rng: &mut Rng) -> Blueprint {
         use crate::palette as pal;
         // Which of the maker's houses this one will be. Rolled for every
         // kind so the dice fall the same way whatever is being built.
@@ -427,6 +441,8 @@ impl Blueprint {
             BuildingKind::House => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 // A carried-in house brings its own footprint, so the
                 // plots are cut to fit it; otherwise the village's own
                 // sizing stands - four beds, a floor to cross, a lane.
@@ -460,6 +476,8 @@ impl Blueprint {
             BuildingKind::Longhouse => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 // As with a house: a carried-in hall brings its own
                 // footprint, and the plot, the levelled pad and the
                 // walls are all cut to it. Leaving the rolled numbers
@@ -484,6 +502,8 @@ impl Blueprint {
             BuildingKind::Sawmill => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: 2.3,
                 half_d: 1.7,
                 wall_h: 0.9,
@@ -495,6 +515,8 @@ impl Blueprint {
             BuildingKind::Blacksmith => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: 1.7,
                 half_d: 1.9,
                 wall_h: 1.7,
@@ -506,6 +528,8 @@ impl Blueprint {
             BuildingKind::Tavern => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: 2.2,
                 half_d: 2.3,
                 wall_h: 1.9,
@@ -517,6 +541,8 @@ impl Blueprint {
             BuildingKind::TownHall => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: 2.5,
                 half_d: 2.9,
                 wall_h: 2.6,
@@ -528,6 +554,8 @@ impl Blueprint {
             BuildingKind::Shrine => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: 1.3,
                 half_d: 1.3,
                 wall_h: 1.1,
@@ -540,6 +568,8 @@ impl Blueprint {
             BuildingKind::Storehouse => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: 2.8,
                 half_d: 1.6,
                 wall_h: 1.3,
@@ -552,6 +582,8 @@ impl Blueprint {
             BuildingKind::Granary => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: 1.5,
                 half_d: 1.5,
                 wall_h: 1.7,
@@ -564,6 +596,8 @@ impl Blueprint {
             BuildingKind::Well => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: 0.9,
                 half_d: 0.9,
                 wall_h: 0.7,
@@ -576,6 +610,8 @@ impl Blueprint {
             BuildingKind::Smokehouse => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: 1.4,
                 half_d: 1.4,
                 wall_h: 1.5,
@@ -588,6 +624,8 @@ impl Blueprint {
             BuildingKind::Mill => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: 1.7,
                 half_d: 1.7,
                 wall_h: 2.8,
@@ -600,6 +638,8 @@ impl Blueprint {
             BuildingKind::Bakery => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: 1.8,
                 half_d: 1.6,
                 wall_h: 1.6,
@@ -612,6 +652,8 @@ impl Blueprint {
             BuildingKind::Weaver => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: 1.6,
                 half_d: 1.5,
                 wall_h: 1.6,
@@ -624,6 +666,8 @@ impl Blueprint {
             BuildingKind::Herbalist => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: 1.3,
                 half_d: 1.4,
                 wall_h: 1.4,
@@ -639,6 +683,8 @@ impl Blueprint {
             BuildingKind::Watchtower => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: 1.35,
                 half_d: 1.35,
                 wall_h: 7.5,
@@ -652,6 +698,8 @@ impl Blueprint {
             BuildingKind::Mine => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: rng.range(1.4, 1.7),
                 half_d: 1.6,
                 wall_h: 1.4,
@@ -665,6 +713,8 @@ impl Blueprint {
             BuildingKind::Dock => Blueprint {
                 kind,
                 plan,
+                // Set below, once for every kind.
+                mirrored: false,
                 half_w: rng.range(1.0, 1.3),
                 half_d: rng.range(2.8, 3.4),
                 wall_h: 0.9,
@@ -1293,7 +1343,7 @@ pub(crate) fn raise_the_founding_hall(
     }
     // And its beds, its table, its doors - out of the maker's own marks.
     match super::baked::drawing_at(BuildingKind::Longhouse, plan.plan) {
-        Some(work) => super::baked::furnish_baked(commands, hall, work),
+        Some(work) => super::baked::furnish_baked(commands, hall, work, plan.mirrored),
         None => {
             commands.entity(hall).insert(Shell {
                 half_w: plan.half_w,
@@ -1312,19 +1362,7 @@ pub(crate) fn raise_the_founding_hall(
         half_w: plan.half_w,
         half_d: plan.half_d,
         doors: super::baked::drawing_at(BuildingKind::Longhouse, plan.plan)
-            .map(|work| {
-                work.marks
-                    .iter()
-                    .filter(|mark| mark.mark == "door")
-                    .map(|mark| Doorway {
-                        at: Vec2::new(mark.at[0], mark.at[2]),
-                        out: {
-                            let facing = Quat::from_rotation_y(mark.yaw) * Vec3::X;
-                            Vec2::new(facing.x, facing.z).normalize_or(Vec2::X)
-                        },
-                    })
-                    .collect()
-            })
+            .map(|work| super::baked::doorways(work, plan.mirrored))
             .filter(|doors: &Vec<Doorway>| !doors.is_empty())
             .unwrap_or_else(|| vec![Doorway::on_x_wall(plan.half_w, 0.0)]),
     };
@@ -1345,9 +1383,7 @@ pub(crate) fn raise_stage(
     // A house carried in from the bench is raised from its own boxes;
     // the village's own hand still builds everything else.
     if let Some(work) = super::baked::drawing_at(plan.kind, plan.plan) {
-        super::baked::raise_baked(
-            commands, meshes, materials, site, stage, work, plan.walls, plan.roof,
-        );
+        super::baked::raise_baked(commands, meshes, materials, site, stage, work, plan.mirrored);
         return;
     }
 
