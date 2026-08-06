@@ -163,17 +163,31 @@ fn carried() -> &'static Vec<Baked> {
                     .and_then(|text| serde_json::from_str::<Baked>(&text).ok())
                 {
                     Some(work) => {
-                        info!(
-                            "carried in {}: {} boxes, {} marks",
-                            work.name,
-                            work.boxes.len(),
-                            work.marks.len()
-                        );
                         // A maker's drawing of the same name replaces the one
-                        // that shipped: they drew it second, and meant it.
+                        // that shipped: they drew it second, and meant it. It
+                        // says so rather than doing it quietly - a village
+                        // missing a building it was expecting is a thing to be
+                        // able to read in a log.
                         match works.iter().position(|had| had.name == work.name) {
-                            Some(standing) => works[standing] = work,
-                            None => works.push(work),
+                            Some(standing) => {
+                                info!(
+                                    "carried in {}: {} boxes, {} marks - replacing the one \
+                                     already carried in under that name",
+                                    work.name,
+                                    work.boxes.len(),
+                                    work.marks.len()
+                                );
+                                works[standing] = work;
+                            }
+                            None => {
+                                info!(
+                                    "carried in {}: {} boxes, {} marks",
+                                    work.name,
+                                    work.boxes.len(),
+                                    work.marks.len()
+                                );
+                                works.push(work);
+                            }
                         }
                     }
                     None => warn!("could not read the baked building at {}", path.display()),
