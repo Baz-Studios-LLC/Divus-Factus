@@ -420,8 +420,11 @@ pub const STRUCTURE: &[CatalogEntry] = &[
         },
         "walls",
     ),
+    // One noun for the family, the material after it - the way TRIM, STONE and
+    // TRIM sit together. Two words for one thing, "stairs" and "steps", meant
+    // knowing which of them we had happened to use.
+    structure("STAIRS, STONE", PartKind::Prop("steps"), "footing"),
     structure("STAIRS, WOOD", PartKind::Stairs(0.75), "footing"),
-    structure("STEPS, STONE", PartKind::Prop("steps"), "footing"),
     structure(
         "TRIM, STONE, STRETCH",
         PartKind::TrimRun { stone: true },
