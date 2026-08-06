@@ -152,12 +152,14 @@ impl Plugin for GizmoPlugin {
                 // And the modes go back to NORMAL on the way out, so a maker who
                 // left the builder in RESIZE does not come back to a bench that
                 // has been in RESIZE all the while they were somewhere else.
-                |bench: Res<crate::Bench>, mut mode: ResMut<ToolMode>, mut chosen: ResMut<Selected>| {
+                |bench: Res<crate::Bench>,
+                 mut mode: ResMut<ToolMode>,
+                 mut chosen: ResMut<Selected>| {
                     if bench.is_changed() && *bench != crate::Bench::Builder {
                         *mode = ToolMode::Normal;
                         chosen.clear();
                     }
-                }
+                },
             );
     }
 }
@@ -377,8 +379,7 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
             // A flight carries one more, in gold: the rail's own height, since
             // both of the red-and-blue pair are spoken for by its width and its
             // run. Brett: "maybe we can add a handle for rail height?"
-            if let Some(PartKind::Stairs { rise, hand, .. }) =
-                builder::kind_from_name(&record.part)
+            if let Some(PartKind::Stairs { rise, hand, .. }) = builder::kind_from_name(&record.part)
             {
                 handles.push((
                     spin * Vec3::Y,
@@ -704,10 +705,9 @@ fn work_gizmo(
             // once and only the part it rebuilds differs.
             let (across, rebuild): (f32, &dyn Fn(f32) -> PartKind) =
                 match builder::kind_from_name(&record.part) {
-                    Some(PartKind::GableRoof(long, span, over, _)) => (
-                        span,
-                        &move |pitch| PartKind::GableRoof(long, span, over, pitch),
-                    ),
+                    Some(PartKind::GableRoof(long, span, over, _)) => (span, &move |pitch| {
+                        PartKind::GableRoof(long, span, over, pitch)
+                    }),
                     Some(PartKind::Gable(long, _)) => {
                         (long, &move |pitch| PartKind::Gable(long, pitch))
                     }
@@ -743,7 +743,8 @@ fn work_gizmo(
             // one: a pad of no height is a pad nobody can see or click.
             let pull = ((t - state.t0) * 16.0).round() / 16.0;
             let high = (h0 + pull).clamp(0.0625, 8.0);
-            let Some(PartKind::Foundation(w, d, was)) = builder::kind_from_name(&record.part) else {
+            let Some(PartKind::Foundation(w, d, was)) = builder::kind_from_name(&record.part)
+            else {
                 return;
             };
             if (high - was).abs() < 1e-4 {

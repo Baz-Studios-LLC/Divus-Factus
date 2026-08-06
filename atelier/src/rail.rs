@@ -331,11 +331,17 @@ standing: click a part,
 shift-click the lot,
 \\ empties the brush",
         ),
-        ("right-click", "a part's menu, or a saved
+        (
+            "right-click",
+            "a part's menu, or a saved
 work's - group, ungroup,
-trim, bury"),
-        ("shift-click", "choose several; right-
-click to group them"),
+trim, bury",
+        ),
+        (
+            "shift-click",
+            "choose several; right-
+click to group them",
+        ),
         ("esc / del", "empty the hand"),
         (
             "del",
@@ -884,7 +890,12 @@ fn work_stage_bar(
     stages: Res<crate::builder::Stages>,
     mut wish: ResMut<crate::builder::StageWish>,
     deeds: Query<(&Interaction, &StageDeedButton)>,
-    mut buttons: Query<(&Interaction, &StageButton, &mut BorderColor, &mut BackgroundColor)>,
+    mut buttons: Query<(
+        &Interaction,
+        &StageButton,
+        &mut BorderColor,
+        &mut BackgroundColor,
+    )>,
 ) {
     for (interaction, button) in &deeds {
         if *interaction == Interaction::Pressed && wish.0.is_none() {
@@ -892,9 +903,7 @@ fn work_stage_bar(
         }
     }
     for (interaction, button, _, _) in &buttons {
-        if *interaction == Interaction::Pressed
-            && button.0 != stages.showing()
-            && wish.0.is_none()
+        if *interaction == Interaction::Pressed && button.0 != stages.showing() && wish.0.is_none()
         {
             wish.0 = Some(crate::builder::StageDeed::Show(button.0));
         }
@@ -1015,4 +1024,3 @@ fn work_settings(
         };
     }
 }
-

@@ -142,16 +142,19 @@ impl Default for Clip {
 impl Clip {
     /// This joint's first key, and its last, for turning across the seam.
     fn first_key(&self, joint: &str) -> Option<(f32, Quat)> {
-        self.keys
-            .iter()
-            .find_map(|key| key.pose.get(joint).map(|turn| (key.at, Quat::from_array(*turn))))
+        self.keys.iter().find_map(|key| {
+            key.pose
+                .get(joint)
+                .map(|turn| (key.at, Quat::from_array(*turn)))
+        })
     }
 
     fn last_key(&self, joint: &str) -> Option<(f32, Quat)> {
-        self.keys
-            .iter()
-            .rev()
-            .find_map(|key| key.pose.get(joint).map(|turn| (key.at, Quat::from_array(*turn))))
+        self.keys.iter().rev().find_map(|key| {
+            key.pose
+                .get(joint)
+                .map(|turn| (key.at, Quat::from_array(*turn)))
+        })
     }
 
     /// The pose at a moment: every joint keyed anywhere in the clip, turned to
@@ -976,11 +979,7 @@ fn hang_the_keys(
                 height: Val::Percent(tall * 100.0),
                 ..default()
             },
-            BackgroundColor(theme::text_dim(&palette).with_alpha(if whole {
-                0.55
-            } else {
-                0.32
-            })),
+            BackgroundColor(theme::text_dim(&palette).with_alpha(if whole { 0.55 } else { 0.32 })),
             ChildOf(track),
         ));
         at += step;
@@ -1056,7 +1055,8 @@ fn hang_the_bodies_shelf(
             Visibility::Hidden,
         ))
         .id();
-    let bodies_drawer = crate::builder::drawer(&mut commands, &fonts, &palette, shelf, "THE BODY", true);
+    let bodies_drawer =
+        crate::builder::drawer(&mut commands, &fonts, &palette, shelf, "THE BODY", true);
     for (index, body) in bodies.0.iter().enumerate() {
         let button = commands
             .spawn((
@@ -1171,34 +1171,119 @@ fn prop_body(what: &str) -> Vec<(Vec3, Vec3, &'static str, f32)> {
     // (middle, size, ramp, shade)
     match what {
         "axe" => vec![
-            (Vec3::new(0.0, -0.28, 0.0), Vec3::new(0.04, 0.62, 0.04), "wood", 0.45),
-            (Vec3::new(0.0, -0.56, 0.0), Vec3::new(0.16, 0.13, 0.04), "stone", 0.75),
-            (Vec3::new(0.09, -0.56, 0.0), Vec3::new(0.06, 0.07, 0.05), "stone", 0.9),
+            (
+                Vec3::new(0.0, -0.28, 0.0),
+                Vec3::new(0.04, 0.62, 0.04),
+                "wood",
+                0.45,
+            ),
+            (
+                Vec3::new(0.0, -0.56, 0.0),
+                Vec3::new(0.16, 0.13, 0.04),
+                "stone",
+                0.75,
+            ),
+            (
+                Vec3::new(0.09, -0.56, 0.0),
+                Vec3::new(0.06, 0.07, 0.05),
+                "stone",
+                0.9,
+            ),
         ],
         "pick" => vec![
-            (Vec3::new(0.0, -0.30, 0.0), Vec3::new(0.04, 0.66, 0.04), "wood", 0.4),
-            (Vec3::new(0.0, -0.60, 0.0), Vec3::new(0.34, 0.05, 0.05), "stone", 0.8),
-            (Vec3::new(0.15, -0.57, 0.0), Vec3::new(0.06, 0.05, 0.05), "stone", 0.95),
-            (Vec3::new(-0.15, -0.57, 0.0), Vec3::new(0.06, 0.05, 0.05), "stone", 0.95),
+            (
+                Vec3::new(0.0, -0.30, 0.0),
+                Vec3::new(0.04, 0.66, 0.04),
+                "wood",
+                0.4,
+            ),
+            (
+                Vec3::new(0.0, -0.60, 0.0),
+                Vec3::new(0.34, 0.05, 0.05),
+                "stone",
+                0.8,
+            ),
+            (
+                Vec3::new(0.15, -0.57, 0.0),
+                Vec3::new(0.06, 0.05, 0.05),
+                "stone",
+                0.95,
+            ),
+            (
+                Vec3::new(-0.15, -0.57, 0.0),
+                Vec3::new(0.06, 0.05, 0.05),
+                "stone",
+                0.95,
+            ),
         ],
         "sword" => vec![
-            (Vec3::new(0.0, -0.09, 0.0), Vec3::new(0.04, 0.18, 0.04), "wood", 0.35),
-            (Vec3::new(0.0, -0.19, 0.0), Vec3::new(0.18, 0.04, 0.05), "bone", 0.75),
-            (Vec3::new(0.0, -0.55, 0.0), Vec3::new(0.06, 0.70, 0.02), "bone", 0.95),
+            (
+                Vec3::new(0.0, -0.09, 0.0),
+                Vec3::new(0.04, 0.18, 0.04),
+                "wood",
+                0.35,
+            ),
+            (
+                Vec3::new(0.0, -0.19, 0.0),
+                Vec3::new(0.18, 0.04, 0.05),
+                "bone",
+                0.75,
+            ),
+            (
+                Vec3::new(0.0, -0.55, 0.0),
+                Vec3::new(0.06, 0.70, 0.02),
+                "bone",
+                0.95,
+            ),
         ],
         "rod" => vec![
-            (Vec3::new(0.0, -0.14, 0.0), Vec3::new(0.04, 0.28, 0.04), "wood", 0.3),
-            (Vec3::new(0.0, -0.90, 0.0), Vec3::new(0.025, 1.30, 0.025), "wood", 0.55),
+            (
+                Vec3::new(0.0, -0.14, 0.0),
+                Vec3::new(0.04, 0.28, 0.04),
+                "wood",
+                0.3,
+            ),
+            (
+                Vec3::new(0.0, -0.90, 0.0),
+                Vec3::new(0.025, 1.30, 0.025),
+                "wood",
+                0.55,
+            ),
             // The line, hanging from the tip. A pole with no line is a stick.
-            (Vec3::new(0.0, -1.85, 0.0), Vec3::new(0.008, 0.62, 0.008), "bone", 0.9),
+            (
+                Vec3::new(0.0, -1.85, 0.0),
+                Vec3::new(0.008, 0.62, 0.008),
+                "bone",
+                0.9,
+            ),
         ],
         "hoe" => vec![
-            (Vec3::new(0.0, -0.34, 0.0), Vec3::new(0.04, 0.72, 0.04), "wood", 0.45),
-            (Vec3::new(0.06, -0.70, 0.0), Vec3::new(0.16, 0.05, 0.10), "stone", 0.7),
+            (
+                Vec3::new(0.0, -0.34, 0.0),
+                Vec3::new(0.04, 0.72, 0.04),
+                "wood",
+                0.45,
+            ),
+            (
+                Vec3::new(0.06, -0.70, 0.0),
+                Vec3::new(0.16, 0.05, 0.10),
+                "stone",
+                0.7,
+            ),
         ],
         "torch" => vec![
-            (Vec3::new(0.0, -0.22, 0.0), Vec3::new(0.05, 0.46, 0.05), "wood", 0.35),
-            (Vec3::new(0.0, -0.50, 0.0), Vec3::new(0.09, 0.12, 0.09), "cloth-rust", 0.85),
+            (
+                Vec3::new(0.0, -0.22, 0.0),
+                Vec3::new(0.05, 0.46, 0.05),
+                "wood",
+                0.35,
+            ),
+            (
+                Vec3::new(0.0, -0.50, 0.0),
+                Vec3::new(0.09, 0.12, 0.09),
+                "cloth-rust",
+                0.85,
+            ),
         ],
         _ => Vec::new(),
     }

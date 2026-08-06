@@ -78,7 +78,6 @@ enum Shape {
     MitreBack,
 }
 
-
 /// A right-angle prism: a box with one end cut clean through at an angle.
 ///
 /// The shape a saw makes. A wedge is a GABLE's prism - two slopes meeting at a
@@ -419,7 +418,11 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     structure("DOORWAY", PartKind::Prop("doorway"), "walls"),
     structure("FLOOR, 2M", PartKind::Floor(2.0, 2.0), "footing"),
     structure("FLOOR, STRETCH", PartKind::FloorRun, "footing"),
-    structure("FOUNDATION, 2M", PartKind::Foundation(2.0, 2.0, 0.375), "footing"),
+    structure(
+        "FOUNDATION, 2M",
+        PartKind::Foundation(2.0, 2.0, 0.375),
+        "footing",
+    ),
     structure("FOUNDATION, STRETCH", PartKind::FoundationRun, "footing"),
     structure("GABLE, STRETCH", PartKind::GableRun, "roof"),
     structure(
@@ -630,32 +633,48 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             "wood",
             0.7,
         )],
-        PartKind::Seg { long, high, lift } => vec![slab(
-            0.0,
-            lift + high * 0.5,
-            0.0,
-            // Drawn a hair longer than it measures, and it laps at both ends.
+        PartKind::Seg { long, high, lift } => {
+            // The lap goes INWARD, never past the wall's own edges.
             //
-            // A segment exists to fill the wall BESIDE something - the pieces a
-            // punch leaves either side of a window, a header over it, a sill
-            // under it - so both its ends abut. Two boxes that meet exactly
-            // share an edge each works out by its own sum, from different
-            // centres, and the last bits disagree; the rasteriser then leaves a
-            // hairline that neither claims and the dark behind the wall shows
-            // through it. Brett photographed one running down from a window, and
-            // it survives the bake because the fault is in the geometry.
+            // It used to be added to the height as well as the length, which
+            // grew the piece by a sixty-fourth at BOTH ends - so a header stood
+            // proud of the wall top and the pieces either side of a door stood
+            // proud of their neighbours. Brett: "When i add a double door to
+            // this wall it seems to get slightly taller than the other walls?"
+            // It did, by a sixty-fourth, which is exactly the amount that reads
+            // as a step in a straight run of wall.
             //
-            // A sixty-fourth at each end: too small to see, too large for any
-            // float to lose. Put HERE rather than where a punch works out its
-            // leavings, because that would only mend walls punched from today
-            // on - and the buildings that have the seam are the ones already
-            // drawn. Seventeen of these stand in the longhouse alone.
-            *long + LAP,
-            *high + LAP,
-            WALL_THICK,
-            "wood",
-            0.7,
-        )],
+            // A header is the only one with a joint to close vertically: it sits
+            // over a frame, and laps DOWN onto it. Everything else meets the
+            // wall top or the floor, and those are edges rather than joints.
+            let drop = if *lift > 0.0 { LAP } else { 0.0 };
+            vec![slab(
+                0.0,
+                lift + high * 0.5 - drop * 0.5,
+                0.0,
+                // Drawn a hair longer than it measures, and it laps at both ends.
+                //
+                // A segment exists to fill the wall BESIDE something - the pieces a
+                // punch leaves either side of a window, a header over it, a sill
+                // under it - so both its ends abut. Two boxes that meet exactly
+                // share an edge each works out by its own sum, from different
+                // centres, and the last bits disagree; the rasteriser then leaves a
+                // hairline that neither claims and the dark behind the wall shows
+                // through it. Brett photographed one running down from a window, and
+                // it survives the bake because the fault is in the geometry.
+                //
+                // A sixty-fourth at each end: too small to see, too large for any
+                // float to lose. Put HERE rather than where a punch works out its
+                // leavings, because that would only mend walls punched from today
+                // on - and the buildings that have the seam are the ones already
+                // drawn. Seventeen of these stand in the longhouse alone.
+                *long + LAP,
+                *high + drop,
+                WALL_THICK,
+                "wood",
+                0.7,
+            )]
+        }
         PartKind::Floor(w, d) => vec![slab(0.0, 0.0625, 0.0, *w, 0.125, *d, "wood", 0.5)],
         PartKind::FloorRun => vec![slab(0.0, 0.0625, 0.0, 0.25, 0.125, 0.25, "wood", 0.5)],
         PartKind::Foundation(w, d, high) => {
@@ -1931,7 +1950,10 @@ fn take_one_back_out(
     no: Query<&Interaction, (Changed<Interaction>, With<RemovalNo>)>,
 ) {
     // Answering first, so a press cannot both raise a card and answer it.
-    if let Some((_, chosen)) = yes.iter().find(|(touch, _)| **touch == Interaction::Pressed) {
+    if let Some((_, chosen)) = yes
+        .iter()
+        .find(|(touch, _)| **touch == Interaction::Pressed)
+    {
         match std::fs::remove_file(&chosen.0.path) {
             Ok(()) => info!("took {} back out of the game", chosen.0.name),
             Err(why) => warn!("could not remove {}: {why}", chosen.0.path.display()),
@@ -1951,7 +1973,10 @@ fn take_one_back_out(
     if !cards.is_empty() || naming.0.is_some() {
         return;
     }
-    let Some((_, row)) = rows.iter().find(|(touch, _)| **touch == Interaction::Pressed) else {
+    let Some((_, row)) = rows
+        .iter()
+        .find(|(touch, _)| **touch == Interaction::Pressed)
+    else {
         return;
     };
     // The asking. Taking a building out of the village is not something to do on
@@ -2149,7 +2174,10 @@ fn hang_the_pieces(
                 ..default()
             },
             TextColor(theme::text_dim(&palette).with_alpha(0.7)),
-            TextLayout::new(bevy::text::Justify::Left, bevy::text::LineBreak::WordBoundary),
+            TextLayout::new(
+                bevy::text::Justify::Left,
+                bevy::text::LineBreak::WordBoundary,
+            ),
             ChildOf(drawer.0),
         ));
         return;
@@ -2236,7 +2264,10 @@ fn wield_a_piece(
     }
     // Taking one up. The ordinary hand empties: two things held at once is two
     // things placed by one click.
-    if let Some((_, piece)) = taken.iter().find(|(touch, _)| **touch == Interaction::Pressed) {
+    if let Some((_, piece)) = taken
+        .iter()
+        .find(|(touch, _)| **touch == Interaction::Pressed)
+    {
         if let Some(read) = std::fs::read_to_string(&piece.0)
             .ok()
             .and_then(|text| serde_json::from_str::<Piece>(&text).ok())
@@ -2328,7 +2359,11 @@ fn wield_a_piece(
             false,
         );
     }
-    info!("set down the piece {} - {} parts", held.name, held.parts.len());
+    info!(
+        "set down the piece {} - {} parts",
+        held.name,
+        held.parts.len()
+    );
 }
 
 fn bake_into_the_game(
@@ -2768,9 +2803,8 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
             let rise = parts.next()?.parse().ok()?;
             let wide = parts.next().and_then(|n| n.parse().ok()).unwrap_or(1.25);
             let cloth = parts.next().unwrap_or("");
-            let letter = |at: usize, was: bool| {
-                cloth.chars().nth(at).map_or(was, |letter| letter == 's')
-            };
+            let letter =
+                |at: usize, was: bool| cloth.chars().nth(at).map_or(was, |letter| letter == 's');
             // And the rail's own height, on the end. A flight from before the
             // rail could be raised opens at the height they all had.
             let hand = parts.next().and_then(|n| n.parse().ok()).unwrap_or(0.875);
@@ -3149,9 +3183,7 @@ fn trim_to_roof(
     // given up.
     let seated: Vec<&(Vec3, Vec3, Quat)> = roofs
         .iter()
-        .filter(|(box_at, box_half, box_turn)| {
-            !point_in_box(at, *box_at, *box_half, *box_turn)
-        })
+        .filter(|(box_at, box_half, box_turn)| !point_in_box(at, *box_at, *box_half, *box_turn))
         .collect();
 
     // The part's own cross-section, so its CORNERS are cast and not its centre
@@ -3425,7 +3457,9 @@ fn raise_part_menu(
     }
     // Carrying a mark is reason enough to offer it, whatever the part is.
     if !deeds.contains(&Deed::Ungroup)
-        && placed.get(part).is_ok_and(|(_, _, record)| record.group.is_some())
+        && placed
+            .get(part)
+            .is_ok_and(|(_, _, record)| record.group.is_some())
     {
         deeds.insert(0, Deed::Ungroup);
     }
@@ -3449,7 +3483,11 @@ fn raise_part_menu(
     if deeds.is_empty() {
         return;
     }
-    let Some(at) = windows.iter().next().and_then(|window| window.cursor_position()) else {
+    let Some(at) = windows
+        .iter()
+        .next()
+        .and_then(|window| window.cursor_position())
+    else {
         return;
     };
 
@@ -3555,7 +3593,10 @@ fn work_part_menu(
         Some((Deed::Ungroup, part)) => {
             // A group first: the commonest thing UNGROUP is asked to undo, now
             // that grouping exists at all.
-            let holding = placed.get(part).ok().and_then(|(_, _, record)| record.group);
+            let holding = placed
+                .get(part)
+                .ok()
+                .and_then(|(_, _, record)| record.group);
             if let Some(group) = holding {
                 let kin: Vec<Entity> = placed
                     .iter()
@@ -3587,8 +3628,7 @@ fn work_part_menu(
                 }
                 if let Some(kind) = kind_from_name(&record.part) {
                     let record = record.clone();
-                    let together =
-                        a_fresh_group(held.iter().map(|(_, _, record)| record));
+                    let together = a_fresh_group(held.iter().map(|(_, _, record)| record));
                     ungroup(
                         &mut commands,
                         &mut meshes,
@@ -3626,8 +3666,7 @@ fn work_part_menu(
                 })
                 .collect();
             let trimmed = placed.get(part).ok().and_then(|(_, _, record)| {
-                kind_from_name(&record.part)
-                    .and_then(|kind| trim_to_roof(&kind, record, &roofs))
+                kind_from_name(&record.part).and_then(|kind| trim_to_roof(&kind, record, &roofs))
             });
             if let Some((made, moved)) = trimmed
                 && let Ok((_, mut transform, mut record)) = placed.get_mut(part)
@@ -4083,11 +4122,7 @@ fn work_palette(
 
 // ---------------------------------------------------------------- the shelf
 
-fn raise_shelf(
-    mut commands: Commands,
-    fonts: Res<Fonts>,
-    palette: Res<Palette>,
-) {
+fn raise_shelf(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette>) {
     let shelf = commands
         .spawn((
             Shelf,
@@ -4126,7 +4161,6 @@ fn raise_shelf(
         ChildOf(shelf),
     ));
 
-
     // The drawers of parts.
     for (name, entries, open) in [
         ("STRUCTURE", STRUCTURE, true),
@@ -4163,7 +4197,6 @@ fn raise_shelf(
             Box::leak(name.to_uppercase().into_boxed_str()),
         );
     }
-
 }
 
 /// A drawer: a header that opens and closes, and the body under it.
@@ -4245,17 +4278,18 @@ fn button_label(
     button: Entity,
     label: &'static str,
 ) -> Entity {
-    commands.spawn((
-        Text::new(label),
-        TextFont {
-            font: fonts.text.clone().into(),
-            font_size: FontSize::Px(12.0),
-            ..default()
-        },
-        TextColor(theme::text_dim(palette)),
-        ChildOf(button),
-    ))
-    .id()
+    commands
+        .spawn((
+            Text::new(label),
+            TextFont {
+                font: fonts.text.clone().into(),
+                font_size: FontSize::Px(12.0),
+                ..default()
+            },
+            TextColor(theme::text_dim(palette)),
+            ChildOf(button),
+        ))
+        .id()
 }
 
 /// The shelf belongs to the Builder bench alone.
@@ -4563,8 +4597,8 @@ fn paint_the_work(
             brush.ramp = Some(ramps[next].to_string());
         }
     }
-    let by = f32::from(keys.just_pressed(KeyCode::Equal))
-        - f32::from(keys.just_pressed(KeyCode::Minus));
+    let by =
+        f32::from(keys.just_pressed(KeyCode::Equal)) - f32::from(keys.just_pressed(KeyCode::Minus));
     if by != 0.0 {
         brush.shade = (brush.shade + by * 0.25).clamp(0.0, 1.0);
         if brush.ramp.is_none() {
@@ -5831,7 +5865,10 @@ fn hang_the_chosen(
                 ..default()
             },
             TextColor(theme::text_dim(&palette)),
-            TextLayout::new(bevy::text::Justify::Left, bevy::text::LineBreak::WordBoundary),
+            TextLayout::new(
+                bevy::text::Justify::Left,
+                bevy::text::LineBreak::WordBoundary,
+            ),
             ChildOf(panel),
         ));
     }
@@ -6725,7 +6762,9 @@ fn raise_naming_card(
     ));
     commands.spawn((
         Text::new(match what_for {
-            NamingFor::Carrying => "the village raises it under this name - esc thinks better of it",
+            NamingFor::Carrying => {
+                "the village raises it under this name - esc thinks better of it"
+            }
             NamingFor::AsAPiece => "kept for any work, not just this one - esc thinks better of it",
             NamingFor::Keeping => "enter saves - esc thinks better of it",
         }),
@@ -7085,7 +7124,6 @@ fn take_the_name(
         commands.entity(card).despawn();
     }
 }
-
 
 /// Passing words return to their old text when their moment ends.
 fn settle_words(
@@ -7765,31 +7803,33 @@ fn bury_the_chosen(
         return;
     }
     for chosen in doomed {
-    if let Ok((_, chosen_at, _, _)) = parts.get(chosen) {
-        // The marks it carries go with it. A door's routing mark left standing
-        // in a wall with no door is worse than either: the village reads it and
-        // sends people to walk through masonry.
-        let carried = carried_marks(
-            chosen,
-            chosen_at.translation,
-            parts.iter().map(|(e, at, record, _)| (e, at.translation, record)),
-        );
-        for mark in carried {
-            commands.entity(mark).despawn();
+        if let Ok((_, chosen_at, _, _)) = parts.get(chosen) {
+            // The marks it carries go with it. A door's routing mark left standing
+            // in a wall with no door is worse than either: the village reads it and
+            // sends people to walk through masonry.
+            let carried = carried_marks(
+                chosen,
+                chosen_at.translation,
+                parts
+                    .iter()
+                    .map(|(e, at, record, _)| (e, at.translation, record)),
+            );
+            for mark in carried {
+                commands.entity(mark).despawn();
+            }
+            // A door taken out leaves the wall whole again. The older path through
+            // X has always done this; a second way to remove a part that did not
+            // would leave holes nobody could account for.
+            heal_wall(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &palette,
+                &parts,
+                chosen,
+            );
+            commands.entity(chosen).despawn();
         }
-        // A door taken out leaves the wall whole again. The older path through
-        // X has always done this; a second way to remove a part that did not
-        // would leave holes nobody could account for.
-        heal_wall(
-            &mut commands,
-            &mut meshes,
-            &mut materials,
-            &palette,
-            &parts,
-            chosen,
-        );
-        commands.entity(chosen).despawn();
-    }
     }
     selected.clear();
 }
@@ -8090,18 +8130,14 @@ pub(crate) fn bake_a_work(
             PartKind::Prop("chest" | "cupboard" | "wardrobe" | "shelves") => {
                 marks.push(mark("store", anchor, record.yaw))
             }
-            PartKind::Prop("anvil" | "loom") => {
-                marks.push(mark("work", anchor, record.yaw))
-            }
+            PartKind::Prop("anvil" | "loom") => marks.push(mark("work", anchor, record.yaw)),
             PartKind::Prop("candle") => marks.push(mark("light", anchor, record.yaw)),
             _ => {}
         }
 
         // The body itself, as boxes the game can simply draw.
         let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-        for Slab(mut at, size, ramp, shade, clarity, shape, mut lean) in
-            body_of(&kind, repaint)
-        {
+        for Slab(mut at, size, ramp, shade, clarity, shape, mut lean) in body_of(&kind, repaint) {
             if record.flip {
                 at.x = -at.x;
                 lean = -lean;
@@ -8160,9 +8196,9 @@ pub(crate) fn bake_a_work(
         .collect();
     marks.retain(|(what, at, _, hand)| {
         *hand
-            || !by_hand.iter().any(|(other, spot)| {
-                other == what && (spot.x - at.x).hypot(spot.z - at.z) < 0.8
-            })
+            || !by_hand
+                .iter()
+                .any(|(other, spot)| other == what && (spot.x - at.x).hypot(spot.z - at.z) < 0.8)
     });
     let marks: Vec<String> = marks
         .iter()
@@ -8345,6 +8381,60 @@ fn turn_part(
 #[cfg(test)]
 mod roof_tests {
     use super::*;
+
+    /// A wall piece never stands taller than it measures. The lap that closes
+    /// its seams goes inward - toward the joint it has - and a wall's top and
+    /// the floor are edges rather than joints.
+    #[test]
+    fn a_wall_piece_keeps_its_own_height() {
+        let top_of = |kind: &PartKind| {
+            body_of(kind, None)
+                .iter()
+                .map(|Slab(at, size, ..)| at.y + size.y * 0.5)
+                .fold(f32::NEG_INFINITY, f32::max)
+        };
+        let bottom_of = |kind: &PartKind| {
+            body_of(kind, None)
+                .iter()
+                .map(|Slab(at, size, ..)| at.y - size.y * 0.5)
+                .fold(f32::INFINITY, f32::min)
+        };
+        // A plain wall, and the full-height pieces a punch leaves beside a door.
+        let wall = PartKind::Wall(2.0);
+        let beside = PartKind::Seg {
+            long: 0.75,
+            high: WALL_HIGH,
+            lift: 0.0,
+        };
+        assert!(
+            (top_of(&beside) - top_of(&wall)).abs() < 1e-4,
+            "a piece beside a door stands at {} where the wall beside it stands at {}",
+            top_of(&beside),
+            top_of(&wall)
+        );
+        assert!(bottom_of(&beside).abs() < 1e-4, "it left the floor");
+
+        // A header over a door: its top is the wall's, and it laps DOWN onto the
+        // frame beneath it.
+        let header = PartKind::Seg {
+            long: 1.5,
+            high: 0.5,
+            lift: WALL_HIGH - 0.5,
+        };
+        assert!(
+            (top_of(&header) - WALL_HIGH).abs() < 1e-4,
+            "a header rose past the wall top, to {}",
+            top_of(&header)
+        );
+        assert!(
+            bottom_of(&header) < WALL_HIGH - 0.5 - 1e-4,
+            "a header should lap down onto what it sits over"
+        );
+
+        // And the length still laps at both ends, which is what it is for.
+        let Slab(_, size, ..) = &body_of(&beside, None)[0];
+        assert!(size.x > 0.75 + 1e-4, "a piece stopped lapping along its wall");
+    }
 
     /// A part rests on what MOST of it is standing on. One corner brushing a
     /// wall used to carry the whole part onto the wall, which is what a maker
@@ -8588,7 +8678,10 @@ mod roof_tests {
             "widening by 0.75 moved the footprint by {}",
             wider.x - flight.x
         );
-        assert!((wider.y - flight.y).abs() < 1e-4, "widening changed the run");
+        assert!(
+            (wider.y - flight.y).abs() < 1e-4,
+            "widening changed the run"
+        );
     }
 
     /// A flight climbs by whole treads, and its rail runs from newel to newel at
@@ -8684,12 +8777,19 @@ mod roof_tests {
         );
         let boxes = roof_boxes(&roof);
         let kind = PartKind::Beam(8.0, 0.0, 0.0);
-        let beam = a_record("beam-8".to_string(), [0.0, 4.0, 0.0], std::f32::consts::FRAC_PI_2);
+        let beam = a_record(
+            "beam-8".to_string(),
+            [0.0, 4.0, 0.0],
+            std::f32::consts::FRAC_PI_2,
+        );
         let (once, moved) = trim_to_roof(&kind, &beam, &boxes).expect("the first trim");
         let PartKind::Beam(_, first_high, first_low) = once else {
             panic!("a trimmed beam is a beam");
         };
-        assert!(first_high > 0.0 || first_low > 0.0, "the first trim cut nothing");
+        assert!(
+            first_high > 0.0 || first_low > 0.0,
+            "the first trim cut nothing"
+        );
         match trim_to_roof(&once, &moved, &boxes) {
             None => {}
             Some((PartKind::Beam(_, high, low), _)) => {
@@ -9021,11 +9121,7 @@ mod roof_tests {
         // offered it, and offering a deed that does nothing is the fault.
         let kind = PartKind::Beam(4.0, 0.0, 0.0);
         let record = a_record("beam-4".to_string(), [0.0, 0.0, 0.0], 0.0);
-        let far_off = vec![(
-            Vec3::new(40.0, 0.0, 0.0),
-            Vec3::splat(1.0),
-            Quat::IDENTITY,
-        )];
+        let far_off = vec![(Vec3::new(40.0, 0.0, 0.0), Vec3::splat(1.0), Quat::IDENTITY)];
         assert!(trim_to_roof(&kind, &record, &far_off).is_none());
         assert!(trim_to_roof(&kind, &record, &[]).is_none());
     }
@@ -9156,7 +9252,10 @@ mod roof_tests {
         assert!(!comes_apart(&PartKind::Wall(2.0)), "a wall is a wall");
 
         // And every part can be told what it is, whether or not it comes apart.
-        for kind in [PartKind::Wall(2.0), PartKind::GableRoof(6.0, 4.0, 0.25, 30.0)] {
+        for kind in [
+            PartKind::Wall(2.0),
+            PartKind::GableRoof(6.0, 4.0, 0.25, 30.0),
+        ] {
             for nature in NATURES {
                 assert!(
                     deeds_for(&kind).contains(&Deed::Nature(nature)),
@@ -9238,7 +9337,10 @@ mod roof_tests {
         else {
             panic!("the oldest roofs no longer open");
         };
-        assert_eq!((long, span, over, pitch), (6.0, 4.0, 0.25, ROOF_PITCH_DEGREES));
+        assert_eq!(
+            (long, span, over, pitch),
+            (6.0, 4.0, 0.25, ROOF_PITCH_DEGREES)
+        );
     }
 
     /// The highest point anything in a roof reaches: the ridge.
