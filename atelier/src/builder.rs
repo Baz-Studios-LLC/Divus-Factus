@@ -1546,6 +1546,13 @@ struct Shelf;
 #[derive(Component)]
 struct SaveButton;
 
+/// Opens the folder the works live in, in whatever the desktop calls a window
+/// of files. Brett asked for it and it is the sort of thing a bench should have
+/// had from the start: the bench writes `.baz` files somewhere sensible, and
+/// "somewhere sensible" is a path nobody should have to be told.
+#[derive(Component)]
+struct OpenFolderButton;
+
 /// The save button's label, so it can say what just happened.
 #[derive(Component)]
 struct SaveLabel;
@@ -1699,6 +1706,7 @@ impl Plugin for BuilderPlugin {
                 Update,
                 (
                     save_workbench,
+                    open_the_folder,
                     take_the_name,
                     dims_panel,
                     recall,
@@ -3298,6 +3306,33 @@ fn raise_shelf(
         },
         TextColor(theme::accent(&palette)),
         ChildOf(save),
+    ));
+    // And the way to the works themselves, under it.
+    let folder = commands
+        .spawn((
+            OpenFolderButton,
+            Interaction::default(),
+            Node {
+                margin: UiRect::top(Val::Px(6.0)),
+                padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.18)),
+            BorderColor::all(theme::text_dim(&palette).with_alpha(0.5)),
+            ChildOf(files),
+        ))
+        .id();
+    commands.spawn((
+        Text::new("OPEN THE FOLDER"),
+        TextFont {
+            font: fonts.display.clone().into(),
+            font_size: FontSize::Px(11.0),
+            ..default()
+        },
+        TextColor(theme::text_dim(&palette)),
+        ChildOf(folder),
     ));
     commands.spawn((
         Text::new(
@@ -5461,6 +5496,47 @@ fn bench_path() -> std::path::PathBuf {
     bench_home().join(format!("out/buildings/workbench.{WORK_KIND}"))
 }
 
+/// Where the works are kept: the folder the bench saves into and loads from.
+fn works_home() -> std::path::PathBuf {
+    bench_path()
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_else(bench_home)
+}
+
+/// Shows the works folder in the desktop's own file window.
+///
+/// The folder is MADE first if it is not there. A bench that has never saved
+/// anything has no folder yet, and a button that quietly does nothing is worse
+/// than no button - the maker is left wondering which of the two broke.
+fn open_the_folder(
+    folders: Query<&Interaction, (Changed<Interaction>, With<OpenFolderButton>)>,
+) {
+    if !folders
+        .iter()
+        .any(|interaction| *interaction == Interaction::Pressed)
+    {
+        return;
+    }
+    let home = works_home();
+    if let Err(why) = std::fs::create_dir_all(&home) {
+        warn!("could not make {}: {why}", home.display());
+        return;
+    }
+    // One name per desktop, and the same argument to all three.
+    let opener = if cfg!(target_os = "macos") {
+        "open"
+    } else if cfg!(target_os = "windows") {
+        "explorer"
+    } else {
+        "xdg-open"
+    };
+    match std::process::Command::new(opener).arg(&home).spawn() {
+        Ok(_) => info!("opened {}", home.display()),
+        Err(why) => warn!("could not open {}: {why}", home.display()),
+    }
+}
+
 /// The save button asks the work its name; the writing happens when the
 /// name is given, in [`take_the_name`].
 fn save_workbench(
@@ -6971,6 +7047,23 @@ fn turn_part(
 #[cfg(test)]
 mod roof_tests {
     use super::*;
+
+    /// The folder the button opens is the folder the works are in - the same one
+    /// the bench saves into and lists from, not merely near it.
+    #[test]
+    fn the_folder_button_opens_where_the_works_are() {
+        let home = works_home();
+        assert_eq!(
+            bench_path().parent().expect("the bench sits in a folder"),
+            home,
+            "the button and the save would open two different places"
+        );
+        assert!(
+            home.ends_with("out/buildings"),
+            "the works live at {}",
+            home.display()
+        );
+    }
 
     /// Trimming a beam that has ALREADY been trimmed must not undo the saw.
     #[test]
