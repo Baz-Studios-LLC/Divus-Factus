@@ -136,6 +136,29 @@ impl Default for WorldSeed {
     }
 }
 
+/// Which graphics API the game asks for.
+///
+/// Windows offers two and wgpu takes whichever it meets first, which on Brett's
+/// friend's laptop was Vulkan: an RTX 4060 drawing through the path that gets
+/// the least attention on Windows, rather than the platform's own. Direct3D 12
+/// is what a Windows game is expected to speak, and what NVIDIA's driver is
+/// tuned hardest for.
+///
+/// `WGPU_BACKEND` still wins when it is set, which is how the two get compared
+/// on a real machine rather than argued about here - and how anybody stuck on a
+/// card where the default is the wrong answer gets themselves out.
+fn drawn_by() -> bevy::render::settings::Backends {
+    use bevy::render::settings::Backends;
+    if let Some(told) = Backends::from_env() {
+        return told;
+    }
+    if cfg!(windows) {
+        Backends::DX12
+    } else {
+        Backends::all()
+    }
+}
+
 fn main() {
     // The voice bench: the corpus with no world around it, for judging
     // the writing without hunting two villagers across a valley first.
@@ -144,7 +167,17 @@ fn main() {
         return;
     }
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
+        .add_plugins(
+            DefaultPlugins
+                .set(bevy::render::RenderPlugin {
+                    render_creation: bevy::render::settings::WgpuSettings {
+                        backends: Some(drawn_by()),
+                        ..default()
+                    }
+                    .into(),
+                    ..default()
+                })
+                .set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Divus Factus".into(),
                 resolution: (1600u32, 900u32).into(),
@@ -161,12 +194,13 @@ fn main() {
             }),
             // The divine hand is the pointer. The operating system's arrow floating
             // over it breaks the one illusion the game is named after.
-            primary_cursor_options: Some(bevy::window::CursorOptions {
-                visible: false,
-                ..default()
-            }),
-            ..default()
-        }))
+                    primary_cursor_options: Some(bevy::window::CursorOptions {
+                        visible: false,
+                        ..default()
+                    }),
+                    ..default()
+                }),
+        )
         .init_state::<GameState>()
         .init_resource::<WorldSeed>()
         .add_plugins((
