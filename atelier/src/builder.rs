@@ -1521,6 +1521,284 @@ struct Shelf;
 #[derive(Component)]
 pub(crate) struct SaveButton;
 
+/// The IN THE GAME drawer's body, so the list can be hung again after a bake.
+#[derive(Resource)]
+struct CarriedDrawer(Entity);
+
+/// Set whenever the list is out of date: at startup, after a bake, after a
+/// removal.
+#[derive(Resource)]
+struct CarriedStale(bool);
+
+impl Default for CarriedStale {
+    fn default() -> Self {
+        CarriedStale(true)
+    }
+}
+
+/// One drawing already carried into the game.
+#[derive(Component, Clone)]
+struct CarriedRow {
+    path: std::path::PathBuf,
+    name: String,
+}
+
+/// The card that asks before a drawing is taken back out of the game.
+#[derive(Component)]
+struct RemovalCard;
+
+/// Its two answers.
+#[derive(Component)]
+struct RemovalYes(CarriedRow);
+
+#[derive(Component)]
+struct RemovalNo;
+
+/// Just enough of a baked file to list it.
+#[derive(serde::Deserialize)]
+struct CarriedFile {
+    name: String,
+    #[serde(default)]
+    kind: String,
+}
+
+/// Hangs the list of what the game will raise.
+fn hang_the_carried(
+    mut commands: Commands,
+    fonts: Res<Fonts>,
+    palette: Res<Palette>,
+    drawer: Option<Res<CarriedDrawer>>,
+    mut stale: ResMut<CarriedStale>,
+) {
+    if !stale.0 {
+        return;
+    }
+    let Some(drawer) = drawer else {
+        return;
+    };
+    stale.0 = false;
+    commands.entity(drawer.0).despawn_related::<Children>();
+
+    let home = carried_home("buildings");
+    let mut carried: Vec<(std::path::PathBuf, CarriedFile)> = std::fs::read_dir(&home)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|kind| kind == "json"))
+        .filter_map(|path| {
+            std::fs::read_to_string(&path)
+                .ok()
+                .and_then(|text| serde_json::from_str::<CarriedFile>(&text).ok())
+                .map(|file| (path, file))
+        })
+        .collect();
+    carried.sort_by(|a, b| a.1.name.cmp(&b.1.name));
+
+    if carried.is_empty() {
+        commands.spawn((
+            Text::new("nothing carried in yet"),
+            TextFont {
+                font: fonts.text.clone().into(),
+                font_size: FontSize::Px(11.0),
+                ..default()
+            },
+            TextColor(theme::text_dim(&palette).with_alpha(0.7)),
+            ChildOf(drawer.0),
+        ));
+        return;
+    }
+    for (path, file) in carried {
+        let row = CarriedRow {
+            path,
+            name: file.name.clone(),
+        };
+        let button = commands
+            .spawn((
+                row.clone(),
+                Interaction::default(),
+                Node {
+                    width: Val::Percent(100.0),
+                    min_width: Val::Px(0.0),
+                    flex_direction: FlexDirection::Column,
+                    padding: UiRect::axes(Val::Px(9.0), Val::Px(4.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::BLACK.with_alpha(0.18)),
+                BorderColor::all(theme::panel_border(&palette)),
+                ChildOf(drawer.0),
+            ))
+            .id();
+        let name = button_label(
+            &mut commands,
+            &fonts,
+            &palette,
+            button,
+            Box::leak(file.name.to_uppercase().into_boxed_str()),
+        );
+        // A saved name is usually one long word with nothing a line breaker
+        // would call a gap, and a word that will not break hangs off the shelf.
+        commands.entity(name).insert(TextLayout::new(
+            bevy::text::Justify::Left,
+            bevy::text::LineBreak::AnyCharacter,
+        ));
+        let said = crate::builder::KINDS
+            .iter()
+            .find(|(word, _)| *word == file.kind)
+            .map(|(_, label)| *label)
+            .unwrap_or("BY ITS NAME");
+        commands.spawn((
+            Text::new(said),
+            TextFont {
+                font: fonts.text.clone().into(),
+                font_size: FontSize::Px(10.0),
+                ..default()
+            },
+            TextColor(theme::text_dim(&palette).with_alpha(0.75)),
+            ChildOf(button),
+        ));
+        commands.spawn((
+            crate::rail::Word("Take it back out of the game"),
+            ChildOf(button),
+        ));
+    }
+}
+
+/// A press on a row asks; a press on the card answers.
+#[allow(clippy::too_many_arguments)]
+fn take_one_back_out(
+    mut commands: Commands,
+    fonts: Res<Fonts>,
+    palette: Res<Palette>,
+    naming: Res<Naming>,
+    mut stale: ResMut<CarriedStale>,
+    rows: Query<(&Interaction, &CarriedRow), Changed<Interaction>>,
+    cards: Query<Entity, With<RemovalCard>>,
+    yes: Query<(&Interaction, &RemovalYes), Changed<Interaction>>,
+    no: Query<&Interaction, (Changed<Interaction>, With<RemovalNo>)>,
+) {
+    // Answering first, so a press cannot both raise a card and answer it.
+    if let Some((_, chosen)) = yes.iter().find(|(touch, _)| **touch == Interaction::Pressed) {
+        match std::fs::remove_file(&chosen.0.path) {
+            Ok(()) => info!("took {} back out of the game", chosen.0.name),
+            Err(why) => warn!("could not remove {}: {why}", chosen.0.path.display()),
+        }
+        stale.0 = true;
+        for card in &cards {
+            commands.entity(card).despawn();
+        }
+        return;
+    }
+    if no.iter().any(|touch| *touch == Interaction::Pressed) {
+        for card in &cards {
+            commands.entity(card).despawn();
+        }
+        return;
+    }
+    if !cards.is_empty() || naming.0.is_some() {
+        return;
+    }
+    let Some((_, row)) = rows.iter().find(|(touch, _)| **touch == Interaction::Pressed) else {
+        return;
+    };
+    // The asking. Taking a building out of the village is not something to do on
+    // one press of a row a maker might have brushed while reading it.
+    let card = commands
+        .spawn((
+            RemovalCard,
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Percent(50.0),
+                top: Val::Percent(40.0),
+                margin: UiRect {
+                    left: Val::Px(-170.0),
+                    ..default()
+                },
+                width: Val::Px(340.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                padding: UiRect::all(Val::Px(18.0)),
+                row_gap: Val::Px(8.0),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(theme::panel_bg()),
+            BorderColor::all(theme::accent(&palette).with_alpha(0.7)),
+            GlobalZIndex(50),
+        ))
+        .id();
+    commands.spawn((
+        Text::new(format!("TAKE {} OUT OF THE GAME?", row.name.to_uppercase())),
+        TextFont {
+            font: fonts.display.clone().into(),
+            font_size: FontSize::Px(14.0),
+            ..default()
+        },
+        TextColor(theme::accent(&palette)),
+        ChildOf(card),
+    ));
+    commands.spawn((
+        Text::new("the drawing on the bench is untouched - only the game's copy goes"),
+        TextFont {
+            font: fonts.text.clone().into(),
+            font_size: FontSize::Px(11.0),
+            ..default()
+        },
+        TextColor(theme::text_dim(&palette).with_alpha(0.8)),
+        ChildOf(card),
+    ));
+    let answers = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(8.0),
+                margin: UiRect::top(Val::Px(4.0)),
+                ..default()
+            },
+            ChildOf(card),
+        ))
+        .id();
+    for take in [true, false] {
+        let button = commands
+            .spawn((
+                Interaction::default(),
+                Node {
+                    padding: UiRect::axes(Val::Px(16.0), Val::Px(6.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::BLACK.with_alpha(0.18)),
+                BorderColor::all(if take {
+                    theme::accent(&palette).with_alpha(0.7)
+                } else {
+                    theme::panel_border(&palette)
+                }),
+                ChildOf(answers),
+            ))
+            .id();
+        if take {
+            commands.entity(button).insert(RemovalYes(row.clone()));
+        } else {
+            commands.entity(button).insert(RemovalNo);
+        }
+        commands.spawn((
+            Text::new(if take { "TAKE IT OUT" } else { "LEAVE IT" }),
+            TextFont {
+                font: fonts.display.clone().into(),
+                font_size: FontSize::Px(12.0),
+                ..default()
+            },
+            TextColor(if take {
+                theme::accent(&palette)
+            } else {
+                theme::text_dim(&palette)
+            }),
+            ChildOf(button),
+        ));
+    }
+}
+
 /// A button that carries the work into the game.
 #[derive(Component)]
 pub(crate) struct BakeButton;
@@ -1799,6 +2077,7 @@ impl Plugin for BuilderPlugin {
             .init_resource::<StageHeld>()
             .init_resource::<WorkWanted>()
             .init_resource::<CarryingKind>()
+            .init_resource::<CarriedStale>()
             .init_resource::<Brush>()
             .init_resource::<Naming>()
             .init_resource::<Hovered>()
@@ -1868,6 +2147,8 @@ impl Plugin for BuilderPlugin {
                     pick_a_work,
                     bake_into_the_game,
                     choose_the_kind,
+                    hang_the_carried,
+                    take_one_back_out,
                     take_the_name,
                     dims_panel,
                     recall,
@@ -3230,6 +3511,13 @@ fn raise_shelf(
             button_label(&mut commands, &fonts, &palette, button, entry.label);
         }
     }
+    // What the game will raise: the drawings already carried in, so a maker can
+    // see them and be rid of one. Brett: "Is there a way I can see those houses
+    // and delete one or more of them?" - and the folder they live in is under
+    // Application Support, which is not a place anybody browses by accident.
+    let carried = drawer(&mut commands, &fonts, &palette, shelf, "IN THE GAME", false);
+    commands.insert_resource(CarriedDrawer(carried));
+
     let widgets = drawer(&mut commands, &fonts, &palette, shelf, "WIDGETS", false);
     for (name, _, _) in WIDGETS {
         let button = plain_button(&mut commands, &palette, widgets);
@@ -5592,6 +5880,7 @@ fn take_the_name(
     stages: Res<Stages>,
     palette: Res<Palette>,
     kind: Res<CarryingKind>,
+    mut stale: ResMut<CarriedStale>,
     mut keystrokes: MessageReader<bevy::input::keyboard::KeyboardInput>,
     mut naming: ResMut<Naming>,
     time: Res<Time>,
@@ -5677,6 +5966,7 @@ fn take_the_name(
             stages: drawings,
         };
         let (word, label) = KINDS[kind.0.min(KINDS.len() - 1)];
+        stale.0 = true;
         let said = match carry_into_the_game(&work, &palette, &called, word) {
             Ok((boxes, marks)) => format!(
                 "CARRIED {} IN AS A {label} - {boxes} BOXES, {marks} MARKS",
