@@ -1344,7 +1344,24 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // share a plane with nothing.
             let head_z = run * 0.5 + ATOM - post * 0.5;
             let span = head_z - foot_z;
-            let rail_len = span.hypot(rise);
+            // The rail stops INSIDE the newels rather than at their centres.
+            //
+            // A leaning box has square ends, and a square end cut across a slope
+            // reaches further at one corner than the other - so the rail poked
+            // out of the newel's face at the top. Brett: "the beam is protruding
+            // from the front. Can't we miter that to prevent that?" A mitre is
+            // the carpenter's answer and the bench cannot draw one here: its
+            // mitre cuts across a part's X and this rail runs along Z.
+            //
+            // Pulling both ends back by half a newel does the same job. The ends
+            // are then buried in the posts, where nothing can see whether they
+            // are square, and the rail keeps its own line and pitch exactly -
+            // both ends move along it by the same amount.
+            // Never more than half of it: a two-tread flight is barely longer
+            // than its own newels, and pulling a whole post out of each end left
+            // it with no rail at all.
+            let held = ((span - post.min(span * 0.5)) / span).max(0.5);
+            let rail_len = span.hypot(rise) * held;
             // A slab's length lies along Z, and leaning about X carries its far
             // end UP when the angle is negative - see `dress_part`.
             let lean = -(rise / span).atan();
@@ -8566,6 +8583,58 @@ fn turn_part(
 mod roof_tests {
     use super::*;
 
+    /// A flight's rail ends inside its newels: nothing of it shows past a post,
+    /// at any pitch a flight can be drawn at.
+    #[test]
+    fn a_rail_ends_inside_its_newels() {
+        for rise in [0.375_f32, 0.75, 1.5, 3.0] {
+            let body = body_of(
+                &PartKind::Stairs {
+                    rise,
+                    wide: 1.25,
+                    stone: false,
+                    rail_stone: false,
+                    hand: RAIL_HIGH,
+                },
+                None,
+            );
+            // The newels: where the rail is allowed to reach.
+            let newels: Vec<&Slab> = body
+                .iter()
+                .filter(|Slab(_, size, ..)| (size.x - RAIL_POST).abs() < 1e-5 && size.y > 0.5)
+                .collect();
+            let reach = newels
+                .iter()
+                .map(|Slab(at, size, ..)| at.z + size.z * 0.5)
+                .fold(f32::NEG_INFINITY, f32::max);
+            let back = newels
+                .iter()
+                .map(|Slab(at, size, ..)| at.z - size.z * 0.5)
+                .fold(f32::INFINITY, f32::min);
+
+            let Some(Slab(at, size, _, _, _, _, lean)) =
+                body.iter().find(|Slab(.., lean)| *lean != 0.0)
+            else {
+                panic!("a flight rising {rise} has no rail");
+            };
+            // The rail's own corners, carried into the part's frame.
+            let turn = Quat::from_rotation_x(*lean);
+            let half = *size * 0.5;
+            let spread = (turn * Vec3::new(0.0, half.y, 0.0)).abs()
+                + (turn * Vec3::new(0.0, 0.0, half.z)).abs();
+            assert!(
+                at.z + spread.z <= reach + 1e-4,
+                "a rail on a flight rising {rise} reaches {} past a newel at {reach}",
+                at.z + spread.z
+            );
+            assert!(
+                at.z - spread.z >= back - 1e-4,
+                "a rail on a flight rising {rise} hangs {} behind a newel at {back}",
+                at.z - spread.z
+            );
+        }
+    }
+
     /// A flight's rail line stands a WHOLE number of atoms from its middle.
     ///
     /// This is what lets a flat rail, placed on the grid like everything else,
@@ -9279,14 +9348,17 @@ mod roof_tests {
             // climbs rather than at some angle of their own.
             let rails: Vec<&Slab> = body.iter().filter(|Slab(.., lean)| *lean != 0.0).collect();
             assert_eq!(rails.len(), 2, "a flight wants a rail on each side");
-            // The span the rail actually covers: from the foot newel's centre,
-            // a reveal in from the bottom tread, to the head newel's centre,
-            // which hangs a lap PAST the top one so the rail meets the wall.
+            // The span the rail's LINE covers: from the foot newel's centre, a
+            // reveal in from the bottom tread, to the head newel's centre, which
+            // hangs a lap PAST the top one so the rail meets the wall. The rail
+            // itself is shorter than that - it ends inside the newels - but it
+            // lies along the same line at the same pitch.
             let (post, reveal, lap) = (RAIL_POST, ATOM, ATOM);
             let full = steps as f32 * 0.25;
             let foot = -full * 0.5 + post * 0.5 + reveal;
             let head = full * 0.5 + lap - post * 0.5;
             let run = head - foot;
+            let held = ((run - post.min(run * 0.5)) / run).max(0.5);
             let wanted = -(rise / run).atan();
             for Slab(.., lean) in &rails {
                 assert!(
@@ -9294,9 +9366,8 @@ mod roof_tests {
                     "a rail leans {lean} where the flight climbs at {wanted}"
                 );
             }
-            // And a rail is as long as the slope it covers, or it stops short of
-            // the newel it is supposed to meet.
-            let want_len = run.hypot(rise);
+            // And a rail spans its own line, less the newels it ends inside.
+            let want_len = run.hypot(rise) * held;
             for Slab(_, size, ..) in &rails {
                 assert!(
                     (size.z - want_len).abs() < 1e-3,
