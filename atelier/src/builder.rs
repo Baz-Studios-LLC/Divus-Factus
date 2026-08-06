@@ -1205,7 +1205,14 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             let reveal = 0.0625_f32;
             let inset = wide * 0.5 - post * 0.5 - reveal;
             let foot_z = -run * 0.5 + post * 0.5 + reveal;
-            let head_z = run * 0.5 - post * 0.5 - reveal;
+            // The HEAD newel goes the other way: a lap PAST the top tread rather
+            // than a reveal short of it. A flight almost always meets something
+            // at the top - Brett: "the railing on the steps in the back should
+            // flush to the wall behind it" - and a newel set in from the back
+            // leaves a slot between the rail and whatever it arrives at. Past
+            // the tread it simply disappears into the wall, and its faces still
+            // share a plane with nothing.
+            let head_z = run * 0.5 + LAP - post * 0.5;
             let span = head_z - foot_z;
             let rail_len = span.hypot(rise);
             // A slab's length lies along Z, and leaning about X carries its far
@@ -8552,7 +8559,8 @@ mod roof_tests {
         );
 
         // The flight: its run grows in whole treads, so the measured extent
-        // moves in the same steps the geometry does.
+        // moves in the same steps the geometry does. The head newel hangs a lap
+        // past the top tread on purpose, so the body measures that much longer.
         let (steps, _, tread) = stair_rhythm(0.75);
         let flight = extent_of(&PartKind::Stairs {
             rise: 0.75,
@@ -8561,8 +8569,9 @@ mod roof_tests {
             rail_stone: false,
             hand: 0.875,
         });
+        let treads = steps as f32 * tread;
         assert!(
-            (flight.y - steps as f32 * tread).abs() < 1e-4,
+            flight.y > treads && flight.y < treads + 0.0625,
             "a flight of {steps} treads measured {} along its run",
             flight.y
         );
@@ -8620,9 +8629,14 @@ mod roof_tests {
             // climbs rather than at some angle of their own.
             let rails: Vec<&Slab> = body.iter().filter(|Slab(.., lean)| *lean != 0.0).collect();
             assert_eq!(rails.len(), 2, "a flight wants a rail on each side");
-            // The span the rail actually covers: the run, less a newel, less
-            // the reveal the rail is set in by at each end.
-            let run = steps as f32 * 0.25 - 0.1875 - 2.0 * 0.0625;
+            // The span the rail actually covers: from the foot newel's centre,
+            // a reveal in from the bottom tread, to the head newel's centre,
+            // which hangs a lap PAST the top one so the rail meets the wall.
+            let (post, reveal, lap) = (0.1875_f32, 0.0625_f32, 0.03125_f32);
+            let full = steps as f32 * 0.25;
+            let foot = -full * 0.5 + post * 0.5 + reveal;
+            let head = full * 0.5 + lap - post * 0.5;
+            let run = head - foot;
             let wanted = -(rise / run).atan();
             for Slab(.., lean) in &rails {
                 assert!(
