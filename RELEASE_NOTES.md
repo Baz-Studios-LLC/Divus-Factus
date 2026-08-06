@@ -1,44 +1,38 @@
-## The shipped game could not find its own files
+## PLAY opens the game on Windows
 
-**Every building drawn in the Atelier was missing from the released game.** The
-village raised its old hand-built houses instead, in every world, on every
-machine — while the same code run from the source tree raised the drawn ones.
-Everything the game reads with its own hands looked in two places, and both of
-them are only right in a source tree: a bundled app launched from Finder has no
-asset root and a working directory of `/`, so the search missed quietly and the
-village fell back to what it has always been able to build. Which looks exactly
-like nothing being wrong.
+**Pressing PLAY in the launcher opened the Atelier instead of the game.** Every
+Windows player, every time. The launcher runs the first program it finds in the
+folder, and we ship two — sorted the way a filesystem sorts them, the bench came
+first. It ships as `TheAtelier` now: it cannot be mistaken for the game by
+anything reading names, and it sorts after it besides, so PLAY opens the game
+with no launcher update at all. Macs were never affected.
 
-**The voice lines were missing too, and nobody could have seen it** — a village
-with no lines simply says less. It reads all 1140 of them now.
+## The bench asks what a building IS
 
-Both are fixed at the root: the places a data folder might be are written down
-once, and every reader takes all of them, beginning with the folder beside the
-program. The bench had it twice over — its palette was falling back to guesses at
-the game's own colours in every launcher build.
+**Carrying a building into the game asks two questions now — what it is called,
+and what it is.** Press BAKE and a card comes up with a name and every kind of
+building the village knows: house, longhouse, tavern, sawmill, and the fifteen
+others. The answer is written into the file as a fact.
 
-## A building can be carried into the game by hand
+Before this, a drawing was claimed by whatever kind-word its file name happened
+to begin with, which is a rule a maker has to know and can get wrong without ever
+being told — `mill1` is a mill, `sawmill1` is a sawmill, and `millhouse1` was a
+mill with a surprise in it. Old drawings still read the old way.
 
-**Draw it, press BAKE, start the game.** The Atelier's work used to reach the
-village only through a developer's command line, which meant the bench in the
-launcher build was a sketchpad with nowhere to send anything. There is a BAKE
-glyph beside the save now: it writes the building where the game reads, alongside
-the ones that shipped, and the next world raises it. A drawing of your own with
-the same name as a shipped one replaces it.
+**And a drawer that shows what the game will raise.** IN THE GAME, on the shelf,
+lists every building the village can build — the ones that shipped inside the app
+and the ones you carried in — each saying which it is. Your own can be taken back
+out with a press and a confirm; the shipped ones say why they cannot be, and what
+to do instead.
 
-**Every kind of building can take a drawing.** A work saved as `tavern-corner`
-becomes the tavern the moment it is baked — no list to add it to. Once a kind has
-one drawing, the village never falls back to its own hand for that kind again.
+## The rig
 
-## Under the hood
-
-- The game says which way each building went up: *the longhouse rises from the
-  drawing longhouse1-10people*, or *the mine rises by the village's own hand — no
-  drawing carried in*. There was no way to tell from the outside, which is how
-  the fault above hid for a release.
-- Drawing names are claimed by the longest kind-word that begins them, so `mill`
-  no longer threatens to swallow `sawmill` and `smokehouse` the way `house` once
-  swallowed `longhouse`.
-- The rig bench: the head no longer flips when it is touched, limbs no longer
-  shiver or swell under the hand, and a press on the scrub bar lands where the
-  cursor is.
+- A head no longer flips upside down the moment it is touched. A head sits above
+  its joint and a limb hangs below its own, and the drag aimed everything the
+  same way; it now reads which way the part you pressed actually lies.
+- Limbs no longer shiver in the hand or swell as you drag them. Aiming a bone at
+  where it already points backwards has no single answer, and asking anyway gave
+  a different one every frame.
+- A press on the scrub bar lands where the cursor is, rather than four times as
+  far along.
+- Quarter-second marks along the track, and the body opens face on.
