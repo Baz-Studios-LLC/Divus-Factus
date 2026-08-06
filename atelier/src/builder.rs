@@ -75,6 +75,13 @@ const RAIL_HIGH: f32 = ATOM * 14.0;
 /// About a pace between balusters, and a whole number of atoms.
 const RAIL_GAP: f32 = ATOM * 8.0;
 
+/// A baluster is TWO atoms square, not one.
+///
+/// An odd number of atoms cannot have both its faces on the lattice while its
+/// centre is on it too - a one-atom post centred on an atom has its sides on
+/// half-atoms - and it is the FACES that decide whether two parts meet.
+const RAIL_PIN: f32 = ATOM * 2.0;
+
 /// How high a flight climbs when it comes off the shelf, and how tall a footing
 /// stands when it does.
 ///
@@ -1221,13 +1228,15 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             let gaps = (span / RAIL_GAP).round().max(1.0);
             for step in 1..gaps as i32 {
                 let x = -span * 0.5 + span * (step as f32 / gaps);
+                // Snapped, like the newels: an even spread is not the lattice,
+                // and a baluster off it puts four faces off it.
                 body.push(slab(
-                    x,
+                    on_the_lattice(x),
                     (hand - RAIL_THICK * 0.5) * 0.5,
                     0.0,
-                    ATOM,
+                    RAIL_PIN,
                     hand - RAIL_THICK * 0.5,
-                    ATOM,
+                    RAIL_PIN,
                     ramp,
                     pin_shade,
                 ));
@@ -1249,8 +1258,11 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // planes as its sides, and two surfaces at one depth is a fight the
             // renderer settles differently every frame: the stripes Brett
             // photographed. A hoop stands out on a real barrel anyway.
-            slab(0.03125, 0.15625, 0.03125, 0.625, 0.0625, 0.625, "stone", 0.45),
-            slab(0.03125, 0.53125, 0.03125, 0.625, 0.0625, 0.625, "stone", 0.45),
+            // Eleven atoms to the barrel's nine: proud by an atom all round, and
+            // ODD like the body it wraps. An even hoop on a body centred half an
+            // atom off lands its own faces half an atom off.
+            slab(0.03125, 0.15625, 0.03125, 0.6875, 0.0625, 0.6875, "stone", 0.45),
+            slab(0.03125, 0.53125, 0.03125, 0.6875, 0.0625, 0.6875, "stone", 0.45),
         ],
         PartKind::Prop("crate") => vec![
             slab(0.0, 0.3125, 0.0, 0.625, 0.625, 0.625, "wood", 0.6),
@@ -1570,9 +1582,9 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                         side * inset,
                         stood + tall * 0.5,
                         z,
-                        ATOM,
+                        RAIL_PIN,
                         tall,
-                        ATOM,
+                        RAIL_PIN,
                         rail_ramp,
                         pin_shade,
                     ));
@@ -9082,7 +9094,7 @@ mod roof_tests {
             );
             let pins = body
                 .iter()
-                .filter(|Slab(_, size, ..)| (size.x - ATOM).abs() < 1e-5)
+                .filter(|Slab(_, size, ..)| (size.x - RAIL_PIN).abs() < 1e-5)
                 .count();
             assert!(pins >= 2, "a flight rising {rise} carries {pins} balusters");
         }
@@ -9179,7 +9191,7 @@ mod roof_tests {
             );
             let pins: Vec<&Slab> = body
                 .iter()
-                .filter(|Slab(_, size, ..)| (size.x - ATOM).abs() < 1e-5)
+                .filter(|Slab(_, size, ..)| (size.x - RAIL_PIN).abs() < 1e-5)
                 .collect();
             let want = (long - RAIL_POST * 2.0) / RAIL_GAP;
             assert!(
@@ -9315,6 +9327,74 @@ mod roof_tests {
         fights.sort();
         fights.dedup();
         assert!(fights.is_empty(), "parts at odds with themselves:\n  {}", fights.join("\n  "));
+    }
+
+    /// Every FACE of every box lands on the lattice, at every size a maker can
+    /// draw the part at.
+    ///
+    /// Stronger than asking sizes to be whole atoms, and it is the rule that
+    /// actually matters: what makes two parts meet is where their faces ARE, not
+    /// how big they are. A stair rail three atoms wide had a whole-atom size and
+    /// a half-atom face, and no flat rail could ever reach it. Brett: "Holding to
+    /// the atom grid is paramount."
+    ///
+    /// Anything a pitch derives is exempt, and only that: a slope's length is a
+    /// hypotenuse, and no rule about a grid can ask an angle to be a whole number
+    /// of sixteenths. Decor answers for itself along with everything else - it
+    /// turned out to be one part out, and that one was mine from this morning.
+    #[test]
+    fn every_face_lands_on_an_atom() {
+        let mut adrift: Vec<String> = Vec::new();
+        for entry in STRUCTURE.iter().chain(FURNITURE).chain(DECOR) {
+            // Drawn at several sizes, since a maker stretches things: a rule
+            // that only holds at the shelf's own numbers is not a rule.
+            let sizes: Vec<PartKind> = match entry.kind.run_axes() {
+                Some(_) => [0.25_f32, 1.0, 2.0, 3.5]
+                    .iter()
+                    .map(|n| entry.kind.run_made(*n, *n))
+                    .collect(),
+                None => vec![entry.kind],
+            };
+            for kind in sizes {
+                if matches!(
+                    kind,
+                    PartKind::Roof(..)
+                        | PartKind::RoofRun
+                        | PartKind::GableRoof(..)
+                        | PartKind::GableRoofRun
+                        | PartKind::HipRoof(..)
+                        | PartKind::HipRoofRun
+                        | PartKind::Gable(..)
+                        | PartKind::GableRun
+                        | PartKind::RoofPlan(..)
+                ) {
+                    continue;
+                }
+                for Slab(at, size, _, _, _, shape, lean) in body_of(&kind, None) {
+                    if lean != 0.0 || !matches!(shape, Shape::Box) {
+                        continue;
+                    }
+                    for axis in 0..3 {
+                        for face in [at[axis] - size[axis] * 0.5, at[axis] + size[axis] * 0.5] {
+                            let atoms = face / ATOM;
+                            if (atoms - atoms.round()).abs() > 1e-3 {
+                                adrift.push(format!(
+                                    "{} has a face at {face:.4} on axis {axis} - {atoms:.2} atoms",
+                                    part_name(&kind)
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        adrift.sort();
+        adrift.dedup();
+        assert!(
+            adrift.is_empty(),
+            "faces off the lattice:\n  {}",
+            adrift.join("\n  ")
+        );
     }
 
     /// Every measurement of every part is a whole number of atoms.
