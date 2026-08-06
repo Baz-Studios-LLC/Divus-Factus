@@ -3287,6 +3287,51 @@ fn length_of(kind: &PartKind) -> Option<(f32, Box<dyn Fn(f32) -> PartKind>)> {
         }
         PartKind::Wall(long) => Some((long, Box::new(PartKind::Wall))),
         PartKind::Ridge(long) => Some((long, Box::new(PartKind::Ridge))),
+        // Everything else a maker can size along its own length. Brett: "Trim to
+        // roof needs to be added to all the parts in the bench" - and the three
+        // above were only the three that had come up. A part that can be made
+        // shorter can be trimmed; a part that cannot has nothing for a saw to
+        // take, which is every prop and every widget.
+        PartKind::Seg { long, high, lift } => Some((
+            long,
+            Box::new(move |n| PartKind::Seg { long: n, high, lift }),
+        )),
+        PartKind::Trim { long, stone } => {
+            Some((long, Box::new(move |n| PartKind::Trim { long: n, stone })))
+        }
+        PartKind::Gable(long, pitch) => {
+            Some((long, Box::new(move |n| PartKind::Gable(n, pitch))))
+        }
+        PartKind::GableRoof(long, span, over, pitch) => Some((
+            long,
+            Box::new(move |n| PartKind::GableRoof(n, span, over, pitch)),
+        )),
+        // The flat ones are sized in two, and it is their X a trim comes back
+        // along - the same axis every other part is cut on.
+        PartKind::Floor(_, deep) => Some((
+            body_of(kind, None)
+                .iter()
+                .map(|Slab(at, size, ..)| at.x.abs() + size.x * 0.5)
+                .fold(0.0_f32, f32::max)
+                * 2.0,
+            Box::new(move |n| PartKind::Floor(n, deep)),
+        )),
+        PartKind::Foundation(_, deep, high) => Some((
+            body_of(kind, None)
+                .iter()
+                .map(|Slab(at, size, ..)| at.x.abs() + size.x * 0.5)
+                .fold(0.0_f32, f32::max)
+                * 2.0,
+            Box::new(move |n| PartKind::Foundation(n, deep, high)),
+        )),
+        PartKind::Roof(_, deep) => Some((
+            body_of(kind, None)
+                .iter()
+                .map(|Slab(at, size, ..)| at.x.abs() + size.x * 0.5)
+                .fold(0.0_f32, f32::max)
+                * 2.0,
+            Box::new(move |n| PartKind::Roof(n, deep)),
+        )),
         _ => None,
     }
 }
@@ -8379,6 +8424,54 @@ fn turn_part(
 #[cfg(test)]
 mod roof_tests {
     use super::*;
+
+    /// Every part a maker can make shorter can be trimmed to a roof, and the
+    /// rebuild keeps everything about it except the length.
+    #[test]
+    fn everything_sizable_can_be_trimmed() {
+        let cases: Vec<PartKind> = vec![
+            PartKind::Wall(3.0),
+            PartKind::Seg {
+                long: 2.0,
+                high: 1.5,
+                lift: 0.5,
+            },
+            PartKind::Trim {
+                long: 2.0,
+                stone: true,
+            },
+            PartKind::Beam(4.0, 0.25, 0.0),
+            PartKind::Ridge(3.0),
+            PartKind::Gable(4.0, 45.0),
+            PartKind::GableRoof(6.0, 4.0, 0.25, 40.0),
+            PartKind::Floor(3.0, 2.0),
+            PartKind::Foundation(3.0, 2.0, 0.75),
+            PartKind::Roof(3.0, 2.0),
+        ];
+        for kind in cases {
+            let name = part_name(&kind);
+            let Some((long, rebuild)) = length_of(&kind) else {
+                panic!("{name} cannot be trimmed, and it has a length");
+            };
+            assert!(long > 0.0, "{name} reports no length at all");
+            // Half as long, and still the same KIND of thing.
+            let made = rebuild(long * 0.5);
+            assert_eq!(
+                std::mem::discriminant(&made),
+                std::mem::discriminant(&kind),
+                "{name} came back as something else"
+            );
+            let (shorter, _) = length_of(&made).expect("the shorter one has a length too");
+            assert!(
+                shorter < long - 1e-4,
+                "{name} was asked for half its length and answered {shorter} of {long}"
+            );
+        }
+        // And a part with nothing to take stays alone: a prop is a drawn thing,
+        // not a length.
+        assert!(length_of(&PartKind::Prop("barrel")).is_none());
+        assert!(length_of(&PartKind::Widget("sleep")).is_none());
+    }
 
     /// No part may have two boxes whose faces lie in one plane where they
     /// OVERLAP. That is what a renderer cannot settle, and it shows as the
