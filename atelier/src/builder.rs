@@ -169,13 +169,17 @@ fn hip_mesh(top_x: f32, top_z: f32) -> Mesh {
     };
     // The deck, then the four slopes, each from an eave edge up to the deck edge
     // above it. Wound so every face looks outward.
-    face(deck);
+    // The deck, wound so it looks UP. Wound the other way it is culled, and what
+    // a maker sees through the hole is the underside of the roof - which reads
+    // as a sunken tray rather than a missing face. Brett: "the hip roof needs the
+    // flat part on top."
+    face([deck[3], deck[2], deck[1], deck[0]]);
     face([foot[0], deck[0], deck[1], foot[1]]);
     face([foot[1], deck[1], deck[2], foot[2]]);
     face([foot[2], deck[2], deck[3], foot[3]]);
     face([foot[3], deck[3], deck[0], foot[0]]);
-    // And the underside, so a roof seen from below is not a hole.
-    face([foot[0], foot[3], foot[2], foot[1]]);
+    // And the underside, looking DOWN, so a roof seen from below is not a hole.
+    face([foot[1], foot[2], foot[3], foot[0]]);
     let uvs: Vec<[f32; 2]> = positions.iter().map(|_| [0.0, 0.0]).collect();
     Mesh::new(
         bevy::render::mesh::PrimitiveTopology::TriangleList,
@@ -8751,6 +8755,40 @@ fn turn_part(
 #[cfg(test)]
 mod roof_tests {
     use super::*;
+
+    /// Every face of a hip roof looks OUTWARD. A face wound the other way is
+    /// culled, and a roof missing its deck reads as a sunken tray rather than as
+    /// a hole - which is exactly how Brett described it.
+    #[test]
+    fn a_hip_roof_faces_outward() {
+        for (keep_x, keep_z) in [(0.5_f32, 0.5_f32), (0.25, 0.75), (0.9, 0.1)] {
+            let mesh = hip_mesh(keep_x, keep_z);
+            let Some(bevy::mesh::VertexAttributeValues::Float32x3(points)) =
+                mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+            else {
+                panic!("a hip roof has no corners");
+            };
+            let Some(bevy::mesh::VertexAttributeValues::Float32x3(normals)) =
+                mesh.attribute(Mesh::ATTRIBUTE_NORMAL)
+            else {
+                panic!("a hip roof has no normals");
+            };
+            // Each face is four corners with one normal; its middle should lie
+            // the way its normal points, measured from the shape's own centre.
+            for face in 0..points.len() / 4 {
+                let corners = &points[face * 4..face * 4 + 4];
+                let middle = corners.iter().fold(Vec3::ZERO, |sum, corner| {
+                    sum + Vec3::from(*corner) * 0.25
+                });
+                let normal = Vec3::from(normals[face * 4]);
+                assert!(
+                    normal.dot(middle) > 0.0,
+                    "face {face} of a {keep_x}x{keep_z} hip looks inward: middle {middle}, \
+                     normal {normal}"
+                );
+            }
+        }
+    }
 
     /// A hip roof slopes in the same distance on all four sides and keeps a flat
     /// deck, whatever shape the building under it is.

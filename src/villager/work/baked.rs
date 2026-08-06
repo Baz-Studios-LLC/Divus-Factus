@@ -339,12 +339,14 @@ fn hip(keep_x: f32, keep_z: f32) -> Mesh {
         }
         indices.extend([first, first + 1, first + 2, first, first + 2, first + 3]);
     };
-    face(deck);
+    // The deck looks UP and the underside looks DOWN; wound the other way each
+    // is culled, and a roof with no top reads as a sunken tray.
+    face([deck[3], deck[2], deck[1], deck[0]]);
     face([foot[0], deck[0], deck[1], foot[1]]);
     face([foot[1], deck[1], deck[2], foot[2]]);
     face([foot[2], deck[2], deck[3], foot[3]]);
     face([foot[3], deck[3], deck[0], foot[0]]);
-    face([foot[0], foot[3], foot[2], foot[1]]);
+    face([foot[1], foot[2], foot[3], foot[0]]);
     let uvs: Vec<[f32; 2]> = positions.iter().map(|_| [0.0, 0.0]).collect();
     Mesh::new(
         bevy::render::mesh::PrimitiveTopology::TriangleList,

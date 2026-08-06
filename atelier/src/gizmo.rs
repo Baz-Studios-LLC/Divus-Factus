@@ -330,6 +330,7 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                 PartKind::Foundation(w, d, _) => Some((w, d, true)),
                 PartKind::Roof(w, d) => Some((w, d, true)),
                 PartKind::GableRoof(w, d, _, _) => Some((w, d, true)),
+                PartKind::HipRoof(w, d, _, _) => Some((w, d, true)),
                 _ => None,
             });
             let Some((w, d, both)) = sized else {
@@ -403,9 +404,16 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
             // A whole roof carries two more, in gold: the eaves, which
             // reach out past the walls without taking the gables with
             // them.
-            if let Some(PartKind::GableRoof(long, span, over, pitch)) =
-                builder::kind_from_name(&record.part)
-            {
+            // Both roofs wear the gold pair: a hip has eaves and a pitch just
+            // as a gable roof does, and Brett asked for the lot - "it needs
+            // resize handles for everything too".
+            if let Some((long, span, over, pitch)) = match builder::kind_from_name(&record.part) {
+                Some(PartKind::GableRoof(long, span, over, pitch))
+                | Some(PartKind::HipRoof(long, span, over, pitch)) => {
+                    Some((long, span, over, pitch))
+                }
+                _ => None,
+            } {
                 // Stood off along the ridge, not straight out past the blue
                 // ones. A handle is a shaft one and a third long with a head on
                 // the end, and these sat on the SAME LINE as the depth handles
@@ -836,15 +844,22 @@ fn work_gizmo(
             // the gables at the ends do not move at all.
             let pull = ((t - state.t0) * 16.0).round() / 16.0;
             let over = (o0 + pull).clamp(0.0, 3.0);
-            let Some(PartKind::GableRoof(long, span, was, pitch)) =
-                builder::kind_from_name(&record.part)
-            else {
-                return;
+            // Both roofs reach their eaves out the same way.
+            let made = match builder::kind_from_name(&record.part) {
+                Some(PartKind::GableRoof(long, span, was, pitch)) => {
+                    if (over - was).abs() < 1e-4 {
+                        return;
+                    }
+                    PartKind::GableRoof(long, span, over, pitch)
+                }
+                Some(PartKind::HipRoof(long, span, was, pitch)) => {
+                    if (over - was).abs() < 1e-4 {
+                        return;
+                    }
+                    PartKind::HipRoof(long, span, over, pitch)
+                }
+                _ => return,
             };
-            if (over - was).abs() < 1e-4 {
-                return;
-            }
-            let made = PartKind::GableRoof(long, span, over, pitch);
             record.part = builder::part_name(&made);
             commands.entity(part).despawn_related::<Children>();
             builder::dress_part(
@@ -910,6 +925,7 @@ fn work_gizmo(
                 PartKind::Foundation(_, _, high) => PartKind::Foundation(w, d, high),
                 PartKind::Roof(..) => PartKind::Roof(w, d),
                 PartKind::GableRoof(_, _, over, pitch) => PartKind::GableRoof(w, d, over, pitch),
+                PartKind::HipRoof(_, _, over, pitch) => PartKind::HipRoof(w, d, over, pitch),
                 _ => return,
             };
             let fresh = builder::part_name(&made);
