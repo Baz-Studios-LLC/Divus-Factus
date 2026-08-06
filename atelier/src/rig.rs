@@ -614,6 +614,17 @@ struct ClipTrack;
 #[derive(Component)]
 struct KeyTick;
 
+/// A mark of the clock along the track, so a maker can see where a moment falls
+/// rather than counting pixels. Brett: "The scrub bar needs quarter tick marks."
+#[derive(Component)]
+struct Grade;
+
+/// How close two marks may stand before the row of them reads as a smear.
+const GRADE_ROOM: f32 = 8.0;
+
+/// The track's own width, which the marks are spaced against.
+const TRACK_WIDTH: f32 = 420.0;
+
 /// The playhead.
 #[derive(Component)]
 struct Playhead;
@@ -708,7 +719,7 @@ fn hang_the_clip_bar(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Pal
         ClipTrack,
         Interaction::default(),
         Node {
-            width: Val::Px(420.0),
+            width: Val::Px(TRACK_WIDTH),
             height: Val::Px(26.0),
             border: UiRect::all(Val::Px(1.0)),
             ..default()
@@ -875,7 +886,7 @@ fn hang_the_keys(
     clip: Res<Clip>,
     play: Res<Play>,
     track: Query<Entity, With<ClipTrack>>,
-    ticks: Query<Entity, Or<(With<KeyTick>, With<Playhead>)>>,
+    ticks: Query<Entity, Or<(With<KeyTick>, With<Playhead>, With<Grade>)>>,
     mut heads: Query<&mut Node, With<Playhead>>,
 ) {
     if *bench != Bench::Rig {
@@ -894,6 +905,42 @@ fn hang_the_keys(
     for tick in &ticks {
         commands.entity(tick).despawn();
     }
+
+    // The clock first, under everything: quarter seconds while they have room to
+    // stand apart, whole seconds when they have not, and failing both the
+    // quarters of the clip itself - which is the one spacing that cannot crowd,
+    // however long the clip runs.
+    let length = clip.length.max(0.01);
+    let step = [0.25_f32, 1.0]
+        .into_iter()
+        .find(|step| (step / length) * TRACK_WIDTH >= GRADE_ROOM)
+        .unwrap_or(length * 0.25);
+    let mut at = step;
+    while at < length - 1e-3 {
+        // A mark on the second stands taller than the quarters between them, so
+        // the eye can count seconds without reading any of them.
+        let whole = (at / 1.0).fract() < 1e-3 || (at / 1.0).fract() > 1.0 - 1e-3;
+        let tall = if whole { 0.55 } else { 0.30 };
+        commands.spawn((
+            Grade,
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Percent((at / length) * 100.0),
+                bottom: Val::Px(0.0),
+                width: Val::Px(1.0),
+                height: Val::Percent(tall * 100.0),
+                ..default()
+            },
+            BackgroundColor(theme::text_dim(&palette).with_alpha(if whole {
+                0.55
+            } else {
+                0.32
+            })),
+            ChildOf(track),
+        ));
+        at += step;
+    }
+
     for key in &clip.keys {
         commands.spawn((
             KeyTick,
@@ -1215,7 +1262,12 @@ fn stand_the_camera(bench: Res<Bench>, mut eye: ResMut<crate::camera::OrbitRig>)
         return;
     }
     eye.focus = Vec3::new(0.0, 1.0, 0.0);
-    eye.yaw = 0.0;
+    // Face on, which is NOT the builder's zero. A body's arms hang off its X, so
+    // the eye at zero looks straight down the shoulder line and sees a silhouette
+    // - Brett: "The view is starting on the side not the front." The face looks
+    // along -Z, which the beard and the eyes both say plainly enough in the
+    // game's own builder, so the eye stands there and looks back.
+    eye.yaw = -std::f32::consts::FRAC_PI_2;
     eye.pitch = 0.30;
     eye.distance = 4.6;
 }
