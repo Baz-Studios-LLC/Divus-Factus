@@ -38,9 +38,12 @@ cp -R "$ROOT/assets" "$APP/Contents/MacOS/assets"
 # no bench beside it, and a build without one is simply a game.
 BENCH="$ROOT/atelier/target/release/divus-factus-atelier"
 if [ -f "$BENCH" ]; then
-  cp "$BENCH" "$APP/Contents/MacOS/divus-factus-atelier"
-  chmod +x "$APP/Contents/MacOS/divus-factus-atelier"
-  strip "$APP/Contents/MacOS/divus-factus-atelier" 2>/dev/null || true
+  # The same name it takes on Windows. A bundle names its own executable in
+  # Info.plist so nothing here was ever at risk of being launched by mistake -
+  # but one name for the bench on both platforms is one name to look for.
+  cp "$BENCH" "$APP/Contents/MacOS/TheAtelier"
+  chmod +x "$APP/Contents/MacOS/TheAtelier"
+  strip "$APP/Contents/MacOS/TheAtelier" 2>/dev/null || true
   # The palette the bench paints from, exported by the game. Its fonts come out
   # of the game's own assets folder, which is already beside them.
   cp -R "$ROOT/atelier/data" "$APP/Contents/MacOS/data"

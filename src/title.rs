@@ -101,23 +101,32 @@ struct AtelierButton;
 /// `None` means it is not installed, and the button does not appear at all. A
 /// door that opens onto nothing is worse than no door.
 fn atelier_beside_us() -> Option<std::path::PathBuf> {
-    let named = if cfg!(windows) {
+    // What it is called where it SHIPS, and what cargo calls it in a tree. The
+    // shipped name changed because a launcher that runs the first `.exe` in the
+    // folder ran the bench when a player pressed PLAY - so the bench now sorts
+    // after the game and cannot be mistaken for it either.
+    let shipped = if cfg!(windows) {
+        "TheAtelier.exe"
+    } else {
+        "TheAtelier"
+    };
+    let built = if cfg!(windows) {
         "divus-factus-atelier.exe"
     } else {
         "divus-factus-atelier"
     };
     let us = std::env::current_exe().ok()?;
     let here = us.parent()?;
-    let beside = here.join(named);
-    if beside.is_file() {
-        return Some(beside);
+    for named in [shipped, built] {
+        let beside = here.join(named);
+        if beside.is_file() {
+            return Some(beside);
+        }
     }
     // A source tree: the game runs from `target/release`, the bench builds into
     // `atelier/target/release`.
     let workspace = here.parent()?.parent()?;
-    let in_tree = workspace
-        .join("atelier/target/release")
-        .join(named);
+    let in_tree = workspace.join("atelier/target/release").join(built);
     in_tree.is_file().then_some(in_tree)
 }
 

@@ -67,7 +67,11 @@ jobs:
           Copy-Item -Recurse assets stage\assets
           # The bench beside it, and the palette it paints from; its fonts come
           # out of the assets folder already copied above.
-          Copy-Item atelier\target\release\divus-factus-atelier.exe stage\divus-factus-atelier.exe
+          # NAMED so it cannot be mistaken for the game, and named so it sorts
+          # after it: a launcher that takes the first .exe in the folder took
+          # `divus-factus-atelier.exe` and opened the editor when a player
+          # pressed PLAY.
+          Copy-Item atelier\target\release\divus-factus-atelier.exe stage\TheAtelier.exe
           Copy-Item -Recurse atelier\data stage\data
           Compress-Archive -Path stage\* -DestinationPath dist\DivusFactus-windows-x86_64.zip -Force
 
