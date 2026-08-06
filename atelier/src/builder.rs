@@ -4823,7 +4823,15 @@ fn support_height(
     carrying_structure: bool,
     except: Option<Entity>,
 ) -> f32 {
-    let mut top = 0.0f32;
+    // What holds up each sample of the footprint, kept apart rather than merged
+    // into one highest-anywhere answer.
+    //
+    // The highest was wrong the moment a part came NEAR something tall: one
+    // corner brushing a wall lifted the whole thing onto the wall, which is
+    // exactly what a maker sees as "it jumps to being on top of the wall" when
+    // they were only trying to set it against one. What holds a part up is what
+    // most of it is standing on.
+    let mut under = vec![0.0f32; samples.len()];
     for (entity, transform, record, showing) in placed {
         // A wall the cutaway has taken away holds nothing up and
         // catches nothing: what you cannot see, you cannot build on.
@@ -4849,7 +4857,7 @@ fn support_height(
                 at.x = -at.x;
             }
             let face_y = at.y + size.y * 0.5;
-            for sample in samples {
+            for (which, sample) in samples.iter().enumerate() {
                 // Where the sample's own column meets this piece's top
                 // face. The turn carries (lx, face_y, lz) into the world,
                 // so its x and z rows are two equations in lx and lz -
@@ -4869,13 +4877,37 @@ fn support_height(
                 let lz = (cx.x * rz - rx * cx.z) / det;
                 if (lx - at.x).abs() <= size.x * 0.5 && (lz - at.z).abs() <= size.z * 0.5 {
                     let world_y = transform.translation.y + (turn * Vec3::new(lx, face_y, lz)).y;
-                    top = top.max(world_y);
-                    break;
+                    // Every sample answered, not the first one that hits: the
+                    // vote below needs all of them, and the old `break` left
+                    // four of the five unasked.
+                    under[which] = under[which].max(world_y);
                 }
             }
         }
     }
-    top
+    seated_at(&under)
+}
+
+/// The height most of a footprint agrees on.
+///
+/// Quantised to a sixty-fourth first, because two samples on one floor can
+/// differ in the last bit of a float and would otherwise count as two opinions.
+/// Most samples wins, and the LOWER of two equal counts - so a part half over a
+/// wall settles beside it rather than climbing it, which is the whole point.
+pub fn seated_at(under: &[f32]) -> f32 {
+    let mut votes: Vec<(i64, f32, usize)> = Vec::new();
+    for height in under {
+        let key = (height * 64.0).round() as i64;
+        match votes.iter_mut().find(|(had, ..)| *had == key) {
+            Some((_, _, count)) => *count += 1,
+            None => votes.push((key, *height, 1)),
+        }
+    }
+    votes
+        .into_iter()
+        .max_by(|a, b| a.2.cmp(&b.2).then(b.1.total_cmp(&a.1)))
+        .map(|(_, height, _)| height)
+        .unwrap_or(0.0)
 }
 
 /// A platform's top rectangle: foundations and floors, the things walls
@@ -8306,6 +8338,27 @@ fn turn_part(
 #[cfg(test)]
 mod roof_tests {
     use super::*;
+
+    /// A part rests on what MOST of it is standing on. One corner brushing a
+    /// wall used to carry the whole part onto the wall, which is what a maker
+    /// sees when a piece they are setting against something jumps on top of it.
+    #[test]
+    fn a_part_rests_on_what_most_of_it_stands_on() {
+        // Centre and three corners on a floor at 0.375, one corner on a 2m wall.
+        assert!((seated_at(&[0.375, 0.375, 0.375, 0.375, 2.0]) - 0.375).abs() < 1e-4);
+        // Two corners on the wall is still not most of it.
+        assert!((seated_at(&[0.375, 0.375, 0.375, 2.0, 2.0]) - 0.375).abs() < 1e-4);
+        // Genuinely up on the wall: it stays up there.
+        assert!((seated_at(&[2.0, 2.0, 2.0, 0.375, 0.375]) - 2.0).abs() < 1e-4);
+        // A tie settles LOW: setting a thing beside a wall is far commoner than
+        // balancing it half on top of one.
+        assert!((seated_at(&[0.375, 0.375, 2.0, 2.0]) - 0.375).abs() < 1e-4);
+        // Nothing underneath is the ground.
+        assert!(seated_at(&[0.0, 0.0, 0.0]).abs() < 1e-4);
+        assert!(seated_at(&[]).abs() < 1e-4);
+        // Floats that differ in the last bit are one opinion, not several.
+        assert!((seated_at(&[0.375, 0.375_000_04, 0.374_999_97, 1.5]) - 0.375).abs() < 1e-4);
+    }
 
     /// A pad grows upward from where it sits, and one drawn before it could be
     /// raised opens at the height every pad used to have.
