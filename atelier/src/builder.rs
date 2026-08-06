@@ -3064,7 +3064,7 @@ fn raise_shelf(
 
 /// A drawer: a header that opens and closes, and the body under it.
 /// Returns the body, ready for buttons.
-fn drawer(
+pub(crate) fn drawer(
     commands: &mut Commands,
     fonts: &Fonts,
     palette: &Palette,

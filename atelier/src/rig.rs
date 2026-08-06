@@ -95,6 +95,12 @@ struct RigJoint(String);
 struct RigBox(String);
 
 /// Everything belonging to the rig bench, so the whole body can be swept.
+///
+/// It wears the stage's own `RigFurniture` besides, which is what puts it away
+/// when the maker walks to the builder. The pedestal already did that and the
+/// body did not, so the villager stood in the middle of the building grid -
+/// Brett: "When you are in rig mode and go back to build mode the body is still
+/// there."
 #[derive(Component)]
 struct RigPart;
 
@@ -239,6 +245,7 @@ impl Plugin for RigPlugin {
             .init_resource::<Play>()
             .init_resource::<Held>()
             .init_resource::<CallToRest>()
+            .init_resource::<Holding>()
             .add_systems(
                 Startup,
                 (
@@ -264,6 +271,8 @@ impl Plugin for RigPlugin {
                     stand_at_rest,
                     show_the_top_bar,
                     stand_the_camera,
+                    work_the_props,
+                    hold_the_prop,
                 )
                     .chain(),
             );
@@ -370,6 +379,7 @@ fn raise_the_body(
         let entity = commands
             .spawn((
                 RigPart,
+                crate::stage::RigFurniture,
                 RigJoint(joint.name.clone()),
                 Transform::from_translation(at),
                 Visibility::default(),
@@ -387,6 +397,7 @@ fn raise_the_body(
         };
         commands.spawn((
             RigPart,
+            crate::stage::RigFurniture,
             RigBox(slab.joint.clone()),
             Mesh3d(cube.clone()),
             MeshMaterial3d(materials.add(StandardMaterial {
@@ -1011,20 +1022,7 @@ fn hang_the_bodies_shelf(
             Visibility::Hidden,
         ))
         .id();
-    commands.spawn((
-        Text::new("THE BODY"),
-        TextFont {
-            font: fonts.display.clone().into(),
-            font_size: FontSize::Px(13.0),
-            ..default()
-        },
-        TextColor(theme::accent(&palette)),
-        Node {
-            margin: UiRect::bottom(Val::Px(4.0)),
-            ..default()
-        },
-        ChildOf(shelf),
-    ));
+    let bodies_drawer = crate::builder::drawer(&mut commands, &fonts, &palette, shelf, "THE BODY", true);
     for (index, body) in bodies.0.iter().enumerate() {
         let button = commands
             .spawn((
@@ -1037,7 +1035,7 @@ fn hang_the_bodies_shelf(
                 },
                 BackgroundColor(Color::BLACK.with_alpha(0.18)),
                 BorderColor::all(theme::panel_border(&palette)),
-                ChildOf(shelf),
+                ChildOf(bodies_drawer),
             ))
             .id();
         commands.spawn((
@@ -1054,6 +1052,244 @@ fn hang_the_bodies_shelf(
             TextColor(theme::text_dim(&palette)),
             ChildOf(button),
         ));
+    }
+
+    // What the hands can hold. A pose is read off what the body is DOING, and an
+    // arm swinging nothing is an arm swinging nothing - Brett: "props that I can
+    // have them hold and attache to their hands. A fishing pole, an axe, a mining
+    // pick, sword etc."
+    let props = crate::builder::drawer(&mut commands, &fonts, &palette, shelf, "PROPS", true);
+    let mut prop_button = |what: &'static str, label: &'static str| {
+        let button = commands
+            .spawn((
+                PropButton(what),
+                Interaction::default(),
+                Node {
+                    padding: UiRect::axes(Val::Px(9.0), Val::Px(4.0)),
+                    border: UiRect::all(Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::BLACK.with_alpha(0.18)),
+                BorderColor::all(theme::panel_border(&palette)),
+                ChildOf(props),
+            ))
+            .id();
+        commands.spawn((
+            Text::new(label),
+            TextFont {
+                font: fonts.display.clone().into(),
+                font_size: FontSize::Px(11.0),
+                ..default()
+            },
+            TextColor(theme::text_dim(&palette)),
+            ChildOf(button),
+        ));
+        commands.spawn((
+            crate::rail::Word("Put it in the hand, or take it out again"),
+            ChildOf(button),
+        ));
+    };
+    for (what, label) in PROPS {
+        prop_button(what, label);
+    }
+    let swap = commands
+        .spawn((
+            SwapHands,
+            Interaction::default(),
+            Node {
+                margin: UiRect::top(Val::Px(4.0)),
+                padding: UiRect::axes(Val::Px(9.0), Val::Px(4.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.18)),
+            BorderColor::all(theme::accent(&palette).with_alpha(0.5)),
+            ChildOf(props),
+        ))
+        .id();
+    commands.spawn((
+        Text::new("THE OTHER HAND"),
+        TextFont {
+            font: fonts.display.clone().into(),
+            font_size: FontSize::Px(11.0),
+            ..default()
+        },
+        TextColor(theme::accent(&palette)),
+        ChildOf(swap),
+    ));
+}
+
+/// The props a hand can hold, and the words on their buttons.
+const PROPS: [(&str, &str); 6] = [
+    ("axe", "AXE"),
+    ("pick", "MINING PICK"),
+    ("sword", "SWORD"),
+    ("rod", "FISHING POLE"),
+    ("hoe", "HOE"),
+    ("torch", "TORCH"),
+];
+
+/// A prop's boxes, in the grip's own frame: the handle runs down -Y from the
+/// hand, the way a tool hangs when an arm is at rest, and the working end is
+/// furthest from the palm.
+fn prop_body(what: &str) -> Vec<(Vec3, Vec3, &'static str, f32)> {
+    // (middle, size, ramp, shade)
+    match what {
+        "axe" => vec![
+            (Vec3::new(0.0, -0.28, 0.0), Vec3::new(0.04, 0.62, 0.04), "wood", 0.45),
+            (Vec3::new(0.0, -0.56, 0.0), Vec3::new(0.16, 0.13, 0.04), "stone", 0.75),
+            (Vec3::new(0.09, -0.56, 0.0), Vec3::new(0.06, 0.07, 0.05), "stone", 0.9),
+        ],
+        "pick" => vec![
+            (Vec3::new(0.0, -0.30, 0.0), Vec3::new(0.04, 0.66, 0.04), "wood", 0.4),
+            (Vec3::new(0.0, -0.60, 0.0), Vec3::new(0.34, 0.05, 0.05), "stone", 0.8),
+            (Vec3::new(0.15, -0.57, 0.0), Vec3::new(0.06, 0.05, 0.05), "stone", 0.95),
+            (Vec3::new(-0.15, -0.57, 0.0), Vec3::new(0.06, 0.05, 0.05), "stone", 0.95),
+        ],
+        "sword" => vec![
+            (Vec3::new(0.0, -0.09, 0.0), Vec3::new(0.04, 0.18, 0.04), "wood", 0.35),
+            (Vec3::new(0.0, -0.19, 0.0), Vec3::new(0.18, 0.04, 0.05), "bone", 0.75),
+            (Vec3::new(0.0, -0.55, 0.0), Vec3::new(0.06, 0.70, 0.02), "bone", 0.95),
+        ],
+        "rod" => vec![
+            (Vec3::new(0.0, -0.14, 0.0), Vec3::new(0.04, 0.28, 0.04), "wood", 0.3),
+            (Vec3::new(0.0, -0.90, 0.0), Vec3::new(0.025, 1.30, 0.025), "wood", 0.55),
+            // The line, hanging from the tip. A pole with no line is a stick.
+            (Vec3::new(0.0, -1.85, 0.0), Vec3::new(0.008, 0.62, 0.008), "bone", 0.9),
+        ],
+        "hoe" => vec![
+            (Vec3::new(0.0, -0.34, 0.0), Vec3::new(0.04, 0.72, 0.04), "wood", 0.45),
+            (Vec3::new(0.06, -0.70, 0.0), Vec3::new(0.16, 0.05, 0.10), "stone", 0.7),
+        ],
+        "torch" => vec![
+            (Vec3::new(0.0, -0.22, 0.0), Vec3::new(0.05, 0.46, 0.05), "wood", 0.35),
+            (Vec3::new(0.0, -0.50, 0.0), Vec3::new(0.09, 0.12, 0.09), "cloth-rust", 0.85),
+        ],
+        _ => Vec::new(),
+    }
+}
+
+/// What the body is holding, and in which hand.
+#[derive(Resource)]
+struct Holding {
+    prop: Option<&'static str>,
+    /// The forearm the prop hangs from.
+    hand: &'static str,
+}
+
+impl Default for Holding {
+    fn default() -> Self {
+        Holding {
+            prop: None,
+            hand: "arm.r.lower",
+        }
+    }
+}
+
+/// A button that puts a prop in the hand, or takes it out.
+#[derive(Component)]
+struct PropButton(&'static str);
+
+/// A button that moves whatever is held to the other hand.
+#[derive(Component)]
+struct SwapHands;
+
+/// A prop's own boxes, so they can be swept when it changes.
+#[derive(Component)]
+struct PropPart;
+
+/// Puts the held prop in the hand, and takes the old one away.
+///
+/// It hangs off the FOREARM, at the far end of the forearm's own box, which is
+/// where a hand would be if the body had one. The bodies are boxes and the last
+/// box of an arm IS the hand as far as anything here is concerned.
+fn hold_the_prop(
+    mut commands: Commands,
+    bench: Res<Bench>,
+    palette: Res<Palette>,
+    bodies: Res<Bodies>,
+    wearing: Res<Wearing>,
+    holding: Res<Holding>,
+    standing: Res<Standing>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    held: Query<Entity, With<PropPart>>,
+) {
+    if *bench != Bench::Rig {
+        return;
+    }
+    if !holding.is_changed() && !standing.is_changed() {
+        return;
+    }
+    for part in &held {
+        commands.entity(part).despawn();
+    }
+    let Some(what) = holding.prop else {
+        return;
+    };
+    let Some(hand) = standing.0.get(holding.hand).copied() else {
+        return;
+    };
+    // The far end of the forearm, read off the body that is standing rather
+    // than guessed: a child's forearm is not their father's.
+    let palm = bodies
+        .0
+        .get(wearing.0.min(bodies.0.len().saturating_sub(1)))
+        .and_then(|body| {
+            body.boxes
+                .iter()
+                .find(|slab| slab.joint == holding.hand)
+                .map(|slab| slab.at[1] - slab.size[1] * 0.5)
+        })
+        .unwrap_or(-0.25);
+
+    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+    for (at, size, ramp, shade) in prop_body(what) {
+        commands.spawn((
+            PropPart,
+            RigPart,
+            crate::stage::RigFurniture,
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: palette.shade(ramp, shade),
+                perceptual_roughness: 0.95,
+                reflectance: 0.03,
+                ..default()
+            })),
+            Transform::from_translation(at + Vec3::new(0.0, palm, 0.0)).with_scale(size),
+            ChildOf(hand),
+        ));
+    }
+}
+
+/// The prop buttons, and the one that changes hands.
+fn work_the_props(
+    bench: Res<Bench>,
+    mut holding: ResMut<Holding>,
+    props: Query<(&Interaction, &PropButton), Changed<Interaction>>,
+    swaps: Query<&Interaction, (Changed<Interaction>, With<SwapHands>)>,
+) {
+    if *bench != Bench::Rig {
+        return;
+    }
+    for (touch, prop) in &props {
+        if *touch != Interaction::Pressed {
+            continue;
+        }
+        // The same prop again is the maker putting it down.
+        holding.prop = if holding.prop == Some(prop.0) {
+            None
+        } else {
+            Some(prop.0)
+        };
+    }
+    if swaps.iter().any(|touch| *touch == Interaction::Pressed) {
+        holding.hand = if holding.hand == "arm.r.lower" {
+            "arm.l.lower"
+        } else {
+            "arm.r.lower"
+        };
     }
 }
 
