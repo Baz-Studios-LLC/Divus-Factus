@@ -74,6 +74,15 @@ const RAIL_THICK: f32 = ATOM * 2.0;
 const RAIL_HIGH: f32 = ATOM * 14.0;
 /// About a pace between balusters, and a whole number of atoms.
 const RAIL_GAP: f32 = ATOM * 8.0;
+
+/// How high a flight climbs when it comes off the shelf, and how tall a footing
+/// stands when it does.
+///
+/// One number for both, so a platform and a flight meet without being measured
+/// against each other by hand - Brett: "Can we make the two foundation pieces
+/// that we have default to the same height as the default stairs?" Twelve atoms
+/// is four treads of three, which is what the rhythm makes of it anyway.
+const STEP_UP: f32 = ATOM * 12.0;
 const WALL_HIGH: f32 = 2.5;
 
 /// One piece of a part's body: offset from the part origin, size, ramp,
@@ -427,7 +436,7 @@ impl PartKind {
                 lift: *lift,
             },
             PartKind::FloorRun => PartKind::Floor(w, d),
-            PartKind::FoundationRun => PartKind::Foundation(w, d, 0.375),
+            PartKind::FoundationRun => PartKind::Foundation(w, d, STEP_UP),
             PartKind::RoofRun => PartKind::Roof(w, d),
             other => *other,
         }
@@ -464,7 +473,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     structure("FLOOR, STRETCH", PartKind::FloorRun, "footing"),
     structure(
         "FOUNDATION, 2M",
-        PartKind::Foundation(2.0, 2.0, 0.375),
+        PartKind::Foundation(2.0, 2.0, STEP_UP),
         "footing",
     ),
     structure("FOUNDATION, STRETCH", PartKind::FoundationRun, "footing"),
@@ -502,22 +511,22 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     structure(
         "STAIRS, STONE",
         PartKind::Stairs {
-            rise: 0.75,
+            rise: STEP_UP,
             wide: 1.25,
             stone: true,
             rail_stone: true,
-            hand: 0.875,
+            hand: RAIL_HIGH,
         },
         "footing",
     ),
     structure(
         "STAIRS, WOOD",
         PartKind::Stairs {
-            rise: 0.75,
+            rise: STEP_UP,
             wide: 1.25,
             stone: false,
             rail_stone: false,
-            hand: 0.875,
+            hand: RAIL_HIGH,
         },
         "footing",
     ),
@@ -3056,7 +3065,7 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
         // Legacy names from before the primitives learned their sizes.
         "floor" => Some(PartKind::Floor(2.0, 2.0)),
         "roof" => Some(PartKind::Roof(2.2, 2.2)),
-        "prop:foundation" => Some(PartKind::Foundation(2.0, 2.0, 0.375)),
+        "prop:foundation" => Some(PartKind::Foundation(2.0, 2.0, STEP_UP)),
         "prop:trim" => Some(PartKind::Trim {
             long: 2.0,
             stone: false,
@@ -8600,6 +8609,43 @@ fn turn_part(
 #[cfg(test)]
 mod roof_tests {
     use super::*;
+
+    /// A footing off the shelf stands exactly as high as a flight off the shelf
+    /// climbs, so the two meet without measuring.
+    #[test]
+    fn a_footing_and_a_flight_meet_off_the_shelf() {
+        let high_of = |kind: &PartKind| {
+            body_of(kind, None)
+                .iter()
+                .map(|Slab(at, size, ..)| at.y + size.y * 0.5)
+                .fold(f32::NEG_INFINITY, f32::max)
+        };
+        let footing = STRUCTURE
+            .iter()
+            .find(|entry| entry.label == "FOUNDATION, 2M")
+            .map(|entry| high_of(&entry.kind))
+            .expect("the shelf has a footing");
+        // A flight's treads, which is what a footing has to match - not its
+        // newels, which stand a rail's height above that.
+        let flight = STRUCTURE
+            .iter()
+            .find(|entry| entry.label == "STAIRS, WOOD")
+            .map(|entry| {
+                body_of(&entry.kind, None)
+                    .iter()
+                    .filter(|Slab(_, size, ..)| size.x > RAIL_POST + 1e-4)
+                    .map(|Slab(at, size, ..)| at.y + size.y * 0.5)
+                    .fold(f32::NEG_INFINITY, f32::max)
+            })
+            .expect("the shelf has a flight");
+        assert!(
+            (footing - flight).abs() < 1e-5,
+            "a footing stands {footing} and a flight climbs {flight}"
+        );
+        // And a drawn-out footing agrees with the one that comes ready-made.
+        let drawn = high_of(&PartKind::FoundationRun.run_made(2.0, 2.0));
+        assert!((drawn - footing).abs() < 1e-5, "the stretch one stands {drawn}");
+    }
 
     /// The back of a flight is ONE face: the top tread and the head newel end in
     /// the same plane, so a flight pushed against a wall meets it with both.
