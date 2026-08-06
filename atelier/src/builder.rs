@@ -8519,7 +8519,9 @@ mod roof_tests {
             // climbs rather than at some angle of their own.
             let rails: Vec<&Slab> = body.iter().filter(|Slab(.., lean)| *lean != 0.0).collect();
             assert_eq!(rails.len(), 2, "a flight wants a rail on each side");
-            let run = steps as f32 * 0.25 - 0.1875;
+            // The span the rail actually covers: the run, less a newel, less
+            // the reveal the rail is set in by at each end.
+            let run = steps as f32 * 0.25 - 0.1875 - 2.0 * 0.0625;
             let wanted = -(rise / run).atan();
             for Slab(.., lean) in &rails {
                 assert!(
