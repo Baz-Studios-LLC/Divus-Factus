@@ -772,11 +772,17 @@ fn work_gizmo(
             }
             let made = PartKind::Foundation(w, d, high);
             record.part = builder::part_name(&made);
-            // A pad grows UPWARD from where it sits: its underside is the thing
-            // resting on the ground, and a footing that sank as it grew would
-            // have to be put back every time.
-            transform.translation.y = state.start_at.y + (high - was) * 0.5;
-            record.at = transform.translation.into();
+            // The part does NOT move. A pad's box is drawn from its origin
+            // upward - the origin IS the underside - so growing it already grows
+            // it upward and away from the ground it rests on.
+            //
+            // It used to be lifted by half the growth, on the assumption that
+            // the box was centred on the origin like most parts. That put the
+            // pad half an atom into the air for every atom it gained, and half
+            // an atom is exactly what the lattice cannot have: Brett, "A
+            // foundation on the ground when I stretch it up it seems to get off
+            // the atom grid."
+            let _ = was;
             commands.entity(part).despawn_related::<Children>();
             builder::dress_part(
                 &mut commands,

@@ -8756,6 +8756,42 @@ fn turn_part(
 mod roof_tests {
     use super::*;
 
+    /// A pad's origin is its UNDERSIDE, so growing it taller lifts nothing.
+    ///
+    /// Every part whose handle changes a height has to answer this, or the part
+    /// wanders off the ground - and off the lattice - as it grows.
+    #[test]
+    fn a_footing_grows_from_its_underside() {
+        for high in [ATOM, STEP_UP, 1.0, 2.5] {
+            let body = body_of(&PartKind::Foundation(2.0, 2.0, high), None);
+            let bottom = body
+                .iter()
+                .map(|Slab(at, size, ..)| at.y - size.y * 0.5)
+                .fold(f32::INFINITY, f32::min);
+            assert!(
+                bottom.abs() < 1e-5,
+                "a footing {high} tall has its underside at {bottom} rather than its origin"
+            );
+        }
+        // And a flight does the same, so a footing and a flight raised together
+        // still meet.
+        let body = body_of(
+            &PartKind::Stairs {
+                rise: STEP_UP,
+                wide: 1.25,
+                stone: false,
+                rail_stone: false,
+                hand: RAIL_HIGH,
+            },
+            None,
+        );
+        let bottom = body
+            .iter()
+            .map(|Slab(at, size, ..)| at.y - size.y * 0.5)
+            .fold(f32::INFINITY, f32::min);
+        assert!(bottom.abs() < 1e-5, "a flight starts at {bottom}");
+    }
+
     /// Every face of a hip roof looks OUTWARD. A face wound the other way is
     /// culled, and a roof missing its deck reads as a sunken tray rather than as
     /// a hole - which is exactly how Brett described it.
