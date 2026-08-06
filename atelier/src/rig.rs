@@ -612,7 +612,7 @@ struct ClipTrack;
 
 /// A key's own tick on the track.
 #[derive(Component)]
-struct KeyTick(usize);
+struct KeyTick;
 
 /// The playhead.
 #[derive(Component)]
@@ -894,9 +894,9 @@ fn hang_the_keys(
     for tick in &ticks {
         commands.entity(tick).despawn();
     }
-    for (index, key) in clip.keys.iter().enumerate() {
+    for key in &clip.keys {
         commands.spawn((
-            KeyTick(index),
+            KeyTick,
             Node {
                 position_type: PositionType::Absolute,
                 left: Val::Percent((key.at / clip.length.max(0.01)) * 100.0),
