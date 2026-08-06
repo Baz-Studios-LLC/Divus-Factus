@@ -7885,6 +7885,15 @@ pub(crate) fn lift_roofs(
             Cutaway::WallsDown => Cutaway::Whole,
         };
     }
+    // The cutaway decides what a BUILDING shows, and only while a maker is
+    // standing at the building bench. It used to write every part's visibility
+    // whichever bench was out, which put the whole work back on the stage the
+    // instant the rig had put it away - Brett: "When you go to the rig it doesnt
+    // clear the bench first." The stage says who is on show; this says which of
+    // them the roof is hiding.
+    if *bench != Bench::Builder {
+        return;
+    }
     for (record, mut visibility) in &mut parts {
         // What a part IS, and nothing else. This used to ask the part's KIND as
         // well - a gable roof was roof-ish whatever it had been told, a wall was
