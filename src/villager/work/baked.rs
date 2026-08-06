@@ -306,6 +306,56 @@ pub fn beds(kind: super::BuildingKind) -> Option<usize> {
         .min()
 }
 
+/// A truncated pyramid: four faces sloping in from the foot to a flat top.
+///
+/// The bench's hip roof. Written out here corner for corner as well as there,
+/// like every other shape the two programs share - see `FORMATS.md`. The two
+/// numbers are how much of the box the flat top keeps along each axis.
+fn hip(keep_x: f32, keep_z: f32) -> Mesh {
+    let (tx, tz) = (keep_x.clamp(0.0, 1.0) * 0.5, keep_z.clamp(0.0, 1.0) * 0.5);
+    let foot = [
+        Vec3::new(-0.5, -0.5, -0.5),
+        Vec3::new(0.5, -0.5, -0.5),
+        Vec3::new(0.5, -0.5, 0.5),
+        Vec3::new(-0.5, -0.5, 0.5),
+    ];
+    let deck = [
+        Vec3::new(-tx, 0.5, -tz),
+        Vec3::new(tx, 0.5, -tz),
+        Vec3::new(tx, 0.5, tz),
+        Vec3::new(-tx, 0.5, tz),
+    ];
+    let mut positions: Vec<[f32; 3]> = Vec::new();
+    let mut normals: Vec<[f32; 3]> = Vec::new();
+    let mut indices: Vec<u32> = Vec::new();
+    let mut face = |corners: [Vec3; 4]| {
+        let first = positions.len() as u32;
+        let normal = (corners[1] - corners[0])
+            .cross(corners[2] - corners[0])
+            .normalize_or(Vec3::Y);
+        for corner in corners {
+            positions.push(corner.to_array());
+            normals.push(normal.to_array());
+        }
+        indices.extend([first, first + 1, first + 2, first, first + 2, first + 3]);
+    };
+    face(deck);
+    face([foot[0], deck[0], deck[1], foot[1]]);
+    face([foot[1], deck[1], deck[2], foot[2]]);
+    face([foot[2], deck[2], deck[3], foot[3]]);
+    face([foot[3], deck[3], deck[0], foot[0]]);
+    face([foot[0], foot[3], foot[2], foot[1]]);
+    let uvs: Vec<[f32; 2]> = positions.iter().map(|_| [0.0, 0.0]).collect();
+    Mesh::new(
+        bevy::render::mesh::PrimitiveTopology::TriangleList,
+        bevy::asset::RenderAssetUsages::default(),
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+    .with_inserted_indices(bevy::render::mesh::Indices::U32(indices))
+}
+
 /// A gable's prism, and the ridge cap's, cut the way the bench cuts
 /// them: unit-sized, so a box's scale shapes them.
 /// A right-angle prism: a box with one end cut clean through at an angle.
@@ -520,6 +570,15 @@ pub fn raise_baked(
             "ridge" => ridge.clone(),
             "mitre" => mitred.clone(),
             "mitre-back" => mitred_back.clone(),
+            // A hip roof carries its own proportions in its form - "hip:0.5x0.6"
+            // - because a truncated pyramid is a different mesh at every deck
+            // size and a name alone cannot say which. See atelier/FORMATS.md.
+            hipped if hipped.starts_with("hip:") => {
+                let mut parts = hipped.trim_start_matches("hip:").split('x');
+                let keep_x = parts.next().and_then(|n| n.parse().ok()).unwrap_or(0.5);
+                let keep_z = parts.next().and_then(|n| n.parse().ok()).unwrap_or(0.5);
+                meshes.add(hip(keep_x, keep_z))
+            }
             _ => cube.clone(),
         };
         let mut raised = commands.spawn((

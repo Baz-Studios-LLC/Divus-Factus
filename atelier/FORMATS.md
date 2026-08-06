@@ -148,6 +148,12 @@ its colour already looked up, plus the marks that say what the place is FOR.
   - `mitre-back`: the same cut the other way about, full height at +X. Which
     hand is wanted depends on which END of a beam is being capped, and a beam
     running between two slopes wants one of each.
+  - `hip:<x>x<z>`: a truncated pyramid - four faces sloping in from the foot to
+    a flat top, which is a hip roof with a deck. The two numbers are how much of
+    the box's width and depth the top keeps, so `hip:0.5000x0.6250` slopes in a
+    quarter of the width on each side and three sixteenths of the depth. They
+    ride in the form because the mesh is different at every deck size and a
+    name alone could not say which.
 - `kind` is what the village raises it AS: one of `house`, `longhouse`, `sawmill`,
   `blacksmith`, `tavern`, `townhall`, `storehouse`, `granary`, `well`,
   `smokehouse`, `mill`, `bakery`, `weaver`, `herbalist`, `watchtower`, `shrine`,

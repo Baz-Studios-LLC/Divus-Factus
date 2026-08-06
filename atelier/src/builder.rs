@@ -116,6 +116,75 @@ enum Shape {
     /// The same cut the other way about: full height at +X. Which hand is
     /// wanted depends on which end of a beam is being capped.
     MitreBack,
+    /// A truncated pyramid: four faces sloping in from the box's foot to a
+    /// smaller flat top. A hip roof with a deck on it.
+    ///
+    /// The two numbers are what fraction of the box's own half-extents the top
+    /// face keeps, along X and along Z. They differ because a roof is rarely
+    /// square and the slope should run in the same distance on every side.
+    ///
+    /// This has to be a SHAPE rather than an arrangement of slabs, because a
+    /// slab can lean about X and no other axis - which is what a gable roof's
+    /// two slopes use, and why a gable roof has only two. Four of them needs the
+    /// slope carried in the mesh.
+    Hip(f32, f32),
+}
+
+/// A truncated pyramid, in a unit box: four sloping faces and a flat top.
+///
+/// The hip roof. Brett: "a square roof that slopes on all four sides and it flat
+/// on top." Built like every other shape here - unit-sized, so the slab's own
+/// dimensions give it its pitch and its footprint - and the two fractions say
+/// how much of the box the flat top keeps.
+fn hip_mesh(top_x: f32, top_z: f32) -> Mesh {
+    let (tx, tz) = (top_x.clamp(0.0, 1.0) * 0.5, top_z.clamp(0.0, 1.0) * 0.5);
+    // Eight corners: the eave rectangle at the bottom, the deck at the top.
+    let foot = [
+        Vec3::new(-0.5, -0.5, -0.5),
+        Vec3::new(0.5, -0.5, -0.5),
+        Vec3::new(0.5, -0.5, 0.5),
+        Vec3::new(-0.5, -0.5, 0.5),
+    ];
+    let deck = [
+        Vec3::new(-tx, 0.5, -tz),
+        Vec3::new(tx, 0.5, -tz),
+        Vec3::new(tx, 0.5, tz),
+        Vec3::new(-tx, 0.5, tz),
+    ];
+    let mut positions: Vec<[f32; 3]> = Vec::new();
+    let mut normals: Vec<[f32; 3]> = Vec::new();
+    let mut indices: Vec<u32> = Vec::new();
+    let mut face = |corners: [Vec3; 4]| {
+        let first = positions.len() as u32;
+        // Flat-shaded, like every other face in this world: one normal for the
+        // whole face, worked out from its own corners.
+        let normal = (corners[1] - corners[0])
+            .cross(corners[2] - corners[0])
+            .normalize_or(Vec3::Y);
+        for corner in corners {
+            positions.push(corner.to_array());
+            normals.push(normal.to_array());
+        }
+        indices.extend([first, first + 1, first + 2, first, first + 2, first + 3]);
+    };
+    // The deck, then the four slopes, each from an eave edge up to the deck edge
+    // above it. Wound so every face looks outward.
+    face(deck);
+    face([foot[0], deck[0], deck[1], foot[1]]);
+    face([foot[1], deck[1], deck[2], foot[2]]);
+    face([foot[2], deck[2], deck[3], foot[3]]);
+    face([foot[3], deck[3], deck[0], foot[0]]);
+    // And the underside, so a roof seen from below is not a hole.
+    face([foot[0], foot[3], foot[2], foot[1]]);
+    let uvs: Vec<[f32; 2]> = positions.iter().map(|_| [0.0, 0.0]).collect();
+    Mesh::new(
+        bevy::render::mesh::PrimitiveTopology::TriangleList,
+        bevy::asset::RenderAssetUsages::default(),
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+    .with_inserted_indices(bevy::render::mesh::Indices::U32(indices))
 }
 
 /// A right-angle prism: a box with one end cut clean through at an angle.
@@ -394,6 +463,13 @@ pub enum PartKind {
     GableRun,
     RidgeRun,
     GableRoofRun,
+    /// A hip roof: four faces sloping in from the eaves to a flat deck.
+    ///
+    /// The same four numbers a gable roof takes - how long, how far across, how
+    /// far the eaves reach past the walls, and the pitch - because it is the
+    /// same roof with its ends hipped in rather than closed by a gable.
+    HipRoof(f32, f32, f32, f32),
+    HipRoofRun,
     FloorRun,
     FoundationRun,
     RoofRun,
@@ -415,7 +491,8 @@ impl PartKind {
             PartKind::FloorRun
             | PartKind::FoundationRun
             | PartKind::RoofRun
-            | PartKind::GableRoofRun => Some(2),
+            | PartKind::GableRoofRun
+            | PartKind::HipRoofRun => Some(2),
             _ => None,
         }
     }
@@ -439,6 +516,7 @@ impl PartKind {
             // A hand's breadth of overhang to begin with; the gold
             // handles pull it further without moving the gables.
             PartKind::GableRoofRun => PartKind::GableRoof(w, d, 0.25, ROOF_PITCH_DEGREES),
+            PartKind::HipRoofRun => PartKind::HipRoof(w, d, 0.25, ROOF_PITCH_DEGREES),
             PartKind::SegRun { high, lift } => PartKind::Seg {
                 long: w,
                 high: *high,
@@ -504,6 +582,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     structure("RAIL, STRETCH", PartKind::RailRun { stone: false }, "frame"),
     structure("RIDGE, STRETCH", PartKind::RidgeRun, "roof"),
     structure("ROOF, GABLE, STRETCH", PartKind::GableRoofRun, "roof"),
+    structure("ROOF, HIP, STRETCH", PartKind::HipRoofRun, "roof"),
     structure("ROOF, PANEL", PartKind::Roof(2.2, 2.2), "roof"),
     structure("ROOF, STRETCH", PartKind::RoofRun, "roof"),
     structure(
@@ -1063,6 +1142,31 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 0.7,
             ),
         ],
+        PartKind::HipRoof(long, span, over, pitch) => {
+            // The roof's own footprint, eaves and all.
+            let half_long = (long * 0.5 + over).max(ATOM);
+            let half_span = (span * 0.5 + over).max(ATOM);
+            // How far the slope runs IN from the eave, the same on all four
+            // sides: half of the shorter half-extent, which leaves a deck of the
+            // same proportion whatever shape the building is.
+            let run = on_the_lattice(half_long.min(half_span) * 0.5).max(ATOM);
+            let high = on_the_lattice(run * pitch.to_radians().tan()).max(ATOM);
+            // What the deck keeps of the box, as a fraction of each half-extent:
+            // the slope runs in the same DISTANCE on every side, so the two
+            // fractions differ whenever the roof is not square.
+            let keep_x = ((half_long - run) / half_long).clamp(0.0, 1.0);
+            let keep_z = ((half_span - run) / half_span).clamp(0.0, 1.0);
+            vec![Slab(
+                Vec3::new(0.0, high * 0.5, 0.0),
+                Vec3::new(half_long * 2.0, high, half_span * 2.0),
+                "earth".to_string(),
+                0.4,
+                1.0,
+                Shape::Hip(keep_x, keep_z),
+                0.0,
+            )]
+        }
+        PartKind::HipRoofRun => body_of(&PartKind::HipRoof(0.25, 0.25, 0.0, ROOF_PITCH_DEGREES), None),
         PartKind::Rail { long, hand, stone } => {
             let (ramp, post_shade, rail_shade, pin_shade) = if *stone {
                 ("stone", 0.5, 0.55, 0.58)
@@ -2918,6 +3022,10 @@ pub fn part_name(kind: &PartKind) -> String {
         PartKind::GableRoof(long, span, over, pitch) => {
             format!("gableroof-{long}x{span}x{over}x{pitch}")
         }
+        PartKind::HipRoof(long, span, over, pitch) => {
+            format!("hiproof-{long}x{span}x{over}x{pitch}")
+        }
+        PartKind::HipRoofRun => "hiproofrun".to_string(),
         PartKind::RoofPlan(w, d) => format!("roofplan-{w}x{d}"),
         PartKind::Floor(w, d) => format!("floor-{w}x{d}"),
         PartKind::Foundation(w, d, high) => format!("foundation-{w}x{d}x{high}"),
@@ -2939,6 +3047,17 @@ pub fn part_name(kind: &PartKind) -> String {
 pub fn kind_from_name(name: &str) -> Option<PartKind> {
     if let Some(rest) = name.strip_prefix("wall-") {
         return rest.parse::<f32>().ok().map(PartKind::Wall);
+    }
+    if let Some(rest) = name.strip_prefix("hiproof-") {
+        let mut parts = rest.split('x');
+        let long = parts.next()?.parse().ok()?;
+        let span = parts.next()?.parse().ok()?;
+        let over = parts.next().and_then(|n| n.parse().ok()).unwrap_or(0.25);
+        let pitch = parts
+            .next()
+            .and_then(|n| n.parse().ok())
+            .unwrap_or(ROOF_PITCH_DEGREES);
+        return Some(PartKind::HipRoof(long, span, over, pitch));
     }
     if let Some(rest) = name.strip_prefix("gableroof-") {
         // Four numbers now: the building it covers, the overhang, and the
@@ -3231,6 +3350,7 @@ pub fn dress_part(
                 Shape::Ridge => meshes.add(wedge_mesh(true)),
                 Shape::Mitre => meshes.add(mitre_mesh(false)),
                 Shape::MitreBack => meshes.add(mitre_mesh(true)),
+                Shape::Hip(top_x, top_z) => meshes.add(hip_mesh(top_x, top_z)),
                 Shape::Box => meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
             }),
             MeshMaterial3d(materials.add(StandardMaterial {
@@ -3493,6 +3613,10 @@ fn length_of(kind: &PartKind) -> Option<(f32, Box<dyn Fn(f32) -> PartKind>)> {
         PartKind::GableRoof(long, span, over, pitch) => Some((
             long,
             Box::new(move |n| PartKind::GableRoof(n, span, over, pitch)),
+        )),
+        PartKind::HipRoof(long, span, over, pitch) => Some((
+            long,
+            Box::new(move |n| PartKind::HipRoof(n, span, over, pitch)),
         )),
         // The flat ones are sized in two, and it is their X a trim comes back
         // along - the same axis every other part is cut on.
@@ -5059,6 +5183,7 @@ fn is_structure(kind: &PartKind) -> bool {
             | PartKind::Chimney(..)
             | PartKind::RidgeRun
             | PartKind::GableRoof(..)
+            | PartKind::HipRoof(..)
             | PartKind::GableRoofRun
             | PartKind::Stairs { .. }
             | PartKind::Rail { .. }
@@ -8384,12 +8509,20 @@ pub(crate) fn bake_a_work(
             // turn the game will draw it with.
             let turn = turn * Quat::from_rotation_x(lean);
             let colour = palette.shade(&ramp, shade).to_srgba();
+            // A hip's two fractions ride in its form, since the game has to
+            // build the same frustum and a name alone cannot say how far in the
+            // deck stands. See FORMATS.md.
+            let hip = match shape {
+                Shape::Hip(x, z) => format!("hip:{x:.4}x{z:.4}"),
+                _ => String::new(),
+            };
             let form = match shape {
                 Shape::Box => "box",
                 Shape::Wedge => "wedge",
                 Shape::Ridge => "ridge",
                 Shape::Mitre => "mitre",
                 Shape::MitreBack => "mitre-back",
+                Shape::Hip(..) => hip.as_str(),
             };
             let stage = match kind {
                 PartKind::Gable(..)
@@ -8618,6 +8751,42 @@ fn turn_part(
 #[cfg(test)]
 mod roof_tests {
     use super::*;
+
+    /// A hip roof slopes in the same distance on all four sides and keeps a flat
+    /// deck, whatever shape the building under it is.
+    #[test]
+    fn a_hip_roof_slopes_on_every_side() {
+        for (long, span) in [(6.0_f32, 6.0_f32), (8.0, 4.0), (3.0, 9.0)] {
+            let kind = PartKind::HipRoof(long, span, 0.25, 40.0);
+            let body = body_of(&kind, None);
+            assert_eq!(body.len(), 1, "a hip roof is one shape");
+            let Slab(at, size, .., shape, _) = &body[0];
+            let Shape::Hip(keep_x, keep_z) = shape else {
+                panic!("a hip roof is not a hip");
+            };
+            // It covers the building and its eaves.
+            assert!((size.x - (long + 0.5)).abs() < 1e-4);
+            assert!((size.z - (span + 0.5)).abs() < 1e-4);
+            assert!(at.y > 0.0 && size.y > 0.0, "a hip roof has no height");
+
+            // The deck is inset the SAME distance on every side.
+            let in_x = size.x * 0.5 * (1.0 - keep_x);
+            let in_z = size.z * 0.5 * (1.0 - keep_z);
+            assert!(
+                (in_x - in_z).abs() < 1e-3,
+                "the slope runs in {in_x} one way and {in_z} the other"
+            );
+            // And there IS a deck: a hip that came to a point would be a spire.
+            assert!(
+                *keep_x > 0.05 && *keep_z > 0.05,
+                "a hip roof came to a point: {keep_x} by {keep_z}"
+            );
+        }
+        // A steeper pitch is a taller roof, and the deck stays where it is.
+        let low = body_of(&PartKind::HipRoof(6.0, 6.0, 0.25, 20.0), None);
+        let steep = body_of(&PartKind::HipRoof(6.0, 6.0, 0.25, 50.0), None);
+        assert!(steep[0].1.y > low[0].1.y, "pitch did not raise the roof");
+    }
 
     /// A height that a hand can pull comes back on the lattice, wherever it
     /// started - including a part drawn before the rule existed.
@@ -9095,6 +9264,8 @@ mod roof_tests {
                     | PartKind::RoofRun
                     | PartKind::GableRoof(..)
                     | PartKind::GableRoofRun
+                    | PartKind::HipRoof(..)
+                    | PartKind::HipRoofRun
                     | PartKind::Gable(..)
                     | PartKind::GableRun
                     | PartKind::RoofPlan(..)
