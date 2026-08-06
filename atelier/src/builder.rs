@@ -51,7 +51,12 @@ const WALL_THICK: f32 = 0.25;
 /// How far a piece that is MEANT to butt against another is drawn past its own
 /// measure, so the two lap instead of meeting exactly. A sixty-fourth at each
 /// end. See the wall segment in `body_of`.
-const LAP: f32 = 0.03125;
+/// The lattice everything is drawn on: a sixteenth of a metre, one ATOM.
+///
+/// Every measurement in a part is a whole number of these. Brett's rule, and the
+/// one that makes the bench's seams close by themselves - a sixteenth is a power
+/// of two, so parts that meet on the lattice agree on the edge exactly.
+const ATOM: f32 = 0.0625;
 const WALL_HIGH: f32 = 2.5;
 
 /// One piece of a part's body: offset from the part origin, size, ramp,
@@ -634,42 +639,28 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             0.7,
         )],
         PartKind::Seg { long, high, lift } => {
-            // The lap goes INWARD, never past the wall's own edges.
+            // NO lap. A wall piece is exactly what it measures.
             //
-            // It used to be added to the height as well as the length, which
-            // grew the piece by a sixty-fourth at BOTH ends - so a header stood
-            // proud of the wall top and the pieces either side of a door stood
-            // proud of their neighbours. Brett: "When i add a double door to
-            // this wall it seems to get slightly taller than the other walls?"
-            // It did, by a sixty-fourth, which is exactly the amount that reads
-            // as a step in a straight run of wall.
+            // It used to be drawn half an atom longer and half an atom taller so
+            // its seams could not open - and half an atom is off the lattice, so
+            // it stood proud of the wall top, proud of its neighbours, and proud
+            // of the corner it ended at. Brett found all three: "it seems to get
+            // slightly taller than the other walls", then "same problem,
+            // different axis", then the rule that settles it - "everything
+            // should respect the grid so all items line up. Whole atoms only."
             //
-            // A header is the only one with a joint to close vertically: it sits
-            // over a frame, and laps DOWN onto it. Everything else meets the
-            // wall top or the floor, and those are edges rather than joints.
-            let drop = if *lift > 0.0 { LAP } else { 0.0 };
+            // Which turns out to close the seams the lap was for. A sixteenth is
+            // a power of two: two pieces meeting on the lattice work out the
+            // same edge bit for bit, from different centres, and there is
+            // nothing left for the rasteriser to leave a hairline in. The
+            // hairline Brett photographed was a piece off the lattice, not a
+            // piece that met its neighbour too exactly.
             vec![slab(
                 0.0,
-                lift + high * 0.5 - drop * 0.5,
+                lift + high * 0.5,
                 0.0,
-                // Drawn a hair longer than it measures, and it laps at both ends.
-                //
-                // A segment exists to fill the wall BESIDE something - the pieces a
-                // punch leaves either side of a window, a header over it, a sill
-                // under it - so both its ends abut. Two boxes that meet exactly
-                // share an edge each works out by its own sum, from different
-                // centres, and the last bits disagree; the rasteriser then leaves a
-                // hairline that neither claims and the dark behind the wall shows
-                // through it. Brett photographed one running down from a window, and
-                // it survives the bake because the fault is in the geometry.
-                //
-                // A sixty-fourth at each end: too small to see, too large for any
-                // float to lose. Put HERE rather than where a punch works out its
-                // leavings, because that would only mend walls punched from today
-                // on - and the buildings that have the seam are the ones already
-                // drawn. Seventeen of these stand in the longhouse alone.
-                *long + LAP,
-                *high + drop,
+                *long,
+                *high,
                 WALL_THICK,
                 "wood",
                 0.7,
@@ -1209,7 +1200,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             let post = 0.1875_f32;
             let hand = hand.clamp(0.375, 2.0);
             let cap = post;
-            let rail_thick = post * 0.75;
+            let rail_thick = ATOM * 2.0;
             // The TREADS stand proud of the rail by a sixteenth, on every side.
             //
             // Flush is the one thing that cannot be: a newel's face in exactly
@@ -1231,7 +1222,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // leaves a slot between the rail and whatever it arrives at. Past
             // the tread it simply disappears into the wall, and its faces still
             // share a plane with nothing.
-            let head_z = run * 0.5 + LAP - post * 0.5;
+            let head_z = run * 0.5 + ATOM - post * 0.5;
             let span = head_z - foot_z;
             let rail_len = span.hypot(rise);
             // A slab's length lies along Z, and leaning about X carries its far
@@ -1291,13 +1282,18 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     if tall < 0.125 {
                         continue;
                     }
+                    // On the lattice, like everything else: a baluster is a
+                    // whole atom square, and stands a whole number of atoms
+                    // tall. The last hair of it disappears into the rail above,
+                    // which is where a joiner would want it anyway.
+                    let tall = (tall / ATOM).round().max(1.0) * ATOM;
                     body.push(slab(
                         side * inset,
                         stood + tall * 0.5,
                         z,
-                        post * 0.5,
+                        ATOM,
                         tall,
-                        post * 0.5,
+                        ATOM,
                         rail_ramp,
                         pin_shade,
                     ));
@@ -8382,6 +8378,64 @@ fn turn_part(
 mod roof_tests {
     use super::*;
 
+    /// Every measurement of every part is a whole number of atoms.
+    ///
+    /// Brett's rule: "everything should respect the grid so all items line up.
+    /// Whole atoms only." It is what makes seams close by themselves, and a
+    /// single half-atom anywhere is what put a lip on a corner and a step in a
+    /// run of wall.
+    #[test]
+    fn every_part_is_drawn_in_whole_atoms() {
+        let mut off: Vec<String> = Vec::new();
+        // Decor is exempt, on Brett's call - "the decor is probably the one
+        // exception to the whole atom rule tbf" - and so is anything a roof's
+        // pitch derives: "Slanted roofs too". A slope's own measurements come
+        // out of an angle, and no rule about the lattice can ask an angle to be
+        // a whole number of sixteenths.
+        for entry in STRUCTURE.iter().chain(FURNITURE) {
+            if matches!(
+                entry.kind,
+                PartKind::Roof(..)
+                    | PartKind::RoofRun
+                    | PartKind::GableRoof(..)
+                    | PartKind::GableRoofRun
+                    | PartKind::Gable(..)
+                    | PartKind::GableRun
+                    | PartKind::RoofPlan(..)
+            ) {
+                continue;
+            }
+            // A run is a stub until it is drawn out; measure what it becomes.
+            let kind = match entry.kind.run_axes() {
+                Some(_) => entry.kind.run_made(2.0, 2.0),
+                None => entry.kind,
+            };
+            for Slab(at, size, _, _, _, shape, lean) in body_of(&kind, None) {
+                // A slope's own length is a hypotenuse: whole atoms of rise and
+                // run give a diagonal that is not a whole anything, and no rule
+                // about the lattice can ask otherwise. The same goes for a shape
+                // that is not a box - a wedge's height follows its pitch.
+                if lean != 0.0 || !matches!(shape, Shape::Box) {
+                    continue;
+                }
+                for axis in 0..3 {
+                    // Sizes must be whole atoms; a CENTRE may sit on a half
+                    // atom, since a box of odd width is centred between two.
+                    let atoms = size[axis] / ATOM;
+                    if (atoms - atoms.round()).abs() > 1e-3 {
+                        off.push(format!(
+                            "{} is {:.4} across axis {axis} - {atoms:.2} atoms",
+                            part_name(&kind),
+                            size[axis]
+                        ));
+                    }
+                    let _ = at;
+                }
+            }
+        }
+        assert!(off.is_empty(), "off the lattice:\n  {}", off.join("\n  "));
+    }
+
     /// A wall piece never stands taller than it measures. The lap that closes
     /// its seams goes inward - toward the joint it has - and a wall's top and
     /// the floor are edges rather than joints.
@@ -8414,8 +8468,8 @@ mod roof_tests {
         );
         assert!(bottom_of(&beside).abs() < 1e-4, "it left the floor");
 
-        // A header over a door: its top is the wall's, and it laps DOWN onto the
-        // frame beneath it.
+        // A header over a door: its top is the wall's, and its bottom is where
+        // it says it is.
         let header = PartKind::Seg {
             long: 1.5,
             high: 0.5,
@@ -8427,13 +8481,23 @@ mod roof_tests {
             top_of(&header)
         );
         assert!(
-            bottom_of(&header) < WALL_HIGH - 0.5 - 1e-4,
-            "a header should lap down onto what it sits over"
+            (bottom_of(&header) - (WALL_HIGH - 0.5)).abs() < 1e-6,
+            "a header hangs below where it measures"
         );
 
-        // And the length still laps at both ends, which is what it is for.
+        // And it is exactly as long as it says: whole atoms, no lap, so the
+        // lattice does the work the lap used to be asked to do.
         let Slab(_, size, ..) = &body_of(&beside, None)[0];
-        assert!(size.x > 0.75 + 1e-4, "a piece stopped lapping along its wall");
+        assert!(
+            (size.x - 0.75).abs() < 1e-6,
+            "a wall piece measuring 0.75 was drawn {} long",
+            size.x
+        );
+        assert!(
+            (size.x / ATOM).fract().abs() < 1e-4,
+            "a wall piece is off the lattice at {} long",
+            size.x
+        );
     }
 
     /// A part rests on what MOST of it is standing on. One corner brushing a
@@ -8661,7 +8725,7 @@ mod roof_tests {
         });
         let treads = steps as f32 * tread;
         assert!(
-            flight.y > treads && flight.y < treads + 0.0625,
+            flight.y > treads && flight.y <= treads + 0.0625 + 1e-4,
             "a flight of {steps} treads measured {} along its run",
             flight.y
         );
@@ -8725,7 +8789,7 @@ mod roof_tests {
             // The span the rail actually covers: from the foot newel's centre,
             // a reveal in from the bottom tread, to the head newel's centre,
             // which hangs a lap PAST the top one so the rail meets the wall.
-            let (post, reveal, lap) = (0.1875_f32, 0.0625_f32, 0.03125_f32);
+            let (post, reveal, lap) = (0.1875_f32, 0.0625_f32, 0.0625_f32);
             let full = steps as f32 * 0.25;
             let foot = -full * 0.5 + post * 0.5 + reveal;
             let head = full * 0.5 + lap - post * 0.5;
