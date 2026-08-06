@@ -1002,16 +1002,18 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         ],
         PartKind::Prop("barrel") => vec![
             slab(0.03125, 0.375, 0.03125, 0.5625, 0.75, 0.5625, "wood", 0.55),
-            slab(
-                0.03125, 0.15625, 0.03125, 0.5625, 0.0625, 0.5625, "stone", 0.45,
-            ),
-            slab(
-                0.03125, 0.53125, 0.03125, 0.5625, 0.0625, 0.5625, "stone", 0.45,
-            ),
+            // The hoops stand PROUD of the staves. Drawn flush - the same width
+            // and depth as the barrel itself - their sides sat in the same
+            // planes as its sides, and two surfaces at one depth is a fight the
+            // renderer settles differently every frame: the stripes Brett
+            // photographed. A hoop stands out on a real barrel anyway.
+            slab(0.03125, 0.15625, 0.03125, 0.625, 0.0625, 0.625, "stone", 0.45),
+            slab(0.03125, 0.53125, 0.03125, 0.625, 0.0625, 0.625, "stone", 0.45),
         ],
         PartKind::Prop("crate") => vec![
             slab(0.0, 0.3125, 0.0, 0.625, 0.625, 0.625, "wood", 0.6),
-            slab(0.0, 0.59375, 0.0, 0.5, 0.0625, 0.5, "wood", 0.4),
+            // The lid rests on the crate rather than sinking into its top face.
+            slab(0.0, 0.65625, 0.0, 0.5, 0.0625, 0.5, "wood", 0.4),
         ],
         PartKind::Prop("shelves") => vec![
             slab(
@@ -8377,6 +8379,79 @@ fn turn_part(
 #[cfg(test)]
 mod roof_tests {
     use super::*;
+
+    /// No part may have two boxes whose faces lie in one plane where they
+    /// OVERLAP. That is what a renderer cannot settle, and it shows as the
+    /// stripes Brett found across a barrel.
+    ///
+    /// Faces in one plane that do not overlap are fine - two table legs stand
+    /// with their sides in the same planes and never argue about a pixel.
+    ///
+    /// IGNORED, and run by hand: `cargo test no_part_fights_itself -- --ignored`.
+    /// It found forty-nine of these across the shelf the first time it was
+    /// pointed at it, and they are a backlog rather than a regression - the
+    /// barrel Brett photographed is mended, and the rest are waiting. A test
+    /// that fails for work nobody has done yet stops being read.
+    #[test]
+    #[ignore = "a standing audit of the catalogue, not a check on today's work"]
+    fn no_part_fights_itself() {
+        let mut fights: Vec<String> = Vec::new();
+        for entry in STRUCTURE.iter().chain(FURNITURE).chain(DECOR) {
+            let kind = match entry.kind.run_axes() {
+                Some(_) => entry.kind.run_made(2.0, 2.0),
+                None => entry.kind,
+            };
+            let boxes: Vec<(Vec3, Vec3)> = body_of(&kind, None)
+                .into_iter()
+                .filter(|Slab(.., shape, lean)| *lean == 0.0 && matches!(shape, Shape::Box))
+                .map(|Slab(at, size, ..)| (at, size))
+                .collect();
+            for (i, (at, size)) in boxes.iter().enumerate() {
+                for (other_at, other_size) in boxes.iter().skip(i + 1) {
+                    for axis in 0..3 {
+                        // Do they share a face plane on this axis?
+                        let faces = [
+                            at[axis] - size[axis] * 0.5,
+                            at[axis] + size[axis] * 0.5,
+                        ];
+                        let theirs = [
+                            other_at[axis] - other_size[axis] * 0.5,
+                            other_at[axis] + other_size[axis] * 0.5,
+                        ];
+                        let shared = faces
+                            .iter()
+                            .any(|mine| theirs.iter().any(|theirs| (mine - theirs).abs() < 1e-5));
+                        if !shared {
+                            continue;
+                        }
+                        // And do they overlap on ALL THREE axes - that is,
+                        // does one stand INSIDE the other?
+                        //
+                        // Two boxes merely touching share a face plane too: a
+                        // table top rests on a leg, and the plane between them
+                        // is the joint. Nothing fights there, because each is on
+                        // its own side of it. A fight needs both faces in one
+                        // plane AND both boxes in the same space, which is what
+                        // a hoop around a barrel is.
+                        let overlaps = (0..3).all(|other| {
+                            let gap = (at[other] - other_at[other]).abs();
+                            gap < (size[other] + other_size[other]) * 0.5 - 1e-4
+                        });
+                        if overlaps {
+                            fights.push(format!(
+                                "{} has two faces at {:.4} on axis {axis}",
+                                part_name(&kind),
+                                faces[0].max(theirs[0])
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        fights.sort();
+        fights.dedup();
+        assert!(fights.is_empty(), "parts at odds with themselves:\n  {}", fights.join("\n  "));
+    }
 
     /// Every measurement of every part is a whole number of atoms.
     ///
