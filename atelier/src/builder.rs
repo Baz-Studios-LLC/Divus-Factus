@@ -5227,6 +5227,14 @@ fn place_grab_remove(
         .iter()
         .any(|interaction| *interaction != Interaction::None);
 
+    // A SHIFT-click gathers rather than places: the hand keeps whatever it is
+    // holding, and nothing is picked up. It is the one click in this mode that
+    // is not about putting something down or taking it up.
+    if (keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight))
+        && buttons.just_pressed(MouseButton::Left)
+    {
+        return;
+    }
     if buttons.just_pressed(MouseButton::Left) && !over_ui {
         if let Some(kind) = hand.kind {
             // A stretch tool: the first click sets the anchor where the

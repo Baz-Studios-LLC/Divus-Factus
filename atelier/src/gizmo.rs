@@ -226,8 +226,21 @@ fn select_part(
     if dims.0.is_some() {
         return;
     }
-    if *bench != Bench::Builder || naming.0.is_some() || *mode == ToolMode::Normal {
+    if *bench != Bench::Builder || naming.0.is_some() {
         selected.clear();
+        return;
+    }
+    // NORMAL is placement: a click there picks a part up, and always did. But
+    // SHIFT-click is free in that mode, and grouping is the one thing a maker
+    // had to leave the mode to do - Brett: "What about shift clicking in normal
+    // mode? Should that work too? Right now it just picks the piece up." So
+    // shift gathers here as well, and a plain click lets go of what was gathered
+    // before picking anything up.
+    let gathering = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+    if *mode == ToolMode::Normal && !gathering {
+        if buttons.just_pressed(MouseButton::Left) {
+            selected.clear();
+        }
         return;
     }
     // A part that has gone - buried, or left behind on another step - stops
@@ -241,7 +254,7 @@ fn select_part(
         // part that belongs to a group takes the whole group, which is what
         // being grouped MEANS - see `builder::kin_of`.
         let kin = builder::kin_of(touched, &records);
-        if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
+        if gathering {
             for part in kin {
                 selected.toggle(part);
             }
