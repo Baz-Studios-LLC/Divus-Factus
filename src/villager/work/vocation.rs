@@ -277,7 +277,10 @@ pub(crate) fn morning_muster(
     courting: Query<&crate::villager::Courting, (With<Villager>, Without<Corpse>)>,
     ground: (
         Option<Res<crate::villager::explore::KnownWorld>>,
-        Query<(&GlobalTransform, &crate::scatter::FellableTree)>,
+        // The tree's own Transform and the chunk it hangs from, NOT its
+        // GlobalTransform. See `wood_known`.
+        Query<(&Transform, &ChildOf, &crate::scatter::FellableTree)>,
+        Query<&Transform, Without<crate::scatter::FellableTree>>,
         Option<Res<Terrain>>,
         Option<Res<SettlementSite>>,
     ),
@@ -305,7 +308,7 @@ pub(crate) fn morning_muster(
     *reckoned = clock.elapsed;
 
     let (buildings, sites, stores, fields) = town;
-    let (known, trees, terrain, site) = ground;
+    let (known, trees, chunks, terrain, site) = ground;
     let mouths = workers.iter().count();
     if mouths == 0 {
         return;
@@ -324,10 +327,31 @@ pub(crate) fn morning_muster(
 
     // Whether any fellable tree stands on ground the village knows. When
     // none does, more foresters are useless - someone has to go find woods.
+    //
+    // In FLAT coordinates, which is the only space `KnownWorld` speaks: its
+    // centre is where the flag went in and its pockets are written from
+    // villagers' own Transforms. A tree's GLOBAL transform is a point on the
+    // bent globe, thousands of units from any of that, so this asked whether a
+    // tree on the planet's surface stood within a hundred and seventy metres of
+    // a spot in the flat sim - and the answer was always no.
+    //
+    // Which is why nobody was building. No tree was known, so the forester was
+    // struck off the trades a village may take up; with no forester there is no
+    // timber, and with no timber there is nothing to raise. Brett: "not sure why
+    // nobody is building anything?"
     let wood_known = known.as_ref().is_none_or(|k| {
-        trees
-            .iter()
-            .any(|(at, tree)| tree.harvestable() && k.knows(at.translation()))
+        trees.iter().any(|(at, parent, tree)| {
+            if !tree.harvestable() {
+                return false;
+            }
+            // A tree hangs from its chunk, and the chunk's own Transform is
+            // where that chunk stands in the flat world.
+            let seated = chunks
+                .get(parent.parent())
+                .map(|chunk| chunk.translation)
+                .unwrap_or(Vec3::ZERO);
+            k.knows(seated + at.translation)
+        })
     });
     // Whether water lies within a working walk of the square - twelve
     // spokes, no dart-throwing, so no rng is needed here.

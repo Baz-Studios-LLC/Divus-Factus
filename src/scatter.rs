@@ -408,6 +408,16 @@ fn populate_chunks(
             chunk.coord.y as f32 * CHUNK_SIZE,
         );
 
+        // A stone node, if this chunk holds one: a cluster of real boulders in
+        // one place, rather than a stone every few strides everywhere.
+        //
+        // Brett's idea, and it answers the clutter and the economy at once:
+        // "then there could be places where there are certain nodes. they could
+        // mine from there with out all the rocvks lol". A miner walks to a
+        // OUTCROP and works it; the rest of the world can be as bare as it
+        // looks right.
+        let node = stone_node(chunk.coord, &terrain);
+
         let mut builder = MeshBuilder::default();
         // Standing trees gather here and are spawned after the sweep:
         // real entities every one, bucketed into grove visuals so the
@@ -479,7 +489,17 @@ fn populate_chunks(
                 };
 
                 if slope > 0.42 {
-                    if rng.chance(0.30) {
+                    // Steep ground used to be a third rock. Brett, looking at a
+                    // hillside of them: "there is so much ground clutter form
+                    // rocks... There has to be a way to clean this up lol, it
+                    // has to be wasting memory as well." It was: ten thousand
+                    // meshes and six and a half thousand of them casting
+                    // shadows, most of them a stone the size of a loaf.
+                    //
+                    // Stone gathers into OUTCROPS now - see `stone_node` - so
+                    // the scatter can be as thin as it looks right without the
+                    // village going short.
+                    if rng.chance(0.06) {
                         let roll = roll_rock(&mut rng);
                         let near_village = settlement.as_ref().is_some_and(|site| {
                             Vec2::new(x - site.centre.x, z - site.centre.z).length()
@@ -541,11 +561,13 @@ fn populate_chunks(
                             commands.entity(bush).insert(ChildOf(entity));
                         }
                     }
-                } else if rng.chance(0.055) {
-                    // Loose stones on open ground: near the settlement they are
-                    // real boulders — the miners' bread. (The flat-ground rocks
-                    // were baked scenery at first, and the whole civic ladder
-                    // starved for stone on any village founded on flat land.)
+                } else if rng.chance(0.012) {
+                    // A stone here and there on open ground, where it used to be
+                    // one in eighteen scatter points - which reads as gravel
+                    // spilled over the whole world rather than as country.
+                    // (The flat-ground rocks were baked scenery at first, and
+                    // the whole civic ladder starved for stone on any village
+                    // founded on flat land; the outcrops carry that now.)
                     let roll = roll_rock(&mut rng);
                     let near_village = settlement.as_ref().is_some_and(|site| {
                         Vec2::new(x - site.centre.x, z - site.centre.z).length()
@@ -599,6 +621,45 @@ fn populate_chunks(
                 } else if rng.chance(0.05) {
                     bake_rock(&mut builder, local - seated, &mut rng);
                 }
+            }
+        }
+
+        // The node's own stones: real boulders, gathered in one place, big
+        // enough that a miner has a reason to walk there.
+        if let Some((at, count)) = node {
+            let mut rng = Rng::new(
+                (at.x * 1000.0) as i64 as u64 ^ ((at.z * 1000.0) as i64 as u64) << 8 ^ 0x0B0_1DE7,
+            );
+            for _ in 0..count {
+                let about = Vec3::new(
+                    at.x + rng.range(-3.5, 3.5),
+                    0.0,
+                    at.z + rng.range(-3.5, 3.5),
+                );
+                let stood = Vec3::new(about.x, terrain.height_at(about.x, about.z), about.z);
+                if stripped.is_stripped(stood.x, stood.z)
+                    || terrain.is_worked_within(stood.x, stood.z, 2.0)
+                {
+                    continue;
+                }
+                // Heavier than a loose stone and worth the walk: an outcrop
+                // holds what a scatter of gravel used to hold between it.
+                let mut roll = roll_rock(&mut rng);
+                roll.girth = rng.range(1.4, 2.6);
+                roll.mass *= roll.girth;
+                roll.radius *= roll.girth;
+                let rock = spawn_boulder(
+                    &mut commands,
+                    &mut meshes,
+                    terrain_assets.ground_material.clone(),
+                    // The chunk's own middle is its local frame, the same one
+                    // every rock and tree in it is seated against.
+                    stood - Vec3::new(origin.x + CHUNK_SIZE * 0.5, 0.0, origin.y + CHUNK_SIZE * 0.5),
+                    &mut rng,
+                    roll,
+                    Some(library),
+                );
+                commands.entity(rock).insert(ChildOf(entity));
             }
         }
 
@@ -1172,6 +1233,38 @@ pub(crate) struct RockRoll {
 
 /// One rock in six is a real outcrop: shoulder-high, many loads of stone,
 /// mined for days before it is gone.
+/// Where this chunk's stone gathers, if it gathers here at all.
+///
+/// One chunk in nine or so carries an outcrop, seated on the stoniest ground it
+/// can find within itself, and every stone in it is a real boulder a miner can
+/// work. Deterministic from the chunk's own coordinate, so a node is in the same
+/// place every time the chunk is drawn and does not wander when a maker walks
+/// away and comes back.
+fn stone_node(coord: IVec2, terrain: &crate::terrain::Terrain) -> Option<(Vec3, usize)> {
+    let mut rng = Rng::new(
+        (coord.x as i64 * 73_856_093 ^ coord.y as i64 * 19_349_663).unsigned_abs() ^ 0x5EED_57_0E,
+    );
+    if !rng.chance(0.11) {
+        return None;
+    }
+    // The stoniest spot in the chunk, out of a handful of tries: a node on a
+    // slope reads as an outcrop, and one in a meadow reads as litter.
+    let origin = Vec2::new(coord.x as f32 * CHUNK_SIZE, coord.y as f32 * CHUNK_SIZE);
+    let mut best: Option<(f32, Vec3)> = None;
+    for _ in 0..12 {
+        let at = origin + Vec2::new(rng.range(6.0, 58.0), rng.range(6.0, 58.0));
+        let high = terrain.height_at(at.x, at.y);
+        if high < crate::terrain::WATER_LEVEL + 1.0 {
+            continue;
+        }
+        let stoniness = terrain.slope_at(at.x, at.y);
+        if best.as_ref().is_none_or(|(had, _)| stoniness > *had) {
+            best = Some((stoniness, Vec3::new(at.x, high, at.y)));
+        }
+    }
+    best.map(|(_, at)| (at, rng.range_i(4, 9) as usize))
+}
+
 pub(crate) fn roll_rock(rng: &mut Rng) -> RockRoll {
     let mass = rng.range(90.0, 170.0);
     let radius = rng.range(0.7, 1.05);
