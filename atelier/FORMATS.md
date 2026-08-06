@@ -48,8 +48,11 @@ Local space: +Y up, metres. Position and orientation on the bench are
 FREE: the import rebases the building on its own bounds, and the door
 widget defines the front - the whole blueprint is turned so the (first)
 door faces the village. The gold sill (+X) is a working aid, not a law.
-The bench saves to `out/buildings/workbench.json` and reloads it on launch;
-rename a finished piece in Finder to keep it.
+The bench saves to `out/buildings/workbench.baz` and reloads it on launch;
+rename a finished piece in Finder to keep it. A saved building is a `.baz` —
+JSON inside, as it always was, but named for the studio whose bench made it
+rather than for the notation it happens to be written in. Files saved as `.json`
+before the rename still open, and always will.
 
 The file is a list of PARTS, not raw boxes — every entry is something the
 game already understands, so the carrying-in is mechanical:

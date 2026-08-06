@@ -2926,7 +2926,7 @@ fn raise_shelf(
         let mut names: Vec<std::path::PathBuf> = entries
             .flatten()
             .map(|entry| entry.path())
-            .filter(|path| path.extension().is_some_and(|e| e == "json"))
+            .filter(|path| is_a_work(path))
             .collect();
         names.sort();
         for path in names {
@@ -5110,9 +5110,28 @@ fn stages_from_flat(parts: &[Placed]) -> Vec<Vec<Placed>> {
         .collect()
 }
 
+/// What a saved building is called on disk.
+///
+/// `.baz`, for the studio whose bench this is. `.json` said only what these are
+/// written IN, which is true of a great many files and tells a maker looking at
+/// a folder nothing at all; this says whose they are and what made them.
+///
+/// The contents are still JSON and always were - this is a name, not a format.
+pub const WORK_KIND: &str = "baz";
+
+/// Whether a file is a saved work: the name it wears now, or the one it wore
+/// before the name changed.
+///
+/// Both, forever. A maker's buildings are not something to lose to a rename, and
+/// the ones already on disk are the only two that exist.
+fn is_a_work(path: &std::path::Path) -> bool {
+    path.extension()
+        .is_some_and(|kind| kind == WORK_KIND || kind == "json")
+}
+
 fn bench_path() -> std::path::PathBuf {
     let base = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    std::path::PathBuf::from(base).join("out/buildings/workbench.json")
+    std::path::PathBuf::from(base).join(format!("out/buildings/workbench.{WORK_KIND}"))
 }
 
 /// The save button asks the work its name; the writing happens when the
@@ -5336,14 +5355,22 @@ fn take_the_name(
             // rather than clobbering it in silence.
             let ours = work_name.0.as_deref() == Some(written);
             let mut stem = written.to_string();
-            let mut path = dir.join(format!("{stem}.json"));
+            let mut path = dir.join(format!("{stem}.{WORK_KIND}"));
             if !ours {
                 let mut n = 2;
-                while path.exists() {
+                while path.exists() || dir.join(format!("{stem}.json")).exists() {
                     stem = format!("{written}-{n}");
-                    path = dir.join(format!("{stem}.json"));
+                    path = dir.join(format!("{stem}.{WORK_KIND}"));
                     n += 1;
                 }
+            }
+            // A work saved under a name it already held as a `.json` leaves no
+            // twin behind: the drawer lists what is in the folder, and two rows
+            // reading LONGHOUSE would be two rows a maker has to tell apart by
+            // opening them.
+            let elder = dir.join(format!("{stem}.json"));
+            if ours && elder.exists() && elder != path {
+                let _ = std::fs::remove_file(&elder);
             }
             // The shown step is standing as entities; the rest are already
             // records. Gather the one before writing, or a maker's last few
@@ -6308,7 +6335,7 @@ mod bake {
 
         for entry in std::fs::read_dir(&dir).expect("out/buildings") {
             let path = entry.expect("entry").path();
-            if path.extension().is_none_or(|e| e != "json") {
+            if !is_a_work(&path) {
                 continue;
             }
             let Ok(text) = std::fs::read_to_string(&path) else {
@@ -6887,6 +6914,17 @@ mod roof_tests {
         assert!(length_of(&PartKind::Wall(2.0)).is_some());
         assert!(length_of(&PartKind::Chimney(1.75)).is_none());
         assert!(length_of(&PartKind::Prop("pole")).is_none());
+    }
+
+    #[test]
+    fn a_work_is_known_by_either_name() {
+        // The rename must never cost a maker a building: everything already on
+        // disk wears `.json`, and the drawer has to go on finding it.
+        assert!(is_a_work(std::path::Path::new("longhouse1-10people.baz")));
+        assert!(is_a_work(std::path::Path::new("longhouse1-10people.json")));
+        assert!(!is_a_work(std::path::Path::new("palette.png")));
+        assert!(!is_a_work(std::path::Path::new("notes.txt")));
+        assert_eq!(WORK_KIND, "baz", "the studio's own mark");
     }
 
     #[test]
