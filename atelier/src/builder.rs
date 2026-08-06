@@ -291,7 +291,18 @@ pub enum PartKind {
     /// One part in two materials, the way TRIM and TRIM, STONE are one part:
     /// the flight is the same flight, and stone or timber is a fact about it
     /// rather than a different thing to draw.
-    Stairs { rise: f32, wide: f32, stone: bool },
+    ///
+    /// The TREADS and the RAIL answer separately, because a stone stair with a
+    /// timber handrail is a real building and so is its opposite - Brett: "What
+    /// if i wanted a stone railing on a wooden step or vice versa?" The shelf
+    /// offers the two matching pairs, which are what a maker reaches for most,
+    /// and the right-click menu changes the rail on a flight already standing.
+    Stairs {
+        rise: f32,
+        wide: f32,
+        stone: bool,
+        rail_stone: bool,
+    },
     /// A ridge pole: a round log along the spine, the older way of
     /// closing a roof.
     /// A whole gable roof: both slopes and the ridge between them, drawn
@@ -433,6 +444,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
             rise: 0.75,
             wide: 1.25,
             stone: true,
+            rail_stone: true,
         },
         "footing",
     ),
@@ -442,6 +454,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
             rise: 0.75,
             wide: 1.25,
             stone: false,
+            rail_stone: false,
         },
         "footing",
     ),
@@ -1119,16 +1132,27 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(0.0, 1.375, -0.03125, 0.125, 1.0, 0.1875, "wood", 0.4),
             slab(0.0, 1.375, -0.03125, 1.0, 0.125, 0.1875, "wood", 0.4),
         ],
-        PartKind::Stairs { rise, wide, stone } => {
+        PartKind::Stairs {
+            rise,
+            wide,
+            stone,
+            rail_stone,
+        } => {
             // A stair is a rhythm, not a size: pick the number of steps that
             // gets nearest the rise asked for, then let every tread be equal.
             // Uneven steps are the one thing a foot notices.
             let (steps, riser, tread) = stair_rhythm(*rise);
-            // The one difference between a timber flight and a stone one.
-            let (ramp, tread_shade, post_shade, rail_shade, pin_shade) = if *stone {
-                ("stone", 0.6, 0.5, 0.55, 0.58)
+            // The one difference between a timber flight and a stone one, asked
+            // twice: once of the treads and once of everything a hand touches.
+            let (ramp, tread_shade) = if *stone {
+                ("stone", 0.6)
             } else {
-                ("wood", 0.45, 0.4, 0.5, 0.45)
+                ("wood", 0.45)
+            };
+            let (rail_ramp, post_shade, rail_shade, pin_shade) = if *rail_stone {
+                ("stone", 0.5, 0.55, 0.58)
+            } else {
+                ("wood", 0.4, 0.5, 0.45)
             };
             let rise = steps as f32 * riser;
             let run = steps as f32 * tread;
@@ -1178,7 +1202,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     post,
                     hand + cap,
                     post,
-                    ramp,
+                    rail_ramp,
                     post_shade,
                 ));
                 body.push(slab(
@@ -1188,7 +1212,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     post,
                     hand + cap,
                     post,
-                    ramp,
+                    rail_ramp,
                     post_shade,
                 ));
                 body.push(leaning(
@@ -1198,7 +1222,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     rail_thick,
                     rail_thick,
                     rail_len,
-                    ramp,
+                    rail_ramp,
                     rail_shade,
                     lean,
                 ));
@@ -1224,7 +1248,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                         post * 0.5,
                         tall,
                         post * 0.5,
-                        ramp,
+                        rail_ramp,
                         pin_shade,
                     ));
                 }
@@ -2638,12 +2662,16 @@ pub fn part_name(kind: &PartKind) -> String {
         PartKind::BeamRun => "beamrun".to_string(),
         PartKind::Ridge(long) => format!("ridge-{long}"),
         PartKind::Chimney(drop) => format!("chimney-{drop}"),
-        PartKind::Stairs { rise, wide, stone } => {
-            if *stone {
-                format!("stairsstone-{rise}x{wide}")
-            } else {
-                format!("stairs-{rise}x{wide}")
-            }
+        PartKind::Stairs {
+            rise,
+            wide,
+            stone,
+            rail_stone,
+        } => {
+            // Two letters for two materials: the treads, then the rail. The
+            // older spellings said one thing about a flight and are still read.
+            let say = |stone: &bool| if *stone { "s" } else { "w" };
+            format!("stairs-{rise}x{wide}x{}{}", say(stone), say(rail_stone))
         }
         PartKind::GableRoof(long, span, over, pitch) => {
             format!("gableroof-{long}x{span}x{over}x{pitch}")
@@ -2694,15 +2722,25 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
     }
     // Stone first: `stairs-` is a prefix of nothing else, but `stairsstone-`
     // begins with `stairs` and would be read as a timber flight called `stone…`.
-    for (word, stone) in [("stairsstone-", true), ("stairs-", false)] {
+    for (word, was_stone) in [("stairsstone-", true), ("stairs-", false)] {
         if let Some(rest) = name.strip_prefix(word) {
-            // Two numbers, what it climbs and how wide it is. One is a flight
-            // from before a maker could widen them, and opens at the width they
-            // all had.
+            // What it climbs, how wide it is, and two letters for the two
+            // materials. A flight from before a maker could widen them opens at
+            // the width they all had; one from before the rail could differ
+            // wears the same material throughout, which is what it looked like.
             let mut parts = rest.split('x');
             let rise = parts.next()?.parse().ok()?;
             let wide = parts.next().and_then(|n| n.parse().ok()).unwrap_or(1.25);
-            return Some(PartKind::Stairs { rise, wide, stone });
+            let cloth = parts.next().unwrap_or("");
+            let letter = |at: usize, was: bool| {
+                cloth.chars().nth(at).map_or(was, |letter| letter == 's')
+            };
+            return Some(PartKind::Stairs {
+                rise,
+                wide,
+                stone: letter(0, was_stone),
+                rail_stone: letter(1, was_stone),
+            });
         }
     }
     if let Some(rest) = name.strip_prefix("ridge-") {
@@ -2993,6 +3031,8 @@ enum Deed {
     TrimToRoof,
     /// Make one thing of everything chosen.
     Group,
+    /// Put the rail of a flight in the other material.
+    RailIn(bool),
     /// Keep everything chosen as a PIECE, to bring into other works.
     ///
     /// Brett: "if I could save groups that I could bring into other builds."
@@ -3012,6 +3052,8 @@ impl Deed {
             Deed::Nature(_) => "FURNISHING",
             Deed::TrimToRoof => "TRIM TO THE ROOF",
             Deed::Group => "GROUP",
+            Deed::RailIn(true) => "RAIL IN STONE",
+            Deed::RailIn(false) => "RAIL IN TIMBER",
             Deed::KeepAsPiece => "KEEP AS A PIECE",
         }
     }
@@ -3248,6 +3290,11 @@ fn deeds_for(kind: &PartKind) -> Vec<Deed> {
         PartKind::GableRoof(..) => vec![Deed::Ungroup],
         _ => Vec::new(),
     };
+    // A flight's rail can be the other material: offered as the thing it would
+    // BECOME, so the line says what pressing it does.
+    if let PartKind::Stairs { rail_stone, .. } = kind {
+        deeds.push(Deed::RailIn(!rail_stone));
+    }
     // Every part can be told what it is; only some can be broken up.
     deeds.extend(NATURES.iter().map(|nature| Deed::Nature(nature)));
     deeds
@@ -3549,6 +3596,36 @@ fn work_part_menu(
                     &palette,
                     &made,
                     &moved,
+                    part,
+                    false,
+                );
+            }
+        }
+        Some((Deed::RailIn(stone), part)) => {
+            if let Ok((_, _, mut record)) = placed.get_mut(part)
+                && let Some(PartKind::Stairs {
+                    rise,
+                    wide,
+                    stone: treads,
+                    ..
+                }) = kind_from_name(&record.part)
+            {
+                let made = PartKind::Stairs {
+                    rise,
+                    wide,
+                    stone: treads,
+                    rail_stone: stone,
+                };
+                record.part = part_name(&made);
+                let copy = record.clone();
+                commands.entity(part).despawn_related::<Children>();
+                dress_part(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    &palette,
+                    &made,
+                    &copy,
                     part,
                     false,
                 );
@@ -7095,10 +7172,16 @@ pub(crate) fn dims_panel(
                         }
                         PartKind::Chimney(_) => Some(PartKind::Chimney(w)),
                         // Typed: width, and the height it climbs after the x.
-                        PartKind::Stairs { rise, stone, .. } => Some(PartKind::Stairs {
+                        PartKind::Stairs {
+                            rise,
+                            stone,
+                            rail_stone,
+                            ..
+                        } => Some(PartKind::Stairs {
                             rise: d.unwrap_or(rise),
                             wide: w,
                             stone,
+                            rail_stone,
                         }),
                         _ => None,
                     };
@@ -8178,11 +8261,13 @@ mod roof_tests {
             rise: 1.125,
             wide: 1.5,
             stone: false,
+            rail_stone: false,
         };
         let stone = PartKind::Stairs {
             rise: 1.125,
             wide: 1.5,
             stone: true,
+            rail_stone: true,
         };
         let a = body_of(&timber, None);
         let b = body_of(&stone, None);
@@ -8202,6 +8287,54 @@ mod roof_tests {
                 part_name(&kind_from_name(&name).expect("a flight reads back")),
                 name
             );
+        }
+    }
+
+    /// The treads and the rail answer separately, and a flight saved before they
+    /// could still opens wearing one material throughout - which is what it
+    /// looked like when it was drawn.
+    #[test]
+    fn a_flight_can_mix_its_materials() {
+        let mixed = PartKind::Stairs {
+            rise: 0.75,
+            wide: 1.25,
+            stone: true,
+            rail_stone: false,
+        };
+        let body = body_of(&mixed, None);
+        let treads: Vec<&Slab> = body
+            .iter()
+            .filter(|Slab(_, size, ..)| (size.x - 1.25).abs() < 1e-4)
+            .collect();
+        assert!(
+            treads.len() > 1 && treads.iter().all(|Slab(_, _, ramp, ..)| ramp == "stone"),
+            "the treads should be stone"
+        );
+        let rails: Vec<&Slab> = body.iter().filter(|Slab(.., lean)| *lean != 0.0).collect();
+        assert!(
+            !rails.is_empty() && rails.iter().all(|Slab(_, _, ramp, ..)| ramp == "wood"),
+            "the rail should be timber"
+        );
+        // It reads back the way it was written.
+        let name = part_name(&mixed);
+        let Some(PartKind::Stairs {
+            stone, rail_stone, ..
+        }) = kind_from_name(&name)
+        else {
+            panic!("{name} did not read back as a flight");
+        };
+        assert!(stone && !rail_stone, "{name} lost which was which");
+
+        // The elder spellings, from before either number existed.
+        for (elder, want_stone) in [("stairs-0.75", false), ("stairsstone-1.5x2", true)] {
+            let Some(PartKind::Stairs {
+                stone, rail_stone, ..
+            }) = kind_from_name(elder)
+            else {
+                panic!("{elder} no longer opens at all");
+            };
+            assert_eq!(stone, want_stone, "{elder} changed its treads");
+            assert_eq!(rail_stone, want_stone, "{elder} changed its rail");
         }
     }
 
@@ -8227,6 +8360,7 @@ mod roof_tests {
             rise: 0.75,
             wide: 1.25,
             stone: false,
+            rail_stone: false,
         });
         assert!(
             (flight.y - steps as f32 * tread).abs() < 1e-4,
@@ -8238,6 +8372,7 @@ mod roof_tests {
             rise: 0.75,
             wide: 2.0,
             stone: false,
+            rail_stone: false,
         });
         assert!(
             (wider.x - flight.x - 0.75).abs() < 1e-4,
@@ -8258,6 +8393,7 @@ mod roof_tests {
                     rise: asked,
                     wide: 1.25,
                     stone: false,
+                    rail_stone: false,
                 },
                 None,
             );

@@ -763,13 +763,16 @@ fn work_gizmo(
                 PartKind::Gable(_, pitch) => PartKind::Gable(w, pitch),
                 PartKind::Beam(_, high, low) => PartKind::Beam(w, high, low),
                 PartKind::Chimney(_) => PartKind::Chimney(w.max(0.0)),
-                PartKind::Stairs { stone, .. } => {
+                PartKind::Stairs {
+                    stone, rail_stone, ..
+                } => {
                     let (_, riser, tread) = builder::stair_rhythm(0.0);
                     let steps = (d / tread).round().clamp(2.0, 24.0);
                     PartKind::Stairs {
                         rise: steps * riser,
                         wide: w.max(0.375),
                         stone,
+                        rail_stone,
                     }
                 }
                 PartKind::Ridge(_) => PartKind::Ridge(w),
