@@ -985,19 +985,29 @@ fn hang_the_bodies_shelf(
     let shelf = commands
         .spawn((
             BodyShelf,
+            // The builder's shelf exactly: same edge, same width, same border on
+            // the one side it touches. Brett: "I like the design for he whole app
+            // with the shelf on the left and right", and a panel that merely
+            // floated near the right edge was a different thing that happened to
+            // be over there. What goes on it will grow - the bodies are only the
+            // first tenants.
             Node {
                 position_type: PositionType::Absolute,
-                right: Val::Px(10.0),
-                top: Val::Px(56.0),
+                right: Val::Px(0.0),
+                top: Val::Px(0.0),
+                bottom: Val::Px(0.0),
                 width: Val::Px(212.0),
                 flex_direction: FlexDirection::Column,
                 row_gap: Val::Px(3.0),
-                padding: UiRect::all(Val::Px(10.0)),
-                border: UiRect::all(Val::Px(1.0)),
+                padding: UiRect::all(Val::Px(12.0)),
+                border: UiRect::left(Val::Px(1.0)),
+                overflow: Overflow::scroll_y(),
                 ..default()
             },
             BackgroundColor(theme::panel_bg()),
             BorderColor::all(theme::panel_border(&palette)),
+            crate::look::Scrollable,
+            bevy::ui::ScrollPosition::default(),
             Visibility::Hidden,
         ))
         .id();
