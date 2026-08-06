@@ -27,12 +27,6 @@ struct StageDeedButton(crate::builder::StageDeed);
 #[derive(Component)]
 struct StageBar;
 
-/// Where the file work lives on the rail: builder parents its save and
-/// load drawers here instead of crowding the shelf.
-#[derive(Resource)]
-pub struct FileHome(pub Entity);
-
-/// The button on the top bar that lifts the roof off.
 /// The gear at the rail's foot, and the settings panel it opens.
 #[derive(Component)]
 struct SettingsButton;
@@ -249,20 +243,6 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
             ChildOf(button),
         ));
     }
-
-    // The file work's home, between the benches and the keybinds.
-    let file_home = commands
-        .spawn((
-            Node {
-                flex_direction: FlexDirection::Column,
-                row_gap: Val::Px(3.0),
-                margin: UiRect::top(Val::Px(10.0)),
-                ..default()
-            },
-            ChildOf(rail),
-        ))
-        .id();
-    commands.insert_resource(FileHome(file_home));
 
     // The footer: how the bench speaks to the world.
     let foot = commands
