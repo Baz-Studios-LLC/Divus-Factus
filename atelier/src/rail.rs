@@ -52,7 +52,7 @@ impl Plugin for RailPlugin {
                 work_settings,
                 work_stage_bar,
                 hang_the_stage_bar,
-                speak_at_the_foot,
+                follow_with_a_word,
             ),
         );
     }
@@ -439,7 +439,9 @@ off, walls down as well",
         .id();
     // The gear: a drawn sliders glyph, since the fonts keep no gear.
     let gear = icon_face(&mut commands, &palette, tools);
-    commands.entity(gear).insert(SettingsButton);
+    commands
+        .entity(gear)
+        .insert((SettingsButton, Word("The keys, and what they do")));
     for offset in [-5.0f32, 3.0, -2.0] {
         let bar = commands
             .spawn((
@@ -471,7 +473,10 @@ off, walls down as well",
     let save = icon_face(&mut commands, &palette, tools);
     commands
         .entity(save)
-        .insert(crate::builder::SaveButton)
+        .insert((
+            crate::builder::SaveButton,
+            Word("Save the work under a name you give it"),
+        ))
         .insert(BorderColor::all(theme::accent(&palette).with_alpha(0.7)));
     let body = pane(&mut commands, save, 18.0, 16.0, true, &palette);
     commands.entity(body).insert(Node {
@@ -485,10 +490,35 @@ off, walls down as well",
     });
     plate(&mut commands, body, 10.0, 5.0, theme::accent(&palette));
 
+    // OPEN A WORK: a page with its lines, and the desktop's own file window
+    // behind it.
+    let open = icon_face(&mut commands, &palette, tools);
+    commands.entity(open).insert((
+        crate::builder::OpenWorkButton,
+        Word("Open a work from anywhere on the disk"),
+    ));
+    let page = pane(&mut commands, open, 14.0, 18.0, true, &palette);
+    commands.entity(page).insert(Node {
+        width: Val::Px(14.0),
+        height: Val::Px(18.0),
+        border: UiRect::all(Val::Px(1.0)),
+        flex_direction: FlexDirection::Column,
+        align_items: AlignItems::Center,
+        justify_content: JustifyContent::Center,
+        row_gap: Val::Px(3.0),
+        ..default()
+    });
+    for _ in 0..3 {
+        plate(&mut commands, page, 8.0, 1.0, theme::text_dim(&palette));
+    }
+
     // THE FOLDER: a tab and a body, which is what a folder has been since
     // before any of this.
     let folder = icon_face(&mut commands, &palette, tools);
-    commands.entity(folder).insert(crate::builder::OpenFolderButton);
+    commands.entity(folder).insert((
+        crate::builder::OpenFolderButton,
+        Word("Open the folder the works are kept in"),
+    ));
     let stack = commands
         .spawn((
             Node {
@@ -507,7 +537,10 @@ off, walls down as well",
     // here that takes something away, so it wears the dimmest border of the
     // four - nothing about it should invite a stray hand.
     let broom = icon_face(&mut commands, &palette, tools);
-    commands.entity(broom).insert(crate::builder::ClearButton);
+    commands.entity(broom).insert((
+        crate::builder::ClearButton,
+        Word("Clear the bench: every part comes off it"),
+    ));
     let stack = commands
         .spawn((
             Node {
@@ -546,9 +579,30 @@ off, walls down as well",
 /// What the foot says when nothing is under the hand.
 pub const FOOT_SAYING: &str = "what you save here, the god carries into the world by hand.";
 
-/// The line at the foot of the rail.
+/// The line at the foot of the rail. The save's answer lands here - a glyph
+/// with no writing on it cannot say what it just did.
 #[derive(Component)]
 struct FootWord;
+
+/// What a thing says when the hand rests on it.
+///
+/// Hung on the button rather than looked up by type, so anything at all can
+/// carry a word: the five glyphs do, and the next one will by being spawned
+/// with it.
+#[derive(Component)]
+pub struct Word(pub &'static str);
+
+/// The floating card that shows it, and follows the cursor.
+#[derive(Component)]
+struct Tooltip;
+
+/// How long a hand rests on a thing before it is asking about it.
+///
+/// Brett: "maybe it takes a second before it pops up". A tooltip that appears
+/// the instant the cursor crosses a button follows the hand around the screen
+/// like a fly, and a maker crossing the row to reach the broom would raise four
+/// cards on the way.
+const DWELL: f32 = 0.6;
 
 /// One icon button's frame: the gear's own, so the four read as one row.
 fn icon_face(commands: &mut Commands, palette: &Palette, parent: Entity) -> Entity {
@@ -611,36 +665,91 @@ fn pane(
         .id()
 }
 
-/// The foot says what the hand is over.
+/// The tooltip: a card at the cursor, saying what is under it.
 ///
-/// An icon with no word on it is a guess until somebody has pressed it once,
-/// and the one that clears the bench is not a button anybody should learn by
-/// pressing. The line was already there, saying nothing that changes.
-fn speak_at_the_foot(
-    saves: Query<&Interaction, With<crate::builder::SaveButton>>,
-    folders: Query<&Interaction, With<crate::builder::OpenFolderButton>>,
-    brooms: Query<&Interaction, With<crate::builder::ClearButton>>,
-    gears: Query<&Interaction, With<SettingsButton>>,
-    // A word passing through - the save's own answer - has the floor until it
-    // has had its moment.
-    mut word: Query<&mut Text, (With<FootWord>, Without<crate::builder::PassingWord>)>,
+/// It TRACKS rather than sits, which is Brett's call and the right one - "these
+/// tooltips shoul be hovering tooltips like tooltips in wow that are tracking
+/// the mouse". A word at the foot of the rail asks the eye to leave the very
+/// thing it is asking about, and by the time it has read the word the hand has
+/// moved on.
+///
+/// An icon with no writing on it is a guess until somebody has pressed it once,
+/// and the one that empties the bench is not a button to learn by pressing.
+#[allow(clippy::too_many_arguments)]
+fn follow_with_a_word(
+    mut commands: Commands,
+    time: Res<Time>,
+    fonts: Res<Fonts>,
+    palette: Res<Palette>,
+    windows: Query<&Window>,
+    hovered: Query<(&Interaction, &Word)>,
+    cards: Query<Entity, With<Tooltip>>,
+    mut nodes: Query<&mut Node, With<Tooltip>>,
+    mut showing: Local<Option<&'static str>>,
+    mut resting: Local<f32>,
 ) {
-    let touched = |touch: &Interaction| *touch != Interaction::None;
-    let saying = if saves.iter().any(touched) {
-        "save the work, under a name you give it."
-    } else if folders.iter().any(touched) {
-        "open the folder the works are kept in."
-    } else if brooms.iter().any(touched) {
-        "clear the bench: every part comes off it."
-    } else if gears.iter().any(touched) {
-        "the keys, and what they do."
-    } else {
-        FOOT_SAYING
+    let under = hovered
+        .iter()
+        .find(|(touch, _)| **touch != Interaction::None)
+        .map(|(_, word)| word.0);
+    // The rest has to be on ONE thing: crossing from a button to its neighbour
+    // starts the count again, or a hand travelling the row would arrive at the
+    // far end with a card already up for something it passed.
+    *resting = match (under, *showing) {
+        (Some(word), Some(shown)) if word == shown => *resting + time.delta_secs(),
+        (Some(_), _) => 0.0,
+        (None, _) => 0.0,
     };
-    for mut text in &mut word {
-        if text.0 != saying {
-            *text = Text::new(saying);
+    let wanted = under.filter(|_| *resting >= DWELL);
+
+    // Raised and dropped rather than hidden and shown: a tooltip exists while
+    // the hand is somewhere, and one kept about with its visibility off is one
+    // more thing to remember to keep true.
+    let up = !cards.is_empty();
+    if under != *showing || up != wanted.is_some() {
+        for card in &cards {
+            commands.entity(card).despawn();
         }
+        if under != *showing {
+            *showing = under;
+            *resting = 0.0;
+        }
+        if let Some(word) = wanted {
+            let card = commands
+                .spawn((
+                    Tooltip,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        padding: UiRect::axes(Val::Px(8.0), Val::Px(5.0)),
+                        border: UiRect::all(Val::Px(1.0)),
+                        max_width: Val::Px(260.0),
+                        ..default()
+                    },
+                    BackgroundColor(theme::panel_bg().with_alpha(0.97)),
+                    BorderColor::all(theme::panel_border(&palette)),
+                    GlobalZIndex(200),
+                ))
+                .id();
+            commands.spawn((
+                Text::new(word),
+                TextFont {
+                    font: fonts.text.clone().into(),
+                    font_size: FontSize::Px(12.0),
+                    ..default()
+                },
+                TextColor(theme::accent(&palette).with_alpha(0.9)),
+                ChildOf(card),
+            ));
+        }
+    }
+    // And it follows. Below and right of the point, the way every tooltip does,
+    // so the cursor never covers the first word of what it raised.
+    let Some(at) = windows.iter().next().and_then(|w| w.cursor_position()) else {
+        return;
+    };
+    for mut node in &mut nodes {
+        node.left = Val::Px(at.x + 16.0);
+        node.top = Val::Px(at.y + 20.0);
     }
 }
 

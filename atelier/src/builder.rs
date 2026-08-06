@@ -1546,6 +1546,21 @@ pub(crate) struct SaveButton;
 #[derive(Component)]
 pub(crate) struct OpenFolderButton;
 
+/// A button that asks the desktop for a work to open.
+///
+/// Brett wanted `.baz` files associated with the bench so a double click opened
+/// them, and then found the shorter way himself: "what if we just had a open
+/// file button?" - which needs nothing of the operating system, works the same
+/// on both, and can open a work kept anywhere rather than only the ones in the
+/// bench's own folder.
+#[derive(Component)]
+pub(crate) struct OpenWorkButton;
+
+/// A work the maker has chosen from the desktop's own file window, waiting to
+/// be set out on the bench.
+#[derive(Resource, Default)]
+pub(crate) struct WorkWanted(pub Option<std::path::PathBuf>);
+
 /// The save button's label, so it can say what just happened.
 #[derive(Component)]
 pub(crate) struct SaveLabel;
@@ -1631,6 +1646,7 @@ impl Plugin for BuilderPlugin {
             .init_resource::<Stages>()
             .init_resource::<StageWish>()
             .init_resource::<StageHeld>()
+            .init_resource::<WorkWanted>()
             .init_resource::<Brush>()
             .init_resource::<Naming>()
             .init_resource::<Hovered>()
@@ -1699,6 +1715,7 @@ impl Plugin for BuilderPlugin {
                 Update,
                 (
                     save_workbench,
+                    pick_a_work,
                     open_the_folder,
                     take_the_name,
                     dims_panel,
@@ -3543,6 +3560,35 @@ fn dress_shelf_border(palette: &Palette, standing: bool, border: &mut BorderColo
 /// Template presses sweep the bench and set out the ready-made start; the
 /// clear button just sweeps.
 #[allow(clippy::too_many_arguments)]
+/// Asks the desktop for a work to open.
+///
+/// The dialog is the system's own, and it stops the world while it is up - which
+/// is what a modal dialog is. `NonSendMarker` is what keeps this system on the
+/// main thread, where a Mac insists its panels be raised; without it Bevy is
+/// free to run it on a worker and the panel is a crash rather than a window.
+fn pick_a_work(
+    _main_thread: bevy::ecs::system::NonSendMarker,
+    mut wanted: ResMut<WorkWanted>,
+    buttons: Query<&Interaction, (Changed<Interaction>, With<OpenWorkButton>)>,
+) {
+    if !buttons
+        .iter()
+        .any(|interaction| *interaction == Interaction::Pressed)
+    {
+        return;
+    }
+    let home = works_home();
+    let _ = std::fs::create_dir_all(&home);
+    if let Some(path) = rfd::FileDialog::new()
+        .set_title("Open a work")
+        .add_filter("Divus Factus works", &[WORK_KIND])
+        .set_directory(&home)
+        .pick_file()
+    {
+        wanted.0 = Some(path);
+    }
+}
+
 /// Opens a saved work onto a cleared bench, or simply clears it.
 fn open_or_clear(
     mut commands: Commands,
@@ -3550,15 +3596,18 @@ fn open_or_clear(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     palette: Res<Palette>,
+    mut chosen: ResMut<WorkWanted>,
     files: Query<(&Interaction, &LoadFileButton), Changed<Interaction>>,
     clears: Query<&Interaction, (Changed<Interaction>, With<ClearButton>)>,
     standing: Query<Entity, (With<Placed>, Without<Ghost>)>,
     mut work_name: ResMut<WorkName>,
 ) {
-    let wanted = files
-        .iter()
-        .find(|(interaction, _)| **interaction == Interaction::Pressed)
-        .map(|(_, file)| file.0.clone());
+    let wanted = chosen.0.take().or_else(|| {
+        files
+            .iter()
+            .find(|(interaction, _)| **interaction == Interaction::Pressed)
+            .map(|(_, file)| file.0.clone())
+    });
     let sweeping = clears
         .iter()
         .any(|interaction| *interaction == Interaction::Pressed);
