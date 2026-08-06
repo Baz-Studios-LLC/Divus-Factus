@@ -85,7 +85,13 @@ enum Grip {
     /// Pull one end of a sized primitive: which local axis, and the
     /// dimensions when the grip closed. The handle's own direction
     /// already points out of the pulled end.
-    Size { on_x: bool, w0: f32, d0: f32 },
+    Size {
+        on_x: bool,
+        w0: f32,
+        d0: f32,
+        /// What the part actually MEASURED when the handle was taken hold of.
+        was: Vec2,
+    },
     /// Pull a whole roof's eaves out past the walls, leaving the gables
     /// where the building is.
     Over { o0: f32 },
@@ -287,7 +293,14 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
             (Vec3::Z, Vec3::ZERO, "cloth-blue", Grip::Slide),
         ],
         ToolMode::Resize => {
-            let sized = builder::kind_from_name(&record.part).and_then(|kind| match kind {
+            let standing = builder::kind_from_name(&record.part);
+            // What the part MEASURES right now, kept with the grip so the mover
+            // can tell how much it truly grew.
+            let was = standing
+                .as_ref()
+                .map(builder::extent_of)
+                .unwrap_or(Vec2::ZERO);
+            let sized = standing.and_then(|kind| match kind {
                 PartKind::Wall(long) => Some((long, 0.0, false)),
                 // The pieces a punch leaves are walls too, and stretch
                 // like them - only their height and lift stay put.
@@ -297,9 +310,14 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                 PartKind::Beam(long, ..) => Some((long, 0.0, false)),
                 // The chimney sizes its own reach downward.
                 PartKind::Chimney(drop) => Some((drop, 0.0, false)),
-                // A flight is sized by what it CLIMBS: pulling the handle asks
-                // for more height, and the treads divide it evenly again.
-                PartKind::Stairs(rise) => Some((rise, 0.0, false)),
+                // A flight wears both handles. Across is its WIDTH, which is a
+                // real measurement of it. Along is its RUN - and a longer run is
+                // a taller flight, because the treads are even and the count is
+                // what changes, so pulling it out really is climbing higher.
+                PartKind::Stairs(rise, wide) => {
+                    let (steps, _, tread) = builder::stair_rhythm(rise);
+                    Some((wide, steps as f32 * tread, true))
+                }
                 PartKind::Ridge(long) => Some((long, 0.0, false)),
                 PartKind::Floor(w, d) => Some((w, d, true)),
                 PartKind::Foundation(w, d) => Some((w, d, true)),
@@ -321,6 +339,7 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                         on_x: true,
                         w0: w,
                         d0: d,
+                        was,
                     },
                 ));
             }
@@ -335,6 +354,7 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                             on_x: false,
                             w0: w,
                             d0: d,
+                            was,
                         },
                     ));
                 }
@@ -717,7 +737,7 @@ fn work_gizmo(
                 false,
             );
         }
-        Grip::Size { on_x, w0, d0 } => {
+        Grip::Size { on_x, w0, d0, was } => {
             // Pulling outward along the handle grows the dimension; the
             // far end stands still, so the centre walks half the growth.
             // One atom per step, always: resizing is fine work by nature.
@@ -730,7 +750,8 @@ fn work_gizmo(
             } else {
                 (w0, (d0 + pull).max(0.25))
             };
-            let grown = if on_x { w - w0 } else { d - d0 };
+            // Measured rather than asked for: see `builder::extent_of`.
+            let grown = 0.0;
             let made = match kind {
                 PartKind::Wall(_) => PartKind::Wall(w),
                 PartKind::Seg { high, lift, .. } => PartKind::Seg {
@@ -742,7 +763,11 @@ fn work_gizmo(
                 PartKind::Gable(_, pitch) => PartKind::Gable(w, pitch),
                 PartKind::Beam(_, high, low) => PartKind::Beam(w, high, low),
                 PartKind::Chimney(_) => PartKind::Chimney(w.max(0.0)),
-                PartKind::Stairs(_) => PartKind::Stairs(w.max(0.375)),
+                PartKind::Stairs(..) => {
+                    let (_, riser, tread) = builder::stair_rhythm(0.0);
+                    let steps = (d / tread).round().clamp(2.0, 24.0);
+                    PartKind::Stairs(steps * riser, w.max(0.375))
+                }
                 PartKind::Ridge(_) => PartKind::Ridge(w),
                 PartKind::Floor(..) => PartKind::Floor(w, d),
                 PartKind::Foundation(..) => PartKind::Foundation(w, d),
@@ -754,7 +779,14 @@ fn work_gizmo(
             if fresh == record.part {
                 return;
             }
-            transform.translation = state.start_at + state.dir * (grown * 0.5);
+            // The part keeps the end the maker is NOT pulling: it moves by half
+            // of however much it truly grew, which for a part whose handle asks
+            // for something other than its own width - a chimney's drop, a
+            // flight's rise - is nothing at all.
+            let now = builder::extent_of(&made);
+            let truly = if on_x { now.x - was.x } else { now.y - was.y };
+            let _ = grown;
+            transform.translation = state.start_at + state.dir * (truly * 0.5);
             record.at = transform.translation.into();
             record.part = fresh;
             // The body is rebuilt in place; the entity, and with it the

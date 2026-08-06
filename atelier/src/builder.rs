@@ -286,8 +286,9 @@ pub enum PartKind {
     /// lean about X and no other axis, so a rail that RUNS at the stair's own
     /// angle - which is what Brett asked for, "We can use angles for the railing
     /// now that we have angles right?" - has to climb the axis that leaning
-    /// answers to. Turn it with R like anything else.
-    Stairs(f32),
+    /// answers to. Turn it with R like anything else. The two numbers are what
+    /// it CLIMBS and how WIDE it is.
+    Stairs(f32, f32),
     /// A ridge pole: a round log along the spine, the older way of
     /// closing a roof.
     /// A whole gable roof: both slopes and the ridge between them, drawn
@@ -424,7 +425,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     // TRIM sit together. Two words for one thing, "stairs" and "steps", meant
     // knowing which of them we had happened to use.
     structure("STAIRS, STONE", PartKind::Prop("steps"), "footing"),
-    structure("STAIRS, WOOD", PartKind::Stairs(0.75), "footing"),
+    structure("STAIRS, WOOD", PartKind::Stairs(0.75, 1.25), "footing"),
     structure(
         "TRIM, STONE, STRETCH",
         PartKind::TrimRun { stone: true },
@@ -1099,16 +1100,14 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(0.0, 1.375, -0.03125, 0.125, 1.0, 0.1875, "wood", 0.4),
             slab(0.0, 1.375, -0.03125, 1.0, 0.125, 0.1875, "wood", 0.4),
         ],
-        PartKind::Stairs(rise) => {
+        PartKind::Stairs(rise, wide) => {
             // A stair is a rhythm, not a size: pick the number of steps that
             // gets nearest the rise asked for, then let every tread be equal.
             // Uneven steps are the one thing a foot notices.
-            let riser = 0.1875_f32;
-            let tread = 0.25_f32;
-            let steps = ((rise / riser).round() as i32).clamp(2, 24);
+            let (steps, riser, tread) = stair_rhythm(*rise);
             let rise = steps as f32 * riser;
             let run = steps as f32 * tread;
-            let wide = 1.25_f32;
+            let wide = wide.max(0.375);
             let mut body: Vec<Slab> = Vec::new();
             // Treads, each a solid block from the ground - the way the stone
             // steps are drawn, and the way a mason would actually build it.
@@ -1125,34 +1124,44 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     0.45,
                 ));
             }
-            // A newel at each corner, and a rail between each pair, running at
-            // the flight's own angle.
+            // A newel at each corner, a rail between each pair running at the
+            // flight's own angle, and balusters standing on the treads.
             let post = 0.1875_f32;
             let hand = 0.875_f32;
+            let cap = post;
+            let rail_thick = post * 0.75;
             let inset = wide * 0.5 - post * 0.5;
             let foot_z = -run * 0.5 + post * 0.5;
             let head_z = run * 0.5 - post * 0.5;
-            let rail_len = (run - post).hypot(rise);
+            let span = head_z - foot_z;
+            let rail_len = span.hypot(rise);
             // A slab's length lies along Z, and leaning about X carries its far
             // end UP when the angle is negative - see `dress_part`.
-            let lean = -(rise / (run - post)).atan();
+            let lean = -(rise / span).atan();
+            // Where the rail's own line stands at a given point along the run.
+            let rail_at = |z: f32| hand + rise * ((z - foot_z) / span);
             for side in [-1.0_f32, 1.0] {
+                // The newels stand a CAP above the rail rather than stopping at
+                // it. A rail's square end meeting a post's top corner leaves the
+                // seam in plain sight, at both ends - Brett: "this join isnt
+                // great. Same with the top." Run the post past the joint and the
+                // joint is inside the post.
                 body.push(slab(
                     side * inset,
-                    hand * 0.5,
+                    (hand + cap) * 0.5,
                     foot_z,
                     post,
-                    hand,
+                    hand + cap,
                     post,
                     "wood",
                     0.4,
                 ));
                 body.push(slab(
                     side * inset,
-                    rise + hand * 0.5,
+                    rise + (hand + cap) * 0.5,
                     head_z,
                     post,
-                    hand,
+                    hand + cap,
                     post,
                     "wood",
                     0.4,
@@ -1161,13 +1170,39 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     side * inset,
                     rise * 0.5 + hand,
                     0.0,
-                    post * 0.75,
-                    post * 0.75,
+                    rail_thick,
+                    rail_thick,
                     rail_len,
                     "wood",
                     0.5,
                     lean,
                 ));
+                // Balusters, every other tread: each stands on the step under it
+                // and reaches the rail's underside, so they shorten and lengthen
+                // with the slope the way real ones do. Brett: "a verticle pole
+                // gets added every so often to look more like real railing".
+                for step in (1..steps).step_by(2) {
+                    let z = -run * 0.5 + (step as f32 + 0.5) * tread;
+                    if z <= foot_z + post || z >= head_z - post {
+                        continue;
+                    }
+                    let stood = (step + 1) as f32 * riser;
+                    let under = rail_at(z) - rail_thick * 0.5;
+                    let tall = under - stood;
+                    if tall < 0.125 {
+                        continue;
+                    }
+                    body.push(slab(
+                        side * inset,
+                        stood + tall * 0.5,
+                        z,
+                        post * 0.5,
+                        tall,
+                        post * 0.5,
+                        "wood",
+                        0.45,
+                    ));
+                }
             }
             body
         }
@@ -2578,7 +2613,7 @@ pub fn part_name(kind: &PartKind) -> String {
         PartKind::BeamRun => "beamrun".to_string(),
         PartKind::Ridge(long) => format!("ridge-{long}"),
         PartKind::Chimney(drop) => format!("chimney-{drop}"),
-        PartKind::Stairs(rise) => format!("stairs-{rise}"),
+        PartKind::Stairs(rise, wide) => format!("stairs-{rise}x{wide}"),
         PartKind::GableRoof(long, span, over, pitch) => {
             format!("gableroof-{long}x{span}x{over}x{pitch}")
         }
@@ -2627,7 +2662,13 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
         return Some(PartKind::Chimney(0.0));
     }
     if let Some(rest) = name.strip_prefix("stairs-") {
-        return rest.parse::<f32>().ok().map(PartKind::Stairs);
+        // Two numbers now, what it climbs and how wide it is. One is a flight
+        // from before a maker could widen them, and opens at the width they all
+        // had.
+        let mut parts = rest.split('x');
+        let rise = parts.next()?.parse().ok()?;
+        let wide = parts.next().and_then(|n| n.parse().ok()).unwrap_or(1.25);
+        return Some(PartKind::Stairs(rise, wide));
     }
     if let Some(rest) = name.strip_prefix("ridge-") {
         return rest.parse::<f32>().ok().map(PartKind::Ridge);
@@ -4522,6 +4563,49 @@ fn cursor_point(
     Some(ray.get_point(reach))
 }
 
+/// How far a part reaches along its own X and Z, measured from the boxes it is
+/// actually made of.
+///
+/// Which is not always the number the handle is pulling. A chimney's handle
+/// asks for its DROP and a flight's asks for its RUN, and a run only comes in
+/// whole treads - so the number asked for and the part that answers can differ,
+/// and a mover that trusted the asking slid the part sideways while the geometry
+/// stood still in jumps. Brett: "when you resize the stai height right now they
+/// slide to the side while resizing...the chiney does it as well."
+pub fn extent_of(kind: &PartKind) -> Vec2 {
+    let mut low = Vec3::splat(f32::INFINITY);
+    let mut high = Vec3::splat(f32::NEG_INFINITY);
+    for Slab(at, size, _, _, _, _, lean) in body_of(kind, None) {
+        // A leaning slab reaches further across than it is thick and less far
+        // along than it is long. Measuring its unturned box makes a stair rail
+        // - which is longer than the flight it runs beside - the widest thing
+        // about the flight, and everything downstream believes it.
+        let turn = Quat::from_rotation_x(lean);
+        let half = size * 0.5;
+        let reach = (turn * Vec3::new(half.x, 0.0, 0.0)).abs()
+            + (turn * Vec3::new(0.0, half.y, 0.0)).abs()
+            + (turn * Vec3::new(0.0, 0.0, half.z)).abs();
+        low = low.min(at - reach);
+        high = high.max(at + reach);
+    }
+    if !low.x.is_finite() {
+        return Vec2::ZERO;
+    }
+    Vec2::new(high.x - low.x, high.z - low.z)
+}
+
+/// How a flight divides: how many treads, how tall each riser, how deep each
+/// tread.
+///
+/// A stair is a rhythm rather than a size. Asked for a height, it takes the
+/// number of EVEN steps that comes nearest - uneven steps are the one thing a
+/// foot notices - and the run follows from the count.
+pub fn stair_rhythm(rise: f32) -> (i32, f32, f32) {
+    let riser = 0.1875_f32;
+    let tread = 0.25_f32;
+    (((rise / riser).round() as i32).clamp(2, 24), riser, tread)
+}
+
 /// Whether this kind counts as structure - walls, their leavings, floors,
 /// roofs, foundations and steps. Structure rests only on structure; props
 /// rest on anything.
@@ -4546,7 +4630,7 @@ fn is_structure(kind: &PartKind) -> bool {
             | PartKind::RidgeRun
             | PartKind::GableRoof(..)
             | PartKind::GableRoofRun
-            | PartKind::Stairs(_)
+            | PartKind::Stairs(..)
             | PartKind::Prop("steps")
             | PartKind::Prop("pole")
     )
@@ -6975,7 +7059,10 @@ pub(crate) fn dims_panel(
                             Some(PartKind::GableRoof(w, d.unwrap_or(old), over, pitch))
                         }
                         PartKind::Chimney(_) => Some(PartKind::Chimney(w)),
-                        PartKind::Stairs(_) => Some(PartKind::Stairs(w)),
+                        // Typed: width, and the height it climbs after the x.
+                        PartKind::Stairs(rise, _) => {
+                            Some(PartKind::Stairs(d.unwrap_or(rise), w))
+                        }
                         _ => None,
                     };
                     if let Some(made) = made {
@@ -8045,13 +8132,47 @@ fn turn_part(
 mod roof_tests {
     use super::*;
 
+    /// A part whose handle asks for something other than its own width must not
+    /// WANDER when that handle is pulled. A chimney's handle asks for its drop,
+    /// which is a height; a flight's asks for a run that only comes in whole
+    /// treads. Both used to slide sideways while the geometry stood still.
+    #[test]
+    fn a_part_only_moves_by_what_it_truly_grew() {
+        // The chimney: its drop is a Y measurement, so nothing about its
+        // footprint changes however far the handle is pulled.
+        let short = extent_of(&PartKind::Chimney(0.5));
+        let tall = extent_of(&PartKind::Chimney(3.0));
+        assert!(
+            (short.x - tall.x).abs() < 1e-4 && (short.y - tall.y).abs() < 1e-4,
+            "a chimney's footprint changed with its drop: {short} to {tall}"
+        );
+
+        // The flight: its run grows in whole treads, so the measured extent
+        // moves in the same steps the geometry does.
+        let (steps, _, tread) = stair_rhythm(0.75);
+        let flight = extent_of(&PartKind::Stairs(0.75, 1.25));
+        assert!(
+            (flight.y - steps as f32 * tread).abs() < 1e-4,
+            "a flight of {steps} treads measured {} along its run",
+            flight.y
+        );
+        // Widening is a true X change, and the only one.
+        let wider = extent_of(&PartKind::Stairs(0.75, 2.0));
+        assert!(
+            (wider.x - flight.x - 0.75).abs() < 1e-4,
+            "widening by 0.75 moved the footprint by {}",
+            wider.x - flight.x
+        );
+        assert!((wider.y - flight.y).abs() < 1e-4, "widening changed the run");
+    }
+
     /// A flight climbs by whole treads, and its rail runs from newel to newel at
     /// the angle the flight actually has. A rail written to a fixed angle is a
     /// rail that floats at every height but one.
     #[test]
     fn a_stair_carries_a_rail_at_its_own_pitch() {
         for asked in [0.375_f32, 0.75, 1.5, 2.25] {
-            let body = body_of(&PartKind::Stairs(asked), None);
+            let body = body_of(&PartKind::Stairs(asked, 1.25), None);
             let riser = 0.1875_f32;
             let steps = ((asked / riser).round() as i32).clamp(2, 24);
             let rise = steps as f32 * riser;
