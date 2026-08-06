@@ -1310,6 +1310,22 @@ pub struct Placed {
     /// of an L.
     #[serde(default)]
     pub flip: bool,
+    /// Which group this part belongs to, if any.
+    ///
+    /// A plain number, shared by everything grouped together, and that is the
+    /// whole mechanism: parts wearing one move, paint, delete and travel as one.
+    /// It replaces a GUESS with a fact. A part used to carry the marks that
+    /// happened to sit within a metre of it, nearest owner winning, which works
+    /// until two beds are pushed together or a mark stands between a door and a
+    /// wall. A group says which pieces belong to which and stops the bench
+    /// inferring it.
+    ///
+    /// Flat, not nested. A group of groups doubles the question a click has to
+    /// answer - the part, or the whole? - and nothing yet needs the second
+    /// level.
+    #[serde(default)]
+    pub group: Option<u32>,
+
     /// A widget that has been cut loose from whatever it was standing in.
     ///
     /// A door arrives with its routing mark, a bed could arrive with its sleep
@@ -1322,6 +1338,37 @@ pub struct Placed {
     /// which is what a maker who placed one inside a door meant by it.
     #[serde(default)]
     pub loose: bool,
+}
+
+/// Everything that moves when this part moves: itself, and whatever shares its
+/// group.
+///
+/// A click on any one of a group takes them all, because that is what being
+/// grouped means. An ungrouped part is its own company.
+pub fn kin_of(part: Entity, records: &Query<(Entity, &Placed), Without<Ghost>>) -> Vec<Entity> {
+    let Ok((_, record)) = records.get(part) else {
+        return vec![part];
+    };
+    let Some(group) = record.group else {
+        return vec![part];
+    };
+    records
+        .iter()
+        .filter(|(_, other)| other.group == Some(group))
+        .map(|(entity, _)| entity)
+        .collect()
+}
+
+/// A group number nothing else is using.
+///
+/// Taken over whatever records the caller has to hand, since the two callers
+/// hold different shapes of query and neither should have to reshape itself to
+/// ask a question about numbers.
+pub fn a_fresh_group<'a>(records: impl Iterator<Item = &'a Placed>) -> u32 {
+    records
+        .filter_map(|record| record.group)
+        .max()
+        .map_or(1, |highest| highest + 1)
 }
 
 /// How far a mark may sit from a part and still be carried by it.
@@ -1422,6 +1469,7 @@ impl Hand {
             stage: self.stage.clone(),
             flip: self.flip,
             loose: false,
+            group: None,
         })
     }
 }
@@ -1884,6 +1932,7 @@ pub fn seat_the_figures(
             stage: "widget".to_string(),
             flip: false,
             loose: false,
+            group: None,
         };
         spawn_part(commands, meshes, materials, palette, &widget, &mark, false);
     }
@@ -1986,6 +2035,8 @@ enum Deed {
     /// Bring a part back until it stops at the roof instead of coming through
     /// it.
     TrimToRoof,
+    /// Make one thing of everything chosen.
+    Group,
 }
 
 impl Deed {
@@ -1998,6 +2049,7 @@ impl Deed {
             Deed::Nature("footing") => "PART OF THE FOOTING",
             Deed::Nature(_) => "FURNISHING",
             Deed::TrimToRoof => "TRIM TO THE ROOF",
+            Deed::Group => "GROUP",
         }
     }
 }
@@ -2250,6 +2302,7 @@ fn raise_part_menu(
     hovered: Res<Hovered>,
     naming: Res<Naming>,
     hand: Res<Hand>,
+    selected: Res<crate::gizmo::Selected>,
     placed: Query<(Entity, &Transform, &Placed), Without<Ghost>>,
     menus: Query<Entity, With<PartMenu>>,
     mut drift: Local<f32>,
@@ -2283,6 +2336,10 @@ fn raise_part_menu(
         return;
     };
     let mut deeds = deeds_for(&kind);
+    // Grouping needs company: one part is already as gathered as it gets.
+    if selected.0.len() > 1 {
+        deeds.insert(0, Deed::Group);
+    }
     // Only where there is a roof to trim to, and a length to trim.
     if length_of(&kind).is_some()
         && placed
@@ -2292,6 +2349,11 @@ fn raise_part_menu(
         deeds.insert(0, Deed::TrimToRoof);
     }
     // Carrying a mark is reason enough to offer it, whatever the part is.
+    if !deeds.contains(&Deed::Ungroup)
+        && placed.get(part).is_ok_and(|(_, _, record)| record.group.is_some())
+    {
+        deeds.insert(0, Deed::Ungroup);
+    }
     if !deeds.contains(&Deed::Ungroup) {
         let held: Vec<(Entity, Vec3, &Placed)> = placed
             .iter()
@@ -2378,6 +2440,7 @@ fn work_part_menu(
     keys: Res<ButtonInput<KeyCode>>,
     buttons: Res<ButtonInput<MouseButton>>,
     palette: Res<Palette>,
+    selected: Res<crate::gizmo::Selected>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut lines: Query<(&MenuLine, &Interaction, &mut BackgroundColor)>,
@@ -2413,7 +2476,22 @@ fn work_part_menu(
     }
     match chosen {
         Some((Deed::Ungroup, part)) => {
-            // First the marks it carries, which any part may have; then the
+            // A group first: the commonest thing UNGROUP is asked to undo, now
+            // that grouping exists at all.
+            let holding = placed.get(part).ok().and_then(|(_, _, record)| record.group);
+            if let Some(group) = holding {
+                let kin: Vec<Entity> = placed
+                    .iter()
+                    .filter(|(_, _, record)| record.group == Some(group))
+                    .map(|(entity, _, _)| entity)
+                    .collect();
+                for part in kin {
+                    if let Ok((_, _, mut record)) = placed.get_mut(part) {
+                        record.group = None;
+                    }
+                }
+            }
+            // Then the marks it carries, which any part may have; then the
             // part's own pieces, which only some parts can be broken into.
             let held: Vec<(Entity, Vec3, Placed)> = placed
                 .iter()
@@ -2432,6 +2510,8 @@ fn work_part_menu(
                 }
                 if let Some(kind) = kind_from_name(&record.part) {
                     let record = record.clone();
+                    let together =
+                        a_fresh_group(held.iter().map(|(_, _, record)| record));
                     ungroup(
                         &mut commands,
                         &mut meshes,
@@ -2440,6 +2520,7 @@ fn work_part_menu(
                         &kind,
                         &record,
                         part,
+                        together,
                     );
                 }
             }
@@ -2489,6 +2570,15 @@ fn work_part_menu(
                 );
             }
         }
+        Some((Deed::Group, _)) => {
+            let together = a_fresh_group(placed.iter().map(|(_, _, record)| record));
+            let chosen: Vec<Entity> = selected.iter().collect();
+            for part in chosen {
+                if let Ok((_, _, mut record)) = placed.get_mut(part) {
+                    record.group = Some(together);
+                }
+            }
+        }
         Some((Deed::Nature(nature), part)) => {
             // Nothing to redraw: a part's nature changes what the bench and the
             // village make of it, not what it looks like.
@@ -2504,7 +2594,20 @@ fn work_part_menu(
 }
 
 /// Breaks a made part into the parts it is made of, standing exactly where its
-/// own pieces stood.
+/// own pieces stood — and GROUPED, so it is still one thing to move.
+///
+/// Which is where the two kinds of togetherness meet, and Brett asked how they
+/// fit: a gable roof is a MADE part, parametric, a span and an overhang and a
+/// pitch with handles that change those numbers and re-derive every piece from
+/// them. A group is an ASSEMBLY: separate parts, each with its own record, moved
+/// as one and edited freely. Neither is a lesser version of the other.
+///
+/// Ungrouping is the door between them, and it only opens one way. What was a
+/// roof becomes four parts that can each be pulled, pitched, painted and
+/// deleted - and can no longer be pitched TOGETHER, because the number they
+/// shared is gone. Trading parameters for freedom is exactly what a maker is
+/// asking for when they break something up, so the trade is the feature. Coming
+/// back is what undo is for.
 ///
 /// A gable roof is four things the bench can already draw: two slopes, which are
 /// roof panels, and two ends, which are gables. So it comes apart into four
@@ -2517,6 +2620,7 @@ fn work_part_menu(
 ///
 /// Undo needs no help here. The bench remembers whole states rather than deeds,
 /// so four parts appearing and one leaving is one step back like anything else.
+#[allow(clippy::too_many_arguments)]
 fn ungroup(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
@@ -2525,6 +2629,7 @@ fn ungroup(
     kind: &PartKind,
     record: &Placed,
     part: Entity,
+    together: u32,
 ) {
     let PartKind::GableRoof(long, span, over, degrees) = *kind else {
         return;
@@ -2564,6 +2669,7 @@ fn ungroup(
                 stage: record.stage.clone(),
                 flip: record.flip,
                 loose: false,
+                group: None,
             },
         ));
 
@@ -2583,11 +2689,15 @@ fn ungroup(
                 stage: record.stage.clone(),
                 flip: record.flip,
                 loose: false,
+                group: None,
             },
         ));
     }
 
-    for (kind, record) in born {
+    // One number across the pieces, so the roof that WAS one thing to move is
+    // still one thing to move.
+    for (kind, mut record) in born {
+        record.group = Some(together);
         spawn_part(commands, meshes, materials, palette, &kind, &record, false);
     }
     commands.entity(part).despawn();
@@ -3479,13 +3589,13 @@ fn paint_the_work(
     if !selected.is_changed() {
         return;
     }
-    let Some(chosen) = selected.0 else {
+    if selected.is_empty() {
         return;
-    };
+    }
     let whole = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
 
     for (part, mut record) in &mut placed {
-        if !whole && part != chosen {
+        if !whole && !selected.holds(part) {
             continue;
         }
         let Some(kind) = kind_from_name(&record.part) else {
@@ -3828,7 +3938,7 @@ fn move_ghost(
     }
     // While the arrows are out, the ghost stands aside entirely - fine
     // tuning wants a clear view and no accidental placements.
-    let tuning = selected.0.is_some();
+    let tuning = !selected.is_empty();
     for mut visibility in &mut ghost_shapes {
         let wanted = if tuning {
             Visibility::Hidden
@@ -3944,6 +4054,7 @@ fn move_ghost(
             stage: hand.stage.clone(),
             flip: hand.flip,
             loose: false,
+            group: None,
         };
         // A whole roof draws as a flat plane while it is being sized -
         // the footprint it will cover - and becomes a roof when the
@@ -4494,7 +4605,7 @@ fn place_grab_remove(
     if *bench != Bench::Builder
         || naming.0.is_some()
         || gizmo_hot.0
-        || selected.0.is_some()
+        || !selected.is_empty()
         || *tool != crate::gizmo::ToolMode::Normal
     {
         return;
@@ -4764,6 +4875,7 @@ fn heal_wall_at(
         stage: "walls".to_string(),
         flip: false,
         loose: false,
+        group: None,
     };
     for piece in doomed {
         commands.entity(piece).despawn();
@@ -4963,6 +5075,7 @@ fn punch_wall(
             stage: record.stage.clone(),
             flip: false,
             loose: false,
+            group: None,
         };
         spawn_part(commands, meshes, materials, palette, &kind, &piece, false);
     }
@@ -4984,6 +5097,7 @@ fn punch_wall(
         stage: "walls".to_string(),
         flip: hand.flip,
         loose: false,
+        group: None,
     };
     spawn_part(
         commands,
@@ -5021,6 +5135,7 @@ fn punch_wall(
                 stage: "widget".to_string(),
                 flip: false,
                 loose: false,
+                group: None,
             };
             spawn_part(commands, meshes, materials, palette, &widget, &mark, false);
         }
@@ -5571,7 +5686,7 @@ pub(crate) fn dims_panel(
     }
 
     // The selected sized part, if any, and its measure.
-    let sized = selected.0.and_then(|part| {
+    let sized = selected.one().and_then(|part| {
         let (_, record) = parts.get(part).ok()?;
         let kind = kind_from_name(&record.part)?;
         match kind {
@@ -5914,7 +6029,7 @@ fn copy_and_paste(
         return;
     }
     if keys.just_pressed(KeyCode::KeyC)
-        && let Some(source) = selected.0.or(hovered.grab)
+        && let Some(source) = selected.lead().or(hovered.grab)
         && let Ok(record) = placed.get(source)
     {
         clipboard.0 = Some(record.clone());
@@ -5977,7 +6092,7 @@ fn mirror_part(
     }
     // A standing part first: mirroring what you can see beats mirroring
     // what you are about to place.
-    if let Some(part) = selected.0
+    if let Some(part) = selected.lead()
         && let Ok((mut transform, mut record)) = parts.get_mut(part)
         && let Some(kind) = kind_from_name(&record.part)
     {
@@ -6032,7 +6147,7 @@ fn reflow_openings(
 
     if buttons.just_pressed(MouseButton::Left) {
         *came_from = selected
-            .0
+            .lead()
             .and_then(|part| placed.get(part).ok())
             .filter(|(_, _, record, _)| opening_for(record).is_some())
             .map(|(entity, at, _, _)| (entity, at.translation));
@@ -6153,9 +6268,12 @@ fn bury_the_chosen(
     if !keys.just_pressed(KeyCode::Delete) && !keys.just_pressed(KeyCode::Backspace) {
         return;
     }
-    let Some(chosen) = selected.0 else {
+    // Everything chosen, not merely the first of them.
+    let doomed: Vec<Entity> = selected.iter().collect();
+    if doomed.is_empty() {
         return;
-    };
+    }
+    for chosen in doomed {
     if let Ok((_, chosen_at, _, _)) = parts.get(chosen) {
         // The marks it carries go with it. A door's routing mark left standing
         // in a wall with no door is worse than either: the village reads it and
@@ -6181,7 +6299,8 @@ fn bury_the_chosen(
         );
         commands.entity(chosen).despawn();
     }
-    selected.0 = None;
+    }
+    selected.clear();
 }
 
 /// A request to show another step, or to add or drop one.
@@ -6261,7 +6380,7 @@ fn turn_to_stage(
     for (part, _) in &standing {
         commands.entity(part).despawn();
     }
-    selected.0 = None;
+    selected.clear();
     for record in &stages.drawings[wanted] {
         if let Some(kind) = kind_from_name(&record.part) {
             spawn_part(
@@ -6629,7 +6748,7 @@ fn tilt_part(
     {
         return;
     }
-    let Some(part) = selected.0 else {
+    let Some(part) = selected.lead() else {
         return;
     };
     let Ok((mut transform, mut record)) = parts.get_mut(part) else {
@@ -6660,7 +6779,7 @@ fn turn_part(
     {
         return;
     }
-    let Some(part) = selected.0 else {
+    let Some(part) = selected.lead() else {
         return;
     };
     let Ok((mut transform, mut record)) = parts.get_mut(part) else {
@@ -6742,6 +6861,7 @@ mod roof_tests {
             stage: "frame".to_string(),
             flip: false,
             loose: false,
+            group: None,
         }
     }
 
@@ -6799,6 +6919,7 @@ mod roof_tests {
             stage: "roof".to_string(),
             flip: false,
             loose: false,
+            group: None,
         };
         let boxes = roof_boxes(&roof);
         assert!(!boxes.is_empty(), "the roof gathered no boxes at all");
@@ -7019,6 +7140,7 @@ mod roof_tests {
             stage: stage.to_string(),
             flip: false,
             loose: false,
+            group: None,
         })
         .collect();
 

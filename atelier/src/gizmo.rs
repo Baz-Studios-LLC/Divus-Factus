@@ -9,7 +9,7 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
 use crate::Bench;
-use crate::builder::{self, Hovered, Naming, PartKind, Placed};
+use crate::builder::{self, Ghost, Hovered, Naming, PartKind, Placed};
 use crate::look::Palette;
 
 /// Which tool the mouse is.
@@ -26,7 +26,55 @@ pub enum ToolMode {
 
 /// The part currently wearing handles.
 #[derive(Resource, Default)]
-pub struct Selected(pub Option<Entity>);
+pub struct Selected(pub Vec<Entity>);
+
+impl Selected {
+    /// The one part chosen, when exactly one is.
+    ///
+    /// Handles ask this rather than "the first of them", and the difference is
+    /// the whole rule: a single part wears its OWN handles - a gable roof keeps
+    /// its eaves and its ridge - while several together can only be moved, since
+    /// stretching six things at once has no meaning to invent.
+    pub fn one(&self) -> Option<Entity> {
+        (self.0.len() == 1).then(|| self.0[0])
+    }
+
+    /// The part a menu or a measure speaks about: the first chosen.
+    pub fn lead(&self) -> Option<Entity> {
+        self.0.first().copied()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn holds(&self, part: Entity) -> bool {
+        self.0.contains(&part)
+    }
+
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
+
+    /// This one alone.
+    pub fn only(&mut self, part: Entity) {
+        self.0.clear();
+        self.0.push(part);
+    }
+
+    /// In or out - a shift-click on something already chosen lets it go.
+    pub fn toggle(&mut self, part: Entity) {
+        if let Some(at) = self.0.iter().position(|held| *held == part) {
+            self.0.remove(at);
+        } else {
+            self.0.push(part);
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = Entity> + '_ {
+        self.0.iter().copied()
+    }
+}
 
 /// A drag in progress.
 pub struct DragState {
@@ -142,7 +190,7 @@ fn walk_modes(
         };
     }
     if mode.is_changed() && *mode == ToolMode::Normal {
-        selected.0 = None;
+        selected.clear();
     }
 }
 
@@ -159,28 +207,40 @@ fn select_part(
     dims: Res<builder::DimsEntry>,
     hovered: Res<Hovered>,
     parts: Query<(), With<Placed>>,
+    records: Query<(Entity, &Placed), Without<Ghost>>,
     mut selected: ResMut<Selected>,
 ) {
     if dims.0.is_some() {
         return;
     }
     if *bench != Bench::Builder || naming.0.is_some() || *mode == ToolMode::Normal {
-        selected.0 = None;
+        selected.clear();
         return;
     }
-    if let Some(chosen) = selected.0
-        && !parts.contains(chosen)
-    {
-        selected.0 = None;
-    }
+    // A part that has gone - buried, or left behind on another step - stops
+    // being chosen without taking the rest of the choice with it.
+    selected.0.retain(|part| parts.contains(*part));
     if buttons.just_pressed(MouseButton::Left)
         && !hot.0
         && let Some(touched) = hovered.grab
     {
-        selected.0 = Some(touched);
+        // Shift adds and takes away; a plain click starts afresh. Clicking a
+        // part that belongs to a group takes the whole group, which is what
+        // being grouped MEANS - see `builder::kin_of`.
+        let kin = builder::kin_of(touched, &records);
+        if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
+            for part in kin {
+                selected.toggle(part);
+            }
+        } else {
+            selected.clear();
+            for part in kin {
+                selected.toggle(part);
+            }
+        }
     }
     if keys.just_pressed(KeyCode::Escape) {
-        selected.0 = None;
+        selected.clear();
     }
 }
 
@@ -318,9 +378,9 @@ fn dress_gizmo(
     roots: Query<Entity, With<GizmoRoot>>,
     mut stamp: Local<(Option<Entity>, ToolMode, String)>,
 ) {
-    let standing = selected.0.and_then(|part| parts.get(part).ok());
+    let standing = selected.one().and_then(|part| parts.get(part).ok());
     let fresh = (
-        selected.0,
+        selected.lead(),
         *mode,
         standing
             .map(|(_, record)| record.part.clone())
@@ -436,7 +496,9 @@ fn work_gizmo(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut parts: Query<(Entity, &mut Transform, &mut Placed), Without<Handle>>,
 ) {
-    let Some(part) = selected.0 else {
+    // Handles hang on ONE part; a set of parts is moved by its own handles at
+    // the middle, which are the move handles and no others.
+    let Some(part) = selected.one().or_else(|| selected.lead()) else {
         drag.0 = None;
         hot.0 = false;
         return;
@@ -520,6 +582,19 @@ fn work_gizmo(
             transform.translation = state.start_at + state.dir * step;
             record.at = transform.translation.into();
             let moved = transform.translation - was;
+
+            // Everything else chosen goes the same distance. The handle hangs on
+            // one part, but a choice of several moves as one thing - that is
+            // what choosing several is FOR.
+            if moved.length_squared() > 0.0 {
+                let others: Vec<Entity> = selected.iter().filter(|held| *held != part).collect();
+                for other in others {
+                    if let Ok((_, mut at, mut record)) = parts.get_mut(other) {
+                        at.translation += moved;
+                        record.at = at.translation.into();
+                    }
+                }
+            }
 
             // And the marks it carries travel with it. A door slid along a wall
             // that left its routing mark behind would put the village's doorway

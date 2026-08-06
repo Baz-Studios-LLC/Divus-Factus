@@ -324,6 +324,8 @@ standing: click a part,
 shift-click the lot,
 \\ empties the brush",
         ),
+        ("shift-click", "choose several; right-
+click to group them"),
         ("esc / del", "empty the hand"),
         (
             "del",
