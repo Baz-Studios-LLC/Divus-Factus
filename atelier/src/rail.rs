@@ -148,7 +148,10 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
                 left: Val::Px(0.0),
                 top: Val::Px(0.0),
                 bottom: Val::Px(0.0),
-                width: Val::Px(190.0),
+                // The shelf's own width. The two stand either side of the same
+                // stage and a bench with mismatched margins reads as a bench
+                // that was assembled rather than drawn.
+                width: Val::Px(212.0),
                 flex_direction: FlexDirection::Column,
                 padding: UiRect::all(Val::Px(14.0)),
                 row_gap: Val::Px(8.0),
