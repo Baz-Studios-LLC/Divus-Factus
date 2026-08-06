@@ -100,6 +100,8 @@ enum Grip {
     Pitch { p0: f32 },
     /// Raise or lower a flight's handrail. The treads do not move.
     Rail { h0: f32 },
+    /// Raise or lower a pad: how tall the stone stands.
+    Rise { h0: f32 },
 }
 
 #[derive(Resource, Default)]
@@ -322,7 +324,7 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                 }
                 PartKind::Ridge(long) => Some((long, 0.0, false)),
                 PartKind::Floor(w, d) => Some((w, d, true)),
-                PartKind::Foundation(w, d) => Some((w, d, true)),
+                PartKind::Foundation(w, d, _) => Some((w, d, true)),
                 PartKind::Roof(w, d) => Some((w, d, true)),
                 PartKind::GableRoof(w, d, _, _) => Some((w, d, true)),
                 _ => None,
@@ -360,6 +362,17 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                         },
                     ));
                 }
+            }
+            // A pad carries one more, in gold: how TALL it stands. Both of the
+            // red-and-blue pair are spoken for by its footprint, and a footing
+            // that cannot be raised cannot reach the ground on a slope.
+            if let Some(PartKind::Foundation(_, _, high)) = builder::kind_from_name(&record.part) {
+                handles.push((
+                    spin * Vec3::Y,
+                    spin * Vec3::new(0.0, high, 0.0),
+                    "cloth-gold",
+                    Grip::Rise { h0: high },
+                ));
             }
             // A flight carries one more, in gold: the rail's own height, since
             // both of the red-and-blue pair are spoken for by its width and its
@@ -725,6 +738,36 @@ fn work_gizmo(
                 false,
             );
         }
+        Grip::Rise { h0 } => {
+            // Whole sixteenths, like every other pull, and never thinner than
+            // one: a pad of no height is a pad nobody can see or click.
+            let pull = ((t - state.t0) * 16.0).round() / 16.0;
+            let high = (h0 + pull).clamp(0.0625, 8.0);
+            let Some(PartKind::Foundation(w, d, was)) = builder::kind_from_name(&record.part) else {
+                return;
+            };
+            if (high - was).abs() < 1e-4 {
+                return;
+            }
+            let made = PartKind::Foundation(w, d, high);
+            record.part = builder::part_name(&made);
+            // A pad grows UPWARD from where it sits: its underside is the thing
+            // resting on the ground, and a footing that sank as it grew would
+            // have to be put back every time.
+            transform.translation.y = state.start_at.y + (high - was) * 0.5;
+            record.at = transform.translation.into();
+            commands.entity(part).despawn_related::<Children>();
+            builder::dress_part(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &palette,
+                &made,
+                &record,
+                part,
+                false,
+            );
+        }
         Grip::Rail { h0 } => {
             // In whole sixteenths, like everything else a hand pulls, and never
             // below a step's own height or above a chest.
@@ -834,7 +877,7 @@ fn work_gizmo(
                 }
                 PartKind::Ridge(_) => PartKind::Ridge(w),
                 PartKind::Floor(..) => PartKind::Floor(w, d),
-                PartKind::Foundation(..) => PartKind::Foundation(w, d),
+                PartKind::Foundation(_, _, high) => PartKind::Foundation(w, d, high),
                 PartKind::Roof(..) => PartKind::Roof(w, d),
                 PartKind::GableRoof(_, _, over, pitch) => PartKind::GableRoof(w, d, over, pitch),
                 _ => return,

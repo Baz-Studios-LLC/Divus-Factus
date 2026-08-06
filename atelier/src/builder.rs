@@ -315,7 +315,13 @@ pub enum PartKind {
     /// It is never placed - the record beneath it names the roof.
     RoofPlan(f32, f32),
     Floor(f32, f32),
-    Foundation(f32, f32),
+    /// A stone pad: how wide, how deep, and how TALL.
+    ///
+    /// The height is a third number because Brett wanted footings that answer to
+    /// the ground: "I would like the foundation to be able to be stretched in
+    /// the other axis as well, so i could make taller foundations if I wanted."
+    /// A pad set into a slope has to reach the ground somewhere.
+    Foundation(f32, f32, f32),
     Roof(f32, f32),
     /// The stretch tools: anchored with one click, drawn to size, set
     /// with the next. They exist only in the hand - what they place are
@@ -378,7 +384,7 @@ impl PartKind {
                 lift: *lift,
             },
             PartKind::FloorRun => PartKind::Floor(w, d),
-            PartKind::FoundationRun => PartKind::Foundation(w, d),
+            PartKind::FoundationRun => PartKind::Foundation(w, d, 0.375),
             PartKind::RoofRun => PartKind::Roof(w, d),
             other => *other,
         }
@@ -413,7 +419,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     structure("DOORWAY", PartKind::Prop("doorway"), "walls"),
     structure("FLOOR, 2M", PartKind::Floor(2.0, 2.0), "footing"),
     structure("FLOOR, STRETCH", PartKind::FloorRun, "footing"),
-    structure("FOUNDATION, 2M", PartKind::Foundation(2.0, 2.0), "footing"),
+    structure("FOUNDATION, 2M", PartKind::Foundation(2.0, 2.0, 0.375), "footing"),
     structure("FOUNDATION, STRETCH", PartKind::FoundationRun, "footing"),
     structure("GABLE, STRETCH", PartKind::GableRun, "roof"),
     structure(
@@ -652,8 +658,9 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         )],
         PartKind::Floor(w, d) => vec![slab(0.0, 0.0625, 0.0, *w, 0.125, *d, "wood", 0.5)],
         PartKind::FloorRun => vec![slab(0.0, 0.0625, 0.0, 0.25, 0.125, 0.25, "wood", 0.5)],
-        PartKind::Foundation(w, d) => {
-            vec![slab(0.0, 0.1875, 0.0, *w, 0.375, *d, "stone", 0.55)]
+        PartKind::Foundation(w, d, high) => {
+            let high = high.max(0.0625);
+            vec![slab(0.0, high * 0.5, 0.0, *w, high, *d, "stone", 0.55)]
         }
         PartKind::FoundationRun => {
             vec![slab(0.0, 0.1875, 0.0, 0.25, 0.375, 0.25, "stone", 0.55)]
@@ -2700,7 +2707,7 @@ pub fn part_name(kind: &PartKind) -> String {
         }
         PartKind::RoofPlan(w, d) => format!("roofplan-{w}x{d}"),
         PartKind::Floor(w, d) => format!("floor-{w}x{d}"),
-        PartKind::Foundation(w, d) => format!("foundation-{w}x{d}"),
+        PartKind::Foundation(w, d, high) => format!("foundation-{w}x{d}x{high}"),
         PartKind::Roof(w, d) => format!("roof-{w}x{d}"),
         PartKind::WallRun
         | PartKind::TrimRun { .. }
@@ -2808,7 +2815,13 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
         return sides_of(rest).map(|(w, d)| PartKind::Floor(w, d));
     }
     if let Some(rest) = name.strip_prefix("foundation-") {
-        return sides_of(rest).map(|(w, d)| PartKind::Foundation(w, d));
+        // Three numbers now. A pad from before it could be raised opens at the
+        // height every pad used to have.
+        let mut parts = rest.split('x');
+        let w = parts.next()?.parse().ok()?;
+        let d = parts.next()?.parse().ok()?;
+        let high = parts.next().and_then(|n| n.parse().ok()).unwrap_or(0.375);
+        return Some(PartKind::Foundation(w, d, high));
     }
     if let Some(rest) = name.strip_prefix("roof-") {
         return sides_of(rest).map(|(w, d)| PartKind::Roof(w, d));
@@ -2842,7 +2855,7 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
         // Legacy names from before the primitives learned their sizes.
         "floor" => Some(PartKind::Floor(2.0, 2.0)),
         "roof" => Some(PartKind::Roof(2.2, 2.2)),
-        "prop:foundation" => Some(PartKind::Foundation(2.0, 2.0)),
+        "prop:foundation" => Some(PartKind::Foundation(2.0, 2.0, 0.375)),
         "prop:trim" => Some(PartKind::Trim {
             long: 2.0,
             stone: false,
@@ -5654,7 +5667,9 @@ fn spoken_of(kind: &PartKind) -> String {
         }
         PartKind::RoofPlan(w, d) => format!("ROOF PLAN, {w:.2} X {d:.2}M"),
         PartKind::Floor(w, d) => format!("FLOOR, {w:.2} X {d:.2}M"),
-        PartKind::Foundation(w, d) => format!("FOUNDATION, {w:.2} X {d:.2}M"),
+        PartKind::Foundation(w, d, high) => {
+            format!("FOUNDATION, {w:.2} X {d:.2}M, {high:.2} TALL")
+        }
         PartKind::Roof(w, d) => format!("ROOF PANEL, {w:.2} X {d:.2}M"),
         PartKind::Prop(what) | PartKind::Widget(what) => what.to_uppercase(),
         other => part_name(other).to_uppercase(),
@@ -7124,9 +7139,8 @@ pub(crate) fn dims_panel(
             PartKind::GableRoof(w, d, _, pitch) => Some((part, w, Some(d), Some(pitch))),
             PartKind::Gable(long, pitch) => Some((part, long, None, Some(pitch))),
             PartKind::Chimney(drop) => Some((part, drop, None, None)),
-            PartKind::Floor(w, d) | PartKind::Foundation(w, d) | PartKind::Roof(w, d) => {
-                Some((part, w, Some(d), None))
-            }
+            PartKind::Floor(w, d) | PartKind::Roof(w, d) => Some((part, w, Some(d), None)),
+            PartKind::Foundation(w, d, _) => Some((part, w, Some(d), None)),
             _ => None,
         }
     });
@@ -7188,8 +7202,8 @@ pub(crate) fn dims_panel(
                         }),
                         PartKind::Trim { stone, .. } => Some(PartKind::Trim { long: w, stone }),
                         PartKind::Floor(_, old) => Some(PartKind::Floor(w, d.unwrap_or(old))),
-                        PartKind::Foundation(_, old) => {
-                            Some(PartKind::Foundation(w, d.unwrap_or(old)))
+                        PartKind::Foundation(_, old, high) => {
+                            Some(PartKind::Foundation(w, d.unwrap_or(old), high))
                         }
                         PartKind::Roof(_, old) => Some(PartKind::Roof(w, d.unwrap_or(old))),
                         // The pitch rides through a resize: a roof HAS a pitch,
@@ -7244,7 +7258,9 @@ pub(crate) fn dims_panel(
             PartKind::Wall(long) => Some(format!("wall - {}", units(long))),
             PartKind::Trim { long, .. } => Some(format!("trim - {}", units(long))),
             PartKind::Floor(w, d) => Some(format!("floor - {} x {}", units(w), units(d))),
-            PartKind::Foundation(w, d) => Some(format!("foundation - {} x {}", units(w), units(d))),
+            PartKind::Foundation(w, d, _) => {
+                Some(format!("foundation - {} x {}", units(w), units(d)))
+            }
             PartKind::Roof(w, d) => Some(format!("roof - {} x {}", units(w), units(d))),
             _ => None,
         };
@@ -8290,6 +8306,38 @@ fn turn_part(
 #[cfg(test)]
 mod roof_tests {
     use super::*;
+
+    /// A pad grows upward from where it sits, and one drawn before it could be
+    /// raised opens at the height every pad used to have.
+    #[test]
+    fn a_footing_can_be_raised() {
+        let low = body_of(&PartKind::Foundation(2.0, 2.0, 0.375), None);
+        let tall = body_of(&PartKind::Foundation(2.0, 2.0, 1.5), None);
+        let underside = |body: &[Slab]| {
+            body.iter()
+                .map(|Slab(at, size, ..)| at.y - size.y * 0.5)
+                .fold(f32::INFINITY, f32::min)
+        };
+        assert!(underside(&low).abs() < 1e-4, "a pad rests on the ground");
+        assert!(
+            underside(&tall).abs() < 1e-4,
+            "a raised pad left the ground rather than growing off it"
+        );
+        let top = |body: &[Slab]| {
+            body.iter()
+                .map(|Slab(at, size, ..)| at.y + size.y * 0.5)
+                .fold(0.0_f32, f32::max)
+        };
+        assert!((top(&tall) - 1.5).abs() < 1e-4);
+
+        // Every older spelling opens, and at the height it was drawn.
+        let Some(PartKind::Foundation(w, d, high)) = kind_from_name("foundation-2x3") else {
+            panic!("an elder pad no longer opens");
+        };
+        assert_eq!((w, d, high), (2.0, 3.0, 0.375));
+        let name = part_name(&PartKind::Foundation(2.0, 3.0, 1.25));
+        assert_eq!(part_name(&kind_from_name(&name).expect("reads back")), name);
+    }
 
     /// No two boxes of a flight may share a face in the same plane. Two surfaces
     /// at one depth is a fight the renderer settles differently frame to frame,
