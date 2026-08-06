@@ -13,6 +13,7 @@ mod camera;
 mod gizmo;
 mod look;
 mod rail;
+mod rig;
 mod stage;
 
 /// Which bench the maker stands at.
@@ -38,5 +39,12 @@ fn main() {
         .init_resource::<Bench>()
         .add_plugins((look::LookPlugin, camera::CameraPlugin, stage::StagePlugin))
         .add_plugins((rail::RailPlugin, builder::BuilderPlugin, gizmo::GizmoPlugin))
+        .add_plugins(rig::RigPlugin)
+        // Which bench the maker opens at. A maker working on the rig for an
+        // hour should not walk across the builder to reach it every time.
+        .insert_resource(match std::env::var("ATELIER_BENCH").as_deref() {
+            Ok("rig") => Bench::Rig,
+            _ => Bench::Builder,
+        })
         .run();
 }

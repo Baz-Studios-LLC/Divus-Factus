@@ -67,6 +67,7 @@ fn steer(
     keys: Res<ButtonInput<KeyCode>>,
     naming: Res<crate::builder::Naming>,
     dims: Res<crate::builder::DimsEntry>,
+    bench: Res<crate::Bench>,
     over_pane: Res<crate::look::OverPane>,
     buttons: Res<ButtonInput<MouseButton>>,
     motion: Res<AccumulatedMouseMotion>,
@@ -101,6 +102,22 @@ fn steer(
             rig.yaw = yaw;
             rig.pitch = pitch;
         }
+    }
+
+    // The rig bench turns about the body and nothing else. Brett: "lock the
+    // camera to the center so that you can orbit the cahracter and zoom but not
+    // pan". A body is one thing standing in one place - there is nowhere to pan
+    // TO - and a bench that let the eye wander off it would only ever be
+    // something to correct.
+    if *bench == crate::Bench::Rig {
+        if scroll.delta.y != 0.0 && !over_pane.0 {
+            rig.distance = (rig.distance * (1.0 - scroll.delta.y * 0.08)).clamp(1.2, 20.0);
+        }
+        let chest = Vec3::new(0.0, 1.0, 0.0);
+        if rig.focus.distance(chest) > 1e-4 {
+            rig.focus = chest;
+        }
+        return;
     }
 
     // Pan on middle mouse: the bench moves with the pointer.

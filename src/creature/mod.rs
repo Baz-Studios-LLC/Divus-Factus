@@ -7,6 +7,7 @@
 
 pub mod anim;
 pub mod body;
+pub mod clip;
 pub mod genome;
 pub mod wildlife;
 
@@ -52,6 +53,10 @@ impl Plugin for CreaturePlugin {
                     succumb,
                     anim::advance_motion,
                     anim::animate_creatures,
+                    // After the sines, always: a clip writes back over the few
+                    // joints it was drawn with and leaves the rest walking.
+                    clip::clips_follow_the_day,
+                    clip::play_clips,
                 )
                     .chain()
                     .in_set(CreatureSet),

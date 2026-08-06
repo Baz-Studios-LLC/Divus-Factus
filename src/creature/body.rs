@@ -766,6 +766,274 @@ fn build_quadruped(
     }
 }
 
+/// The bench's own word for each joint a clip may key.
+///
+/// The two programs share no code, so the bond between a clip drawn on the bench
+/// and a body raised in the world is these ten words and nothing else. They are
+/// SIDED - "arm.l" and not "Arm" twice - because the game names both arms the
+/// same thing and a clip that raised "an arm" would be raising either.
+pub const JOINTS: [&str; 10] = [
+    "body",
+    "head",
+    "leg.l",
+    "leg.l.lower",
+    "leg.r",
+    "leg.r.lower",
+    "arm.l",
+    "arm.l.lower",
+    "arm.r",
+    "arm.r.lower",
+];
+
+/// Which canonical joint each entity of a built rig answers to.
+///
+/// Sides are read off the joint's own X rather than the order the limbs were
+/// pushed in, because the order is an implementation detail of the builder and
+/// the side is a fact about the body.
+pub fn joints_of(rig: &CreatureRig, world: &World) -> Vec<(Entity, &'static str)> {
+    name_the_joints(rig, |joint| {
+        world
+            .get::<Transform>(joint)
+            .map(|at| at.translation.x)
+            .unwrap_or(0.0)
+    })
+}
+
+/// The same naming, for a caller holding queries rather than a whole world.
+pub fn name_the_joints(
+    rig: &CreatureRig,
+    side_of: impl Fn(Entity) -> f32,
+) -> Vec<(Entity, &'static str)> {
+    let mut named = vec![(rig.body, "body"), (rig.head, "head")];
+    for limb in &rig.limbs {
+        let side = side_of(limb.entity);
+        let name = match (limb.is_arm, side < 0.0) {
+            (false, true) => ("leg.l", "leg.l.lower"),
+            (false, false) => ("leg.r", "leg.r.lower"),
+            (true, true) => ("arm.l", "arm.l.lower"),
+            (true, false) => ("arm.r", "arm.r.lower"),
+        };
+        named.push((limb.entity, name.0));
+        named.push((limb.lower, name.1));
+    }
+    named
+}
+
+/// Writes the bodies the bench poses on, out of the game's own builder.
+///
+/// The Atelier and the game share no code, so the bench could only ever have a
+/// SECOND villager in it - hand-copied, and wrong the first time a proportion
+/// moved. It reads these files instead: the real bodies, built by the real
+/// builder from real genomes, with the joints named the way a clip names them.
+/// Brett asked for "the ability to test on differnt body types and sizes that
+/// appear in the game", and this is the only way to be sure that is what they
+/// are.
+///
+/// By hand, when the body changes:
+/// `cargo test bake_the_bodies -- --ignored --nocapture`
+#[cfg(test)]
+mod bake {
+    use super::*;
+    use crate::creature::genome::{Age, Sex, Species};
+    use crate::rng::Rng;
+
+    /// One drawn box, in the frame of the joint it hangs from.
+    struct Slab {
+        joint: String,
+        at: Vec3,
+        turn: Quat,
+        size: Vec3,
+        rgb: [u8; 3],
+    }
+
+    /// Walks a built body, gathering every box under the joint it answers to.
+    fn gather(
+        world: &World,
+        entity: Entity,
+        joint: &str,
+        from_joint: Transform,
+        named: &[(Entity, &'static str)],
+        cloth: &std::collections::HashMap<AssetId<StandardMaterial>, [u8; 3]>,
+        into: &mut Vec<Slab>,
+    ) {
+        let Some(children) = world.get::<Children>(entity) else {
+            return;
+        };
+        for child in children.iter() {
+            let at = world.get::<Transform>(child).copied().unwrap_or_default();
+            // A joint of its own starts a new frame; anything else carries the
+            // one it is standing in.
+            let (joint, from_joint) = match named.iter().find(|(e, _)| *e == child) {
+                Some((_, name)) => (*name, Transform::default()),
+                None => (joint, from_joint * at),
+            };
+            if let Some(paint) = world.get::<MeshMaterial3d<StandardMaterial>>(child) {
+                into.push(Slab {
+                    joint: joint.to_string(),
+                    at: from_joint.translation,
+                    turn: from_joint.rotation,
+                    size: from_joint.scale,
+                    rgb: cloth.get(&paint.0.id()).copied().unwrap_or([255, 255, 255]),
+                });
+            }
+            gather(world, child, joint, from_joint, named, cloth, into);
+        }
+    }
+
+    #[test]
+    #[ignore = "a hand-run export, not a check"]
+    fn bake_the_bodies() {
+        // A span of the village rather than a sample of it: every age and sex
+        // the world raises, so a clip can be tried on the smallest body it will
+        // ever play on and the largest.
+        let mut wanted: Vec<(Age, Sex)> = Vec::new();
+        for age in [Age::Child, Age::Adult, Age::Elder] {
+            for sex in [Sex::Female, Sex::Male] {
+                wanted.push((age, sex));
+            }
+        }
+        let out = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("atelier/data/bodies");
+        std::fs::create_dir_all(&out).expect("the bodies folder");
+
+        let mut found = 0;
+        for (age, sex) in wanted {
+            // Rolled until the dice give the body wanted. The genome decides age
+            // and sex itself, and asking it to do so is cheaper than a second
+            // constructor that could disagree with the first.
+            let Some(seed) = (1u64..4000).find(|seed| {
+                let genome = CreatureGenome::random(Species::Human, &mut Rng::new(*seed));
+                genome.age == age && genome.sex == sex
+            }) else {
+                println!("no seed gave a {age:?} {sex:?}");
+                continue;
+            };
+            let genome = CreatureGenome::random(Species::Human, &mut Rng::new(seed));
+
+            let mut app = App::new();
+            app.add_plugins((MinimalPlugins, bevy::asset::AssetPlugin::default()));
+            app.init_asset::<Mesh>().init_asset::<StandardMaterial>();
+            app.add_systems(Startup, init_creature_assets);
+            app.update();
+            let assets = app.world().resource::<CreatureAssets>();
+            let assets = CreatureAssets {
+                cube: assets.cube.clone(),
+                materials: assets.materials.clone(),
+            };
+            let world = app.world_mut();
+            let root = world.spawn((Transform::default(), Visibility::default())).id();
+            let mut queue = bevy::ecs::world::CommandQueue::default();
+            let rig = {
+                let mut commands = Commands::new(&mut queue, world);
+                build_body(&mut commands, &assets, root, &genome)
+            };
+            queue.apply(world);
+
+            let named = joints_of(&rig, world);
+            // The colours come out first, as plain numbers. The walk wants the
+            // world and the materials at once, and a raw pointer to dodge that
+            // is a bargain nobody needs to strike for six files.
+            let cloth: std::collections::HashMap<AssetId<StandardMaterial>, [u8; 3]> = world
+                .resource::<Assets<StandardMaterial>>()
+                .iter()
+                .map(|(id, stuff)| {
+                    let dye = stuff.base_color.to_srgba();
+                    (
+                        id,
+                        [
+                            (dye.red * 255.0).round() as u8,
+                            (dye.green * 255.0).round() as u8,
+                            (dye.blue * 255.0).round() as u8,
+                        ],
+                    )
+                })
+                .collect();
+            let mut slabs = Vec::new();
+            gather(world, root, "body", Transform::default(), &named, &cloth, &mut slabs);
+
+            // The joints themselves, each in its parent's frame.
+            let parent_of = |name: &str| -> Option<&'static str> {
+                match name {
+                    "body" => None,
+                    "leg.l.lower" => Some("leg.l"),
+                    "leg.r.lower" => Some("leg.r"),
+                    "arm.l.lower" => Some("arm.l"),
+                    "arm.r.lower" => Some("arm.r"),
+                    _ => Some("body"),
+                }
+            };
+            let say = |v: Vec3| format!("[{:.4}, {:.4}, {:.4}]", v.x, v.y, v.z);
+            let joints: Vec<String> = JOINTS
+                .iter()
+                .map(|name| {
+                    let entity = named
+                        .iter()
+                        .find(|(_, given)| given == name)
+                        .map(|(entity, _)| *entity);
+                    let at = entity
+                        .and_then(|entity| world.get::<Transform>(entity))
+                        .map(|at| at.translation)
+                        .unwrap_or(Vec3::ZERO);
+                    let parent = match parent_of(name) {
+                        Some(parent) => format!("\"{parent}\""),
+                        None => "null".to_string(),
+                    };
+                    format!(
+                        "    {{\"name\": \"{name}\", \"parent\": {parent}, \"at\": {}}}",
+                        say(at)
+                    )
+                })
+                .collect();
+            let boxes: Vec<String> = slabs
+                .iter()
+                .map(|slab| {
+                    format!(
+                        "    {{\"joint\": \"{}\", \"at\": {}, \"size\": {}, \
+                         \"turn\": [{:.5}, {:.5}, {:.5}, {:.5}], \"rgb\": [{}, {}, {}]}}",
+                        slab.joint,
+                        say(slab.at),
+                        say(slab.size),
+                        slab.turn.x,
+                        slab.turn.y,
+                        slab.turn.z,
+                        slab.turn.w,
+                        slab.rgb[0],
+                        slab.rgb[1],
+                        slab.rgb[2],
+                    )
+                })
+                .collect();
+
+            let name = format!(
+                "{}-{}",
+                match age {
+                    Age::Child => "child",
+                    Age::Adult => "adult",
+                    Age::Elder => "elder",
+                },
+                match sex {
+                    Sex::Female => "woman",
+                    Sex::Male => "man",
+                }
+            );
+            let json = format!(
+                "{{\n  \"format\": 1,\n  \"kind\": \"body\",\n  \"name\": \"{name}\",\n  \
+                 \"high\": {:.4},\n  \"joints\": [\n{}\n  ],\n  \"boxes\": [\n{}\n  ]\n}}\n",
+                rig.height,
+                joints.join(",\n"),
+                boxes.join(",\n"),
+            );
+            std::fs::write(out.join(format!("{name}.json")), json).expect("write the body");
+            println!(
+                "baked {name}: {} boxes, {:.2}m tall",
+                slabs.len(),
+                rig.height
+            );
+            found += 1;
+        }
+        assert!(found > 0, "no bodies were baked at all");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

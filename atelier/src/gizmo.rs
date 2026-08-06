@@ -128,7 +128,26 @@ impl Plugin for GizmoPlugin {
             .add_systems(Startup, raise_gizmo_camera)
             .add_systems(
                 Update,
-                (walk_modes, select_part, dress_gizmo, work_gizmo, ride_along).chain(),
+                (walk_modes, select_part, dress_gizmo, work_gizmo)
+                    .chain()
+                    // Moving, resizing and painting are things done to a
+                    // BUILDING. Brett, on finding he could stretch a villager's
+                    // head: "I shouldnt be able to stretch or resize any part of
+                    // them." The rig bench has one tool and it is the hand.
+                    .run_if(|bench: Res<crate::Bench>| *bench == crate::Bench::Builder),
+            )
+            .add_systems(Update, ride_along)
+            .add_systems(
+                Update,
+                // And the modes go back to NORMAL on the way out, so a maker who
+                // left the builder in RESIZE does not come back to a bench that
+                // has been in RESIZE all the while they were somewhere else.
+                (|bench: Res<crate::Bench>, mut mode: ResMut<ToolMode>, mut chosen: ResMut<Selected>| {
+                    if bench.is_changed() && *bench != crate::Bench::Builder {
+                        *mode = ToolMode::Normal;
+                        chosen.clear();
+                    }
+                })
             );
     }
 }

@@ -3279,9 +3279,13 @@ fn dress_shelf_border(palette: &Palette, standing: bool, border: &mut BorderColo
 /// free to run it on a worker and the panel is a crash rather than a window.
 fn pick_a_work(
     _main_thread: bevy::ecs::system::NonSendMarker,
+    bench: Res<Bench>,
     mut wanted: ResMut<WorkWanted>,
     buttons: Query<&Interaction, (Changed<Interaction>, With<OpenWorkButton>)>,
 ) {
+    if *bench != Bench::Builder {
+        return;
+    }
     if !buttons
         .iter()
         .any(|interaction| *interaction == Interaction::Pressed)
@@ -3307,11 +3311,15 @@ fn open_or_clear(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     palette: Res<Palette>,
+    bench: Res<Bench>,
     mut chosen: ResMut<WorkWanted>,
     clears: Query<&Interaction, (Changed<Interaction>, With<ClearButton>)>,
     standing: Query<Entity, (With<Placed>, Without<Ghost>)>,
     mut work_name: ResMut<WorkName>,
 ) {
+    if *bench != Bench::Builder {
+        return;
+    }
     let wanted = chosen.0.take();
     let sweeping = clears
         .iter()
@@ -5139,7 +5147,7 @@ fn is_a_work(path: &std::path::Path) -> bool {
 ///
 /// A maker working in the tree still writes to `atelier/out/buildings`, which is
 /// where their buildings already are and where git can see them.
-pub fn bench_home() -> std::path::PathBuf {
+pub(crate) fn bench_home() -> std::path::PathBuf {
     if let Ok(tree) = std::env::var("CARGO_MANIFEST_DIR") {
         return std::path::PathBuf::from(tree);
     }
@@ -5174,12 +5182,17 @@ fn works_home() -> std::path::PathBuf {
 /// name is given, in [`take_the_name`].
 fn save_workbench(
     mut commands: Commands,
+    bench: Res<Bench>,
     fonts: Res<Fonts>,
     palette: Res<Palette>,
     work_name: Res<WorkName>,
     mut naming: ResMut<Naming>,
     saves: Query<&Interaction, (Changed<Interaction>, With<SaveButton>)>,
 ) {
+    // The glyphs are one row for both benches; what they save is not.
+    if *bench != Bench::Builder {
+        return;
+    }
     let pressed = saves
         .iter()
         .any(|interaction| *interaction == Interaction::Pressed);

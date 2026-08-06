@@ -25,7 +25,13 @@ struct StageDeedButton(crate::builder::StageDeed);
 
 /// The row itself, rebuilt whenever the number of steps changes.
 #[derive(Component)]
-struct StageBar;
+pub struct StageBar;
+
+/// The row of modes along the top. Buildings only: they move, resize and paint
+/// parts, and a body has none. Brett: "the top bar needs differnt buttons on
+/// top, those are for buildings."
+#[derive(Component)]
+pub struct ModeBar;
 
 /// The gear at the rail's foot, and the settings panel it opens.
 #[derive(Component)]
@@ -62,15 +68,18 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
     // was supposed to be inside. A hard-coded width is a measurement of the
     // contents kept somewhere the contents cannot reach.
     let centring = commands
-        .spawn(Node {
-            position_type: PositionType::Absolute,
-            left: Val::Px(0.0),
-            top: Val::Px(0.0),
-            width: Val::Percent(100.0),
-            flex_direction: FlexDirection::Row,
-            justify_content: JustifyContent::Center,
-            ..default()
-        })
+        .spawn((
+            ModeBar,
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(0.0),
+                top: Val::Px(0.0),
+                width: Val::Percent(100.0),
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+        ))
         .id();
     let bar = commands
         .spawn((
