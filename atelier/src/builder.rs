@@ -2342,10 +2342,28 @@ fn trim_to_roof(
     }
     let middle = at + along * (reach[0] - reach[1]) * 0.5;
     let lattice = |n: f32| (n * 16.0).round() / 16.0;
+    // What this end was ALREADY cut back to, if a saw has been here before.
+    let (had_high, had_low) = match *kind {
+        PartKind::Beam(_, high, low) => (high, low),
+        _ => (0.0, 0.0),
+    };
     let made = match rebuild(lattice(trimmed).max(0.125)) {
         // A beam takes its cuts; anything else can only be shortened, since
         // nothing else has an end to cut.
-        PartKind::Beam(long, ..) => PartKind::Beam(long, lattice(cut[0]), lattice(cut[1])),
+        //
+        // And it KEEPS the ones it has. The cast reads a beam's square envelope
+        // - the box its slabs fill - so a beam already mitred to a slope reads
+        // as meeting that slope everywhere at once, the wedge between first
+        // corner and last comes out as nothing, and a second trim handed the
+        // beam back with square ends at the same length it already had. Which
+        // is exactly what a maker sees as the saw work being undone: Brett,
+        // after tagging a trimmed beam as part of the roof, "it loses its trim
+        // to roof angles". Taking the deeper of the two can only ever cut more.
+        PartKind::Beam(long, ..) => PartKind::Beam(
+            long,
+            lattice(cut[0]).max(had_high),
+            lattice(cut[1]).max(had_low),
+        ),
         other => other,
     };
     let mut moved = record.clone();
@@ -6953,6 +6971,85 @@ fn turn_part(
 #[cfg(test)]
 mod roof_tests {
     use super::*;
+
+    /// Trimming a beam that has ALREADY been trimmed must not undo the saw.
+    #[test]
+    fn a_second_trim_keeps_the_cuts_the_first_one_made() {
+        let roof = a_record(
+            part_name(&PartKind::GableRoof(8.0, 6.0, 0.25, 45.0)),
+            [0.0, 3.0, 0.0],
+            0.0,
+        );
+        let boxes = roof_boxes(&roof);
+        let kind = PartKind::Beam(8.0, 0.0, 0.0);
+        let beam = a_record("beam-8".to_string(), [0.0, 4.0, 0.0], std::f32::consts::FRAC_PI_2);
+        let (once, moved) = trim_to_roof(&kind, &beam, &boxes).expect("the first trim");
+        let PartKind::Beam(_, first_high, first_low) = once else {
+            panic!("a trimmed beam is a beam");
+        };
+        assert!(first_high > 0.0 || first_low > 0.0, "the first trim cut nothing");
+        match trim_to_roof(&once, &moved, &boxes) {
+            None => {}
+            Some((PartKind::Beam(_, high, low), _)) => {
+                assert!(
+                    high >= first_high - 1e-4 && low >= first_low - 1e-4,
+                    "a second trim gave the beam square ends again: \
+                     {first_high}/{first_low} became {high}/{low}"
+                );
+            }
+            Some(_) => panic!("a trimmed beam came back as something else"),
+        }
+    }
+
+    /// Naming a part's nature must not touch its body. A trimmed beam wears its
+    /// cuts in its NAME, so anything that rewrites that name loses the saw work.
+    #[test]
+    fn naming_a_nature_leaves_the_body_alone() {
+        use bevy::asset::AssetPlugin;
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<Mesh>().init_asset::<StandardMaterial>();
+        app.insert_resource(crate::look::load_palette_for_bake());
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app.init_resource::<ButtonInput<MouseButton>>();
+        app.init_resource::<crate::gizmo::Selected>();
+        app.add_systems(Update, work_part_menu);
+
+        let trimmed = "beam-6.375x0.375x0.375";
+        let beam = app
+            .world_mut()
+            .spawn((
+                Placed {
+                    part: trimmed.to_string(),
+                    at: [0.0, 2.0, 0.0],
+                    yaw: 0.0,
+                    tilt: 0.0,
+                    ramp: None,
+                    shade: 0.5,
+                    stage: "frame".to_string(),
+                    flip: false,
+                    group: None,
+                    loose: false,
+                },
+                Transform::default(),
+            ))
+            .id();
+        let menu = app.world_mut().spawn(PartMenu).id();
+        app.world_mut().spawn((
+            MenuLine {
+                deed: Deed::Nature("roof"),
+                part: beam,
+            },
+            Interaction::Pressed,
+            BackgroundColor(Color::NONE),
+            ChildOf(menu),
+        ));
+        app.update();
+
+        let record = app.world().get::<Placed>(beam).expect("the beam stands");
+        assert_eq!(record.stage, "roof", "the nature did not take");
+        assert_eq!(record.part, trimmed, "the trim was lost with the naming");
+    }
 
     /// Roofs saved before the pitch could be pulled, taken from the buildings
     /// actually on disk when it was added.
