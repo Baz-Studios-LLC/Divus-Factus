@@ -148,6 +148,13 @@ its colour already looked up, plus the marks that say what the place is FOR.
   - `mitre-back`: the same cut the other way about, full height at +X. Which
     hand is wanted depends on which END of a beam is being capped, and a beam
     running between two slopes wants one of each.
+- `kind` is what the village raises it AS: one of `house`, `longhouse`, `sawmill`,
+  `blacksmith`, `tavern`, `townhall`, `storehouse`, `granary`, `well`,
+  `smokehouse`, `mill`, `bakery`, `weaver`, `herbalist`, `watchtower`, `shrine`,
+  `dock`, `mine`. The bench asks for it when a work is carried in, so it is a
+  fact rather than a guess. A file without one falls back to the older reading -
+  the longest of those words that begins its NAME - which is what every drawing
+  baked before the card existed relies on.
 - `half_w`/`half_d` are the FINISHED building's footprint: the plot the village
   clears, the obstacle while it is being raised, and the walkable shell when it
   is done.

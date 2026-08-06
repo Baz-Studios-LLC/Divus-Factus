@@ -45,6 +45,14 @@ pub struct Mark {
 #[derive(serde::Deserialize, Clone)]
 pub struct Baked {
     pub name: String,
+    /// What the village should raise this AS, said outright by the maker who
+    /// baked it. A drawing used to be claimed by whatever kind-word its file
+    /// name happened to begin with, which is a rule a maker has to know and can
+    /// get wrong in silence - `millhouse` is a mill with a surprise in it. The
+    /// bench asks now, so the answer is a fact rather than a guess. Empty on the
+    /// drawings baked before it asked, which fall back to the old reading.
+    #[serde(default)]
+    pub kind: String,
     pub half_w: f32,
     pub half_d: f32,
     #[allow(dead_code)]
@@ -221,7 +229,20 @@ fn called(kind: super::BuildingKind) -> &'static str {
 ///
 /// So a drawing belongs to the LONGEST word that begins its name, and every kind
 /// is checked against that one answer.
-fn claimed_by(name: &str) -> Option<super::BuildingKind> {
+fn claimed_by(work: &Baked) -> Option<super::BuildingKind> {
+    // What the maker SAID, first and last.
+    if !work.kind.is_empty() {
+        return super::BuildingKind::every()
+            .iter()
+            .copied()
+            .find(|kind| called(*kind) == work.kind);
+    }
+    claimed_by_name(&work.name)
+}
+
+/// The older reading, for a drawing baked before the bench asked: the kind is
+/// whatever word begins its name.
+fn claimed_by_name(name: &str) -> Option<super::BuildingKind> {
     let mut kinds: Vec<super::BuildingKind> = super::BuildingKind::every().to_vec();
     kinds.sort_by_key(|kind| std::cmp::Reverse(called(*kind).len()));
     kinds
@@ -234,7 +255,7 @@ fn claimed_by(name: &str) -> Option<super::BuildingKind> {
 pub fn drawings(kind: super::BuildingKind) -> Vec<&'static Baked> {
     carried()
         .iter()
-        .filter(|work| claimed_by(&work.name) == Some(kind))
+        .filter(|work| claimed_by(work) == Some(kind))
         .collect()
 }
 
@@ -696,6 +717,39 @@ mod tests {
         }
     }
 
+
+    /// A maker's stated kind outranks whatever their file name begins with. The
+    /// whole point of the bench asking is that `millhouse-tavern` can be a
+    /// tavern if that is what it was drawn as.
+    #[test]
+    fn a_stated_kind_beats_the_name() {
+        let named = |name: &str, kind: &str| Baked {
+            name: name.to_string(),
+            kind: kind.to_string(),
+            half_w: 1.0,
+            half_d: 1.0,
+            high: 1.0,
+            boxes: Vec::new(),
+            marks: Vec::new(),
+        };
+        assert_eq!(
+            claimed_by(&named("millhouse-of-mine", "tavern")),
+            Some(BuildingKind::Tavern),
+            "the maker said tavern"
+        );
+        // And with nothing said, the longest word that begins the name wins -
+        // which is what every drawing baked before the card existed relies on.
+        assert_eq!(
+            claimed_by(&named("longhouse1-10people", "")),
+            Some(BuildingKind::Longhouse)
+        );
+        assert_eq!(
+            claimed_by(&named("sawmill2", "")),
+            Some(BuildingKind::Sawmill),
+            "sawmill is not a mill"
+        );
+        assert_eq!(claimed_by(&named("cathedral", "")), None);
+    }
     #[test]
     fn a_longhouse_is_never_dealt_out_as_a_house() {
         // "longhouse1" begins with neither more nor less than its own

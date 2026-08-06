@@ -1544,80 +1544,108 @@ pub(crate) fn carried_home(under: &str) -> std::path::PathBuf {
     std::path::PathBuf::from(base).join(under)
 }
 
-/// Bakes what is on the bench into the game.
+/// Asks what the work is, and where it should go, before carrying it in.
 ///
 /// The bake used to be a `cargo test`, which meant a building could only be
 /// carried in from a source tree - so the Atelier in the launcher build was a
 /// sketchpad whose work had nowhere to go. Brett: "At what point does it install
-/// its own files?" It goes here now, in one press, and the game reads this
-/// folder alongside the drawings that shipped with it.
+/// its own files?" It goes into the game's own folder now, in one press, and the
+/// game reads that folder alongside the drawings that shipped with it.
 ///
-/// It bakes the WHOLE work under its own name, which is the name it was saved
-/// as. A work never saved has no name to bake under, and says so rather than
-/// inventing one.
+/// The press raises the card rather than writing at once, because a building
+/// needs two things said about it and only one of them was ever in the file
+/// name: what it is CALLED, and what it IS.
+#[allow(clippy::too_many_arguments)]
 fn bake_into_the_game(
-    bench: Res<Bench>,
-    palette: Res<Palette>,
-    stages: Res<Stages>,
-    work_name: Res<WorkName>,
     mut commands: Commands,
-    time: Res<Time>,
-    placed: Query<&Placed, Without<Ghost>>,
+    bench: Res<Bench>,
+    fonts: Res<Fonts>,
+    palette: Res<Palette>,
+    work_name: Res<WorkName>,
+    mut naming: ResMut<Naming>,
+    mut kind: ResMut<CarryingKind>,
     bakes: Query<&Interaction, (Changed<Interaction>, With<BakeButton>)>,
-    mut words: Query<(Entity, &mut Text), With<SaveLabel>>,
 ) {
     if *bench != Bench::Builder
+        || naming.0.is_some()
         || !bakes
             .iter()
             .any(|interaction| *interaction == Interaction::Pressed)
     {
         return;
     }
-    let mut say = |word: String| {
-        for (entity, mut text) in &mut words {
-            *text = Text::new(word.clone());
-            commands.entity(entity).insert(PassingWord {
-                back: crate::rail::FOOT_SAYING,
-                until: time.elapsed_secs() + 3.5,
-            });
-        }
-    };
-    let Some(name) = work_name.0.clone() else {
-        say("SAVE THE WORK FIRST - A BAKE NEEDS ITS NAME".to_string());
+    let called = work_name.0.clone().unwrap_or_default();
+    // The kind the name already suggests, if it suggests one - a maker who has
+    // been naming their works `longhouse1` for a week should find the card
+    // already pointing at the longhouse. LONGEST word first, or `longhouse1`
+    // opens on "house".
+    let mut guessed: Vec<usize> = (0..KINDS.len()).collect();
+    guessed.sort_by_key(|index| std::cmp::Reverse(KINDS[*index].0.len()));
+    kind.0 = guessed
+        .into_iter()
+        .find(|index| called.starts_with(KINDS[*index].0))
+        .unwrap_or(0);
+    naming.0 = Some(called);
+    naming.1 = NamingFor::Carrying;
+    raise_naming_card(&mut commands, &fonts, &palette, NamingFor::Carrying, kind.0);
+}
+
+/// Presses on the card's kinds, while it is up.
+#[allow(clippy::too_many_arguments)]
+fn choose_the_kind(
+    mut commands: Commands,
+    fonts: Res<Fonts>,
+    palette: Res<Palette>,
+    naming: Res<Naming>,
+    mut kind: ResMut<CarryingKind>,
+    cards: Query<Entity, With<NamingCard>>,
+    buttons: Query<(&Interaction, &KindButton), Changed<Interaction>>,
+) {
+    if naming.0.is_none() || naming.1 != NamingFor::Carrying {
+        return;
+    }
+    let Some(chosen) = buttons
+        .iter()
+        .find(|(touch, _)| **touch == Interaction::Pressed)
+        .map(|(_, button)| button.0)
+    else {
         return;
     };
-    // The bench as it stands, in the shape the baker reads.
-    let mut drawings = stages.drawings.to_vec();
-    if let Some(showing) = drawings.get_mut(stages.showing) {
-        *showing = placed.iter().cloned().collect();
+    if chosen == kind.0 {
+        return;
     }
-    let work = Workbench {
-        format: 1,
-        name: name.clone(),
-        parts: Vec::new(),
-        stages: drawings,
-    };
-    let (json, boxes, marks) = bake_a_work(&work, &palette, &name);
+    kind.0 = chosen;
+    // Redrawn rather than repainted: the card is a handful of nodes and this
+    // happens once per press, so the marking has ONE place it is decided rather
+    // than two that could come to disagree.
+    for card in &cards {
+        commands.entity(card).despawn();
+    }
+    raise_naming_card(&mut commands, &fonts, &palette, NamingFor::Carrying, chosen);
+}
+
+/// Writes the work into the game's own folder, as a building of a named kind.
+fn carry_into_the_game(
+    work: &Workbench,
+    palette: &Palette,
+    name: &str,
+    kind: &str,
+) -> Result<(usize, usize), String> {
+    let (json, boxes, marks) = bake_a_work(work, palette, name);
+    // The kind, said outright in the file. A drawing used to be claimed by
+    // whatever kind-word began its name, which a maker has to know and can get
+    // wrong without being told.
+    let json = json.replacen(
+        "\"format\": 1,",
+        &format!("\"format\": 1,\n  \"kind\": \"{kind}\","),
+        1,
+    );
     let home = carried_home("buildings");
-    if let Err(why) = std::fs::create_dir_all(&home) {
-        warn!("could not make {}: {why}", home.display());
-        say("THE GAME'S FOLDER COULD NOT BE MADE".to_string());
-        return;
-    }
+    std::fs::create_dir_all(&home).map_err(|why| format!("{}: {why}", home.display()))?;
     let out = home.join(format!("{name}.json"));
-    match std::fs::write(&out, json) {
-        Ok(()) => {
-            info!("baked {name} into {}", out.display());
-            say(format!(
-                "CARRIED {} INTO THE GAME - {boxes} BOXES, {marks} MARKS",
-                name.to_uppercase()
-            ));
-        }
-        Err(why) => {
-            warn!("could not write {}: {why}", out.display());
-            say("THE GAME'S FOLDER COULD NOT BE WRITTEN".to_string());
-        }
-    }
+    std::fs::write(&out, json).map_err(|why| format!("{}: {why}", out.display()))?;
+    info!("carried {name} in as a {kind}, at {}", out.display());
+    Ok((boxes, marks))
 }
 
 /// A button that asks the desktop for a work to open.
@@ -1654,7 +1682,60 @@ pub(crate) struct PassingWord {
 /// The name being typed for an export, while the naming card is up.
 /// While this is Some, every other key on the bench holds its tongue.
 #[derive(Resource, Default)]
-pub struct Naming(pub Option<String>);
+pub struct Naming(pub Option<String>, pub NamingFor);
+
+/// What the name being typed is FOR.
+///
+/// The same card asks both questions, because they are the same question asked
+/// of two different places: what shall this be called where it is kept, and what
+/// shall it be called where it is raised.
+#[derive(Default, Clone, Copy, PartialEq)]
+pub enum NamingFor {
+    /// Keeping the work on the bench, as a `.baz`.
+    #[default]
+    Keeping,
+    /// Carrying it into the game, as a building of a named kind.
+    Carrying,
+}
+
+/// The kinds of building the village knows, and the word each takes in a baked
+/// file.
+///
+/// Written out here AND in the game, like every other word the two programs
+/// share, and named in FORMATS.md so the pair can be kept honest. A drawing used
+/// to be claimed by whatever kind-word its file name happened to begin with,
+/// which is a rule a maker has to know and can silently get wrong: `mill1` is a
+/// mill, `sawmill1` is a sawmill, and `millhouse1` is a mill with a surprise in
+/// it. Brett: "have a drop down box with what building in the game it is." So
+/// the kind is CHOSEN, and written into the file as a fact.
+pub const KINDS: [(&str, &str); 18] = [
+    ("house", "HOUSE"),
+    ("longhouse", "LONGHOUSE"),
+    ("sawmill", "SAWMILL"),
+    ("blacksmith", "BLACKSMITH"),
+    ("tavern", "TAVERN"),
+    ("townhall", "TOWN HALL"),
+    ("storehouse", "STOREHOUSE"),
+    ("granary", "GRANARY"),
+    ("well", "WELL"),
+    ("smokehouse", "SMOKEHOUSE"),
+    ("mill", "MILL"),
+    ("bakery", "BAKERY"),
+    ("weaver", "WEAVER"),
+    ("herbalist", "HERBALIST"),
+    ("watchtower", "WATCHTOWER"),
+    ("shrine", "SHRINE"),
+    ("dock", "DOCK"),
+    ("mine", "MINE"),
+];
+
+/// Which kind the card is offering, while it is up.
+#[derive(Resource, Default)]
+pub struct CarryingKind(pub usize);
+
+/// One kind on the card.
+#[derive(Component)]
+struct KindButton(usize);
 
 /// The naming card's root, for tearing it down.
 #[derive(Component)]
@@ -1717,6 +1798,7 @@ impl Plugin for BuilderPlugin {
             .init_resource::<StageWish>()
             .init_resource::<StageHeld>()
             .init_resource::<WorkWanted>()
+            .init_resource::<CarryingKind>()
             .init_resource::<Brush>()
             .init_resource::<Naming>()
             .init_resource::<Hovered>()
@@ -1785,6 +1867,7 @@ impl Plugin for BuilderPlugin {
                     save_workbench,
                     pick_a_work,
                     bake_into_the_game,
+                    choose_the_kind,
                     take_the_name,
                     dims_panel,
                     recall,
@@ -5298,12 +5381,20 @@ fn save_workbench(
         .any(|interaction| *interaction == Interaction::Pressed);
     if pressed && naming.0.is_none() {
         naming.0 = Some(work_name.0.clone().unwrap_or_default());
-        raise_naming_card(&mut commands, &fonts, &palette);
+        naming.1 = NamingFor::Keeping;
+        raise_naming_card(&mut commands, &fonts, &palette, NamingFor::Keeping, 0);
     }
 }
 
 /// The card that asks for the work's name.
-fn raise_naming_card(commands: &mut Commands, fonts: &Fonts, palette: &Palette) {
+fn raise_naming_card(
+    commands: &mut Commands,
+    fonts: &Fonts,
+    palette: &Palette,
+    what_for: NamingFor,
+    chosen: usize,
+) {
+    let carrying = what_for == NamingFor::Carrying;
     let card = commands
         .spawn((
             NamingCard,
@@ -5312,10 +5403,10 @@ fn raise_naming_card(commands: &mut Commands, fonts: &Fonts, palette: &Palette) 
                 left: Val::Percent(50.0),
                 top: Val::Percent(40.0),
                 margin: UiRect {
-                    left: Val::Px(-170.0),
+                    left: Val::Px(if carrying { -210.0 } else { -170.0 }),
                     ..default()
                 },
-                width: Val::Px(340.0),
+                width: Val::Px(if carrying { 420.0 } else { 340.0 }),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 padding: UiRect::all(Val::Px(18.0)),
@@ -5329,7 +5420,11 @@ fn raise_naming_card(commands: &mut Commands, fonts: &Fonts, palette: &Palette) 
         ))
         .id();
     commands.spawn((
-        Text::new("NAME THE WORK"),
+        Text::new(if carrying {
+            "CARRY IT INTO THE GAME"
+        } else {
+            "NAME THE WORK"
+        }),
         TextFont {
             font: fonts.display.clone().into(),
             font_size: FontSize::Px(15.0),
@@ -5358,7 +5453,11 @@ fn raise_naming_card(commands: &mut Commands, fonts: &Fonts, palette: &Palette) 
         ChildOf(card),
     ));
     commands.spawn((
-        Text::new("enter saves - esc thinks better of it"),
+        Text::new(if carrying {
+            "the village raises it under this name - esc thinks better of it"
+        } else {
+            "enter saves - esc thinks better of it"
+        }),
         TextFont {
             font: fonts.text.clone().into(),
             font_size: FontSize::Px(11.0),
@@ -5367,6 +5466,70 @@ fn raise_naming_card(commands: &mut Commands, fonts: &Fonts, palette: &Palette) 
         TextColor(theme::text_dim(palette).with_alpha(0.8)),
         ChildOf(card),
     ));
+    if carrying {
+        commands.spawn((
+            Text::new("WHAT IS IT?"),
+            TextFont {
+                font: fonts.display.clone().into(),
+                font_size: FontSize::Px(12.0),
+                ..default()
+            },
+            TextColor(theme::text_dim(palette)),
+            Node {
+                margin: UiRect::top(Val::Px(6.0)),
+                ..default()
+            },
+            ChildOf(card),
+        ));
+        let kinds = commands
+            .spawn((
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    flex_wrap: FlexWrap::Wrap,
+                    justify_content: JustifyContent::Center,
+                    column_gap: Val::Px(4.0),
+                    row_gap: Val::Px(4.0),
+                    ..default()
+                },
+                ChildOf(card),
+            ))
+            .id();
+        for (index, (_, label)) in KINDS.iter().enumerate() {
+            let standing = index == chosen;
+            let button = commands
+                .spawn((
+                    KindButton(index),
+                    Interaction::default(),
+                    Node {
+                        padding: UiRect::axes(Val::Px(7.0), Val::Px(3.0)),
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::BLACK.with_alpha(if standing { 0.45 } else { 0.18 })),
+                    BorderColor::all(if standing {
+                        theme::accent(palette).with_alpha(0.8)
+                    } else {
+                        theme::panel_border(palette)
+                    }),
+                    ChildOf(kinds),
+                ))
+                .id();
+            commands.spawn((
+                Text::new(*label),
+                TextFont {
+                    font: fonts.display.clone().into(),
+                    font_size: FontSize::Px(10.0),
+                    ..default()
+                },
+                TextColor(if standing {
+                    theme::accent(palette)
+                } else {
+                    theme::text_dim(palette)
+                }),
+                ChildOf(button),
+            ));
+        }
+    }
     let row = commands
         .spawn((
             Node {
@@ -5378,7 +5541,10 @@ fn raise_naming_card(commands: &mut Commands, fonts: &Fonts, palette: &Palette) 
             ChildOf(card),
         ))
         .id();
-    for (label, accent) in [("SAVE", true), ("CANCEL", false)] {
+    for (label, accent) in [
+        (if carrying { "CARRY IN" } else { "SAVE" }, true),
+        ("CANCEL", false),
+    ] {
         let button = commands
             .spawn((
                 Interaction::default(),
@@ -5424,6 +5590,8 @@ fn raise_naming_card(commands: &mut Commands, fonts: &Fonts, palette: &Palette) 
 fn take_the_name(
     mut commands: Commands,
     stages: Res<Stages>,
+    palette: Res<Palette>,
+    kind: Res<CarryingKind>,
     mut keystrokes: MessageReader<bevy::input::keyboard::KeyboardInput>,
     mut naming: ResMut<Naming>,
     time: Res<Time>,
@@ -5435,6 +5603,7 @@ fn take_the_name(
     mut shown: Query<&mut Text, With<NameText>>,
     mut save_labels: Query<(Entity, &mut Text), (With<SaveLabel>, Without<NameText>)>,
 ) {
+    let what_for = naming.1;
     let Some(name) = naming.0.as_mut() else {
         return;
     };
@@ -5487,7 +5656,45 @@ fn take_the_name(
     let Some(saving) = done else {
         return;
     };
-    if saving {
+    // The same card, two errands. Carrying in writes a building the village can
+    // raise; keeping writes the work itself, which is the maker's own copy and
+    // the only one they can go on drawing.
+    if saving && what_for == NamingFor::Carrying {
+        let called = if name.is_empty() {
+            "untitled".to_string()
+        } else {
+            name.clone()
+        };
+        let mut drawings = stages.drawings.clone();
+        let showing = stages.showing.min(drawings.len().saturating_sub(1));
+        if let Some(slot) = drawings.get_mut(showing) {
+            *slot = placed.iter().cloned().collect();
+        }
+        let work = Workbench {
+            format: 2,
+            name: called.clone(),
+            parts: Vec::new(),
+            stages: drawings,
+        };
+        let (word, label) = KINDS[kind.0.min(KINDS.len() - 1)];
+        let said = match carry_into_the_game(&work, &palette, &called, word) {
+            Ok((boxes, marks)) => format!(
+                "CARRIED {} IN AS A {label} - {boxes} BOXES, {marks} MARKS",
+                called.to_uppercase()
+            ),
+            Err(why) => {
+                warn!("could not carry {called} in: {why}");
+                "THE GAME'S FOLDER COULD NOT BE WRITTEN".to_string()
+            }
+        };
+        for (entity, mut text) in &mut save_labels {
+            *text = Text::new(said.clone());
+            commands.entity(entity).insert(PassingWord {
+                back: crate::rail::FOOT_SAYING,
+                until: time.elapsed_secs() + 3.5,
+            });
+        }
+    } else if saving {
         let written = if name.is_empty() {
             "untitled"
         } else {
