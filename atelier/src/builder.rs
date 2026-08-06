@@ -47,6 +47,11 @@ const _: () = assert!(PITCH_LEAST <= ROOF_PITCH_DEGREES && ROOF_PITCH_DEGREES <=
 /// conforms to these when its buildings are replaced. A quarter-metre
 /// wall on a quarter-metre grid means centrelines always land on snaps.
 const WALL_THICK: f32 = 0.25;
+
+/// How far a piece that is MEANT to butt against another is drawn past its own
+/// measure, so the two lap instead of meeting exactly. A sixty-fourth at each
+/// end. See the wall segment in `body_of`.
+const LAP: f32 = 0.03125;
 const WALL_HIGH: f32 = 2.5;
 
 /// One piece of a part's body: offset from the part origin, size, ramp,
@@ -576,8 +581,24 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             0.0,
             lift + high * 0.5,
             0.0,
-            *long,
-            *high,
+            // Drawn a hair longer than it measures, and it laps at both ends.
+            //
+            // A segment exists to fill the wall BESIDE something - the pieces a
+            // punch leaves either side of a window, a header over it, a sill
+            // under it - so both its ends abut. Two boxes that meet exactly
+            // share an edge each works out by its own sum, from different
+            // centres, and the last bits disagree; the rasteriser then leaves a
+            // hairline that neither claims and the dark behind the wall shows
+            // through it. Brett photographed one running down from a window, and
+            // it survives the bake because the fault is in the geometry.
+            //
+            // A sixty-fourth at each end: too small to see, too large for any
+            // float to lose. Put HERE rather than where a punch works out its
+            // leavings, because that would only mend walls punched from today
+            // on - and the buildings that have the seam are the ones already
+            // drawn. Seventeen of these stand in the longhouse alone.
+            *long + LAP,
+            *high + LAP,
             WALL_THICK,
             "wood",
             0.7,
