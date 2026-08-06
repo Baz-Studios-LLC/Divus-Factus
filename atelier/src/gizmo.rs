@@ -312,6 +312,7 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                 // like them - only their height and lift stay put.
                 PartKind::Seg { long, .. } => Some((long, 0.0, false)),
                 PartKind::Trim { long, .. } => Some((long, 0.0, false)),
+                PartKind::Rail { long, .. } => Some((long, 0.0, false)),
                 PartKind::Gable(long, _) => Some((long, 0.0, false)),
                 PartKind::Beam(long, ..) => Some((long, 0.0, false)),
                 // The chimney sizes its own reach downward.
@@ -374,6 +375,17 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                     spin * Vec3::new(0.0, high, 0.0),
                     "cloth-gold",
                     Grip::Rise { h0: high },
+                ));
+            }
+            // A flat rail carries the same gold handle a flight's does, and for
+            // the same reason: both of the red-and-blue pair are spoken for, and
+            // a landing has to meet the flight it continues.
+            if let Some(PartKind::Rail { hand, .. }) = builder::kind_from_name(&record.part) {
+                handles.push((
+                    spin * Vec3::Y,
+                    spin * Vec3::new(0.0, hand, 0.0),
+                    "cloth-gold",
+                    Grip::Rail { h0: hand },
                 ));
             }
             // A flight carries one more, in gold: the rail's own height, since
@@ -774,25 +786,37 @@ fn work_gizmo(
             // below a step's own height or above a chest.
             let pull = ((t - state.t0) * 16.0).round() / 16.0;
             let hand = (h0 + pull).clamp(0.375, 2.0);
-            let Some(PartKind::Stairs {
-                rise,
-                wide,
-                stone,
-                rail_stone,
-                hand: was,
-            }) = builder::kind_from_name(&record.part)
-            else {
-                return;
-            };
-            if (hand - was).abs() < 1e-4 {
-                return;
-            }
-            let made = PartKind::Stairs {
-                rise,
-                wide,
-                stone,
-                rail_stone,
-                hand,
+            // The same handle serves a flight's rail and a flat one's.
+            let made = match builder::kind_from_name(&record.part) {
+                Some(PartKind::Stairs {
+                    rise,
+                    wide,
+                    stone,
+                    rail_stone,
+                    hand: was,
+                }) => {
+                    if (hand - was).abs() < 1e-4 {
+                        return;
+                    }
+                    PartKind::Stairs {
+                        rise,
+                        wide,
+                        stone,
+                        rail_stone,
+                        hand,
+                    }
+                }
+                Some(PartKind::Rail {
+                    long,
+                    hand: was,
+                    stone,
+                }) => {
+                    if (hand - was).abs() < 1e-4 {
+                        return;
+                    }
+                    PartKind::Rail { long, hand, stone }
+                }
+                _ => return,
             };
             record.part = builder::part_name(&made);
             commands.entity(part).despawn_related::<Children>();
@@ -857,6 +881,11 @@ fn work_gizmo(
                     lift,
                 },
                 PartKind::Trim { stone, .. } => PartKind::Trim { long: w, stone },
+                PartKind::Rail { hand, stone, .. } => PartKind::Rail {
+                    long: w,
+                    hand,
+                    stone,
+                },
                 PartKind::Gable(_, pitch) => PartKind::Gable(w, pitch),
                 PartKind::Beam(_, high, low) => PartKind::Beam(w, high, low),
                 PartKind::Chimney(_) => PartKind::Chimney(w.max(0.0)),

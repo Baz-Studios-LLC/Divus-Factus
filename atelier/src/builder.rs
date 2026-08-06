@@ -57,6 +57,14 @@ const WALL_THICK: f32 = 0.25;
 /// one that makes the bench's seams close by themselves - a sixteenth is a power
 /// of two, so parts that meet on the lattice agree on the edge exactly.
 const ATOM: f32 = 0.0625;
+
+/// The railing's own measurements, shared by the stairs and the flat rail so a
+/// landing carries straight on from a flight.
+const RAIL_POST: f32 = ATOM * 3.0;
+const RAIL_THICK: f32 = ATOM * 2.0;
+const RAIL_HIGH: f32 = ATOM * 14.0;
+/// About a pace between balusters, and a whole number of atoms.
+const RAIL_GAP: f32 = ATOM * 8.0;
 const WALL_HIGH: f32 = 2.5;
 
 /// One piece of a part's body: offset from the part origin, size, ramp,
@@ -309,6 +317,22 @@ pub enum PartKind {
         /// How high the rail stands above each tread.
         hand: f32,
     },
+    /// A handrail on the flat: posts at each end, a rail between them, and
+    /// balusters under it - the stair's own railing, run along level ground.
+    ///
+    /// Brett: "can you make a stratchable railing that lines up with this post
+    /// from the stair railing? It would be great to continue it on a flat
+    /// surface." So every measurement of it is the flight's: the same post, the
+    /// same rail, the same balusters, and the same height above what it stands
+    /// on - a landing at the top of a flight carries straight on.
+    Rail {
+        long: f32,
+        hand: f32,
+        stone: bool,
+    },
+    RailRun {
+        stone: bool,
+    },
     /// A ridge pole: a round log along the spine, the older way of
     /// closing a roof.
     /// A whole gable roof: both slopes and the ridge between them, drawn
@@ -356,6 +380,7 @@ impl PartKind {
         match self {
             PartKind::WallRun
             | PartKind::TrimRun { .. }
+            | PartKind::RailRun { .. }
             | PartKind::SegRun { .. }
             | PartKind::GableRun
             | PartKind::RidgeRun
@@ -374,6 +399,11 @@ impl PartKind {
             PartKind::WallRun => PartKind::Wall(w),
             PartKind::TrimRun { stone } => PartKind::Trim {
                 long: w,
+                stone: *stone,
+            },
+            PartKind::RailRun { stone } => PartKind::Rail {
+                long: w,
+                hand: RAIL_HIGH,
                 stone: *stone,
             },
             PartKind::GableRun => PartKind::Gable(w, ROOF_PITCH_DEGREES),
@@ -439,6 +469,12 @@ pub const STRUCTURE: &[CatalogEntry] = &[
         "walls",
     ),
     structure("POLE, CORNER", PartKind::Prop("pole"), "frame"),
+    structure(
+        "RAIL, STONE, STRETCH",
+        PartKind::RailRun { stone: true },
+        "frame",
+    ),
+    structure("RAIL, STRETCH", PartKind::RailRun { stone: false }, "frame"),
     structure("RIDGE, STRETCH", PartKind::RidgeRun, "roof"),
     structure("ROOF, GABLE, STRETCH", PartKind::GableRoofRun, "roof"),
     structure("ROOF, PANEL", PartKind::Roof(2.2, 2.2), "roof"),
@@ -1000,6 +1036,77 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 0.7,
             ),
         ],
+        PartKind::Rail { long, hand, stone } => {
+            let (ramp, post_shade, rail_shade, pin_shade) = if *stone {
+                ("stone", 0.5, 0.55, 0.58)
+            } else {
+                ("wood", 0.4, 0.5, 0.45)
+            };
+            let hand = hand.clamp(0.375, 2.0);
+            let cap = RAIL_POST;
+            let long = long.max(RAIL_POST * 2.0);
+            let mut body = vec![
+                // A newel at each end, capped above the rail the way a flight's
+                // are, so the two meet without a seam to see.
+                slab(
+                    -long * 0.5 + RAIL_POST * 0.5,
+                    (hand + cap) * 0.5,
+                    0.0,
+                    RAIL_POST,
+                    hand + cap,
+                    RAIL_POST,
+                    ramp,
+                    post_shade,
+                ),
+                slab(
+                    long * 0.5 - RAIL_POST * 0.5,
+                    (hand + cap) * 0.5,
+                    0.0,
+                    RAIL_POST,
+                    hand + cap,
+                    RAIL_POST,
+                    ramp,
+                    post_shade,
+                ),
+                // The rail itself, from newel to newel.
+                slab(
+                    0.0,
+                    hand,
+                    0.0,
+                    long - RAIL_POST,
+                    RAIL_THICK,
+                    RAIL_THICK,
+                    ramp,
+                    rail_shade,
+                ),
+            ];
+            // Balusters at a pace apart, spread evenly between the newels so a
+            // rail of any length looks made rather than cut off.
+            let span = long - RAIL_POST * 2.0;
+            let gaps = (span / RAIL_GAP).round().max(1.0);
+            for step in 1..gaps as i32 {
+                let x = -span * 0.5 + span * (step as f32 / gaps);
+                body.push(slab(
+                    x,
+                    (hand - RAIL_THICK * 0.5) * 0.5,
+                    0.0,
+                    ATOM,
+                    hand - RAIL_THICK * 0.5,
+                    ATOM,
+                    ramp,
+                    pin_shade,
+                ));
+            }
+            body
+        }
+        PartKind::RailRun { stone } => body_of(
+            &PartKind::Rail {
+                long: 0.25,
+                hand: RAIL_HIGH,
+                stone: *stone,
+            },
+            None,
+        ),
         PartKind::Prop("barrel") => vec![
             slab(0.03125, 0.375, 0.03125, 0.5625, 0.75, 0.5625, "wood", 0.55),
             // The hoops stand PROUD of the staves. Drawn flush - the same width
@@ -2726,6 +2833,10 @@ pub fn part_name(kind: &PartKind) -> String {
         PartKind::BeamRun => "beamrun".to_string(),
         PartKind::Ridge(long) => format!("ridge-{long}"),
         PartKind::Chimney(drop) => format!("chimney-{drop}"),
+        PartKind::Rail { long, hand, stone } => {
+            format!("rail-{long}x{hand}x{}", if *stone { "s" } else { "w" })
+        }
+        PartKind::RailRun { stone } => format!("railrun-{}", if *stone { "s" } else { "w" }),
         PartKind::Stairs {
             rise,
             wide,
@@ -2788,6 +2899,13 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
     if name == "prop:chimney" {
         // The first chimneys, from before the shaft could reach.
         return Some(PartKind::Chimney(0.0));
+    }
+    if let Some(rest) = name.strip_prefix("rail-") {
+        let mut parts = rest.split('x');
+        let long = parts.next()?.parse().ok()?;
+        let hand = parts.next().and_then(|n| n.parse().ok()).unwrap_or(RAIL_HIGH);
+        let stone = parts.next().is_some_and(|word| word.starts_with('s'));
+        return Some(PartKind::Rail { long, hand, stone });
     }
     // Stone first: `stairs-` is a prefix of nothing else, but `stairsstone-`
     // begins with `stairs` and would be read as a timber flight called `stone…`.
@@ -3299,6 +3417,14 @@ fn length_of(kind: &PartKind) -> Option<(f32, Box<dyn Fn(f32) -> PartKind>)> {
         PartKind::Trim { long, stone } => {
             Some((long, Box::new(move |n| PartKind::Trim { long: n, stone })))
         }
+        PartKind::Rail { long, hand, stone } => Some((
+            long,
+            Box::new(move |n| PartKind::Rail {
+                long: n,
+                hand,
+                stone,
+            }),
+        )),
         PartKind::Gable(long, pitch) => {
             Some((long, Box::new(move |n| PartKind::Gable(n, pitch))))
         }
@@ -4868,6 +4994,7 @@ fn is_structure(kind: &PartKind) -> bool {
             | PartKind::GableRoof(..)
             | PartKind::GableRoofRun
             | PartKind::Stairs { .. }
+            | PartKind::Rail { .. }
             | PartKind::Prop("steps")
             | PartKind::Prop("pole")
     )
@@ -8424,6 +8551,88 @@ fn turn_part(
 #[cfg(test)]
 mod roof_tests {
     use super::*;
+
+    /// A flat rail is the flight's rail on level ground: the same post, the same
+    /// handrail, the same height. A landing that met a flight a hair off would
+    /// be worse than no landing at all.
+    #[test]
+    fn a_flat_rail_matches_the_flight_it_continues() {
+        let flight = body_of(
+            &PartKind::Stairs {
+                rise: 0.75,
+                wide: 1.25,
+                stone: false,
+                rail_stone: false,
+                hand: RAIL_HIGH,
+            },
+            None,
+        );
+        let rail = body_of(
+            &PartKind::Rail {
+                long: 3.0,
+                hand: RAIL_HIGH,
+                stone: false,
+            },
+            None,
+        );
+        // The newels: same square, same height above what they stand on.
+        let newel = |body: &[Slab]| {
+            body.iter()
+                .find(|Slab(_, size, ..)| (size.x - RAIL_POST).abs() < 1e-5 && size.y > 0.5)
+                .map(|Slab(_, size, ..)| *size)
+        };
+        assert_eq!(
+            newel(&flight),
+            newel(&rail),
+            "a flat rail's newel is not the flight's"
+        );
+        // The handrail: same cross-section.
+        let bar = |body: &[Slab]| {
+            body.iter()
+                .find(|Slab(_, size, ..)| (size.y - RAIL_THICK).abs() < 1e-5)
+                .map(|Slab(_, size, ..)| size.y)
+        };
+        assert_eq!(bar(&flight), bar(&rail), "the two handrails differ");
+
+        // And the rail stands where the flight's does at its top step.
+        let top_of_rail = rail
+            .iter()
+            .find(|Slab(_, size, ..)| (size.y - RAIL_THICK).abs() < 1e-5)
+            .map(|Slab(at, ..)| at.y)
+            .expect("a rail has a rail");
+        assert!(
+            (top_of_rail - RAIL_HIGH).abs() < 1e-5,
+            "the flat rail sits at {top_of_rail} rather than {RAIL_HIGH}"
+        );
+
+        // Balusters come and go with the length, and never crowd the newels.
+        for long in [1.0_f32, 3.0, 8.0] {
+            let body = body_of(
+                &PartKind::Rail {
+                    long,
+                    hand: RAIL_HIGH,
+                    stone: true,
+                },
+                None,
+            );
+            let pins: Vec<&Slab> = body
+                .iter()
+                .filter(|Slab(_, size, ..)| (size.x - ATOM).abs() < 1e-5)
+                .collect();
+            let want = (long - RAIL_POST * 2.0) / RAIL_GAP;
+            assert!(
+                pins.len() as f32 >= want.round() - 1.0 && pins.len() as f32 <= want.round(),
+                "a rail {long} long carries {} balusters",
+                pins.len()
+            );
+            for Slab(at, ..) in &pins {
+                assert!(
+                    at.x.abs() < long * 0.5 - RAIL_POST,
+                    "a baluster stands inside a newel"
+                );
+            }
+        }
+    }
 
     /// Every part a maker can make shorter can be trimmed to a roof, and the
     /// rebuild keeps everything about it except the length.
