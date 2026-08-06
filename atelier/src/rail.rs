@@ -442,11 +442,11 @@ off, walls down as well",
     commands
         .entity(gear)
         .insert((SettingsButton, Word("The keys, and what they do")));
-    for offset in [-5.0f32, 3.0, -2.0] {
+    for offset in [-6.5f32, 4.0, -2.5] {
         let bar = commands
             .spawn((
                 Node {
-                    width: Val::Px(18.0),
+                    width: Val::Px(24.0),
                     height: Val::Px(2.0),
                     ..default()
                 },
@@ -457,10 +457,10 @@ off, walls down as well",
         commands.spawn((
             Node {
                 position_type: PositionType::Absolute,
-                left: Val::Px(9.0 + offset),
-                top: Val::Px(-1.5),
-                width: Val::Px(5.0),
-                height: Val::Px(5.0),
+                left: Val::Px(12.0 + offset),
+                top: Val::Px(-2.0),
+                width: Val::Px(6.0),
+                height: Val::Px(6.0),
                 ..default()
             },
             BackgroundColor(theme::accent(&palette)),
@@ -478,17 +478,17 @@ off, walls down as well",
             Word("Save the work under a name you give it"),
         ))
         .insert(BorderColor::all(theme::accent(&palette).with_alpha(0.7)));
-    let body = pane(&mut commands, save, 18.0, 16.0, true, &palette);
+    let body = pane(&mut commands, save, 24.0, 21.0, true, &palette);
     commands.entity(body).insert(Node {
-        width: Val::Px(18.0),
-        height: Val::Px(16.0),
+        width: Val::Px(24.0),
+        height: Val::Px(21.0),
         border: UiRect::all(Val::Px(1.0)),
         justify_content: JustifyContent::Center,
         align_items: AlignItems::FlexEnd,
-        padding: UiRect::bottom(Val::Px(2.0)),
+        padding: UiRect::bottom(Val::Px(3.0)),
         ..default()
     });
-    plate(&mut commands, body, 10.0, 5.0, theme::accent(&palette));
+    plate(&mut commands, body, 13.0, 7.0, theme::accent(&palette));
 
     // OPEN A WORK: a page with its lines, and the desktop's own file window
     // behind it.
@@ -497,41 +497,20 @@ off, walls down as well",
         crate::builder::OpenWorkButton,
         Word("Open a work from anywhere on the disk"),
     ));
-    let page = pane(&mut commands, open, 14.0, 18.0, true, &palette);
+    let page = pane(&mut commands, open, 18.0, 24.0, true, &palette);
     commands.entity(page).insert(Node {
-        width: Val::Px(14.0),
-        height: Val::Px(18.0),
+        width: Val::Px(18.0),
+        height: Val::Px(24.0),
         border: UiRect::all(Val::Px(1.0)),
         flex_direction: FlexDirection::Column,
         align_items: AlignItems::Center,
         justify_content: JustifyContent::Center,
-        row_gap: Val::Px(3.0),
+        row_gap: Val::Px(4.0),
         ..default()
     });
     for _ in 0..3 {
-        plate(&mut commands, page, 8.0, 1.0, theme::text_dim(&palette));
+        plate(&mut commands, page, 11.0, 2.0, theme::text_dim(&palette));
     }
-
-    // THE FOLDER: a tab and a body, which is what a folder has been since
-    // before any of this.
-    let folder = icon_face(&mut commands, &palette, tools);
-    commands.entity(folder).insert((
-        crate::builder::OpenFolderButton,
-        Word("Open the folder the works are kept in"),
-    ));
-    let stack = commands
-        .spawn((
-            Node {
-                width: Val::Px(18.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::FlexStart,
-                ..default()
-            },
-            ChildOf(folder),
-        ))
-        .id();
-    plate(&mut commands, stack, 8.0, 3.0, theme::accent(&palette));
-    pane(&mut commands, stack, 18.0, 11.0, true, &palette);
 
     // THE BROOM: a handle and a head. It sweeps the bench, and it is the one
     // here that takes something away, so it wears the dimmest border of the
@@ -552,8 +531,8 @@ off, walls down as well",
             ChildOf(broom),
         ))
         .id();
-    plate(&mut commands, stack, 2.0, 10.0, theme::text_dim(&palette));
-    plate(&mut commands, stack, 12.0, 4.0, theme::accent(&palette));
+    plate(&mut commands, stack, 3.0, 13.0, theme::text_dim(&palette));
+    plate(&mut commands, stack, 16.0, 5.0, theme::accent(&palette));
 
     // The line under them says what the hand is over, and the bench's own word
     // when it is over nothing. Which is where the save's answer lands too: a
@@ -605,13 +584,17 @@ struct Tooltip;
 const DWELL: f32 = 0.6;
 
 /// One icon button's frame: the gear's own, so the four read as one row.
+///
+/// They grew when the folder left. Four glyphs at the old size left a third of
+/// the rail's width empty beside them, and a glyph is a picture - the bigger it
+/// is drawn the less it has to be guessed at.
 fn icon_face(commands: &mut Commands, palette: &Palette, parent: Entity) -> Entity {
     commands
         .spawn((
             Interaction::default(),
             Node {
-                width: Val::Px(34.0),
-                height: Val::Px(30.0),
+                width: Val::Px(44.0),
+                height: Val::Px(38.0),
                 flex_direction: FlexDirection::Column,
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
@@ -720,9 +703,9 @@ fn follow_with_a_word(
                     Tooltip,
                     Node {
                         position_type: PositionType::Absolute,
-                        padding: UiRect::axes(Val::Px(8.0), Val::Px(5.0)),
+                        padding: UiRect::axes(Val::Px(12.0), Val::Px(8.0)),
                         border: UiRect::all(Val::Px(1.0)),
-                        max_width: Val::Px(260.0),
+                        max_width: Val::Px(320.0),
                         ..default()
                     },
                     BackgroundColor(theme::panel_bg().with_alpha(0.97)),
@@ -734,7 +717,7 @@ fn follow_with_a_word(
                 Text::new(word),
                 TextFont {
                     font: fonts.text.clone().into(),
-                    font_size: FontSize::Px(12.0),
+                    font_size: FontSize::Px(16.0),
                     ..default()
                 },
                 TextColor(theme::accent(&palette).with_alpha(0.9)),

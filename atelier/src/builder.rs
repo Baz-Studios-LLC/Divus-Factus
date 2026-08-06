@@ -1539,13 +1539,6 @@ struct Shelf;
 #[derive(Component)]
 pub(crate) struct SaveButton;
 
-/// Opens the folder the works live in, in whatever the desktop calls a window
-/// of files. Brett asked for it and it is the sort of thing a bench should have
-/// had from the start: the bench writes `.baz` files somewhere sensible, and
-/// "somewhere sensible" is a path nobody should have to be told.
-#[derive(Component)]
-pub(crate) struct OpenFolderButton;
-
 /// A button that asks the desktop for a work to open.
 ///
 /// Brett wanted `.baz` files associated with the bench so a double click opened
@@ -1716,7 +1709,6 @@ impl Plugin for BuilderPlugin {
                 (
                     save_workbench,
                     pick_a_work,
-                    open_the_folder,
                     take_the_name,
                     dims_panel,
                     recall,
@@ -3278,22 +3270,6 @@ fn raise_shelf(
         );
     }
 
-    commands.spawn((
-        Text::new(
-            "build anywhere: the door\nwidget decides the front.\nthe gold marks +X if you\nlike to work oriented.",
-        ),
-        TextFont {
-            font: fonts.text.clone().into(),
-            font_size: FontSize::Px(10.0),
-            ..default()
-        },
-        TextColor(theme::text_dim(&palette).with_alpha(0.75)),
-        Node {
-            margin: UiRect::top(Val::Px(8.0)),
-            ..default()
-        },
-        ChildOf(shelf),
-    ));
 }
 
 /// A drawer: a header that opens and closes, and the body under it.
@@ -5462,39 +5438,6 @@ fn works_home() -> std::path::PathBuf {
         .parent()
         .map(std::path::Path::to_path_buf)
         .unwrap_or_else(bench_home)
-}
-
-/// Shows the works folder in the desktop's own file window.
-///
-/// The folder is MADE first if it is not there. A bench that has never saved
-/// anything has no folder yet, and a button that quietly does nothing is worse
-/// than no button - the maker is left wondering which of the two broke.
-fn open_the_folder(
-    folders: Query<&Interaction, (Changed<Interaction>, With<OpenFolderButton>)>,
-) {
-    if !folders
-        .iter()
-        .any(|interaction| *interaction == Interaction::Pressed)
-    {
-        return;
-    }
-    let home = works_home();
-    if let Err(why) = std::fs::create_dir_all(&home) {
-        warn!("could not make {}: {why}", home.display());
-        return;
-    }
-    // One name per desktop, and the same argument to all three.
-    let opener = if cfg!(target_os = "macos") {
-        "open"
-    } else if cfg!(target_os = "windows") {
-        "explorer"
-    } else {
-        "xdg-open"
-    };
-    match std::process::Command::new(opener).arg(&home).spawn() {
-        Ok(_) => info!("opened {}", home.display()),
-        Err(why) => warn!("could not open {}: {why}", home.display()),
-    }
 }
 
 /// The save button asks the work its name; the writing happens when the
