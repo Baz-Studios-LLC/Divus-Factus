@@ -1630,6 +1630,7 @@ impl Plugin for BuilderPlugin {
         app.init_resource::<Hand>()
             .init_resource::<Stages>()
             .init_resource::<StageWish>()
+            .init_resource::<StageHeld>()
             .init_resource::<Brush>()
             .init_resource::<Naming>()
             .init_resource::<Hovered>()
@@ -6442,7 +6443,20 @@ pub enum StageDeed {
     AddBare,
     /// Drop the step being shown.
     Drop,
+    /// Remember this step, to put on another.
+    Take,
+    /// Put the remembered step here, in place of what stands.
+    Put,
 }
+
+/// A step held aside, waiting to be put on another.
+///
+/// Brett: "I need a way to copy a stage and paste it on anotehr stage." `+ COPY`
+/// only ever made a NEW step from the one showing, which is the wrong shape for
+/// "make step three look like step two again" - there is no new step wanted, and
+/// the one that needs changing already exists.
+#[derive(Resource, Default)]
+pub struct StageHeld(Option<Vec<Placed>>);
 
 /// Sets out another step of the work.
 ///
@@ -6454,6 +6468,7 @@ pub enum StageDeed {
 fn turn_to_stage(
     mut commands: Commands,
     mut wish: ResMut<StageWish>,
+    mut held: ResMut<StageHeld>,
     mut stages: ResMut<Stages>,
     mut history: ResMut<History>,
     palette: Res<Palette>,
@@ -6474,6 +6489,21 @@ fn turn_to_stage(
 
     let wanted = match deed {
         StageDeed::Show(step) => step.min(stages.drawings.len() - 1),
+        StageDeed::Take => {
+            // Nothing moves: the step is remembered exactly as it was gathered a
+            // moment ago, and the bench goes on showing it.
+            held.0 = Some(stages.drawings[showing].clone());
+            return;
+        }
+        StageDeed::Put => {
+            let Some(kept) = held.0.clone() else {
+                return;
+            };
+            // In PLACE of what stands, not beside it. Two steps merged would be
+            // a step nobody drew, and the way to add to a step is to draw on it.
+            stages.drawings[showing] = kept;
+            showing
+        }
         StageDeed::AddCopying => {
             let copy = stages.drawings[showing].clone();
             stages.drawings.push(copy);
@@ -6511,12 +6541,20 @@ fn turn_to_stage(
             );
         }
     }
+    let travelled = wanted != showing;
     stages.showing = wanted;
-    // Undo does not reach across a step. Every part on the bench has just been
-    // swapped for another step's, and a history that let someone undo INTO that
-    // would put one step's parts down on another - which is not a thing a maker
-    // could have done by hand, and so not a thing undo should be able to do.
-    history.forget();
+    // Undo does not reach ACROSS a step. Every part on the bench has just been
+    // swapped for another step's, and a history that let someone undo into that
+    // would put one step's parts down on another - not a thing a maker could
+    // have done by hand, and so not a thing undo should be able to do.
+    //
+    // But PUTTING a step over the one showing never leaves it, and replaces
+    // what was there - which is exactly the kind of large, destructive, ordinary
+    // edit undo exists for. Forgetting there would make a mis-aimed PUT the one
+    // thing in this bench that cannot be taken back.
+    if travelled {
+        history.forget();
+    }
 }
 
 /// How many steps a work rises in, and which step a part belongs to.

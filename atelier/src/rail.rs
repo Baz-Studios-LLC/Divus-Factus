@@ -570,6 +570,11 @@ fn hang_the_stage_bar(
         (crate::builder::StageDeed::AddCopying, "+ COPY"),
         (crate::builder::StageDeed::AddBare, "+ BARE"),
         (crate::builder::StageDeed::Drop, "-"),
+        // A step taken from here and put on another. The `+` pair make a NEW
+        // step; these two change one that already stands, which is a different
+        // job and reads as one.
+        (crate::builder::StageDeed::Take, "TAKE"),
+        (crate::builder::StageDeed::Put, "PUT"),
     ] {
         let button = stage_face(
             &mut commands,
