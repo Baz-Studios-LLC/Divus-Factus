@@ -126,11 +126,7 @@ impl Corpus {
     /// first, the workspace's for a dev run.
     pub fn load() -> Corpus {
         let mut lines: Vec<Line> = Vec::new();
-        let root = std::env::var("BEVY_ASSET_ROOT").unwrap_or_else(|_| ".".to_string());
-        for dir in [
-            std::path::PathBuf::from(&root).join("assets/voice"),
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets/voice"),
-        ] {
+        for dir in crate::carried::roads("assets/voice") {
             let Ok(entries) = std::fs::read_dir(&dir) else {
                 continue;
             };

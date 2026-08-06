@@ -132,12 +132,8 @@ static CARRIED: std::sync::OnceLock<Vec<Clip>> = std::sync::OnceLock::new();
 
 fn carried() -> &'static Vec<Clip> {
     CARRIED.get_or_init(|| {
-        let root = std::env::var("BEVY_ASSET_ROOT").unwrap_or_else(|_| ".".to_string());
         let mut clips: Vec<Clip> = Vec::new();
-        for dir in [
-            std::path::PathBuf::from(&root).join("assets/clips"),
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets/clips"),
-        ] {
+        for dir in crate::carried::roads("assets/clips") {
             let Ok(entries) = std::fs::read_dir(&dir) else {
                 continue;
             };

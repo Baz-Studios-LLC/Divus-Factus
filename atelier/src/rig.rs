@@ -296,18 +296,22 @@ impl Plugin for RigPlugin {
 /// written.
 fn carry_in_the_bodies(mut bodies: ResMut<Bodies>, mut wearing: ResMut<Wearing>) {
     let mut roads: Vec<std::path::PathBuf> = Vec::new();
-    if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
-        roads.push(std::path::PathBuf::from(manifest).join("data/bodies"));
-    }
-    roads.push(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/bodies"));
-    roads.push("data/bodies".into());
-    roads.push("atelier/data/bodies".into());
+    // Beside the program FIRST, which is where a bundle keeps it. A bench
+    // launched from the game's title screen has a working directory of `/`, and
+    // a source tree that happens to exist on the machine is not the copy that
+    // was shipped.
     if let Ok(exe) = std::env::current_exe()
         && let Some(beside) = exe.parent()
     {
         roads.push(beside.join("data/bodies"));
         roads.push(beside.join("../Resources/data/bodies"));
     }
+    if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
+        roads.push(std::path::PathBuf::from(manifest).join("data/bodies"));
+    }
+    roads.push("data/bodies".into());
+    roads.push("atelier/data/bodies".into());
+    roads.push(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/bodies"));
     let Some((home, entries)) = roads
         .into_iter()
         .find_map(|road| std::fs::read_dir(&road).ok().map(|entries| (road, entries)))

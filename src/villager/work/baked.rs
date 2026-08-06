@@ -131,11 +131,7 @@ static CARRIED: std::sync::OnceLock<Vec<Baked>> = std::sync::OnceLock::new();
 fn carried() -> &'static Vec<Baked> {
     CARRIED.get_or_init(|| {
         let mut works: Vec<Baked> = Vec::new();
-        let root = std::env::var("BEVY_ASSET_ROOT").unwrap_or_else(|_| ".".to_string());
-        for dir in [
-            std::path::PathBuf::from(&root).join("assets/buildings"),
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets/buildings"),
-        ] {
+        for dir in crate::carried::roads("assets/buildings") {
             let Ok(entries) = std::fs::read_dir(&dir) else {
                 continue;
             };
@@ -171,30 +167,63 @@ fn carried() -> &'static Vec<Baked> {
     })
 }
 
-/// What a kind's drawings are named. A kind absent from this list has no
-/// bench drawings and is raised by the village's own hand, the way
-/// everything was before there was an Atelier.
-fn called(kind: super::BuildingKind) -> Option<&'static str> {
+/// What a kind's drawings are named.
+///
+/// EVERY kind has a word now. Brett: "When I have at least one building for a
+/// building type the defaults can be erased" - so a drawing saved as
+/// `tavern-corner.baz` becomes the tavern the moment it is carried in, with
+/// nothing to register and no code to change. A kind nobody has drawn falls back
+/// to the village's own hand, exactly as everything did before there was an
+/// Atelier; a kind somebody HAS drawn never falls back again.
+fn called(kind: super::BuildingKind) -> &'static str {
+    use super::BuildingKind as K;
     match kind {
-        super::BuildingKind::House => Some("house"),
-        super::BuildingKind::Longhouse => Some("longhouse"),
-        _ => None,
+        K::House => "house",
+        K::Longhouse => "longhouse",
+        K::Sawmill => "sawmill",
+        K::Blacksmith => "blacksmith",
+        K::Tavern => "tavern",
+        K::TownHall => "townhall",
+        K::Storehouse => "storehouse",
+        K::Granary => "granary",
+        K::Well => "well",
+        K::Smokehouse => "smokehouse",
+        K::Mill => "mill",
+        K::Bakery => "bakery",
+        K::Weaver => "weaver",
+        K::Herbalist => "herbalist",
+        K::Watchtower => "watchtower",
+        K::Shrine => "shrine",
+        K::Dock => "dock",
+        K::Mine => "mine",
     }
+}
+
+/// Every word a drawing could be claimed by, longest first.
+///
+/// Which is the whole trick, and it used to be a special case written out by
+/// hand for the one collision anybody had noticed: "longhouse1" is not a house.
+/// There are three of those pairs now - mill inside sawmill, house inside
+/// longhouse, mill inside smokehouse - and a rule that ruled out one of them by
+/// name would leave the others to be found the hard way, in a village where the
+/// sawmill had quietly become a mill.
+///
+/// So a drawing belongs to the LONGEST word that begins its name, and every kind
+/// is checked against that one answer.
+fn claimed_by(name: &str) -> Option<super::BuildingKind> {
+    let mut kinds: Vec<super::BuildingKind> = super::BuildingKind::every().to_vec();
+    kinds.sort_by_key(|kind| std::cmp::Reverse(called(*kind).len()));
+    kinds
+        .into_iter()
+        .find(|kind| name.starts_with(called(*kind)))
 }
 
 /// Every drawing carried in for this kind, in a settled order - so a
 /// world seed raises the same street twice.
 pub fn drawings(kind: super::BuildingKind) -> Vec<&'static Baked> {
-    let Some(called) = called(kind) else {
-        return Vec::new();
-    };
     carried()
         .iter()
-        // "longhouse1" is not a house: a kind takes only the names that
-        // begin with its OWN word, and the longer word is checked by
-        // being its own prefix, not by being ruled out of the shorter.
-        .filter(|work| work.name.starts_with(called))
-        .filter(|work| called != "house" || !work.name.starts_with("longhouse"))
+        .filter(|work| claimed_by(&work.name) == Some(kind))
         .collect()
 }
 

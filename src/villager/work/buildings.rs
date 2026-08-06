@@ -129,6 +129,15 @@ impl BuildingKind {
         }
     }
 
+    /// Every kind there is, so a rule about all of them can be written once.
+    pub fn every() -> &'static [BuildingKind] {
+        use BuildingKind::*;
+        &[
+            House, Longhouse, Sawmill, Blacksmith, Tavern, TownHall, Storehouse, Granary, Well,
+            Smokehouse, Mill, Bakery, Weaver, Herbalist, Watchtower, Shrine, Dock, Mine,
+        ]
+    }
+
     pub fn name(self) -> &'static str {
         match self {
             BuildingKind::House => "A house",
@@ -1379,7 +1388,20 @@ pub(crate) fn raise_stage(
     plan: &Blueprint,
 ) {
     // A house carried in from the bench is raised from its own boxes;
-    // the village's own hand still builds everything else.
+    // the village's own hand still builds everything else. It says WHICH out
+    // loud, once per building, because the difference is the whole point of the
+    // bench and there was no way to tell from a log which one you were looking
+    // at - Brett, watching his own longhouse not appear: "5 tests in a row all
+    // procedural longhouses".
+    if stage == 0 {
+        match super::baked::drawing_at(plan.kind, plan.plan) {
+            Some(work) => info!("{} rises from the drawing {}", plan.kind.name(), work.name),
+            None => info!(
+                "{} rises by the village's own hand - no drawing carried in",
+                plan.kind.name()
+            ),
+        }
+    }
     if let Some(work) = super::baked::drawing_at(plan.kind, plan.plan) {
         super::baked::raise_baked(commands, meshes, materials, site, stage, work, plan.mirrored);
         return;

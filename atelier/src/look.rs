@@ -170,6 +170,12 @@ pub fn load_palette_for_bake() -> Palette {
 /// anywhere), then the working directory, then gives up gracefully.
 fn load_palette() -> Palette {
     let mut roads = Vec::new();
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(beside) = exe.parent()
+    {
+        roads.push(beside.join("data/palette.json"));
+        roads.push(beside.join("../Resources/data/palette.json"));
+    }
     if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
         roads.push(std::path::PathBuf::from(manifest).join("data/palette.json"));
     }
