@@ -231,9 +231,72 @@ pub struct WaterPlane;
 struct FlatSpot {
     x: f32,
     z: f32,
+    /// The level core's half extents, in the pad's own frame, and the way that
+    /// frame is turned. A round working - a field, a mine mouth - has none of
+    /// these and is all `radius`.
+    ///
+    /// A building is a rectangle and its pad used to be a circle wide enough to
+    /// hold the corners, which levels half again as much ground as the building
+    /// stands on and leaves a plateau reaching out past every wall. Brett: "the
+    /// defomation of the land to flatten it out needs to be much more subtle
+    /// than this". A pad shaped like the thing standing on it is the subtlety:
+    /// the same floor, a good deal less moved earth.
+    half_w: f32,
+    half_d: f32,
+    yaw: f32,
+    /// How far the level ground reaches past that core, in every direction.
     radius: f32,
     falloff: f32,
     height: f32,
+    /// Whether the working leaves bare earth behind it.
+    ///
+    /// A tilled field does - no blades through the furrows. A house's terrace
+    /// does not, which was the other half of what Brett saw: "also it doesnt
+    /// need to turn off the grass". Grass growing up to the walls, and under
+    /// them, costs nothing at all - "every house has a foundation that is taller
+    /// than the grass", and he keeps it that way on the bench.
+    bare: bool,
+}
+
+impl FlatSpot {
+    /// How far outside the level core this spot is - negative within it. The
+    /// distance to an oriented rectangle, rounded off by `radius`, which for a
+    /// pad with no extent at all is simply the distance to its middle.
+    fn beyond(&self, x: f32, z: f32) -> f32 {
+        let (sin, cos) = self.yaw.sin_cos();
+        let (dx, dz) = (x - self.x, z - self.z);
+        // Into the pad's own frame. The building's +X is its front.
+        let along = dx * cos - dz * sin;
+        let across = dx * sin + dz * cos;
+        let out_w = along.abs() - self.half_w;
+        let out_d = across.abs() - self.half_d;
+        let outside = Vec2::new(out_w.max(0.0), out_d.max(0.0)).length();
+        let inside = out_w.max(out_d).min(0.0);
+        outside + inside - self.radius
+    }
+}
+
+/// A worked pad as the save file keeps it. Its own type rather than a tuple of
+/// nine floats, which nobody can read and everybody can put in the wrong order.
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
+pub struct WorkedGround {
+    pub x: f32,
+    pub z: f32,
+    #[serde(default)]
+    pub half_w: f32,
+    #[serde(default)]
+    pub half_d: f32,
+    #[serde(default)]
+    pub yaw: f32,
+    pub radius: f32,
+    pub falloff: f32,
+    pub height: f32,
+    #[serde(default = "yes")]
+    pub bare: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 /// The terrain function. Holds a seed, the memoised rivers, and the spots
@@ -337,14 +400,22 @@ impl Terrain {
     /// `height_at` reports it everywhere, and the caller is responsible for
     /// rebuilding the chunk meshes that cover it.
     pub fn flatten(&self, x: f32, z: f32, radius: f32, falloff: f32, height: f32) {
+        self.work(FlatSpot {
+            x,
+            z,
+            half_w: 0.0,
+            half_d: 0.0,
+            yaw: 0.0,
+            radius,
+            falloff,
+            height,
+            bare: true,
+        });
+    }
+
+    fn work(&self, spot: FlatSpot) {
         if let Ok(mut worked) = self.worked.write() {
-            worked.push(FlatSpot {
-                x,
-                z,
-                radius,
-                falloff,
-                height,
-            });
+            worked.push(spot);
         }
     }
 
@@ -358,69 +429,122 @@ impl Terrain {
     /// house on a slope standing on a mesa with a metre of cliff at its
     /// downhill edge - fine for a mine mouth, which wants to look cut, and
     /// wrong for everywhere anyone walks.
-    pub fn terrace(&self, x: f32, z: f32, radius: f32, least: f32, height: f32) -> f32 {
-        // The worst of the earth to be moved, read around the pad's rim.
+    pub fn terrace(
+        &self,
+        x: f32,
+        z: f32,
+        half_w: f32,
+        half_d: f32,
+        yaw: f32,
+        margin: f32,
+        least: f32,
+        height: f32,
+    ) -> f32 {
+        // The worst of the earth to be moved, read around the pad's rim - which
+        // is a rectangle's rim now, so the corners are read where the corners
+        // are rather than at some circle that swallows them.
+        let (sin, cos) = yaw.sin_cos();
+        let (reach_w, reach_d) = (half_w + margin, half_d + margin);
         let mut cut: f32 = 0.0;
-        for step in 0..12 {
-            let turn = std::f32::consts::TAU * step as f32 / 12.0;
-            let (sin, cos) = turn.sin_cos();
-            let rim = self.height_at(x + cos * radius, z + sin * radius);
+        for step in 0..16 {
+            let turn = std::f32::consts::TAU * step as f32 / 16.0;
+            let (s, c) = turn.sin_cos();
+            // A point on the rectangle's rim in that direction: whichever wall
+            // the ray leaves through.
+            let scale = (reach_w / c.abs()).min(reach_d / s.abs());
+            let (along, across) = (c * scale, s * scale);
+            let rim = self.height_at(
+                x + along * cos + across * sin,
+                z - along * sin + across * cos,
+            );
             cut = cut.max((rim - height).abs());
         }
-        // One in three: graded earth rather than a quarry face. Smoothstep
-        // steepens toward the middle of the ring, so the true grade at the
-        // halfway line is a shade sharper than that.
-        let falloff = least.max((cut * 3.0).min(18.0));
-        self.flatten(x, z, radius, falloff, height);
-        radius + falloff
+        // One in four: graded earth rather than a quarry face, and a shallower
+        // grade than the one in three it used to cut - a bank a metre high now
+        // takes four metres to come back, which reads as ground rather than as
+        // groundwork. Smoothstep steepens toward the middle of the ring, so the
+        // true grade at the halfway line is a shade sharper than that.
+        let falloff = least.max((cut * 4.0).min(18.0));
+        self.work(FlatSpot {
+            x,
+            z,
+            half_w,
+            half_d,
+            yaw,
+            radius: margin,
+            falloff,
+            height,
+            // Ground people live on keeps its grass.
+            bare: false,
+        });
+        reach_w.hypot(reach_d) + falloff
     }
 
     /// Every worked pad, for the save file.
-    pub fn export_worked(&self) -> Vec<(f32, f32, f32, f32, f32)> {
+    pub fn export_worked(&self) -> Vec<WorkedGround> {
         self.worked
             .read()
             .map(|worked| {
                 worked
                     .iter()
-                    .map(|s| (s.x, s.z, s.radius, s.falloff, s.height))
+                    .map(|s| WorkedGround {
+                        x: s.x,
+                        z: s.z,
+                        half_w: s.half_w,
+                        half_d: s.half_d,
+                        yaw: s.yaw,
+                        radius: s.radius,
+                        falloff: s.falloff,
+                        height: s.height,
+                        bare: s.bare,
+                    })
                     .collect()
             })
             .unwrap_or_default()
     }
 
     /// Restores worked pads from a save.
-    pub fn import_worked(&self, spots: &[(f32, f32, f32, f32, f32)]) {
+    pub fn import_worked(&self, spots: &[WorkedGround]) {
         if let Ok(mut worked) = self.worked.write() {
             worked.clear();
-            for &(x, z, radius, falloff, height) in spots {
-                worked.push(FlatSpot {
-                    x,
-                    z,
-                    radius,
-                    falloff,
-                    height,
-                });
-            }
+            worked.extend(spots.iter().map(|s| FlatSpot {
+                x: s.x,
+                z: s.z,
+                half_w: s.half_w,
+                half_d: s.half_d,
+                yaw: s.yaw,
+                radius: s.radius,
+                falloff: s.falloff,
+                height: s.height,
+                bare: s.bare,
+            }));
         }
     }
 
-    /// Whether this ground has been worked level - a field pad, one day a
-    /// floor. Nothing wild grows on worked ground.
+    /// Whether this ground has been worked level - a field pad, a house's
+    /// floor. Nothing wild takes root on worked ground.
     pub fn is_worked(&self, x: f32, z: f32) -> bool {
         self.is_worked_within(x, z, 0.0)
     }
 
-    /// Worked ground plus a margin - trees keep a wider berth than grass.
+    /// Worked ground plus a margin - trees keep a wider berth than stones do.
     pub fn is_worked_within(&self, x: f32, z: f32, margin: f32) -> bool {
         let Ok(worked) = self.worked.read() else {
             return false;
         };
-        worked.iter().any(|spot| {
-            let dx = x - spot.x;
-            let dz = z - spot.z;
-            let reach = spot.radius + margin;
-            dx * dx + dz * dz < reach * reach
-        })
+        worked.iter().any(|spot| spot.beyond(x, z) < margin)
+    }
+
+    /// Whether this ground has been worked BARE: turned earth, a quarried
+    /// face, a mine's mouth. Grass grows on everything else that has been
+    /// levelled, a house's terrace included.
+    pub fn is_bare(&self, x: f32, z: f32) -> bool {
+        let Ok(worked) = self.worked.read() else {
+            return false;
+        };
+        worked
+            .iter()
+            .any(|spot| spot.bare && spot.beyond(x, z) < 0.0)
     }
 
     /// Applies the worked-level pads to a computed height.
@@ -430,15 +554,11 @@ impl Terrain {
         };
         let mut height = height;
         for spot in worked.iter() {
-            let reach = spot.radius + spot.falloff;
-            let dx = x - spot.x;
-            let dz = z - spot.z;
-            let d2 = dx * dx + dz * dz;
-            if d2 >= reach * reach {
+            let beyond = spot.beyond(x, z);
+            if beyond >= spot.falloff {
                 continue;
             }
-            let d = d2.sqrt();
-            let w = ((reach - d) / spot.falloff).clamp(0.0, 1.0);
+            let w = ((spot.falloff - beyond) / spot.falloff).clamp(0.0, 1.0);
             let w = w * w * (3.0 - 2.0 * w);
             height = height * (1.0 - w) + spot.height * w;
         }
@@ -1696,6 +1816,79 @@ fn follow_water_plane(
 mod tests {
     use super::*;
     use bevy::mesh::VertexAttributeValues;
+
+    /// A house's pad is the house's own rectangle. The circle it used to be
+    /// levelled the ground off the ends of a long building as flat as the floor
+    /// itself, which is a plateau reaching out past every wall - and half again
+    /// as much moved earth as the building needed.
+    #[test]
+    fn a_terrace_is_the_shape_of_what_stands_on_it() {
+        let land = Terrain::new(31);
+        // A long building, turned off the axes so the frame has to be right.
+        let (x, z, yaw) = (120.0_f32, -80.0_f32, 0.9_f32);
+        let (half_w, half_d, margin) = (3.0_f32, 9.0_f32, 1.6_f32);
+        let floor = land.height_at(x, z);
+        land.terrace(x, z, half_w, half_d, yaw, margin, 2.4, floor);
+
+        let (sin, cos) = yaw.sin_cos();
+        // Local (along, across) to world: +X is the front, +Z the length.
+        let world = |along: f32, across: f32| {
+            (
+                x + along * cos + across * sin,
+                z - along * sin + across * cos,
+            )
+        };
+        // Every corner of the floor itself is level with it.
+        for (along, across) in [
+            (half_w, half_d),
+            (-half_w, half_d),
+            (half_w, -half_d),
+            (-half_w, -half_d),
+            (0.0, 0.0),
+        ] {
+            let (wx, wz) = world(along, across);
+            assert!(
+                (land.height_at(wx, wz) - floor).abs() < 1e-3,
+                "the floor at ({along}, {across}) stands at {} and not {floor}",
+                land.height_at(wx, wz)
+            );
+        }
+        // And the ground off the SIDE, at the distance the old circle would
+        // have reached to hold those corners, is the land's own again.
+        let corner = (half_w + margin).hypot(half_d + margin);
+        for across in [0.0_f32, 3.0] {
+            let (wx, wz) = world(corner + 6.0, across);
+            let untouched = Terrain::new(31).height_at(wx, wz);
+            assert!(
+                (land.height_at(wx, wz) - untouched).abs() < 1e-3,
+                "ground {corner:.1}m off the front wall was levelled with the floor"
+            );
+        }
+    }
+
+    /// Grass grows on a terrace and not in a furrow.
+    #[test]
+    fn only_turned_earth_is_left_bare() {
+        let land = Terrain::new(31);
+        let (house, field) = ((0.0_f32, 0.0_f32), (60.0_f32, 0.0_f32));
+        land.terrace(
+            house.0,
+            house.1,
+            3.0,
+            3.0,
+            0.0,
+            1.0,
+            2.4,
+            land.height_at(house.0, house.1),
+        );
+        land.flatten(field.0, field.1, 3.4, 2.6, land.height_at(field.0, field.1));
+
+        assert!(!land.is_bare(house.0, house.1), "a terrace lost its grass");
+        assert!(land.is_bare(field.0, field.1), "a field kept its grass");
+        // Both are still worked, which is what keeps trees off them.
+        assert!(land.is_worked(house.0, house.1));
+        assert!(land.is_worked(field.0, field.1));
+    }
 
     #[test]
     fn height_is_deterministic() {

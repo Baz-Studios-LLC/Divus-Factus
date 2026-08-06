@@ -1277,13 +1277,11 @@ pub(crate) fn raise_the_founding_hall(
     // vetted the site was wrong: ground level enough for a village is
     // nowhere near level enough for a hall twenty-five metres long, and
     // the thing came up half buried.
-    // The pad has to cover the CORNERS, not the longest side: a rectangle
-    // reaches further diagonally than either half-extent, so a pad cut to
-    // `reach` left the ends of the hall - and its porch - standing on
-    // ground nothing had marked as worked, with grass coming up through
-    // the boards.
-    let pad = plan.half_w.hypot(plan.half_d) + 2.5;
-    let worked = terrain.terrace(at.x, at.z, pad, 2.4, at.y);
+    // The pad is the hall's own rectangle, turned the way the hall is, with a
+    // pace of standing room around it. It used to be a circle wide enough to
+    // hold the corners, which is nearly twice the ground and every bit of it
+    // levelled - fine while nothing grew there, and a plateau once it did.
+    let worked = terrain.terrace(at.x, at.z, plan.half_w, plan.half_d, yaw, 2.5, 2.4, at.y);
 
     // The clearing, BEFORE the chunks are swapped - a scattered tree is
     // a child of its chunk, and a chunk despawn takes its children with
@@ -2839,8 +2837,7 @@ pub(crate) fn plan_houses(
         // Breaking ground levels the plot: the pad is worked flat and rolls
         // back into the hillside, so no floor, sill, or stake ever clips
         // into a slope. This is what a foundation is *for*.
-        let pad = plan.half_w.max(plan.half_d) + 1.6;
-        let worked = terrain.terrace(at.x, at.z, pad, 2.4, at.y);
+        let worked = terrain.terrace(at.x, at.z, plan.half_w, plan.half_d, yaw, 1.6, 2.4, at.y);
         let (chunks, grass, chunk_assets, stripped, dirty_groves) = &mut ground;
 
         // And clears it properly: every tree within canopy's reach of the

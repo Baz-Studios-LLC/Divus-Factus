@@ -127,7 +127,7 @@ struct SaveGame {
     banner: Option<(u32, u32)>,
     centre: Vec3,
     woodpile: Vec3,
-    worked: Vec<(f32, f32, f32, f32, f32)>,
+    worked: Vec<crate::terrain::WorkedGround>,
     known: KnownWorld,
     belief: (f32, f32),
     legend_numbers: (f32, f32, f32, u8),

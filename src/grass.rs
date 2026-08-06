@@ -207,8 +207,12 @@ pub fn build_grass_mesh(terrain: &Terrain, seed: u32, coord: IVec2) -> Option<Me
             if height < WATER_LEVEL + 0.4 {
                 continue;
             }
-            // Tilled or built ground is bare: no blades through the furrows.
-            if terrain.is_worked(x, z) {
+            // Tilled ground is bare: no blades through the furrows. Ground
+            // merely levelled - a house's terrace - keeps its grass, because a
+            // bald ring around every house is worse than a blade under a floor
+            // nobody can see. Brett: "every house has a foundation that is
+            // taller than the grass", and he draws them that way.
+            if terrain.is_bare(x, z) {
                 continue;
             }
             if terrain.slope_at(x, z) > 0.4 {
