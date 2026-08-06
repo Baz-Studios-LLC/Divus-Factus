@@ -475,9 +475,6 @@ pub const WIDGETS: &[(&str, &str, f32)] = &[
     ("light", "cloth-gold", 0.95),
 ];
 
-/// The bench's ready-made starts: authored files under templates/.
-pub const TEMPLATES: &[(&str, &str)] = &[("HOUSE", "house"), ("LONGHOUSE", "longhouse")];
-
 /// The boxes a part is made of, in its own local space, resting on y = 0.
 fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
     let slab = |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32| {
@@ -1503,10 +1500,6 @@ struct ShelfButton(&'static CatalogEntry);
 #[derive(Component)]
 struct WidgetButton(&'static str);
 
-/// A button that loads a ready-made start onto a cleared bench.
-#[derive(Component)]
-struct TemplateButton(&'static str);
-
 /// A button that loads a saved work file back onto a cleared bench.
 #[derive(Component)]
 struct LoadFileButton(std::path::PathBuf);
@@ -1660,7 +1653,7 @@ impl Plugin for BuilderPlugin {
                     show_shelf,
                     work_drawers,
                     work_shelf,
-                    work_templates,
+                    open_or_clear,
                     steer_hand,
                     // The painting tools and the part menu as one group: this
                     // tuple is at Bevy's own limit for how many systems it will
@@ -3214,17 +3207,6 @@ fn raise_shelf(
     // shelf keeps only parts and widgets.
     let files = file_home.map(|home| home.0).unwrap_or(shelf);
 
-    // READY-MADE: templates and the broom.
-    let ready = drawer(&mut commands, &fonts, &palette, files, "READY-MADE", true);
-    for (label, name) in TEMPLATES {
-        let button = plain_button(&mut commands, &palette, ready);
-        commands.entity(button).insert(TemplateButton(name));
-        button_label(&mut commands, &fonts, &palette, button, label);
-    }
-    let clear = plain_button(&mut commands, &palette, ready);
-    commands.entity(clear).insert(ClearButton);
-    button_label(&mut commands, &fonts, &palette, clear, "CLEAR THE BENCH");
-
     // The drawers of parts.
     for (name, entries, open) in [
         ("STRUCTURE", STRUCTURE, true),
@@ -3333,6 +3315,38 @@ fn raise_shelf(
         },
         TextColor(theme::text_dim(&palette)),
         ChildOf(folder),
+    ));
+
+    // The broom, last. It used to live with the two ready-made starts, which
+    // Brett has done with - "We can remove the ready made stuff and section" -
+    // and it was never one of them: those put a building ON the bench and this
+    // takes everything off it. Down here it sits with the other ways in and out
+    // of a work, which is what it is.
+    let sweep = commands
+        .spawn((
+            ClearButton,
+            Interaction::default(),
+            Node {
+                margin: UiRect::top(Val::Px(6.0)),
+                padding: UiRect::vertical(Val::Px(6.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.18)),
+            BorderColor::all(theme::text_dim(&palette).with_alpha(0.5)),
+            ChildOf(files),
+        ))
+        .id();
+    commands.spawn((
+        Text::new("CLEAR THE BENCH"),
+        TextFont {
+            font: fonts.display.clone().into(),
+            font_size: FontSize::Px(11.0),
+            ..default()
+        },
+        TextColor(theme::text_dim(&palette)),
+        ChildOf(sweep),
     ));
     commands.spawn((
         Text::new(
@@ -3616,35 +3630,22 @@ fn dress_shelf_border(palette: &Palette, standing: bool, border: &mut BorderColo
 /// Template presses sweep the bench and set out the ready-made start; the
 /// clear button just sweeps.
 #[allow(clippy::too_many_arguments)]
-fn work_templates(
+/// Opens a saved work onto a cleared bench, or simply clears it.
+fn open_or_clear(
     mut commands: Commands,
     mut stages: ResMut<Stages>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     palette: Res<Palette>,
-    templates: Query<(&Interaction, &TemplateButton), Changed<Interaction>>,
     files: Query<(&Interaction, &LoadFileButton), Changed<Interaction>>,
     clears: Query<&Interaction, (Changed<Interaction>, With<ClearButton>)>,
     standing: Query<Entity, (With<Placed>, Without<Ghost>)>,
     mut work_name: ResMut<WorkName>,
 ) {
-    let base = bench_home();
-    let mut from_file = false;
-    let wanted = templates
+    let wanted = files
         .iter()
         .find(|(interaction, _)| **interaction == Interaction::Pressed)
-        .map(|(_, template)| {
-            std::path::PathBuf::from(&base).join(format!("templates/{}.json", template.0))
-        })
-        .or_else(|| {
-            files
-                .iter()
-                .find(|(interaction, _)| **interaction == Interaction::Pressed)
-                .map(|(_, file)| {
-                    from_file = true;
-                    file.0.clone()
-                })
-        });
+        .map(|(_, file)| file.0.clone());
     let sweeping = clears
         .iter()
         .any(|interaction| *interaction == Interaction::Pressed);
@@ -3658,13 +3659,10 @@ fn work_templates(
         work_name.0 = None;
         return;
     };
-    // A loaded work carries its name; a template starts nameless.
-    work_name.0 = if from_file {
-        path.file_stem()
-            .map(|stem| stem.to_string_lossy().to_string())
-    } else {
-        None
-    };
+    // A loaded work carries its own name into the bench.
+    work_name.0 = path
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().to_string());
     match std::fs::read_to_string(&path)
         .ok()
         .and_then(|text| serde_json::from_str::<Workbench>(&text).ok())
