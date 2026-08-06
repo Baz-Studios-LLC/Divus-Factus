@@ -5038,8 +5038,11 @@ fn hang_the_chosen(
             ChosenPanel,
             Node {
                 position_type: PositionType::Absolute,
-                left: Val::Px(10.0),
-                top: Val::Px(330.0),
+                // Upper right of the VIEW, clear of the shelf that owns the
+                // right edge: the panel is about the thing under the cursor, and
+                // the cursor is out here rather than over on the rail.
+                right: Val::Px(222.0),
+                top: Val::Px(10.0),
                 width: Val::Px(232.0),
                 max_height: Val::Px(420.0),
                 flex_direction: FlexDirection::Column,
