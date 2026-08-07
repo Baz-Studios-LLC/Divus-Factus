@@ -1358,6 +1358,10 @@ pub fn build_chunk_mesh(terrain: &Terrain, coord: IVec2) -> Mesh {
 /// which is what lets a river run through hills a hundred units above the ocean.
 /// Cells with no river collapse to nothing, so a chunk without one costs no
 /// geometry at all.
+/// How far up the beach the sea's mesh is carried past the waterline, so its
+/// own polygon edge falls on ground where it is already invisible.
+const SHORE_REACH: f32 = 1.5;
+
 pub fn build_river_mesh(terrain: &Terrain, coord: IVec2) -> Option<Mesh> {
     build_water_mesh(terrain, coord, false)
 }
@@ -1400,6 +1404,17 @@ fn build_water_mesh(terrain: &Terrain, coord: IVec2, sea: bool) -> Option<Mesh> 
                     any = true;
                 } else {
                     heights[index] = h;
+                    // A step of dry land past the waterline still counts as
+                    // shore. The sheet is cut on the chunk's own two-metre
+                    // grid, so ending it at the last WET corner left the
+                    // coastline as a row of two-metre teeth - the polygon
+                    // edge, in plain view. Carried a little way up the beach
+                    // the edge lands on ground the depth fade has already
+                    // taken to nothing, and there is no hard line left to see.
+                    if h < WATER_LEVEL + SHORE_REACH {
+                        wet[index] = true;
+                        any = true;
+                    }
                 }
             } else {
                 match terrain.river_surface_at(x, z) {
