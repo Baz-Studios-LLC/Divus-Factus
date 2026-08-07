@@ -1738,7 +1738,7 @@ pub(crate) fn rebuild_chunks_near(
 fn follow_water_plane(
     cameras: Query<&crate::camera::CameraRig>,
     mut meshes: ResMut<Assets<Mesh>>,
-    water: Query<(&Mesh3d, &Transform), With<WaterPlane>>,
+    mut water: Query<(&Mesh3d, &Transform, &mut Visibility), With<WaterPlane>>,
     mut woven: Local<Option<(i32, i32, i32)>>,
 ) {
     let Ok(rig) = cameras.single() else {
@@ -1757,6 +1757,28 @@ fn follow_water_plane(
     // vertices, well under a millisecond - and sized with the streamed
     // ground, since past the loaded shore the planet paints its own ocean.
     let receding = 1.0 - ((rig.distance - 2_200.0) / 800.0).clamp(0.0, 1.0);
+
+    // Once the taper reaches zero the planet's own painted ocean owns every
+    // shore in view and this sheet has nothing left to wet. It was never
+    // switched OFF, though, only scaled down - and `receding.max(0.001)`
+    // cannot reach zero. What was left hung there as a small flat square of
+    // sea lying across the curve of the globe, lit by its own flat normal
+    // while the world behind it fell away. Hide it instead, and do not spend
+    // a mesh rebuild on a sheet nobody can see.
+    let wanted = if receding <= 0.0 {
+        Visibility::Hidden
+    } else {
+        Visibility::Inherited
+    };
+    if let Some((_, _, mut seen)) = water.iter_mut().next() {
+        if *seen != wanted {
+            *seen = wanted;
+        }
+    }
+    if wanted == Visibility::Hidden {
+        return;
+    }
+
     let fit = (stream_radius(rig.distance) as f32 / VIEW_CHUNKS as f32) * receding.max(0.001);
     let heart = Vec2::new(rig.focus.x, rig.focus.z);
     let signature = (
@@ -1769,7 +1791,7 @@ fn follow_water_plane(
     }
     *woven = Some(signature);
 
-    let Some((mesh3d, _)) = water.iter().next() else {
+    let Some((mesh3d, _, _)) = water.iter().next() else {
         return;
     };
     let Some(mut mesh) = meshes.get_mut(&mesh3d.0) else {

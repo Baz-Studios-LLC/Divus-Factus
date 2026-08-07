@@ -384,6 +384,19 @@ pub struct CameraRig {
     /// Higher converges faster. Tuned by feel; around 12 reads as responsive but
     /// still weighted, which suits something the size of a god.
     pub smoothing: f32,
+    /// Whether the world is being held by the mouse this frame.
+    ///
+    /// Direct manipulation and smoothing cannot both be in the same loop. The
+    /// grab reads the ground under the cursor from where the camera ACTUALLY
+    /// is, and sets the target so that ground comes back under the hand - but
+    /// a smoothed camera is never where its target says, so the next frame
+    /// reads a different piece of ground and corrects again, and the camera's
+    /// own catch-up drives the correction. That is the wobble: the rig chasing
+    /// a target computed from the fact that it has not arrived yet.
+    ///
+    /// While the world is held the focus is therefore snapped, not smoothed.
+    /// Nothing is lost - the mouse is the smoothing.
+    pub held_by_hand: bool,
     /// Ground point the current zoom is closing in on.
     ///
     /// Held for the whole smoothed zoom rather than applied once on the scroll
@@ -410,6 +423,7 @@ impl Default for CameraRig {
             orbit_sensitivity: 0.005,
             zoom_sensitivity: 0.12,
             smoothing: 12.0,
+            held_by_hand: false,
             zoom_anchor: None,
         }
     }
@@ -535,6 +549,9 @@ fn spawn_camera(mut commands: Commands) {
 
 fn read_camera_input(
     mut grabbed: Local<Option<Vec3>>,
+    // Whether the drag in progress is the world's. A press that begins on a
+    // panel belongs to the panel for its whole life, however far it wanders.
+    mut ours: Local<bool>,
     keys: Res<ButtonInput<KeyCode>>,
     keymap: Res<crate::keymap::Keymap>,
     buttons: Res<ButtonInput<MouseButton>>,
@@ -603,20 +620,40 @@ fn read_camera_input(
         rig.target_focus = fold_onto_the_sphere(rig.target_focus);
     }
 
-    // The middle mouse GRABS THE WORLD. Not a camera pan: the ground under
-    // the cursor is seized on the press, and while the button is held the
-    // whole planet is turned so that piece of ground stays under the hand -
-    // the gesture Black and White taught, and the only one that makes sense
-    // once the world is a ball. At village zoom the turn is microscopic and
-    // it feels exactly like the drag-pan it replaces; from altitude the same
-    // pull spins continents. One mechanism, every height.
-    if buttons.just_pressed(MouseButton::Middle) {
-        *grabbed = cursor_sphere_direction(&windows, &cameras);
+    // The mouse GRABS THE WORLD. Not a camera pan: the ground under the cursor
+    // is seized on the press, and while the button is held the whole planet is
+    // turned so that piece of ground stays under the hand - the gesture Black
+    // and White taught, and the only one that makes sense once the world is a
+    // ball. At village zoom the turn is microscopic and it feels exactly like
+    // the drag-pan it replaces; from altitude the same pull spins continents.
+    // One mechanism, every height.
+    //
+    // On the LEFT button, which is where the hand reaches for it. Middle keeps
+    // working because it is what this was bound to first and fingers remember,
+    // but left is the gesture: you put your hand on the world and you move it.
+    let taking_hold =
+        buttons.just_pressed(MouseButton::Left) || buttons.just_pressed(MouseButton::Middle);
+    let holding_on = buttons.pressed(MouseButton::Left) || buttons.pressed(MouseButton::Middle);
+    if taking_hold {
+        // A press that lands on a panel is the panel's. Judged ONCE, at the
+        // press: a drag that starts on a roster and slides off it must not
+        // suddenly seize the planet halfway through, and one that starts on
+        // the world must go on turning it even when the cursor crosses a panel.
+        *ours = !pointer.over_ui;
+        *grabbed = if *ours {
+            cursor_sphere_direction(&windows, &cameras)
+        } else {
+            None
+        };
     }
-    if buttons.just_released(MouseButton::Middle) {
+    if !holding_on {
+        *ours = false;
         *grabbed = None;
     }
-    if buttons.pressed(MouseButton::Middle) {
+    // Told to the smoothing pass, which must not chase a target the grab is
+    // deriving from where the camera already is. See `CameraRig::held_by_hand`.
+    rig.held_by_hand = holding_on && *ours && grabbed.is_some();
+    if holding_on && *ours {
         if let Some(held) = *grabbed {
             if let Some(now) = cursor_sphere_direction(&windows, &cameras) {
                 rig.target_focus = turn_the_world(rig.target_focus, held, now);
@@ -838,7 +875,12 @@ fn apply_camera_smoothing(time: Res<Time>, mut rigs: Query<&mut CameraRig>) {
         }
     }
 
-    rig.focus = rig.focus.lerp(rig.target_focus, t);
+    if rig.held_by_hand {
+        // Snapped. See `held_by_hand`.
+        rig.focus = rig.target_focus;
+    } else {
+        rig.focus = rig.focus.lerp(rig.target_focus, t);
+    }
     rig.pitch += (rig.target_pitch - rig.pitch) * t;
 
     // Take the short way round the circle so crossing the seam does not spin the

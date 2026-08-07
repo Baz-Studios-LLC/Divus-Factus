@@ -26,6 +26,8 @@ mod navigation;
 mod noise;
 mod now;
 mod palette;
+mod place;
+mod planet;
 mod render;
 mod rng;
 mod save;
@@ -164,6 +166,12 @@ fn main() {
     // the writing without hunting two villagers across a valley first.
     if std::env::args().any(|arg| arg == "--voice") {
         telling::bench::run();
+        return;
+    }
+    // The planet with nothing living on it, for getting the sphere right
+    // before anything is asked to stand on it. See `planet.rs`.
+    if std::env::args().any(|arg| arg == "--planet") {
+        planet::run();
         return;
     }
     App::new()

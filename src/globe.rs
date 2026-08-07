@@ -190,7 +190,7 @@ fn face_axes(face: u8) -> (Vec3, Vec3, Vec3) {
 
 /// The living tree: the root everything hangs from, and which patches stand.
 #[derive(Resource, Default)]
-struct PlanetTree {
+pub(crate) struct PlanetTree {
     root: Option<Entity>,
     built: HashMap<PatchKey, Patch2>,
     /// The seed the tree was grown for, so a new world fells the old tree.
@@ -204,6 +204,13 @@ struct PlanetTree {
     paint_beat: u64,
     /// A cheap fingerprint of (fog mode, known world) to notice the change.
     veil_print: (bool, u32, usize),
+}
+
+impl PlanetTree {
+    /// How many patches are built. For the planet bench's readout.
+    pub(crate) fn standing(&self) -> usize {
+        self.built.len()
+    }
 }
 
 /// "My vertices are already seated on the sphere — leave my transform alone."
