@@ -973,7 +973,19 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 if half <= ATOM || rise <= ATOM {
                     continue;
                 }
-                let reach = (half * half + rise * rise).sqrt() - ATOM;
+                // LONGER than the gap it crosses, not shorter.
+                //
+                // A brace's ends are cut square across its own length, so where
+                // it meets a rail or a post at an angle a square end cannot
+                // fill the corner - it leaves a wedge of daylight, and two of
+                // them meeting at the apex leave a notch between. Cut short by
+                // an atom, as this was, the gap is simply bigger.
+                //
+                // Run it past both ends instead and let the timber it meets
+                // swallow the overshoot. The apex closes because the pair cross
+                // behind the rail rather than stopping at it, and the feet
+                // close because they carry on into the sill.
+                let reach = (half * half + rise * rise).sqrt() + ATOM * 3.0;
                 let angle = rise.atan2(half);
                 let (x, _) = across(from, to - from);
                 for side in [-1.0f32, 1.0] {
