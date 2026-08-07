@@ -4857,6 +4857,12 @@ fn raise_palette(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palette
             },
             BackgroundColor(theme::panel_bg()),
             BorderColor::all(theme::panel_border(&palette)),
+            // The other half of scrolling, and the other way round from the
+            // rail's fault: this one clipped its children and had nothing to
+            // tell it where to. Overflow alone is a pane that hides what will
+            // not fit; `Scrollable` is what lets the wheel reach it.
+            crate::look::Scrollable,
+            bevy::ui::ScrollPosition::default(),
             Visibility::Hidden,
         ))
         .id();

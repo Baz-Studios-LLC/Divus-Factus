@@ -174,6 +174,14 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
                 padding: UiRect::all(Val::Px(14.0)),
                 row_gap: Val::Px(8.0),
                 border: UiRect::right(Val::Px(1.0)),
+                // Without this the wheel did nothing here. `Scrollable` and a
+                // `ScrollPosition` are only half of it - a scroll position
+                // moves a node's children only if the node CLIPS them, and a
+                // node with no overflow set does not. So the rail took the
+                // wheel, told the camera to keep its hands off the zoom, and
+                // then sat still: the one arrangement that looks like the
+                // scroll is broken rather than absent.
+                overflow: Overflow::scroll_y(),
                 ..default()
             },
             BackgroundColor(theme::panel_bg()),
@@ -279,6 +287,8 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
                 row_gap: Val::Px(3.0),
                 padding: UiRect::all(Val::Px(14.0)),
                 border: UiRect::all(Val::Px(1.0)),
+                // As above: scrollable, and now actually able to scroll.
+                overflow: Overflow::scroll_y(),
                 ..default()
             },
             BackgroundColor(theme::panel_bg()),
