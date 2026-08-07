@@ -369,68 +369,115 @@ fn hip(keep_x: f32, keep_z: f32) -> Mesh {
 /// The vertices are the Atelier's, corner for corner. The two programs share no
 /// code and never will, so the only thing keeping a shape the same shape in both
 /// is that somebody wrote it out twice and said so - see `FORMATS.md`.
-fn mitre(mirrored: bool) -> Mesh {
+/// A unit box with its top face cut back at each end.
+///
+/// `low` and `high` are RUNS as fractions of the box's own length: how far
+/// along it the saw travels while crossing its full height, at the -X end and
+/// the +X end. Nought is a square end.
+///
+/// One shape for every angled end there is. There used to be two - a mitre and
+/// its mirror - because a beam can be cut at one end or the other, and neither
+/// could do both at once, which is what a brace actually wants: it meets a rail
+/// at one end and a sill at the other. A run of one takes the top face all the
+/// way to the far corner, which IS the old full mitre, so nothing that could be
+/// drawn before has stopped being drawable.
+fn cut_mesh(low: f32, high: f32) -> Mesh {
+    let (low, high) = (low.clamp(0.0, 1.0), high.clamp(0.0, 1.0));
+    // Two cuts that would cross leave the top face inside out. Share the length
+    // between them instead, which is the deepest pair that still leaves a beam.
+    let (low, high) = if low + high > 1.0 {
+        (low / (low + high), high / (low + high))
+    } else {
+        (low, high)
+    };
+    let (a, b) = (-0.5 + low, 0.5 - high);
+    let peak = b <= a;
+
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut normals: Vec<[f32; 3]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
-    // Mirrored, it is full at +X instead - the other hand of the same cut, for
-    // the other end of a beam.
-    let mut face = |corners: &[[f32; 3]], normal: [f32; 3]| {
+
+    // Normals from the corners themselves, and wound to face outward.
+    //
+    // The shape is convex and centred on the origin, so a face's own middle
+    // points the way that face does - which settles both the normal's sign and
+    // the winding without anyone having to reason about which end is cut. The
+    // slanted ends are where doing it by hand goes wrong, and they are the
+    // whole point of this mesh.
+    let mut face = |corners: &[Vec3]| {
+        let middle = corners.iter().copied().sum::<Vec3>() / corners.len() as f32;
+        let Some(normal) = (corners[1] - corners[0])
+            .cross(corners[2] - corners[0])
+            .try_normalize()
+        else {
+            return;
+        };
+        let (normal, flip) = if normal.dot(middle) < 0.0 {
+            (-normal, true)
+        } else {
+            (normal, false)
+        };
         let first = positions.len() as u32;
-        let mut corners: Vec<[f32; 3]> = corners.to_vec();
-        let mut normal = normal;
-        if mirrored {
-            for corner in &mut corners {
-                corner[0] = -corner[0];
-            }
+        let mut corners = corners.to_vec();
+        if flip {
             corners.reverse();
-            normal[0] = -normal[0];
         }
         for corner in &corners {
-            positions.push(*corner);
-            normals.push(normal);
+            positions.push(corner.to_array());
+            normals.push(normal.to_array());
         }
         for step in 1..(corners.len() as u32 - 1) {
             indices.extend_from_slice(&[first, first + step, first + step + 1]);
         }
     };
-    // Full height at -X, falling away to nothing at +X.
-    face(
-        &[[-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [-0.5, 0.5, 0.5]],
-        [0.0, 0.0, 1.0],
-    );
-    face(
-        &[[0.5, -0.5, -0.5], [-0.5, -0.5, -0.5], [-0.5, 0.5, -0.5]],
-        [0.0, 0.0, -1.0],
-    );
-    face(
-        &[
-            [-0.5, -0.5, 0.5],
-            [0.5, -0.5, 0.5],
-            [0.5, -0.5, -0.5],
-            [-0.5, -0.5, -0.5],
-        ],
-        [0.0, -1.0, 0.0],
-    );
-    face(
-        &[
-            [-0.5, -0.5, -0.5],
-            [-0.5, -0.5, 0.5],
-            [-0.5, 0.5, 0.5],
-            [-0.5, 0.5, -0.5],
-        ],
-        [-1.0, 0.0, 0.0],
-    );
-    let slant = 1.0 / 2.0f32.sqrt();
-    face(
-        &[
-            [0.5, -0.5, 0.5],
-            [0.5, -0.5, -0.5],
-            [-0.5, 0.5, -0.5],
-            [-0.5, 0.5, 0.5],
-        ],
-        [slant, slant, 0.0],
-    );
+
+    let at = |x: f32, y: f32, z: f32| Vec3::new(x, y, z);
+
+    // The underside keeps its full length whatever comes off the top.
+    face(&[
+        at(-0.5, -0.5, -0.5),
+        at(0.5, -0.5, -0.5),
+        at(0.5, -0.5, 0.5),
+        at(-0.5, -0.5, 0.5),
+    ]);
+    // The top, shortened by both runs - and gone altogether where the two cuts
+    // meet, which is a ridge rather than a face.
+    if !peak {
+        face(&[
+            at(a, 0.5, -0.5),
+            at(b, 0.5, -0.5),
+            at(b, 0.5, 0.5),
+            at(a, 0.5, 0.5),
+        ]);
+    }
+    // The sides: a trapezium, or a triangle where the cuts have met.
+    for z in [-0.5f32, 0.5] {
+        if peak {
+            face(&[at(-0.5, -0.5, z), at(0.5, -0.5, z), at(a, 0.5, z)]);
+        } else {
+            face(&[
+                at(-0.5, -0.5, z),
+                at(0.5, -0.5, z),
+                at(b, 0.5, z),
+                at(a, 0.5, z),
+            ]);
+        }
+    }
+    // And the ends themselves, square where nothing was cut and leaning where
+    // something was.
+    face(&[
+        at(-0.5, -0.5, -0.5),
+        at(-0.5, -0.5, 0.5),
+        at(a, 0.5, 0.5),
+        at(a, 0.5, -0.5),
+    ]);
+    face(&[
+        at(0.5, -0.5, -0.5),
+        at(0.5, -0.5, 0.5),
+        at(b, 0.5, 0.5),
+        at(b, 0.5, -0.5),
+    ]);
+
     Mesh::new(
         bevy::render::mesh::PrimitiveTopology::TriangleList,
         bevy::asset::RenderAssetUsages::default(),
@@ -547,8 +594,6 @@ pub fn raise_baked(
     let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
     let wedge = meshes.add(prism(false));
     let ridge = meshes.add(prism(true));
-    let mitred = meshes.add(mitre(false));
-    let mitred_back = meshes.add(mitre(true));
     let framed = has_frame(work);
     for piece in work
         .boxes
@@ -570,8 +615,21 @@ pub fn raise_baked(
         let mesh = match piece.form.as_str() {
             "wedge" => wedge.clone(),
             "ridge" => ridge.clone(),
-            "mitre" => mitred.clone(),
-            "mitre-back" => mitred_back.clone(),
+            // A cut carries its two runs, as fractions of the piece's own
+            // length - "cut:0.0000x0.3300". One form for every angled end.
+            //
+            // "mitre" and "mitre-back" were the same thing said two ways, and
+            // each could only cut ALL of one end; they are still read, as the
+            // full cuts they always were, so a drawing made before this still
+            // opens.
+            "mitre" => meshes.add(cut_mesh(0.0, 1.0)),
+            "mitre-back" => meshes.add(cut_mesh(1.0, 0.0)),
+            cutting if cutting.starts_with("cut:") => {
+                let mut runs = cutting.trim_start_matches("cut:").split('x');
+                let low = runs.next().and_then(|n| n.parse().ok()).unwrap_or(0.0);
+                let high = runs.next().and_then(|n| n.parse().ok()).unwrap_or(0.0);
+                meshes.add(cut_mesh(low, high))
+            }
             // A hip roof carries its own proportions in its form - "hip:0.5x0.6"
             // - because a truncated pyramid is a different mesh at every deck
             // size and a name alone cannot say which. See atelier/FORMATS.md.

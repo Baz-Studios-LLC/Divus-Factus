@@ -141,13 +141,23 @@ its colour already looked up, plus the marks that say what the place is FOR.
   - `wedge`: a GABLE's prism. A triangle with its peak in the middle, standing
     across the part's length. Symmetric.
   - `ridge`: the same prism turned to run lengthwise, apex up — a ridge cap.
-  - `mitre`: a right-angle prism, full height at -X and cut clean away to
-    nothing at +X. What a saw leaves, and what a beam meeting a roof wants: a
-    wedge cannot do it, being symmetric, and a tilted box cannot do it either,
-    because the far end of a tilted box is still square.
-  - `mitre-back`: the same cut the other way about, full height at +X. Which
-    hand is wanted depends on which END of a beam is being capped, and a beam
-    running between two slopes wants one of each.
+  - `cut:<low>x<high>`: a box whose TOP FACE is cut back at each end. The two
+    numbers are RUNS as fractions of the piece's own length — how far along it
+    the saw travels while crossing its full height — at the -X end and the +X
+    end. `cut:0.0000x0.3300` is square at one end and mitred at the other;
+    `cut:0.2500x0.2500` is cut at both, which is what a brace wants, meeting a
+    rail at one end and a sill at the other.
+
+    A run rather than an angle, because a run is the number everything already
+    has: a roof hands over the difference between where its slope crosses the
+    top of a beam and where it crosses the bottom, and nobody needs
+    trigonometry to say what they mean.
+  - `mitre` and `mitre-back`: WHAT `cut` REPLACED, still read so that older
+    drawings open. They were two whole shapes rather than one property, each
+    able to say only that ALL of one end was gone — so no beam could be cut at
+    both ends, and every part that wanted an angled end grew a shape of its own
+    instead. They are exactly `cut:0.0000x1.0000` and `cut:1.0000x0.0000`, and
+    the bench no longer writes either.
   - `hip:<x>x<z>`: a truncated pyramid - four faces sloping in from the foot to
     a flat top, which is a hip roof with a deck. The two numbers are how much of
     the box's width and depth the top keeps, so `hip:0.5000x0.6250` slopes in a

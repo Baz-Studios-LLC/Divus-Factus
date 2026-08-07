@@ -176,6 +176,15 @@ struct Slab {
     /// Turned about the part's thickness, which swings it WITHIN that face.
     /// What a diagonal brace in a wall needs.
     cant: f32,
+    /// How far the top face is cut back at each end, as a RUN in the piece's
+    /// own units: the distance the saw travels along it while crossing its full
+    /// height. `x` is the -X end, `y` is the +X end, and nought is square.
+    ///
+    /// A run rather than an angle because a run is the number everything else
+    /// already has - a roof hands over the difference between where its slope
+    /// meets the top of a beam and where it meets the bottom - and no caller
+    /// needs trigonometry to say what it wants.
+    cut: Vec2,
 }
 
 /// What a piece of a body is cut from.
@@ -188,12 +197,6 @@ enum Shape {
     /// A ridge cap's prism: the triangle stands ACROSS the part, which
     /// runs lengthwise under it, apex up.
     Ridge,
-    /// A right-angle prism: a box with one end cut through at an angle, full
-    /// height at -X and falling away to +X. What a saw leaves.
-    Mitre,
-    /// The same cut the other way about: full height at +X. Which hand is
-    /// wanted depends on which end of a beam is being capped.
-    MitreBack,
     /// A truncated pyramid: four faces sloping in from the box's foot to a
     /// smaller flat top. A hip roof with a deck on it.
     ///
@@ -280,75 +283,115 @@ fn hip_mesh(top_x: f32, top_z: f32) -> Mesh {
 /// slab's own proportions make it: a mitre one long and one high is
 /// forty-five degrees, and squashing it flatter or steeper is what sizing it
 /// does. The full-height end stands at -X and the cut falls away to +X.
-fn mitre_mesh(mirrored: bool) -> Mesh {
+/// A unit box with its top face cut back at each end.
+///
+/// `low` and `high` are RUNS as fractions of the box's own length: how far
+/// along it the saw travels while crossing its full height, at the -X end and
+/// the +X end. Nought is a square end.
+///
+/// One shape for every angled end there is. There used to be two - a mitre and
+/// its mirror - because a beam can be cut at one end or the other, and neither
+/// could do both at once, which is what a brace actually wants: it meets a rail
+/// at one end and a sill at the other. A run of one takes the top face all the
+/// way to the far corner, which IS the old full mitre, so nothing that could be
+/// drawn before has stopped being drawable.
+fn cut_mesh(low: f32, high: f32) -> Mesh {
+    let (low, high) = (low.clamp(0.0, 1.0), high.clamp(0.0, 1.0));
+    // Two cuts that would cross leave the top face inside out. Share the length
+    // between them instead, which is the deepest pair that still leaves a beam.
+    let (low, high) = if low + high > 1.0 {
+        (low / (low + high), high / (low + high))
+    } else {
+        (low, high)
+    };
+    let (a, b) = (-0.5 + low, 0.5 - high);
+    let peak = b <= a;
+
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut normals: Vec<[f32; 3]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
-    // Mirrored, the cut faces the other way: full height at +X instead. Which
-    // hand a mitre needs depends on which END of a beam it caps, so both exist -
-    // a slab may lean about its own X, and a lean can turn the material to the
-    // other SIDE but cannot swap which end is full.
-    let mut face = |corners: &[[f32; 3]], normal: [f32; 3]| {
+
+    // Normals from the corners themselves, and wound to face outward.
+    //
+    // The shape is convex and centred on the origin, so a face's own middle
+    // points the way that face does - which settles both the normal's sign and
+    // the winding without anyone having to reason about which end is cut. The
+    // slanted ends are where doing it by hand goes wrong, and they are the
+    // whole point of this mesh.
+    let mut face = |corners: &[Vec3]| {
+        let middle = corners.iter().copied().sum::<Vec3>() / corners.len() as f32;
+        let Some(normal) = (corners[1] - corners[0])
+            .cross(corners[2] - corners[0])
+            .try_normalize()
+        else {
+            return;
+        };
+        let (normal, flip) = if normal.dot(middle) < 0.0 {
+            (-normal, true)
+        } else {
+            (normal, false)
+        };
         let first = positions.len() as u32;
-        let mut corners: Vec<[f32; 3]> = corners.to_vec();
-        let mut normal = normal;
-        if mirrored {
-            for corner in &mut corners {
-                corner[0] = -corner[0];
-            }
-            // Mirroring turns a face inside out; walking it the other way puts
-            // it right again.
+        let mut corners = corners.to_vec();
+        if flip {
             corners.reverse();
-            normal[0] = -normal[0];
         }
         for corner in &corners {
-            positions.push(*corner);
-            normals.push(normal);
+            positions.push(corner.to_array());
+            normals.push(normal.to_array());
         }
         for step in 1..(corners.len() as u32 - 1) {
             indices.extend_from_slice(&[first, first + step, first + step + 1]);
         }
     };
-    // The two triangles, one at each side: full height at -X, nothing at +X.
-    face(
-        &[[-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [-0.5, 0.5, 0.5]],
-        [0.0, 0.0, 1.0],
-    );
-    face(
-        &[[0.5, -0.5, -0.5], [-0.5, -0.5, -0.5], [-0.5, 0.5, -0.5]],
-        [0.0, 0.0, -1.0],
-    );
-    // The floor.
-    face(
-        &[
-            [-0.5, -0.5, 0.5],
-            [0.5, -0.5, 0.5],
-            [0.5, -0.5, -0.5],
-            [-0.5, -0.5, -0.5],
-        ],
-        [0.0, -1.0, 0.0],
-    );
-    // The square end it was cut from.
-    face(
-        &[
-            [-0.5, -0.5, -0.5],
-            [-0.5, -0.5, 0.5],
-            [-0.5, 0.5, 0.5],
-            [-0.5, 0.5, -0.5],
-        ],
-        [-1.0, 0.0, 0.0],
-    );
-    // And the cut itself.
-    let slant = (1.0f32 / 2.0f32.sqrt(), 1.0 / 2.0f32.sqrt());
-    face(
-        &[
-            [0.5, -0.5, 0.5],
-            [0.5, -0.5, -0.5],
-            [-0.5, 0.5, -0.5],
-            [-0.5, 0.5, 0.5],
-        ],
-        [slant.0, slant.1, 0.0],
-    );
+
+    let at = |x: f32, y: f32, z: f32| Vec3::new(x, y, z);
+
+    // The underside keeps its full length whatever comes off the top.
+    face(&[
+        at(-0.5, -0.5, -0.5),
+        at(0.5, -0.5, -0.5),
+        at(0.5, -0.5, 0.5),
+        at(-0.5, -0.5, 0.5),
+    ]);
+    // The top, shortened by both runs - and gone altogether where the two cuts
+    // meet, which is a ridge rather than a face.
+    if !peak {
+        face(&[
+            at(a, 0.5, -0.5),
+            at(b, 0.5, -0.5),
+            at(b, 0.5, 0.5),
+            at(a, 0.5, 0.5),
+        ]);
+    }
+    // The sides: a trapezium, or a triangle where the cuts have met.
+    for z in [-0.5f32, 0.5] {
+        if peak {
+            face(&[at(-0.5, -0.5, z), at(0.5, -0.5, z), at(a, 0.5, z)]);
+        } else {
+            face(&[
+                at(-0.5, -0.5, z),
+                at(0.5, -0.5, z),
+                at(b, 0.5, z),
+                at(a, 0.5, z),
+            ]);
+        }
+    }
+    // And the ends themselves, square where nothing was cut and leaning where
+    // something was.
+    face(&[
+        at(-0.5, -0.5, -0.5),
+        at(-0.5, -0.5, 0.5),
+        at(a, 0.5, 0.5),
+        at(a, 0.5, -0.5),
+    ]);
+    face(&[
+        at(0.5, -0.5, -0.5),
+        at(0.5, -0.5, 0.5),
+        at(b, 0.5, 0.5),
+        at(b, 0.5, -0.5),
+    ]);
+
     Mesh::new(
         bevy::render::mesh::PrimitiveTopology::TriangleList,
         bevy::asset::RenderAssetUsages::default(),
@@ -804,6 +847,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             shape: Shape::Box,
             lean: 0.0,
             cant: 0.0,
+            cut: Vec2::ZERO,
         }
     };
     // A wedge: the gable's own shape.
@@ -817,6 +861,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             shape: Shape::Wedge,
             lean: 0.0,
             cant: 0.0,
+            cut: Vec2::ZERO,
         }
     };
     // A piece that leans on its own, about its length: the two slopes of
@@ -833,6 +878,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 shape: Shape::Box,
                 lean,
                 cant: 0.0,
+                cut: Vec2::ZERO,
             }
         };
     // A piece swung WITHIN its part's face rather than out of it: the diagonal
@@ -851,6 +897,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 shape: Shape::Box,
                 lean: 0.0,
                 cant,
+                cut: Vec2::ZERO,
             }
         };
     // A ridge cap: the same triangle, laid along the part's length.
@@ -864,6 +911,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             shape: Shape::Ridge,
             lean: 0.0,
             cant: 0.0,
+            cut: Vec2::ZERO,
         }
     };
     // Glass: the world shows through it.
@@ -881,6 +929,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             shape: Shape::Box,
             lean: 0.0,
             cant: 0.0,
+            cut: Vec2::ZERO,
         }
     };
     let mut slabs = match kind {
@@ -1240,36 +1289,27 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // since the full face points inward at both.
             let thick = 0.375;
             let (high, low) = (cut_high.max(0.0), cut_low.max(0.0));
-            let square = (long - high - low).max(0.0625);
-            let middle = (low - high) * 0.5;
-            let mut body = vec![slab(
-                middle, 0.1875, 0.0, square, thick, thick, "wood", 0.45,
-            )];
-            if high > 0.0 {
-                body.push(Slab {
-                    at: Vec3::new(middle + square * 0.5 + high * 0.5, 0.1875, 0.0),
-                    size: Vec3::new(high, thick, thick),
-                    ramp: "wood".to_string(),
-                    shade: 0.45,
-                    clarity: 1.0,
-                    shape: Shape::Mitre,
-                    lean: 0.0,
-                    cant: 0.0,
-                });
-            }
-            if low > 0.0 {
-                body.push(Slab {
-                    at: Vec3::new(middle - square * 0.5 - low * 0.5, 0.1875, 0.0),
-                    size: Vec3::new(low, thick, thick),
-                    ramp: "wood".to_string(),
-                    shade: 0.45,
-                    clarity: 1.0,
-                    shape: Shape::MitreBack,
-                    lean: 0.0,
-                    cant: 0.0,
-                });
-            }
-            body
+            // ONE timber, cut at both ends.
+            //
+            // This used to be three pieces: a square middle with a mitre prism
+            // stuck on each end, in opposite hands, because a cut was a SHAPE
+            // and no shape could cut both ends. A beam cut at one end had two
+            // pieces and a beam cut at neither had one, so its own length meant
+            // something different in each case and every seam between them was
+            // a place two faces could disagree.
+            //
+            // A cut is a property of the box now, so a beam is a beam.
+            vec![Slab {
+                at: Vec3::new(0.0, 0.1875, 0.0),
+                size: Vec3::new(long.max(ATOM), thick, thick),
+                ramp: "wood".to_string(),
+                shade: 0.45,
+                clarity: 1.0,
+                shape: Shape::Box,
+                lean: 0.0,
+                cant: 0.0,
+                cut: Vec2::new(low, high),
+            }]
         }
         PartKind::BeamRun => {
             vec![slab(0.0, 0.1875, 0.0, 0.25, 0.375, 0.375, "wood", 0.45)]
@@ -1462,6 +1502,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 shape: Shape::Hip(keep_x, keep_z),
                 lean: 0.0,
                 cant: 0.0,
+                cut: Vec2::ZERO,
             }]
         }
         PartKind::HipRoofRun => body_of(&PartKind::HipRoof(0.25, 0.25, 0.0, ROOF_PITCH_DEGREES), None),
@@ -3640,7 +3681,7 @@ pub fn dress_part(
 ) {
     let translucent = ghostly || matches!(kind, PartKind::Widget(_));
     let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-    for Slab { at: mut at, size, ramp, shade, clarity, shape, lean: mut lean, cant } in
+    for Slab { at: mut at, size, ramp, shade, clarity, shape, lean: mut lean, cant, cut } in
         body_of(kind, repaint)
     {
         // Mirrored: the body reflects across its own length, and any
@@ -3664,10 +3705,11 @@ pub fn dress_part(
             Mesh3d(match shape {
                 Shape::Wedge => meshes.add(wedge_mesh(false)),
                 Shape::Ridge => meshes.add(wedge_mesh(true)),
-                Shape::Mitre => meshes.add(mitre_mesh(false)),
-                Shape::MitreBack => meshes.add(mitre_mesh(true)),
                 Shape::Hip(top_x, top_z) => meshes.add(hip_mesh(top_x, top_z)),
-                Shape::Box => meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
+                // A square-ended box is the common case and Bevy's own cuboid
+                // is the cheapest way to say it.
+                Shape::Box if cut == Vec2::ZERO => meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
+                Shape::Box => meshes.add(cut_mesh(cut.x / size.x, cut.y / size.x)),
             }),
             MeshMaterial3d(materials.add(StandardMaterial {
                 base_color: color,
@@ -8820,8 +8862,17 @@ pub(crate) fn bake_a_work(
 
         // The body itself, as boxes the game can simply draw.
         let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-        for Slab { at: mut at, size, ramp, shade, clarity, shape, lean: mut lean, cant: mut cant } in
-            body_of(&kind, repaint)
+        for Slab {
+            at: mut at,
+            size,
+            ramp,
+            shade,
+            clarity,
+            shape,
+            lean: mut lean,
+            cant: mut cant,
+            cut,
+        } in body_of(&kind, repaint)
         {
             if record.flip {
                 at.x = -at.x;
@@ -8843,12 +8894,23 @@ pub(crate) fn bake_a_work(
                 Shape::Hip(x, z) => format!("hip:{x:.4}x{z:.4}"),
                 _ => String::new(),
             };
+            // A cut rides in the form the same way, and for the same reason: the
+            // game builds the mesh itself and a name alone cannot say how far
+            // the saw travelled. As FRACTIONS of the piece's own length, because
+            // the game scales a unit box and never sees the metres.
+            //
+            // This is what "mitre" and "mitre-back" used to be, and they could
+            // only ever say ALL of one end. See FORMATS.md.
+            let cut_form = if cut != Vec2::ZERO && matches!(shape, Shape::Box) {
+                format!("cut:{:.4}x{:.4}", cut.x / size.x, cut.y / size.x)
+            } else {
+                String::new()
+            };
             let form = match shape {
+                Shape::Box if !cut_form.is_empty() => cut_form.as_str(),
                 Shape::Box => "box",
                 Shape::Wedge => "wedge",
                 Shape::Ridge => "ridge",
-                Shape::Mitre => "mitre",
-                Shape::MitreBack => "mitre-back",
                 Shape::Hip(..) => hip.as_str(),
             };
             let stage = match kind {
@@ -10516,21 +10578,25 @@ mod roof_tests {
         // rectangle would fail now that a beam's ends are cut, because a mitre's
         // box takes in the very wood the saw removed.
         let mut points: Vec<Vec3> = Vec::new();
-        for Slab { at: offset, size, shape, .. } in body_of(&made, None) {
-            let corners: Vec<Vec3> = match shape {
-                // The prism's own six, not the eight of the box it came from.
-                Shape::Mitre | Shape::MitreBack => {
-                    let full = if shape == Shape::Mitre { -0.5 } else { 0.5 };
-                    vec![
-                        Vec3::new(full, -0.5, -0.5),
-                        Vec3::new(full, -0.5, 0.5),
-                        Vec3::new(full, 0.5, -0.5),
-                        Vec3::new(full, 0.5, 0.5),
-                        Vec3::new(-full, -0.5, -0.5),
-                        Vec3::new(-full, -0.5, 0.5),
-                    ]
-                }
-                _ => (0..8)
+        for Slab { at: offset, size, cut, .. } in body_of(&made, None) {
+            // A cut beam's real corners: the underside keeps its full length
+            // and the top is pulled in by each end's run. One rule for every
+            // piece now - there used to be a case per mitre hand, and a beam
+            // cut at both ends had no case at all because it could not exist.
+            let (low, high) = (cut.x / size.x, cut.y / size.x);
+            let corners: Vec<Vec3> = if cut != Vec2::ZERO {
+                vec![
+                    Vec3::new(-0.5, -0.5, -0.5),
+                    Vec3::new(-0.5, -0.5, 0.5),
+                    Vec3::new(0.5, -0.5, -0.5),
+                    Vec3::new(0.5, -0.5, 0.5),
+                    Vec3::new(-0.5 + low, 0.5, -0.5),
+                    Vec3::new(-0.5 + low, 0.5, 0.5),
+                    Vec3::new(0.5 - high, 0.5, -0.5),
+                    Vec3::new(0.5 - high, 0.5, 0.5),
+                ]
+            } else {
+                (0..8)
                     .map(|n| {
                         Vec3::new(
                             if n & 1 == 0 { -0.5 } else { 0.5 },
@@ -10538,7 +10604,7 @@ mod roof_tests {
                             if n & 4 == 0 { -0.5 } else { 0.5 },
                         )
                     })
-                    .collect(),
+                    .collect()
             };
             points.extend(
                 corners
