@@ -87,10 +87,23 @@ const SPLIT_PX: f32 = 7.0;
 /// `tend_the_tree`.
 const MERGE_HYSTERESIS: f32 = 0.75;
 
-/// How far the planet's water sits below true level, to keep clear of the
-/// chunks' own sea without putting a step in the ocean where the two meet.
+/// How far the planet's water sits below true level: enough to keep out of the
+/// chunks' own sea, and no more than that.
+///
+/// A twentieth of a unit. It was one whole unit, which sounded like nothing and
+/// was not: the ground under the two waters does not meet either - patch relief
+/// is sunk by `PATCH_SINK` so it cannot fight the chunks - so at the streamed
+/// edge there is a step in the BED, and any gap between the two water surfaces
+/// is a window onto it. A staircase of chunk-sized treads ran round the whole
+/// loaded region with a brown seabed face under each one.
+///
+/// Held this close the two seas are one surface to the eye, and whatever the
+/// bed does underneath is the water's business. Nothing fights, because within
+/// the streamed radius - the only place both are drawn - a twentieth of a unit
+/// is many depth values wide.
+///
 /// See `build_patch_water`.
-const WATER_CLEARANCE: f32 = 1.0;
+const WATER_CLEARANCE: f32 = 0.05;
 
 /// Patches built per frame while the tree is chasing the camera. A build is
 /// a couple of milliseconds of noise sampling; four a frame chases a fast
