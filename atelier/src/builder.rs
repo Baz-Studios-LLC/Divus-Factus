@@ -126,16 +126,38 @@ const INFILL_SET: i32 = 1;
 /// A doorway's clear width and height, and a window's.
 const DOOR_WIDE: i32 = 16;
 const DOOR_HIGH: i32 = 32;
-const WINDOW_WIDE: i32 = 14;
-const WINDOW_HIGH: i32 = 14;
+const WINDOW_WIDE: i32 = 18;
+const WINDOW_HIGH: i32 = 16;
 /// How high a window's sill stands off the wall's foot.
 const WINDOW_SILL: i32 = 18;
-/// A jamb is as heavy as a corner post: an opening's edge carries the wall over
-/// it, and a stud's worth of timber under a lintel reads as a mistake.
+/// How heavy the timber down an opening's side is.
+///
+/// A DOOR's is as heavy as a corner post: it is a big hole and the wall over it
+/// has to be carried, and a stud's worth of timber under that lintel reads as a
+/// mistake. A WINDOW's is a stud, because it is not carrying much and because a
+/// frame twice the weight of every other upright in the wall reads as a
+/// different kind of timber altogether - which is what it looked like.
+///
+/// The window grew by exactly what its jambs gave up, so the hole and its frame
+/// together take the same room they always did.
+fn jamb_of(what: Opening) -> i32 {
+    match what {
+        Opening::Door => POST_WIDE,
+        Opening::Window => STUD_WIDE,
+    }
+}
+
+/// The widest a jamb can be, for the room an opening needs reserved.
 const JAMB_WIDE: i32 = POST_WIDE;
 
 /// How many doors and windows one framed wall may hold.
 pub const MOST_OPENINGS: usize = 4;
+
+/// A window bar's thickness - the mullion standing up it and the transom lying
+/// across. Half a stud: these divide the light rather than carry the wall, and
+/// a bar as heavy as a stud reads as a wall with a small hole either side of it
+/// rather than as a window.
+const BAR_WIDE: i32 = 1;
 
 /// A span of atoms in `n` parts that sum to exactly the span.
 ///
@@ -172,9 +194,9 @@ fn openings_at(
         let rise = rise.min(tall - PLATE_TALL - foot - PLATE_TALL);
         // Two openings that overlap would frame each other's jambs and leave a
         // bay of no width between them. The later one simply does not fit.
-        if holes.iter().any(|(_, hx, hw, hy, hh)| {
-            from < hx + hw + JAMB_WIDE
-                && from + wide + JAMB_WIDE > *hx
+        if holes.iter().any(|(theirs, hx, hw, hy, hh)| {
+            from < hx + hw + jamb_of(*theirs)
+                && from + wide + jamb_of(what) > *hx
                 && foot < hy + hh
                 && foot + rise > *hy
         }) {
@@ -1124,13 +1146,13 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // whole length in a single timber.
             let mut course = |body: &mut Vec<Slab>, foot: i32, rise: i32| {
                 let mut from = 0;
-                for (_, hx, hw, hy, hh) in &holes {
+                for (what, hx, hw, hy, hh) in &holes {
                     if foot + rise <= *hy || foot >= hy + hh {
                         continue;
                     }
-                    let left = hx - JAMB_WIDE;
-                    timber(body, from, left - from, foot, rise);
-                    from = hx + hw + JAMB_WIDE;
+                    let jamb = jamb_of(*what);
+                    timber(body, from, hx - jamb - from, foot, rise);
+                    from = hx + hw + jamb;
                 }
                 timber(body, from, span - from, foot, rise);
             };
@@ -1149,11 +1171,36 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // is the timber the hole ADDS - the whole reason nothing has to be
             // cut out of anything.
             for (what, hx, hw, hy, hh) in &holes {
-                timber(&mut body, hx - JAMB_WIDE, JAMB_WIDE, inner_foot, inner_tall);
-                timber(&mut body, hx + hw, JAMB_WIDE, inner_foot, inner_tall);
+                let jamb = jamb_of(*what);
+                timber(&mut body, hx - jamb, jamb, inner_foot, inner_tall);
+                timber(&mut body, hx + hw, jamb, inner_foot, inner_tall);
                 timber(&mut body, *hx, *hw, hy + hh, PLATE_TALL);
                 if *what == Opening::Window {
                     timber(&mut body, *hx, *hw, hy - PLATE_TALL, PLATE_TALL);
+
+                    // The cross in the light: a mullion up the middle and a
+                    // transom across it, dividing the opening into four panes.
+                    //
+                    // Set back with the plaster rather than standing at the
+                    // wall's full thickness, because a bar is joinery in the
+                    // reveal and not part of the frame carrying the wall over
+                    // the hole.
+                    let thin = WALL_THICK - (INFILL_SET * 2) as f32 * ATOM;
+                    let bar = |body: &mut Vec<Slab>, from: i32, wide: i32, foot: i32, rise: i32| {
+                        let (x, w) = across(from, wide);
+                        body.push(slab(
+                            x,
+                            (foot as f32 + rise as f32 * 0.5) * ATOM,
+                            0.0,
+                            w,
+                            rise as f32 * ATOM,
+                            thin,
+                            "wood",
+                            0.55,
+                        ));
+                    };
+                    bar(&mut body, hx + (hw - BAR_WIDE) / 2, BAR_WIDE, *hy, *hh);
+                    bar(&mut body, *hx, *hw, hy + (hh - BAR_WIDE) / 2, BAR_WIDE);
                 }
             }
 
@@ -1174,20 +1221,21 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 }
                 let mut spans: Vec<(i32, i32)> = Vec::new();
                 let mut from = POST_WIDE;
-                for (_, hx, hw, hy, hh) in &holes {
+                for (what, hx, hw, hy, hh) in &holes {
+                    let jamb = jamb_of(*what);
                     if foot < hy + hh && foot + rise > *hy {
                         // The opening stands in this course: the wall stops at
                         // its jamb and picks up again past the other one.
-                        spans.push((from, hx - JAMB_WIDE));
-                        from = hx + hw + JAMB_WIDE;
+                        spans.push((from, hx - jamb));
+                        from = hx + hw + jamb;
                     } else {
                         // It does not: the wall between its jambs is ordinary
                         // wall in this course and wants ordinary framing. An
                         // apron under a window is a bay like any other, and
                         // gets its own studs and its own braces.
-                        spans.push((from, hx - JAMB_WIDE));
+                        spans.push((from, hx - jamb));
                         spans.push((*hx, hx + hw));
-                        from = hx + hw + JAMB_WIDE;
+                        from = hx + hw + jamb;
                     }
                 }
                 spans.push((from, span - POST_WIDE));
@@ -7351,7 +7399,7 @@ fn punch_wall(
     // wall already knows what an opening is: it frames one, declines to panel
     // it, and divides the bays either side of it. So the wall simply gains the
     // opening where it was aimed, and re-solves.
-    if let Some(PartKind::Framed {
+    let reframed = if let Some(PartKind::Framed {
         long,
         high,
         mut openings,
@@ -7386,14 +7434,16 @@ fn punch_wall(
             openings,
         };
         commands.entity(wall).despawn_related::<Children>();
-        let mut record = record.clone();
-        record.part = part_name(&made);
+        let mut reframed = record.clone();
+        reframed.part = part_name(&made);
         dress_part(
-            commands, meshes, materials, palette, &made, &record, wall, false,
+            commands, meshes, materials, palette, &made, &reframed, wall, false,
         );
-        commands.entity(wall).insert(record);
-        return true;
-    }
+        commands.entity(wall).insert(reframed);
+        true
+    } else {
+        false
+    };
     let centre_of = |offset: f32| {
         let base = placed
             .get(wall)
@@ -7450,8 +7500,12 @@ fn punch_wall(
         .get(wall)
         .map(|(_, tf, _, _)| tf.translation)
         .unwrap_or(at);
-    commands.entity(wall).despawn();
-    for (kind, spot) in leavings {
+    // A framed wall reframed itself above and is still standing; only a plain
+    // one is taken away and replaced by the pieces its opening leaves.
+    if !reframed {
+        commands.entity(wall).despawn();
+    }
+    for (kind, spot) in leavings.into_iter().filter(|_| !reframed) {
         let piece = Placed {
             part: part_name(&kind),
             at: spot.into(),
@@ -7486,15 +7540,26 @@ fn punch_wall(
         loose: false,
         group: None,
     };
-    spawn_part(
-        commands,
-        meshes,
-        materials,
-        palette,
-        &frame_kind,
-        &frame,
-        false,
-    );
+    // The frame prop IS a frame - jambs, sill, lintel and the bars across -
+    // which is exactly what a framed wall already gathered around the opening
+    // when it reframed itself. Set down there it draws a second frame inside
+    // the first, a few atoms off, and the pair read as a mistake with a shadow
+    // in it. So on a plain wall the prop supplies the frame; on a framed wall
+    // the wall does, and nothing is set down.
+    //
+    // The widget below is not geometry and arrives either way: it is how the
+    // village knows there is a door here to walk through.
+    if !reframed {
+        spawn_part(
+            commands,
+            meshes,
+            materials,
+            palette,
+            &frame_kind,
+            &frame,
+            false,
+        );
+    }
 
     // A door is a doorway: the routing widget arrives with it, its nose
     // pointing OUT through the opening - the way you were looking when
@@ -10132,15 +10197,28 @@ mod roof_tests {
                     && (piece.at.y - y).abs() < piece.size.y * 0.5 - 1e-4
             };
 
-            assert!(
-                !body.iter().any(|piece| holds(piece, 0.0)),
-                "something fills the middle of the {}",
-                if hole == Opening::Door { "doorway" } else { "window" },
-            );
+            // A quarter of the way in, not the middle: a window has a mullion
+            // and a transom crossing at its centre now, so the centre is
+            // rightly full. The panes either side of them are what must be
+            // clear.
+            for quarter in [-0.25f32, 0.25] {
+                let x = quarter * wide as f32 * ATOM;
+                assert!(
+                    !body.iter().any(|piece| holds(piece, x)),
+                    "something fills the {} at {x:.3}",
+                    if hole == Opening::Door {
+                        "doorway"
+                    } else {
+                        "window"
+                    },
+                );
+            }
             // And a jamb down each side of it, which is the timber the opening
             // brought with it.
             for side in [-1.0f32, 1.0] {
-                let at = side * (wide + JAMB_WIDE) as f32 * 0.5 * ATOM;
+                // Its OWN jamb: a door's is a post's width and a window's is a
+                // stud's, so the frame reads like the rest of the framing.
+                let at = side * (wide + jamb_of(hole)) as f32 * 0.5 * ATOM;
                 assert!(
                     body.iter()
                         .any(|piece| piece.ramp == "wood" && holds(piece, at)),
