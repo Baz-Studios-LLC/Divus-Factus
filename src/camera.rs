@@ -312,6 +312,13 @@ pub const CLOSE_NEAR: f32 = 0.04;
 /// opens both ways, the transform is pointed by yaw and pitch rather than at
 /// the focus, and the ground-clearance lift is skipped. Well under the
 /// twelve metres ordinary play is clamped to, so only Avatar reaches it.
+/// The god camera's vertical field of view, in radians.
+///
+/// Named because the title screen has to aim the planet at a place on the
+/// SCREEN, and turning a fraction of the frame into an angle needs the lens
+/// that frame was drawn with.
+pub const FIELD_OF_VIEW: f32 = 0.62;
+
 pub const FIRST_PERSON: f32 = 0.5;
 
 /// Mouse travel in a single frame, in pixels, past which free look treats the
@@ -571,7 +578,7 @@ fn spawn_camera(mut commands: Commands) {
         Projection::Perspective(PerspectiveProjection {
             // A slightly long lens flattens the scene, which reinforces the
             // look-at-a-model feeling the tilt-shift pass will build on.
-            fov: 0.62,
+            fov: FIELD_OF_VIEW,
             near: WIDE_NEAR,
             // Far enough to see the far limb of the planet from the top of the
             // orbital zoom. Reverse-Z depth keeps the precision honest across

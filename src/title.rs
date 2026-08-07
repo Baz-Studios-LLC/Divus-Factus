@@ -545,7 +545,7 @@ fn spawn_title(
                 // frame sits up inside it.
                 position_type: PositionType::Absolute,
                 right: px(110),
-                top: percent(24),
+                top: percent(MENU_TOP * 100.0),
                 bottom: px(0),
                 width: px(340),
                 flex_direction: FlexDirection::Column,
@@ -958,6 +958,29 @@ const DRIFT_TURN: f32 = 0.021;
 /// and I had that back to front.
 const DRIFT_AIM: f32 = -0.16;
 
+/// Where the menu column starts, as a fraction of the screen's height. It runs
+/// from there to the foot of the frame and centres its buttons in what is left,
+/// so its own middle is halfway between this and the bottom.
+const MENU_TOP: f32 = 0.24;
+
+/// How far the title turns the camera DOWN its aim, so the planet's middle
+/// lands level with the menu's.
+///
+/// Derived rather than dialled. The planet and the menu read as a pair, so the
+/// number that places one has to be the number that places the other - and a
+/// constant tuned by eye against one build of the camera goes wrong the moment
+/// the camera changes, which is exactly what happened: the eye used to be
+/// seated by its own coordinates and is a rigid offset in the rig's frame now,
+/// which reframes anything as far out as this.
+///
+/// Turning the camera up moves the world down, so this is positive.
+fn menu_middle_aim() -> f32 {
+    let middle = (MENU_TOP + 1.0) * 0.5;
+    // How far off the frame's centre that is, in half-heights.
+    let off = (middle - 0.5) * 2.0;
+    (off * (crate::camera::FIELD_OF_VIEW * 0.5).tan()).atan()
+}
+
 /// Slowly circles the camera over the village while the pre-game screens are
 /// up. The world lives underneath — fires burning, villagers about their
 /// day — which is the whole point of looking at it.
@@ -982,7 +1005,7 @@ fn drift_title_camera(
     // The planet to the left, the menu to the right: the camera turns off its
     // own aim rather than the world moving. Nothing else in the game shifts its
     // aim, so this is set here and cleared on the way out.
-    rig.aim_offset = Vec2::new(DRIFT_AIM, 0.0);
+    rig.aim_offset = Vec2::new(DRIFT_AIM, menu_middle_aim());
     rig.target_yaw += DRIFT_TURN * time.delta_secs();
     rig.zoom_anchor = None;
 }
@@ -1718,5 +1741,31 @@ fn handle_choice(
         if *interaction == Interaction::Pressed {
             exit.write(AppExit::Success);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// The planet's middle lands level with the menu's.
+    ///
+    /// Both are placed from `MENU_TOP`, so the only way they can part company
+    /// is if this arithmetic is wrong - which is worth saying out loud, because
+    /// the symptom is "the planet looks a bit high" and nobody can check that
+    /// by eye against a number in another file.
+    #[test]
+    fn the_planet_is_aimed_at_the_menus_middle() {
+        let aim = super::menu_middle_aim();
+        // Undo it: an angle back into a fraction of the screen.
+        let off = aim.tan() / (crate::camera::FIELD_OF_VIEW * 0.5).tan();
+        let landed = 0.5 + off * 0.5;
+        let menu = (super::MENU_TOP + 1.0) * 0.5;
+        assert!(
+            (landed - menu).abs() < 1e-4,
+            "the planet lands at {landed} of the screen and the menu sits at {menu}",
+        );
+        assert!(
+            aim > 0.0,
+            "turning the camera up is what moves the world down",
+        );
     }
 }
