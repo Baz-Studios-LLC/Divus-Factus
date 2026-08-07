@@ -575,8 +575,19 @@ impl Terrain {
     /// has been generated or in what order.
     /// Ground height at a world position, including river channels.
     pub fn height_at(&self, x: f32, z: f32) -> f32 {
+        self.carved(x, z, self.river_query(x, z))
+    }
+
+    /// The ground, given an answer about the river already in hand.
+    ///
+    /// Split out because `river_surface_at` needs both the course and the
+    /// ground, and asking `height_at` for the second ran the whole spatial
+    /// lookup a second time - on every vertex of every patch and every chunk in
+    /// the world, which with a full drainage network is a great deal of walking
+    /// the same bins to get the same answer.
+    fn carved(&self, x: f32, z: f32, query: Option<(f32, f32, f32)>) -> f32 {
         let base = self.base_height_at(x, z);
-        let Some((level, distance, width)) = self.river_query(x, z) else {
+        let Some((level, distance, width)) = query else {
             return self.leveled(x, z, base);
         };
         let half_width = rivers::CHANNEL_HALF_WIDTH * width;
@@ -598,6 +609,16 @@ impl Terrain {
     fn river_query(&self, x: f32, z: f32) -> Option<(f32, f32, f32)> {
         self.rivers.ensure_near(self, x, z);
         self.rivers.nearest(x, z)
+    }
+
+    /// The surface of any standing water over this point.
+    ///
+    /// Lakes need no channel cut for them and no shoreline drawn: the fill that
+    /// makes them raises the water to its outlet, and the shore is wherever the
+    /// land happens to cross that. All the ground has to do is be lower.
+    fn still_query(&self, x: f32, z: f32) -> Option<f32> {
+        self.rivers.ensure_near(self, x, z);
+        self.rivers.still_at(x, z)
     }
 
     /// Ground height before any river is cut into it.
@@ -698,12 +719,26 @@ impl Terrain {
     /// `None` below sea level, where the ocean already covers everything and a
     /// second surface would only fight it.
     pub fn river_surface_at(&self, x: f32, z: f32) -> Option<f32> {
-        let (level, distance, width) = self.river_query(x, z)?;
-        if distance > rivers::CHANNEL_HALF_WIDTH * width * 1.05 {
-            return None;
+        let query = self.river_query(x, z);
+
+        // Flowing water, if a channel holds this point.
+        let mut surface = query
+            .filter(|(_, distance, width)| {
+                *distance <= rivers::CHANNEL_HALF_WIDTH * width * 1.05
+            })
+            .map(|(level, _, _)| level);
+
+        // And standing water, which needs no channel and has no drawn edge -
+        // a lake covers whatever ground lies under its level, so its shore is a
+        // contour of the land and follows every inlet and headland for free.
+        if let Some(pond) = self.still_query(x, z) {
+            if surface.is_none_or(|had| pond > had) {
+                surface = Some(pond);
+            }
         }
-        let ground = self.height_at(x, z);
-        (level > ground + 0.12 && level > WATER_LEVEL + 0.8).then_some(level)
+
+        let ground = self.carved(x, z, query);
+        surface.filter(|level| *level > ground + 0.12 && *level > WATER_LEVEL + 0.8)
     }
 
     /// Whether a position lies in flowing water.
@@ -2079,16 +2114,34 @@ mod tests {
 
     #[test]
     fn river_water_is_level_across_the_channel() {
-        // The law the redesign exists to honour: across its width, a river is a
-        // level sheet. Along the course it may fall, so the tolerance allows for
-        // downstream slope but not for the hammock sag it replaces.
+        // The same law as `rivers::water_is_level_across_a_channel`, asked one
+        // layer up: through `river_surface_at`, which is what the rest of the
+        // game actually calls, and which brings the carve and the lakes in with
+        // it.
+        //
+        // Over LAND. Half this world is ocean and the origin is not special -
+        // for seed 77 it is open sea, and the net this used to cast there found
+        // seven wet points in five thousand, none of which were rivers. It has
+        // been failing for that reason and not for any fault in the water.
         let t = Terrain::new(77);
-        let mut checked = 0;
+        let mut middle = Vec2::ZERO;
+        let mut highest = f32::NEG_INFINITY;
+        for iz in -24..24 {
+            for ix in -24..24 {
+                let at = Vec2::new(ix as f32 * 320.0, iz as f32 * 320.0);
+                let h = t.base_height_at(at.x, at.y);
+                if h > highest {
+                    highest = h;
+                    middle = at;
+                }
+            }
+        }
 
+        let mut checked = 0;
         'search: for iz in -60..60 {
             for ix in -60..60 {
-                let x = ix as f32 * 40.0;
-                let z = iz as f32 * 40.0;
+                let x = middle.x + ix as f32 * 12.0;
+                let z = middle.y + iz as f32 * 12.0;
                 let Some(here) = t.river_surface_at(x, z) else {
                     continue;
                 };
