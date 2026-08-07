@@ -946,8 +946,10 @@ fn drawn_radial(h: f32, wet: f32) -> f32 {
 fn paint(terrain: &Terrain, x: f32, z: f32, h: f32, wet: f32, slope: f32) -> [f32; 4] {
     if h < wet {
         let depth = ((wet - h) / 8.0).clamp(0.0, 1.0);
-        let shallow = palette::shade(&palette::WATER, 0.9).to_linear();
-        let deep = palette::shade(&palette::WATER, 0.45).to_linear();
+        // The sheet's own two shades, not a second opinion about them. See
+        // `water::SEA_SHALLOW`.
+        let shallow = palette::shade(&palette::WATER, crate::water::SEA_SHALLOW).to_linear();
+        let deep = palette::shade(&palette::WATER, crate::water::SEA_DEEP).to_linear();
         return [
             shallow.red + (deep.red - shallow.red) * depth,
             shallow.green + (deep.green - shallow.green) * depth,

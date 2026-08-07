@@ -56,13 +56,30 @@ pub struct WaterParams {
     pub _pad: Vec2,
 }
 
+/// Where on the water ramp the sea's two colours are taken from.
+///
+/// Shared, because TWO different things draw the same ocean: this sheet, over
+/// whatever ground is loaded, and the planet's own painted surface everywhere
+/// beyond it. Each used to choose its own shades - 1.0 and 0.62 here, 0.9 and
+/// 0.45 on the planet - and since neither is wrong on its own, nothing looked
+/// broken until you saw them side by side, where the join showed up as a
+/// square of differently-coloured sea lying in the middle of the ocean.
+///
+/// Brett: "its a different color than the rest of the water...if they were the
+/// same color they would blend."
+///
+/// The play-level sheet's values win, because those are the ones that have
+/// been looked at from a boat.
+pub const SEA_SHALLOW: f32 = 1.0;
+pub const SEA_DEEP: f32 = 0.62;
+
 impl Default for WaterParams {
     fn default() -> Self {
         // Both drawn from the bright end of the water ramp. A god camera spends most
         // of its time at an oblique angle, where the depth mix leans toward `deep` —
         // pick that too dark and the sea reads as navy paint at every useful zoom.
-        let shallow = palette::shade(&palette::WATER, 1.0).to_linear();
-        let deep = palette::shade(&palette::WATER, 0.62).to_linear();
+        let shallow = palette::shade(&palette::WATER, SEA_SHALLOW).to_linear();
+        let deep = palette::shade(&palette::WATER, SEA_DEEP).to_linear();
         let sky = crate::render::horizon_color().to_linear();
 
         WaterParams {
