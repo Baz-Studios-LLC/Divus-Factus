@@ -153,6 +153,31 @@ impl Place {
         }
     }
 
+    /// The point a `fraction` of the way along the great circle to another
+    /// place.
+    ///
+    /// A slerp, and deliberately UNCLAMPED, unlike `toward`: a fraction past
+    /// one carries on beyond the far end and a negative one sets off the other
+    /// way. That is what a lerp between two points does, and what anything
+    /// that interpolates rather than walks needs - zooming out, say, which has
+    /// to carry the view further from the spot under the cursor than it
+    /// started.
+    pub fn glide(&self, other: Place, fraction: f32) -> Place {
+        let full = self.angle_to(other);
+        if full <= f32::EPSILON {
+            return *self;
+        }
+        let axis = self
+            .dir
+            .cross(other.dir)
+            .try_normalize()
+            .unwrap_or_else(|| self.east_local());
+        Place {
+            dir: (Quat::from_axis_angle(axis, full * fraction) * self.dir).normalize(),
+            high: self.high,
+        }
+    }
+
     /// A step of `dist` units on a bearing, clockwise from north.
     pub fn walk(&self, bearing: f32, dist: f32) -> Place {
         let (sin, cos) = bearing.sin_cos();
@@ -297,6 +322,23 @@ mod tests {
         let part = here.toward(there, 25.0);
         assert!((here.apart(part) - 25.0).abs() < 0.01);
         assert!((part.apart(there) - 25.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn a_glide_runs_past_both_ends() {
+        let here = Place::from_flat(Vec3::ZERO);
+        let there = Place::from_flat(Vec3::new(600.0, 0.0, -800.0));
+        let gap = here.apart(there);
+
+        assert!(here.glide(there, 0.0).apart(here) < 0.01);
+        assert!(here.glide(there, 1.0).apart(there) < 0.01);
+        assert!((here.glide(there, 0.5).apart(here) - gap * 0.5).abs() < 0.1);
+        // Past the far end, and back behind the near one. This is what
+        // separates a glide from a step: `toward` would stop at `there`.
+        assert!((here.glide(there, 2.0).apart(here) - gap * 2.0).abs() < 0.5);
+        let back = here.glide(there, -1.0);
+        assert!((back.apart(here) - gap).abs() < 0.5);
+        assert!((back.apart(there) - gap * 2.0).abs() < 0.5);
     }
 
     #[test]

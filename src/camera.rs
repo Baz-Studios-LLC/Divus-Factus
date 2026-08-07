@@ -496,11 +496,27 @@ pub(crate) fn normalised_scroll(delta: f32, unit: MouseScrollUnit) -> f32 {
 /// pins the focus to the terrain every frame — moving it here as well would just be
 /// overwritten, and on a slope the two would fight.
 fn zoom_focus(focus: Vec3, target: Vec3, ratio: f32) -> Vec3 {
-    Vec3::new(
-        target.x + (focus.x - target.x) * ratio,
-        focus.y,
-        target.z + (focus.z - target.z) * ratio,
-    )
+    // Along the great circle between them, NOT across the coordinate plane.
+    //
+    // The flat `(x, z)` is longitude and latitude multiplied by the radius, so
+    // lerping it is lerping ANGLES. Two failures came out of that. Near a pole
+    // east-west arc length collapses, so a few units of actual ground is an
+    // enormous step of `x`, and the focus shot round the world - the fast spin
+    // on zoom. And across the date line the straight line between two adjacent
+    // places is the whole circumference the wrong way.
+    //
+    // As places, `ratio` means what it always meant: one leaves the focus
+    // alone, zero arrives at the anchor, and everything between is that
+    // fraction of the way along the ground.
+    let here = crate::place::Place::from_flat(focus);
+    let anchor = crate::place::Place::from_flat(target);
+    if anchor.apart(here) <= f32::EPSILON {
+        return focus;
+    }
+    // A glide and not a step, because zooming OUT has to carry the focus
+    // further from the anchor than it began - past the far end of the arc,
+    // which anything that refuses to overshoot cannot do.
+    canonical_near(focus, anchor.glide(here, ratio).direction())
 }
 
 /// Ground point under the mouse cursor, if the cursor is over the terrain.
@@ -740,7 +756,15 @@ fn read_camera_input(
         // Zoom toward whatever is under the cursor rather than the centre of the
         // screen, so zooming doubles as aiming: you can drop onto one villager
         // without panning there first.
-        rig.zoom_anchor = cursor_ground_point(&windows, &cameras, terrain.as_deref());
+        // The ground under the cursor when there IS loaded ground under it,
+        // and the planet's own surface when there is not. Zoomed out at the
+        // globe the terrain raycast has nothing to hit, so the anchor came
+        // back None and the zoom fell to the centre of the screen - which is
+        // precisely the altitude at which aiming the zoom matters most.
+        let focus = rig.focus;
+        rig.zoom_anchor = cursor_ground_point(&windows, &cameras, terrain.as_deref()).or_else(
+            || cursor_sphere_direction(&windows, &cameras).map(|dir| canonical_near(focus, dir)),
+        );
     }
 
     // Leaving for the sky. Past the play ceiling the view steepens toward
@@ -766,7 +790,29 @@ fn read_camera_input(
 /// Pure, and separately tested, because the axes of this are easy to get wrong
 /// and impossible to see wrong from a screenshot.
 pub(crate) fn turn_the_world(focus: Vec3, held: Vec3, now: Vec3) -> Vec3 {
-    let turn = Quat::from_rotation_arc(now, held);
+    // Built from an explicit axis and a CLAMPED angle, not from
+    // `from_rotation_arc`, which documents that it picks an arbitrary axis
+    // when its two directions are opposite - and near the planet's silhouette
+    // they can be, because a hit that skids over the limb lands on the far
+    // side of the world. An arbitrary axis through the middle is a half turn,
+    // which is the planet flipping end over end under the hand.
+    //
+    // The angle is capped so no single reading can lurch the world either.
+    // `held` is fixed for the whole gesture, so a capped step is not a step
+    // lost: the next frame sees the same gap and takes another bite of it,
+    // and a fast drag converges over two or three frames instead of snapping.
+    let axis = now.cross(held);
+    let Some(axis) = axis.try_normalize() else {
+        // Parallel: already aligned, nothing to turn. Or antiparallel, where
+        // there is no honest answer and leaving the world alone is the only
+        // safe one.
+        return focus;
+    };
+    let angle = axis
+        .dot(now.cross(held))
+        .atan2(now.dot(held))
+        .min(MOST_TURN_IN_A_FRAME);
+    let turn = Quat::from_axis_angle(axis, angle);
     let stance = crate::globe::planet_stance();
     let focus_dir = stance * crate::terrain::direction_at(focus.x, focus.z);
     let turned = stance.inverse() * (turn * focus_dir);
@@ -803,6 +849,20 @@ fn canonical_near(was: Vec3, direction: Vec3) -> Vec3 {
 /// Where the cursor's ray meets the planet's sea-level sphere, as a unit
 /// direction from the planet's centre — the handle the world-grab holds.
 /// `None` when the cursor is off the ball entirely.
+/// The most the world may turn from one reading, in radians.
+const MOST_TURN_IN_A_FRAME: f32 = 0.35;
+
+/// How far inside the silhouette a hit must land to be worth trusting, as a
+/// fraction of the radius.
+///
+/// At the limb the sphere runs edgewise to the eye: the near and far
+/// intersections meet, and the ground under the cursor sweeps arbitrarily fast
+/// for an arbitrarily small movement of the mouse. Readings from there are not
+/// slightly noisy, they are meaningless - and they are what sent the grab to
+/// the far side of the world. Past this the cursor is treated as being off the
+/// planet, and a grab in progress simply holds still until it comes back.
+const STEADY_GROUND: f32 = 0.12;
+
 fn cursor_sphere_direction(
     windows: &Query<&Window, With<PrimaryWindow>>,
     cameras: &Query<(&Camera, &GlobalTransform), With<GodCamera>>,
@@ -821,6 +881,9 @@ fn cursor_sphere_direction(
         return None;
     }
     let depth = (radius * radius - off_axis).sqrt();
+    if depth < radius * STEADY_GROUND {
+        return None;
+    }
     let hit = ray.origin + *ray.direction * (along - depth);
     Some((hit - centre).normalize())
 }
