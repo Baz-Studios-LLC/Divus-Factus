@@ -141,7 +141,24 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         view.viewport.w * view.clip_from_view[1][1] * 0.5 / max(camera_distance, 1.0);
     let detail = smoothstep(2.5, 12.0, wavelength * px_per_unit);
 
-    let normal = wave_normal(p, t, water.wave_strength, detail);
+    // The wave field is computed flat, around +Y, and then stood up on the
+    // surface it is actually lying on.
+    //
+    // It used to be used as it came out, which quietly assumed the world was a
+    // plane with +Y for up. It very nearly is - at the point where the flat
+    // scaffold touches the globe - and that is where the streamed chunks are,
+    // so their sea looked right and the planet's did not. The boundary between
+    // the two was the streaming edge: ripples and glitter on one side of it,
+    // dead flat water on the other, with a straight diagonal join.
+    //
+    // The tangent is world +X flattened onto the surface, which keeps the wave
+    // field lined up with the same axes `p` is sampled in, so the pattern runs
+    // on unbroken across the join instead of twisting at it.
+    let up = normalize(in.world_normal);
+    let ripple = wave_normal(p, t, water.wave_strength, detail);
+    let tangent = normalize(vec3<f32>(1.0, 0.0, 0.0) - up * up.x);
+    let bitangent = cross(up, tangent);
+    let normal = normalize(tangent * ripple.x + up * ripple.y + bitangent * ripple.z);
     let sun = normalize(water.sun.xyz);
 
     // Fresnel: water is nearly opaque underfoot and nearly a mirror at the horizon.
@@ -210,10 +227,22 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     if (detail > 0.2) {
         let crest = wave_height(p, t);
         let whitecap =
-            smoothstep(0.55, 0.95, crest) * detail * smoothstep(0.05, 0.4, submersion);
+            smoothstep(0.55, 0.95, crest) * detail * smoothstep(0.02, 0.15, submersion);
         color = mix(color, water.sky.rgb * 1.45, whitecap * 0.5);
         alpha = max(alpha, whitecap * 0.65);
     }
+
+    // The sheen itself makes the surface visible, however little water there is
+    // under it.
+    //
+    // Everything above earns its opacity from DEPTH, which is right for the
+    // body of the water - shallows should show the sand through them. It is
+    // wrong for the sheen: a highlight is light bouncing off the surface, and
+    // the surface is just as present over a foot of water as over a fathom. So
+    // the shallows came out flat pale bands hugging every coast, with the
+    // ripples running right up to them and stopping - the one place a real sea
+    // is busiest.
+    alpha = max(alpha, clamp(specular * water.specular, 0.0, 1.0) * 0.8);
 
     // Reflection is stronger at a glancing angle — but only where there is water to
     // reflect in. Applying it regardless forced the shallows opaque at exactly the
