@@ -24,6 +24,7 @@ mod god;
 mod history;
 mod hud;
 pub(crate) mod layers;
+pub(crate) mod ordo_trial;
 pub(crate) mod timings;
 mod inspector;
 mod manifest;

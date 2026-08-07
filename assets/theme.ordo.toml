@@ -1,0 +1,36 @@
+# Divus Factus's own interface, said in Ordo's vocabulary.
+#
+# A one-for-one translation of `ui::theme`, so the panel built from this should
+# be indistinguishable from the panels built from that. Where the two drift is
+# the whole point of the exercise.
+#
+# The ramps are LENT by the game - see `lend_ramps`. Ordo names roles and never
+# ships colours, which is what lets the interface stay dyed from the same ramps
+# the villagers' own clothes are.
+
+[color]
+panel_bg     = { srgb = [0.045, 0.050, 0.062], alpha = 0.985 }
+title_bg     = { srgb = [0.075, 0.082, 0.102], alpha = 0.990 }
+card_bg      = { srgb = [0.058, 0.062, 0.078] }
+card_border  = { ramp = "cloth_gold", shade = 0.60, alpha = 0.55 }
+panel_border = { ramp = "cloth_gold", shade = 0.55, alpha = 0.35 }
+ink          = { ramp = "bone", shade = 0.97 }
+ink_dim      = { ramp = "bone", shade = 0.78 }
+accent       = { ramp = "cloth_gold", shade = 0.85 }
+
+[font]
+display      = { path = "fonts/Cinzel.ttf" }
+display_bold = { path = "fonts/CinzelDecorative-Bold.ttf" }
+body         = { path = "fonts/EBGaramond.ttf" }
+
+[metric]
+title_size  = 13.0
+body_size   = 13.0
+small_size  = 12.0
+pad         = 12.0
+gap         = 5.0
+margin      = 10.0
+label_width = 112.0
+row_height  = 22.0
+border      = 1.0
+radius      = 5.0

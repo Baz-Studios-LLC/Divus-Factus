@@ -259,6 +259,7 @@ fn main() {
             fog::FogPlugin,
             globe::GlobePlugin,
             debug::timings::TimingsPlugin,
+            debug::ordo_trial::OrdoTrialPlugin,
         ))
         .add_systems(Startup, spawn_lighting)
         .run();

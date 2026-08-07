@@ -1,0 +1,155 @@
+//! The first contact between Divus Factus and Ordo.
+//!
+//! `DIVUS_FACTUS_ORDO=1` puts two panels on screen carrying the SAME content:
+//! one built out of Ordo's widgets, one hand-built the way every panel in this
+//! game is built today. Side by side, in the same frame, under the same light.
+//!
+//! The point is not to convert the interface. It is to find out what is wrong
+//! with Ordo while it is still cheap to change - it has never been used by a
+//! real game, and this is the first one. See `../Ordo/FIRST-PORT.md`.
+//!
+//! Everything here is scaffolding and should be deleted the day the answer is
+//! known, which is why it is one file behind one dial and touches nothing else.
+
+use bevy::ecs::schedule::common_conditions::run_once;
+use bevy::prelude::*;
+use ordo::prelude::*;
+
+use crate::ui::{Anchor as DfAnchor, theme};
+
+/// Whether the trial is wanted at all.
+pub fn asked_for() -> bool {
+    std::env::var("DIVUS_FACTUS_ORDO").is_ok_and(|dial| dial != "0")
+}
+
+pub struct OrdoTrialPlugin;
+
+impl Plugin for OrdoTrialPlugin {
+    fn build(&self, app: &mut App) {
+        if !asked_for() {
+            return;
+        }
+        app.add_plugins(ordo::OrdoPlugin::with_theme("theme.ordo.toml"))
+            .add_systems(Startup, lend_ramps)
+            // NOT at Startup: `Fonts` is loaded a beat later, so a panel raised
+            // there dies asking for it. Ordo's own widgets do not care - they
+            // carry a `Face` tag and the repaint pass finds the font whenever it
+            // arrives - which is the first thing the port has said in Ordo's
+            // favour, and it said it by killing the hand-built twin.
+            .add_systems(
+                Update,
+                raise_the_pair
+                    .run_if(resource_exists::<crate::ui::Fonts>)
+                    .run_if(run_once),
+            );
+    }
+}
+
+/// The game hands Ordo its own pigment.
+///
+/// Ordo names roles and never ships colours, so the interface stays dyed from
+/// the very ramps the villagers' clothes are dyed from - which is the whole
+/// reason a kit that shipped its own palette would be no use here.
+///
+/// `palette::shade` snaps to one of five stops, so a `shade` in the theme file
+/// has five distinct outcomes and not a continuum. That is exactly what this
+/// game's interface does today, so it is right - but it does mean the "tune the
+/// shade live" idea is worth less than it sounds, and the smooth twin is
+/// registered beside each one for anything that wants a real knob.
+fn lend_ramps(mut ramps: ResMut<Ramps>) {
+    ramps.register("cloth_gold", |t| {
+        crate::palette::shade(&crate::palette::CLOTH_GOLD, t)
+    });
+    ramps.register("bone", |t| {
+        crate::palette::shade(&crate::palette::BONE, t)
+    });
+    ramps.register("cloth_gold_smooth", |t| {
+        crate::palette::shade_smooth(&crate::palette::CLOTH_GOLD, t)
+    });
+    ramps.register("bone_smooth", |t| {
+        crate::palette::shade_smooth(&crate::palette::BONE, t)
+    });
+}
+
+/// The same panel twice: Ordo's on the left, the game's own on the right.
+fn raise_the_pair(mut commands: Commands, fonts: Res<crate::ui::Fonts>) {
+    // ---- Ordo's -------------------------------------------------------
+    commands.spawn((
+        panel(Anchor::TopLeft, Some(260.0)),
+        children![
+            heading("The Village"),
+            (row(), children![label("Believers"), body("1,204")]),
+            (row(), children![label("Timber"), body("86")]),
+            (row(), children![label("Faith"), dim("rising")]),
+            button("Dismiss"),
+        ],
+    ));
+
+    // ---- and the game's own, by hand ----------------------------------
+    //
+    // Written the way every panel in this game is written, so what is being
+    // compared is the two ways of saying it rather than two different panels.
+    let mine = crate::ui::panel(&mut commands, DfAnchor::TopRight, None, Some(260.0)).root;
+    let title = commands
+        .spawn((
+            Text::new("The Village"),
+            TextFont {
+                font: fonts.display.clone().into(),
+                font_size: bevy::text::FontSize::Px(theme::TITLE_SIZE),
+                ..default()
+            },
+            TextColor(theme::accent()),
+            ChildOf(mine),
+        ))
+        .id();
+    let _ = title;
+    for (name, value, dimmed) in [
+        ("Believers", "1,204", false),
+        ("Timber", "86", false),
+        ("Faith", "rising", true),
+    ] {
+        let line = commands
+            .spawn((
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    min_height: Val::Px(22.0),
+                    ..default()
+                },
+                ChildOf(mine),
+            ))
+            .id();
+        commands.spawn((
+            Text::new(name),
+            TextFont {
+                font: fonts.text.clone().into(),
+                font_size: bevy::text::FontSize::Px(theme::BODY_SIZE),
+                ..default()
+            },
+            TextColor(theme::text_dim()),
+            Node {
+                width: Val::Px(theme::LABEL_WIDTH),
+                ..default()
+            },
+            ChildOf(line),
+        ));
+        commands.spawn((
+            Text::new(value),
+            TextFont {
+                font: fonts.text.clone().into(),
+                font_size: bevy::text::FontSize::Px(if dimmed {
+                    theme::SMALL_SIZE
+                } else {
+                    theme::BODY_SIZE
+                }),
+                ..default()
+            },
+            TextColor(if dimmed {
+                theme::text_dim()
+            } else {
+                theme::text()
+            }),
+            ChildOf(line),
+        ));
+    }
+}

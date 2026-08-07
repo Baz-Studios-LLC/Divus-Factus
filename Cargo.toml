@@ -7,7 +7,12 @@ edition = "2024"
 winres = "0.1"
 
 [dependencies]
-bevy = { version = "0.19.0", features = ["serialize", "wav"] }
+bevy = { version = "0.19.0", features = ["serialize", "wav", "file_watcher"] }
+# Brett's own UI kit, at ../Ordo. A PATH dependency on purpose: while both move
+# together a path is what you want, and a pinned rev is what you want the day
+# this ships against it. See ../Ordo/FIRST-PORT.md - this is that first port,
+# and the point of it is to find out what is wrong with Ordo.
+ordo = { path = "../Ordo" }
 # Temporary: names systems and components in B0001 conflict panics.
 bevy_ecs = { version = "0.19.0", features = ["debug"] }
 # The one other dependency, for save files. Hand-rolling serialization for a
