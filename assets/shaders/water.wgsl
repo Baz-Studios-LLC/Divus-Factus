@@ -242,42 +242,11 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     color = mix(color, water.sky.rgb * 1.35, foam_band * 0.8);
     alpha = max(alpha, foam_band * 0.9);
 
-    // Whitecaps. The foam above is the shore's - it appears where the water
-    // thins against land - and an ocean that only foams at its edges reads as a
-    // rippled sheet rather than as something moving. Real foam breaks off the
-    // CRESTS, so it goes where the wave field is near its peak.
-    //
-    // Faded with `detail` for the same reason the waves are: a crest a fraction
-    // of a pixel wide can only alias, and a sea sprayed with sub-pixel white
-    // sparkles is the noisiest thing on screen. Gated on submersion too, so it
-    // cannot break over ground that is barely wet.
-    if (detail > 0.2) {
-        let crest = wave_height(p, t);
-        let whitecap =
-            smoothstep(0.55, 0.95, crest) * detail * smoothstep(0.02, 0.15, submersion);
-        color = mix(color, water.sky.rgb * 1.45, whitecap * 0.5);
-        alpha = max(alpha, whitecap * 0.65);
-    }
-
-    // The sheen itself makes the surface visible, however little water there is
-    // under it.
-    //
-    // Everything above earns its opacity from DEPTH, which is right for the
-    // body of the water - shallows should show the sand through them. It is
-    // wrong for the sheen: a highlight is light bouncing off the surface, and
-    // the surface is just as present over a foot of water as over a fathom. So
-    // the shallows came out flat pale bands hugging every coast, with the
-    // ripples running right up to them and stopping - the one place a real sea
-    // is busiest.
-    alpha = max(alpha, clamp(specular * water.specular, 0.0, 1.0) * 0.8);
-
-    // And a little presence of its own wherever there is water at all, so the
-    // wave field is still readable over sand. Depth alone took the shallows to
-    // nearly nothing, which is honest about seeing the bottom and wrong about
-    // there being a surface above it: the ripples ran to the shelf and stopped.
-    // Small enough that the sand still shows through.
-    alpha = max(alpha, 0.12 * smoothstep(0.0, 0.06, submersion) * detail);
-
+    // No whitecaps. Foam breaking off crests is an ocean's detail, and this
+    // world is flat-shaded and low-poly: from any height the game is played at
+    // they were not foam but a pattern, and from orbit they banded the whole
+    // planet in arcs. What reads as water at this resolution is the COLOUR -
+    // shallow against deep, a foam line at the shore, and the sun on it.
     // Reflection is stronger at a glancing angle — but only where there is water to
     // reflect in. Applying it regardless forced the shallows opaque at exactly the
     // low angles a god camera uses, which drew a hard line along every shore instead

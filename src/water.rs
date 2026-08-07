@@ -94,7 +94,9 @@ impl Default for WaterParams {
             // detail this fine from aliasing when the camera pulls back.
             wave_scale: 0.05,
             wave_speed: 0.9,
-            wave_strength: 0.85,
+            // Barely there. Enough to keep the sun's sheen alive and moving
+            // across the surface, and not enough to draw a pattern on it.
+            wave_strength: 0.16,
             specular: 0.55,
             // A few metres of water is enough to hide the bottom; below that the
             // seabed shows through, which is what sells it as liquid.
