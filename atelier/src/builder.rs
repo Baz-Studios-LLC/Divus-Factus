@@ -142,6 +142,34 @@ const JAMB_WIDE: i32 = POST_WIDE;
 /// by one atom - four millimetres, invisible - and the parts still tile the
 /// span exactly. Straight out of Opificium's `Len::divide`, which is the piece
 /// that makes a wall gain a bay cleanly instead of gaining a seam.
+/// Where an opening actually sits in a wall of this size: its left edge, its
+/// width, its foot and its height, all in atoms.
+///
+/// Lifted out so the solver and the test that checks the wall for holes are
+/// asking the same question of the same arithmetic. A test that worked the
+/// clamp out for itself would agree with the solver right up until one of them
+/// was changed.
+fn opening_at(span: i32, tall: i32, opening: Option<(Opening, f32)>) -> Option<(Opening, i32, i32, i32, i32)> {
+    let (what, at) = opening?;
+    let (wide, rise, foot) = match what {
+        Opening::Door => (DOOR_WIDE, DOOR_HIGH, PLATE_TALL),
+        Opening::Window => (WINDOW_WIDE, WINDOW_HIGH, PLATE_TALL + WINDOW_SILL),
+    };
+    let middle = (span as f32 * 0.5 + at / ATOM).round() as i32;
+    let room = span - POST_WIDE - JAMB_WIDE - wide;
+    if room < POST_WIDE + JAMB_WIDE {
+        return None;
+    }
+    let from = (middle - wide / 2).clamp(POST_WIDE + JAMB_WIDE, room);
+    Some((
+        what,
+        from,
+        wide,
+        foot,
+        rise.min(tall - PLATE_TALL - foot - PLATE_TALL),
+    ))
+}
+
 fn into_bays(span: i32, bays: i32) -> Vec<i32> {
     if bays <= 0 {
         return Vec::new();
@@ -1069,15 +1097,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // of wall it takes out. Nothing is subtracted anywhere - this is
             // simply the region the framing works AROUND, and the panels and
             // the rails and the studs all ask it whether they are wanted.
-            let hole = opening.map(|(what, at)| {
-                let (wide, rise, foot) = match what {
-                    Opening::Door => (DOOR_WIDE, DOOR_HIGH, inner_foot),
-                    Opening::Window => (WINDOW_WIDE, WINDOW_HIGH, inner_foot + WINDOW_SILL),
-                };
-                let middle = (span as f32 * 0.5 + at / ATOM).round() as i32;
-                let from = (middle - wide / 2).clamp(POST_WIDE + JAMB_WIDE, span - POST_WIDE - JAMB_WIDE - wide);
-                (what, from, wide, foot, rise.min(tall - PLATE_TALL - foot - PLATE_TALL))
-            });
+            let hole = opening_at(span, tall, *opening);
             // Whether a stretch of wall at this height is clear of the hole.
             let clear = |from: i32, to: i32, foot: i32, rise: i32| -> bool {
                 let Some((_, hx, hw, hy, hh)) = hole else {
@@ -1122,6 +1142,32 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 timber(&mut body, hx, hw, hy + hh, PLATE_TALL);
                 if what == Opening::Window {
                     timber(&mut body, hx, hw, hy - PLATE_TALL, PLATE_TALL);
+                }
+
+                // The wall the opening does NOT take: the apron under a window
+                // and anything left over its head.
+                //
+                // Without this the opening's whole column was left out at every
+                // height rather than only where the opening is - the bays are
+                // divided either side of it, so nothing was ever laid between
+                // the jambs at all. A window sat with a hole under it running
+                // clean down to the sill plate, which you could see straight
+                // through. Per course, so the rail still crosses in front of it.
+                for (foot, rise) in [(inner_foot, low_tall), (high_foot, high_tall)] {
+                    if rise <= 0 || (foot < hy + hh && foot + rise > hy) {
+                        continue;
+                    }
+                    let (x, w) = across(hx, hw);
+                    body.push(slab(
+                        x,
+                        (foot as f32 + rise as f32 * 0.5) * ATOM,
+                        0.0,
+                        w,
+                        rise as f32 * ATOM,
+                        WALL_THICK - (INFILL_SET * 2) as f32 * ATOM,
+                        "bone",
+                        0.9,
+                    ));
                 }
             }
 
@@ -9908,6 +9954,63 @@ mod roof_tests {
                     "{bays} bays of {span} differ by {}",
                     widest - narrowest,
                 );
+            }
+        }
+    }
+
+    /// A framed wall has no holes in it that are not doors or windows.
+    ///
+    /// The law this exists for, and one the eye is bad at: a gap in framing
+    /// looks like a shadow between two timbers until you happen to see daylight
+    /// through it from the right angle.
+    ///
+    /// It caught a real one immediately. The bays are divided EITHER SIDE of an
+    /// opening, so the opening's whole column was left out at every height
+    /// rather than only where the opening is - and a window sat with a hole
+    /// under it running clean down to the sill plate.
+    #[test]
+    fn a_framed_wall_is_solid_where_it_is_not_open() {
+        for (name, opening) in [
+            ("plain", None),
+            ("a door", Some((Opening::Door, 0.0))),
+            ("a window", Some((Opening::Window, 0.0))),
+            // Off centre, where the two spans divide differently.
+            ("a door to one side", Some((Opening::Door, -0.75))),
+        ] {
+            for long in [2.5f32, 4.0, 6.5] {
+                let kind = PartKind::Framed {
+                    long,
+                    high: WALL_HIGH,
+                    opening,
+                };
+                let body = body_of(&kind, None);
+                let span = (long / ATOM).round() as i32;
+                let tall = (WALL_HIGH / ATOM).round() as i32;
+                // The hole itself is allowed to be a hole - asked of the same
+                // arithmetic the solver uses, so the two cannot drift apart.
+                let hole = opening_at(span, tall, opening);
+
+                for iy in 0..tall {
+                    for ix in 0..span {
+                        let x = (ix as f32 + 0.5) * ATOM - span as f32 * 0.5 * ATOM;
+                        let y = (iy as f32 + 0.5) * ATOM;
+                        // Canted pieces are skipped: a brace is extra timber
+                        // over a panel that is already there, and its box is
+                        // not where its wood is.
+                        let filled = body.iter().any(|piece| {
+                            piece.cant == 0.0
+                                && (piece.at.x - x).abs() < piece.size.x * 0.5
+                                && (piece.at.y - y).abs() < piece.size.y * 0.5
+                        });
+                        let open = hole.is_some_and(|(_, hx, hw, hy, hh)| {
+                            ix >= hx && ix < hx + hw && iy >= hy && iy < hy + hh
+                        });
+                        assert!(
+                            filled || open,
+                            "{name} at {long}m has a hole at ({x:.3}, {y:.3})",
+                        );
+                    }
+                }
             }
         }
     }
