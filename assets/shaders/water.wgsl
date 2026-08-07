@@ -52,7 +52,23 @@ fn value_noise(p: vec2<f32>) -> f32 {
 
 /// Height of the wave field at a world-space point.
 ///
-/// Three octaves, each rotated by the golden angle relative to the last. Sine waves
+/// TWO long, slow swells, rotated by the golden angle so their crests never line
+/// up. Not an ocean simulation - a swell this game can actually show.
+///
+/// It was three octaves plus a noise tap at a fourteen-metre wavelength, which is
+/// a real sea surface and exactly the wrong thing here. Everything is looked at
+/// from a god's camera hundreds or thousands of units up, where fourteen metres
+/// is a fraction of a pixel: detail that small cannot be SEEN, only aliased, and
+/// every water fault of the last few hours was that same field beating against
+/// the pixel grid in a different disguise - moire rings from altitude, a hard
+/// line across open water where the fade cut out, a seam at the streamed edge.
+///
+/// A hundred-odd unit swell is many pixels wide from any height the game is
+/// played at, so there is nothing left to alias and nothing to fade. It also
+/// suits the world it is in: everything else here is flat-shaded and low-poly,
+/// and a finely detailed sea in the middle of that reads as borrowed.
+///
+/// Sine waves
 /// at similar headings reinforce into parallel stripes — invisible up close,
 /// unmistakable from altitude — and rotating by an angle with no rational
 /// relationship to a full turn means the crests never line up.
@@ -70,14 +86,13 @@ fn wave_height(p: vec2<f32>, t: f32) -> f32 {
     let a = 2.39996;
     let rot = mat2x2<f32>(cos(a), -sin(a), sin(a), cos(a));
 
-    for (var i = 0; i < 3; i = i + 1) {
+    for (var i = 0; i < 2; i = i + 1) {
         total += sin(dot(q, vec2<f32>(0.82, 0.57)) + t * (1.0 + f32(i) * 0.37)) * amp;
         norm += amp;
-        amp *= 0.55;
-        q = rot * q * 1.9;
+        amp *= 0.5;
+        q = rot * q * 1.6;
     }
 
-    total += (value_noise(p * 0.65 + vec2<f32>(t * 0.13, t * -0.09)) - 0.5) * 1.4;
     return total / norm;
 }
 

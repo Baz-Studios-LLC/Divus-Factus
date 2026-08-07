@@ -92,9 +92,9 @@ impl Default for WaterParams {
             // hundred and fourteen metres, which meant an entire pond sat inside a
             // third of one wave and read as glass. Distance fade in the shader keeps
             // detail this fine from aliasing when the camera pulls back.
-            wave_scale: 0.45,
+            wave_scale: 0.05,
             wave_speed: 0.9,
-            wave_strength: 0.42,
+            wave_strength: 0.85,
             specular: 0.55,
             // A few metres of water is enough to hide the bottom; below that the
             // seabed shows through, which is what sells it as liquid.
