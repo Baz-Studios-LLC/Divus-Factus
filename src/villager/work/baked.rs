@@ -369,29 +369,51 @@ fn hip(keep_x: f32, keep_z: f32) -> Mesh {
 /// The vertices are the Atelier's, corner for corner. The two programs share no
 /// code and never will, so the only thing keeping a shape the same shape in both
 /// is that somebody wrote it out twice and said so - see `FORMATS.md`.
-/// A unit box with its top face cut back at each end.
+/// A unit box with its top or bottom face cut back at each end.
 ///
-/// `low` and `high` are RUNS as fractions of the box's own length: how far
-/// along it the saw travels while crossing its full height, at the -X end and
-/// the +X end. Nought is a square end.
+/// `low` and `high` are RUNS as fractions of the box's own length: how far along
+/// it the saw travels while crossing its full height, at the -X end and the +X
+/// end. Nought is a square end. A POSITIVE run cuts the top face back, a
+/// NEGATIVE one cuts the bottom.
 ///
 /// One shape for every angled end there is. There used to be two - a mitre and
 /// its mirror - because a beam can be cut at one end or the other, and neither
-/// could do both at once, which is what a brace actually wants: it meets a rail
-/// at one end and a sill at the other. A run of one takes the top face all the
-/// way to the far corner, which IS the old full mitre, so nothing that could be
-/// drawn before has stopped being drawable.
+/// could do both at once. A run of one takes a face all the way to the far
+/// corner, which IS the old full mitre, so nothing that could be drawn before
+/// has stopped being drawable.
+///
+/// The signs are what make a brace possible. Cut the top at one end and the
+/// bottom at the other and the two ends come out PARALLEL - a parallelogram,
+/// which is what a diagonal brace is, since both of its ends meet horizontal
+/// timber.
 fn cut_mesh(low: f32, high: f32) -> Mesh {
-    let (low, high) = (low.clamp(0.0, 1.0), high.clamp(0.0, 1.0));
-    // Two cuts that would cross leave the top face inside out. Share the length
-    // between them instead, which is the deepest pair that still leaves a beam.
-    let (low, high) = if low + high > 1.0 {
-        (low / (low + high), high / (low + high))
-    } else {
-        (low, high)
+    let (low, high) = (low.clamp(-1.0, 1.0), high.clamp(-1.0, 1.0));
+    // A run may be NEGATIVE, and that is what lets a brace exist. A positive
+    // run cuts the top face back; a negative one cuts the bottom. Cut the top at
+    // one end and the bottom at the other by the same amount and the two ends
+    // come out PARALLEL - a parallelogram, which is what a diagonal brace is,
+    // because both of its ends meet horizontal timber. With the top cut at both
+    // ends the ends converge instead, and a brace would sit in its bay like a
+    // wedge.
+    let inset = |run: f32| (run.max(0.0), (-run).max(0.0));
+    let (top_low, foot_low) = inset(low);
+    let (top_high, foot_high) = inset(high);
+    // Cuts that would cross each other leave a face inside out; share the
+    // length between them instead.
+    let share = |a: f32, b: f32| {
+        if a + b > 1.0 {
+            (a / (a + b), b / (a + b))
+        } else {
+            (a, b)
+        }
     };
-    let (a, b) = (-0.5 + low, 0.5 - high);
-    let peak = b <= a;
+    let (top_low, top_high) = share(top_low, top_high);
+    let (foot_low, foot_high) = share(foot_low, foot_high);
+
+    let (ta, tb) = (-0.5 + top_low, 0.5 - top_high);
+    let (fa, fb) = (-0.5 + foot_low, 0.5 - foot_high);
+    let top_peak = tb <= ta;
+    let foot_peak = fb <= fa;
 
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut normals: Vec<[f32; 3]> = Vec::new();
@@ -405,6 +427,9 @@ fn cut_mesh(low: f32, high: f32) -> Mesh {
     // slanted ends are where doing it by hand goes wrong, and they are the
     // whole point of this mesh.
     let mut face = |corners: &[Vec3]| {
+        if corners.len() < 3 {
+            return;
+        }
         let middle = corners.iter().copied().sum::<Vec3>() / corners.len() as f32;
         let Some(normal) = (corners[1] - corners[0])
             .cross(corners[2] - corners[0])
@@ -433,51 +458,49 @@ fn cut_mesh(low: f32, high: f32) -> Mesh {
 
     let at = |x: f32, y: f32, z: f32| Vec3::new(x, y, z);
 
-    // The underside keeps its full length whatever comes off the top.
-    face(&[
-        at(-0.5, -0.5, -0.5),
-        at(0.5, -0.5, -0.5),
-        at(0.5, -0.5, 0.5),
-        at(-0.5, -0.5, 0.5),
-    ]);
-    // The top, shortened by both runs - and gone altogether where the two cuts
-    // meet, which is a ridge rather than a face.
-    if !peak {
+    // The underside and the top, each shortened by whatever was cut from it.
+    if !foot_peak {
         face(&[
-            at(a, 0.5, -0.5),
-            at(b, 0.5, -0.5),
-            at(b, 0.5, 0.5),
-            at(a, 0.5, 0.5),
+            at(fa, -0.5, -0.5),
+            at(fb, -0.5, -0.5),
+            at(fb, -0.5, 0.5),
+            at(fa, -0.5, 0.5),
         ]);
     }
-    // The sides: a trapezium, or a triangle where the cuts have met.
+    if !top_peak {
+        face(&[
+            at(ta, 0.5, -0.5),
+            at(tb, 0.5, -0.5),
+            at(tb, 0.5, 0.5),
+            at(ta, 0.5, 0.5),
+        ]);
+    }
+    // The sides, walked round in order so a collapsed edge simply drops out.
     for z in [-0.5f32, 0.5] {
-        if peak {
-            face(&[at(-0.5, -0.5, z), at(0.5, -0.5, z), at(a, 0.5, z)]);
-        } else {
-            face(&[
-                at(-0.5, -0.5, z),
-                at(0.5, -0.5, z),
-                at(b, 0.5, z),
-                at(a, 0.5, z),
-            ]);
+        let mut corners = vec![at(fa, -0.5, z)];
+        if !foot_peak {
+            corners.push(at(fb, -0.5, z));
         }
+        corners.push(at(tb, 0.5, z));
+        if !top_peak {
+            corners.push(at(ta, 0.5, z));
+        }
+        face(&corners);
     }
     // And the ends themselves, square where nothing was cut and leaning where
     // something was.
     face(&[
-        at(-0.5, -0.5, -0.5),
-        at(-0.5, -0.5, 0.5),
-        at(a, 0.5, 0.5),
-        at(a, 0.5, -0.5),
+        at(fa, -0.5, -0.5),
+        at(fa, -0.5, 0.5),
+        at(ta, 0.5, 0.5),
+        at(ta, 0.5, -0.5),
     ]);
     face(&[
-        at(0.5, -0.5, -0.5),
-        at(0.5, -0.5, 0.5),
-        at(b, 0.5, 0.5),
-        at(b, 0.5, -0.5),
+        at(fb, -0.5, -0.5),
+        at(fb, -0.5, 0.5),
+        at(tb, 0.5, 0.5),
+        at(tb, 0.5, -0.5),
     ]);
-
     Mesh::new(
         bevy::render::mesh::PrimitiveTopology::TriangleList,
         bevy::asset::RenderAssetUsages::default(),

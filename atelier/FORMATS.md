@@ -141,12 +141,17 @@ its colour already looked up, plus the marks that say what the place is FOR.
   - `wedge`: a GABLE's prism. A triangle with its peak in the middle, standing
     across the part's length. Symmetric.
   - `ridge`: the same prism turned to run lengthwise, apex up — a ridge cap.
-  - `cut:<low>x<high>`: a box whose TOP FACE is cut back at each end. The two
-    numbers are RUNS as fractions of the piece's own length — how far along it
-    the saw travels while crossing its full height — at the -X end and the +X
-    end. `cut:0.0000x0.3300` is square at one end and mitred at the other;
-    `cut:0.2500x0.2500` is cut at both, which is what a brace wants, meeting a
-    rail at one end and a sill at the other.
+  - `cut:<low>x<high>`: a box with a face cut back at each end. The two numbers
+    are RUNS as fractions of the piece's own length — how far along it the saw
+    travels while crossing its full height — at the -X end and the +X end.
+    Nought is a square end. A POSITIVE run cuts the TOP face back; a NEGATIVE
+    one cuts the BOTTOM.
+
+    The signs are what let a brace exist. `cut:0.2500x-0.2500` cuts the top at
+    one end and the bottom at the other, so the two ends come out PARALLEL — a
+    parallelogram, which is what a diagonal brace is, both of its ends meeting
+    horizontal timber. Cut the top at both ends and the ends converge instead,
+    and a brace sits in its bay like a wedge.
 
     A run rather than an angle, because a run is the number everything already
     has: a roof hands over the difference between where its slope crosses the
