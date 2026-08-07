@@ -116,19 +116,30 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let view_dir = normalize(view.world_position.xyz - world);
 
-    // Fade wave detail with distance, so the far sea settles instead of
-    // shimmering into aliasing.
+    // Fade wave detail by how big a wave is ON SCREEN, not by how far away it
+    // is. Same rule the planet's quadtree splits on, and for the same reason:
+    // a pixel threshold is automatically right at every altitude, every field
+    // of view and every window size, where a distance in metres is hand-tuned
+    // for one of them and wrong for the rest.
     //
-    // Over five thousand units, not nine hundred. Nine hundred was right when
-    // the sea was one quad a few hundred units across being dragged along
-    // under the camera - past its own edge there was no water to fade. Now the
-    // ground carries its own water and the sea runs to the horizon and beyond
-    // it, and the horizon from any height worth standing at is thousands of
-    // units off: the ripples died at eleven hundred, which is roughly where
-    // the streamed ground ends, so the whole far half of every seascape went
-    // flat at once and it read as the shader giving up near the shore.
+    // It was a distance, and both ways of being wrong turned up within an hour
+    // of each other. Faded over nine hundred units, the sea went flat about
+    // where the streamed ground ends, so from a low camera the shader appeared
+    // to give up near the shore. Stretched to five thousand to fix that, waves
+    // a few centimetres across on screen survived out to the horizon and beat
+    // against the pixel grid - which is not ripples at all but MOIRE, and it
+    // curves, so the ocean from altitude wore circular arcs nothing in the
+    // world put there.
+    //
+    // Below a couple of pixels a wave cannot be drawn, only aliased. Above ten
+    // or so it is worth every cycle it costs.
     let camera_distance = length(view.world_position.xyz - world);
-    let detail = clamp(1.0 - (camera_distance - 180.0) / 5000.0, 0.12, 1.0);
+    let wavelength = 6.2831853 / max(water.wave_scale, 0.0001);
+    // Perspective: clip_from_view[1][1] is cot(fov/2), so this is how many
+    // pixels one world unit covers at this range.
+    let px_per_unit =
+        view.viewport.w * view.clip_from_view[1][1] * 0.5 / max(camera_distance, 1.0);
+    let detail = smoothstep(2.5, 12.0, wavelength * px_per_unit);
 
     let normal = wave_normal(p, t, water.wave_strength, detail);
     let sun = normalize(water.sun.xyz);
