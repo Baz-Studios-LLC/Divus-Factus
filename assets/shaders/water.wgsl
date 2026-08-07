@@ -160,11 +160,24 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let lambert = clamp(dot(normal, sun), 0.0, 1.0);
     color *= 0.82 + lambert * 0.28;
 
-    // Broad specular sheen. Deliberately wide: a tight highlight on a surface this
-    // large collapses into one blown-out blob.
+    // Specular sheen, and the one place the distance fade must NOT simply take
+    // things away.
+    //
+    // The sea's whole look is specular, so flattening its normals with range -
+    // which is the only way to stop them aliasing - takes the sun off the water
+    // with them, and the far ocean goes dead grey. That was the flat band on
+    // the horizon. Tessendorf's answer, and LEAN mapping's: waves too small to
+    // draw are not GONE, they are roughness. Hand the lost detail to the width
+    // of the lobe instead of subtracting it from the light.
+    //
+    // So the highlight broadens as the surface flattens, and the strength is
+    // not scaled down at all - the same light, spread over more sea. Near to,
+    // that is glitter on individual crests; far off, it is the wide soft path
+    // the sun lays across water, which is what the eye actually reads at range.
     let half_vector = normalize(sun + view_dir);
-    let specular = pow(clamp(dot(normal, half_vector), 0.0, 1.0), 48.0);
-    color += water.sky.rgb * specular * water.specular * detail;
+    let sharpness = mix(5.0, 48.0, detail);
+    let specular = pow(clamp(dot(normal, half_vector), 0.0, 1.0), sharpness);
+    color += water.sky.rgb * specular * water.specular;
 
     // How much water sits between this fragment and whatever is behind it. This is
     // what makes it read as a liquid rather than a painted surface: shallows go
@@ -184,6 +197,23 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let foam_band = smoothstep(0.35, 1.0, foam) * smoothstep(0.02, 0.25, submersion);
     color = mix(color, water.sky.rgb * 1.35, foam_band * 0.8);
     alpha = max(alpha, foam_band * 0.9);
+
+    // Whitecaps. The foam above is the shore's - it appears where the water
+    // thins against land - and an ocean that only foams at its edges reads as a
+    // rippled sheet rather than as something moving. Real foam breaks off the
+    // CRESTS, so it goes where the wave field is near its peak.
+    //
+    // Faded with `detail` for the same reason the waves are: a crest a fraction
+    // of a pixel wide can only alias, and a sea sprayed with sub-pixel white
+    // sparkles is the noisiest thing on screen. Gated on submersion too, so it
+    // cannot break over ground that is barely wet.
+    if (detail > 0.2) {
+        let crest = wave_height(p, t);
+        let whitecap =
+            smoothstep(0.55, 0.95, crest) * detail * smoothstep(0.05, 0.4, submersion);
+        color = mix(color, water.sky.rgb * 1.45, whitecap * 0.5);
+        alpha = max(alpha, whitecap * 0.65);
+    }
 
     // Reflection is stronger at a glancing angle — but only where there is water to
     // reflect in. Applying it regardless forced the shallows opaque at exactly the
