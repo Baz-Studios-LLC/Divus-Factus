@@ -117,6 +117,18 @@ const WIDEST: f32 = 2.0;
 /// damp ground the fill happened to touch.
 const LAKE_LEAST: f32 = 0.35;
 
+/// How many cells a body of standing water must cover to be a lake.
+///
+/// Filling gives a lake for every closed basin, which is exactly right and, on
+/// its own, far too generous: ridged mountain noise makes hundreds of little
+/// enclosed hollows between its creases, and every one of them came out as a
+/// tarn. Real mountains have tarns; they do not have one in every dip.
+///
+/// Six cells is about six thousand square metres - a pond you could row across.
+/// Anything smaller is a puddle the ground happened to hold, and the ground can
+/// go on holding it without the world drawing water in it.
+const LAKE_LEAST_CELLS: usize = 6;
+
 /// Spatial-hash bin size for segment lookup.
 const BIN: f32 = 32.0;
 
@@ -502,6 +514,43 @@ fn solve_region(inner: &mut Inner, terrain: &Terrain, region: IVec2) {
     }
 
     // ---- 5. keep the standing water ----------------------------------
+    //
+    // Only the bodies big enough to be worth calling water. Flood each one to
+    // find how far it reaches - across the whole window, so a lake lying over a
+    // region's edge is measured whole rather than judged by the corner of it
+    // this region can see.
+    let drowned: Vec<bool> = (0..SIDE * SIDE)
+        .map(|i| {
+            rank[i] != usize::MAX
+                && filled[i] > ground[i] + LAKE_LEAST
+                && filled[i] > WATER_LEVEL + 0.5
+        })
+        .collect();
+    let mut lake = vec![false; SIDE * SIDE];
+    let mut seen = vec![false; SIDE * SIDE];
+    for start in 0..SIDE * SIDE {
+        if !drowned[start] || seen[start] {
+            continue;
+        }
+        let mut body = Vec::new();
+        let mut walk = vec![start];
+        seen[start] = true;
+        while let Some(index) = walk.pop() {
+            body.push(index);
+            for (next, _) in neighbours(index) {
+                if drowned[next] && !seen[next] {
+                    seen[next] = true;
+                    walk.push(next);
+                }
+            }
+        }
+        if body.len() >= LAKE_LEAST_CELLS {
+            for index in body {
+                lake[index] = true;
+            }
+        }
+    }
+
     let mut level = vec![f32::NAN; REGION_CELLS * REGION_CELLS];
     for iz in 0..REGION_CELLS {
         for ix in 0..REGION_CELLS {
@@ -509,10 +558,7 @@ fn solve_region(inner: &mut Inner, terrain: &Terrain, region: IVec2) {
             if rank[index] == usize::MAX {
                 continue;
             }
-            // Standing water is where the fill had to rise above the land, and
-            // only where it rose enough to be worth calling water. Below sea
-            // level the ocean has it already.
-            if filled[index] > ground[index] + LAKE_LEAST && filled[index] > WATER_LEVEL + 0.5 {
+            if lake[index] {
                 level[iz * REGION_CELLS + ix] = filled[index];
             }
         }
@@ -676,12 +722,18 @@ mod tests {
 
         for (at, level, _) in channel_points(&terrain, &index, middle) {
             // Which way is downstream: the steepest fall of the surface itself.
+            // Over a SHORT stride. A headwater on a mountainside meanders on a
+            // radius of a dozen units or so, so a six unit baseline straddles
+            // the bend and there is no direction across it to find - which read
+            // as four fifths of the fall appearing sideways. Close in, the
+            // course is straight and the question means something again.
+            const STRIDE: f32 = 1.0;
             let read = |p: Vec2| index.nearest(p.x, p.y).map(|(l, _, _)| l);
             let (Some(east), Some(west), Some(south), Some(north)) = (
-                read(at + Vec2::X * 3.0),
-                read(at - Vec2::X * 3.0),
-                read(at + Vec2::Y * 3.0),
-                read(at - Vec2::Y * 3.0),
+                read(at + Vec2::X * STRIDE),
+                read(at - Vec2::X * STRIDE),
+                read(at + Vec2::Y * STRIDE),
+                read(at - Vec2::Y * STRIDE),
             ) else {
                 continue;
             };
@@ -690,16 +742,25 @@ mod tests {
                 continue;
             };
             let across = Vec2::new(-down.y, down.x);
+            // How much the surface falls ALONG the course over the same stride,
+            // to measure the tilt against. A mountain stream drops hard and a
+            // lowland river barely at all, and "level across" has to mean the
+            // same thing on both - so the test is a ratio, not a number of
+            // units. An absolute tolerance here is really a limit on gradient
+            // wearing a level's clothes, and it moves every time the mountains
+            // do.
+            let along = fall.length().max(0.0);
 
             for side in [across, -across] {
-                let probe = at + side * 3.0;
+                let probe = at + side * STRIDE;
                 if let Some((near, distance, width)) = index.nearest(probe.x, probe.y) {
                     if distance < CHANNEL_HALF_WIDTH * width {
-                        worst = worst.max((near - level).abs());
+                        let tilt = (near - level).abs();
+                        worst = worst.max(tilt);
                         assert!(
-                            (near - level).abs() < 0.75,
-                            "surface tilts {:.2} across the channel at {at:?}",
-                            (near - level).abs(),
+                            tilt < along * 0.35 + 0.1,
+                            "surface tilts {tilt:.2} across the channel at {at:?}, \
+                             while falling {along:.2} along it",
                         );
                     }
                 }

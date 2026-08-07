@@ -721,8 +721,28 @@ impl Terrain {
         // approaches 1, so every extra power crushes what little there is.
         let belt_mask = ((belt - 0.46) / 0.16).clamp(0.0, 1.0) * ridge_mask;
         if belt_mask > 0.0 {
-            let peaks = ridged_3d(dir * spherical(0.0021), self.seed ^ 0x77aa, 4);
-            height += peaks * peaks * belt_mask.powf(1.3) * 240.0;
+            // FIVE octaves here, unlike the hills and the ridges below the
+            // treeline. What was cut from those was a twelve unit wavelength
+            // wearing the ground like orange peel; the finest octave of this
+            // one is nearer thirty, on slopes that rise two hundred units, and
+            // that is not texture - it is the ridgeline. Ridged noise makes its
+            // creases in the last octave it is given, so taking one away does
+            // not smooth a mountain, it rounds it off.
+            let peaks = ridged_3d(dir * spherical(0.0021), self.seed ^ 0x77aa, 5);
+            // NOT squared. The comment above this warns that ridged noise
+            // rarely approaches one and that every extra power crushes what
+            // little there is - and then the code squared it anyway, which is
+            // what made a range read as a grey plateau with dimples rather than
+            // as mountains. Ridged noise draws connected CREST LINES; squaring
+            // pushes everything that is not already at the top down to nothing,
+            // so the lines broke into separate bumps with flat hollows between
+            // them, and the hollows are closed basins, which is why every one
+            // of them held a tarn.
+            //
+            // At 1.4 the crests stay joined into ridges with valleys running
+            // off them, and the multiplier comes down to keep the summits where
+            // they were - `the_world_has_mountains` measures both ends of that.
+            height += peaks.powf(1.4) * belt_mask.powf(1.3) * 165.0;
         }
 
         height.clamp(0.0, TERRAIN_HEIGHT)
