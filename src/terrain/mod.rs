@@ -1411,6 +1411,38 @@ pub fn build_chunk_mesh(terrain: &Terrain, coord: IVec2) -> Mesh {
 /// own polygon edge falls on ground where it is already invisible.
 const SHORE_REACH: f32 = 1.5;
 
+/// Depth at which water has reached its full colour and is fully opaque.
+const DEEP_BY: f32 = 7.0;
+
+/// The colour of water this deep, as a vertex colour.
+///
+/// Everything the old shader worked out per fragment, known here for nothing:
+/// the mesh is built from the terrain, so the depth at a vertex is simply the
+/// water's level less the bed under it. Shallow water keeps the bed's colour by
+/// being nearly clear; deep water hides it by being nearly opaque; and at the
+/// waterline the alpha reaches zero, which is what lets the sheet run up onto
+/// the beach and vanish instead of stopping on an edge.
+pub fn water_colour(depth: f32) -> [f32; 4] {
+    let t = (depth / DEEP_BY).clamp(0.0, 1.0);
+    let shallow = palette::shade(&palette::WATER, SEA_SHALLOW).to_linear();
+    let deep = palette::shade(&palette::WATER, SEA_DEEP).to_linear();
+    [
+        shallow.red + (deep.red - shallow.red) * t,
+        shallow.green + (deep.green - shallow.green) * t,
+        shallow.blue + (deep.blue - shallow.blue) * t,
+        // Eased in, so a shore fades rather than stepping out of nothing.
+        (t * (2.0 - t)).clamp(0.0, 1.0) * 0.94,
+    ]
+}
+
+/// Where on the water ramp the sea's two colours are taken from.
+///
+/// Shared, because two different things draw the same ocean: the chunks'
+/// own sea and the planet's patches. They used to choose their own shades and
+/// the join between them was a square of differently coloured sea.
+pub const SEA_SHALLOW: f32 = 1.0;
+pub const SEA_DEEP: f32 = 0.62;
+
 pub fn build_river_mesh(terrain: &Terrain, coord: IVec2) -> Option<Mesh> {
     build_water_mesh(terrain, coord, false)
 }
@@ -1483,6 +1515,7 @@ fn build_water_mesh(terrain: &Terrain, coord: IVec2, sea: bool) -> Option<Mesh> 
 
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut normals: Vec<[f32; 3]> = Vec::new();
+    let mut colors: Vec<[f32; 4]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
 
     // One quad per cell whose four corners all carry water. Requiring all four keeps
@@ -1527,6 +1560,10 @@ fn build_water_mesh(terrain: &Terrain, coord: IVec2, sea: bool) -> Option<Mesh> 
                 let (seat, turn) = crate::globe::bend_frame(flat);
                 positions.push(seat.to_array());
                 normals.push((turn * Vec3::Y).to_array());
+                // The bed under this corner, which is the ground height where
+                // the corner is dry and the carved channel where it is not.
+                let bed = terrain.height_at(origin.x + x0 + dx, origin.y + z0 + dz);
+                colors.push(water_colour(y - bed));
             }
 
             indices.extend_from_slice(&[base, base + 2, base + 3, base, base + 3, base + 1]);
@@ -1563,17 +1600,16 @@ pub struct TerrainAssets {
     /// a brown channel — Brett's "rivers were never good". Reading the depth
     /// over a couple of units instead gives a river a surface while leaving the
     /// sea's shallows exactly as they were.
-    pub river_material: Handle<crate::water::WaterMaterial>,
+    pub river_material: Handle<StandardMaterial>,
     /// The sea's own, shared with the planet's patches so the ocean at
     /// altitude and the ocean underfoot are the same water lit the same way.
-    pub sea_material: Handle<crate::water::WaterMaterial>,
+    pub sea_material: Handle<StandardMaterial>,
 }
 
 fn setup_terrain(
     mut commands: Commands,
     _meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut water_materials: ResMut<Assets<crate::water::WaterMaterial>>,
     world_seed: Res<crate::WorldSeed>,
 ) {
     // Vertex colours carry all the surface variation, so the material is plain white.
@@ -1596,18 +1632,38 @@ fn setup_terrain(
     // from any height the god saw a loaded island in a dead grey sea of
     // nothing. Past this quad's edge, the planet paints its own ocean.
 
-    let water_material = water_materials.add(crate::water::WaterMaterial::default());
-    let river_material = water_materials.add({
-        let mut river = crate::water::WaterMaterial::default();
-        // A river is shallow, so it has to say what it is in less depth.
-        river.params.depth_fade = 1.6;
-        river.params.foam_width = 0.5;
-        // And its own scale of ripple: the sea's fourteen-metre swell across a
-        // channel a few metres wide is one flat facet of a wave.
-        river.params.wave_scale = 1.9;
-        river.params.wave_strength = 0.3;
-        river
-    });
+    // Water is a plain lit surface now, and everything that made it read as
+    // water is carried by the MESH.
+    //
+    // There was a whole shader here: a noise wave field perturbing the normal,
+    // a hand-rolled sun and sky reflection, fresnel, foam, and a read of the
+    // depth prepass to work out how much water lay between the eye and the
+    // seabed. All of it ran per fragment over a surface that covers half the
+    // screen, and every water fault of the last day was one of those pieces
+    // beating against the pixel grid at a distance where it could not be seen.
+    //
+    // None of it was needed, because the meshes are ours. `water_colour` knows
+    // the exact depth at every vertex - the terrain told it - so shallow
+    // against deep, and the fade to nothing at the shore, are vertex colours.
+    // A flat-shaded low-poly world wanted that anyway; a physically detailed sea
+    // in the middle of it always looked borrowed.
+    let mut still_water = StandardMaterial {
+        base_color: Color::WHITE,
+        alpha_mode: AlphaMode::Blend,
+        // Smooth enough to catch the sun as a broad soft sheen, which is the
+        // one thing the old shader did that the colour cannot.
+        perceptual_roughness: 0.22,
+        reflectance: 0.35,
+        // Water casting a shadow onto its own bed puts a dark band under every
+        // shoreline, which reads as the surface hovering above the sand rather
+        // than meeting it.
+        double_sided: true,
+        cull_mode: None,
+        ..default()
+    };
+    still_water.base_color.set_alpha(1.0);
+    let water_material = materials.add(still_water.clone());
+    let river_material = materials.add(still_water);
 
     // No sheet any more. The sea used to be ONE square quad, sized to the
     // streamed ground and dragged along under the camera, and every problem it

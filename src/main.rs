@@ -43,7 +43,6 @@ mod title;
 mod trails;
 mod ui;
 mod villager;
-mod water;
 mod weather;
 mod witness;
 
@@ -222,7 +221,6 @@ fn main() {
             render::RenderPlugin,
             debug::DebugPlugin,
             loading::LoadingPlugin,
-            water::WaterPlugin,
             witness::WitnessPlugin,
             grass::GrassPlugin,
         ))

@@ -57,7 +57,6 @@ pub fn run() {
         crate::terrain::TerrainPlugin,
         crate::globe::GlobePlugin,
         crate::render::RenderPlugin,
-        crate::water::WaterPlugin,
         crate::keymap::KeymapPlugin,
         // Trees, rocks and the rest of what grows on the ground. Not villagers
         // - nothing here is alive - but a planet with bare ground on it is not

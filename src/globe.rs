@@ -791,7 +791,7 @@ struct PatchWater;
 fn dress_the_patch_water(
     mut commands: Commands,
     assets: Option<Res<crate::terrain::TerrainAssets>>,
-    bare: Query<Entity, (With<PatchWater>, Without<MeshMaterial3d<crate::water::WaterMaterial>>)>,
+    bare: Query<Entity, (With<PatchWater>, Without<MeshMaterial3d<StandardMaterial>>)>,
 ) {
     let Some(assets) = assets else {
         return;
@@ -1074,7 +1074,7 @@ fn build_patch_water(terrain: &Terrain, key: PatchKey) -> Option<Mesh> {
 
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(stride * stride);
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity(stride * stride);
-    let mut uvs: Vec<[f32; 2]> = Vec::with_capacity(stride * stride);
+    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(stride * stride);
     let mut drowned = vec![false; stride * stride];
     let mut any = false;
 
@@ -1095,7 +1095,9 @@ fn build_patch_water(terrain: &Terrain, key: PatchKey) -> Option<Mesh> {
             drowned[gj * stride + gi] = under;
             positions.push((dir * (PLANET_RADIUS + wet - WATER_CLEARANCE)).to_array());
             normals.push(dir.to_array());
-            uvs.push([gi as f32 / n as f32, gj as f32 / n as f32]);
+            // Depth against the bed, exactly as the chunks' own sea reads it,
+            // so the two agree where they meet. See `terrain::water_colour`.
+            colors.push(crate::terrain::water_colour(wet - h));
         }
     }
     if !any {
@@ -1146,7 +1148,7 @@ fn build_patch_water(terrain: &Terrain, key: PatchKey) -> Option<Mesh> {
         )
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
         .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
-        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colors)
         .with_inserted_indices(Indices::U32(indices)),
     )
 }
@@ -1159,10 +1161,10 @@ fn build_patch_water(terrain: &Terrain, key: PatchKey) -> Option<Mesh> {
 fn paint(terrain: &Terrain, x: f32, z: f32, h: f32, wet: f32, slope: f32) -> [f32; 4] {
     if h < wet {
         let depth = ((wet - h) / 8.0).clamp(0.0, 1.0);
-        // The sheet's own two shades, not a second opinion about them. See
-        // `water::SEA_SHALLOW`.
-        let shallow = palette::shade(&palette::WATER, crate::water::SEA_SHALLOW).to_linear();
-        let deep = palette::shade(&palette::WATER, crate::water::SEA_DEEP).to_linear();
+        // The same two shades the water itself is drawn in. See
+        // `terrain::SEA_SHALLOW`.
+        let shallow = palette::shade(&palette::WATER, crate::terrain::SEA_SHALLOW).to_linear();
+        let deep = palette::shade(&palette::WATER, crate::terrain::SEA_DEEP).to_linear();
         return [
             shallow.red + (deep.red - shallow.red) * depth,
             shallow.green + (deep.green - shallow.green) * depth,

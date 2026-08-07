@@ -192,15 +192,6 @@ impl Walls {
         excused
     }
 
-    fn blocks(&self, p: Vec2, excused: &[bool; MOST_BUILDINGS]) -> bool {
-        self.buildings
-            .iter()
-            .enumerate()
-            .any(|(slot, building)| {
-                !excused.get(slot).copied().unwrap_or(false) && building.contains(p)
-            })
-    }
-
     /// Whether a straight walk from `a` to `b` passes through any building it
     /// is not excused from. See `Footprint::crosses`.
     fn barred(&self, a: Vec2, b: Vec2, excused: &[bool; MOST_BUILDINGS]) -> bool {
