@@ -123,13 +123,15 @@ const BAY_WANTED: i32 = 14;
 /// How far the panel between the timbers sits behind their faces.
 const INFILL_SET: i32 = 1;
 
-/// A doorway's clear width and height, and a window's.
+/// A doorway's clear width and height.
 const DOOR_WIDE: i32 = 16;
 const DOOR_HIGH: i32 = 32;
+
+/// A window's clear width. It takes its HEIGHT from the wall rather than from a
+/// number here: it fills the upper course, so the rail is its sill and the head
+/// plate is its lintel, and a window that is a fixed height would leave a
+/// second beam lying against one of them.
 const WINDOW_WIDE: i32 = 18;
-const WINDOW_HIGH: i32 = 16;
-/// How high a window's sill stands off the wall's foot.
-const WINDOW_SILL: i32 = 18;
 /// How heavy the timber down an opening's side is.
 ///
 /// A DOOR's is as heavy as a corner post: it is a big hole and the wall over it
@@ -149,6 +151,22 @@ fn jamb_of(what: Opening) -> i32 {
 
 /// The widest a jamb can be, for the room an opening needs reserved.
 const JAMB_WIDE: i32 = POST_WIDE;
+
+/// Where a wall of this height puts its courses: the clear band's foot and
+/// height, the rail's foot, and the upper course's foot and height.
+///
+/// Shared, because the openings have to be placed against the same courses the
+/// framing lays - a window that fills the upper course has to know where that
+/// course is, and working it out twice is working it out twice.
+fn courses_of(tall: i32) -> (i32, i32, i32, i32, i32) {
+    let inner_foot = PLATE_TALL;
+    let inner_tall = tall - PLATE_TALL * 2;
+    let low_tall = ((inner_tall - PLATE_TALL) * 2 / 5).max(4);
+    let rail_foot = inner_foot + low_tall;
+    let high_foot = rail_foot + PLATE_TALL;
+    let high_tall = (tall - PLATE_TALL - high_foot).max(0);
+    (inner_foot, low_tall, rail_foot, high_foot, high_tall)
+}
 
 /// How many doors and windows one framed wall may hold.
 pub const MOST_OPENINGS: usize = 4;
@@ -180,10 +198,24 @@ fn openings_at(
     openings: &[Option<(Opening, f32)>; MOST_OPENINGS],
 ) -> Vec<(Opening, i32, i32, i32, i32)> {
     let mut holes: Vec<(Opening, i32, i32, i32, i32)> = Vec::new();
+    let (inner_foot, _, _, high_foot, high_tall) = courses_of(tall);
     for (what, at) in openings.iter().flatten().copied() {
         let (wide, rise, foot) = match what {
-            Opening::Door => (DOOR_WIDE, DOOR_HIGH, PLATE_TALL),
-            Opening::Window => (WINDOW_WIDE, WINDOW_HIGH, PLATE_TALL + WINDOW_SILL),
+            Opening::Door => (DOOR_WIDE, DOOR_HIGH, inner_foot),
+            // A window FILLS the upper course, from the rail to the head plate.
+            //
+            // It used to sit inside that course with a sill of its own under it
+            // and a lintel of its own over it - and each of those landed
+            // directly against the rail or the plate, so the wall showed six
+            // atoms of solid timber above the glass and six below. Two beams
+            // touching read as one thick beam, and the window looked squeezed
+            // between them.
+            //
+            // Reaching the course's own edges instead, the rail IS its sill and
+            // the head plate IS its lintel. Both come out exactly a plate thick,
+            // like every other horizontal in the wall, and the window is taller
+            // by the two it is no longer paying for.
+            Opening::Window => (WINDOW_WIDE, high_tall, high_foot),
         };
         let room = span - POST_WIDE - JAMB_WIDE - wide;
         if room < POST_WIDE + JAMB_WIDE {
@@ -1112,7 +1144,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 let middle = (from as f32 + wide as f32 * 0.5) - span as f32 * 0.5;
                 (middle * ATOM, wide as f32 * ATOM)
             };
-            let mut timber = |body: &mut Vec<Slab>, from: i32, wide: i32, foot: i32, rise: i32| {
+            let timber = |body: &mut Vec<Slab>, from: i32, wide: i32, foot: i32, rise: i32| {
                 if wide <= 0 || rise <= 0 {
                     return;
                 }
@@ -1144,7 +1176,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // A horizontal member, laid in as many pieces as the openings
             // standing in its band leave. One that crosses no opening runs the
             // whole length in a single timber.
-            let mut course = |body: &mut Vec<Slab>, foot: i32, rise: i32| {
+            let course = |body: &mut Vec<Slab>, foot: i32, rise: i32| {
                 let mut from = 0;
                 for (what, hx, hw, hy, hh) in &holes {
                     if foot + rise <= *hy || foot >= hy + hh {
@@ -1174,9 +1206,19 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 let jamb = jamb_of(*what);
                 timber(&mut body, hx - jamb, jamb, inner_foot, inner_tall);
                 timber(&mut body, hx + hw, jamb, inner_foot, inner_tall);
-                timber(&mut body, *hx, *hw, hy + hh, PLATE_TALL);
+                // A lintel only where there is not already a plate doing the
+                // job: a window reaching the head plate has one over it
+                // already, and a second laid against it is the doubled beam
+                // this was drawn to avoid.
+                if hy + hh < tall - PLATE_TALL {
+                    timber(&mut body, *hx, *hw, hy + hh, PLATE_TALL);
+                }
                 if *what == Opening::Window {
-                    timber(&mut body, *hx, *hw, hy - PLATE_TALL, PLATE_TALL);
+                    // A sill only where the rail is not already under it, for
+                    // the same reason as the lintel above.
+                    if *hy > high_foot {
+                        timber(&mut body, *hx, *hw, hy - PLATE_TALL, PLATE_TALL);
+                    }
 
                     // The cross in the light: a mullion up the middle and a
                     // transom across it, dividing the opening into four panes.
@@ -3939,7 +3981,7 @@ pub fn dress_part(
 ) {
     let translucent = ghostly || matches!(kind, PartKind::Widget(_));
     let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-    for Slab { at: mut at, size, ramp, shade, clarity, shape, lean: mut lean, cant, cut } in
+    for Slab { mut at, size, ramp, shade, clarity, shape, mut lean, cant, cut } in
         body_of(kind, repaint)
     {
         // Mirrored: the body reflects across its own length, and any
@@ -5890,7 +5932,7 @@ fn support_height(
         }
         let turn = pose(record.yaw, record.tilt, record.flip);
         let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-        for Slab { at: mut at, size, .. } in body_of(&kind, repaint) {
+        for Slab { mut at, size, .. } in body_of(&kind, repaint) {
             if record.flip {
                 at.x = -at.x;
             }
@@ -9152,7 +9194,7 @@ pub(crate) fn bake_a_work(
             continue;
         };
         let turn = pose(record.yaw, record.tilt, record.flip);
-        for Slab { at: mut at, size, .. } in body_of(&kind, None) {
+        for Slab { mut at, size, .. } in body_of(&kind, None) {
             if record.flip {
                 at.x = -at.x;
             }
@@ -9209,14 +9251,14 @@ pub(crate) fn bake_a_work(
         // The body itself, as boxes the game can simply draw.
         let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
         for Slab {
-            at: mut at,
+            mut at,
             size,
             ramp,
             shade,
             clarity,
             shape,
-            lean: mut lean,
-            cant: mut cant,
+            mut lean,
+            mut cant,
             cut,
         } in body_of(&kind, repaint)
         {
