@@ -128,7 +128,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     // the streamed ground ends, so the whole far half of every seascape went
     // flat at once and it read as the shader giving up near the shore.
     let camera_distance = length(view.world_position.xyz - world);
-    let detail = clamp(1.0 - (camera_distance - 180.0) / 5_000.0, 0.12, 1.0);
+    let detail = clamp(1.0 - (camera_distance - 180.0) / 5000.0, 0.12, 1.0);
 
     let normal = wave_normal(p, t, water.wave_strength, detail);
     let sun = normalize(water.sun.xyz);
