@@ -784,11 +784,19 @@ fn work_gizmo(
                     }
                     PartKind::Foundation(w, d, high)
                 }
-                Some(PartKind::Framed { long, high: was }) => {
+                Some(PartKind::Framed {
+                    long,
+                    high: was,
+                    opening,
+                }) => {
                     if (high - was).abs() < 1e-4 {
                         return;
                     }
-                    PartKind::Framed { long, high }
+                    PartKind::Framed {
+                        long,
+                        high,
+                        opening,
+                    }
                 }
                 _ => return,
             };
@@ -916,7 +924,11 @@ fn work_gizmo(
             let grown = 0.0;
             let made = match kind {
                 PartKind::Wall(_) => PartKind::Wall(w),
-                PartKind::Framed { high, .. } => PartKind::Framed { long: w, high },
+                PartKind::Framed { high, opening, .. } => PartKind::Framed {
+                    long: w,
+                    high,
+                    opening,
+                },
                 PartKind::Seg { high, lift, .. } => PartKind::Seg {
                     long: w,
                     high,
