@@ -886,7 +886,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         // is snapped, because nothing here is ever off.
         PartKind::Framed { long, high } => {
             let span = (long / ATOM).round().max(POST_WIDE as f32 * 2.0) as i32;
-            let tall = (high / ATOM).round().max((PLATE_TALL * 2 + 2) as f32) as i32;
+            let tall = (high / ATOM).round().max((PLATE_TALL * 3 + 8) as f32) as i32;
             let mut body = Vec::new();
 
             // Atoms to metres, and the wall's own left end to its middle. The
@@ -895,35 +895,48 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 let middle = (from as f32 + wide as f32 * 0.5) - span as f32 * 0.5;
                 (middle * ATOM, wide as f32 * ATOM)
             };
-            let timber = |body: &mut Vec<Slab>, from: i32, wide: i32, foot: i32, tall: i32| {
+            let timber = |body: &mut Vec<Slab>, from: i32, wide: i32, foot: i32, rise: i32| {
                 let (x, w) = across(from, wide);
                 body.push(slab(
                     x,
-                    (foot as f32 + tall as f32 * 0.5) * ATOM,
+                    (foot as f32 + rise as f32 * 0.5) * ATOM,
                     0.0,
                     w,
-                    tall as f32 * ATOM,
+                    rise as f32 * ATOM,
                     WALL_THICK,
                     "wood",
                     0.62,
                 ));
             };
 
-            // The plates run the whole length, top and bottom. Everything
-            // vertical lives between them and spans exactly the clear height,
-            // so no two timbers ever want the same depth and there is nothing
-            // for a seam to happen in.
+            // The plates run the whole length, top and bottom, and a rail
+            // divides what is between them into two COURSES.
+            //
+            // The rail is what makes the bracing look like bracing. A brace
+            // runs corner to corner of the space it stiffens, so in a course
+            // the full height of the wall it comes out as a tall narrow spike
+            // and a run of them reads as a zigzag. Cut the wall into a low
+            // course and a tall one and the same brace in the low course is
+            // wide and shallow, which is what a real frame looks like and what
+            // Opificium draws.
             timber(&mut body, 0, span, 0, PLATE_TALL);
             timber(&mut body, 0, span, tall - PLATE_TALL, PLATE_TALL);
-            let clear_foot = PLATE_TALL;
-            let clear_tall = tall - PLATE_TALL * 2;
 
-            // A post at each end, heavier than the studs between them.
-            timber(&mut body, 0, POST_WIDE, clear_foot, clear_tall);
-            timber(&mut body, span - POST_WIDE, POST_WIDE, clear_foot, clear_tall);
+            let inner_foot = PLATE_TALL;
+            let inner_tall = tall - PLATE_TALL * 2;
+            // The braced course takes the lower third or so. Whole atoms, and
+            // never so thin that a brace has nothing to cross.
+            let low_tall = ((inner_tall - PLATE_TALL) * 2 / 5).max(4);
+            let rail_foot = inner_foot + low_tall;
+            timber(&mut body, 0, span, rail_foot, PLATE_TALL);
+            let high_foot = rail_foot + PLATE_TALL;
+            let high_tall = (tall - PLATE_TALL - high_foot).max(0);
 
-            // And the clear span between the posts divided into whole bays.
-            // The studs stand at the divisions; the ends are already posts.
+            // A post at each end, running the whole clear height behind the
+            // rail - a corner post is one timber, not two stacked.
+            timber(&mut body, 0, POST_WIDE, inner_foot, inner_tall);
+            timber(&mut body, span - POST_WIDE, POST_WIDE, inner_foot, inner_tall);
+
             let inner_from = POST_WIDE;
             let inner_span = (span - POST_WIDE * 2).max(0);
             let bays = ((inner_span as f32 / BAY_WANTED as f32).round() as i32).max(1);
@@ -935,34 +948,38 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 edge += *w;
                 edges.push(edge);
             }
-            for edge in &edges[1..edges.len().saturating_sub(1)] {
-                timber(&mut body, edge - STUD_WIDE / 2, STUD_WIDE, clear_foot, clear_tall);
+
+            // Each course gets its own studs, spanning exactly its own clear
+            // height. Nothing overlaps anything, so no two timbers ever want
+            // the same depth and there is nothing for a seam to happen in.
+            for (foot, rise) in [(inner_foot, low_tall), (high_foot, high_tall)] {
+                if rise <= 0 {
+                    continue;
+                }
+                for edge in &edges[1..edges.len().saturating_sub(1)] {
+                    timber(&mut body, edge - STUD_WIDE / 2, STUD_WIDE, foot, rise);
+                }
             }
 
-            // A pair of braces in every bay, rising to meet at its middle -
-            // the pattern from Brett's own bench, and the reason the cant
-            // exists. A brace runs corner to corner of the space it stiffens,
-            // so its length is the hypotenuse and its angle is whatever that
-            // triangle makes; drawn at a fixed forty-five it would either miss
-            // the corner or run out through the stud.
-            //
-            // Cut a little short at each end so it dies into the timber rather
-            // than crossing it.
+            // Braces, in the low course only, a pair to a bay rising to meet at
+            // its middle. Their angle is whatever the bay's own triangle makes:
+            // drawn at a fixed forty five they would either miss the corner or
+            // run out through the stud, and a bay is only square by accident.
             for pair in edges.windows(2) {
                 let (from, to) = (pair[0], pair[1]);
                 let bay = (to - from) as f32 * ATOM;
-                let rise = clear_tall as f32 * ATOM;
+                let rise = low_tall as f32 * ATOM;
                 let half = bay * 0.5;
                 if half <= ATOM || rise <= ATOM {
                     continue;
                 }
-                let reach = (half * half + rise * rise).sqrt() - ATOM * 2.0;
+                let reach = (half * half + rise * rise).sqrt() - ATOM;
                 let angle = rise.atan2(half);
+                let (x, _) = across(from, to - from);
                 for side in [-1.0f32, 1.0] {
-                    let (x, _) = across(from, to - from);
                     body.push(canted(
                         x - side * half * 0.5,
-                        (clear_foot as f32 + clear_tall as f32 * 0.5) * ATOM,
+                        (inner_foot as f32 + low_tall as f32 * 0.5) * ATOM,
                         0.0,
                         reach,
                         STUD_WIDE as f32 * ATOM,
@@ -974,40 +991,40 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 }
             }
 
-            // The panels between them. Not a wall with timber drawn on it: the
-            // panel is what is LEFT, cut to the gap the framing leaves, and set
-            // back so the timber stands proud of it. Nothing is subtracted from
-            // anything anywhere in here.
-            for pair in edges.windows(2) {
-                let (mut from, mut to) = (pair[0], pair[1]);
-                if from > inner_from {
-                    from += STUD_WIDE / 2;
-                }
-                if to < inner_from + inner_span {
-                    to -= STUD_WIDE / 2;
-                }
-                if to <= from {
+            // The panels. Not a wall with timber drawn on it: a panel is what
+            // the framing LEAVES, cut to the gap and set back so the timber
+            // stands proud of it. Nothing is subtracted from anything anywhere.
+            for (foot, rise) in [(inner_foot, low_tall), (high_foot, high_tall)] {
+                if rise <= 0 {
                     continue;
                 }
-                let (x, w) = across(from, to - from);
-                body.push(slab(
-                    x,
-                    (clear_foot as f32 + clear_tall as f32 * 0.5) * ATOM,
-                    0.0,
-                    w,
-                    clear_tall as f32 * ATOM,
-                    // Thinner than the wall by an atom on each face, so the
-                    // timber stands proud of the plaster on both sides. That
-                    // shadow line is the whole look; flush, it is a painted
-                    // stripe.
-                    WALL_THICK - (INFILL_SET * 2) as f32 * ATOM,
-                    // BONE, not "plaster". The bench has no plaster ramp, and a
-                    // ramp it does not know comes back as the missing-colour
-                    // magenta - which is exactly what the panels were. Bone is
-                    // the off-white a lime daub actually is.
-                    "bone",
-                    0.9,
-                ));
+                for pair in edges.windows(2) {
+                    let (mut from, mut to) = (pair[0], pair[1]);
+                    if from > inner_from {
+                        from += STUD_WIDE / 2;
+                    }
+                    if to < inner_from + inner_span {
+                        to -= STUD_WIDE / 2;
+                    }
+                    if to <= from {
+                        continue;
+                    }
+                    let (x, w) = across(from, to - from);
+                    body.push(slab(
+                        x,
+                        (foot as f32 + rise as f32 * 0.5) * ATOM,
+                        0.0,
+                        w,
+                        rise as f32 * ATOM,
+                        // Thinner than the wall by an atom on each face, so the
+                        // timber stands proud of the plaster on both sides. That
+                        // shadow line is the whole look; flush, it is a painted
+                        // stripe.
+                        WALL_THICK - (INFILL_SET * 2) as f32 * ATOM,
+                        "bone",
+                        0.9,
+                    ));
+                }
             }
             body
         }
