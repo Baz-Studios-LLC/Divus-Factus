@@ -10180,6 +10180,24 @@ mod roof_tests {
     /// prop draws the leaf - so nothing makes them agree except this. They
     /// disagreed by two atoms, which is a black strip of daylight over every
     /// door in the world.
+    /// The grid a maker sets is the grid every pull lands on.
+    ///
+    /// The step is `16 / grid`, which is the same expression the ghost snaps a
+    /// placed part with - so a part can be put down on a quarter metre and
+    /// dragged on quarter metres, rather than put down on one and dragged off
+    /// it a sixteenth at a time.
+    #[test]
+    fn the_grid_is_the_step_every_pull_takes() {
+        for (grid, want) in [(1, 1.0 / 16.0), (2, 1.0 / 8.0), (4, 0.25), (8, 0.5), (16, 1.0)] {
+            let per = 16.0 / SnapGrid(grid).0 as f32;
+            assert!(
+                (1.0 / per - want).abs() < 1e-6,
+                "a grid of {grid} steps by {} rather than {want}",
+                1.0 / per,
+            );
+        }
+    }
+
     #[test]
     fn a_doorway_is_the_size_of_its_door() {
         let leaf = body_of(&PartKind::Prop("door"), None);

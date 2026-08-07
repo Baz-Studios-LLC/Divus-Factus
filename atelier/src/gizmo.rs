@@ -604,6 +604,7 @@ fn work_gizmo(
     children: Query<&Children>,
     dyes: Query<&MeshMaterial3d<StandardMaterial>>,
     palette: Res<Palette>,
+    grid: Res<builder::SnapGrid>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut parts: Query<(Entity, &mut Transform, &mut Placed), Without<Handle>>,
@@ -685,11 +686,19 @@ fn work_gizmo(
     let Some(t) = along_axis(&ray, state.start_at, state.dir) else {
         return;
     };
+    // Every pull lands on the grid the bench is set to, which is what G
+    // changes. It used to be whole sixteenths always - "resizing is fine work
+    // by nature", which is true of most resizing and not of a maker who has
+    // just asked for quarter metres because they are laying out a building.
+    //
+    // Placing a part already worked this way. A handle that did not meant the
+    // same part could be put down on a quarter and then dragged off it.
+    let per = 16.0 / grid.0.max(1) as f32;
+    let step_of = |pull: f32| (pull * per).round() / per;
+
     match state.grip {
         Grip::Slide => {
-            // A sixteenth of a metre: the universal lattice's own step,
-            // so a fine move can always be undone by a coarse snap.
-            let step = ((t - state.t0) * 16.0).round() / 16.0;
+            let step = step_of(t - state.t0);
             let was = transform.translation;
             transform.translation = state.start_at + state.dir * step;
             record.at = transform.translation.into();
@@ -773,9 +782,9 @@ fn work_gizmo(
             );
         }
         Grip::Rise { h0 } => {
-            // Whole sixteenths, like every other pull, and never thinner than
-            // one: a pad of no height is a pad nobody can see or click.
-            let pull = ((t - state.t0) * 16.0).round() / 16.0;
+            // On the grid, like every other pull, and never thinner than one
+            // atom: a pad of no height is a pad nobody can see or click.
+            let pull = step_of(t - state.t0);
             let high = (h0 + pull).clamp(0.0625, 8.0);
             let made = match builder::kind_from_name(&record.part) {
                 Some(PartKind::Foundation(w, d, was)) => {
@@ -874,9 +883,9 @@ fn work_gizmo(
             );
         }
         Grip::Over { o0 } => {
-            // The eaves reach out in whole units; the walls beneath and
-            // the gables at the ends do not move at all.
-            let pull = ((t - state.t0) * 16.0).round() / 16.0;
+            // The eaves reach out on the grid; the walls beneath and the
+            // gables at the ends do not move at all.
+            let pull = step_of(t - state.t0);
             let over = (o0 + pull).clamp(0.0, 3.0);
             // Both roofs reach their eaves out the same way.
             let made = match builder::kind_from_name(&record.part) {
@@ -910,8 +919,7 @@ fn work_gizmo(
         Grip::Size { on_x, w0, d0, was } => {
             // Pulling outward along the handle grows the dimension; the
             // far end stands still, so the centre walks half the growth.
-            // One atom per step, always: resizing is fine work by nature.
-            let pull = ((t - state.t0) * 16.0).round() / 16.0;
+            let pull = step_of(t - state.t0);
             let Some(kind) = builder::kind_from_name(&record.part) else {
                 return;
             };
