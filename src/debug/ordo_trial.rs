@@ -85,6 +85,25 @@ fn raise_the_pair(mut commands: Commands, fonts: Res<crate::ui::Fonts>) {
         ],
     ));
 
+    // ---- and a WINDOW, which Ordo did not have until now --------------
+    //
+    // Lifted out of this game, because the rule is that anything the interface
+    // needs and Ordo lacks gets built IN ORDO. Drag it by the title bar, shut
+    // it with the cross, and clicking any part of it brings it to the front.
+    //
+    // Note what the caller writes: the body, and nothing else. The title bar
+    // and the close button are put on afterwards by a pass, the same way paint
+    // is - which is what lets a window be an ordinary `children!` spawn like
+    // every other widget here.
+    commands.spawn((
+        ordo::window::window("The Ledger", Anchor::BottomLeft, 300.0),
+        children![
+            (row(), children![label("Founded"), body("Spring 1")]),
+            (row(), children![label("Souls"), body("14")]),
+            (row(), children![label("Mood"), dim("content")]),
+        ],
+    ));
+
     // ---- and the game's own, by hand ----------------------------------
     //
     // Written the way every panel in this game is written, so what is being
