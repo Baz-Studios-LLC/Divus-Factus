@@ -946,11 +946,23 @@ const DRIFT_DISTANCE: f32 = 31_000.0;
 /// becomes a globe turning on its own axis rather than a camera flying round a
 /// world.
 const DRIFT_PITCH: f32 = 1.50;
-/// Radians per second the vantage circles the planet. The camera turns and the
-/// world does not: the simulation's whole coordinate system is pinned to this
-/// sphere, so spinning the planet would spin every village on it. Circling it
-/// instead is the same picture and costs nothing. A lap takes five minutes.
-const DRIFT_TURN: f32 = 0.021;
+/// How long the vantage takes to go once round the planet, in seconds.
+///
+/// The camera travels and the world does not: the simulation's whole coordinate
+/// system is pinned to this sphere, so spinning the planet would spin every
+/// village on it. Circling it is the same picture and costs nothing.
+///
+/// It used to circle by adding to the camera's YAW, which is not circling
+/// anything. At the title's pitch the eye stands almost straight out from its
+/// focus, so yaw barely moves it - it turns the image about its own middle
+/// instead, and the planet span like a record seen from above rather than
+/// turning like a globe.
+///
+/// The FOCUS walks instead, east along its own line of latitude, and the eye
+/// goes with it because it stands radially out from wherever the focus is. The
+/// view stays pointed at the planet's centre the whole way round, so what the
+/// eye sees is the world turning past it, edge on.
+const DRIFT_LAP: f32 = 300.0;
 
 /// How far the title turns the camera off its aim, in radians. NEGATIVE slides
 /// the world left, which is where the planet belongs while the menu has the
@@ -996,8 +1008,10 @@ fn drift_title_camera(
     let Ok(mut rig) = rigs.single_mut() else {
         return;
     };
+    // A restored world tours its own village's latitude, so the ground the
+    // player left is the ground that comes round. Only the latitude: the
+    // longitude is what the drift is walking.
     if let Some(site) = site {
-        rig.target_focus.x = site.centre.x;
         rig.target_focus.z = site.centre.z;
     }
     rig.target_distance = DRIFT_DISTANCE;
@@ -1006,7 +1020,10 @@ fn drift_title_camera(
     // own aim rather than the world moving. Nothing else in the game shifts its
     // aim, so this is set here and cleared on the way out.
     rig.aim_offset = Vec2::new(DRIFT_AIM, menu_middle_aim());
-    rig.target_yaw += DRIFT_TURN * time.delta_secs();
+    rig.target_focus.x += crate::terrain::planet_circumference() / DRIFT_LAP * time.delta_secs();
+    // Sent out to the sphere and brought home, so a lap does not walk the
+    // coordinates off the end of the world.
+    rig.target_focus = crate::camera::fold_onto_the_sphere(rig.target_focus);
     rig.zoom_anchor = None;
 }
 
