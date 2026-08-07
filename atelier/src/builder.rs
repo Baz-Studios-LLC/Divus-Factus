@@ -101,6 +101,55 @@ pub fn on_the_lattice(measure: f32) -> f32 {
 }
 const WALL_HIGH: f32 = 2.5;
 
+// The framing, in whole atoms.
+//
+// Integers, and that is the point rather than an implementation detail. A bay
+// edge reached by adding stud widths and a bay edge reached by dividing the
+// span have to be the SAME NUMBER, or the panel between them is a hair too
+// wide and the seam shows. Added and divided as `i32` they cannot help but
+// agree; turned into metres once at the end, they land on the lattice by
+// construction rather than by being snapped back onto it afterwards.
+
+/// A corner post's width. Visibly heavier than a stud - that contrast is most
+/// of what makes a wall read as framed rather than striped.
+const POST_WIDE: i32 = 4;
+/// A stud's width.
+const STUD_WIDE: i32 = 2;
+/// How deep the sill and head plates are, measured up the wall.
+const PLATE_TALL: i32 = 3;
+/// What a bay wants to be. The solver divides each clear span into whole bays
+/// as near this as it can, so no bay is ever a runt.
+const BAY_WANTED: i32 = 14;
+/// How far the panel between the timbers sits behind their faces.
+const INFILL_SET: i32 = 1;
+
+/// A span of atoms in `n` parts that sum to exactly the span.
+///
+/// Integer division leaves a remainder of up to `n - 1` atoms. Dropping it
+/// would leave a visible runt at one end of the wall, so it is spread an atom
+/// at a time across the leading parts: the widest and narrowest bay then differ
+/// by one atom - four millimetres, invisible - and the parts still tile the
+/// span exactly. Straight out of Opificium's `Len::divide`, which is the piece
+/// that makes a wall gain a bay cleanly instead of gaining a seam.
+fn into_bays(span: i32, bays: i32) -> Vec<i32> {
+    if bays <= 0 {
+        return Vec::new();
+    }
+    let base = span.div_euclid(bays);
+    let mut over = span.rem_euclid(bays);
+    (0..bays)
+        .map(|_| {
+            let extra = if over > 0 {
+                over -= 1;
+                1
+            } else {
+                0
+            };
+            base + extra
+        })
+        .collect()
+}
+
 /// One piece of a part's body: offset from the part origin, size, ramp,
 /// shade, how much of the world shows through it (1.0 = none), and
 /// whether it is a wedge rather than a box - a triangular prism, for
@@ -368,6 +417,27 @@ fn wedge_mesh(lengthwise: bool) -> Mesh {
 #[derive(Clone, Copy, PartialEq)]
 pub enum PartKind {
     Wall(f32),
+    /// A half-timbered wall that frames ITSELF.
+    ///
+    /// Every other part in here is a shape a maker sizes. This one is a
+    /// specification the bench solves: given a length and a height it works out
+    /// where the sill and head plates go, where the corner posts stand, and how
+    /// many studs divide the clear span between them - then places all of it
+    /// from scratch every time either number changes.
+    ///
+    /// The difference shows the moment you pull it. A plain wall dragged from
+    /// two metres to three is the same wall stretched, and everything drawn on
+    /// it stretches too. A framed wall dragged the same way GAINS A BAY: the
+    /// studs stay the width studs are, the panels stay the size panels are, and
+    /// the wall is simply longer. Nothing is ever scaled, so nothing is ever
+    /// distorted.
+    ///
+    /// Taken from Opificium, which is Brett's own bench for medieval buildings
+    /// and worked this way from the start.
+    Framed {
+        long: f32,
+        high: f32,
+    },
     /// A piece of wall left standing around an opening: the sides of a
     /// doorway, the header above it, the sill strip under a window.
     Seg {
@@ -636,6 +706,14 @@ pub const STRUCTURE: &[CatalogEntry] = &[
     ),
     structure("TRIM, STRETCH", PartKind::TrimRun { stone: false }, "walls"),
     structure("WALL, 2M", PartKind::Wall(2.0), "walls"),
+    structure(
+        "WALL, FRAMED",
+        PartKind::Framed {
+            long: 3.0,
+            high: WALL_HIGH,
+        },
+        "walls",
+    ),
     structure("WALL, STRETCH", PartKind::WallRun, "walls"),
     structure("WINDOW", PartKind::Prop("window"), "walls"),
 ];
@@ -771,6 +849,99 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             "wood",
             0.7,
         )],
+        // The wall that frames itself. See `PartKind::Framed`.
+        //
+        // Everything is worked out in whole atoms from the left end and turned
+        // into metres once, at the very end, when the slab is cut. Nothing here
+        // is snapped, because nothing here is ever off.
+        PartKind::Framed { long, high } => {
+            let span = (long / ATOM).round().max(POST_WIDE as f32 * 2.0) as i32;
+            let tall = (high / ATOM).round().max((PLATE_TALL * 2 + 2) as f32) as i32;
+            let mut body = Vec::new();
+
+            // Atoms to metres, and the wall's own left end to its middle. The
+            // one conversion in the whole solve.
+            let across = |from: i32, wide: i32| -> (f32, f32) {
+                let middle = (from as f32 + wide as f32 * 0.5) - span as f32 * 0.5;
+                (middle * ATOM, wide as f32 * ATOM)
+            };
+            let timber = |body: &mut Vec<Slab>, from: i32, wide: i32, foot: i32, tall: i32| {
+                let (x, w) = across(from, wide);
+                body.push(slab(
+                    x,
+                    (foot as f32 + tall as f32 * 0.5) * ATOM,
+                    0.0,
+                    w,
+                    tall as f32 * ATOM,
+                    WALL_THICK,
+                    "wood",
+                    0.62,
+                ));
+            };
+
+            // The plates run the whole length, top and bottom. Everything
+            // vertical lives between them and spans exactly the clear height,
+            // so no two timbers ever want the same depth and there is nothing
+            // for a seam to happen in.
+            timber(&mut body, 0, span, 0, PLATE_TALL);
+            timber(&mut body, 0, span, tall - PLATE_TALL, PLATE_TALL);
+            let clear_foot = PLATE_TALL;
+            let clear_tall = tall - PLATE_TALL * 2;
+
+            // A post at each end, heavier than the studs between them.
+            timber(&mut body, 0, POST_WIDE, clear_foot, clear_tall);
+            timber(&mut body, span - POST_WIDE, POST_WIDE, clear_foot, clear_tall);
+
+            // And the clear span between the posts divided into whole bays.
+            // The studs stand at the divisions; the ends are already posts.
+            let inner_from = POST_WIDE;
+            let inner_span = (span - POST_WIDE * 2).max(0);
+            let bays = ((inner_span as f32 / BAY_WANTED as f32).round() as i32).max(1);
+            let widths = into_bays(inner_span, bays);
+
+            let mut edge = inner_from;
+            let mut edges = vec![edge];
+            for w in &widths {
+                edge += *w;
+                edges.push(edge);
+            }
+            for edge in &edges[1..edges.len().saturating_sub(1)] {
+                timber(&mut body, edge - STUD_WIDE / 2, STUD_WIDE, clear_foot, clear_tall);
+            }
+
+            // The panels between them. Not a wall with timber drawn on it: the
+            // panel is what is LEFT, cut to the gap the framing leaves, and set
+            // back so the timber stands proud of it. Nothing is subtracted from
+            // anything anywhere in here.
+            for pair in edges.windows(2) {
+                let (mut from, mut to) = (pair[0], pair[1]);
+                if from > inner_from {
+                    from += STUD_WIDE / 2;
+                }
+                if to < inner_from + inner_span {
+                    to -= STUD_WIDE / 2;
+                }
+                if to <= from {
+                    continue;
+                }
+                let (x, w) = across(from, to - from);
+                body.push(slab(
+                    x,
+                    (clear_foot as f32 + clear_tall as f32 * 0.5) * ATOM,
+                    0.0,
+                    w,
+                    clear_tall as f32 * ATOM,
+                    // Thinner than the wall by an atom on each face, so the
+                    // timber stands proud of the plaster on both sides. That
+                    // shadow line is the whole look; flush, it is a painted
+                    // stripe.
+                    WALL_THICK - (INFILL_SET * 2) as f32 * ATOM,
+                    "plaster",
+                    0.92,
+                ));
+            }
+            body
+        }
         PartKind::Wall(length) => vec![slab(
             0.0,
             WALL_HIGH * 0.5,
@@ -3010,6 +3181,7 @@ pub fn part_name(kind: &PartKind) -> String {
                 format!("trim-{long}")
             }
         }
+        PartKind::Framed { long, high } => format!("framed-{long}x{high}"),
         PartKind::Gable(long, pitch) => format!("gable-{long}x{pitch}"),
         PartKind::Beam(long, high, low) => format!("beam-{long}x{high}x{low}"),
         PartKind::BeamRun => "beamrun".to_string(),
@@ -3063,6 +3235,15 @@ pub fn part_name(kind: &PartKind) -> String {
 pub fn kind_from_name(name: &str) -> Option<PartKind> {
     if let Some(rest) = name.strip_prefix("wall-") {
         return rest.parse::<f32>().ok().map(PartKind::Wall);
+    }
+    if let Some(rest) = name.strip_prefix("framed-") {
+        let mut parts = rest.split('x');
+        let long = parts.next()?.parse().ok()?;
+        let high = parts
+            .next()
+            .and_then(|n| n.parse().ok())
+            .unwrap_or(WALL_HIGH);
+        return Some(PartKind::Framed { long, high });
     }
     if let Some(rest) = name.strip_prefix("hiproof-") {
         let mut parts = rest.split('x');
@@ -3602,6 +3783,10 @@ fn length_of(kind: &PartKind) -> Option<(f32, Box<dyn Fn(f32) -> PartKind>)> {
             Some((long, Box::new(move |n| PartKind::Beam(n, high, low))))
         }
         PartKind::Wall(long) => Some((long, Box::new(PartKind::Wall))),
+        PartKind::Framed { long, high } => Some((
+            long,
+            Box::new(move |n| PartKind::Framed { long: n, high }),
+        )),
         PartKind::Ridge(long) => Some((long, Box::new(PartKind::Ridge))),
         // Everything else a maker can size along its own length. Brett: "Trim to
         // roof needs to be added to all the parts in the bench" - and the three
@@ -9342,6 +9527,52 @@ mod roof_tests {
     /// hypotenuse, and no rule about a grid can ask an angle to be a whole number
     /// of sixteenths. Decor answers for itself along with everything else - it
     /// turned out to be one part out, and that one was mine from this morning.
+    /// The bays tile their span exactly, at every length a wall can be.
+    ///
+    /// This is the one thing the integers are for. A remainder dropped is a
+    /// runt bay at one end; a remainder kept in floats is a seam that opens
+    /// and closes as the wall is dragged.
+    #[test]
+    fn the_bays_fill_the_span_exactly() {
+        for span in 1..400 {
+            for bays in 1..12 {
+                let parts = into_bays(span, bays);
+                assert_eq!(parts.len(), bays as usize);
+                assert_eq!(parts.iter().sum::<i32>(), span, "{bays} bays of {span}");
+                let widest = *parts.iter().max().unwrap();
+                let narrowest = *parts.iter().min().unwrap();
+                assert!(
+                    widest - narrowest <= 1,
+                    "{bays} bays of {span} differ by {}",
+                    widest - narrowest,
+                );
+            }
+        }
+    }
+
+    /// Pulled longer, a framed wall gains a bay rather than stretching the
+    /// ones it had. That is the whole difference between a generator and a
+    /// shape, and it is worth a test that says so out loud.
+    #[test]
+    fn a_longer_wall_gains_a_bay() {
+        let studs = |long: f32| {
+            body_of(
+                &PartKind::Framed {
+                    long,
+                    high: WALL_HIGH,
+                },
+                None,
+            )
+            .len()
+        };
+        let short = studs(2.0);
+        let long = studs(6.0);
+        assert!(
+            long > short,
+            "six metres came out with {long} pieces against two metres' {short}",
+        );
+    }
+
     #[test]
     fn every_face_lands_on_an_atom() {
         let mut adrift: Vec<String> = Vec::new();

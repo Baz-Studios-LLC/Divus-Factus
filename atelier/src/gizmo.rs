@@ -370,7 +370,16 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
             // A pad carries one more, in gold: how TALL it stands. Both of the
             // red-and-blue pair are spoken for by its footprint, and a footing
             // that cannot be raised cannot reach the ground on a slope.
-            if let Some(PartKind::Foundation(_, _, high)) = builder::kind_from_name(&record.part) {
+            let stands = match builder::kind_from_name(&record.part) {
+                Some(PartKind::Foundation(_, _, high)) => Some(high),
+                // A framed wall carries the same gold handle, and wants it more
+                // than a pad does: its length is one of the two numbers it
+                // solves from and its height is the other. Pulled taller it
+                // re-solves rather than stretching, so the plates stay plates.
+                Some(PartKind::Framed { high, .. }) => Some(high),
+                _ => None,
+            };
+            if let Some(high) = stands {
                 handles.push((
                     spin * Vec3::Y,
                     spin * Vec3::new(0.0, high, 0.0),
@@ -763,14 +772,21 @@ fn work_gizmo(
             // one: a pad of no height is a pad nobody can see or click.
             let pull = ((t - state.t0) * 16.0).round() / 16.0;
             let high = (h0 + pull).clamp(0.0625, 8.0);
-            let Some(PartKind::Foundation(w, d, was)) = builder::kind_from_name(&record.part)
-            else {
-                return;
+            let made = match builder::kind_from_name(&record.part) {
+                Some(PartKind::Foundation(w, d, was)) => {
+                    if (high - was).abs() < 1e-4 {
+                        return;
+                    }
+                    PartKind::Foundation(w, d, high)
+                }
+                Some(PartKind::Framed { long, high: was }) => {
+                    if (high - was).abs() < 1e-4 {
+                        return;
+                    }
+                    PartKind::Framed { long, high }
+                }
+                _ => return,
             };
-            if (high - was).abs() < 1e-4 {
-                return;
-            }
-            let made = PartKind::Foundation(w, d, high);
             record.part = builder::part_name(&made);
             // The part does NOT move. A pad's box is drawn from its origin
             // upward - the origin IS the underside - so growing it already grows
@@ -782,7 +798,6 @@ fn work_gizmo(
             // an atom is exactly what the lattice cannot have: Brett, "A
             // foundation on the ground when I stretch it up it seems to get off
             // the atom grid."
-            let _ = was;
             commands.entity(part).despawn_related::<Children>();
             builder::dress_part(
                 &mut commands,
