@@ -1474,6 +1474,9 @@ pub struct TerrainAssets {
     /// over a couple of units instead gives a river a surface while leaving the
     /// sea's shallows exactly as they were.
     pub river_material: Handle<crate::water::WaterMaterial>,
+    /// The sea's own, shared with the planet's patches so the ocean at
+    /// altitude and the ocean underfoot are the same water lit the same way.
+    pub sea_material: Handle<crate::water::WaterMaterial>,
 }
 
 fn setup_terrain(
@@ -1562,6 +1565,7 @@ fn setup_terrain(
     commands.insert_resource(TerrainAssets {
         ground_material,
         river_material,
+        sea_material: water_material.clone(),
     });
     commands.init_resource::<LoadedChunks>();
 }

@@ -255,6 +255,10 @@ pub struct PlanetDetail {
 struct Patch2 {
     entity: Entity,
     mesh: Handle<Mesh>,
+    /// The sea, lakes and rivers standing on this patch, if any stand on it.
+    /// A child entity, so it inherits the patch's visibility and is felled
+    /// with it; the mesh is held so it can be dropped from the assets too.
+    water: Option<Handle<Mesh>>,
     last_shown: u64,
     painted: u64,
 }
@@ -342,7 +346,8 @@ impl Plugin for GlobePlugin {
             .init_resource::<PlanetDetail>()
             .add_systems(
                 Update,
-                (plant_the_tree, dress_the_patches).run_if(resource_exists::<Terrain>),
+                (plant_the_tree, dress_the_patches, dress_the_patch_water)
+                    .run_if(resource_exists::<Terrain>),
             )
             .add_systems(
                 Update,
@@ -689,6 +694,9 @@ fn grow_patch(
     if let Some(old) = tree.built.remove(&key) {
         commands.entity(old.entity).despawn();
         meshes.remove(&old.mesh);
+        if let Some(water) = old.water {
+            meshes.remove(&water);
+        }
     }
     let mesh = meshes.add(build_patch(terrain, veil, key));
     let entity = commands
@@ -703,6 +711,24 @@ fn grow_patch(
             ChildOf(root),
         ))
         .id();
+    // And the water standing on it, as a child so it is shown, hidden and
+    // felled with the ground it covers. Render layers are not inherited, so
+    // it states its own.
+    let water = build_patch_water(terrain, key).map(|sheet| {
+        let handle = meshes.add(sheet);
+        commands.spawn((
+            PatchWater,
+            Mesh3d(handle.clone()),
+            Transform::default(),
+            Visibility::Inherited,
+            RenderLayers::layer(GLOBE_LAYER),
+            NotShadowCaster,
+            NotShadowReceiver,
+            ChildOf(entity),
+        ));
+        handle
+    });
+
     let beat = tree.beat;
     let painted = tree.paint_beat;
     tree.built.insert(
@@ -710,11 +736,34 @@ fn grow_patch(
         Patch2 {
             entity,
             mesh,
+            water,
             last_shown: beat,
             painted,
         },
     );
     entity
+}
+
+/// The sea standing on one patch. See `build_patch_water`.
+#[derive(Component)]
+struct PatchWater;
+
+/// Hands the water shader to any patch sea that lacks it, the same way
+/// `dress_the_patches` hands out the skin - so patch growth never has to know
+/// what water looks like.
+fn dress_the_patch_water(
+    mut commands: Commands,
+    assets: Option<Res<crate::terrain::TerrainAssets>>,
+    bare: Query<Entity, (With<PatchWater>, Without<MeshMaterial3d<crate::water::WaterMaterial>>)>,
+) {
+    let Some(assets) = assets else {
+        return;
+    };
+    for sea in &bare {
+        commands
+            .entity(sea)
+            .insert(MeshMaterial3d(assets.sea_material.clone()));
+    }
 }
 
 /// Hands the shared material to any patch that lacks it. Separate from the
@@ -797,7 +846,7 @@ fn build_patch(
                 _ => WATER_LEVEL,
             };
             let wet = surface.max(WATER_LEVEL);
-            grid.push(dir * drawn_radial(h, wet));
+            grid.push(dir * drawn_radial(h));
             ground.push((x, z, h, wet));
         }
     }
@@ -928,14 +977,123 @@ pub(crate) fn ground_coordinates(dir: Vec3) -> (f32, f32) {
     (lon * PLANET_RADIUS, -lat * PLANET_RADIUS)
 }
 
-/// Radial distance the surface is drawn at. Water is drawn AT its surface —
-/// the sea at sea level, a lake at the lake's own level — because a globe
-/// shows its waters, not its beds. Land is TRUE relief: the planet sits
-/// underneath the flat world whenever the god is high enough to see past
-/// the loaded ground, and an exaggerated mountain would tower up through
-/// the real ground above it.
-fn drawn_radial(h: f32, wet: f32) -> f32 {
-    PLANET_RADIUS + WATER_LEVEL + (h.max(wet) - WATER_LEVEL).max(0.0) - PATCH_SINK
+/// Radial distance the GROUND is drawn at. True relief everywhere now, beds
+/// included: the planet sits underneath the flat world whenever the god is
+/// high enough to see past the loaded ground, and an exaggerated mountain
+/// would tower up through the real ground above it.
+///
+/// It used to lift every drowned vertex to the water's surface and paint it
+/// blue, because there was nothing else to draw the sea with up here. That is
+/// what made the ocean a picture of water rather than water: the flat sheet
+/// over the loaded ground had the whole water shader - waves, sky reflection,
+/// fresnel, foam - and the planet had a coloured triangle, and where the two
+/// met you could see the join. They can be given the same colour and never the
+/// same light.
+///
+/// So the bed is drawn where the bed is, and `build_patch_water` lays the
+/// actual water over it. The water shader measures its own thickness from
+/// whatever is drawn behind it, which is exactly what a real bed gives it -
+/// shallows clear enough to show the bottom, depths opaque, foam along the
+/// shore - and none of that was reachable while the bed WAS the surface.
+fn drawn_radial(h: f32) -> f32 {
+    PLANET_RADIUS + h - PATCH_SINK
+}
+
+/// The water standing over one patch, if any: the sea, and the lakes and
+/// rivers the courses know, all of them the same question asked once.
+///
+/// Drawn at the water's own surface, with the sphere's own outward for a
+/// normal - a level surface on a ball IS the sphere, so there is nothing to
+/// derive. No skirt and no neighbour sampling either: the sheet is level, so
+/// two patches meeting at different depths still meet exactly.
+///
+/// Unsunk, unlike the ground, which is what leaves `PATCH_SINK` between the
+/// two - room for the shader to read a thickness in even where the water is
+/// barely a hand deep.
+fn build_patch_water(terrain: &Terrain, key: PatchKey) -> Option<Mesh> {
+    let n = PATCH_CELLS;
+    let stride = n + 1;
+    let (u0, v0, side) = key.rect();
+    let (outward, along_u, along_v) = face_axes(key.face);
+    let step = side / n as f32;
+
+    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(stride * stride);
+    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(stride * stride);
+    let mut uvs: Vec<[f32; 2]> = Vec::with_capacity(stride * stride);
+    let mut drowned = vec![false; stride * stride];
+    let mut any = false;
+
+    for gj in 0..stride {
+        for gi in 0..stride {
+            let u = u0 + gi as f32 * step;
+            let v = v0 + gj as f32 * step;
+            let dir = (outward + along_u * u + along_v * v).normalize();
+            let (x, z) = ground_coordinates(dir);
+            let h = terrain.base_height_at(x, z);
+            let surface = match terrain.river_surface_at(x, z) {
+                Some(level) if level > h => level,
+                _ => WATER_LEVEL,
+            };
+            let wet = surface.max(WATER_LEVEL);
+            let under = h < wet;
+            any |= under;
+            drowned[gj * stride + gi] = under;
+            positions.push((dir * (PLANET_RADIUS + wet)).to_array());
+            normals.push(dir.to_array());
+            uvs.push([gi as f32 / n as f32, gj as f32 / n as f32]);
+        }
+    }
+    if !any {
+        return None;
+    }
+
+    // Winding read off the geometry, the same way `build_patch` reads it, so
+    // the sea faces outward on all six faces of the cube without any of them
+    // having to know which face they are.
+    let pa = Vec3::from(positions[0]);
+    let pb = Vec3::from(positions[1]);
+    let pc = Vec3::from(positions[stride]);
+    let outward_as_abc = (pb - pa).cross(pc - pa).dot(pa) > 0.0;
+
+    let mut indices: Vec<u32> = Vec::new();
+    for row in 0..n {
+        for column in 0..n {
+            let corner = [
+                row * stride + column,
+                row * stride + column + 1,
+                (row + 1) * stride + column,
+                (row + 1) * stride + column + 1,
+            ];
+            // Any drowned corner is enough. The dry ones are already at the
+            // water's level, so the sheet runs up onto the shore and the
+            // shader's own depth fade thins it away there - rather than
+            // stopping dead at the last wet vertex and leaving a staircase
+            // along every coast on the planet.
+            if !corner.iter().any(|i| drowned[*i]) {
+                continue;
+            }
+            let [a, b, c, d] = corner.map(|i| i as u32);
+            if outward_as_abc {
+                indices.extend_from_slice(&[a, b, c, b, d, c]);
+            } else {
+                indices.extend_from_slice(&[a, c, b, b, c, d]);
+            }
+        }
+    }
+    if indices.is_empty() {
+        return None;
+    }
+
+    Some(
+        Mesh::new(
+            PrimitiveTopology::TriangleList,
+            RenderAssetUsages::RENDER_WORLD,
+        )
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+        .with_inserted_indices(Indices::U32(indices)),
+    )
 }
 
 /// One vertex's colour: any standing water by depth in the water's own
