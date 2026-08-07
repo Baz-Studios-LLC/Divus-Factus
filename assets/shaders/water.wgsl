@@ -116,9 +116,19 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let view_dir = normalize(view.world_position.xyz - world);
 
-    // Fade wave detail with distance, so the far sea settles instead of shimmering.
+    // Fade wave detail with distance, so the far sea settles instead of
+    // shimmering into aliasing.
+    //
+    // Over five thousand units, not nine hundred. Nine hundred was right when
+    // the sea was one quad a few hundred units across being dragged along
+    // under the camera - past its own edge there was no water to fade. Now the
+    // ground carries its own water and the sea runs to the horizon and beyond
+    // it, and the horizon from any height worth standing at is thousands of
+    // units off: the ripples died at eleven hundred, which is roughly where
+    // the streamed ground ends, so the whole far half of every seascape went
+    // flat at once and it read as the shader giving up near the shore.
     let camera_distance = length(view.world_position.xyz - world);
-    let detail = clamp(1.0 - (camera_distance - 180.0) / 900.0, 0.12, 1.0);
+    let detail = clamp(1.0 - (camera_distance - 180.0) / 5_000.0, 0.12, 1.0);
 
     let normal = wave_normal(p, t, water.wave_strength, detail);
     let sun = normalize(water.sun.xyz);

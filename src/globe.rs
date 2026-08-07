@@ -87,6 +87,11 @@ const SPLIT_PX: f32 = 7.0;
 /// `tend_the_tree`.
 const MERGE_HYSTERESIS: f32 = 0.75;
 
+/// How far the planet's water sits below true level, to keep clear of the
+/// chunks' own sea without putting a step in the ocean where the two meet.
+/// See `build_patch_water`.
+const WATER_CLEARANCE: f32 = 1.0;
+
 /// Patches built per frame while the tree is chasing the camera. A build is
 /// a couple of milliseconds of noise sampling; four a frame chases a fast
 /// descent closely without stuttering the simulation, and a patch that
@@ -1026,8 +1031,8 @@ fn drawn_radial(h: f32) -> f32 {
 /// derive. No skirt and no neighbour sampling either: the sheet is level, so
 /// two patches meeting at different depths still meet exactly.
 ///
-/// Sunk by `PATCH_SINK`, exactly as the bed under it is, and both halves of
-/// that matter.
+/// Sunk by `WATER_CLEARANCE` - just enough to keep out of the chunks' way,
+/// and no more.
 ///
 /// The DEPTH has to be honest. The shader reads thickness as the distance
 /// between this surface and whatever is drawn behind it, so sinking the bed
@@ -1036,12 +1041,17 @@ fn drawn_radial(h: f32) -> f32 {
 /// band, and the sea would run up the beach with no edge on it. Sunk together,
 /// the difference is `wet - h` exactly - the number the terrain actually knows.
 ///
-/// And it puts this surface CLEAR of the flat sheet, which is drawn at sea
-/// level with no sink at all. They were coplanar, and two water surfaces in
-/// the same plane is a z-fight - which is what flashed pale blue in a ring
-/// around the camera as the streamed ground moved and the two took it in turns
-/// to win. Underneath, the near sheet wins outright, and past the sheet's edge
-/// this is the only water there is.
+/// It cannot sit at true sea level, because the chunks' own sea does and two
+/// water surfaces in one plane is a z-fight. It cannot drop the whole
+/// `PATCH_SINK` either, which is what it did at first: the chunks' sea ends at
+/// the streamed radius and this carries on from there, so a two and a half
+/// unit sink put a STEP in the ocean at that edge, seen end-on from any low
+/// camera. A single unit clears the chunks and is nothing to look at from the
+/// thousand-odd units away that boundary always is.
+///
+/// The cost is that the depth read here runs `PATCH_SINK - WATER_CLEARANCE`
+/// too deep, so a shore drawn by a patch will not foam. Shores near enough to
+/// look at are drawn by chunks, which measure honestly.
 fn build_patch_water(terrain: &Terrain, key: PatchKey) -> Option<Mesh> {
     let n = PATCH_CELLS;
     let stride = n + 1;
@@ -1070,7 +1080,7 @@ fn build_patch_water(terrain: &Terrain, key: PatchKey) -> Option<Mesh> {
             let under = h < wet;
             any |= under;
             drowned[gj * stride + gi] = under;
-            positions.push((dir * (PLANET_RADIUS + wet - PATCH_SINK)).to_array());
+            positions.push((dir * (PLANET_RADIUS + wet - WATER_CLEARANCE)).to_array());
             normals.push(dir.to_array());
             uvs.push([gi as f32 / n as f32, gj as f32 / n as f32]);
         }
