@@ -742,10 +742,49 @@ impl Terrain {
             // At 1.4 the crests stay joined into ridges with valleys running
             // off them, and the multiplier comes down to keep the summits where
             // they were - `the_world_has_mountains` measures both ends of that.
-            height += peaks.powf(1.4) * belt_mask.powf(1.3) * 165.0;
+            // A MASS, and ridges on it - not ridges alone.
+            //
+            // All the height used to come from the ridged field, and ridged
+            // noise is high on its crests and low everywhere else. Add a
+            // hundred and sixty units of that to a belt and the low patches
+            // between crests come out ringed by high ground: closed basins, in
+            // the middle of every range. The belt's own falloff is the only
+            // thing sloping outward and the noise swings harder than it does,
+            // so the noise wins locally and the basin stays shut. That is the
+            // crater, and the fill then puts a lake in it, because a closed
+            // basin is exactly what a lake is.
+            //
+            // Split it. Most of the height is now a smooth dome that falls away
+            // in every direction, so wherever you stand there is always lower
+            // ground somewhere near - and the ridges ride on top of that
+            // instead of being the whole of it. A mountain reads as one mass
+            // with creases rather than a field of bumps, and the water has
+            // somewhere to go.
+            let dome = belt_mask.powf(1.3);
+            height += dome * 150.0 + peaks.powf(1.4) * dome * 95.0;
         }
 
         height.clamp(0.0, TERRAIN_HEIGHT)
+    }
+
+    /// The middle of the biggest piece of high ground within reach.
+    ///
+    /// For tests. Half this world is ocean and the origin is not special - for
+    /// seed 77 it is open sea - so anything that wants rivers, lakes or
+    /// mountains has to go and find a catchment first.
+    #[cfg(test)]
+    pub fn somewhere_inland(&self) -> Vec2 {
+        let mut best = (f32::NEG_INFINITY, Vec2::ZERO);
+        for iz in -24..24 {
+            for ix in -24..24 {
+                let at = Vec2::new(ix as f32 * 320.0, iz as f32 * 320.0);
+                let h = self.base_height_at(at.x, at.y);
+                if h > best.0 {
+                    best = (h, at);
+                }
+            }
+        }
+        best.1
     }
 
     /// The river's water surface here, if a course carries water at this point.
@@ -2204,56 +2243,89 @@ mod tests {
     }
 
     #[test]
-    fn river_water_is_level_across_the_channel() {
-        // The same law as `rivers::water_is_level_across_a_channel`, asked one
-        // layer up: through `river_surface_at`, which is what the rest of the
-        // game actually calls, and which brings the carve and the lakes in with
-        // it.
+    fn a_channel_is_cut_below_the_water_it_carries() {
+        // What THIS layer owns. Whether a river's surface is level across its
+        // width is a question about the network and is measured there, against
+        // the course's own fall and at a stride short enough to mean something.
+        // Asked here it could only ever be a question about two points three
+        // units apart, and two points three units apart can be in two different
+        // rivers - `river_influence_at` reaches half again past the channel, so
+        // a tributary and the trunk it is about to join both answer to it, at
+        // two heights, correctly.
         //
-        // Over LAND. Half this world is ocean and the origin is not special -
-        // for seed 77 it is open sea, and the net this used to cast there found
-        // seven wet points in five thousand, none of which were rivers. It has
-        // been failing for that reason and not for any fault in the water.
+        // The carve is this layer's job: wherever water is drawn, the ground
+        // under it has been cut below it, and cut by enough to hold water
+        // rather than by a rounding error.
         let t = Terrain::new(77);
-        let mut middle = Vec2::ZERO;
-        let mut highest = f32::NEG_INFINITY;
-        for iz in -24..24 {
-            for ix in -24..24 {
-                let at = Vec2::new(ix as f32 * 320.0, iz as f32 * 320.0);
-                let h = t.base_height_at(at.x, at.y);
-                if h > highest {
-                    highest = h;
-                    middle = at;
-                }
-            }
-        }
-
+        let middle = t.somewhere_inland();
         let mut checked = 0;
+
         'search: for iz in -60..60 {
             for ix in -60..60 {
                 let x = middle.x + ix as f32 * 12.0;
                 let z = middle.y + iz as f32 * 12.0;
-                let Some(here) = t.river_surface_at(x, z) else {
+                let Some(surface) = t.river_surface_at(x, z) else {
                     continue;
                 };
-
-                for (dx, dz) in [(3.0, 0.0), (-3.0, 0.0), (0.0, 3.0), (0.0, -3.0)] {
-                    if let Some(near) = t.river_surface_at(x + dx, z + dz) {
-                        assert!(
-                            (near - here).abs() < 2.0,
-                            "surface steps {:.1} in three units at ({x}, {z})",
-                            (near - here).abs(),
-                        );
-                    }
-                }
-
+                let bed = t.height_at(x, z);
+                assert!(
+                    surface > bed,
+                    "water at {surface:.2} over ground at {bed:.2} at ({x}, {z})",
+                );
+                assert!(
+                    surface > WATER_LEVEL,
+                    "inland water at {surface:.2} below the sea at ({x}, {z})",
+                );
                 checked += 1;
-                if checked > 60 {
+                if checked > 200 {
                     break 'search;
                 }
             }
         }
-        assert!(checked > 10, "only {checked} river samples found");
+        assert!(checked > 10, "only {checked} wet samples found");
+    }
+
+    /// Standing water lies flat, whatever the ground under it is doing.
+    ///
+    /// The one law lakes have, and the reason they are made by filling rather
+    /// than drawn: every cell of a lake carries the height of the outlet that
+    /// made it, so a shore can wander wherever the land does and the surface
+    /// still cannot tilt.
+    #[test]
+    fn a_lake_lies_flat() {
+        let t = Terrain::new(77);
+        let middle = t.somewhere_inland();
+        let mut found = 0;
+
+        'search: for iz in -60..60 {
+            for ix in -60..60 {
+                let x = middle.x + ix as f32 * 12.0;
+                let z = middle.y + iz as f32 * 12.0;
+                // Standing water: wet, and with no channel anywhere near it.
+                let (Some(here), None) = (t.river_surface_at(x, z), t.river_influence_at(x, z))
+                else {
+                    continue;
+                };
+                for (dx, dz) in [(6.0, 0.0), (-6.0, 0.0), (0.0, 6.0), (0.0, -6.0)] {
+                    let (px, pz) = (x + dx, z + dz);
+                    if t.river_influence_at(px, pz).is_some() {
+                        continue;
+                    }
+                    if let Some(near) = t.river_surface_at(px, pz) {
+                        assert!(
+                            (near - here).abs() < 0.01,
+                            "a lake tilts {:.3} in six units at ({x}, {z})",
+                            (near - here).abs(),
+                        );
+                    }
+                }
+                found += 1;
+                if found > 40 {
+                    break 'search;
+                }
+            }
+        }
+        assert!(found > 5, "only {found} points of standing water found");
     }
 
     #[test]
