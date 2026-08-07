@@ -59,6 +59,18 @@ pub fn run() {
         crate::render::RenderPlugin,
         crate::water::WaterPlugin,
         crate::keymap::KeymapPlugin,
+        // Trees, rocks and the rest of what grows on the ground. Not villagers
+        // - nothing here is alive - but a planet with bare ground on it is not
+        // the planet the game is played on, and half of what the eye judges
+        // ground BY is what is standing on it.
+        crate::scatter::ScatterPlugin,
+        crate::grass::GrassPlugin,
+        // Not for the veil - that is off. Chunks are born HIDDEN and this owns
+        // the only line in the game that shows one, so without it every
+        // streamed chunk stays invisible for the life of the run, and with it
+        // every tree, grove and stretch of near water standing on one. What
+        // was on screen all this time was the planet's own patches.
+        crate::fog::FogPlugin,
     ))
     .add_plugins((
         crate::calendar::CalendarPlugin,
@@ -78,6 +90,9 @@ pub fn run() {
     // chart, the chronicle and the village panels with it, and every one of
     // them wants a village.
     .init_resource::<crate::debug::layers::ViewLayers>()
+    // Where the flag went, which is nowhere - the villagers own this and there
+    // are none here, but the veil asks after it.
+    .init_resource::<crate::villager::ChosenGround>()
     // The sun, the sky fill and the moon. These live in `main` rather than in
     // any plugin, so an app assembled from the plugin list alone gets no light
     // at all - which is exactly what happened: the planet hung in the dark
@@ -85,7 +100,7 @@ pub fn run() {
     .add_systems(Startup, crate::spawn_lighting)
     // Straight past the splash and the title: there is no game to open.
     .add_systems(Startup, open_the_world)
-    .add_systems(Update, (jump_about, read_the_position))
+    .add_systems(Update, (jump_about, read_the_position, are_the_trees_upright))
     .run();
 }
 
@@ -184,4 +199,62 @@ fn read_the_position(
     if let Some(tree) = tree {
         info!("planet: {} patches standing", tree.standing());
     }
+}
+
+/// Are the trees standing up?
+///
+/// On a ball "upright" is a different direction at every point, so a tree that
+/// looks fine at the origin can be lying on its side a continent away. This
+/// measures it rather than judging it from the picture: the angle between each
+/// tree's own up and the planet's outward where it stands.
+fn are_the_trees_upright(
+    time: Res<Time>,
+    mut said: Local<bool>,
+    keys: Res<ButtonInput<KeyCode>>,
+    trees: Query<&GlobalTransform, With<crate::scatter::FellableTree>>,
+    groves: Query<(&Mesh3d, &ViewVisibility), With<crate::scatter::GroveMesh>>,
+    meshes: Res<Assets<Mesh>>,
+) {
+    // Once the world has had time to settle, and again on T.
+    let due = !*said && time.elapsed_secs() > 12.0;
+    if !due && !keys.just_pressed(KeyCode::KeyT) {
+        return;
+    }
+    *said = true;
+    let centre = crate::globe::planet_centre();
+    let mut counted = 0usize;
+    let mut worst: f32 = 0.0;
+    let mut total = 0.0;
+    for at in &trees {
+        let outward = (at.translation() - centre).normalize_or(Vec3::Y);
+        let mine = (at.rotation() * Vec3::Y).normalize_or(Vec3::Y);
+        let off = mine.dot(outward).clamp(-1.0, 1.0).acos().to_degrees();
+        worst = worst.max(off);
+        total += off;
+        counted += 1;
+    }
+    if counted == 0 {
+        info!("planet: no trees standing at all");
+        return;
+    }
+    info!(
+        "planet: {counted} trees, leaning {:.1} degrees off the outward on          average, worst {worst:.1}",
+        total / counted as f32,
+    );
+
+    // A tree is only an entity; what is DRAWN is its grove's merged mesh. If
+    // every tree is standing and nothing is on screen, this is where it went.
+    let mut stands = 0usize;
+    let mut seen = 0usize;
+    let mut vertices = 0usize;
+    for (mesh, visible) in &groves {
+        stands += 1;
+        if visible.get() {
+            seen += 1;
+        }
+        if let Some(mesh) = meshes.get(&mesh.0) {
+            vertices += mesh.count_vertices();
+        }
+    }
+    info!("planet: {stands} groves, {seen} on screen, {vertices} vertices between them");
 }
