@@ -787,7 +787,7 @@ fn work_gizmo(
                 Some(PartKind::Framed {
                     long,
                     high: was,
-                    opening,
+                    openings,
                 }) => {
                     if (high - was).abs() < 1e-4 {
                         return;
@@ -795,7 +795,7 @@ fn work_gizmo(
                     PartKind::Framed {
                         long,
                         high,
-                        opening,
+                        openings,
                     }
                 }
                 _ => return,
@@ -924,10 +924,12 @@ fn work_gizmo(
             let grown = 0.0;
             let made = match kind {
                 PartKind::Wall(_) => PartKind::Wall(w),
-                PartKind::Framed { high, opening, .. } => PartKind::Framed {
+                PartKind::Framed {
+                    high, openings, ..
+                } => PartKind::Framed {
                     long: w,
                     high,
-                    opening,
+                    openings,
                 },
                 PartKind::Seg { high, lift, .. } => PartKind::Seg {
                     long: w,

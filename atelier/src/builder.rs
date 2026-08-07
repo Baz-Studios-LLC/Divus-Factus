@@ -134,6 +134,9 @@ const WINDOW_SILL: i32 = 18;
 /// it, and a stud's worth of timber under a lintel reads as a mistake.
 const JAMB_WIDE: i32 = POST_WIDE;
 
+/// How many doors and windows one framed wall may hold.
+pub const MOST_OPENINGS: usize = 4;
+
 /// A span of atoms in `n` parts that sum to exactly the span.
 ///
 /// Integer division leaves a remainder of up to `n - 1` atoms. Dropping it
@@ -149,25 +152,38 @@ const JAMB_WIDE: i32 = POST_WIDE;
 /// asking the same question of the same arithmetic. A test that worked the
 /// clamp out for itself would agree with the solver right up until one of them
 /// was changed.
-fn opening_at(span: i32, tall: i32, opening: Option<(Opening, f32)>) -> Option<(Opening, i32, i32, i32, i32)> {
-    let (what, at) = opening?;
-    let (wide, rise, foot) = match what {
-        Opening::Door => (DOOR_WIDE, DOOR_HIGH, PLATE_TALL),
-        Opening::Window => (WINDOW_WIDE, WINDOW_HIGH, PLATE_TALL + WINDOW_SILL),
-    };
-    let middle = (span as f32 * 0.5 + at / ATOM).round() as i32;
-    let room = span - POST_WIDE - JAMB_WIDE - wide;
-    if room < POST_WIDE + JAMB_WIDE {
-        return None;
+fn openings_at(
+    span: i32,
+    tall: i32,
+    openings: &[Option<(Opening, f32)>; MOST_OPENINGS],
+) -> Vec<(Opening, i32, i32, i32, i32)> {
+    let mut holes: Vec<(Opening, i32, i32, i32, i32)> = Vec::new();
+    for (what, at) in openings.iter().flatten().copied() {
+        let (wide, rise, foot) = match what {
+            Opening::Door => (DOOR_WIDE, DOOR_HIGH, PLATE_TALL),
+            Opening::Window => (WINDOW_WIDE, WINDOW_HIGH, PLATE_TALL + WINDOW_SILL),
+        };
+        let room = span - POST_WIDE - JAMB_WIDE - wide;
+        if room < POST_WIDE + JAMB_WIDE {
+            continue;
+        }
+        let middle = (span as f32 * 0.5 + at / ATOM).round() as i32;
+        let from = (middle - wide / 2).clamp(POST_WIDE + JAMB_WIDE, room);
+        let rise = rise.min(tall - PLATE_TALL - foot - PLATE_TALL);
+        // Two openings that overlap would frame each other's jambs and leave a
+        // bay of no width between them. The later one simply does not fit.
+        if holes.iter().any(|(_, hx, hw, hy, hh)| {
+            from < hx + hw + JAMB_WIDE
+                && from + wide + JAMB_WIDE > *hx
+                && foot < hy + hh
+                && foot + rise > *hy
+        }) {
+            continue;
+        }
+        holes.push((what, from, wide, foot, rise));
     }
-    let from = (middle - wide / 2).clamp(POST_WIDE + JAMB_WIDE, room);
-    Some((
-        what,
-        from,
-        wide,
-        foot,
-        rise.min(tall - PLATE_TALL - foot - PLATE_TALL),
-    ))
+    holes.sort_by_key(|(_, from, ..)| *from);
+    holes
 }
 
 fn into_bays(span: i32, bays: i32) -> Vec<i32> {
@@ -579,8 +595,13 @@ pub enum PartKind {
     Framed {
         long: f32,
         high: f32,
-        /// What the wall leaves a hole for, and how far along it.
-        opening: Option<(Opening, f32)>,
+        /// What the wall leaves holes for, and how far along it each one sits.
+        ///
+        /// A fixed array because a `PartKind` is `Copy` and is spelled out as a
+        /// name - a wall is its measurements, and a list that could grow without
+        /// bound could not be either of those things. Four is more openings than
+        /// one wall of a house has ever wanted.
+        openings: [Option<(Opening, f32)>; MOST_OPENINGS],
     },
     /// A piece of wall left standing around an opening: the sides of a
     /// doorway, the header above it, the sill strip under a window.
@@ -855,7 +876,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
         PartKind::Framed {
             long: 3.0,
             high: WALL_HIGH,
-            opening: None,
+            openings: [None; MOST_OPENINGS],
         },
         "walls",
     ),
@@ -864,7 +885,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
         PartKind::Framed {
             long: 3.0,
             high: WALL_HIGH,
-            opening: Some((Opening::Door, 0.0)),
+            openings: [Some((Opening::Door, 0.0)), None, None, None],
         },
         "walls",
     ),
@@ -873,7 +894,7 @@ pub const STRUCTURE: &[CatalogEntry] = &[
         PartKind::Framed {
             long: 3.0,
             high: WALL_HIGH,
-            opening: Some((Opening::Window, 0.0)),
+            openings: [Some((Opening::Window, 0.0)), None, None, None],
         },
         "walls",
     ),
@@ -1057,7 +1078,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
         PartKind::Framed {
             long,
             high,
-            opening,
+            openings,
         } => {
             let span = (long / ATOM).round().max(POST_WIDE as f32 * 2.0) as i32;
             let tall = (high / ATOM).round().max((PLATE_TALL * 3 + 8) as f32) as i32;
@@ -1097,30 +1118,21 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // of wall it takes out. Nothing is subtracted anywhere - this is
             // simply the region the framing works AROUND, and the panels and
             // the rails and the studs all ask it whether they are wanted.
-            let hole = opening_at(span, tall, *opening);
-            // Whether a stretch of wall at this height is clear of the hole.
-            let clear = |from: i32, to: i32, foot: i32, rise: i32| -> bool {
-                let Some((_, hx, hw, hy, hh)) = hole else {
-                    return true;
-                };
-                to <= hx - JAMB_WIDE
-                    || from >= hx + hw + JAMB_WIDE
-                    || foot + rise <= hy
-                    || foot >= hy + hh
-            };
-            // A horizontal member, laid in as many pieces as the hole leaves.
+            let holes = openings_at(span, tall, openings);
+            // A horizontal member, laid in as many pieces as the openings
+            // standing in its band leave. One that crosses no opening runs the
+            // whole length in a single timber.
             let mut course = |body: &mut Vec<Slab>, foot: i32, rise: i32| {
-                let Some((_, hx, hw, hy, hh)) = hole else {
-                    timber(body, 0, span, foot, rise);
-                    return;
-                };
-                if foot + rise <= hy || foot >= hy + hh {
-                    timber(body, 0, span, foot, rise);
-                    return;
+                let mut from = 0;
+                for (_, hx, hw, hy, hh) in &holes {
+                    if foot + rise <= *hy || foot >= hy + hh {
+                        continue;
+                    }
+                    let left = hx - JAMB_WIDE;
+                    timber(body, from, left - from, foot, rise);
+                    from = hx + hw + JAMB_WIDE;
                 }
-                let (left, right) = (hx - JAMB_WIDE, hx + hw + JAMB_WIDE);
-                timber(body, 0, left, foot, rise);
-                timber(body, right, span - right, foot, rise);
+                timber(body, from, span - from, foot, rise);
             };
 
             course(&mut body, 0, PLATE_TALL);
@@ -1136,140 +1148,120 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // clear height, a lintel over it, and a sill under a window. This
             // is the timber the hole ADDS - the whole reason nothing has to be
             // cut out of anything.
-            if let Some((what, hx, hw, hy, hh)) = hole {
+            for (what, hx, hw, hy, hh) in &holes {
                 timber(&mut body, hx - JAMB_WIDE, JAMB_WIDE, inner_foot, inner_tall);
                 timber(&mut body, hx + hw, JAMB_WIDE, inner_foot, inner_tall);
-                timber(&mut body, hx, hw, hy + hh, PLATE_TALL);
-                if what == Opening::Window {
-                    timber(&mut body, hx, hw, hy - PLATE_TALL, PLATE_TALL);
-                }
-
-                // The wall the opening does NOT take: the apron under a window
-                // and anything left over its head.
-                //
-                // Without this the opening's whole column was left out at every
-                // height rather than only where the opening is - the bays are
-                // divided either side of it, so nothing was ever laid between
-                // the jambs at all. A window sat with a hole under it running
-                // clean down to the sill plate, which you could see straight
-                // through. Per course, so the rail still crosses in front of it.
-                for (foot, rise) in [(inner_foot, low_tall), (high_foot, high_tall)] {
-                    if rise <= 0 || (foot < hy + hh && foot + rise > hy) {
-                        continue;
-                    }
-                    let (x, w) = across(hx, hw);
-                    body.push(slab(
-                        x,
-                        (foot as f32 + rise as f32 * 0.5) * ATOM,
-                        0.0,
-                        w,
-                        rise as f32 * ATOM,
-                        WALL_THICK - (INFILL_SET * 2) as f32 * ATOM,
-                        "bone",
-                        0.9,
-                    ));
+                timber(&mut body, *hx, *hw, hy + hh, PLATE_TALL);
+                if *what == Opening::Window {
+                    timber(&mut body, *hx, *hw, hy - PLATE_TALL, PLATE_TALL);
                 }
             }
 
-            // The clear spans, each divided into whole bays of its own. A hole
-            // splits the wall into two runs and each is divided on its own
-            // terms, so a bay is never a runt however the hole falls.
-            let mut spans: Vec<(i32, i32)> = Vec::new();
-            match hole {
-                Some((_, hx, hw, _, _)) => {
-                    spans.push((POST_WIDE, hx - JAMB_WIDE));
-                    spans.push((hx + hw + JAMB_WIDE, span - POST_WIDE));
-                }
-                None => spans.push((POST_WIDE, span - POST_WIDE)),
-            }
-
-            let mut edges_of = |from: i32, to: i32| -> Vec<i32> {
-                let width = (to - from).max(0);
-                if width <= 0 {
-                    return Vec::new();
-                }
-                let bays = ((width as f32 / BAY_WANTED as f32).round() as i32).max(1);
-                let mut edge = from;
-                let mut edges = vec![edge];
-                for w in into_bays(width, bays) {
-                    edge += w;
-                    edges.push(edge);
-                }
-                edges
-            };
-
-            for (from, to) in &spans {
-                let edges = edges_of(*from, *to);
-                if edges.len() < 2 {
+            // The framing, course by course - and the spans worked out FOR EACH
+            // COURSE rather than once for the wall.
+            //
+            // An opening only interrupts the courses it actually stands in. In
+            // the courses it does not, the wall between its jambs is ordinary
+            // wall and wants ordinary framing: its own bays, its own studs, its
+            // own braces. Worked out once for the whole wall instead, the
+            // opening's entire column was left out top to bottom - which first
+            // showed as a hole under every window, and then, once that was
+            // filled with a single panel, as an apron with no timber in it
+            // while the bays either side of it were braced.
+            for (foot, rise) in [(inner_foot, low_tall), (high_foot, high_tall)] {
+                if rise <= 0 {
                     continue;
                 }
-                // Studs, per course, spanning exactly their own clear height.
-                for (foot, rise) in [(inner_foot, low_tall), (high_foot, high_tall)] {
-                    if rise <= 0 {
+                let mut spans: Vec<(i32, i32)> = Vec::new();
+                let mut from = POST_WIDE;
+                for (_, hx, hw, hy, hh) in &holes {
+                    if foot < hy + hh && foot + rise > *hy {
+                        // The opening stands in this course: the wall stops at
+                        // its jamb and picks up again past the other one.
+                        spans.push((from, hx - JAMB_WIDE));
+                        from = hx + hw + JAMB_WIDE;
+                    } else {
+                        // It does not: the wall between its jambs is ordinary
+                        // wall in this course and wants ordinary framing. An
+                        // apron under a window is a bay like any other, and
+                        // gets its own studs and its own braces.
+                        spans.push((from, hx - JAMB_WIDE));
+                        spans.push((*hx, hx + hw));
+                        from = hx + hw + JAMB_WIDE;
+                    }
+                }
+                spans.push((from, span - POST_WIDE));
+
+                for (from, to) in spans {
+                    let width = (to - from).max(0);
+                    if width <= 0 {
                         continue;
                     }
+                    let bays = ((width as f32 / BAY_WANTED as f32).round() as i32).max(1);
+                    let mut edge = from;
+                    let mut edges = vec![edge];
+                    for w in into_bays(width, bays) {
+                        edge += w;
+                        edges.push(edge);
+                    }
+
+                    // Studs at the interior divisions, spanning exactly this
+                    // course's clear height.
                     for edge in &edges[1..edges.len() - 1] {
-                        if clear(edge - STUD_WIDE / 2, edge + STUD_WIDE / 2, foot, rise) {
-                            timber(&mut body, edge - STUD_WIDE / 2, STUD_WIDE, foot, rise);
+                        timber(&mut body, edge - STUD_WIDE / 2, STUD_WIDE, foot, rise);
+                    }
+
+                    // Braces, in the low course only, a pair to a bay rising to
+                    // meet at its middle.
+                    if foot == inner_foot {
+                        for pair in edges.windows(2) {
+                            let (a, b) = (pair[0], pair[1]);
+                            let bay = (b - a) as f32 * ATOM;
+                            let up = rise as f32 * ATOM;
+                            let half = bay * 0.5;
+                            if half <= ATOM * 2.0 || up <= ATOM {
+                                continue;
+                            }
+                            // Both ends meet horizontal timber - the sill below,
+                            // the rail above - so both end faces are horizontal,
+                            // which makes the brace a parallelogram. The run that
+                            // leans a face by the brace's own pitch is its width
+                            // against the tangent of that pitch, and the signs
+                            // are opposite because one end cuts the top and the
+                            // other the bottom.
+                            let angle = up.atan2(half);
+                            let reach = (half * half + up * up).sqrt() + ATOM;
+                            let wide = STUD_WIDE as f32 * ATOM;
+                            let run = (wide / angle.tan().max(1e-3)) / reach;
+                            let (x, _) = across(a, b - a);
+                            for side in [-1.0f32, 1.0] {
+                                body.push(canted(
+                                    x - side * half * 0.5,
+                                    (foot as f32 + rise as f32 * 0.5) * ATOM,
+                                    0.0,
+                                    reach,
+                                    wide,
+                                    WALL_THICK,
+                                    "wood",
+                                    0.62,
+                                    side * angle,
+                                    Vec2::new(side * run, -side * run),
+                                ));
+                            }
                         }
                     }
-                }
 
-                // Braces, in the low course only, a pair to a bay rising to
-                // meet at its middle.
-                for pair in edges.windows(2) {
-                    let (a, b) = (pair[0], pair[1]);
-                    if !clear(a, b, inner_foot, low_tall) {
-                        continue;
-                    }
-                    let bay = (b - a) as f32 * ATOM;
-                    let rise = low_tall as f32 * ATOM;
-                    let half = bay * 0.5;
-                    if half <= ATOM || rise <= ATOM {
-                        continue;
-                    }
-                    // Both ends meet horizontal timber - the sill below, the
-                    // rail above - so both end faces are horizontal, which makes
-                    // the brace a parallelogram. The run that leans a face by
-                    // the brace's own pitch is its width against the tangent of
-                    // that pitch, and the signs are opposite because one end
-                    // cuts the top and the other the bottom.
-                    let angle = rise.atan2(half);
-                    let reach = (half * half + rise * rise).sqrt() + ATOM;
-                    let wide = STUD_WIDE as f32 * ATOM;
-                    let run = (wide / angle.tan().max(1e-3)) / reach;
-                    let (x, _) = across(a, b - a);
-                    for side in [-1.0f32, 1.0] {
-                        body.push(canted(
-                            x - side * half * 0.5,
-                            (inner_foot as f32 + low_tall as f32 * 0.5) * ATOM,
-                            0.0,
-                            reach,
-                            wide,
-                            WALL_THICK,
-                            "wood",
-                            0.62,
-                            side * angle,
-                            Vec2::new(side * run, -side * run),
-                        ));
-                    }
-                }
-
-                // And the panels: what the framing LEAVES, cut to the gap and
-                // set back so the timber stands proud of it.
-                for (foot, rise) in [(inner_foot, low_tall), (high_foot, high_tall)] {
-                    if rise <= 0 {
-                        continue;
-                    }
+                    // And the panels: what the framing LEAVES, cut to the gap
+                    // and set back so the timber stands proud of it.
                     for pair in edges.windows(2) {
                         let (mut a, mut b) = (pair[0], pair[1]);
-                        if a > *from {
+                        if a > from {
                             a += STUD_WIDE / 2;
                         }
-                        if b < *to {
+                        if b < to {
                             b -= STUD_WIDE / 2;
                         }
-                        if b <= a || !clear(a, b, foot, rise) {
+                        if b <= a {
                             continue;
                         }
                         let (x, w) = across(a, b - a);
@@ -3530,14 +3522,21 @@ pub fn part_name(kind: &PartKind) -> String {
         PartKind::Framed {
             long,
             high,
-            opening,
-        } => match opening {
-            // The opening's kind and where along the wall it sits, so a wall
-            // with a door in it is a different part from the same wall without.
-            Some((Opening::Door, at)) => format!("framed-{long}x{high}xd{at}"),
-            Some((Opening::Window, at)) => format!("framed-{long}x{high}xw{at}"),
-            None => format!("framed-{long}x{high}"),
-        },
+            openings,
+        } => {
+            // Every opening's kind and where along the wall it sits, so a wall
+            // with two windows in it is a different part from the same wall
+            // with one.
+            let mut name = format!("framed-{long}x{high}");
+            for (what, at) in openings.iter().flatten() {
+                let letter = match what {
+                    Opening::Door => 'd',
+                    Opening::Window => 'w',
+                };
+                name.push_str(&format!("x{letter}{at}"));
+            }
+            name
+        }
         PartKind::Gable(long, pitch) => format!("gable-{long}x{pitch}"),
         PartKind::Beam(long, high, low) => format!("beam-{long}x{high}x{low}"),
         PartKind::BeamRun => "beamrun".to_string(),
@@ -3599,18 +3598,19 @@ pub fn kind_from_name(name: &str) -> Option<PartKind> {
             .next()
             .and_then(|n| n.parse().ok())
             .unwrap_or(WALL_HIGH);
-        let opening = parts.next().and_then(|hole| {
-            let at = hole[1..].parse().ok()?;
-            match hole.as_bytes().first()? {
-                b'd' => Some((Opening::Door, at)),
-                b'w' => Some((Opening::Window, at)),
+        let mut openings = [None; MOST_OPENINGS];
+        for (slot, hole) in openings.iter_mut().zip(parts) {
+            let Ok(at) = hole[1..].parse() else { continue };
+            *slot = match hole.as_bytes().first() {
+                Some(b'd') => Some((Opening::Door, at)),
+                Some(b'w') => Some((Opening::Window, at)),
                 _ => None,
-            }
-        });
+            };
+        }
         return Some(PartKind::Framed {
             long,
             high,
-            opening,
+            openings,
         });
     }
     if let Some(rest) = name.strip_prefix("hiproof-") {
@@ -4157,13 +4157,13 @@ fn length_of(kind: &PartKind) -> Option<(f32, Box<dyn Fn(f32) -> PartKind>)> {
         PartKind::Framed {
             long,
             high,
-            opening,
+            openings,
         } => Some((
             long,
             Box::new(move |n| PartKind::Framed {
                 long: n,
                 high,
-                opening,
+                openings,
             }),
         )),
         PartKind::Ridge(long) => Some((long, Box::new(PartKind::Ridge))),
@@ -7351,14 +7351,39 @@ fn punch_wall(
     // wall already knows what an opening is: it frames one, declines to panel
     // it, and divides the bays either side of it. So the wall simply gains the
     // opening where it was aimed, and re-solves.
-    if let Some(PartKind::Framed { long, high, .. }) = kind_from_name(&record.part) {
+    if let Some(PartKind::Framed {
+        long,
+        high,
+        mut openings,
+    }) = kind_from_name(&record.part)
+    {
+        let want = Some((
+            if is_door { Opening::Door } else { Opening::Window },
+            on_the_lattice(middle),
+        ));
+        // Into the first empty slot, so a second window joins the first rather
+        // than replacing it. With every slot taken, the nearest one moves - a
+        // wall that quietly ignores the drop would look broken, and a maker who
+        // has filled a wall with doors is asking to move one.
+        match openings.iter_mut().find(|slot| slot.is_none()) {
+            Some(slot) => *slot = want,
+            None => {
+                let nearest = openings
+                    .iter_mut()
+                    .flatten()
+                    .min_by(|(_, a), (_, b)| {
+                        let (a, b) = ((a - middle).abs(), (b - middle).abs());
+                        a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                if let Some(hole) = nearest {
+                    *hole = want.expect("just built");
+                }
+            }
+        }
         let made = PartKind::Framed {
             long,
             high,
-            opening: Some((
-                if is_door { Opening::Door } else { Opening::Window },
-                on_the_lattice(middle),
-            )),
+            openings,
         };
         commands.entity(wall).despawn_related::<Children>();
         let mut record = record.clone();
@@ -10008,25 +10033,46 @@ mod roof_tests {
     /// under it running clean down to the sill plate.
     #[test]
     fn a_framed_wall_is_solid_where_it_is_not_open() {
-        for (name, opening) in [
-            ("plain", None),
-            ("a door", Some((Opening::Door, 0.0))),
-            ("a window", Some((Opening::Window, 0.0))),
+        let one = |what, at| [Some((what, at)), None, None, None];
+        for (name, openings) in [
+            ("plain", [None; MOST_OPENINGS]),
+            ("a door", one(Opening::Door, 0.0)),
+            ("a window", one(Opening::Window, 0.0)),
             // Off centre, where the two spans divide differently.
-            ("a door to one side", Some((Opening::Door, -0.75))),
+            ("a door to one side", one(Opening::Door, -0.75)),
+            // And several at once, which is the case the spans have to be
+            // worked out per course to survive at all.
+            (
+                "two windows",
+                [
+                    Some((Opening::Window, -1.0)),
+                    Some((Opening::Window, 1.0)),
+                    None,
+                    None,
+                ],
+            ),
+            (
+                "a door and a window",
+                [
+                    Some((Opening::Door, -1.0)),
+                    Some((Opening::Window, 1.0)),
+                    None,
+                    None,
+                ],
+            ),
         ] {
             for long in [2.5f32, 4.0, 6.5] {
                 let kind = PartKind::Framed {
                     long,
                     high: WALL_HIGH,
-                    opening,
+                    openings,
                 };
                 let body = body_of(&kind, None);
                 let span = (long / ATOM).round() as i32;
                 let tall = (WALL_HIGH / ATOM).round() as i32;
                 // The hole itself is allowed to be a hole - asked of the same
                 // arithmetic the solver uses, so the two cannot drift apart.
-                let hole = opening_at(span, tall, opening);
+                let holes = openings_at(span, tall, &openings);
 
                 for iy in 0..tall {
                     for ix in 0..span {
@@ -10040,8 +10086,8 @@ mod roof_tests {
                                 && (piece.at.x - x).abs() < piece.size.x * 0.5
                                 && (piece.at.y - y).abs() < piece.size.y * 0.5
                         });
-                        let open = hole.is_some_and(|(_, hx, hw, hy, hh)| {
-                            ix >= hx && ix < hx + hw && iy >= hy && iy < hy + hh
+                        let open = holes.iter().any(|(_, hx, hw, hy, hh)| {
+                            ix >= *hx && ix < hx + hw && iy >= *hy && iy < hy + hh
                         });
                         assert!(
                             filled || open,
@@ -10075,7 +10121,7 @@ mod roof_tests {
                 &PartKind::Framed {
                     long: 4.0,
                     high: WALL_HIGH,
-                    opening: Some((hole, 0.0)),
+                    openings: [Some((hole, 0.0)), None, None, None],
                 },
                 None,
             );
@@ -10114,7 +10160,7 @@ mod roof_tests {
                 &PartKind::Framed {
                     long,
                     high: WALL_HIGH,
-                    opening: None,
+                    openings: [None; MOST_OPENINGS],
                 },
                 None,
             )
