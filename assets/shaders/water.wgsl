@@ -91,14 +91,26 @@ fn wave_height(p: vec2<f32>, t: f32) -> f32 {
 /// faded out. Most of the sea on screen at any time is far away, so this early-out
 /// removes the wave cost from the majority of pixels.
 fn wave_normal(p: vec2<f32>, t: f32, strength: f32, detail: f32) -> vec3<f32> {
-    if detail < 0.2 {
+    // The early-out is a saving, not a fade, and it has to land somewhere the
+    // waves are ALREADY gone or it draws a line across the sea.
+    //
+    // It used to cut at a fifth of full detail while the amplitude below was
+    // scaled by `detail` straight - so at the cut the waves still had a fifth
+    // of their height, and one pixel further they had none. `detail` falls off
+    // with range, so that step is a contour of constant distance from the
+    // camera: a hard edge drawn clean across open water with nothing on either
+    // side of it to explain itself.
+    //
+    // Squared below, the amplitude at this threshold is a twenty-fifth rather
+    // than a fifth, which is nothing to see, and the saving is kept.
+    if detail < 0.12 {
         return vec3<f32>(0.0, 1.0, 0.0);
     }
 
     let e = 0.35;
     let dx = wave_height(p + vec2<f32>(e, 0.0), t) - wave_height(p - vec2<f32>(e, 0.0), t);
     let dz = wave_height(p + vec2<f32>(0.0, e), t) - wave_height(p - vec2<f32>(0.0, e), t);
-    let s = strength * detail;
+    let s = strength * detail * detail;
     return normalize(vec3<f32>(-dx * s, 1.0, -dz * s));
 }
 
@@ -243,6 +255,13 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     // ripples running right up to them and stopping - the one place a real sea
     // is busiest.
     alpha = max(alpha, clamp(specular * water.specular, 0.0, 1.0) * 0.8);
+
+    // And a little presence of its own wherever there is water at all, so the
+    // wave field is still readable over sand. Depth alone took the shallows to
+    // nearly nothing, which is honest about seeing the bottom and wrong about
+    // there being a surface above it: the ripples ran to the shelf and stopped.
+    // Small enough that the sand still shows through.
+    alpha = max(alpha, 0.12 * smoothstep(0.0, 0.06, submersion) * detail);
 
     // Reflection is stronger at a glancing angle — but only where there is water to
     // reflect in. Applying it regardless forced the shallows opaque at exactly the
