@@ -667,7 +667,21 @@ impl Terrain {
         };
 
         // Hills, present everywhere but stronger on land.
-        let detail = warped_fbm_3d(dir * spherical(0.010), self.seed ^ 0xa1a1, 4, 0.5) - 0.5;
+        //
+        // THREE octaves, not four, and the same cut is made to the ridges and
+        // the peaks below. At four, the finest of them has a twelve unit
+        // wavelength carrying a couple of units of height: too small to read as
+        // landform and too big to ignore, so every hillside wore an orange-peel
+        // texture that looked like a shading fault rather than like ground.
+        //
+        // It costs the rivers even more than it costs the eye. Drainage is
+        // solved on this field, and every one of those dimples is a hollow with
+        // no way out - so the fill spends itself on thousands of puddles, the
+        // routing zigzags between them, and catchment that should gather into
+        // one river is split among a dozen scratches. Real land looks dendritic
+        // BECAUSE running water has already smoothed it; this is the erosion
+        // the world never had.
+        let detail = warped_fbm_3d(dir * spherical(0.010), self.seed ^ 0xa1a1, 3, 0.5) - 0.5;
 
         // Whether this is INLAND, which is a different question from how high the
         // continent stands here — and getting those two confused is what emptied
@@ -682,7 +696,7 @@ impl Terrain {
         // shorelines stay gentle and everything past them gets its full relief.
         let inland = (land / 0.25).clamp(0.0, 1.0);
         let ridge_mask = inland * inland * (3.0 - 2.0 * inland);
-        let ridge = ridged_3d(dir * spherical(0.006), self.seed ^ 0xa5a5, 4);
+        let ridge = ridged_3d(dir * spherical(0.006), self.seed ^ 0xa5a5, 3);
 
         let mut height: f32 = WATER_LEVEL
             + shaped * 44.0
@@ -707,7 +721,7 @@ impl Terrain {
         // approaches 1, so every extra power crushes what little there is.
         let belt_mask = ((belt - 0.46) / 0.16).clamp(0.0, 1.0) * ridge_mask;
         if belt_mask > 0.0 {
-            let peaks = ridged_3d(dir * spherical(0.0021), self.seed ^ 0x77aa, 5);
+            let peaks = ridged_3d(dir * spherical(0.0021), self.seed ^ 0x77aa, 4);
             height += peaks * peaks * belt_mask.powf(1.3) * 240.0;
         }
 

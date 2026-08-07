@@ -113,6 +113,55 @@ impl Footprint {
         );
         turned.x.abs() < self.half.x && turned.y.abs() < self.half.y
     }
+
+    /// Whether a straight walk from `a` to `b` passes through this footprint at
+    /// any point.
+    ///
+    /// Asked of the SEGMENT, not of points along it. Straightening used to
+    /// sample the line every half cell and ask `contains` at each sample, which
+    /// cannot answer this: a line that nicks a corner between two samples is
+    /// clipping the building and every sample says it is not. No step is small
+    /// enough to fix that, because a clip can be as thin as you like.
+    ///
+    /// The slab test instead - the segment brought into the footprint's own
+    /// frame, then clipped against each axis in turn. What survives is the
+    /// stretch of the walk that is inside, and if any of it survives, the walk
+    /// goes through.
+    pub fn crosses(&self, a: Vec2, b: Vec2) -> bool {
+        let (sin, cos) = (-self.yaw).sin_cos();
+        let into = |p: Vec2| {
+            let local = p - self.at;
+            Vec2::new(
+                local.x * cos - local.y * sin,
+                local.x * sin + local.y * cos,
+            )
+        };
+        let (a, b) = (into(a), into(b));
+        let run = b - a;
+
+        let (mut enter, mut leave) = (0.0f32, 1.0f32);
+        for axis in 0..2 {
+            let (from, along, half) = (a[axis], run[axis], self.half[axis]);
+            if along.abs() < 1e-6 {
+                // Parallel to this pair of walls: either between them for the
+                // whole walk, or outside them for the whole walk.
+                if from.abs() >= half {
+                    return false;
+                }
+                continue;
+            }
+            let (mut near, mut far) = ((-half - from) / along, (half - from) / along);
+            if near > far {
+                std::mem::swap(&mut near, &mut far);
+            }
+            enter = enter.max(near);
+            leave = leave.min(far);
+            if enter > leave {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 /// Every building the search must walk around.
@@ -149,6 +198,17 @@ impl Walls {
             .enumerate()
             .any(|(slot, building)| {
                 !excused.get(slot).copied().unwrap_or(false) && building.contains(p)
+            })
+    }
+
+    /// Whether a straight walk from `a` to `b` passes through any building it
+    /// is not excused from. See `Footprint::crosses`.
+    fn barred(&self, a: Vec2, b: Vec2, excused: &[bool; MOST_BUILDINGS]) -> bool {
+        self.buildings
+            .iter()
+            .enumerate()
+            .any(|(slot, building)| {
+                !excused.get(slot).copied().unwrap_or(false) && building.crosses(a, b)
             })
     }
 }
@@ -301,9 +361,27 @@ pub fn find_path(
                 let Some(step) = step_cost(terrain, cell, next) else {
                     continue;
                 };
-                // Through a wall is not a step.
+                // Through a wall is not a step - and the STEP is what has to
+                // be clear, not just the cell it lands on.
+                //
+                // Asking only about the destination lets a diagonal cut the
+                // corner off a building: two cells either side of a corner are
+                // both outside it, and the line between their middles is not.
+                // With cells at two and a half metres the bite taken out is
+                // most of a metre, and the whole point of `Walls` is that
+                // nobody walks through a hall they are only passing.
+                //
+                // It was invisible until the terrain was smoothed and a route
+                // happened to want that particular diagonal, which is worth
+                // remembering: the test had been passing for want of the
+                // geometry rather than for want of the bug.
                 let stands = to_world(next, terrain);
-                if walls.blocks(Vec2::new(stands.x, stands.z), &excused) {
+                let here_at = to_world(cell, terrain);
+                if walls.barred(
+                    Vec2::new(here_at.x, here_at.z),
+                    Vec2::new(stands.x, stands.z),
+                    &excused,
+                ) {
                     continue;
                 }
 
@@ -372,16 +450,21 @@ fn walkable_line(
     let distance = a.distance(b);
     let steps = (distance / (CELL * 0.5)).ceil() as i32;
 
+    // Straightening must not cut the corner off a building: the staircase A*
+    // produced went round it, and a straight line between two of its steps can
+    // go straight back through. Asked of the whole segment at once, because
+    // sampling it cannot answer - a clip thinner than the step falls between
+    // two samples that both say the line is clear.
+    if walls.barred(Vec2::new(a.x, a.z), Vec2::new(b.x, b.z), excused) {
+        return false;
+    }
+
+    // The ground still has to be sampled: walkability is a field, not a shape,
+    // and there is nothing to intersect a segment against.
     for i in 1..=steps {
         let t = i as f32 / steps as f32;
         let p = a.lerp(b, t);
         if !terrain.is_walkable(p.x, p.z) {
-            return false;
-        }
-        // Straightening must not cut the corner off a building: the staircase
-        // A* produced went round it, and a straight line between two of its
-        // steps can go straight back through.
-        if walls.blocks(Vec2::new(p.x, p.z), excused) {
             return false;
         }
     }
@@ -466,7 +549,7 @@ mod tests {
                 let p = cursor.lerp(*leg, i as f32 / 20.0);
                 assert!(
                     !hall.contains(Vec2::new(p.x, p.z)),
-                    "a straightened leg cuts the corner off the hall"
+                    "a leg of the route cuts the corner off the hall"
                 );
             }
             cursor = *leg;
