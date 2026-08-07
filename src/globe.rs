@@ -404,20 +404,35 @@ pub(crate) fn bend_frame(flat: Vec3) -> (Vec3, Quat) {
 /// pointer. Each computed it their own way once, and each was wrong in its
 /// own direction.
 pub(crate) fn bent_camera_pose(rig: &CameraRig) -> Transform {
-    let (eye_seat, eye_turn) = bend_frame(rig.eye());
+    // From the rig's CARRIED frame, not from the focus's longitude and
+    // latitude. See `CameraRig::facing`: a frame derived from lat/lon has
+    // poles in it however round the planet is, and the camera would inherit
+    // them - twisting harder and harder as it neared one, and flipping end for
+    // end across it.
+    //
+    // The eye is a rigid offset inside that frame. It used to be seated on its
+    // own, by its own coordinates, which is what forced all the special
+    // handling here: at play pitch the eye stands two and a half thousand
+    // units from its focus, twenty-five degrees of arc on a six thousand unit
+    // world, so seating it by its own place dropped it a quarter-continent
+    // away and turned it into THAT local frame, staring at unrelated ground. A
+    // rig sitting above one point does not have that problem, because it is
+    // one rigid thing over one place.
+    let frame = rig.facing;
+    let focus_seat = planet_centre() + (frame * Vec3::Y) * (PLANET_RADIUS + rig.focus.y);
+    let eye_seat = focus_seat + (frame * rig.eye_offset());
     if rig.distance < crate::camera::FIRST_PERSON {
         // No separation to look along; carry the flat gaze into the seat.
         Transform {
             translation: eye_seat,
-            rotation: eye_turn
+            rotation: frame
                 * Transform::default()
                     .looking_to(rig.forward(), Vec3::Y)
                     .rotation,
             scale: Vec3::ONE,
         }
     } else {
-        let (focus_seat, focus_turn) = bend_frame(rig.focus);
-        let up = focus_turn * Vec3::Y;
+        let up = frame * Vec3::Y;
         let gaze = (focus_seat - eye_seat).normalize_or(-up);
         // Looking almost STRAIGHT DOWN, the local up is no use as a hint - it is
         // nearly antiparallel to the gaze, `looking_at` has no plane left to
@@ -429,7 +444,7 @@ pub(crate) fn bent_camera_pose(rig: &CameraRig) -> Transform {
         // From near the vertical, the honest screen-up is the bearing the rig is
         // facing - the convention every top-down map keeps.
         let up = if gaze.dot(up).abs() > 0.985 {
-            focus_turn * rig.ground_forward()
+            frame * rig.ground_forward()
         } else {
             up
         };
