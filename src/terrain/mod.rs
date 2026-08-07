@@ -163,7 +163,7 @@ impl Plugin for TerrainPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_terrain).add_systems(
             Update,
-            (stream_chunks, follow_water_plane).in_set(TerrainSet),
+            stream_chunks.in_set(TerrainSet),
         );
     }
 }
@@ -1359,6 +1359,20 @@ pub fn build_chunk_mesh(terrain: &Terrain, coord: IVec2) -> Mesh {
 /// Cells with no river collapse to nothing, so a chunk without one costs no
 /// geometry at all.
 pub fn build_river_mesh(terrain: &Terrain, coord: IVec2) -> Option<Mesh> {
+    build_water_mesh(terrain, coord, false)
+}
+
+/// The sea standing over one chunk, if it reaches this far.
+///
+/// The other half of what the planet's patches do overhead, and the reason the
+/// flat sheet could be deleted: water is geometry the ground carries now,
+/// wherever that ground is drawn from, instead of one square quad chasing the
+/// camera around. Same builder as the rivers, asked a different question.
+pub fn build_sea_mesh(terrain: &Terrain, coord: IVec2) -> Option<Mesh> {
+    build_water_mesh(terrain, coord, true)
+}
+
+fn build_water_mesh(terrain: &Terrain, coord: IVec2, sea: bool) -> Option<Mesh> {
     let cell = CHUNK_SIZE / CHUNK_CELLS as f32;
     let origin = Vec2::new(coord.x as f32 * CHUNK_SIZE, coord.y as f32 * CHUNK_SIZE);
     let stride = CHUNK_CELLS + 1;
@@ -1377,13 +1391,25 @@ pub fn build_river_mesh(terrain: &Terrain, coord: IVec2) -> Option<Mesh> {
             let z = origin.y + iz as f32 * cell;
             let index = iz * stride + ix;
 
-            match terrain.river_surface_at(x, z) {
-                Some(surface) => {
+            if sea {
+                // The open sea: everything the ground drops below sea level.
+                let h = terrain.height_at(x, z);
+                if h < WATER_LEVEL {
                     wet[index] = true;
-                    heights[index] = surface;
+                    heights[index] = WATER_LEVEL;
                     any = true;
+                } else {
+                    heights[index] = h;
                 }
-                None => heights[index] = terrain.height_at(x, z),
+            } else {
+                match terrain.river_surface_at(x, z) {
+                    Some(surface) => {
+                        wet[index] = true;
+                        heights[index] = surface;
+                        any = true;
+                    }
+                    None => heights[index] = terrain.height_at(x, z),
+                }
             }
         }
     }
@@ -1481,7 +1507,7 @@ pub struct TerrainAssets {
 
 fn setup_terrain(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
+    _meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut water_materials: ResMut<Assets<crate::water::WaterMaterial>>,
     world_seed: Res<crate::WorldSeed>,
@@ -1505,29 +1531,6 @@ fn setup_terrain(
     // lower than sea level plus the curvature drop vanished under it, and
     // from any height the god saw a loaded island in a dead grey sea of
     // nothing. Past this quad's edge, the planet paints its own ocean.
-    let extent = CHUNK_SIZE * VIEW_CHUNKS as f32 * 1.15;
-    let water_mesh = meshes.add(
-        Mesh::new(
-            PrimitiveTopology::TriangleList,
-            bevy::asset::RenderAssetUsages::MAIN_WORLD
-                | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-        )
-        .with_inserted_attribute(
-            Mesh::ATTRIBUTE_POSITION,
-            vec![
-                [-extent, 0.0, -extent],
-                [-extent, 0.0, extent],
-                [extent, 0.0, extent],
-                [extent, 0.0, -extent],
-            ],
-        )
-        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 1.0, 0.0]; 4])
-        .with_inserted_attribute(
-            Mesh::ATTRIBUTE_UV_0,
-            vec![[0.0, 0.0], [0.0, 1.0], [1.0, 1.0], [1.0, 0.0]],
-        )
-        .with_inserted_indices(Indices::U32(vec![0, 1, 2, 0, 2, 3])),
-    );
 
     let water_material = water_materials.add(crate::water::WaterMaterial::default());
     let river_material = water_materials.add({
@@ -1542,19 +1545,17 @@ fn setup_terrain(
         river
     });
 
-    commands.spawn((
-        Name::new("Water"),
-        Mesh3d(water_mesh),
-        MeshMaterial3d(water_material.clone()),
-        // Identity: the sea's vertices are seated on the sphere in world
-        // space by `follow_water_plane`, sea level and curve baked in.
-        Transform::IDENTITY,
-        // Water casting a shadow onto the seabed puts a dark band under every
-        // shoreline, which reads as the surface hovering above the sand rather than
-        // meeting it.
-        NotShadowCaster,
-        WaterPlane,
-    ));
+    // No sheet any more. The sea used to be ONE square quad, sized to the
+    // streamed ground and dragged along under the camera, and every problem it
+    // had came from being a separate object pretending to be part of the
+    // world: it hung over the globe as a blue square when the view pulled
+    // back, it lit differently from the ocean the planet painted, and it sat
+    // in the same plane as the patch water and fought it.
+    //
+    // Water is geometry the ground carries now - `build_sea_mesh` here for the
+    // chunks, `build_patch_water` for the planet - so there is nothing to
+    // follow the camera, nothing to size, and no edge anywhere for a seam to
+    // live on.
 
     info!(
         "the world is a sphere {:.0} units around, {:.0} across",
@@ -1661,6 +1662,7 @@ pub(crate) fn spawn_chunk(
     coord: IVec2,
 ) -> Entity {
     let river = build_river_mesh(terrain, coord).map(|mesh| meshes.add(mesh));
+    let sea = build_sea_mesh(terrain, coord).map(|mesh| meshes.add(mesh));
     let entity = commands
         .spawn((
             Name::new(format!("Chunk {},{}", coord.x, coord.y)),
@@ -1683,6 +1685,18 @@ pub(crate) fn spawn_chunk(
             Visibility::Hidden,
         ))
         .id();
+    if let Some(sea) = sea {
+        commands.spawn((
+            Name::new("Sea"),
+            Mesh3d(sea),
+            MeshMaterial3d(assets.sea_material.clone()),
+            Transform::default(),
+            // World-space seats already, like its chunk's. See the river below.
+            crate::globe::BentInPlace,
+            NotShadowCaster,
+            ChildOf(entity),
+        ));
+    }
     if let Some(river) = river {
         commands.spawn((
             Name::new("River"),
@@ -1738,105 +1752,6 @@ pub(crate) fn rebuild_chunks_near(
     }
 }
 
-/// Keeps the sea centred under the camera.
-fn follow_water_plane(
-    cameras: Query<&crate::camera::CameraRig>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut water: Query<(&Mesh3d, &Transform, &mut Visibility), With<WaterPlane>>,
-    mut woven: Local<Option<(i32, i32, i32)>>,
-) {
-    let Ok(rig) = cameras.single() else {
-        return;
-    };
-    // The sea wears the streamed world's own size. The quad is cut for the
-    // widest play-zoom view; as the stream radius tapers with altitude the
-    // sea tapers with it, or it hangs over the planet as a flat blue square
-    // long after the ground it was wetting has slimmed to a sliver - the
-    // planet's painted ocean owns everything beyond the loaded shore. It
-    // will follow the curve itself the day the chunks do; they share a
-    // frame, and bending one without the other tears every shoreline.
-    // The sea is CURVED: its vertices are seated on the sphere one by one,
-    // because a sheet thousands of units wide cannot be seated rigidly the
-    // way a chunk can. Rebuilt only when the view moves - a few thousand
-    // vertices, well under a millisecond - and sized with the streamed
-    // ground, since past the loaded shore the planet paints its own ocean.
-    let receding = 1.0 - ((rig.distance - 2_200.0) / 800.0).clamp(0.0, 1.0);
-
-    // Once the taper reaches zero the planet's own painted ocean owns every
-    // shore in view and this sheet has nothing left to wet. It was never
-    // switched OFF, though, only scaled down - and `receding.max(0.001)`
-    // cannot reach zero. What was left hung there as a small flat square of
-    // sea lying across the curve of the globe, lit by its own flat normal
-    // while the world behind it fell away. Hide it instead, and do not spend
-    // a mesh rebuild on a sheet nobody can see.
-    let wanted = if receding <= 0.0 {
-        Visibility::Hidden
-    } else {
-        Visibility::Inherited
-    };
-    if let Some((_, _, mut seen)) = water.iter_mut().next() {
-        if *seen != wanted {
-            *seen = wanted;
-        }
-    }
-    if wanted == Visibility::Hidden {
-        return;
-    }
-
-    let fit = (stream_radius(rig.distance) as f32 / VIEW_CHUNKS as f32) * receding.max(0.001);
-    let heart = Vec2::new(rig.focus.x, rig.focus.z);
-    let signature = (
-        (heart.x / 8.0).round() as i32,
-        (heart.y / 8.0).round() as i32,
-        (fit * 128.0).round() as i32,
-    );
-    if *woven == Some(signature) {
-        return;
-    }
-    *woven = Some(signature);
-
-    let Some((mesh3d, _, _)) = water.iter().next() else {
-        return;
-    };
-    let Some(mut mesh) = meshes.get_mut(&mesh3d.0) else {
-        return;
-    };
-
-    const CELLS: usize = 40;
-    let half = CHUNK_SIZE * VIEW_CHUNKS as f32 * 1.15 * fit;
-    let step = half * 2.0 / CELLS as f32;
-    let stride = CELLS + 1;
-    let mut positions = Vec::with_capacity(stride * stride);
-    let mut normals = Vec::with_capacity(stride * stride);
-    let mut uvs = Vec::with_capacity(stride * stride);
-    for j in 0..stride {
-        for i in 0..stride {
-            let flat = Vec3::new(
-                heart.x - half + i as f32 * step,
-                WATER_LEVEL,
-                heart.y - half + j as f32 * step,
-            );
-            let (seat, turn) = crate::globe::bend_frame(flat);
-            positions.push(seat.to_array());
-            normals.push((turn * Vec3::Y).to_array());
-            uvs.push([i as f32 / CELLS as f32, j as f32 / CELLS as f32]);
-        }
-    }
-    let mut indices = Vec::with_capacity(CELLS * CELLS * 6);
-    for j in 0..CELLS as u32 {
-        for i in 0..CELLS as u32 {
-            let tl = j * stride as u32 + i;
-            let tr = tl + 1;
-            let bl = tl + stride as u32;
-            let br = bl + 1;
-            indices.extend([tl, bl, tr, tr, bl, br]);
-        }
-    }
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-    mesh.insert_indices(Indices::U32(indices));
-}
 
 #[cfg(test)]
 mod tests {
