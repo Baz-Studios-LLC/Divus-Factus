@@ -201,7 +201,13 @@ fn openings_at(
     let (inner_foot, _, _, high_foot, high_tall) = courses_of(tall);
     for (what, at) in openings.iter().flatten().copied() {
         let (wide, rise, foot) = match what {
-            Opening::Door => (DOOR_WIDE, DOOR_HIGH, inner_foot),
+            // A door reaches the FLOOR. It stood on the sill plate before,
+            // which put its head two atoms above the leaf hung in it - the leaf
+            // is two metres from the ground, and the hole was two metres from
+            // the top of the plate - so the door sat low in its own opening
+            // with daylight over it. Nothing crosses a doorway: the plate is
+            // laid in pieces around it, which is what you walk through.
+            Opening::Door => (DOOR_WIDE, DOOR_HIGH, 0),
             // A window FILLS the upper course, from the rail to the head plate.
             //
             // It used to sit inside that course with a sill of its own under it
@@ -1204,14 +1210,20 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // cut out of anything.
             for (what, hx, hw, hy, hh) in &holes {
                 let jamb = jamb_of(*what);
-                timber(&mut body, hx - jamb, jamb, inner_foot, inner_tall);
-                timber(&mut body, hx + hw, jamb, inner_foot, inner_tall);
-                // A lintel only where there is not already a plate doing the
-                // job: a window reaching the head plate has one over it
-                // already, and a second laid against it is the doubled beam
-                // this was drawn to avoid.
-                if hy + hh < tall - PLATE_TALL {
-                    timber(&mut body, *hx, *hw, hy + hh, PLATE_TALL);
+                // A jamb runs from the opening's own foot, which for a door is
+                // the ground, up to the head plate.
+                let jamb_foot = (*hy).min(inner_foot);
+                let jamb_tall = inner_foot + inner_tall - jamb_foot;
+                timber(&mut body, hx - jamb, jamb, jamb_foot, jamb_tall);
+                timber(&mut body, hx + hw, jamb, jamb_foot, jamb_tall);
+                // The lintel fills whatever is left between the opening's head
+                // and the head plate, rather than being one plate thick and
+                // leaving a strip of nothing over it. Where the opening reaches
+                // the plate there is nothing left to fill and no lintel: a
+                // window has the plate itself over it.
+                let over = (tall - PLATE_TALL) - (hy + hh);
+                if over > 0 {
+                    timber(&mut body, *hx, *hw, hy + hh, over);
                 }
                 if *what == Opening::Window {
                     // A sill only where the rail is not already under it, for
@@ -10162,6 +10174,46 @@ mod roof_tests {
     /// opening, so the opening's whole column was left out at every height
     /// rather than only where the opening is - and a window sat with a hole
     /// under it running clean down to the sill plate.
+    /// A door's hole is the size of the leaf hung in it.
+    ///
+    /// The two are drawn by different things - the wall solves the opening, the
+    /// prop draws the leaf - so nothing makes them agree except this. They
+    /// disagreed by two atoms, which is a black strip of daylight over every
+    /// door in the world.
+    #[test]
+    fn a_doorway_is_the_size_of_its_door() {
+        let leaf = body_of(&PartKind::Prop("door"), None);
+        let top = leaf
+            .iter()
+            .filter(|piece| piece.ramp == "wood")
+            .map(|piece| piece.at.y + piece.size.y * 0.5)
+            .fold(f32::NEG_INFINITY, f32::max);
+        let foot = leaf
+            .iter()
+            .map(|piece| piece.at.y - piece.size.y * 0.5)
+            .fold(f32::INFINITY, f32::min);
+
+        let tall = (WALL_HIGH / ATOM).round() as i32;
+        let holes = openings_at(
+            (4.0 / ATOM).round() as i32,
+            tall,
+            &[Some((Opening::Door, 0.0)), None, None, None],
+        );
+        let (_, _, _, hy, hh) = holes[0];
+        assert!(
+            (hy as f32 * ATOM - foot).abs() < 1e-4,
+            "the doorway starts at {} and the door at {foot}",
+            hy as f32 * ATOM,
+        );
+        // The prop's own frame stands a little proud of its leaf; the hole has
+        // to clear the LEAF, and must not be shorter than it.
+        assert!(
+            (hy + hh) as f32 * ATOM >= top - 0.1875 - 1e-4,
+            "the doorway ends at {} and the door reaches {top}",
+            (hy + hh) as f32 * ATOM,
+        );
+    }
+
     #[test]
     fn a_framed_wall_is_solid_where_it_is_not_open() {
         let one = |what, at| [Some((what, at)), None, None, None];
