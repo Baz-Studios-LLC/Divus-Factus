@@ -7266,6 +7266,11 @@ pub fn opening_seat(wall_at: Vec3, along: Vec3, length: f32, wide: f32, point: V
 fn punchable_length(record: &Placed) -> Option<f32> {
     match kind_from_name(&record.part)? {
         PartKind::Wall(long) => Some(long),
+        // A framed wall takes an opening too - it just does not have to be cut
+        // to take one. Being punchable is what lets a window's ghost seat
+        // itself along the wall as you aim, which is the same arithmetic
+        // whether the wall is going to be parted or is going to reframe itself.
+        PartKind::Framed { long, .. } => Some(long),
         PartKind::Seg { long, high, lift }
             if lift.abs() < 0.01 && (high - WALL_HIGH).abs() < 0.05 =>
         {
@@ -7337,6 +7342,33 @@ fn punch_wall(
         .map(|(_, tf, _, _)| tf.translation)
         .unwrap_or(at);
     let middle = opening_seat(wall_at, along, length, wide, wall_at + along * t);
+
+    // A FRAMED wall is not cut. It is told.
+    //
+    // Everything below this parts a plain wall into the pieces an opening
+    // leaves - a jamb strip either side, a header over, a sill under - because
+    // a plain wall is a single box and a box cannot have a hole in it. A framed
+    // wall already knows what an opening is: it frames one, declines to panel
+    // it, and divides the bays either side of it. So the wall simply gains the
+    // opening where it was aimed, and re-solves.
+    if let Some(PartKind::Framed { long, high, .. }) = kind_from_name(&record.part) {
+        let made = PartKind::Framed {
+            long,
+            high,
+            opening: Some((
+                if is_door { Opening::Door } else { Opening::Window },
+                on_the_lattice(middle),
+            )),
+        };
+        commands.entity(wall).despawn_related::<Children>();
+        let mut record = record.clone();
+        record.part = part_name(&made);
+        dress_part(
+            commands, meshes, materials, palette, &made, &record, wall, false,
+        );
+        commands.entity(wall).insert(record);
+        return true;
+    }
     let centre_of = |offset: f32| {
         let base = placed
             .get(wall)
