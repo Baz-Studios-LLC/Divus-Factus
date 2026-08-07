@@ -58,9 +58,23 @@ pub fn stream_radius(camera_distance: f32) -> i32 {
     // this ground anyway; the plate tapers to a sliver whose lift off the
     // curve is a dozen units, and a thousand chunks stop being drawn from
     // heights where they were smaller than the pixels they cost.
+    // To NOTHING, not to a small disc.
+    //
+    // Past the top of that climb the planet's own patches are the whole picture
+    // and a chunk is smaller than a pixel - but the streamer kept six rings of
+    // them around the focus anyway, and asked about them every frame. Standing
+    // still that hardly shows, because they load once and stay. The title
+    // screen is where it does: the vantage circles the planet, so the whole
+    // disc is dragged round with it the entire way.
+    //
+    // Measured at the title, by the systems reporting their own time rather
+    // than by bisecting the frame: `stream_chunks` was one and a half
+    // milliseconds a frame, and every other system in the world together was
+    // under a tenth of one. Ground nobody can see, costing more than all the
+    // ground they can.
     let receding = ((camera_distance - 1_400.0) / 4_000.0).clamp(0.0, 1.0);
-    let ceiling = VIEW_CHUNKS as f32 + (MIN_VIEW_CHUNKS as f32 - VIEW_CHUNKS as f32) * receding;
-    wanted.min(ceiling.round() as i32)
+    let ceiling = VIEW_CHUNKS as f32 * (1.0 - receding);
+    wanted.min(ceiling.round() as i32).max(0)
 }
 /// Chunks built per frame during play when there is little to do.
 ///
@@ -1760,7 +1774,9 @@ fn stream_chunks(
     mut loaded: ResMut<LoadedChunks>,
     cameras: Query<&crate::camera::CameraRig>,
     state: Res<State<crate::GameState>>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("terrain: stream_chunks");
     let Ok(rig) = cameras.single() else {
         return;
     };
@@ -2078,7 +2094,9 @@ mod tests {
         assert_eq!(near, MIN_VIEW_CHUNKS, "close in should be the minimum");
         assert_eq!(far, VIEW_CHUNKS, "far out should reach the maximum");
 
-        for distance in [0.0, 5.0, 60.0, 300.0, 900.0, 10_000.0] {
+        // Within the play zoom. Past it the radius tapers to nothing, which is
+        // the point of the taper, so the floor does not apply up there.
+        for distance in [0.0, 5.0, 60.0, 300.0, 900.0, 1_400.0] {
             let r = stream_radius(distance);
             assert!(
                 (MIN_VIEW_CHUNKS..=VIEW_CHUNKS).contains(&r),
@@ -2090,11 +2108,15 @@ mod tests {
     #[test]
     fn the_stream_radius_tapers_past_the_play_zoom() {
         // Rising through the play zoom grows the view; rising past it hands
-        // the ground to the planet's patches and the plate shrinks away.
+        // the ground to the planet's patches and the plate shrinks away - to
+        // NOTHING, not to a small disc. A chunk up there is smaller than a
+        // pixel, and the streamer was spending more time on those than every
+        // other system in the world put together.
         assert_eq!(stream_radius(1_400.0), VIEW_CHUNKS);
         assert!(stream_radius(3_500.0) < VIEW_CHUNKS);
-        assert_eq!(stream_radius(6_000.0), MIN_VIEW_CHUNKS);
-        assert_eq!(stream_radius(20_000.0), MIN_VIEW_CHUNKS);
+        assert_eq!(stream_radius(5_400.0), 0, "the taper ends at nothing");
+        assert_eq!(stream_radius(20_000.0), 0);
+        assert_eq!(stream_radius(31_000.0), 0, "and the title holds none at all");
     }
 
     #[test]

@@ -809,7 +809,9 @@ fn dress_the_patches(
     mut commands: Commands,
     skin: Option<Res<PlanetSkin>>,
     bare: Query<Entity, (With<Patch>, Without<MeshMaterial3d<PlanetMaterial>>)>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("globe: dress_the_patches");
     let Some(skin) = skin else {
         return;
     };
@@ -1230,7 +1232,9 @@ fn tend_the_tree(
     cameras: Query<(&GlobalTransform, &CameraRig), With<GodCamera>>,
     mut patches: Query<(&Patch, &mut Visibility)>,
     state: Res<State<crate::GameState>>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("globe: tend_the_tree");
     let Some(terrain) = terrain else {
         return;
     };

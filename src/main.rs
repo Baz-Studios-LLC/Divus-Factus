@@ -258,6 +258,7 @@ fn main() {
             founding::FoundingPlugin,
             fog::FogPlugin,
             globe::GlobePlugin,
+            debug::timings::TimingsPlugin,
         ))
         .add_systems(Startup, spawn_lighting)
         .run();

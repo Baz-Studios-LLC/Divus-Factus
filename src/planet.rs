@@ -70,6 +70,7 @@ pub fn run() {
         // every tree, grove and stretch of near water standing on one. What
         // was on screen all this time was the planet's own patches.
         crate::fog::FogPlugin,
+        crate::debug::timings::TimingsPlugin,
     ))
     .add_plugins((
         crate::calendar::CalendarPlugin,

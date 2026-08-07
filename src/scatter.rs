@@ -387,7 +387,9 @@ fn populate_chunks(
     settlement: Option<Res<crate::villager::SettlementSite>>,
     mut library: Local<Option<ScatterMeshes>>,
     chunks: Query<(Entity, &TerrainChunk), Added<TerrainChunk>>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("scatter: populate_chunks");
     if chunks.is_empty() {
         return;
     }
@@ -976,7 +978,9 @@ pub(crate) fn collect_groves(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut baking: Query<(Entity, &mut RebakingGrove)>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("scatter: collect_groves");
     // AT MOST ONE swap per frame: the bake is free by now, but handing the
     // renderer a fresh multi-megabyte mesh is a real upload, and two groves
     // finishing together used to pay both in the same frame.
@@ -1334,7 +1338,12 @@ pub fn chunk_scatter_seed(world_seed: u32, coord: IVec2) -> u64 {
 
 /// Leans foliage back and forth. Two sine waves at different rates so the motion
 /// does not read as a loop.
-fn sway_foliage(time: Res<Time>, mut foliage: Query<(&Foliage, &mut Transform)>) {
+fn sway_foliage(
+    time: Res<Time>,
+    mut foliage: Query<(&Foliage, &mut Transform)>,
+    watch: Res<crate::debug::timings::Timings>,
+) {
+    let _t = watch.watch("scatter: sway_foliage");
     let t = time.elapsed_secs();
 
     for (foliage, mut transform) in &mut foliage {
