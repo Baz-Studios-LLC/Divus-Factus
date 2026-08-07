@@ -1989,6 +1989,27 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             slab(-0.125, 1.0, 0.125, 0.125, 0.125, 0.125, "cloth-gold", 0.8),
             slab(0.125, 1.0, 0.125, 0.125, 0.125, 0.125, "cloth-gold", 0.8),
         ],
+        // The leaf on its own, with no jambs and no lintel around it.
+        //
+        // For a wall that has already framed its own opening. The door prop is
+        // a frame AND a leaf, which is right when a plain wall has been cut and
+        // has nothing of its own - but a framed wall gathers jambs and a lintel
+        // when it takes the opening, so setting the whole prop down draws a
+        // second frame inside the first. Skipping the prop altogether threw the
+        // leaf out with the frame, and left a doorway with no door in it.
+        //
+        // The same leaf and the same latch, at the same places, so a door reads
+        // the same whichever kind of wall it hangs in.
+        PartKind::Prop("door-leaf") => vec![
+            slab(0.0, 1.0, 0.0625, 1.0, 2.0, 0.125, "wood", 0.35),
+            slab(0.375, 1.0, 0.125, 0.125, 0.125, 0.125, "cloth-gold", 0.8),
+        ],
+        PartKind::Prop("door-double-leaf") => vec![
+            slab(-0.5, 1.0, 0.0625, 1.0, 2.0, 0.125, "wood", 0.35),
+            slab(0.5, 1.0, 0.0625, 1.0, 2.0, 0.125, "wood", 0.35),
+            slab(-0.125, 1.0, 0.125, 0.125, 0.125, 0.125, "cloth-gold", 0.8),
+            slab(0.125, 1.0, 0.125, 0.125, 0.125, 0.125, "cloth-gold", 0.8),
+        ],
         PartKind::Prop("doorway") => vec![
             // An opening with no leaf: jambs and a lintel, for the ways
             // between rooms that never wanted a door.
@@ -7591,16 +7612,19 @@ fn punch_wall(
     //
     // The widget below is not geometry and arrives either way: it is how the
     // village knows there is a door here to walk through.
-    if !reframed {
-        spawn_part(
-            commands,
-            meshes,
-            materials,
-            palette,
-            &frame_kind,
-            &frame,
-            false,
-        );
+    // On a framed wall, only what the wall does NOT provide: the leaf and its
+    // latch. A doorway that was never going to have a door in it leaves
+    // nothing at all, because the wall has already drawn the whole of it.
+    let hung = match (reframed, frame_kind) {
+        (false, _) => Some(frame_kind),
+        (true, PartKind::Prop("door")) => Some(PartKind::Prop("door-leaf")),
+        (true, PartKind::Prop("door-double")) => Some(PartKind::Prop("door-double-leaf")),
+        (true, _) => None,
+    };
+    if let Some(hung) = hung {
+        let mut leaf = frame.clone();
+        leaf.part = part_name(&hung);
+        spawn_part(commands, meshes, materials, palette, &hung, &leaf, false);
     }
 
     // A door is a doorway: the routing widget arrives with it, its nose
@@ -10219,10 +10243,14 @@ mod roof_tests {
     /// clear, and is there timber down each of its sides.
     #[test]
     fn an_opening_gathers_its_own_frame() {
+        let tall = (WALL_HIGH / ATOM).round() as i32;
+        let (_, _, _, high_foot, high_tall) = courses_of(tall);
         for hole in [Opening::Door, Opening::Window] {
+            // Asked of the same courses the solver lays against: a window takes
+            // its height from the wall now rather than from a number.
             let (wide, rise, foot) = match hole {
                 Opening::Door => (DOOR_WIDE, DOOR_HIGH, PLATE_TALL),
-                Opening::Window => (WINDOW_WIDE, WINDOW_HIGH, PLATE_TALL + WINDOW_SILL),
+                Opening::Window => (WINDOW_WIDE, high_tall, high_foot),
             };
             let body = body_of(
                 &PartKind::Framed {
