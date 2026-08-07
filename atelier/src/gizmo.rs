@@ -308,6 +308,11 @@ fn handles_for(mode: ToolMode, record: &Placed) -> Vec<(Vec3, Vec3, &'static str
                 .unwrap_or(Vec2::ZERO);
             let sized = standing.and_then(|kind| match kind {
                 PartKind::Wall(long) => Some((long, 0.0, false)),
+                // A framed wall sizes along its length like any other wall.
+                // Its height is the gold handle below - and this match is what
+                // decides whether that one appears at all, because a part that
+                // is not sized returns NO handles, gold included.
+                PartKind::Framed { long, .. } => Some((long, 0.0, false)),
                 // The pieces a punch leaves are walls too, and stretch
                 // like them - only their height and lift stay put.
                 PartKind::Seg { long, .. } => Some((long, 0.0, false)),
@@ -911,6 +916,7 @@ fn work_gizmo(
             let grown = 0.0;
             let made = match kind {
                 PartKind::Wall(_) => PartKind::Wall(w),
+                PartKind::Framed { high, .. } => PartKind::Framed { long: w, high },
                 PartKind::Seg { high, lift, .. } => PartKind::Seg {
                     long: w,
                     high,

@@ -936,8 +936,12 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     // shadow line is the whole look; flush, it is a painted
                     // stripe.
                     WALL_THICK - (INFILL_SET * 2) as f32 * ATOM,
-                    "plaster",
-                    0.92,
+                    // BONE, not "plaster". The bench has no plaster ramp, and a
+                    // ramp it does not know comes back as the missing-colour
+                    // magenta - which is exactly what the panels were. Bone is
+                    // the off-white a lime daub actually is.
+                    "bone",
+                    0.9,
                 ));
             }
             body
