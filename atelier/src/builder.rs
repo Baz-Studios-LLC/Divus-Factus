@@ -151,10 +151,17 @@ fn into_bays(span: i32, bays: i32) -> Vec<i32> {
 }
 
 /// One piece of a part's body: offset from the part origin, size, ramp,
-/// shade, how much of the world shows through it (1.0 = none), and
-/// whether it is a wedge rather than a box - a triangular prism, for
-/// the honest slopes a gable wants.
-struct Slab(Vec3, Vec3, String, f32, f32, Shape, f32);
+/// shade, how much of the world shows through it (1.0 = none), whether it is
+/// a wedge rather than a box - a triangular prism, for the honest slopes a
+/// gable wants - and two angles.
+///
+/// The angles are the piece's own, and they are different rotations for
+/// different jobs. LEAN turns it about its length, which is how a stair's rail
+/// climbs beside the flight. CANT turns it about the part's thickness, which
+/// swings it WITHIN the face of what it belongs to - and that is the one a
+/// diagonal brace in a wall needs, because a brace stays in the wall's plane
+/// and simply lies across it.
+struct Slab(Vec3, Vec3, String, f32, f32, Shape, f32, f32);
 
 /// What a piece of a body is cut from.
 #[derive(Clone, Copy, PartialEq)]
@@ -781,6 +788,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             1.0,
             Shape::Box,
             0.0,
+            0.0,
         )
     };
     // A wedge: the gable's own shape.
@@ -792,6 +800,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             shade,
             1.0,
             Shape::Wedge,
+            0.0,
             0.0,
         )
     };
@@ -808,6 +817,25 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 1.0,
                 Shape::Box,
                 lean,
+                0.0,
+            )
+        };
+    // A piece swung WITHIN its part's face rather than out of it: the diagonal
+    // brace in a wall, and anything else that lies across a flat thing at an
+    // angle. `leaning` turns a piece about its own length and takes it out of
+    // the plane; this keeps it in.
+    #[allow(clippy::too_many_arguments)]
+    let canted =
+        |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32, cant: f32| {
+            Slab(
+                Vec3::new(x, y, z),
+                Vec3::new(sx, sy, sz),
+                ramp.to_string(),
+                shade,
+                1.0,
+                Shape::Box,
+                0.0,
+                cant,
             )
         };
     // A ridge cap: the same triangle, laid along the part's length.
@@ -819,6 +847,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             shade,
             1.0,
             Shape::Ridge,
+            0.0,
             0.0,
         )
     };
@@ -835,6 +864,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             shade,
             0.35,
             Shape::Box,
+            0.0,
             0.0,
         )
     };
@@ -907,6 +937,41 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             }
             for edge in &edges[1..edges.len().saturating_sub(1)] {
                 timber(&mut body, edge - STUD_WIDE / 2, STUD_WIDE, clear_foot, clear_tall);
+            }
+
+            // A pair of braces in every bay, rising to meet at its middle -
+            // the pattern from Brett's own bench, and the reason the cant
+            // exists. A brace runs corner to corner of the space it stiffens,
+            // so its length is the hypotenuse and its angle is whatever that
+            // triangle makes; drawn at a fixed forty-five it would either miss
+            // the corner or run out through the stud.
+            //
+            // Cut a little short at each end so it dies into the timber rather
+            // than crossing it.
+            for pair in edges.windows(2) {
+                let (from, to) = (pair[0], pair[1]);
+                let bay = (to - from) as f32 * ATOM;
+                let rise = clear_tall as f32 * ATOM;
+                let half = bay * 0.5;
+                if half <= ATOM || rise <= ATOM {
+                    continue;
+                }
+                let reach = (half * half + rise * rise).sqrt() - ATOM * 2.0;
+                let angle = rise.atan2(half);
+                for side in [-1.0f32, 1.0] {
+                    let (x, _) = across(from, to - from);
+                    body.push(canted(
+                        x - side * half * 0.5,
+                        (clear_foot as f32 + clear_tall as f32 * 0.5) * ATOM,
+                        0.0,
+                        reach,
+                        STUD_WIDE as f32 * ATOM,
+                        WALL_THICK,
+                        "wood",
+                        0.62,
+                        side * angle,
+                    ));
+                }
             }
 
             // The panels between them. Not a wall with timber drawn on it: the
@@ -1145,6 +1210,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     1.0,
                     Shape::Mitre,
                     0.0,
+                    0.0,
                 ));
             }
             if low > 0.0 {
@@ -1155,6 +1221,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                     0.45,
                     1.0,
                     Shape::MitreBack,
+                    0.0,
                     0.0,
                 ));
             }
@@ -1349,6 +1416,7 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 0.4,
                 1.0,
                 Shape::Hip(keep_x, keep_z),
+                0.0,
                 0.0,
             )]
         }
@@ -3527,7 +3595,7 @@ pub fn dress_part(
 ) {
     let translucent = ghostly || matches!(kind, PartKind::Widget(_));
     let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-    for Slab(mut at, size, ramp, shade, clarity, shape, mut lean) in body_of(kind, repaint) {
+    for Slab(mut at, size, ramp, shade, clarity, shape, mut lean, cant) in body_of(kind, repaint) {
         // Mirrored: the body reflects across its own length, and any
         // lean of its own leans the other way.
         if record.flip {
@@ -3566,7 +3634,7 @@ pub fn dress_part(
                 ..default()
             })),
             Transform::from_translation(at)
-                .with_rotation(Quat::from_rotation_x(lean))
+                .with_rotation(Quat::from_rotation_z(cant) * Quat::from_rotation_x(lean))
                 .with_scale(size),
             ChildOf(root),
         ));
@@ -4215,11 +4283,12 @@ fn work_part_menu(
                     let spin = pose(record.yaw, record.tilt, record.flip);
                     body_of(&kind, None)
                         .into_iter()
-                        .map(move |Slab(offset, size, _, _, _, _, lean)| {
+                        .map(move |Slab(offset, size, _, _, _, _, lean, cant)| {
                             // A slab may lean inside its own part - a roof's
                             // slopes do nothing else - so its turn is the part's
                             // and then its own.
-                            let turn = spin * Quat::from_rotation_x(lean);
+                            let turn =
+                                spin * Quat::from_rotation_z(cant) * Quat::from_rotation_x(lean);
                             (at.translation + spin * offset, size * 0.5, turn)
                         })
                         .collect::<Vec<_>>()
@@ -5329,12 +5398,12 @@ fn cursor_point(
 pub fn extent_of(kind: &PartKind) -> Vec2 {
     let mut low = Vec3::splat(f32::INFINITY);
     let mut high = Vec3::splat(f32::NEG_INFINITY);
-    for Slab(at, size, _, _, _, _, lean) in body_of(kind, None) {
+    for Slab(at, size, _, _, _, _, lean, cant) in body_of(kind, None) {
         // A leaning slab reaches further across than it is thick and less far
         // along than it is long. Measuring its unturned box makes a stair rail
         // - which is longer than the flight it runs beside - the widest thing
         // about the flight, and everything downstream believes it.
-        let turn = Quat::from_rotation_x(lean);
+        let turn = Quat::from_rotation_z(cant) * Quat::from_rotation_x(lean);
         let half = size * 0.5;
         let reach = (turn * Vec3::new(half.x, 0.0, 0.0)).abs()
             + (turn * Vec3::new(0.0, half.y, 0.0)).abs()
@@ -8704,15 +8773,21 @@ pub(crate) fn bake_a_work(
 
         // The body itself, as boxes the game can simply draw.
         let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-        for Slab(mut at, size, ramp, shade, clarity, shape, mut lean) in body_of(&kind, repaint) {
+        for Slab(mut at, size, ramp, shade, clarity, shape, mut lean, mut cant) in
+            body_of(&kind, repaint)
+        {
             if record.flip {
                 at.x = -at.x;
                 lean = -lean;
+                // A mirrored wall's braces lean the other way, or a mirrored
+                // pair comes out leaning the same way as the original and the
+                // whole point of mirroring it is lost.
+                cant = -cant;
             }
             let centre = anchor + turn * at;
-            // A piece that leans carries its own angle into the
+            // A piece that leans or cants carries its own angles into the
             // turn the game will draw it with.
-            let turn = turn * Quat::from_rotation_x(lean);
+            let turn = turn * Quat::from_rotation_z(cant) * Quat::from_rotation_x(lean);
             let colour = palette.shade(&ramp, shade).to_srgba();
             // A hip's two fractions ride in its form, since the game has to
             // build the same frustum and a name alone cannot say how far in the
@@ -9035,7 +9110,7 @@ mod roof_tests {
             let kind = PartKind::HipRoof(long, span, 0.25, 40.0);
             let body = body_of(&kind, None);
             assert_eq!(body.len(), 1, "a hip roof is one shape");
-            let Slab(at, size, .., shape, _) = &body[0];
+            let Slab(at, size, _, _, _, shape, _, _) = &body[0];
             let Shape::Hip(keep_x, keep_z) = shape else {
                 panic!("a hip roof is not a hip");
             };
@@ -9190,8 +9265,8 @@ mod roof_tests {
                 .map(|Slab(at, size, ..)| at.z - size.z * 0.5)
                 .fold(f32::INFINITY, f32::min);
 
-            let Some(Slab(at, size, _, _, _, _, lean)) =
-                body.iter().find(|Slab(.., lean)| *lean != 0.0)
+            let Some(Slab(at, size, _, _, _, _, lean, cant)) =
+                body.iter().find(|Slab(.., lean, _)| *lean != 0.0)
             else {
                 panic!("a flight rising {rise} has no rail");
             };
@@ -9306,7 +9381,7 @@ mod roof_tests {
         };
         for (what, kind) in [("FLIGHT", flight), ("RAIL", rail)] {
             println!("--- {what}");
-            for Slab(at, size, ramp, _, _, _, lean) in body_of(&kind, None) {
+            for Slab(at, size, ramp, _, _, _, lean, cant) in body_of(&kind, None) {
                 println!(
                     "  at ({:.4}, {:.4}, {:.4}) size ({:.4}, {:.4}, {:.4}) {ramp} lean {lean:.3}",
                     at.x, at.y, at.z, size.x, size.y, size.z
@@ -9468,7 +9543,9 @@ mod roof_tests {
             };
             let boxes: Vec<(Vec3, Vec3)> = body_of(&kind, None)
                 .into_iter()
-                .filter(|Slab(.., shape, lean)| *lean == 0.0 && matches!(shape, Shape::Box))
+                .filter(|Slab(.., shape, lean, cant)| {
+                    *lean == 0.0 && *cant == 0.0 && matches!(shape, Shape::Box)
+                })
                 .map(|Slab(at, size, ..)| (at, size))
                 .collect();
             for (i, (at, size)) in boxes.iter().enumerate() {
@@ -9605,8 +9682,12 @@ mod roof_tests {
                 ) {
                     continue;
                 }
-                for Slab(at, size, _, _, _, shape, lean) in body_of(&kind, None) {
-                    if lean != 0.0 || !matches!(shape, Shape::Box) {
+                for Slab(at, size, _, _, _, shape, lean, cant) in body_of(&kind, None) {
+                    // A canted piece is exempt for the same reason a leaning
+                    // one is: it lies across its bay corner to corner, so its
+                    // length is a hypotenuse and no rule about a lattice can
+                    // ask a diagonal to be a whole number of anything.
+                    if lean != 0.0 || cant != 0.0 || !matches!(shape, Shape::Box) {
                         continue;
                     }
                     for axis in 0..3 {
@@ -9666,12 +9747,14 @@ mod roof_tests {
                 Some(_) => entry.kind.run_made(2.0, 2.0),
                 None => entry.kind,
             };
-            for Slab(at, size, _, _, _, shape, lean) in body_of(&kind, None) {
+            for Slab(at, size, _, _, _, shape, lean, cant) in body_of(&kind, None) {
                 // A slope's own length is a hypotenuse: whole atoms of rise and
                 // run give a diagonal that is not a whole anything, and no rule
                 // about the lattice can ask otherwise. The same goes for a shape
-                // that is not a box - a wedge's height follows its pitch.
-                if lean != 0.0 || !matches!(shape, Shape::Box) {
+                // that is not a box - a wedge's height follows its pitch - and
+                // for anything CANTED, which is a brace lying across its bay
+                // from one corner to the other.
+                if lean != 0.0 || cant != 0.0 || !matches!(shape, Shape::Box) {
                     continue;
                 }
                 for axis in 0..3 {
@@ -9833,7 +9916,7 @@ mod roof_tests {
                     }
                     let mut faces: Vec<f32> = body
                         .iter()
-                        .filter(|Slab(.., lean)| *lean == 0.0)
+                        .filter(|Slab(.., lean, _)| *lean == 0.0)
                         .flat_map(|Slab(at, size, ..)| {
                             [at[axis] - size[axis] * 0.5, at[axis] + size[axis] * 0.5]
                         })
@@ -9925,7 +10008,7 @@ mod roof_tests {
             treads.len() > 1 && treads.iter().all(|Slab(_, _, ramp, ..)| ramp == "stone"),
             "the treads should be stone"
         );
-        let rails: Vec<&Slab> = body.iter().filter(|Slab(.., lean)| *lean != 0.0).collect();
+        let rails: Vec<&Slab> = body.iter().filter(|Slab(.., lean, _)| *lean != 0.0).collect();
         assert!(
             !rails.is_empty() && rails.iter().all(|Slab(_, _, ramp, ..)| ramp == "wood"),
             "the rail should be timber"
@@ -10039,7 +10122,7 @@ mod roof_tests {
 
             // The rails: two of them, leaning, and leaning the way the flight
             // climbs rather than at some angle of their own.
-            let rails: Vec<&Slab> = body.iter().filter(|Slab(.., lean)| *lean != 0.0).collect();
+            let rails: Vec<&Slab> = body.iter().filter(|Slab(.., lean, _)| *lean != 0.0).collect();
             assert_eq!(rails.len(), 2, "a flight wants a rail on each side");
             // The span the rail's LINE covers: from the foot newel's centre, a
             // reveal in from the bottom tread, to the head newel's centre, which
@@ -10052,7 +10135,7 @@ mod roof_tests {
             let head = full * 0.5 - post * 0.5;
             let run = head - foot;
             let wanted = -(rise / run).atan();
-            for Slab(.., lean) in &rails {
+            for Slab(.., lean, _) in &rails {
                 assert!(
                     (lean - wanted).abs() < 1e-3,
                     "a rail leans {lean} where the flight climbs at {wanted}"
@@ -10282,7 +10365,7 @@ mod roof_tests {
         let spin = pose(record.yaw, record.tilt, record.flip);
         body_of(&kind, None)
             .into_iter()
-            .map(|Slab(offset, size, _, _, _, _, lean)| {
+            .map(|Slab(offset, size, _, _, _, _, lean, cant)| {
                 let turn = spin * Quat::from_rotation_x(lean);
                 (Vec3::from(record.at) + spin * offset, size * 0.5, turn)
             })
@@ -10383,7 +10466,7 @@ mod roof_tests {
         // rectangle would fail now that a beam's ends are cut, because a mitre's
         // box takes in the very wood the saw removed.
         let mut points: Vec<Vec3> = Vec::new();
-        for Slab(offset, size, _, _, _, shape, _) in body_of(&made, None) {
+        for Slab(offset, size, _, _, _, shape, _, _) in body_of(&made, None) {
             let corners: Vec<Vec3> = match shape {
                 // The prism's own six, not the eight of the box it came from.
                 Shape::Mitre | Shape::MitreBack => {
@@ -10671,7 +10754,7 @@ mod roof_tests {
     fn ridge_top(span: f32, over: f32, pitch: f32) -> f32 {
         body_of(&PartKind::GableRoof(6.0, span, over, pitch), None)
             .iter()
-            .map(|Slab(at, size, _, _, _, _, lean)| {
+            .map(|Slab(at, size, _, _, _, _, lean, cant)| {
                 let reach = (size.y * lean.cos()).abs() + (size.z * lean.sin()).abs();
                 at.y + reach * 0.5
             })
