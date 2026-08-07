@@ -161,7 +161,22 @@ fn into_bays(span: i32, bays: i32) -> Vec<i32> {
 /// swings it WITHIN the face of what it belongs to - and that is the one a
 /// diagonal brace in a wall needs, because a brace stays in the wall's plane
 /// and simply lies across it.
-struct Slab(Vec3, Vec3, String, f32, f32, Shape, f32, f32);
+struct Slab {
+    /// Offset from the part's origin.
+    at: Vec3,
+    size: Vec3,
+    ramp: String,
+    shade: f32,
+    /// How much of the world shows through it. 1.0 is none.
+    clarity: f32,
+    shape: Shape,
+    /// Turned about its own length - how a stair's rail climbs beside the
+    /// flight. This takes a piece OUT of the face it belongs to.
+    lean: f32,
+    /// Turned about the part's thickness, which swings it WITHIN that face.
+    /// What a diagonal brace in a wall needs.
+    cant: f32,
+}
 
 /// What a piece of a body is cut from.
 #[derive(Clone, Copy, PartialEq)]
@@ -780,45 +795,45 @@ pub const WIDGETS: &[(&str, &str, f32)] = &[
 /// The boxes a part is made of, in its own local space, resting on y = 0.
 fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
     let slab = |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32| {
-        Slab(
-            Vec3::new(x, y, z),
-            Vec3::new(sx, sy, sz),
-            ramp.to_string(),
+        Slab {
+            at: Vec3::new(x, y, z),
+            size: Vec3::new(sx, sy, sz),
+            ramp: ramp.to_string(),
             shade,
-            1.0,
-            Shape::Box,
-            0.0,
-            0.0,
-        )
+            clarity: 1.0,
+            shape: Shape::Box,
+            lean: 0.0,
+            cant: 0.0,
+        }
     };
     // A wedge: the gable's own shape.
     let wedge = |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32| {
-        Slab(
-            Vec3::new(x, y, z),
-            Vec3::new(sx, sy, sz),
-            ramp.to_string(),
+        Slab {
+            at: Vec3::new(x, y, z),
+            size: Vec3::new(sx, sy, sz),
+            ramp: ramp.to_string(),
             shade,
-            1.0,
-            Shape::Wedge,
-            0.0,
-            0.0,
-        )
+            clarity: 1.0,
+            shape: Shape::Wedge,
+            lean: 0.0,
+            cant: 0.0,
+        }
     };
     // A piece that leans on its own, about its length: the two slopes of
     // a whole roof, and whatever else wants an angle inside a part.
     #[allow(clippy::too_many_arguments)]
     let leaning =
         |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32, lean: f32| {
-            Slab(
-                Vec3::new(x, y, z),
-                Vec3::new(sx, sy, sz),
-                ramp.to_string(),
+            Slab {
+                at: Vec3::new(x, y, z),
+                size: Vec3::new(sx, sy, sz),
+                ramp: ramp.to_string(),
                 shade,
-                1.0,
-                Shape::Box,
+                clarity: 1.0,
+                shape: Shape::Box,
                 lean,
-                0.0,
-            )
+                cant: 0.0,
+            }
         };
     // A piece swung WITHIN its part's face rather than out of it: the diagonal
     // brace in a wall, and anything else that lies across a flat thing at an
@@ -827,29 +842,29 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
     #[allow(clippy::too_many_arguments)]
     let canted =
         |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32, cant: f32| {
-            Slab(
-                Vec3::new(x, y, z),
-                Vec3::new(sx, sy, sz),
-                ramp.to_string(),
+            Slab {
+                at: Vec3::new(x, y, z),
+                size: Vec3::new(sx, sy, sz),
+                ramp: ramp.to_string(),
                 shade,
-                1.0,
-                Shape::Box,
-                0.0,
+                clarity: 1.0,
+                shape: Shape::Box,
+                lean: 0.0,
                 cant,
-            )
+            }
         };
     // A ridge cap: the same triangle, laid along the part's length.
     let ridge = |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32| {
-        Slab(
-            Vec3::new(x, y, z),
-            Vec3::new(sx, sy, sz),
-            ramp.to_string(),
+        Slab {
+            at: Vec3::new(x, y, z),
+            size: Vec3::new(sx, sy, sz),
+            ramp: ramp.to_string(),
             shade,
-            1.0,
-            Shape::Ridge,
-            0.0,
-            0.0,
-        )
+            clarity: 1.0,
+            shape: Shape::Ridge,
+            lean: 0.0,
+            cant: 0.0,
+        }
     };
     // Glass: the world shows through it.
     #[allow(unused_variables)]
@@ -857,16 +872,16 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
     // horn pane, water in a trough.
     #[allow(unused_variables)]
     let glass = |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32, ramp: &str, shade: f32| {
-        Slab(
-            Vec3::new(x, y, z),
-            Vec3::new(sx, sy, sz),
-            ramp.to_string(),
+        Slab {
+            at: Vec3::new(x, y, z),
+            size: Vec3::new(sx, sy, sz),
+            ramp: ramp.to_string(),
             shade,
-            0.35,
-            Shape::Box,
-            0.0,
-            0.0,
-        )
+            clarity: 0.35,
+            shape: Shape::Box,
+            lean: 0.0,
+            cant: 0.0,
+        }
     };
     let mut slabs = match kind {
         PartKind::WallRun => vec![slab(
@@ -1231,28 +1246,28 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
                 middle, 0.1875, 0.0, square, thick, thick, "wood", 0.45,
             )];
             if high > 0.0 {
-                body.push(Slab(
-                    Vec3::new(middle + square * 0.5 + high * 0.5, 0.1875, 0.0),
-                    Vec3::new(high, thick, thick),
-                    "wood".to_string(),
-                    0.45,
-                    1.0,
-                    Shape::Mitre,
-                    0.0,
-                    0.0,
-                ));
+                body.push(Slab {
+                    at: Vec3::new(middle + square * 0.5 + high * 0.5, 0.1875, 0.0),
+                    size: Vec3::new(high, thick, thick),
+                    ramp: "wood".to_string(),
+                    shade: 0.45,
+                    clarity: 1.0,
+                    shape: Shape::Mitre,
+                    lean: 0.0,
+                    cant: 0.0,
+                });
             }
             if low > 0.0 {
-                body.push(Slab(
-                    Vec3::new(middle - square * 0.5 - low * 0.5, 0.1875, 0.0),
-                    Vec3::new(low, thick, thick),
-                    "wood".to_string(),
-                    0.45,
-                    1.0,
-                    Shape::MitreBack,
-                    0.0,
-                    0.0,
-                ));
+                body.push(Slab {
+                    at: Vec3::new(middle - square * 0.5 - low * 0.5, 0.1875, 0.0),
+                    size: Vec3::new(low, thick, thick),
+                    ramp: "wood".to_string(),
+                    shade: 0.45,
+                    clarity: 1.0,
+                    shape: Shape::MitreBack,
+                    lean: 0.0,
+                    cant: 0.0,
+                });
             }
             body
         }
@@ -1438,16 +1453,16 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
             // fractions differ whenever the roof is not square.
             let keep_x = ((half_long - run) / half_long).clamp(0.0, 1.0);
             let keep_z = ((half_span - run) / half_span).clamp(0.0, 1.0);
-            vec![Slab(
-                Vec3::new(0.0, high * 0.5, 0.0),
-                Vec3::new(half_long * 2.0, high, half_span * 2.0),
-                "earth".to_string(),
-                0.4,
-                1.0,
-                Shape::Hip(keep_x, keep_z),
-                0.0,
-                0.0,
-            )]
+            vec![Slab {
+                at: Vec3::new(0.0, high * 0.5, 0.0),
+                size: Vec3::new(half_long * 2.0, high, half_span * 2.0),
+                ramp: "earth".to_string(),
+                shade: 0.4,
+                clarity: 1.0,
+                shape: Shape::Hip(keep_x, keep_z),
+                lean: 0.0,
+                cant: 0.0,
+            }]
         }
         PartKind::HipRoofRun => body_of(&PartKind::HipRoof(0.25, 0.25, 0.0, ROOF_PITCH_DEGREES), None),
         PartKind::Rail { long, hand, stone } => {
@@ -2079,9 +2094,10 @@ fn body_of(kind: &PartKind, repaint: Option<(&str, f32)>) -> Vec<Slab> {
     // A repainted part carries its choice into every structural slab.
     if let Some((ramp, shade)) = repaint {
         for piece in &mut slabs {
-            if piece.2 == "wood" || piece.2 == "earth" || piece.2.starts_with("cloth") {
-                piece.2 = ramp.to_string();
-                piece.3 = shade;
+            if piece.ramp == "wood" || piece.ramp == "earth" || piece.ramp.starts_with("cloth")
+            {
+                piece.ramp = ramp.to_string();
+                piece.shade = shade;
             }
         }
     }
@@ -3624,7 +3640,9 @@ pub fn dress_part(
 ) {
     let translucent = ghostly || matches!(kind, PartKind::Widget(_));
     let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-    for Slab(mut at, size, ramp, shade, clarity, shape, mut lean, cant) in body_of(kind, repaint) {
+    for Slab { at: mut at, size, ramp, shade, clarity, shape, lean: mut lean, cant } in
+        body_of(kind, repaint)
+    {
         // Mirrored: the body reflects across its own length, and any
         // lean of its own leans the other way.
         if record.flip {
@@ -3789,7 +3807,7 @@ fn trim_to_roof(
     // photographed after the first trim worked.
     let mut low = Vec3::splat(f32::INFINITY);
     let mut high = Vec3::splat(f32::NEG_INFINITY);
-    for Slab(offset, size, ..) in body_of(kind, None) {
+    for Slab { at: offset, size, .. } in body_of(kind, None) {
         low = low.min(offset - size * 0.5);
         high = high.max(offset + size * 0.5);
     }
@@ -3925,7 +3943,7 @@ fn length_of(kind: &PartKind) -> Option<(f32, Box<dyn Fn(f32) -> PartKind>)> {
         PartKind::Floor(_, deep) => Some((
             body_of(kind, None)
                 .iter()
-                .map(|Slab(at, size, ..)| at.x.abs() + size.x * 0.5)
+                .map(|Slab { at, size, .. }| at.x.abs() + size.x * 0.5)
                 .fold(0.0_f32, f32::max)
                 * 2.0,
             Box::new(move |n| PartKind::Floor(n, deep)),
@@ -3933,7 +3951,7 @@ fn length_of(kind: &PartKind) -> Option<(f32, Box<dyn Fn(f32) -> PartKind>)> {
         PartKind::Foundation(_, deep, high) => Some((
             body_of(kind, None)
                 .iter()
-                .map(|Slab(at, size, ..)| at.x.abs() + size.x * 0.5)
+                .map(|Slab { at, size, .. }| at.x.abs() + size.x * 0.5)
                 .fold(0.0_f32, f32::max)
                 * 2.0,
             Box::new(move |n| PartKind::Foundation(n, deep, high)),
@@ -3941,7 +3959,7 @@ fn length_of(kind: &PartKind) -> Option<(f32, Box<dyn Fn(f32) -> PartKind>)> {
         PartKind::Roof(_, deep) => Some((
             body_of(kind, None)
                 .iter()
-                .map(|Slab(at, size, ..)| at.x.abs() + size.x * 0.5)
+                .map(|Slab { at, size, .. }| at.x.abs() + size.x * 0.5)
                 .fold(0.0_f32, f32::max)
                 * 2.0,
             Box::new(move |n| PartKind::Roof(n, deep)),
@@ -4312,7 +4330,7 @@ fn work_part_menu(
                     let spin = pose(record.yaw, record.tilt, record.flip);
                     body_of(&kind, None)
                         .into_iter()
-                        .map(move |Slab(offset, size, _, _, _, _, lean, cant)| {
+                        .map(move |Slab { at: offset, size, lean, cant, .. }| {
                             // A slab may lean inside its own part - a roof's
                             // slopes do nothing else - so its turn is the part's
                             // and then its own.
@@ -5427,7 +5445,7 @@ fn cursor_point(
 pub fn extent_of(kind: &PartKind) -> Vec2 {
     let mut low = Vec3::splat(f32::INFINITY);
     let mut high = Vec3::splat(f32::NEG_INFINITY);
-    for Slab(at, size, _, _, _, _, lean, cant) in body_of(kind, None) {
+    for Slab { at, size, lean, cant, .. } in body_of(kind, None) {
         // A leaning slab reaches further across than it is thick and less far
         // along than it is long. Measuring its unturned box makes a stair rail
         // - which is longer than the flight it runs beside - the widest thing
@@ -5500,7 +5518,7 @@ fn is_structure(kind: &PartKind) -> bool {
 fn footprint_samples(kind: &PartKind, at: Vec3, yaw: f32) -> Vec<Vec3> {
     let mut low = Vec3::splat(f32::INFINITY);
     let mut high = Vec3::splat(f32::NEG_INFINITY);
-    for Slab(slab_at, size, ..) in body_of(kind, None) {
+    for Slab { at: slab_at, size, .. } in body_of(kind, None) {
         low = low.min(slab_at - size * 0.5);
         high = high.max(slab_at + size * 0.5);
     }
@@ -5558,7 +5576,7 @@ fn support_height(
         }
         let turn = pose(record.yaw, record.tilt, record.flip);
         let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-        for Slab(mut at, size, ..) in body_of(&kind, repaint) {
+        for Slab { at: mut at, size, .. } in body_of(&kind, repaint) {
             if record.flip {
                 at.x = -at.x;
             }
@@ -5640,7 +5658,7 @@ fn platform_rects(
         }
         let mut low = Vec3::splat(f32::INFINITY);
         let mut high = Vec3::splat(f32::NEG_INFINITY);
-        for Slab(at, size, ..) in body_of(&kind, None) {
+        for Slab { at, size, .. } in body_of(&kind, None) {
             low = low.min(at - size * 0.5);
             high = high.max(at + size * 0.5);
         }
@@ -5912,7 +5930,7 @@ fn move_ghost(
             // stand off so my body kisses the face.
             let mut low = Vec3::splat(f32::INFINITY);
             let mut high = Vec3::splat(f32::NEG_INFINITY);
-            for Slab(at, size, ..) in body_of(&kind_now, None) {
+            for Slab { at, size, .. } in body_of(&kind_now, None) {
                 low = low.min(at - size * 0.5);
                 high = high.max(at + size * 0.5);
             }
@@ -6115,7 +6133,7 @@ fn move_ghost(
     let mut eave = 0.0;
     if hand.tilt.abs() > 0.001 {
         let mut deep = 0.0f32;
-        for Slab(at, size, ..) in body_of(&kind, None) {
+        for Slab { at, size, .. } in body_of(&kind, None) {
             deep = deep.max((at.z.abs() + size.z * 0.5) * 2.0);
         }
         eave = deep * 0.5 * hand.tilt.abs().sin();
@@ -6226,7 +6244,7 @@ fn ray_scan(
         let origin = inverse * (ray.origin - transform.translation);
         let toward = inverse * Vec3::from(ray.direction);
         let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-        for Slab(at, size, ..) in body_of(&kind, repaint) {
+        for Slab { at, size, .. } in body_of(&kind, repaint) {
             let low = at - size * 0.5;
             let high = at + size * 0.5;
             let mut enter = f32::NEG_INFINITY;
@@ -8746,7 +8764,7 @@ pub(crate) fn bake_a_work(
             continue;
         };
         let turn = pose(record.yaw, record.tilt, record.flip);
-        for Slab(mut at, size, ..) in body_of(&kind, None) {
+        for Slab { at: mut at, size, .. } in body_of(&kind, None) {
             if record.flip {
                 at.x = -at.x;
             }
@@ -8802,7 +8820,7 @@ pub(crate) fn bake_a_work(
 
         // The body itself, as boxes the game can simply draw.
         let repaint = record.ramp.as_deref().map(|r| (r, record.shade));
-        for Slab(mut at, size, ramp, shade, clarity, shape, mut lean, mut cant) in
+        for Slab { at: mut at, size, ramp, shade, clarity, shape, lean: mut lean, cant: mut cant } in
             body_of(&kind, repaint)
         {
             if record.flip {
@@ -9071,7 +9089,7 @@ mod roof_tests {
             let body = body_of(&PartKind::Foundation(2.0, 2.0, high), None);
             let bottom = body
                 .iter()
-                .map(|Slab(at, size, ..)| at.y - size.y * 0.5)
+                .map(|Slab { at, size, .. }| at.y - size.y * 0.5)
                 .fold(f32::INFINITY, f32::min);
             assert!(
                 bottom.abs() < 1e-5,
@@ -9092,7 +9110,7 @@ mod roof_tests {
         );
         let bottom = body
             .iter()
-            .map(|Slab(at, size, ..)| at.y - size.y * 0.5)
+            .map(|Slab { at, size, .. }| at.y - size.y * 0.5)
             .fold(f32::INFINITY, f32::min);
         assert!(bottom.abs() < 1e-5, "a flight starts at {bottom}");
     }
@@ -9139,7 +9157,7 @@ mod roof_tests {
             let kind = PartKind::HipRoof(long, span, 0.25, 40.0);
             let body = body_of(&kind, None);
             assert_eq!(body.len(), 1, "a hip roof is one shape");
-            let Slab(at, size, _, _, _, shape, _, _) = &body[0];
+            let Slab { at, size, shape, .. } = &body[0];
             let Shape::Hip(keep_x, keep_z) = shape else {
                 panic!("a hip roof is not a hip");
             };
@@ -9164,7 +9182,7 @@ mod roof_tests {
         // A steeper pitch is a taller roof, and the deck stays where it is.
         let low = body_of(&PartKind::HipRoof(6.0, 6.0, 0.25, 20.0), None);
         let steep = body_of(&PartKind::HipRoof(6.0, 6.0, 0.25, 50.0), None);
-        assert!(steep[0].1.y > low[0].1.y, "pitch did not raise the roof");
+        assert!(steep[0].size.y > low[0].size.y, "pitch did not raise the roof");
     }
 
     /// A height that a hand can pull comes back on the lattice, wherever it
@@ -9187,7 +9205,7 @@ mod roof_tests {
         let odd = PartKind::Foundation(2.0, 2.0, 0.4);
         let tall = body_of(&odd, None)
             .iter()
-            .map(|Slab(at, size, ..)| at.y + size.y * 0.5)
+            .map(|Slab { at, size, .. }| at.y + size.y * 0.5)
             .fold(0.0_f32, f32::max);
         let atoms = tall / ATOM;
         assert!(
@@ -9203,7 +9221,7 @@ mod roof_tests {
         let high_of = |kind: &PartKind| {
             body_of(kind, None)
                 .iter()
-                .map(|Slab(at, size, ..)| at.y + size.y * 0.5)
+                .map(|Slab { at, size, .. }| at.y + size.y * 0.5)
                 .fold(f32::NEG_INFINITY, f32::max)
         };
         let footing = STRUCTURE
@@ -9219,8 +9237,8 @@ mod roof_tests {
             .map(|entry| {
                 body_of(&entry.kind, None)
                     .iter()
-                    .filter(|Slab(_, size, ..)| size.x > RAIL_POST + 1e-4)
-                    .map(|Slab(at, size, ..)| at.y + size.y * 0.5)
+                    .filter(|Slab { size, .. }| size.x > RAIL_POST + 1e-4)
+                    .map(|Slab { at, size, .. }| at.y + size.y * 0.5)
                     .fold(f32::NEG_INFINITY, f32::max)
             })
             .expect("the shelf has a flight");
@@ -9252,11 +9270,11 @@ mod roof_tests {
                 let back = |pick: &dyn Fn(&Slab) -> bool| {
                     body.iter()
                         .filter(|slab| pick(slab))
-                        .map(|Slab(at, size, ..)| at.z + size.z * 0.5)
+                        .map(|Slab { at, size, .. }| at.z + size.z * 0.5)
                         .fold(f32::NEG_INFINITY, f32::max)
                 };
-                let treads = back(&|Slab(_, size, ..): &Slab| (size.x - wide).abs() < 1e-5);
-                let newels = back(&|Slab(_, size, ..): &Slab| (size.x - RAIL_POST).abs() < 1e-5);
+                let treads = back(&|Slab { size, .. }: &Slab| (size.x - wide).abs() < 1e-5);
+                let newels = back(&|Slab { size, .. }: &Slab| (size.x - RAIL_POST).abs() < 1e-5);
                 assert!(
                     (treads - newels).abs() < 1e-5,
                     "the treads end at {treads} and the newels at {newels}"
@@ -9283,19 +9301,19 @@ mod roof_tests {
             // The newels: where the rail is allowed to reach.
             let newels: Vec<&Slab> = body
                 .iter()
-                .filter(|Slab(_, size, ..)| (size.x - RAIL_POST).abs() < 1e-5 && size.y > 0.5)
+                .filter(|Slab { size, .. }| (size.x - RAIL_POST).abs() < 1e-5 && size.y > 0.5)
                 .collect();
             let reach = newels
                 .iter()
-                .map(|Slab(at, size, ..)| at.z + size.z * 0.5)
+                .map(|Slab { at, size, .. }| at.z + size.z * 0.5)
                 .fold(f32::NEG_INFINITY, f32::max);
             let back = newels
                 .iter()
-                .map(|Slab(at, size, ..)| at.z - size.z * 0.5)
+                .map(|Slab { at, size, .. }| at.z - size.z * 0.5)
                 .fold(f32::INFINITY, f32::min);
 
-            let Some(Slab(at, size, _, _, _, _, lean, cant)) =
-                body.iter().find(|Slab(.., lean, _)| *lean != 0.0)
+            let Some(Slab { at, size, lean, cant, .. }) =
+                body.iter().find(|Slab { lean, .. }| *lean != 0.0)
             else {
                 panic!("a flight rising {rise} has no rail");
             };
@@ -9338,8 +9356,8 @@ mod roof_tests {
             );
             let line = body
                 .iter()
-                .find(|Slab(_, size, ..)| (size.x - RAIL_POST).abs() < 1e-5)
-                .map(|Slab(at, ..)| at.x.abs())
+                .find(|Slab { size, .. }| (size.x - RAIL_POST).abs() < 1e-5)
+                .map(|Slab { at, .. }| at.x.abs())
                 .expect("a flight has newels");
             let atoms = line / ATOM;
             assert!(
@@ -9358,8 +9376,8 @@ mod roof_tests {
             );
             let flat_line = rail
                 .iter()
-                .find(|Slab(_, size, ..)| (size.x - RAIL_POST).abs() < 1e-5)
-                .map(|Slab(at, ..)| at.z.abs())
+                .find(|Slab { size, .. }| (size.x - RAIL_POST).abs() < 1e-5)
+                .map(|Slab { at, .. }| at.z.abs())
                 .expect("a rail has newels");
             assert!(
                 flat_line < 1e-5,
@@ -9387,7 +9405,7 @@ mod roof_tests {
             );
             let pins = body
                 .iter()
-                .filter(|Slab(_, size, ..)| (size.x - RAIL_PIN).abs() < 1e-5)
+                .filter(|Slab { size, .. }| (size.x - RAIL_PIN).abs() < 1e-5)
                 .count();
             assert!(pins >= 2, "a flight rising {rise} carries {pins} balusters");
         }
@@ -9410,7 +9428,7 @@ mod roof_tests {
         };
         for (what, kind) in [("FLIGHT", flight), ("RAIL", rail)] {
             println!("--- {what}");
-            for Slab(at, size, ramp, _, _, _, lean, cant) in body_of(&kind, None) {
+            for Slab { at, size, ramp, lean, cant, .. } in body_of(&kind, None) {
                 println!(
                     "  at ({:.4}, {:.4}, {:.4}) size ({:.4}, {:.4}, {:.4}) {ramp} lean {lean:.3}",
                     at.x, at.y, at.z, size.x, size.y, size.z
@@ -9445,8 +9463,8 @@ mod roof_tests {
         // The newels: same square, same height above what they stand on.
         let newel = |body: &[Slab]| {
             body.iter()
-                .find(|Slab(_, size, ..)| (size.x - RAIL_POST).abs() < 1e-5 && size.y > 0.5)
-                .map(|Slab(_, size, ..)| *size)
+                .find(|Slab { size, .. }| (size.x - RAIL_POST).abs() < 1e-5 && size.y > 0.5)
+                .map(|Slab { size, .. }| *size)
         };
         assert_eq!(
             newel(&flight),
@@ -9456,16 +9474,16 @@ mod roof_tests {
         // The handrail: same cross-section.
         let bar = |body: &[Slab]| {
             body.iter()
-                .find(|Slab(_, size, ..)| (size.y - RAIL_THICK).abs() < 1e-5)
-                .map(|Slab(_, size, ..)| size.y)
+                .find(|Slab { size, .. }| (size.y - RAIL_THICK).abs() < 1e-5)
+                .map(|Slab { size, .. }| size.y)
         };
         assert_eq!(bar(&flight), bar(&rail), "the two handrails differ");
 
         // And the rail stands where the flight's does at its top step.
         let top_of_rail = rail
             .iter()
-            .find(|Slab(_, size, ..)| (size.y - RAIL_THICK).abs() < 1e-5)
-            .map(|Slab(at, ..)| at.y)
+            .find(|Slab { size, .. }| (size.y - RAIL_THICK).abs() < 1e-5)
+            .map(|Slab { at, .. }| at.y)
             .expect("a rail has a rail");
         assert!(
             (top_of_rail - RAIL_HIGH).abs() < 1e-5,
@@ -9484,7 +9502,7 @@ mod roof_tests {
             );
             let pins: Vec<&Slab> = body
                 .iter()
-                .filter(|Slab(_, size, ..)| (size.x - RAIL_PIN).abs() < 1e-5)
+                .filter(|Slab { size, .. }| (size.x - RAIL_PIN).abs() < 1e-5)
                 .collect();
             let want = (long - RAIL_POST * 2.0) / RAIL_GAP;
             assert!(
@@ -9492,7 +9510,7 @@ mod roof_tests {
                 "a rail {long} long carries {} balusters",
                 pins.len()
             );
-            for Slab(at, ..) in &pins {
+            for Slab { at, .. } in &pins {
                 assert!(
                     at.x.abs() < long * 0.5 - RAIL_POST,
                     "a baluster stands inside a newel"
@@ -9572,10 +9590,10 @@ mod roof_tests {
             };
             let boxes: Vec<(Vec3, Vec3)> = body_of(&kind, None)
                 .into_iter()
-                .filter(|Slab(.., shape, lean, cant)| {
+                .filter(|Slab { shape, lean, cant, .. }| {
                     *lean == 0.0 && *cant == 0.0 && matches!(shape, Shape::Box)
                 })
-                .map(|Slab(at, size, ..)| (at, size))
+                .map(|Slab { at, size, .. }| (at, size))
                 .collect();
             for (i, (at, size)) in boxes.iter().enumerate() {
                 for (other_at, other_size) in boxes.iter().skip(i + 1) {
@@ -9711,7 +9729,7 @@ mod roof_tests {
                 ) {
                     continue;
                 }
-                for Slab(at, size, _, _, _, shape, lean, cant) in body_of(&kind, None) {
+                for Slab { at, size, shape, lean, cant, .. } in body_of(&kind, None) {
                     // A canted piece is exempt for the same reason a leaning
                     // one is: it lies across its bay corner to corner, so its
                     // length is a hypotenuse and no rule about a lattice can
@@ -9776,7 +9794,7 @@ mod roof_tests {
                 Some(_) => entry.kind.run_made(2.0, 2.0),
                 None => entry.kind,
             };
-            for Slab(at, size, _, _, _, shape, lean, cant) in body_of(&kind, None) {
+            for Slab { at, size, shape, lean, cant, .. } in body_of(&kind, None) {
                 // A slope's own length is a hypotenuse: whole atoms of rise and
                 // run give a diagonal that is not a whole anything, and no rule
                 // about the lattice can ask otherwise. The same goes for a shape
@@ -9812,13 +9830,13 @@ mod roof_tests {
         let top_of = |kind: &PartKind| {
             body_of(kind, None)
                 .iter()
-                .map(|Slab(at, size, ..)| at.y + size.y * 0.5)
+                .map(|Slab { at, size, .. }| at.y + size.y * 0.5)
                 .fold(f32::NEG_INFINITY, f32::max)
         };
         let bottom_of = |kind: &PartKind| {
             body_of(kind, None)
                 .iter()
-                .map(|Slab(at, size, ..)| at.y - size.y * 0.5)
+                .map(|Slab { at, size, .. }| at.y - size.y * 0.5)
                 .fold(f32::INFINITY, f32::min)
         };
         // A plain wall, and the full-height pieces a punch leaves beside a door.
@@ -9855,7 +9873,7 @@ mod roof_tests {
 
         // And it is exactly as long as it says: whole atoms, no lap, so the
         // lattice does the work the lap used to be asked to do.
-        let Slab(_, size, ..) = &body_of(&beside, None)[0];
+        let Slab { size, .. } = &body_of(&beside, None)[0];
         assert!(
             (size.x - 0.75).abs() < 1e-6,
             "a wall piece measuring 0.75 was drawn {} long",
@@ -9897,7 +9915,7 @@ mod roof_tests {
         let tall = body_of(&PartKind::Foundation(2.0, 2.0, 1.5), None);
         let underside = |body: &[Slab]| {
             body.iter()
-                .map(|Slab(at, size, ..)| at.y - size.y * 0.5)
+                .map(|Slab { at, size, .. }| at.y - size.y * 0.5)
                 .fold(f32::INFINITY, f32::min)
         };
         assert!(underside(&low).abs() < 1e-4, "a pad rests on the ground");
@@ -9907,7 +9925,7 @@ mod roof_tests {
         );
         let top = |body: &[Slab]| {
             body.iter()
-                .map(|Slab(at, size, ..)| at.y + size.y * 0.5)
+                .map(|Slab { at, size, .. }| at.y + size.y * 0.5)
                 .fold(0.0_f32, f32::max)
         };
         assert!((top(&tall) - 1.5).abs() < 1e-4);
@@ -9945,8 +9963,8 @@ mod roof_tests {
                     }
                     let mut faces: Vec<f32> = body
                         .iter()
-                        .filter(|Slab(.., lean, _)| *lean == 0.0)
-                        .flat_map(|Slab(at, size, ..)| {
+                        .filter(|Slab { lean, .. }| *lean == 0.0)
+                        .flat_map(|Slab { at, size, .. }| {
                             [at[axis] - size[axis] * 0.5, at[axis] + size[axis] * 0.5]
                         })
                         .collect();
@@ -9965,8 +9983,8 @@ mod roof_tests {
                 let tread_edge = wide * 0.5;
                 let rail_edge = body
                     .iter()
-                    .filter(|Slab(_, size, ..)| (size.x - wide).abs() > 1e-4)
-                    .map(|Slab(at, size, ..)| at.x.abs() + size.x * 0.5)
+                    .filter(|Slab { size, .. }| (size.x - wide).abs() > 1e-4)
+                    .map(|Slab { at, size, .. }| at.x.abs() + size.x * 0.5)
                     .fold(0.0_f32, f32::max);
                 assert!(
                     rail_edge < tread_edge - 1e-3,
@@ -9998,7 +10016,10 @@ mod roof_tests {
         let a = body_of(&timber, None);
         let b = body_of(&stone, None);
         assert_eq!(a.len(), b.len(), "the two flights are built differently");
-        for (Slab(at, size, ramp, ..), Slab(other_at, other_size, other_ramp, ..)) in
+        for (
+            Slab { at, size, ramp, .. },
+            Slab { at: other_at, size: other_size, ramp: other_ramp, .. },
+        ) in
             a.iter().zip(&b)
         {
             assert!(at.distance(*other_at) < 1e-4 && size.distance(*other_size) < 1e-4);
@@ -10031,15 +10052,15 @@ mod roof_tests {
         let body = body_of(&mixed, None);
         let treads: Vec<&Slab> = body
             .iter()
-            .filter(|Slab(_, size, ..)| (size.x - 1.25).abs() < 1e-4)
+            .filter(|Slab { size, .. }| (size.x - 1.25).abs() < 1e-4)
             .collect();
         assert!(
-            treads.len() > 1 && treads.iter().all(|Slab(_, _, ramp, ..)| ramp == "stone"),
+            treads.len() > 1 && treads.iter().all(|Slab { ramp, .. }| ramp == "stone"),
             "the treads should be stone"
         );
-        let rails: Vec<&Slab> = body.iter().filter(|Slab(.., lean, _)| *lean != 0.0).collect();
+        let rails: Vec<&Slab> = body.iter().filter(|Slab { lean, .. }| *lean != 0.0).collect();
         assert!(
-            !rails.is_empty() && rails.iter().all(|Slab(_, _, ramp, ..)| ramp == "wood"),
+            !rails.is_empty() && rails.iter().all(|Slab { ramp, .. }| ramp == "wood"),
             "the rail should be timber"
         );
         // It reads back the way it was written.
@@ -10141,8 +10162,8 @@ mod roof_tests {
             // ABOVE the top tread, so measuring the whole body measures a post.
             let tallest = body
                 .iter()
-                .filter(|Slab(_, size, ..)| (size.x - 1.25).abs() < 1e-4)
-                .map(|Slab(at, size, ..)| at.y + size.y * 0.5)
+                .filter(|Slab { size, .. }| (size.x - 1.25).abs() < 1e-4)
+                .map(|Slab { at, size, .. }| at.y + size.y * 0.5)
                 .fold(0.0_f32, f32::max);
             assert!(
                 (tallest - rise).abs() < 1e-4,
@@ -10151,7 +10172,7 @@ mod roof_tests {
 
             // The rails: two of them, leaning, and leaning the way the flight
             // climbs rather than at some angle of their own.
-            let rails: Vec<&Slab> = body.iter().filter(|Slab(.., lean, _)| *lean != 0.0).collect();
+            let rails: Vec<&Slab> = body.iter().filter(|Slab { lean, .. }| *lean != 0.0).collect();
             assert_eq!(rails.len(), 2, "a flight wants a rail on each side");
             // The span the rail's LINE covers: from the foot newel's centre, a
             // reveal in from the bottom tread, to the head newel's centre, which
@@ -10164,7 +10185,7 @@ mod roof_tests {
             let head = full * 0.5 - post * 0.5;
             let run = head - foot;
             let wanted = -(rise / run).atan();
-            for Slab(.., lean, _) in &rails {
+            for Slab { lean, .. } in &rails {
                 assert!(
                     (lean - wanted).abs() < 1e-3,
                     "a rail leans {lean} where the flight climbs at {wanted}"
@@ -10173,7 +10194,7 @@ mod roof_tests {
             // And a rail spans its own line, less the newels it ends inside.
             let line = run.hypot(rise);
             let want_len = (line - post).max(line * 0.5);
-            for Slab(_, size, ..) in &rails {
+            for Slab { size, .. } in &rails {
                 assert!(
                     (size.z - want_len).abs() < 1e-3,
                     "a rail {} long spans a slope of {want_len}",
@@ -10342,7 +10363,7 @@ mod roof_tests {
     fn gable_peak(long: f32, pitch: f32) -> f32 {
         body_of(&PartKind::Gable(long, pitch), None)
             .iter()
-            .map(|Slab(_, size, ..)| size.y)
+            .map(|Slab { size, .. }| size.y)
             .fold(f32::MIN, f32::max)
     }
 
@@ -10394,7 +10415,7 @@ mod roof_tests {
         let spin = pose(record.yaw, record.tilt, record.flip);
         body_of(&kind, None)
             .into_iter()
-            .map(|Slab(offset, size, _, _, _, _, lean, cant)| {
+            .map(|Slab { at: offset, size, lean, cant, .. }| {
                 let turn = spin * Quat::from_rotation_x(lean);
                 (Vec3::from(record.at) + spin * offset, size * 0.5, turn)
             })
@@ -10495,7 +10516,7 @@ mod roof_tests {
         // rectangle would fail now that a beam's ends are cut, because a mitre's
         // box takes in the very wood the saw removed.
         let mut points: Vec<Vec3> = Vec::new();
-        for Slab(offset, size, _, _, _, shape, _, _) in body_of(&made, None) {
+        for Slab { at: offset, size, shape, .. } in body_of(&made, None) {
             let corners: Vec<Vec3> = match shape {
                 // The prism's own six, not the eight of the box it came from.
                 Shape::Mitre | Shape::MitreBack => {
@@ -10734,7 +10755,7 @@ mod roof_tests {
         // Straight from the body, so it catches the sign as well as the size.
         let tall = body_of(&PartKind::Gable(4.0, ROOF_PITCH_DEGREES), None)
             .iter()
-            .map(|Slab(_, size, ..)| size.y)
+            .map(|Slab { size, .. }| size.y)
             .fold(f32::MIN, f32::max);
         assert!(
             tall > 0.0,
@@ -10783,7 +10804,7 @@ mod roof_tests {
     fn ridge_top(span: f32, over: f32, pitch: f32) -> f32 {
         body_of(&PartKind::GableRoof(6.0, span, over, pitch), None)
             .iter()
-            .map(|Slab(at, size, _, _, _, _, lean, cant)| {
+            .map(|Slab { at, size, lean, cant, .. }| {
                 let reach = (size.y * lean.cos()).abs() + (size.z * lean.sin()).abs();
                 at.y + reach * 0.5
             })
