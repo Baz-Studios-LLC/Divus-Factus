@@ -1582,6 +1582,7 @@ fn build_water_mesh(terrain: &Terrain, coord: IVec2, sea: bool) -> Option<Mesh> 
         )
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
         .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colors)
         .with_inserted_indices(Indices::U32(indices)),
     )
 }
