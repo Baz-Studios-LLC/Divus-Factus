@@ -82,6 +82,11 @@ const MAX_LEVEL: u8 = 8;
 /// look through every level rather than dissolving it into smoothness.
 const SPLIT_PX: f32 = 7.0;
 
+/// How far under `SPLIT_PX` the error must fall before ground already drawn at
+/// a finer level is allowed to coarsen again. Pure hysteresis; see the cut in
+/// `tend_the_tree`.
+const MERGE_HYSTERESIS: f32 = 0.75;
+
 /// Patches built per frame while the tree is chasing the camera. A build is
 /// a couple of milliseconds of noise sampling; four a frame chases a fast
 /// descent closely without stuttering the simulation, and a patch that
@@ -255,6 +260,19 @@ pub struct PlanetDetail {
 struct Patch2 {
     entity: Entity,
     mesh: Handle<Mesh>,
+    /// The beat this patch was grown on.
+    ///
+    /// A patch enters `built` the instant it is asked for, but its ENTITY is
+    /// spawned through `Commands` and does not exist until the schedule
+    /// flushes. For the rest of that frame the cut believed the new patch was
+    /// standing, handed it the ground, and hid the ancestor that had been
+    /// covering it - so there was one frame with nothing drawn there at all.
+    /// Moving, that is a ring of holes opening and closing around the camera
+    /// as fast as patches are built, which is what flashed.
+    ///
+    /// So a patch is not STANDING until a beat has passed. See the ancestor
+    /// walk in `tend_the_tree`.
+    grown_at: u64,
     /// The sea, lakes and rivers standing on this patch, if any stand on it.
     /// A child entity, so it inherits the patch's visibility and is felled
     /// with it; the mesh is held so it can be dropped from the assets too.
@@ -737,6 +755,7 @@ fn grow_patch(
             entity,
             mesh,
             water,
+            grown_at: beat,
             last_shown: beat,
             painted,
         },
@@ -1219,7 +1238,24 @@ fn tend_the_tree(
         let reach = key.cell_arc() * PATCH_CELLS as f32 * 0.75;
         let distance = (cam_mesh.distance(centre) - reach).max(REFINE_FLOOR);
         let sharp_px = key.cell_arc() / distance * px_per_radian;
-        if sharp_px > SPLIT_PX && key.level < MAX_LEVEL {
+        // Once a patch HAS been split, the error must fall well under the
+        // threshold before its children are given up again - otherwise an
+        // altitude parked on the boundary splits and merges on alternate
+        // frames, rebuilding that ground every time. With eight levels there
+        // is a patch sitting on a threshold in almost every frame.
+        //
+        // Straight out of the Flat Earth Simulator, which took this quadtree
+        // from here and then learned this the hard way on the way back.
+        let already = key.level < MAX_LEVEL
+            && [(0, 0), (1, 0), (0, 1), (1, 1)]
+                .iter()
+                .any(|(dx, dy)| tree.built.contains_key(&key.child(*dx, *dy)));
+        let threshold = if already {
+            SPLIT_PX * MERGE_HYSTERESIS
+        } else {
+            SPLIT_PX
+        };
+        if sharp_px > threshold && key.level < MAX_LEVEL {
             for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
                 walk.push(key.child(dx, dy));
             }
@@ -1279,10 +1315,17 @@ fn tend_the_tree(
     // nearest standing ancestor. Then one pass settles every visibility.
     let mut on_screen: std::collections::HashSet<PatchKey> =
         std::collections::HashSet::with_capacity(wanted.len());
+    let now = tree.beat;
     for key in &wanted {
         let mut candidate = *key;
         loop {
-            if tree.built.contains_key(&candidate) {
+            // Standing means its entity is really there, not merely promised.
+            // See `Patch2::grown_at`.
+            if tree
+                .built
+                .get(&candidate)
+                .is_some_and(|patch| patch.grown_at < now)
+            {
                 on_screen.insert(candidate);
                 break;
             }
