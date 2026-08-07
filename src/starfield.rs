@@ -85,7 +85,7 @@ fn hang_the_stars(
         COUNT.iter().sum::<usize>()
     );
     for (shell, (radius, count)) in SHELLS.iter().zip(COUNT).enumerate() {
-        let mesh = build_a_shell(*radius, count, seed.0 ^ (shell as u32 * 0x9e37_79b9));
+        let mesh = build_a_shell(*radius, count, seed.0 ^ (shell as u32).wrapping_mul(0x9e37_79b9));
         commands.spawn((
             Name::new(format!("Stars {}", shell + 1)),
             Starfield,

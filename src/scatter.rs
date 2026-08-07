@@ -499,7 +499,11 @@ fn populate_chunks(
                     // Stone gathers into OUTCROPS now - see `stone_node` - so
                     // the scatter can be as thin as it looks right without the
                     // village going short.
-                    if rng.chance(0.06) {
+                    // Thinner again. The outcrops carry the stone a village
+                    // needs, so what is left on the open ground is there to
+                    // look like ground and nothing else - and at six in a
+                    // hundred it still read as gravel strewn everywhere.
+                    if rng.chance(0.018) {
                         let roll = roll_rock(&mut rng);
                         let near_village = settlement.as_ref().is_some_and(|site| {
                             Vec2::new(x - site.centre.x, z - site.centre.z).length()
@@ -652,9 +656,16 @@ fn populate_chunks(
                     &mut commands,
                     &mut meshes,
                     terrain_assets.ground_material.clone(),
-                    // The chunk's own middle is its local frame, the same one
-                    // every rock and tree in it is seated against.
-                    stood - Vec3::new(origin.x + CHUNK_SIZE * 0.5, 0.0, origin.y + CHUNK_SIZE * 0.5),
+                    // Where it actually stands. A chunk's transform is the
+                    // identity and its mesh carries world seats, so everything
+                    // hanging off one is placed in WORLD coordinates - see
+                    // `local` above, which is named for a frame it does not
+                    // use. Taking the chunk's middle off first put every node's
+                    // boulders within half a chunk of the flat world's origin,
+                    // and the flat origin is the top of the globe: from
+                    // anywhere else on the planet they hung in the sky, all of
+                    // them, in one clump.
+                    stood,
                     &mut rng,
                     roll,
                     Some(library),

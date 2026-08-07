@@ -163,7 +163,7 @@ impl Plugin for TerrainPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_terrain).add_systems(
             Update,
-            (stream_chunks, follow_water_plane).in_set(TerrainSet),
+            stream_chunks.in_set(TerrainSet),
         );
     }
 }
@@ -575,8 +575,19 @@ impl Terrain {
     /// has been generated or in what order.
     /// Ground height at a world position, including river channels.
     pub fn height_at(&self, x: f32, z: f32) -> f32 {
+        self.carved(x, z, self.river_query(x, z))
+    }
+
+    /// The ground, given an answer about the river already in hand.
+    ///
+    /// Split out because `river_surface_at` needs both the course and the
+    /// ground, and asking `height_at` for the second ran the whole spatial
+    /// lookup a second time - on every vertex of every patch and every chunk in
+    /// the world, which with a full drainage network is a great deal of walking
+    /// the same bins to get the same answer.
+    fn carved(&self, x: f32, z: f32, query: Option<(f32, f32, f32)>) -> f32 {
         let base = self.base_height_at(x, z);
-        let Some((level, distance, width)) = self.river_query(x, z) else {
+        let Some((level, distance, width)) = query else {
             return self.leveled(x, z, base);
         };
         let half_width = rivers::CHANNEL_HALF_WIDTH * width;
@@ -598,6 +609,16 @@ impl Terrain {
     fn river_query(&self, x: f32, z: f32) -> Option<(f32, f32, f32)> {
         self.rivers.ensure_near(self, x, z);
         self.rivers.nearest(x, z)
+    }
+
+    /// The surface of any standing water over this point.
+    ///
+    /// Lakes need no channel cut for them and no shoreline drawn: the fill that
+    /// makes them raises the water to its outlet, and the shore is wherever the
+    /// land happens to cross that. All the ground has to do is be lower.
+    fn still_query(&self, x: f32, z: f32) -> Option<f32> {
+        self.rivers.ensure_near(self, x, z);
+        self.rivers.still_at(x, z)
     }
 
     /// Ground height before any river is cut into it.
@@ -646,7 +667,21 @@ impl Terrain {
         };
 
         // Hills, present everywhere but stronger on land.
-        let detail = warped_fbm_3d(dir * spherical(0.010), self.seed ^ 0xa1a1, 4, 0.5) - 0.5;
+        //
+        // THREE octaves, not four, and the same cut is made to the ridges and
+        // the peaks below. At four, the finest of them has a twelve unit
+        // wavelength carrying a couple of units of height: too small to read as
+        // landform and too big to ignore, so every hillside wore an orange-peel
+        // texture that looked like a shading fault rather than like ground.
+        //
+        // It costs the rivers even more than it costs the eye. Drainage is
+        // solved on this field, and every one of those dimples is a hollow with
+        // no way out - so the fill spends itself on thousands of puddles, the
+        // routing zigzags between them, and catchment that should gather into
+        // one river is split among a dozen scratches. Real land looks dendritic
+        // BECAUSE running water has already smoothed it; this is the erosion
+        // the world never had.
+        let detail = warped_fbm_3d(dir * spherical(0.010), self.seed ^ 0xa1a1, 3, 0.5) - 0.5;
 
         // Whether this is INLAND, which is a different question from how high the
         // continent stands here — and getting those two confused is what emptied
@@ -661,7 +696,7 @@ impl Terrain {
         // shorelines stay gentle and everything past them gets its full relief.
         let inland = (land / 0.25).clamp(0.0, 1.0);
         let ridge_mask = inland * inland * (3.0 - 2.0 * inland);
-        let ridge = ridged_3d(dir * spherical(0.006), self.seed ^ 0xa5a5, 4);
+        let ridge = ridged_3d(dir * spherical(0.006), self.seed ^ 0xa5a5, 3);
 
         let mut height: f32 = WATER_LEVEL
             + shaped * 44.0
@@ -686,11 +721,70 @@ impl Terrain {
         // approaches 1, so every extra power crushes what little there is.
         let belt_mask = ((belt - 0.46) / 0.16).clamp(0.0, 1.0) * ridge_mask;
         if belt_mask > 0.0 {
+            // FIVE octaves here, unlike the hills and the ridges below the
+            // treeline. What was cut from those was a twelve unit wavelength
+            // wearing the ground like orange peel; the finest octave of this
+            // one is nearer thirty, on slopes that rise two hundred units, and
+            // that is not texture - it is the ridgeline. Ridged noise makes its
+            // creases in the last octave it is given, so taking one away does
+            // not smooth a mountain, it rounds it off.
             let peaks = ridged_3d(dir * spherical(0.0021), self.seed ^ 0x77aa, 5);
-            height += peaks * peaks * belt_mask.powf(1.3) * 240.0;
+            // NOT squared. The comment above this warns that ridged noise
+            // rarely approaches one and that every extra power crushes what
+            // little there is - and then the code squared it anyway, which is
+            // what made a range read as a grey plateau with dimples rather than
+            // as mountains. Ridged noise draws connected CREST LINES; squaring
+            // pushes everything that is not already at the top down to nothing,
+            // so the lines broke into separate bumps with flat hollows between
+            // them, and the hollows are closed basins, which is why every one
+            // of them held a tarn.
+            //
+            // At 1.4 the crests stay joined into ridges with valleys running
+            // off them, and the multiplier comes down to keep the summits where
+            // they were - `the_world_has_mountains` measures both ends of that.
+            // A MASS, and ridges on it - not ridges alone.
+            //
+            // All the height used to come from the ridged field, and ridged
+            // noise is high on its crests and low everywhere else. Add a
+            // hundred and sixty units of that to a belt and the low patches
+            // between crests come out ringed by high ground: closed basins, in
+            // the middle of every range. The belt's own falloff is the only
+            // thing sloping outward and the noise swings harder than it does,
+            // so the noise wins locally and the basin stays shut. That is the
+            // crater, and the fill then puts a lake in it, because a closed
+            // basin is exactly what a lake is.
+            //
+            // Split it. Most of the height is now a smooth dome that falls away
+            // in every direction, so wherever you stand there is always lower
+            // ground somewhere near - and the ridges ride on top of that
+            // instead of being the whole of it. A mountain reads as one mass
+            // with creases rather than a field of bumps, and the water has
+            // somewhere to go.
+            let dome = belt_mask.powf(1.3);
+            height += dome * 150.0 + peaks.powf(1.4) * dome * 95.0;
         }
 
         height.clamp(0.0, TERRAIN_HEIGHT)
+    }
+
+    /// The middle of the biggest piece of high ground within reach.
+    ///
+    /// For tests. Half this world is ocean and the origin is not special - for
+    /// seed 77 it is open sea - so anything that wants rivers, lakes or
+    /// mountains has to go and find a catchment first.
+    #[cfg(test)]
+    pub fn somewhere_inland(&self) -> Vec2 {
+        let mut best = (f32::NEG_INFINITY, Vec2::ZERO);
+        for iz in -24..24 {
+            for ix in -24..24 {
+                let at = Vec2::new(ix as f32 * 320.0, iz as f32 * 320.0);
+                let h = self.base_height_at(at.x, at.y);
+                if h > best.0 {
+                    best = (h, at);
+                }
+            }
+        }
+        best.1
     }
 
     /// The river's water surface here, if a course carries water at this point.
@@ -698,12 +792,26 @@ impl Terrain {
     /// `None` below sea level, where the ocean already covers everything and a
     /// second surface would only fight it.
     pub fn river_surface_at(&self, x: f32, z: f32) -> Option<f32> {
-        let (level, distance, width) = self.river_query(x, z)?;
-        if distance > rivers::CHANNEL_HALF_WIDTH * width * 1.05 {
-            return None;
+        let query = self.river_query(x, z);
+
+        // Flowing water, if a channel holds this point.
+        let mut surface = query
+            .filter(|(_, distance, width)| {
+                *distance <= rivers::CHANNEL_HALF_WIDTH * width * 1.05
+            })
+            .map(|(level, _, _)| level);
+
+        // And standing water, which needs no channel and has no drawn edge -
+        // a lake covers whatever ground lies under its level, so its shore is a
+        // contour of the land and follows every inlet and headland for free.
+        if let Some(pond) = self.still_query(x, z) {
+            if surface.is_none_or(|had| pond > had) {
+                surface = Some(pond);
+            }
         }
-        let ground = self.height_at(x, z);
-        (level > ground + 0.12 && level > WATER_LEVEL + 0.8).then_some(level)
+
+        let ground = self.carved(x, z, query);
+        surface.filter(|level| *level > ground + 0.12 && *level > WATER_LEVEL + 0.8)
     }
 
     /// Whether a position lies in flowing water.
@@ -1358,7 +1466,57 @@ pub fn build_chunk_mesh(terrain: &Terrain, coord: IVec2) -> Mesh {
 /// which is what lets a river run through hills a hundred units above the ocean.
 /// Cells with no river collapse to nothing, so a chunk without one costs no
 /// geometry at all.
+/// How far up the beach the sea's mesh is carried past the waterline, so its
+/// own polygon edge falls on ground where it is already invisible.
+const SHORE_REACH: f32 = 1.5;
+
+/// Depth at which water has reached its full colour and is fully opaque.
+const DEEP_BY: f32 = 7.0;
+
+/// The colour of water this deep, as a vertex colour.
+///
+/// Everything the old shader worked out per fragment, known here for nothing:
+/// the mesh is built from the terrain, so the depth at a vertex is simply the
+/// water's level less the bed under it. Shallow water keeps the bed's colour by
+/// being nearly clear; deep water hides it by being nearly opaque; and at the
+/// waterline the alpha reaches zero, which is what lets the sheet run up onto
+/// the beach and vanish instead of stopping on an edge.
+pub fn water_colour(depth: f32) -> [f32; 4] {
+    let t = (depth / DEEP_BY).clamp(0.0, 1.0);
+    let shallow = palette::shade(&palette::WATER, SEA_SHALLOW).to_linear();
+    let deep = palette::shade(&palette::WATER, SEA_DEEP).to_linear();
+    [
+        shallow.red + (deep.red - shallow.red) * t,
+        shallow.green + (deep.green - shallow.green) * t,
+        shallow.blue + (deep.blue - shallow.blue) * t,
+        // Eased in, so a shore fades rather than stepping out of nothing.
+        (t * (2.0 - t)).clamp(0.0, 1.0) * 0.94,
+    ]
+}
+
+/// Where on the water ramp the sea's two colours are taken from.
+///
+/// Shared, because two different things draw the same ocean: the chunks'
+/// own sea and the planet's patches. They used to choose their own shades and
+/// the join between them was a square of differently coloured sea.
+pub const SEA_SHALLOW: f32 = 1.0;
+pub const SEA_DEEP: f32 = 0.62;
+
 pub fn build_river_mesh(terrain: &Terrain, coord: IVec2) -> Option<Mesh> {
+    build_water_mesh(terrain, coord, false)
+}
+
+/// The sea standing over one chunk, if it reaches this far.
+///
+/// The other half of what the planet's patches do overhead, and the reason the
+/// flat sheet could be deleted: water is geometry the ground carries now,
+/// wherever that ground is drawn from, instead of one square quad chasing the
+/// camera around. Same builder as the rivers, asked a different question.
+pub fn build_sea_mesh(terrain: &Terrain, coord: IVec2) -> Option<Mesh> {
+    build_water_mesh(terrain, coord, true)
+}
+
+fn build_water_mesh(terrain: &Terrain, coord: IVec2, sea: bool) -> Option<Mesh> {
     let cell = CHUNK_SIZE / CHUNK_CELLS as f32;
     let origin = Vec2::new(coord.x as f32 * CHUNK_SIZE, coord.y as f32 * CHUNK_SIZE);
     let stride = CHUNK_CELLS + 1;
@@ -1377,13 +1535,36 @@ pub fn build_river_mesh(terrain: &Terrain, coord: IVec2) -> Option<Mesh> {
             let z = origin.y + iz as f32 * cell;
             let index = iz * stride + ix;
 
-            match terrain.river_surface_at(x, z) {
-                Some(surface) => {
+            if sea {
+                // The open sea: everything the ground drops below sea level.
+                let h = terrain.height_at(x, z);
+                if h < WATER_LEVEL {
                     wet[index] = true;
-                    heights[index] = surface;
+                    heights[index] = WATER_LEVEL;
                     any = true;
+                } else {
+                    heights[index] = h;
+                    // A step of dry land past the waterline still counts as
+                    // shore. The sheet is cut on the chunk's own two-metre
+                    // grid, so ending it at the last WET corner left the
+                    // coastline as a row of two-metre teeth - the polygon
+                    // edge, in plain view. Carried a little way up the beach
+                    // the edge lands on ground the depth fade has already
+                    // taken to nothing, and there is no hard line left to see.
+                    if h < WATER_LEVEL + SHORE_REACH {
+                        wet[index] = true;
+                        any = true;
+                    }
                 }
-                None => heights[index] = terrain.height_at(x, z),
+            } else {
+                match terrain.river_surface_at(x, z) {
+                    Some(surface) => {
+                        wet[index] = true;
+                        heights[index] = surface;
+                        any = true;
+                    }
+                    None => heights[index] = terrain.height_at(x, z),
+                }
             }
         }
     }
@@ -1393,6 +1574,7 @@ pub fn build_river_mesh(terrain: &Terrain, coord: IVec2) -> Option<Mesh> {
 
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut normals: Vec<[f32; 3]> = Vec::new();
+    let mut colors: Vec<[f32; 4]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
 
     // One quad per cell whose four corners all carry water. Requiring all four keeps
@@ -1437,6 +1619,10 @@ pub fn build_river_mesh(terrain: &Terrain, coord: IVec2) -> Option<Mesh> {
                 let (seat, turn) = crate::globe::bend_frame(flat);
                 positions.push(seat.to_array());
                 normals.push((turn * Vec3::Y).to_array());
+                // The bed under this corner, which is the ground height where
+                // the corner is dry and the carved channel where it is not.
+                let bed = terrain.height_at(origin.x + x0 + dx, origin.y + z0 + dz);
+                colors.push(water_colour(y - bed));
             }
 
             indices.extend_from_slice(&[base, base + 2, base + 3, base, base + 3, base + 1]);
@@ -1455,6 +1641,7 @@ pub fn build_river_mesh(terrain: &Terrain, coord: IVec2) -> Option<Mesh> {
         )
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
         .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colors)
         .with_inserted_indices(Indices::U32(indices)),
     )
 }
@@ -1473,14 +1660,16 @@ pub struct TerrainAssets {
     /// a brown channel — Brett's "rivers were never good". Reading the depth
     /// over a couple of units instead gives a river a surface while leaving the
     /// sea's shallows exactly as they were.
-    pub river_material: Handle<crate::water::WaterMaterial>,
+    pub river_material: Handle<StandardMaterial>,
+    /// The sea's own, shared with the planet's patches so the ocean at
+    /// altitude and the ocean underfoot are the same water lit the same way.
+    pub sea_material: Handle<StandardMaterial>,
 }
 
 fn setup_terrain(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
+    _meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut water_materials: ResMut<Assets<crate::water::WaterMaterial>>,
     world_seed: Res<crate::WorldSeed>,
 ) {
     // Vertex colours carry all the surface variation, so the material is plain white.
@@ -1502,56 +1691,51 @@ fn setup_terrain(
     // lower than sea level plus the curvature drop vanished under it, and
     // from any height the god saw a loaded island in a dead grey sea of
     // nothing. Past this quad's edge, the planet paints its own ocean.
-    let extent = CHUNK_SIZE * VIEW_CHUNKS as f32 * 1.15;
-    let water_mesh = meshes.add(
-        Mesh::new(
-            PrimitiveTopology::TriangleList,
-            bevy::asset::RenderAssetUsages::MAIN_WORLD
-                | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-        )
-        .with_inserted_attribute(
-            Mesh::ATTRIBUTE_POSITION,
-            vec![
-                [-extent, 0.0, -extent],
-                [-extent, 0.0, extent],
-                [extent, 0.0, extent],
-                [extent, 0.0, -extent],
-            ],
-        )
-        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 1.0, 0.0]; 4])
-        .with_inserted_attribute(
-            Mesh::ATTRIBUTE_UV_0,
-            vec![[0.0, 0.0], [0.0, 1.0], [1.0, 1.0], [1.0, 0.0]],
-        )
-        .with_inserted_indices(Indices::U32(vec![0, 1, 2, 0, 2, 3])),
-    );
 
-    let water_material = water_materials.add(crate::water::WaterMaterial::default());
-    let river_material = water_materials.add({
-        let mut river = crate::water::WaterMaterial::default();
-        // A river is shallow, so it has to say what it is in less depth.
-        river.params.depth_fade = 1.6;
-        river.params.foam_width = 0.5;
-        // And its own scale of ripple: the sea's fourteen-metre swell across a
-        // channel a few metres wide is one flat facet of a wave.
-        river.params.wave_scale = 1.9;
-        river.params.wave_strength = 0.3;
-        river
-    });
+    // Water is a plain lit surface now, and everything that made it read as
+    // water is carried by the MESH.
+    //
+    // There was a whole shader here: a noise wave field perturbing the normal,
+    // a hand-rolled sun and sky reflection, fresnel, foam, and a read of the
+    // depth prepass to work out how much water lay between the eye and the
+    // seabed. All of it ran per fragment over a surface that covers half the
+    // screen, and every water fault of the last day was one of those pieces
+    // beating against the pixel grid at a distance where it could not be seen.
+    //
+    // None of it was needed, because the meshes are ours. `water_colour` knows
+    // the exact depth at every vertex - the terrain told it - so shallow
+    // against deep, and the fade to nothing at the shore, are vertex colours.
+    // A flat-shaded low-poly world wanted that anyway; a physically detailed sea
+    // in the middle of it always looked borrowed.
+    let mut still_water = StandardMaterial {
+        base_color: Color::WHITE,
+        alpha_mode: AlphaMode::Blend,
+        // Smooth enough to catch the sun as a broad soft sheen, which is the
+        // one thing the old shader did that the colour cannot.
+        perceptual_roughness: 0.22,
+        reflectance: 0.35,
+        // Water casting a shadow onto its own bed puts a dark band under every
+        // shoreline, which reads as the surface hovering above the sand rather
+        // than meeting it.
+        double_sided: true,
+        cull_mode: None,
+        ..default()
+    };
+    still_water.base_color.set_alpha(1.0);
+    let water_material = materials.add(still_water.clone());
+    let river_material = materials.add(still_water);
 
-    commands.spawn((
-        Name::new("Water"),
-        Mesh3d(water_mesh),
-        MeshMaterial3d(water_material.clone()),
-        // Identity: the sea's vertices are seated on the sphere in world
-        // space by `follow_water_plane`, sea level and curve baked in.
-        Transform::IDENTITY,
-        // Water casting a shadow onto the seabed puts a dark band under every
-        // shoreline, which reads as the surface hovering above the sand rather than
-        // meeting it.
-        NotShadowCaster,
-        WaterPlane,
-    ));
+    // No sheet any more. The sea used to be ONE square quad, sized to the
+    // streamed ground and dragged along under the camera, and every problem it
+    // had came from being a separate object pretending to be part of the
+    // world: it hung over the globe as a blue square when the view pulled
+    // back, it lit differently from the ocean the planet painted, and it sat
+    // in the same plane as the patch water and fought it.
+    //
+    // Water is geometry the ground carries now - `build_sea_mesh` here for the
+    // chunks, `build_patch_water` for the planet - so there is nothing to
+    // follow the camera, nothing to size, and no edge anywhere for a seam to
+    // live on.
 
     info!(
         "the world is a sphere {:.0} units around, {:.0} across",
@@ -1562,6 +1746,7 @@ fn setup_terrain(
     commands.insert_resource(TerrainAssets {
         ground_material,
         river_material,
+        sea_material: water_material.clone(),
     });
     commands.init_resource::<LoadedChunks>();
 }
@@ -1657,6 +1842,7 @@ pub(crate) fn spawn_chunk(
     coord: IVec2,
 ) -> Entity {
     let river = build_river_mesh(terrain, coord).map(|mesh| meshes.add(mesh));
+    let sea = build_sea_mesh(terrain, coord).map(|mesh| meshes.add(mesh));
     let entity = commands
         .spawn((
             Name::new(format!("Chunk {},{}", coord.x, coord.y)),
@@ -1679,6 +1865,18 @@ pub(crate) fn spawn_chunk(
             Visibility::Hidden,
         ))
         .id();
+    if let Some(sea) = sea {
+        commands.spawn((
+            Name::new("Sea"),
+            Mesh3d(sea),
+            MeshMaterial3d(assets.sea_material.clone()),
+            Transform::default(),
+            // World-space seats already, like its chunk's. See the river below.
+            crate::globe::BentInPlace,
+            NotShadowCaster,
+            ChildOf(entity),
+        ));
+    }
     if let Some(river) = river {
         commands.spawn((
             Name::new("River"),
@@ -1734,83 +1932,6 @@ pub(crate) fn rebuild_chunks_near(
     }
 }
 
-/// Keeps the sea centred under the camera.
-fn follow_water_plane(
-    cameras: Query<&crate::camera::CameraRig>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    water: Query<(&Mesh3d, &Transform), With<WaterPlane>>,
-    mut woven: Local<Option<(i32, i32, i32)>>,
-) {
-    let Ok(rig) = cameras.single() else {
-        return;
-    };
-    // The sea wears the streamed world's own size. The quad is cut for the
-    // widest play-zoom view; as the stream radius tapers with altitude the
-    // sea tapers with it, or it hangs over the planet as a flat blue square
-    // long after the ground it was wetting has slimmed to a sliver - the
-    // planet's painted ocean owns everything beyond the loaded shore. It
-    // will follow the curve itself the day the chunks do; they share a
-    // frame, and bending one without the other tears every shoreline.
-    // The sea is CURVED: its vertices are seated on the sphere one by one,
-    // because a sheet thousands of units wide cannot be seated rigidly the
-    // way a chunk can. Rebuilt only when the view moves - a few thousand
-    // vertices, well under a millisecond - and sized with the streamed
-    // ground, since past the loaded shore the planet paints its own ocean.
-    let receding = 1.0 - ((rig.distance - 2_200.0) / 800.0).clamp(0.0, 1.0);
-    let fit = (stream_radius(rig.distance) as f32 / VIEW_CHUNKS as f32) * receding.max(0.001);
-    let heart = Vec2::new(rig.focus.x, rig.focus.z);
-    let signature = (
-        (heart.x / 8.0).round() as i32,
-        (heart.y / 8.0).round() as i32,
-        (fit * 128.0).round() as i32,
-    );
-    if *woven == Some(signature) {
-        return;
-    }
-    *woven = Some(signature);
-
-    let Some((mesh3d, _)) = water.iter().next() else {
-        return;
-    };
-    let Some(mut mesh) = meshes.get_mut(&mesh3d.0) else {
-        return;
-    };
-
-    const CELLS: usize = 40;
-    let half = CHUNK_SIZE * VIEW_CHUNKS as f32 * 1.15 * fit;
-    let step = half * 2.0 / CELLS as f32;
-    let stride = CELLS + 1;
-    let mut positions = Vec::with_capacity(stride * stride);
-    let mut normals = Vec::with_capacity(stride * stride);
-    let mut uvs = Vec::with_capacity(stride * stride);
-    for j in 0..stride {
-        for i in 0..stride {
-            let flat = Vec3::new(
-                heart.x - half + i as f32 * step,
-                WATER_LEVEL,
-                heart.y - half + j as f32 * step,
-            );
-            let (seat, turn) = crate::globe::bend_frame(flat);
-            positions.push(seat.to_array());
-            normals.push((turn * Vec3::Y).to_array());
-            uvs.push([i as f32 / CELLS as f32, j as f32 / CELLS as f32]);
-        }
-    }
-    let mut indices = Vec::with_capacity(CELLS * CELLS * 6);
-    for j in 0..CELLS as u32 {
-        for i in 0..CELLS as u32 {
-            let tl = j * stride as u32 + i;
-            let tr = tl + 1;
-            let bl = tl + stride as u32;
-            let br = bl + 1;
-            indices.extend([tl, bl, tr, tr, bl, br]);
-        }
-    }
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-    mesh.insert_indices(Indices::U32(indices));
-}
 
 #[cfg(test)]
 mod tests {
@@ -2122,38 +2243,89 @@ mod tests {
     }
 
     #[test]
-    fn river_water_is_level_across_the_channel() {
-        // The law the redesign exists to honour: across its width, a river is a
-        // level sheet. Along the course it may fall, so the tolerance allows for
-        // downstream slope but not for the hammock sag it replaces.
+    fn a_channel_is_cut_below_the_water_it_carries() {
+        // What THIS layer owns. Whether a river's surface is level across its
+        // width is a question about the network and is measured there, against
+        // the course's own fall and at a stride short enough to mean something.
+        // Asked here it could only ever be a question about two points three
+        // units apart, and two points three units apart can be in two different
+        // rivers - `river_influence_at` reaches half again past the channel, so
+        // a tributary and the trunk it is about to join both answer to it, at
+        // two heights, correctly.
+        //
+        // The carve is this layer's job: wherever water is drawn, the ground
+        // under it has been cut below it, and cut by enough to hold water
+        // rather than by a rounding error.
         let t = Terrain::new(77);
+        let middle = t.somewhere_inland();
         let mut checked = 0;
 
         'search: for iz in -60..60 {
             for ix in -60..60 {
-                let x = ix as f32 * 40.0;
-                let z = iz as f32 * 40.0;
-                let Some(here) = t.river_surface_at(x, z) else {
+                let x = middle.x + ix as f32 * 12.0;
+                let z = middle.y + iz as f32 * 12.0;
+                let Some(surface) = t.river_surface_at(x, z) else {
                     continue;
                 };
-
-                for (dx, dz) in [(3.0, 0.0), (-3.0, 0.0), (0.0, 3.0), (0.0, -3.0)] {
-                    if let Some(near) = t.river_surface_at(x + dx, z + dz) {
-                        assert!(
-                            (near - here).abs() < 2.0,
-                            "surface steps {:.1} in three units at ({x}, {z})",
-                            (near - here).abs(),
-                        );
-                    }
-                }
-
+                let bed = t.height_at(x, z);
+                assert!(
+                    surface > bed,
+                    "water at {surface:.2} over ground at {bed:.2} at ({x}, {z})",
+                );
+                assert!(
+                    surface > WATER_LEVEL,
+                    "inland water at {surface:.2} below the sea at ({x}, {z})",
+                );
                 checked += 1;
-                if checked > 60 {
+                if checked > 200 {
                     break 'search;
                 }
             }
         }
-        assert!(checked > 10, "only {checked} river samples found");
+        assert!(checked > 10, "only {checked} wet samples found");
+    }
+
+    /// Standing water lies flat, whatever the ground under it is doing.
+    ///
+    /// The one law lakes have, and the reason they are made by filling rather
+    /// than drawn: every cell of a lake carries the height of the outlet that
+    /// made it, so a shore can wander wherever the land does and the surface
+    /// still cannot tilt.
+    #[test]
+    fn a_lake_lies_flat() {
+        let t = Terrain::new(77);
+        let middle = t.somewhere_inland();
+        let mut found = 0;
+
+        'search: for iz in -60..60 {
+            for ix in -60..60 {
+                let x = middle.x + ix as f32 * 12.0;
+                let z = middle.y + iz as f32 * 12.0;
+                // Standing water: wet, and with no channel anywhere near it.
+                let (Some(here), None) = (t.river_surface_at(x, z), t.river_influence_at(x, z))
+                else {
+                    continue;
+                };
+                for (dx, dz) in [(6.0, 0.0), (-6.0, 0.0), (0.0, 6.0), (0.0, -6.0)] {
+                    let (px, pz) = (x + dx, z + dz);
+                    if t.river_influence_at(px, pz).is_some() {
+                        continue;
+                    }
+                    if let Some(near) = t.river_surface_at(px, pz) {
+                        assert!(
+                            (near - here).abs() < 0.01,
+                            "a lake tilts {:.3} in six units at ({x}, {z})",
+                            (near - here).abs(),
+                        );
+                    }
+                }
+                found += 1;
+                if found > 40 {
+                    break 'search;
+                }
+            }
+        }
+        assert!(found > 5, "only {found} points of standing water found");
     }
 
     #[test]

@@ -26,6 +26,8 @@ mod navigation;
 mod noise;
 mod now;
 mod palette;
+mod place;
+mod planet;
 mod render;
 mod rng;
 mod save;
@@ -41,7 +43,6 @@ mod title;
 mod trails;
 mod ui;
 mod villager;
-mod water;
 mod weather;
 mod witness;
 
@@ -166,6 +167,12 @@ fn main() {
         telling::bench::run();
         return;
     }
+    // The planet with nothing living on it, for getting the sphere right
+    // before anything is asked to stand on it. See `planet.rs`.
+    if std::env::args().any(|arg| arg == "--planet") {
+        planet::run();
+        return;
+    }
     App::new()
         .add_plugins(
             DefaultPlugins
@@ -214,7 +221,6 @@ fn main() {
             render::RenderPlugin,
             debug::DebugPlugin,
             loading::LoadingPlugin,
-            water::WaterPlugin,
             witness::WitnessPlugin,
             grass::GrassPlugin,
         ))
@@ -261,7 +267,7 @@ fn main() {
 ///
 /// Warm key light against a cool fill is what separates the HD-2D look from
 /// flat-lit low-poly, and it costs one extra directional light.
-fn spawn_lighting(mut commands: Commands) {
+pub fn spawn_lighting(mut commands: Commands) {
     // Ambient is deliberately low. A strong ambient fill lights every surface
     // roughly equally, which erases the shading that gives low-poly geometry its
     // form — the "flat and dull" failure mode. Contrast between a bright key light

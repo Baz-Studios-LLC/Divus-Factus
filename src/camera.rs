@@ -35,6 +35,9 @@ impl Plugin for CameraPlugin {
                     fly_the_dive.run_if(crate::world_is_afoot),
                     follow_ground,
                     apply_camera_smoothing,
+                    // After everything that could have moved the focus, and
+                    // before anything reads the camera's pose from it.
+                    carry_the_frame,
                     write_camera_transform,
                     aim_the_near_plane,
                 )
@@ -384,6 +387,39 @@ pub struct CameraRig {
     /// Higher converges faster. Tuned by feel; around 12 reads as responsive but
     /// still weighted, which suits something the size of a god.
     pub smoothing: f32,
+    /// Which way the camera is over the planet, and which way is up on the
+    /// screen: the tangent frame at the focus, in world space.
+    ///
+    /// CARRIED, never recomputed from the focus's longitude and latitude, and
+    /// that is the whole point of it. A ball has no preferred axis. The world
+    /// does not spin, so it does not need poles - but the frame used to be
+    /// rebuilt every frame from `bend_frame`, whose east is the derivative
+    /// along longitude, and THAT has poles whatever the planet thinks. Near
+    /// one, east-west arc length collapses and the frame twists faster and
+    /// faster for the same movement of the ground; at one, longitude is
+    /// undefined and the derivative is a difference of two nearly identical
+    /// directions, so it fell back to a hardcoded axis; and crossing one,
+    /// longitude jumps by half a turn and east flips end for end.
+    ///
+    /// Instead the frame is turned by exactly as much as the ground under it
+    /// turned, and no more. Over a drag or a pan that is parallel transport
+    /// along the great circle: no twist is introduced, so there is nothing to
+    /// blow up anywhere, and the planet can be rolled in any direction for as
+    /// long as you like. See `carry_the_frame`.
+    pub facing: Quat,
+    /// Whether the world is being held by the mouse this frame.
+    ///
+    /// Direct manipulation and smoothing cannot both be in the same loop. The
+    /// grab reads the ground under the cursor from where the camera ACTUALLY
+    /// is, and sets the target so that ground comes back under the hand - but
+    /// a smoothed camera is never where its target says, so the next frame
+    /// reads a different piece of ground and corrects again, and the camera's
+    /// own catch-up drives the correction. That is the wobble: the rig chasing
+    /// a target computed from the fact that it has not arrived yet.
+    ///
+    /// While the world is held the focus is therefore snapped, not smoothed.
+    /// Nothing is lost - the mouse is the smoothing.
+    pub held_by_hand: bool,
     /// Ground point the current zoom is closing in on.
     ///
     /// Held for the whole smoothed zoom rather than applied once on the scroll
@@ -410,6 +446,10 @@ impl Default for CameraRig {
             orbit_sensitivity: 0.005,
             zoom_sensitivity: 0.12,
             smoothing: 12.0,
+            // Seated from the ground it starts on. After this first breath it
+            // is only ever carried.
+            facing: crate::globe::bend_frame(Vec3::ZERO).1,
+            held_by_hand: false,
             zoom_anchor: None,
         }
     }
@@ -431,7 +471,7 @@ impl CameraRig {
     }
 
     /// Offset from focus to eye.
-    fn eye_offset(&self) -> Vec3 {
+    pub(crate) fn eye_offset(&self) -> Vec3 {
         let (sy, cy) = self.yaw.sin_cos();
         let (sp, cp) = self.pitch.sin_cos();
         Vec3::new(sy * cp, sp, cy * cp) * self.distance
@@ -449,7 +489,7 @@ impl CameraRig {
     }
 
     /// Ground-plane right direction.
-    fn ground_right(&self) -> Vec3 {
+    pub(crate) fn ground_right(&self) -> Vec3 {
         let (sy, cy) = self.yaw.sin_cos();
         Vec3::new(cy, 0.0, -sy)
     }
@@ -482,11 +522,27 @@ pub(crate) fn normalised_scroll(delta: f32, unit: MouseScrollUnit) -> f32 {
 /// pins the focus to the terrain every frame — moving it here as well would just be
 /// overwritten, and on a slope the two would fight.
 fn zoom_focus(focus: Vec3, target: Vec3, ratio: f32) -> Vec3 {
-    Vec3::new(
-        target.x + (focus.x - target.x) * ratio,
-        focus.y,
-        target.z + (focus.z - target.z) * ratio,
-    )
+    // Along the great circle between them, NOT across the coordinate plane.
+    //
+    // The flat `(x, z)` is longitude and latitude multiplied by the radius, so
+    // lerping it is lerping ANGLES. Two failures came out of that. Near a pole
+    // east-west arc length collapses, so a few units of actual ground is an
+    // enormous step of `x`, and the focus shot round the world - the fast spin
+    // on zoom. And across the date line the straight line between two adjacent
+    // places is the whole circumference the wrong way.
+    //
+    // As places, `ratio` means what it always meant: one leaves the focus
+    // alone, zero arrives at the anchor, and everything between is that
+    // fraction of the way along the ground.
+    let here = crate::place::Place::from_flat(focus);
+    let anchor = crate::place::Place::from_flat(target);
+    if anchor.apart(here) <= f32::EPSILON {
+        return focus;
+    }
+    // A glide and not a step, because zooming OUT has to carry the focus
+    // further from the anchor than it began - past the far end of the arc,
+    // which anything that refuses to overshoot cannot do.
+    canonical_near(focus, anchor.glide(here, ratio).direction())
 }
 
 /// Ground point under the mouse cursor, if the cursor is over the terrain.
@@ -535,6 +591,9 @@ fn spawn_camera(mut commands: Commands) {
 
 fn read_camera_input(
     mut grabbed: Local<Option<Vec3>>,
+    // Whether the drag in progress is the world's. A press that begins on a
+    // panel belongs to the panel for its whole life, however far it wanders.
+    mut ours: Local<bool>,
     keys: Res<ButtonInput<KeyCode>>,
     keymap: Res<crate::keymap::Keymap>,
     buttons: Res<ButtonInput<MouseButton>>,
@@ -591,7 +650,25 @@ fn read_camera_input(
             + rig.zoom_fraction() * 1.6
             + (rig.target_distance - MAX_DISTANCE).max(0.0) * 0.012;
         let speed = rig.pan_speed * zoom_scale * time.delta_secs();
-        rig.target_focus += pan.normalize() * speed;
+        // Walked along the ground, as a rotation in the rig's own carried
+        // frame - not added to flat `(x, z)`, which is longitude and latitude
+        // multiplied by the radius. Adding to those walks a COORDINATE, and a
+        // coordinate's relation to the ground depends where you are standing:
+        // near a pole the same step of `x` is a fraction of the ground it is
+        // at the equator, so the same key held for the same second flew the
+        // camera further and further the higher it got. The axis comes from
+        // the frame rather than from a compass bearing, so there is no north
+        // to be undefined at the top of the world.
+        let heading = rig.facing * pan.normalize();
+        let up_here = rig.facing * Vec3::Y;
+        if let Some(axis) = heading.cross(up_here).try_normalize() {
+            let stance = crate::globe::planet_stance();
+            let was = stance
+                * crate::terrain::direction_at(rig.target_focus.x, rig.target_focus.z);
+            let turn = Quat::from_axis_angle(axis, speed / crate::terrain::PLANET_RADIUS);
+            let now = stance.inverse() * (turn * was);
+            rig.target_focus = canonical_near(rig.target_focus, now);
+        }
         // And then folded back onto the sphere. Panning walks the flat
         // scaffold, and the scaffold runs off the end of the world: keep going
         // north and `z` grows past the pole for ever, which the terrain field
@@ -603,20 +680,40 @@ fn read_camera_input(
         rig.target_focus = fold_onto_the_sphere(rig.target_focus);
     }
 
-    // The middle mouse GRABS THE WORLD. Not a camera pan: the ground under
-    // the cursor is seized on the press, and while the button is held the
-    // whole planet is turned so that piece of ground stays under the hand -
-    // the gesture Black and White taught, and the only one that makes sense
-    // once the world is a ball. At village zoom the turn is microscopic and
-    // it feels exactly like the drag-pan it replaces; from altitude the same
-    // pull spins continents. One mechanism, every height.
-    if buttons.just_pressed(MouseButton::Middle) {
-        *grabbed = cursor_sphere_direction(&windows, &cameras);
+    // The mouse GRABS THE WORLD. Not a camera pan: the ground under the cursor
+    // is seized on the press, and while the button is held the whole planet is
+    // turned so that piece of ground stays under the hand - the gesture Black
+    // and White taught, and the only one that makes sense once the world is a
+    // ball. At village zoom the turn is microscopic and it feels exactly like
+    // the drag-pan it replaces; from altitude the same pull spins continents.
+    // One mechanism, every height.
+    //
+    // On the LEFT button, which is where the hand reaches for it. Middle keeps
+    // working because it is what this was bound to first and fingers remember,
+    // but left is the gesture: you put your hand on the world and you move it.
+    let taking_hold =
+        buttons.just_pressed(MouseButton::Left) || buttons.just_pressed(MouseButton::Middle);
+    let holding_on = buttons.pressed(MouseButton::Left) || buttons.pressed(MouseButton::Middle);
+    if taking_hold {
+        // A press that lands on a panel is the panel's. Judged ONCE, at the
+        // press: a drag that starts on a roster and slides off it must not
+        // suddenly seize the planet halfway through, and one that starts on
+        // the world must go on turning it even when the cursor crosses a panel.
+        *ours = !pointer.over_ui;
+        *grabbed = if *ours {
+            cursor_sphere_direction(&windows, &cameras)
+        } else {
+            None
+        };
     }
-    if buttons.just_released(MouseButton::Middle) {
+    if !holding_on {
+        *ours = false;
         *grabbed = None;
     }
-    if buttons.pressed(MouseButton::Middle) {
+    // Told to the smoothing pass, which must not chase a target the grab is
+    // deriving from where the camera already is. See `CameraRig::held_by_hand`.
+    rig.held_by_hand = holding_on && *ours && grabbed.is_some();
+    if holding_on && *ours {
         if let Some(held) = *grabbed {
             if let Some(now) = cursor_sphere_direction(&windows, &cameras) {
                 rig.target_focus = turn_the_world(rig.target_focus, held, now);
@@ -703,7 +800,15 @@ fn read_camera_input(
         // Zoom toward whatever is under the cursor rather than the centre of the
         // screen, so zooming doubles as aiming: you can drop onto one villager
         // without panning there first.
-        rig.zoom_anchor = cursor_ground_point(&windows, &cameras, terrain.as_deref());
+        // The ground under the cursor when there IS loaded ground under it,
+        // and the planet's own surface when there is not. Zoomed out at the
+        // globe the terrain raycast has nothing to hit, so the anchor came
+        // back None and the zoom fell to the centre of the screen - which is
+        // precisely the altitude at which aiming the zoom matters most.
+        let focus = rig.focus;
+        rig.zoom_anchor = cursor_ground_point(&windows, &cameras, terrain.as_deref()).or_else(
+            || cursor_sphere_direction(&windows, &cameras).map(|dir| canonical_near(focus, dir)),
+        );
     }
 
     // Leaving for the sky. Past the play ceiling the view steepens toward
@@ -729,7 +834,29 @@ fn read_camera_input(
 /// Pure, and separately tested, because the axes of this are easy to get wrong
 /// and impossible to see wrong from a screenshot.
 pub(crate) fn turn_the_world(focus: Vec3, held: Vec3, now: Vec3) -> Vec3 {
-    let turn = Quat::from_rotation_arc(now, held);
+    // Built from an explicit axis and a CLAMPED angle, not from
+    // `from_rotation_arc`, which documents that it picks an arbitrary axis
+    // when its two directions are opposite - and near the planet's silhouette
+    // they can be, because a hit that skids over the limb lands on the far
+    // side of the world. An arbitrary axis through the middle is a half turn,
+    // which is the planet flipping end over end under the hand.
+    //
+    // The angle is capped so no single reading can lurch the world either.
+    // `held` is fixed for the whole gesture, so a capped step is not a step
+    // lost: the next frame sees the same gap and takes another bite of it,
+    // and a fast drag converges over two or three frames instead of snapping.
+    let axis = now.cross(held);
+    let Some(axis) = axis.try_normalize() else {
+        // Parallel: already aligned, nothing to turn. Or antiparallel, where
+        // there is no honest answer and leaving the world alone is the only
+        // safe one.
+        return focus;
+    };
+    let angle = axis
+        .dot(now.cross(held))
+        .atan2(now.dot(held))
+        .min(MOST_TURN_IN_A_FRAME);
+    let turn = Quat::from_axis_angle(axis, angle);
     let stance = crate::globe::planet_stance();
     let focus_dir = stance * crate::terrain::direction_at(focus.x, focus.z);
     let turned = stance.inverse() * (turn * focus_dir);
@@ -766,6 +893,20 @@ fn canonical_near(was: Vec3, direction: Vec3) -> Vec3 {
 /// Where the cursor's ray meets the planet's sea-level sphere, as a unit
 /// direction from the planet's centre — the handle the world-grab holds.
 /// `None` when the cursor is off the ball entirely.
+/// The most the world may turn from one reading, in radians.
+const MOST_TURN_IN_A_FRAME: f32 = 0.35;
+
+/// How far inside the silhouette a hit must land to be worth trusting, as a
+/// fraction of the radius.
+///
+/// At the limb the sphere runs edgewise to the eye: the near and far
+/// intersections meet, and the ground under the cursor sweeps arbitrarily fast
+/// for an arbitrarily small movement of the mouse. Readings from there are not
+/// slightly noisy, they are meaningless - and they are what sent the grab to
+/// the far side of the world. Past this the cursor is treated as being off the
+/// planet, and a grab in progress simply holds still until it comes back.
+const STEADY_GROUND: f32 = 0.12;
+
 fn cursor_sphere_direction(
     windows: &Query<&Window, With<PrimaryWindow>>,
     cameras: &Query<(&Camera, &GlobalTransform), With<GodCamera>>,
@@ -784,8 +925,56 @@ fn cursor_sphere_direction(
         return None;
     }
     let depth = (radius * radius - off_axis).sqrt();
+    if depth < radius * STEADY_GROUND {
+        return None;
+    }
     let hit = ray.origin + *ray.direction * (along - depth);
     Some((hit - centre).normalize())
+}
+
+/// Turns the carried frame by exactly as much as the ground beneath it turned.
+///
+/// Everything that moves the camera moves `focus`, and knows nothing about
+/// frames - a drag, a keyboard pan, a zoom glide, a jump to a village. This
+/// takes the one rotation that carries the frame's own up onto the focus's new
+/// up, and applies it. That single rule covers all of them:
+///
+/// - For a drag or a pan, where the movement is small and continuous, the
+///   minimal rotation IS parallel transport along the great circle. The frame
+///   arrives with no twist that the journey did not put there, which is what
+///   lets the world be rolled in any direction indefinitely.
+/// - For a jump there is no continuity to preserve, and the minimal rotation
+///   is as good an answer as any - it keeps the screen's up as close to what
+///   it was as the sphere allows.
+///
+/// The one case with no answer is a jump to the exact antipode, where every
+/// rotation is minimal. Nothing is continuous across that, so the frame is
+/// simply re-seated from the ground.
+fn carry_the_frame(mut rigs: Query<&mut CameraRig>) {
+    let Ok(mut rig) = rigs.single_mut() else {
+        return;
+    };
+    rig.facing = carried(rig.facing, rig.focus);
+}
+
+/// The frame, turned onto the ground the focus now stands on. See
+/// `carry_the_frame`.
+pub(crate) fn carried(facing: Quat, focus: Vec3) -> Quat {
+    let want = crate::globe::planet_stance() * crate::terrain::direction_at(focus.x, focus.z);
+    let have = facing * Vec3::Y;
+    let across = have.cross(want);
+    match across.try_normalize() {
+        Some(axis) => {
+            // Through `atan2`, not `acos`: the angle here is usually a
+            // fraction of a degree, which is exactly where `acos` throws away
+            // its significant figures.
+            let angle = across.length().atan2(have.dot(want));
+            (Quat::from_axis_angle(axis, angle) * facing).normalize()
+        }
+        None if have.dot(want) < 0.0 => crate::globe::bend_frame(focus).1,
+        // Already pointing at it. Nothing to carry.
+        None => facing,
+    }
 }
 
 /// Keeps the focus point riding the ground, so orbiting over a hill does not
@@ -838,7 +1027,12 @@ fn apply_camera_smoothing(time: Res<Time>, mut rigs: Query<&mut CameraRig>) {
         }
     }
 
-    rig.focus = rig.focus.lerp(rig.target_focus, t);
+    if rig.held_by_hand {
+        // Snapped. See `held_by_hand`.
+        rig.focus = rig.target_focus;
+    } else {
+        rig.focus = rig.focus.lerp(rig.target_focus, t);
+    }
     rig.pitch += (rig.target_pitch - rig.pitch) * t;
 
     // Take the short way round the circle so crossing the seam does not spin the
@@ -996,6 +1190,78 @@ mod tests {
             "the focus did not come out on the far side: x moved {}",
             moved.x - near_pole.x
         );
+    }
+
+    /// Walk the focus straight over the north pole and watch the two frames.
+    ///
+    /// This is the whole argument for carrying one. The planet does not spin,
+    /// so it has no axis and no poles - but a frame derived from longitude and
+    /// latitude has them regardless, and the camera inherited them.
+    #[test]
+    fn the_carried_frame_crosses_the_pole_without_flipping() {
+        let quarter = crate::terrain::PLANET_RADIUS * std::f32::consts::FRAC_PI_2;
+        let mut focus = Vec3::new(0.0, 0.0, -quarter + 300.0);
+
+        let mut facing = crate::globe::bend_frame(focus).1;
+        let mut was_facing = facing;
+        let mut was_bent = crate::globe::bend_frame(focus).1;
+        let mut worst_carried = 0.0f32;
+        let mut worst_derived = 0.0f32;
+
+        // Five units a step, straight north, right over the top and down the
+        // far side.
+        for _ in 0..120 {
+            focus.z -= 5.0;
+            focus = fold_onto_the_sphere(focus);
+
+            facing = carried(facing, focus);
+            worst_carried =
+                worst_carried.max((facing * Vec3::X).angle_between(was_facing * Vec3::X));
+            was_facing = facing;
+
+            let bent = crate::globe::bend_frame(focus).1;
+            worst_derived = worst_derived.max((bent * Vec3::X).angle_between(was_bent * Vec3::X));
+            was_bent = bent;
+        }
+
+        // Five units of ground on a six thousand unit world is under a tenth
+        // of a degree of arc, and the carried frame never turns more than the
+        // ground under it did.
+        assert!(
+            worst_carried < 0.01,
+            "the carried frame lurched by {worst_carried} radians in one step",
+        );
+        // While the derived one turns end for end, because every longitude
+        // meets at the pole and east is the derivative along longitude.
+        assert!(
+            worst_derived > 1.0,
+            "the lat/lon frame was expected to flip at the pole; worst step was \
+             only {worst_derived} radians - has `bend_frame` changed?",
+        );
+    }
+
+    /// And the frame stays a frame: rolled a long way in one direction it must
+    /// not drift out of square or stop being a rotation.
+    #[test]
+    fn the_carried_frame_stays_square_however_far_it_rolls() {
+        let mut focus = Vec3::new(0.0, 0.0, 0.0);
+        let mut facing = crate::globe::bend_frame(focus).1;
+        // Three times round the world, diagonally, so it crosses both poles
+        // and the date line many times over.
+        for _ in 0..4_000 {
+            focus.x += 21.0;
+            focus.z -= 13.0;
+            focus = fold_onto_the_sphere(focus);
+            facing = carried(facing, focus);
+        }
+        assert!((facing.length() - 1.0).abs() < 1e-3, "drifted off unit length");
+        let east = facing * Vec3::X;
+        let up = facing * Vec3::Y;
+        assert!(east.dot(up).abs() < 1e-3, "east and up came out of square");
+        // And it is still standing on the ground it says it is.
+        let want =
+            crate::globe::planet_stance() * crate::terrain::direction_at(focus.x, focus.z);
+        assert!(up.distance(want) < 1e-2, "the frame drifted off the focus");
     }
 
     #[test]

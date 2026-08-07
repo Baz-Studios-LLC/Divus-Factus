@@ -82,6 +82,29 @@ const MAX_LEVEL: u8 = 8;
 /// look through every level rather than dissolving it into smoothness.
 const SPLIT_PX: f32 = 7.0;
 
+/// How far under `SPLIT_PX` the error must fall before ground already drawn at
+/// a finer level is allowed to coarsen again. Pure hysteresis; see the cut in
+/// `tend_the_tree`.
+const MERGE_HYSTERESIS: f32 = 0.75;
+
+/// How far the planet's water sits below true level: enough to keep out of the
+/// chunks' own sea, and no more than that.
+///
+/// A twentieth of a unit. It was one whole unit, which sounded like nothing and
+/// was not: the ground under the two waters does not meet either - patch relief
+/// is sunk by `PATCH_SINK` so it cannot fight the chunks - so at the streamed
+/// edge there is a step in the BED, and any gap between the two water surfaces
+/// is a window onto it. A staircase of chunk-sized treads ran round the whole
+/// loaded region with a brown seabed face under each one.
+///
+/// Held this close the two seas are one surface to the eye, and whatever the
+/// bed does underneath is the water's business. Nothing fights, because within
+/// the streamed radius - the only place both are drawn - a twentieth of a unit
+/// is many depth values wide.
+///
+/// See `build_patch_water`.
+const WATER_CLEARANCE: f32 = 0.05;
+
 /// Patches built per frame while the tree is chasing the camera. A build is
 /// a couple of milliseconds of noise sampling; four a frame chases a fast
 /// descent closely without stuttering the simulation, and a patch that
@@ -190,7 +213,7 @@ fn face_axes(face: u8) -> (Vec3, Vec3, Vec3) {
 
 /// The living tree: the root everything hangs from, and which patches stand.
 #[derive(Resource, Default)]
-struct PlanetTree {
+pub(crate) struct PlanetTree {
     root: Option<Entity>,
     built: HashMap<PatchKey, Patch2>,
     /// The seed the tree was grown for, so a new world fells the old tree.
@@ -204,6 +227,13 @@ struct PlanetTree {
     paint_beat: u64,
     /// A cheap fingerprint of (fog mode, known world) to notice the change.
     veil_print: (bool, u32, usize),
+}
+
+impl PlanetTree {
+    /// How many patches are built. For the planet bench's readout.
+    pub(crate) fn standing(&self) -> usize {
+        self.built.len()
+    }
 }
 
 /// "My vertices are already seated on the sphere — leave my transform alone."
@@ -248,6 +278,23 @@ pub struct PlanetDetail {
 struct Patch2 {
     entity: Entity,
     mesh: Handle<Mesh>,
+    /// The beat this patch was grown on.
+    ///
+    /// A patch enters `built` the instant it is asked for, but its ENTITY is
+    /// spawned through `Commands` and does not exist until the schedule
+    /// flushes. For the rest of that frame the cut believed the new patch was
+    /// standing, handed it the ground, and hid the ancestor that had been
+    /// covering it - so there was one frame with nothing drawn there at all.
+    /// Moving, that is a ring of holes opening and closing around the camera
+    /// as fast as patches are built, which is what flashed.
+    ///
+    /// So a patch is not STANDING until a beat has passed. See the ancestor
+    /// walk in `tend_the_tree`.
+    grown_at: u64,
+    /// The sea, lakes and rivers standing on this patch, if any stand on it.
+    /// A child entity, so it inherits the patch's visibility and is felled
+    /// with it; the mesh is held so it can be dropped from the assets too.
+    water: Option<Handle<Mesh>>,
     last_shown: u64,
     painted: u64,
 }
@@ -335,7 +382,8 @@ impl Plugin for GlobePlugin {
             .init_resource::<PlanetDetail>()
             .add_systems(
                 Update,
-                (plant_the_tree, dress_the_patches).run_if(resource_exists::<Terrain>),
+                (plant_the_tree, dress_the_patches, dress_the_patch_water)
+                    .run_if(resource_exists::<Terrain>),
             )
             .add_systems(
                 Update,
@@ -397,20 +445,35 @@ pub(crate) fn bend_frame(flat: Vec3) -> (Vec3, Quat) {
 /// pointer. Each computed it their own way once, and each was wrong in its
 /// own direction.
 pub(crate) fn bent_camera_pose(rig: &CameraRig) -> Transform {
-    let (eye_seat, eye_turn) = bend_frame(rig.eye());
+    // From the rig's CARRIED frame, not from the focus's longitude and
+    // latitude. See `CameraRig::facing`: a frame derived from lat/lon has
+    // poles in it however round the planet is, and the camera would inherit
+    // them - twisting harder and harder as it neared one, and flipping end for
+    // end across it.
+    //
+    // The eye is a rigid offset inside that frame. It used to be seated on its
+    // own, by its own coordinates, which is what forced all the special
+    // handling here: at play pitch the eye stands two and a half thousand
+    // units from its focus, twenty-five degrees of arc on a six thousand unit
+    // world, so seating it by its own place dropped it a quarter-continent
+    // away and turned it into THAT local frame, staring at unrelated ground. A
+    // rig sitting above one point does not have that problem, because it is
+    // one rigid thing over one place.
+    let frame = rig.facing;
+    let focus_seat = planet_centre() + (frame * Vec3::Y) * (PLANET_RADIUS + rig.focus.y);
+    let eye_seat = focus_seat + (frame * rig.eye_offset());
     if rig.distance < crate::camera::FIRST_PERSON {
         // No separation to look along; carry the flat gaze into the seat.
         Transform {
             translation: eye_seat,
-            rotation: eye_turn
+            rotation: frame
                 * Transform::default()
                     .looking_to(rig.forward(), Vec3::Y)
                     .rotation,
             scale: Vec3::ONE,
         }
     } else {
-        let (focus_seat, focus_turn) = bend_frame(rig.focus);
-        let up = focus_turn * Vec3::Y;
+        let up = frame * Vec3::Y;
         let gaze = (focus_seat - eye_seat).normalize_or(-up);
         // Looking almost STRAIGHT DOWN, the local up is no use as a hint - it is
         // nearly antiparallel to the gaze, `looking_at` has no plane left to
@@ -422,7 +485,7 @@ pub(crate) fn bent_camera_pose(rig: &CameraRig) -> Transform {
         // From near the vertical, the honest screen-up is the bearing the rig is
         // facing - the convention every top-down map keeps.
         let up = if gaze.dot(up).abs() > 0.985 {
-            focus_turn * rig.ground_forward()
+            frame * rig.ground_forward()
         } else {
             up
         };
@@ -667,6 +730,9 @@ fn grow_patch(
     if let Some(old) = tree.built.remove(&key) {
         commands.entity(old.entity).despawn();
         meshes.remove(&old.mesh);
+        if let Some(water) = old.water {
+            meshes.remove(&water);
+        }
     }
     let mesh = meshes.add(build_patch(terrain, veil, key));
     let entity = commands
@@ -681,6 +747,24 @@ fn grow_patch(
             ChildOf(root),
         ))
         .id();
+    // And the water standing on it, as a child so it is shown, hidden and
+    // felled with the ground it covers. Render layers are not inherited, so
+    // it states its own.
+    let water = build_patch_water(terrain, key).map(|sheet| {
+        let handle = meshes.add(sheet);
+        commands.spawn((
+            PatchWater,
+            Mesh3d(handle.clone()),
+            Transform::default(),
+            Visibility::Inherited,
+            RenderLayers::layer(GLOBE_LAYER),
+            NotShadowCaster,
+            NotShadowReceiver,
+            ChildOf(entity),
+        ));
+        handle
+    });
+
     let beat = tree.beat;
     let painted = tree.paint_beat;
     tree.built.insert(
@@ -688,11 +772,35 @@ fn grow_patch(
         Patch2 {
             entity,
             mesh,
+            water,
+            grown_at: beat,
             last_shown: beat,
             painted,
         },
     );
     entity
+}
+
+/// The sea standing on one patch. See `build_patch_water`.
+#[derive(Component)]
+struct PatchWater;
+
+/// Hands the water shader to any patch sea that lacks it, the same way
+/// `dress_the_patches` hands out the skin - so patch growth never has to know
+/// what water looks like.
+fn dress_the_patch_water(
+    mut commands: Commands,
+    assets: Option<Res<crate::terrain::TerrainAssets>>,
+    bare: Query<Entity, (With<PatchWater>, Without<MeshMaterial3d<StandardMaterial>>)>,
+) {
+    let Some(assets) = assets else {
+        return;
+    };
+    for sea in &bare {
+        commands
+            .entity(sea)
+            .insert(MeshMaterial3d(assets.sea_material.clone()));
+    }
 }
 
 /// Hands the shared material to any patch that lacks it. Separate from the
@@ -775,7 +883,7 @@ fn build_patch(
                 _ => WATER_LEVEL,
             };
             let wet = surface.max(WATER_LEVEL);
-            grid.push(dir * drawn_radial(h, wet));
+            grid.push(dir * drawn_radial(h));
             ground.push((x, z, h, wet));
         }
     }
@@ -906,14 +1014,143 @@ pub(crate) fn ground_coordinates(dir: Vec3) -> (f32, f32) {
     (lon * PLANET_RADIUS, -lat * PLANET_RADIUS)
 }
 
-/// Radial distance the surface is drawn at. Water is drawn AT its surface —
-/// the sea at sea level, a lake at the lake's own level — because a globe
-/// shows its waters, not its beds. Land is TRUE relief: the planet sits
-/// underneath the flat world whenever the god is high enough to see past
-/// the loaded ground, and an exaggerated mountain would tower up through
-/// the real ground above it.
-fn drawn_radial(h: f32, wet: f32) -> f32 {
-    PLANET_RADIUS + WATER_LEVEL + (h.max(wet) - WATER_LEVEL).max(0.0) - PATCH_SINK
+/// Radial distance the GROUND is drawn at. True relief everywhere now, beds
+/// included: the planet sits underneath the flat world whenever the god is
+/// high enough to see past the loaded ground, and an exaggerated mountain
+/// would tower up through the real ground above it.
+///
+/// It used to lift every drowned vertex to the water's surface and paint it
+/// blue, because there was nothing else to draw the sea with up here. That is
+/// what made the ocean a picture of water rather than water: the flat sheet
+/// over the loaded ground had the whole water shader - waves, sky reflection,
+/// fresnel, foam - and the planet had a coloured triangle, and where the two
+/// met you could see the join. They can be given the same colour and never the
+/// same light.
+///
+/// So the bed is drawn where the bed is, and `build_patch_water` lays the
+/// actual water over it. The water shader measures its own thickness from
+/// whatever is drawn behind it, which is exactly what a real bed gives it -
+/// shallows clear enough to show the bottom, depths opaque, foam along the
+/// shore - and none of that was reachable while the bed WAS the surface.
+fn drawn_radial(h: f32) -> f32 {
+    PLANET_RADIUS + h - PATCH_SINK
+}
+
+/// The water standing over one patch, if any: the sea, and the lakes and
+/// rivers the courses know, all of them the same question asked once.
+///
+/// Drawn at the water's own surface, with the sphere's own outward for a
+/// normal - a level surface on a ball IS the sphere, so there is nothing to
+/// derive. No skirt and no neighbour sampling either: the sheet is level, so
+/// two patches meeting at different depths still meet exactly.
+///
+/// Sunk by `WATER_CLEARANCE` - just enough to keep out of the chunks' way,
+/// and no more.
+///
+/// The DEPTH has to be honest. The shader reads thickness as the distance
+/// between this surface and whatever is drawn behind it, so sinking the bed
+/// without sinking the water would add the whole sink to every reading: a
+/// shoreline would come out two and a half units deep, which is past the foam
+/// band, and the sea would run up the beach with no edge on it. Sunk together,
+/// the difference is `wet - h` exactly - the number the terrain actually knows.
+///
+/// It cannot sit at true sea level, because the chunks' own sea does and two
+/// water surfaces in one plane is a z-fight. It cannot drop the whole
+/// `PATCH_SINK` either, which is what it did at first: the chunks' sea ends at
+/// the streamed radius and this carries on from there, so a two and a half
+/// unit sink put a STEP in the ocean at that edge, seen end-on from any low
+/// camera. A single unit clears the chunks and is nothing to look at from the
+/// thousand-odd units away that boundary always is.
+///
+/// The cost is that the depth read here runs `PATCH_SINK - WATER_CLEARANCE`
+/// too deep, so a shore drawn by a patch will not foam. Shores near enough to
+/// look at are drawn by chunks, which measure honestly.
+fn build_patch_water(terrain: &Terrain, key: PatchKey) -> Option<Mesh> {
+    let n = PATCH_CELLS;
+    let stride = n + 1;
+    let (u0, v0, side) = key.rect();
+    let (outward, along_u, along_v) = face_axes(key.face);
+    let step = side / n as f32;
+
+    let mut positions: Vec<[f32; 3]> = Vec::with_capacity(stride * stride);
+    let mut normals: Vec<[f32; 3]> = Vec::with_capacity(stride * stride);
+    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(stride * stride);
+    let mut drowned = vec![false; stride * stride];
+    let mut any = false;
+
+    for gj in 0..stride {
+        for gi in 0..stride {
+            let u = u0 + gi as f32 * step;
+            let v = v0 + gj as f32 * step;
+            let dir = (outward + along_u * u + along_v * v).normalize();
+            let (x, z) = ground_coordinates(dir);
+            let h = terrain.base_height_at(x, z);
+            let surface = match terrain.river_surface_at(x, z) {
+                Some(level) if level > h => level,
+                _ => WATER_LEVEL,
+            };
+            let wet = surface.max(WATER_LEVEL);
+            let under = h < wet;
+            any |= under;
+            drowned[gj * stride + gi] = under;
+            positions.push((dir * (PLANET_RADIUS + wet - WATER_CLEARANCE)).to_array());
+            normals.push(dir.to_array());
+            // Depth against the bed, exactly as the chunks' own sea reads it,
+            // so the two agree where they meet. See `terrain::water_colour`.
+            colors.push(crate::terrain::water_colour(wet - h));
+        }
+    }
+    if !any {
+        return None;
+    }
+
+    // Winding read off the geometry, the same way `build_patch` reads it, so
+    // the sea faces outward on all six faces of the cube without any of them
+    // having to know which face they are.
+    let pa = Vec3::from(positions[0]);
+    let pb = Vec3::from(positions[1]);
+    let pc = Vec3::from(positions[stride]);
+    let outward_as_abc = (pb - pa).cross(pc - pa).dot(pa) > 0.0;
+
+    let mut indices: Vec<u32> = Vec::new();
+    for row in 0..n {
+        for column in 0..n {
+            let corner = [
+                row * stride + column,
+                row * stride + column + 1,
+                (row + 1) * stride + column,
+                (row + 1) * stride + column + 1,
+            ];
+            // Any drowned corner is enough. The dry ones are already at the
+            // water's level, so the sheet runs up onto the shore and the
+            // shader's own depth fade thins it away there - rather than
+            // stopping dead at the last wet vertex and leaving a staircase
+            // along every coast on the planet.
+            if !corner.iter().any(|i| drowned[*i]) {
+                continue;
+            }
+            let [a, b, c, d] = corner.map(|i| i as u32);
+            if outward_as_abc {
+                indices.extend_from_slice(&[a, b, c, b, d, c]);
+            } else {
+                indices.extend_from_slice(&[a, c, b, b, c, d]);
+            }
+        }
+    }
+    if indices.is_empty() {
+        return None;
+    }
+
+    Some(
+        Mesh::new(
+            PrimitiveTopology::TriangleList,
+            RenderAssetUsages::RENDER_WORLD,
+        )
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colors)
+        .with_inserted_indices(Indices::U32(indices)),
+    )
 }
 
 /// One vertex's colour: any standing water by depth in the water's own
@@ -924,8 +1161,10 @@ fn drawn_radial(h: f32, wet: f32) -> f32 {
 fn paint(terrain: &Terrain, x: f32, z: f32, h: f32, wet: f32, slope: f32) -> [f32; 4] {
     if h < wet {
         let depth = ((wet - h) / 8.0).clamp(0.0, 1.0);
-        let shallow = palette::shade(&palette::WATER, 0.9).to_linear();
-        let deep = palette::shade(&palette::WATER, 0.45).to_linear();
+        // The same two shades the water itself is drawn in. See
+        // `terrain::SEA_SHALLOW`.
+        let shallow = palette::shade(&palette::WATER, crate::terrain::SEA_SHALLOW).to_linear();
+        let deep = palette::shade(&palette::WATER, crate::terrain::SEA_DEEP).to_linear();
         return [
             shallow.red + (deep.red - shallow.red) * depth,
             shallow.green + (deep.green - shallow.green) * depth,
@@ -1024,7 +1263,24 @@ fn tend_the_tree(
         let reach = key.cell_arc() * PATCH_CELLS as f32 * 0.75;
         let distance = (cam_mesh.distance(centre) - reach).max(REFINE_FLOOR);
         let sharp_px = key.cell_arc() / distance * px_per_radian;
-        if sharp_px > SPLIT_PX && key.level < MAX_LEVEL {
+        // Once a patch HAS been split, the error must fall well under the
+        // threshold before its children are given up again - otherwise an
+        // altitude parked on the boundary splits and merges on alternate
+        // frames, rebuilding that ground every time. With eight levels there
+        // is a patch sitting on a threshold in almost every frame.
+        //
+        // Straight out of the Flat Earth Simulator, which took this quadtree
+        // from here and then learned this the hard way on the way back.
+        let already = key.level < MAX_LEVEL
+            && [(0, 0), (1, 0), (0, 1), (1, 1)]
+                .iter()
+                .any(|(dx, dy)| tree.built.contains_key(&key.child(*dx, *dy)));
+        let threshold = if already {
+            SPLIT_PX * MERGE_HYSTERESIS
+        } else {
+            SPLIT_PX
+        };
+        if sharp_px > threshold && key.level < MAX_LEVEL {
             for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
                 walk.push(key.child(dx, dy));
             }
@@ -1084,10 +1340,17 @@ fn tend_the_tree(
     // nearest standing ancestor. Then one pass settles every visibility.
     let mut on_screen: std::collections::HashSet<PatchKey> =
         std::collections::HashSet::with_capacity(wanted.len());
+    let now = tree.beat;
     for key in &wanted {
         let mut candidate = *key;
         loop {
-            if tree.built.contains_key(&candidate) {
+            // Standing means its entity is really there, not merely promised.
+            // See `Patch2::grown_at`.
+            if tree
+                .built
+                .get(&candidate)
+                .is_some_and(|patch| patch.grown_at < now)
+            {
                 on_screen.insert(candidate);
                 break;
             }
