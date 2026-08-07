@@ -69,10 +69,20 @@ pub fn run() {
         // seasons want somewhere to post a notice, both of which the UI owns.
         crate::ui::UiPlugin,
     ))
+    // No fog of war. There is nobody here to have walked anywhere, so there is
+    // nothing a veil could honestly be hiding - and this is a bench for looking
+    // at the planet. It is already inert without a `KnownWorld` to draw from;
+    // this says so out loud, so it cannot come back by some other door.
+    .insert_resource(crate::fog::FogMode(false))
     // Which layers are drawn. The whole debug plugin would bring the faith
     // chart, the chronicle and the village panels with it, and every one of
     // them wants a village.
     .init_resource::<crate::debug::layers::ViewLayers>()
+    // The sun, the sky fill and the moon. These live in `main` rather than in
+    // any plugin, so an app assembled from the plugin list alone gets no light
+    // at all - which is exactly what happened: the planet hung in the dark
+    // with its cloud shell the only bright thing on it, at midday.
+    .add_systems(Startup, crate::spawn_lighting)
     // Straight past the splash and the title: there is no game to open.
     .add_systems(Startup, open_the_world)
     .add_systems(Update, (jump_about, read_the_position))

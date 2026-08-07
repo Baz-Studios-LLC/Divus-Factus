@@ -269,7 +269,7 @@ fn main() {
 ///
 /// Warm key light against a cool fill is what separates the HD-2D look from
 /// flat-lit low-poly, and it costs one extra directional light.
-fn spawn_lighting(mut commands: Commands) {
+pub fn spawn_lighting(mut commands: Commands) {
     // Ambient is deliberately low. A strong ambient fill lights every surface
     // roughly equally, which erases the shading that gives low-poly geometry its
     // form — the "flat and dull" failure mode. Contrast between a bright key light
