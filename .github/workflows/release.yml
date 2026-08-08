@@ -34,6 +34,16 @@ jobs:
         with:
           ref: ${{ env.TAG }}
 
+      # Ordo lives BESIDE the game, not inside it - `ordo = { path = "../Ordo" }`
+      # - because it is the studio's shared UI kit, not this game's module.
+      # The runner has to stand the neighbourhood up the same way the desk
+      # does. A plain clone, because the kit is public like everything else
+      # in the org; the first release after the Ordo port failed in thirty-
+      # eight seconds for want of this step.
+      - name: Stand Ordo beside the game
+        shell: bash
+        run: git clone --depth 1 https://github.com/Baz-Studios-LLC/Ordo.git ../Ordo
+
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
