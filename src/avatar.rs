@@ -373,11 +373,19 @@ fn drive_the_body(
         if *activity != Activity::Idle {
             *activity = Activity::Idle;
         }
-        // Where the eyes are pointed, flattened: forward on the ground
-        // is the camera's own bearing.
+        // Where the eyes are pointed, flattened: forward on the ground is
+        // the camera's own bearing - IN THE CAMERA'S OWN FRAME, carried back
+        // into the chart's. The body walks in flat coordinates, but what the
+        // player sees as forward is the carried frame, and the two drift
+        // apart across the world by the holonomy roll (the same angle that
+        // turned the hand). Built from the raw yaw, W walked the chart's
+        // forward, which the far-side camera shows as a diagonal: "w doesn't
+        // walk them straight, it walks diagonal."
+        let chart = crate::globe::bend_frame(at.translation).1;
+        let seen = chart.inverse() * rig.facing;
         let (sin, cos) = rig.yaw.sin_cos();
-        let ahead = Vec3::new(-sin, 0.0, -cos);
-        let beside = Vec3::new(cos, 0.0, -sin);
+        let ahead = (seen * Vec3::new(-sin, 0.0, -cos)).with_y(0.0).normalize();
+        let beside = (seen * Vec3::new(cos, 0.0, -sin)).with_y(0.0).normalize();
         let mut push = Vec3::ZERO;
         if keymap.pressed(&keys, Deed::PanNorth) {
             push += ahead;

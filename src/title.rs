@@ -236,9 +236,48 @@ struct SplashMark;
 const SPLASH_FADE: f32 = 1.3;
 const SPLASH_HOLD: f32 = 1.8;
 
-/// Real seconds since the splash appeared.
-#[derive(Resource)]
-struct SplashClock(f32);
+/// The most one frame may spend of the mark's life.
+///
+/// The world is generated on the first frames BEHIND the splash, and on this
+/// machine that means single frames of four and a half seconds — measured, six
+/// frames in the first five seconds of a run. The mark's whole life is four and
+/// four tenths. So it was faded in, held and faded out inside one frame that
+/// had not yet drawn anything, and the studio's mark never reached the screen
+/// at all. Brett: "the newcity entertainment splash screen disappeared at some
+/// point".
+///
+/// Nothing about the splash changed. It went when world generation got heavy
+/// enough to swallow it whole, which is why it read as vanishing on its own.
+///
+/// So a frame buys at most a tenth of a second of fade however long it really
+/// took, because time nobody saw is not time the mark was on screen. Capped
+/// rather than ignored: a machine slow enough that EVERY frame stalls would
+/// otherwise hold the splash for ever, and a bounded step means the mark is
+/// always worth about forty-four drawn frames whatever the machine is doing.
+const SLOWEST_STEP: f32 = 0.1;
+
+/// How much of the mark's life one frame carries, given how long it really
+/// took. See [`SLOWEST_STEP`].
+fn splash_step(delta: f32) -> f32 {
+    delta.min(SLOWEST_STEP)
+}
+
+/// The mark's whole life: fade in, hold, fade out.
+fn splash_life() -> f32 {
+    SPLASH_FADE * 2.0 + SPLASH_HOLD
+}
+
+/// How far through the mark's life we are, and what it really cost.
+#[derive(Resource, Default)]
+struct SplashClock {
+    /// Seconds of DRAWN time, which is what the fade runs on.
+    spent: f32,
+    /// Real seconds and frames since it appeared, for the line it logs on the
+    /// way out. Had this been there, the bug above would have been a glance
+    /// rather than an afternoon.
+    real: f32,
+    frames: u32,
+}
 
 fn spawn_splash(
     mut commands: Commands,
@@ -256,7 +295,7 @@ fn spawn_splash(
         return;
     }
 
-    commands.insert_resource(SplashClock(0.0));
+    commands.insert_resource(SplashClock::default());
     let screen = commands
         .spawn((
             Name::new("Splash Screen"),
@@ -332,25 +371,31 @@ fn play_splash(
     let Some(mut clock) = clock else {
         return;
     };
-    clock.0 += time.delta_secs();
+    // Only what a frame could actually SHOW spends the mark. See
+    // `SLOWEST_STEP` - the world is being generated behind this, and a frame
+    // that took four seconds put nothing on the screen for any of them.
+    clock.real += time.delta_secs();
+    clock.frames += 1;
+    clock.spent += splash_step(time.delta_secs());
 
     let fade_out_at = SPLASH_FADE + SPLASH_HOLD;
-    let alpha = if clock.0 < SPLASH_FADE {
-        clock.0 / SPLASH_FADE
-    } else if clock.0 < fade_out_at {
+    let alpha = if clock.spent < SPLASH_FADE {
+        clock.spent / SPLASH_FADE
+    } else if clock.spent < fade_out_at {
         1.0
     } else {
-        1.0 - (clock.0 - fade_out_at) / SPLASH_FADE
+        1.0 - (clock.spent - fade_out_at) / SPLASH_FADE
     }
     .clamp(0.0, 1.0);
 
+    // (see `splash_step` for why the step is capped)
     // A key press skips ahead to the fade-out rather than cutting: the mark
     // still leaves the way it always leaves, just now. Jumping to the point
     // on the out-fade with the current alpha keeps the brightness continuous.
     let skipped =
         keys.get_just_pressed().next().is_some() || buttons.get_just_pressed().next().is_some();
-    if skipped && clock.0 < fade_out_at {
-        clock.0 = fade_out_at + (1.0 - alpha) * SPLASH_FADE;
+    if skipped && clock.spent < fade_out_at {
+        clock.spent = fade_out_at + (1.0 - alpha) * SPLASH_FADE;
     }
 
     for mut art in &mut arts {
@@ -361,7 +406,14 @@ fn play_splash(
         mark.0 = Color::srgba(0.82, 0.8, 0.76, alpha * 0.62);
     }
 
-    if clock.0 >= fade_out_at + SPLASH_FADE {
+    if clock.spent >= fade_out_at + SPLASH_FADE {
+        // What the mark actually got, in the two units that matter. A frame
+        // count in single figures here means it was swallowed by the world
+        // being built behind it, which is exactly how it went missing before.
+        info!(
+            "the studio's mark showed for {:.1}s over {} frames",
+            clock.real, clock.frames
+        );
         next.set(GameState::Title);
     }
 }
@@ -759,9 +811,7 @@ fn drift_smoke(
         let along = (puff.lane + t * puff.drift).fract();
         let span = reach.x * 2.0 * SMOKE_SPREAD;
         let band = reach.y * 2.0 * SMOKE_BAND;
-        let mut x = heart.x
-            + (along - 0.5) * span
-            + 0.03 * span * (t * 0.043 + puff.phase).sin();
+        let mut x = heart.x + (along - 0.5) * span + 0.03 * span * (t * 0.043 + puff.phase).sin();
         let mut y = heart.y
             + (puff.home_y - 0.5) * band
             + 0.10 * band * (t * 0.053 + puff.phase * 1.7).sin()
@@ -1581,7 +1631,6 @@ pub(crate) fn build_view_switches(commands: &mut Commands, parent: Entity) {
         let note = commands.spawn(ui::dim(switch.note())).id();
         commands.entity(note).insert(ChildOf(words));
     }
-
 }
 
 /// The knob inside a switch's track, which slides to say which way it is set.
@@ -1784,5 +1833,63 @@ mod tests {
             aim > 0.0,
             "turning the camera up is what moves the world down",
         );
+    }
+
+    /// Frames the way a real launch actually delivers them: the world is
+    /// generated behind the splash, so the first few take SECONDS.
+    ///
+    /// Measured off a run, not invented. `DIVUS_FACTUS_FRAMES=1` reported six
+    /// frames in the first five seconds, worst 4.65s.
+    const A_REAL_LAUNCH: [f32; 6] = [4.65, 0.84, 0.31, 0.12, 0.09, 0.05];
+
+    #[test]
+    fn a_slow_first_frame_cannot_swallow_the_studios_mark() {
+        // The bug Brett found: the mark's whole life is 4.4 seconds of real
+        // time, and ONE frame was longer than that. It faded in, held and
+        // faded out inside a frame that had drawn nothing, so the studio's
+        // mark never reached the screen.
+        let mut spent = 0.0;
+        for delta in A_REAL_LAUNCH {
+            spent += super::splash_step(delta);
+        }
+        assert!(
+            spent < super::splash_life(),
+            "the whole mark was spent in the {} frames it takes to open a \
+             world, before any of it was drawn: {spent}",
+            A_REAL_LAUNCH.len()
+        );
+    }
+
+    #[test]
+    fn the_mark_is_worth_a_useful_number_of_drawn_frames() {
+        let mut spent = 0.0;
+        let mut frames = 0;
+        for delta in A_REAL_LAUNCH {
+            spent += super::splash_step(delta);
+            frames += 1;
+        }
+        while spent < super::splash_life() {
+            spent += super::splash_step(1.0 / 60.0);
+            frames += 1;
+        }
+        assert!(
+            frames > 40,
+            "the mark only got {frames} frames on screen - a studio card that \
+             blinks is worse than none"
+        );
+    }
+
+    #[test]
+    fn the_mark_still_leaves_a_machine_that_never_speeds_up() {
+        // The cap must not become a hang. If EVERY frame stalls the splash
+        // still ends - which is why the step is bounded rather than thrown
+        // away, and the reason that distinction is worth a test.
+        let mut spent = 0.0;
+        let mut frames = 0;
+        while spent < super::splash_life() {
+            spent += super::splash_step(9.0);
+            frames += 1;
+            assert!(frames < 1_000, "the splash never ended");
+        }
     }
 }

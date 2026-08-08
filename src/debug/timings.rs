@@ -28,6 +28,15 @@ pub struct Timings {
     /// Name to (total seconds, times entered) since the last report.
     spent: Mutex<HashMap<&'static str, (f64, u32)>>,
     since: Mutex<Option<Instant>>,
+    /// When this frame's main-world work began.
+    opened: Mutex<Option<Instant>>,
+    /// Main-world seconds, whole-frame seconds, and frames, since the report.
+    whole: Mutex<(f64, f64, u32)>,
+    /// This ONE frame's watched systems, cleared at the end of every frame.
+    this_frame: Mutex<HashMap<&'static str, f64>>,
+    /// When a slow frame was last reported, so a sustained bad patch says so
+    /// once every couple of seconds rather than a dozen times a second.
+    last_cried: Mutex<Option<Instant>>,
 }
 
 impl Default for Timings {
@@ -36,8 +45,107 @@ impl Default for Timings {
             on: std::env::var("DIVUS_FACTUS_TIMINGS").is_ok(),
             spent: Mutex::new(HashMap::new()),
             since: Mutex::new(None),
+            opened: Mutex::new(None),
+            whole: Mutex::new((0.0, 0.0, 0)),
+            this_frame: Mutex::new(HashMap::new()),
+            last_cried: Mutex::new(None),
         }
     }
+}
+
+/// A main-world frame worse than this is worth a line of its own.
+///
+/// Well over the sixteen-and-two-thirds a sixty-hertz frame is allowed and well
+/// under the eighty this is hunting, so an ordinary frame never trips it and a
+/// bad one always does.
+const A_SLOW_FRAME: f64 = 0.025;
+
+/// Opens the frame's own stopwatch, first thing.
+fn open_the_frame(timings: Res<Timings>) {
+    if !timings.on {
+        return;
+    }
+    if let Ok(mut opened) = timings.opened.lock() {
+        *opened = Some(Instant::now());
+    }
+}
+
+/// Closes it, last thing, and banks both halves of the split.
+///
+/// The whole point of the pair. Every watch below can only ever exonerate a
+/// system that carries one, and a handful do — so "the systems add up to half a
+/// millisecond" was a fact about those systems and not about the game. A frame
+/// of ninety milliseconds with half a millisecond accounted for is a
+/// measurement that has not begun.
+///
+/// This splits the frame in two before any of it is attributed: what the MAIN
+/// WORLD spent — every system in every schedule, watched or not — and what is
+/// left, which is the renderer extracting, queueing, preparing, drawing and
+/// presenting. One number says which half of the engine to go and look in, and
+/// that is the question every frame-time hunt in this project has had to answer
+/// first, the hard way, each time.
+fn close_the_frame(timings: Res<Timings>, time: Res<Time<Real>>) {
+    if !timings.on {
+        return;
+    }
+    let Ok(opened) = timings.opened.lock() else {
+        return;
+    };
+    let Some(from) = *opened else {
+        return;
+    };
+    let main = from.elapsed().as_secs_f64();
+    if let Ok(mut whole) = timings.whole.lock() {
+        whole.0 += main;
+        whole.1 += time.delta_secs_f64();
+        whole.2 += 1;
+    }
+
+    // This frame's own watched systems, taken and cleared either way.
+    let mut named: Vec<(&'static str, f64)> = timings
+        .this_frame
+        .lock()
+        .map(|mut frame| {
+            let taken = frame.iter().map(|(name, spent)| (*name, *spent)).collect();
+            frame.clear();
+            taken
+        })
+        .unwrap_or_default();
+
+    // A bad frame says so AT THE TIME. The two-second averages below cannot
+    // see this: the trouble comes in bursts of a few seconds, and a burst
+    // averaged with the good frames either side of it reads as a mild
+    // wobble. Brett had it exactly - "sometimes it dips", "the fps is all
+    // over the place" - and an average is the one instrument that cannot
+    // answer a complaint phrased that way.
+    if main < A_SLOW_FRAME {
+        return;
+    }
+    let now = Instant::now();
+    let Ok(mut cried) = timings.last_cried.lock() else {
+        return;
+    };
+    if cried.is_some_and(|last| now.duration_since(last).as_secs_f32() < 2.0) {
+        return;
+    }
+    *cried = Some(now);
+
+    named.sort_by(|a, b| b.1.total_cmp(&a.1));
+    let watched: f64 = named.iter().map(|(_, spent)| spent).sum();
+    let told = named
+        .iter()
+        .take(4)
+        .map(|(name, spent)| format!("{name} {:.1}", spent * 1000.0))
+        .collect::<Vec<_>>()
+        .join(", ");
+    // The number that matters is the LAST one. If a slow frame is nearly all
+    // "unwatched", the culprit is a system with no stopwatch on it and the net
+    // has to be thrown wider; if it is small, the name is already in the list.
+    info!(
+        "a slow frame: {:.1}ms in the main world - {told} - and {:.1}ms unwatched",
+        main * 1000.0,
+        (main - watched).max(0.0) * 1000.0,
+    );
 }
 
 impl Timings {
@@ -68,12 +176,17 @@ impl Drop for Watch<'_> {
         let Some(from) = self.from else {
             return;
         };
-        let Ok(mut spent) = self.timings.spent.lock() else {
-            return;
-        };
-        let entry = spent.entry(self.name).or_insert((0.0, 0));
-        entry.0 += from.elapsed().as_secs_f64();
-        entry.1 += 1;
+        let took = from.elapsed().as_secs_f64();
+        if let Ok(mut spent) = self.timings.spent.lock() {
+            let entry = spent.entry(self.name).or_insert((0.0, 0));
+            entry.0 += took;
+            entry.1 += 1;
+        }
+        // And into this frame's own tally, which `close_the_frame` reads and
+        // empties. A system that runs twice in a frame adds to itself.
+        if let Ok(mut frame) = self.timings.this_frame.lock() {
+            *frame.entry(self.name).or_insert(0.0) += took;
+        }
     }
 }
 
@@ -103,8 +216,34 @@ pub fn report_timings(timings: Res<Timings>) {
     // Per FRAME, not per call: a system that runs three times a frame and a
     // system that runs once are both answering "how much of the frame did you
     // take", and that is the only question here.
-    let frames = rows.iter().map(|(_, _, hits)| *hits).max().unwrap_or(1).max(1);
-    info!("where the frames went, over {:.1}s and {frames} frames:", over);
+    let frames = rows
+        .iter()
+        .map(|(_, _, hits)| *hits)
+        .max()
+        .unwrap_or(1)
+        .max(1);
+    info!(
+        "where the frames went, over {:.1}s and {frames} frames:",
+        over
+    );
+
+    // The split first, because it says which half of the engine the rest of
+    // this list is even relevant to. See `close_the_frame`.
+    let mut whole = timings.whole.lock().unwrap();
+    let (main, frame, counted) = *whole;
+    *whole = (0.0, 0.0, 0);
+    drop(whole);
+    if counted > 0 {
+        let each = counted as f64;
+        let main = main * 1000.0 / each;
+        let frame = frame * 1000.0 / each;
+        info!(
+            "  {frame:>7.2}ms  THE FRAME  = {main:.2}ms main world (every system) \
+             + {:.2}ms renderer and present",
+            (frame - main).max(0.0),
+        );
+    }
+
     for (name, total, hits) in rows.iter().take(10) {
         info!(
             "  {:>7.2}ms/frame  {name}  ({hits} calls)",
@@ -119,7 +258,10 @@ pub struct TimingsPlugin;
 
 impl Plugin for TimingsPlugin {
     fn build(&self, app: &mut App) {
+        // Chained on purpose: the frame has to be closed before it is
+        // reported, or the split reads a frame's worth of nothing.
         app.init_resource::<Timings>()
-            .add_systems(Last, report_timings);
+            .add_systems(First, open_the_frame)
+            .add_systems(Last, (close_the_frame, report_timings).chain());
     }
 }

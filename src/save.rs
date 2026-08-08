@@ -353,6 +353,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                 match deposit.kind {
                     crate::matter::DepositKind::Iron => 0,
                     crate::matter::DepositKind::Clay => 1,
+                    crate::matter::DepositKind::Stone => 2,
                 },
                 at.translation(),
                 deposit.amount,
@@ -403,6 +404,8 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                 PileKind::Food => 0,
                 PileKind::Timber => 1,
                 PileKind::Stone => 2,
+                PileKind::Clay => 3,
+                PileKind::Ore => 4,
             };
             (kind, t.translation, t.rotation)
         })
@@ -660,6 +663,8 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                 PileKind::Food => 0,
                 PileKind::Timber => 1,
                 PileKind::Stone => 2,
+                PileKind::Clay => 3,
+                PileKind::Ore => 4,
             };
             (kind, r.to, r.to_rot, r.hauled, r.goal)
         })
@@ -928,6 +933,8 @@ fn apply(world: &mut World, save: SaveGame) {
             PileKind::Food => 0,
             PileKind::Timber => 1,
             PileKind::Stone => 2,
+            PileKind::Clay => 3,
+            PileKind::Ore => 4,
         };
         if let Some((_, pos, rot)) = save.piles.iter().find(|(k, _, _)| *k == kind) {
             transform.translation = *pos;
@@ -1003,6 +1010,8 @@ fn apply(world: &mut World, save: SaveGame) {
                     Visibility::default(),
                     crate::hand::PickRadius(b.blueprint.half_w.max(b.blueprint.half_d) + 0.9),
                     crate::hand::Rooted,
+                    // One piece, wherever on the sphere the save was made.
+                    crate::globe::RigidlySeated,
                 ))
                 .id();
             entity
@@ -1031,6 +1040,7 @@ fn apply(world: &mut World, save: SaveGame) {
             } else {
                 commands.entity(entity).insert((
                     Name::new(format!("{}, rising", kind.name())),
+                    crate::globe::RigidlySeated,
                     ConstructionSite {
                         progress: b.progress,
                         stage: b.stage,
@@ -1306,10 +1316,14 @@ fn apply(world: &mut World, save: SaveGame) {
                         &mut meshes,
                         &mut materials,
                         *pos,
-                        if *kind == 0 {
-                            crate::matter::DepositKind::Iron
-                        } else {
-                            crate::matter::DepositKind::Clay
+                        match kind {
+                            0 => crate::matter::DepositKind::Iron,
+                            2 => crate::matter::DepositKind::Stone,
+                            // Clay is the fallback rather than a case, so a
+                            // save written by a later build with a kind this
+                            // one has never heard of comes back as SOMETHING
+                            // in the ground instead of refusing to load.
+                            _ => crate::matter::DepositKind::Clay,
                         },
                         *amount,
                     );
@@ -1754,7 +1768,9 @@ mod tests {
         world.insert_resource(crate::terrain::LoadedChunks::default());
         world.insert_resource(crate::grass::GrassChunks::default());
         world.insert_resource(crate::hand::DivineHand::default());
-        world.insert_resource(crate::villager::ChosenGround(Some(Vec3::new(70.0, 0.0, 9.0))));
+        world.insert_resource(crate::villager::ChosenGround(Some(Vec3::new(
+            70.0, 0.0, 9.0,
+        ))));
         world.insert_resource(crate::villager::DivineName("Hesh".to_string()));
         let settlement = world.spawn_empty().id();
         world.insert_resource(SettlementSite {
@@ -1787,7 +1803,9 @@ mod tests {
              be founded at the abandoned world's spot"
         );
         assert!(
-            world.get_resource::<crate::villager::DivineName>().is_none(),
+            world
+                .get_resource::<crate::villager::DivineName>()
+                .is_none(),
             "the new world's god inherited the old one's name"
         );
     }

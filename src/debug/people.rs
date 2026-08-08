@@ -25,7 +25,17 @@ pub(crate) struct RowLabel(#[allow(dead_code)] Entity);
 /// Where the paperdoll stands: a stage far below the world, on its own
 /// render layer, seen by no one but its own camera.
 pub(crate) const DOLL_STAGE: Vec3 = Vec3::new(0.0, -600.0, 0.0);
-pub(crate) const DOLL_LAYER: usize = 2;
+// FOUR, and the number is load-bearing: 0 is the world, 1 the hand, 2 the
+// PLANET, 3 the deity's own alcove. This was 2 - free when the paperdoll was
+// built, claimed by the globe when the world went round - and a light shines
+// on every VIEW whose layers cross its own, so the portrait studio's thirteen
+// thousand lux key lit the whole main view through the god camera's [0, 2].
+// The world stopped having night the day the planet took layer 2, and nobody
+// connected the two for weeks: the real sun and moon ran their honest cycle
+// underneath a permanent studio noon. Brett: "at one point we made a sun and
+// moon and they cast light which made the planet have real day and night
+// cycles, not sure what happened." This happened.
+pub(crate) const DOLL_LAYER: usize = 4;
 
 /// The offscreen texture the paperdoll camera draws to.
 #[derive(Resource)]

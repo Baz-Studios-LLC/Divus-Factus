@@ -126,12 +126,23 @@ impl Layer {
 /// all — the scenery is either there or it is not, and the altitude is chosen so
 /// that when it goes it was only ever a green tint.
 ///
+/// It is no longer a free judgement, and that is worth saying plainly. Scenery
+/// grows on chunks — a tree is a child of the ground it stands in — so it
+/// cannot outlive [`crate::terrain::CHUNK_CEILING`], and that ceiling came down
+/// from fourteen hundred to seven when the plate did. It was measured at a
+/// thousand once, and by the numbers below the forest is still four percent of
+/// the frame at seven hundred, against the two percent Brett called a tint. So
+/// this is a trade and not a saving: some visible forest, for the frames that
+/// bought it. What softens it is that the dissolve has all but emptied the
+/// world by the time the ceiling arrives — see [`scenery_dissolved`], whose
+/// band moves down with this.
+///
 /// `DIVUS_FACTUS_SCENERY_CEILING` moves it for eyeballing.
 fn scenery_ceiling() -> f32 {
     std::env::var("DIVUS_FACTUS_SCENERY_CEILING")
         .ok()
         .and_then(|dial| dial.parse().ok())
-        .unwrap_or(1000.0)
+        .unwrap_or(crate::terrain::CHUNK_CEILING)
 }
 
 /// Whether ANY scenery is still drawn, given how far back the eye is.
@@ -287,7 +298,9 @@ fn apply_layers(
             With<crate::terrain::TerrainChunk>,
         )>,
     >,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("layers: apply_layers");
     // Hiding is enforced EVERY frame, because the systems that own these
     // entities keep setting them visible again. Showing happens only on the
     // frame a switch flips: handing everything back to `Inherited` every frame
@@ -339,9 +352,7 @@ fn apply_layers(
         // to trample. Every other layer is enforced when off and restored only
         // on the frame its own switch moved.
         let wanted = if layer == Layer::Scenery {
-            let gone = layers.hidden(layer)
-                || !draw_scenery
-                || scenery_dissolved(entity, distance);
+            let gone = layers.hidden(layer) || !draw_scenery || scenery_dissolved(entity, distance);
             Some(if gone {
                 Visibility::Hidden
             } else {
@@ -432,12 +443,33 @@ mod tests {
             if share <= A_TINT {
                 continue;
             }
+            // Below the ground's own ceiling only. A tree is a child of the
+            // chunk it grows in, so above `CHUNK_CEILING` there is nothing for
+            // one to stand in and "is the forest still worth drawing" stops
+            // being a question anyone gets to answer. The seven-hundred row
+            // below reads 4.12% and is skipped by exactly this: it is the one
+            // place where the plate coming in cost something that could be
+            // seen. See `scenery_ceiling`.
+            if distance >= crate::terrain::CHUNK_CEILING {
+                continue;
+            }
             assert!(
                 scenery_within_reach(distance, false),
                 "the scenery is {share}% of the frame at distance {distance} - \
                  cutting it there would be cutting the world, not an optimisation"
             );
         }
+    }
+
+    #[test]
+    fn the_scenery_never_outlives_the_ground_it_grows_in() {
+        assert!(
+            scenery_ceiling() <= crate::terrain::CHUNK_CEILING,
+            "the scenery ceiling is {} and the chunks stop at {} - every grove \
+             between the two is a tree told to stand where there is no ground",
+            scenery_ceiling(),
+            crate::terrain::CHUNK_CEILING,
+        );
     }
 
     #[test]

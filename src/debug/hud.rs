@@ -46,7 +46,7 @@ pub(crate) enum HudValue {
     DepthOfField,
 }
 
-pub(crate) fn spawn_hud(mut commands: Commands) {
+pub(crate) fn spawn_hud(mut commands: Commands, mouse: Res<crate::keymap::MouseScheme>) {
     // The dev overlay, hidden until the backquote asks for it. It borrows
     // the HUD's own live values — a row here is a HudValue and a Node.
     commands.spawn((
@@ -138,12 +138,17 @@ pub(crate) fn spawn_hud(mut commands: Commands) {
         commands.entity(row.value).insert(value);
     }
 
+    // Written from the scheme rather than by hand, so the help can never
+    // contradict the buttons - it did, the moment the buttons became a
+    // setting.
     let hints = commands
-        .spawn(ui::dim(
-            "MMB-drag pans, RMB orbits, the wheel zooms; the letter keys \n\
-             live in the codex settings / hold LMB to grab, flick to throw \n\
-             / F1 hides this panel",
-        ))
+        .spawn(ui::dim(format!(
+            "{land}-drag grabs the land, MMB orbits, the wheel zooms; the \n\
+             letter keys live in the codex settings / hold {action} to pick \n\
+             up, flick to throw / F1 hides this panel",
+            land = mouse.land_name(),
+            action = mouse.action_name(),
+        )))
         .id();
     commands.entity(hints).insert((
         ChildOf(hud.root),
@@ -535,6 +540,12 @@ pub(crate) fn report_frames(
     lit: Query<(), (With<Mesh3d>, Without<bevy::light::NotShadowCaster>)>,
     veils: Query<&MeshMaterial3d<crate::fog::FogMaterial>>,
     folk: Query<(), With<crate::villager::Villager>>,
+    // Shown against standing, because those two are a different question from
+    // all of the above. A patch that is resident but hidden costs memory; one
+    // that is SHOWN costs the frame, and the gap between the two is the whole
+    // subject of the limb cull. `meshes` counts both alike and cannot tell
+    // them apart.
+    detail: Res<crate::globe::PlanetDetail>,
     known: Option<Res<crate::villager::explore::KnownWorld>>,
 ) {
     let ms = time.delta_secs() * 1000.0;
@@ -547,7 +558,7 @@ pub(crate) fn report_frames(
     let distance = rigs.iter().next().map_or(0.0, |rig| rig.distance);
     info!(
         "frames: avg {:.1}ms, worst {:.1}ms over {} frames | zoom {:.0} chunks {} meshes {} \
-         casters {} veils {} folk {}",
+         casters {} veils {} patches {}/{} folk {}",
         window.0 / window.1 as f32,
         window.2,
         window.1,
@@ -556,6 +567,8 @@ pub(crate) fn report_frames(
         meshes.iter().count(),
         lit.iter().count(),
         veils.iter().count(),
+        detail.shown,
+        detail.built,
         folk.iter().count(),
     );
     if let Some(known) = known {

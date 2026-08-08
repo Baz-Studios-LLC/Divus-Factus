@@ -505,18 +505,22 @@ fn populate_chunks(
                     // needs, so what is left on the open ground is there to
                     // look like ground and nothing else - and at six in a
                     // hundred it still read as gravel strewn everywhere.
-                    if rng.chance(0.018) {
+                    if rng.chance(SLOPE_BOULDER) {
                         let roll = roll_rock(&mut rng);
-                        let near_village = settlement.as_ref().is_some_and(|site| {
-                            Vec2::new(x - site.centre.x, z - site.centre.z).length()
-                                < TREE_HARVEST_RADIUS
-                        });
                         if stripped.is_stripped(x, z) {
                             // Bare ground still burns the rock's dice, or
                             // carrying one rock off would reshuffle every
                             // neighbour on the next chunk rebuild.
                             bake_rock(&mut MeshBuilder::default(), local, &mut rng);
-                        } else if near_village {
+                        } else {
+                            // A REAL rock, however far from home. These were
+                            // baked scenery beyond the village's reach, which
+                            // was fine while rocks were furniture - and wrong
+                            // the day the god became a hauler. Brett, denied:
+                            // "it is very jarring to not be able to pick up a
+                            // resource." Boulders are a rare roll, so the
+                            // entity count stays a rounding error; the pebble
+                            // litter below is still baked.
                             let rock = spawn_boulder(
                                 &mut commands,
                                 &mut meshes,
@@ -527,8 +531,6 @@ fn populate_chunks(
                                 Some(library),
                             );
                             commands.entity(rock).insert(ChildOf(entity));
-                        } else {
-                            bake_rock(&mut builder, local - seated, &mut rng);
                         }
                     }
                 } else if forest > 0.50 && moisture > 0.38 {
@@ -567,21 +569,19 @@ fn populate_chunks(
                             commands.entity(bush).insert(ChildOf(entity));
                         }
                     }
-                } else if rng.chance(0.012) {
+                } else if rng.chance(LOOSE_BOULDER) {
                     // A stone here and there on open ground, where it used to be
                     // one in eighteen scatter points - which reads as gravel
                     // spilled over the whole world rather than as country.
                     // (The flat-ground rocks were baked scenery at first, and
                     // the whole civic ladder starved for stone on any village
-                    // founded on flat land; the outcrops carry that now.)
+                    // founded on flat land; the QUARRIES carry that now, and
+                    // the outcrops before them.)
                     let roll = roll_rock(&mut rng);
-                    let near_village = settlement.as_ref().is_some_and(|site| {
-                        Vec2::new(x - site.centre.x, z - site.centre.z).length()
-                            < TREE_HARVEST_RADIUS
-                    });
                     if stripped.is_stripped(x, z) {
                         bake_rock(&mut MeshBuilder::default(), local, &mut rng);
-                    } else if near_village {
+                    } else {
+                        // Live everywhere, same as the slope roll above.
                         let rock = spawn_boulder(
                             &mut commands,
                             &mut meshes,
@@ -592,8 +592,6 @@ fn populate_chunks(
                             Some(library),
                         );
                         commands.entity(rock).insert(ChildOf(entity));
-                    } else {
-                        bake_rock(&mut builder, local - seated, &mut rng);
                     }
                 } else if rng.chance(0.05 * scarcity) {
                     let bush = spawn_bush(
@@ -624,7 +622,7 @@ fn populate_chunks(
                         &mut rng,
                     );
                     commands.entity(flowers).insert(ChildOf(entity));
-                } else if rng.chance(0.05) {
+                } else if rng.chance(LOOSE_PEBBLE) {
                     bake_rock(&mut builder, local - seated, &mut rng);
                 }
             }
@@ -748,6 +746,29 @@ fn populate_chunks(
 /// World units between scatter sample points.
 const SCATTER_SPACING: f32 = 4.5;
 
+/// The chance a scatter point on open ground is a loose pebble, a boulder on
+/// the flat, and a boulder on a slope.
+///
+/// A tenth of what they were, and the third time this has been cut. Brett,
+/// looking at a green meadow with a stone every few strides: "There is still
+/// entirely too many rocks on the ground... lets go back to removing about 90%
+/// of the small rocks and add quarries."
+///
+/// The pebble is the one that mattered. It is the LAST branch of the scatter
+/// chain, so on open meadow — where no tree, bush or herb roll has taken the
+/// point first — one point in twenty became a stone, which is about ten a
+/// chunk over every chunk in the world. The two boulder rolls were already
+/// down at one and two in a hundred and still read as gravel, because a
+/// hundred scatter points is a few strides of walking.
+///
+/// What makes this affordable is that the stone a village needs no longer
+/// comes off the ground: it comes out of [`crate::matter::DepositKind::Stone`].
+/// The rocks left here are scenery, and are meant to read as a stone in the
+/// grass rather than as a supply.
+const LOOSE_PEBBLE: f32 = 0.005;
+const LOOSE_BOULDER: f32 = 0.0012;
+const SLOPE_BOULDER: f32 = 0.002;
+
 /// Side of the grove bucket: trees within one cell share a rendered mesh.
 ///
 /// Fourteen units, and MEASURED rather than inherited. The obvious economy is to
@@ -785,6 +806,9 @@ const GROVE_SPAN: f32 = 14.0;
 /// walk to is real: nothing in arm's reach is set dressing. (Going fully
 /// real everywhere was measured and rejected: 13.6k scenery entities
 /// halved the release frame rate, 59fps to 31.)
+// Kept for the tests that price the scatter against a working walk; the
+// live near-village gate it once served fell when every boulder went live.
+#[allow(dead_code)]
 pub const TREE_HARVEST_RADIUS: f32 = 190.0;
 
 /// Ground the village has already stripped: felled trees and mined-out
@@ -916,7 +940,9 @@ pub(crate) fn rebake_groves(
     mut dirty: ResMut<DirtyGroves>,
     trees: Query<(&Transform, &TreeBody, &InGrove)>,
     groves: Query<&Transform, (With<GroveMesh>, Without<RebakingGrove>)>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("scatter: rebake_groves");
     // Fresh marks (re)start their grove's clock — promptly for a lone fell,
     // at the full quiet for a grove that is still warm from the last one.
     let now = time.elapsed_secs();
@@ -1376,6 +1402,63 @@ pub fn regrow_food(
 mod tests {
     use super::*;
 
+    /// Scatter points in one chunk — the dice this world rolls per chunk.
+    fn points_per_chunk() -> f32 {
+        let steps = (CHUNK_SIZE / SCATTER_SPACING) as i32;
+        (steps * steps) as f32
+    }
+
+    /// A chunk of open meadow must not read as gravel.
+    ///
+    /// Brett has now asked for this three times, which is twice more than any
+    /// number in a game should need. So the claim goes in the suite rather
+    /// than in a comment: a sixty-four unit square of empty ground is allowed
+    /// a couple of stones in it, not a dozen.
+    ///
+    /// The pebble is the roll that matters, because it is the LAST branch of
+    /// the scatter chain — on open ground, where no tree, bush or herb has
+    /// taken the point first, it is the only thing left to be. Its old one in
+    /// twenty put about ten stones in every chunk in the world.
+    #[test]
+    fn open_ground_is_ground_and_not_gravel() {
+        // The worst case is the honest one: a meadow, where every point falls
+        // through to the last branch.
+        let stones = points_per_chunk() * (LOOSE_PEBBLE + LOOSE_BOULDER);
+        assert!(
+            stones <= 2.0,
+            "a chunk of open ground carries about {stones:.1} stones - Brett has \
+             called that gravel three times now"
+        );
+        // And not so bare that stone stops existing as a texture at all: the
+        // point was to thin it, not to sweep the world.
+        assert!(
+            stones > 0.5,
+            "only {stones:.2} stones a chunk - the ground has been swept clean, \
+             which is a different kind of wrong"
+        );
+    }
+
+    /// The village's stone does not come off the ground any more.
+    ///
+    /// A guard on the reasoning rather than on the look: thinning the loose
+    /// rock is only affordable BECAUSE the quarries carry the economy. If the
+    /// scatter ever goes back to being a supply, one of these two numbers has
+    /// drifted and the other should have moved with it.
+    #[test]
+    fn loose_stone_is_scenery_and_not_a_supply() {
+        // Within a miner's reach of the square, at the old rate, there were
+        // hundreds of harvestable stones - more than the whole civic ladder
+        // ever wanted, which is why nothing needed a quarry.
+        let chunks_in_reach = std::f32::consts::PI * (TREE_HARVEST_RADIUS / CHUNK_SIZE).powi(2);
+        let harvestable = chunks_in_reach * points_per_chunk() * LOOSE_BOULDER;
+        assert!(
+            harvestable < 30.0,
+            "{harvestable:.0} loose boulders stand within a miner's reach - at \
+             a couple of stone each that is the whole civic ladder off the \
+             ground, and the quarries are decoration"
+        );
+    }
+
     /// Drives [`rebake_groves`] with a grove holding one tree, and reports
     /// whether the bake was started this frame.
     ///
@@ -1386,6 +1469,9 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins)
             .init_resource::<DirtyGroves>()
+            // The bake carries a stopwatch now, and a system asking for a
+            // resource that is not there is an ERROR rather than a no-op.
+            .init_resource::<crate::debug::timings::Timings>()
             .add_systems(Update, rebake_groves);
         let grove = app
             .world_mut()

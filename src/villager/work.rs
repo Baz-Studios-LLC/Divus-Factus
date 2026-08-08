@@ -116,11 +116,322 @@ pub(super) fn haul_wood(
             target.0 = Some(ground.woodpile);
             continue;
         }
+        // The far end of the only resource in this village that has to be
+        // CARRIED. Stone and food are credited where they are won; timber is
+        // won in the woods and only becomes the village's here. So when the
+        // stores read plenty of food, rising stone and a flat nought of
+        // timber - which is exactly what Brett was looking at - the question
+        // is which half of that walk failed, and until these two lines existed
+        // there was no way to tell from outside.
+        info!("{:.0} timber reached the pile", carrying.amount);
         store.timber += carrying.amount;
         commands.entity(entity).remove::<CarryingWood>();
         shed_wood(&mut commands, entity, &children, &loads);
         *activity = Activity::Idle;
         target.0 = None;
+    }
+}
+
+/// How near an offering must land to count as given, to a build site or to
+/// the village stores.
+const OFFERING_REACH: f32 = 9.0;
+
+/// What a god-given thing is worth, in the store's own units.
+///
+/// A tree pays what felling it would have paid - the god saves the walk and
+/// the axe-work, not the arithmetic - and stone pays by the mass of the rock,
+/// so an outcrop-sized boulder is worth a working day and a loaf-sized stone
+/// is worth a stone.
+pub(crate) fn offering_worth(matter: &crate::matter::Matter) -> (f32, f32) {
+    match matter.substance {
+        crate::matter::Substance::Wood => {
+            // `Matter::felled_tree` writes mass as 30 + maturity * 50, so this
+            // reads maturity back out and pays the feller's own yield.
+            let maturity = ((matter.mass - 30.0) / 50.0).clamp(0.0, 1.0);
+            (2.0 + maturity, 0.0)
+        }
+        crate::matter::Substance::Stone => (0.0, (matter.mass / 60.0).clamp(1.5, 8.0)),
+        crate::matter::Substance::Plant => (0.0, 0.0),
+    }
+}
+
+/// The god's own hand provisions a build.
+///
+/// A tree or boulder carried by the hand and set down at a construction site -
+/// or on the village stores - becomes the timber or stone it is made of.
+/// Brett: "I want the ability to pick up trees and rocks and help them build
+/// with them similar to B&W", and this is that loop: uproot a tree, drop it on
+/// the scaffold, and the village builds with what the god gave.
+///
+/// Only the DIVINELY PLACED convert - the mark the hand leaves on whatever it
+/// sets down, already load-bearing for answered prayers. Without that gate
+/// every boulder lying naturally beside a build site would quietly become
+/// masonry, and the scenery would feed the economy on its own.
+pub(super) fn receive_offerings(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    offered: Query<
+        (
+            Entity,
+            &Transform,
+            Option<&crate::matter::Matter>,
+            Option<&crate::matter::Lump>,
+            Option<&Goods>,
+            Option<&crate::scatter::FoodSource>,
+            Option<&crate::scatter::SacredFlora>,
+            Option<&crate::creature::genome::CreatureGenome>,
+            Has<crate::creature::wildlife::Wild>,
+        ),
+        (
+            With<crate::hand::DivinelyPlaced>,
+            Without<crate::creature::Held>,
+            Without<Airborne>,
+            Without<crate::villager::Person>,
+        ),
+    >,
+    mut sites: Query<(
+        &Transform,
+        &crate::villager::MemberOf,
+        &mut ConstructionSite,
+        &Blueprint,
+    )>,
+    mut towns: Query<(Entity, &crate::villager::SettlementGround, &mut Stockpile)>,
+    mut notices: MessageWriter<crate::ui::Notice>,
+    mut witnessed: MessageWriter<crate::witness::DivineEvent>,
+) {
+    use crate::palette;
+    for (offering, at, matter, lump, goods, food, sacred, genome, wild) in &offered {
+        // What this thing is worth, and what colour its essence bursts in.
+        // Wood pays the feller's rate, stone the rock's mass, a berry bush
+        // the meals still on it, and a wild animal the hunter's own carcass
+        // rate - Brett: "same with rocks or food (I should be able to grab
+        // bushes or animals for the food)". A PERSON is never an offering,
+        // which the query above enforces before any arithmetic can.
+        // (timber, stone, clay, ore, berries, meat, incense, dye) - the whole
+        // pantry - plus the colours its essence bursts in.
+        let mut pays = [0.0f32; 8];
+        // A withdrawn parcel FIRST, before the generic matter arm can claim
+        // it: parcels wear `Matter` for physics, and the matter arm priced
+        // every one of them as the stone its boulder-body pretended to be -
+        // clay came back as masonry and burst in grey. Brett: "the particles
+        // are stone colored not clay colored... same for food and wood." A
+        // parcel pays back exactly the kind and amount that was drawn.
+        let colors: Vec<Color> = if let Some(parcel) = goods {
+            match parcel.kind {
+                PileKind::Timber => {
+                    pays[0] = parcel.amount;
+                    vec![
+                        palette::shade(&palette::WOOD, 0.55),
+                        palette::shade(&palette::WOOD, 0.4),
+                    ]
+                }
+                PileKind::Stone => {
+                    pays[1] = parcel.amount;
+                    vec![
+                        palette::shade(&palette::STONE, 0.6),
+                        palette::shade(&palette::STONE, 0.85),
+                    ]
+                }
+                PileKind::Clay => {
+                    pays[2] = parcel.amount;
+                    vec![Color::srgb(0.62, 0.36, 0.24), Color::srgb(0.5, 0.28, 0.2)]
+                }
+                PileKind::Ore => {
+                    pays[3] = parcel.amount;
+                    vec![Color::srgb(0.48, 0.26, 0.14), Color::srgb(0.3, 0.3, 0.34)]
+                }
+                PileKind::Food => {
+                    pays[4] = parcel.amount;
+                    vec![
+                        palette::shade(&palette::CLOTH_RED, 0.85),
+                        palette::shade(&palette::BONE, 0.75),
+                    ]
+                }
+            }
+        } else if let Some(lump) = lump {
+            match lump.kind {
+                crate::matter::DepositKind::Clay => {
+                    pays[2] = lump.amount;
+                    vec![Color::srgb(0.62, 0.36, 0.24), Color::srgb(0.5, 0.28, 0.2)]
+                }
+                crate::matter::DepositKind::Iron => {
+                    pays[3] = lump.amount;
+                    vec![Color::srgb(0.48, 0.26, 0.14), Color::srgb(0.3, 0.3, 0.34)]
+                }
+                crate::matter::DepositKind::Stone => {
+                    pays[1] = lump.amount;
+                    vec![
+                        palette::shade(&palette::STONE, 0.6),
+                        palette::shade(&palette::STONE, 0.85),
+                    ]
+                }
+            }
+        } else if let Some(flora) = sacred {
+            match flora.kind {
+                crate::scatter::SacredKind::Incense => {
+                    pays[6] = flora.amount;
+                    vec![
+                        palette::shade(&palette::BONE, 0.85),
+                        palette::shade(&palette::STONE, 0.9),
+                    ]
+                }
+                crate::scatter::SacredKind::Dye => {
+                    pays[7] = flora.amount;
+                    vec![
+                        palette::shade(&palette::CLOTH_RED, 0.9),
+                        palette::shade(&palette::GRASS, 0.65),
+                    ]
+                }
+            }
+        } else if let Some(source) = food {
+            pays[4] = source.amount;
+            vec![
+                palette::shade(&palette::CLOTH_RED, 0.85),
+                palette::shade(&palette::GRASS, 0.6),
+            ]
+        } else if wild && genome.is_some() {
+            pays[5] = CARCASS_FOOD;
+            vec![
+                palette::shade(&palette::CLOTH_RED, 0.55),
+                palette::shade(&palette::BONE, 0.9),
+            ]
+        } else if let Some(matter) = matter {
+            let (t, s) = offering_worth(matter);
+            pays[0] = t;
+            pays[1] = s;
+            match matter.substance {
+                crate::matter::Substance::Wood => vec![
+                    palette::shade(&palette::WOOD, 0.55),
+                    palette::shade(&palette::GRASS, 0.55),
+                ],
+                crate::matter::Substance::Stone => vec![
+                    palette::shade(&palette::STONE, 0.6),
+                    palette::shade(&palette::STONE, 0.85),
+                ],
+                crate::matter::Substance::Plant => vec![],
+            }
+        } else {
+            continue;
+        };
+        let [
+            mut timber,
+            mut stone,
+            clay,
+            ore,
+            berries,
+            meat,
+            incense,
+            dye,
+        ] = pays;
+        if pays.iter().all(|worth| *worth <= 0.0) {
+            continue;
+        }
+        let here = at.translation;
+
+        // A build site takes the offering for its own town; failing that, the
+        // village stores take it at the woodpile. Whichever takes it is also
+        // where the burst GATHERS - the essence visibly joins what took it.
+        //
+        // Dropped ON a rising building, the materials go into THAT BUILDING
+        // first - "dropping resources on a partially built building should
+        // add to the building's missing materials" - stone into the footing
+        // it still wants, timber into the frame's progress. The last half
+        // log is left for a carpenter's hands, the same line helpers hold:
+        // many hands and even the god's speed a build, but a person finishes
+        // it. Whatever the site cannot take spills over into the stores.
+        let mut town_and_home = None;
+        for (site_at, member, mut construction, plan) in &mut sites {
+            if site_at.translation.distance(here) >= OFFERING_REACH {
+                continue;
+            }
+            let footing_want =
+                (construction.footing_stone(plan.kind) - construction.stone_laid).max(0.0);
+            let laid = stone.min(footing_want);
+            construction.stone_laid += laid;
+            stone -= laid;
+
+            let frame_want = (plan.kind.timber_cost() - 0.5 - construction.progress).max(0.0);
+            let framed = timber.min(frame_want);
+            construction.progress += framed;
+            timber -= framed;
+
+            // The burst tells the truth about where the gift went: into the
+            // frame while the frame wants it, and to the STORES once the
+            // site is full - a drop on a finished frame gathered into the
+            // scaffold anyway, and read as swallowed. Brett: "adding more
+            // wood doesn't bring the number up any... but the wood still
+            // goes into it?" It goes to the pile, and now it visibly does.
+            town_and_home = Some((member.0, site_at.translation, laid + framed > 0.0));
+            break;
+        }
+        let taker = town_and_home
+            .map(|(town, site, took)| (town, (took).then_some(site)))
+            .or_else(|| {
+                towns
+                    .iter()
+                    .filter(|(_, ground, _)| ground.woodpile.distance(here) < OFFERING_REACH)
+                    .map(|(town, _, _)| (town, None))
+                    .next()
+            });
+        let Some((town, site_home)) = taker else {
+            continue;
+        };
+        let Ok((_, ground, mut store)) = towns.get_mut(town) else {
+            continue;
+        };
+        let home = site_home.unwrap_or(ground.woodpile);
+
+        store.timber += timber;
+        store.stone += stone;
+        store.clay += clay;
+        store.ore += ore;
+        store.incense += incense;
+        store.dye += dye;
+        if berries > 0.0 {
+            store.larder.add(FoodKind::Berries, berries);
+        }
+        if meat > 0.0 {
+            store.larder.add(FoodKind::Meat, meat);
+        }
+        // The pop: the thing becomes its essence where everyone can see it,
+        // bursting in its own colours and gathering into what took it.
+        crate::matter::burst_of(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            here,
+            home,
+            &colors,
+        );
+        commands.entity(offering).despawn();
+        // Named by what it WAS, not what spilled over: pays[] still holds the
+        // whole gift even where the site swallowed a share of it.
+        let [t, s, c, o, b, m, i, d] = pays;
+        let named = [
+            ("timber", t),
+            ("stone", s),
+            ("clay", c),
+            ("ore", o),
+            ("food", b + m),
+            ("incense", i),
+            ("dye", d),
+        ];
+        let (name, worth) = named
+            .iter()
+            .max_by(|a, b| a.1.total_cmp(&b.1))
+            .copied()
+            .unwrap_or(("providence", 0.0));
+        notices.write(crate::ui::Notice::new(format!(
+            "The god provides: {worth:.0} {name}"
+        )));
+        // Seen and believed: providence with witnesses is the whole game.
+        witnessed.write(crate::witness::DivineEvent {
+            kind: crate::witness::DivineEventKind::Provided,
+            position: here,
+            subject: None,
+            intensity: 0.6,
+        });
     }
 }
 
@@ -350,6 +661,7 @@ pub(super) fn salvage_timber(
                     target.0 = Some(log_at.translation);
                 } else {
                     // Shoulder it: the log entity vanishes into the load.
+                    info!("a loose log was salvaged by hand (divinely marked: {marked})");
                     commands.entity(log).despawn();
                     shoulder_wood(&mut commands, &mut meshes, &mut materials, villager);
                     if marked {
@@ -1298,6 +1610,13 @@ pub(super) fn do_work(
                     match deposit.kind {
                         crate::matter::DepositKind::Iron => store.ore += 1.0,
                         crate::matter::DepositKind::Clay => store.clay += 1.0,
+                        // A quarry pays like a boulder does, because the work
+                        // is the same work - a pick, a barrow, and a walk
+                        // home. What it does not do is run out after four
+                        // blows, which is the whole reason it exists.
+                        crate::matter::DepositKind::Stone => {
+                            store.stone += LOOSE_STONE + skill * 1.5
+                        }
                     }
                     if deposit.amount <= 0.5 {
                         // A worked-out vein settles back into the earth.
@@ -1397,6 +1716,8 @@ pub(super) fn do_work(
                     } else {
                         2.0
                     } + skill;
+                    // And the near end of it. See `haul_wood`.
+                    info!("a tree came down: {yield_:.0} timber shouldered");
                     commands
                         .entity(entity)
                         .insert(CarryingWood { amount: yield_ });
@@ -1417,9 +1738,20 @@ pub(super) fn do_work(
                     // flat and rolls back into the hillside around it.
                     let level = terrain.height_at(job.site.x, job.site.z);
                     terrain.flatten(job.site.x, job.site.z, 3.4, 2.6, level);
-                    for chunk in chunks.take_near(job.site.x, job.site.z, 7.0) {
-                        commands.entity(chunk).despawn();
-                    }
+                    // Rebuilt in place, not despawned for the streamer to
+                    // refill: the streamer takes several budgeted frames to
+                    // notice, and every tilled field opened a chunk-sized
+                    // hole in the world while it did.
+                    crate::terrain::rebuild_chunks_near(
+                        &mut commands,
+                        &mut meshes,
+                        &terrain_assets,
+                        &terrain,
+                        &mut chunks,
+                        job.site.x,
+                        job.site.z,
+                        7.0,
+                    );
                     grass.invalidate_near(&mut commands, job.site.x, job.site.z, 7.0);
                     let at = Vec3::new(job.site.x, level, job.site.z);
                     // A field beside other fields shares their rows — the
@@ -1592,6 +1924,89 @@ pub(super) fn do_work(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The offering loop, end to end, in a bare world: a divinely-set-down
+    /// tree beside the woodpile must become timber AND burst into sparks.
+    ///
+    /// Written because the live game did neither and two rounds of tracer
+    /// logging could not say why: the conversion, the notice and the burst
+    /// all hang off one query, so if that query is wrong the whole feature
+    /// silently is. This bench asks the exact question the game asks.
+    #[test]
+    fn an_offering_at_the_pile_becomes_stores_and_sparks() {
+        let mut app = bevy::app::App::new();
+        app.add_plugins(bevy::app::ScheduleRunnerPlugin::default())
+            .add_message::<crate::ui::Notice>()
+            .add_message::<crate::witness::DivineEvent>()
+            .init_resource::<Assets<Mesh>>()
+            .init_resource::<Assets<StandardMaterial>>()
+            .add_systems(Update, receive_offerings);
+
+        let pile = Vec3::new(10.0, 40.0, -6.0);
+        app.world_mut().spawn((
+            crate::villager::SettlementGround {
+                centre: pile,
+                radius: 40.0,
+                woodpile: pile,
+            },
+            Stockpile::default(),
+        ));
+        app.world_mut().spawn((
+            Transform::from_translation(pile + Vec3::X * 2.0),
+            crate::matter::Matter::felled_tree(1.0),
+            crate::hand::DivinelyPlaced { remaining: 20.0 },
+        ));
+
+        app.update();
+
+        let world = app.world_mut();
+        let store = world
+            .query::<&Stockpile>()
+            .single(world)
+            .expect("the town still stands");
+        assert!(
+            (store.timber - 3.0).abs() < 0.01,
+            "a mature offered tree should pay 3 timber, the store holds {}",
+            store.timber
+        );
+        let sparks = world.query::<&crate::matter::Spark>().iter(world).count();
+        assert!(
+            sparks >= 12,
+            "the burst should fill the air with flecks; {sparks} spawned"
+        );
+    }
+
+    /// What the god's own deliveries pay, held against what labour pays.
+    ///
+    /// A dropped tree must be worth what felling it is worth - the god saves
+    /// the walk, not the arithmetic - or provisioning becomes either pointless
+    /// or the only sane way to play. Stone scales with the rock: a loaf-sized
+    /// stone is a stone, an outcrop is a working day.
+    #[test]
+    fn an_offering_pays_what_the_labour_would_have() {
+        // A mature tree: the feller's own yield without a sawmill is 2.0
+        // plus skill; the offering pays the skilless rate.
+        let tree = crate::matter::Matter::felled_tree(1.0);
+        let (timber, stone) = offering_worth(&tree);
+        assert!((timber - 3.0).abs() < 0.01, "a mature tree pays {timber}");
+        assert_eq!(stone, 0.0);
+
+        // A sapling pays less than a grown tree.
+        let sapling = crate::matter::Matter::felled_tree(0.1);
+        assert!(offering_worth(&sapling).0 < timber);
+
+        // A common boulder is a couple of stone; a great outcrop boulder is
+        // capped so one throw cannot fill the yard.
+        let stone_small = crate::matter::Matter::boulder(120.0, 0.9);
+        let (t, s) = offering_worth(&stone_small);
+        assert_eq!(t, 0.0);
+        assert!((1.5..=3.0).contains(&s), "a common boulder pays {s}");
+        let outcrop = crate::matter::Matter::boulder(500.0, 3.0);
+        assert_eq!(offering_worth(&outcrop).1, 8.0, "the cap holds");
+
+        // A bush is a bush.
+        assert_eq!(offering_worth(&crate::matter::Matter::bush()), (0.0, 0.0));
+    }
     use crate::rng::Rng;
 
     #[test]

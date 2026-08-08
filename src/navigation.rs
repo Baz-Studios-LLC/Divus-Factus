@@ -32,14 +32,236 @@ pub struct NavigationPlugin;
 impl Plugin for NavigationPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Walls>()
+            .init_resource::<Reachable>()
             // Before the routes that read it, and in the same frame a building
             // finishes: a hall that is standing but not yet an obstacle is a
             // hall people walk through for as long as their current route
             // lasts.
             .add_systems(
                 Update,
-                survey_the_walls.before(crate::creature::plan_routes),
+                (survey_the_walls, chart_the_ground).before(crate::creature::plan_routes),
             );
+    }
+}
+
+// ------------------------------------------------------- what can be reached
+
+/// Cells charted per frame while the map is being drawn.
+///
+/// The charting is a flood fill over tens of thousands of cells, and each one
+/// costs a terrain query - noise plus a walk of the drainage bins. Done in one
+/// go that is a visible hitch, so it is spread instead: the map is simply
+/// incomplete for a second or so after a village is founded, and an incomplete
+/// map answers "I do not know" and costs nothing.
+const CHARTED_PER_FRAME: usize = 900;
+
+/// How far around the village the ground is charted, in world units.
+///
+/// Errands are bounded - `WORK_REACH` is a hundred and seventy, the foresters'
+/// radius a hundred and ninety - so a map of the ground a village actually uses
+/// is a bounded thing even though the world is not.
+const CHARTED_REACH: f32 = 300.0;
+
+/// How often the whole map is drawn again, in seconds of real time.
+///
+/// The world does change: ground gets terraced, a dock reaches out over water,
+/// a quarry cuts a pit. All of those can JOIN two shores that were separate,
+/// and a stale map would go on refusing an errand that has become possible. So
+/// it is redrawn rather than patched - the whole thing costs a second of
+/// background charting, and being occasionally slow to notice a new bridge is
+/// the only failure it can have.
+const REDRAW_AFTER: f32 = 30.0;
+
+/// Which island of walkable ground each cell belongs to.
+///
+/// The point of it: **a search that fails is the most expensive search there
+/// is.** It expands its entire budget - three thousand cells - before it can
+/// say no, and a villager who wants something across a bay asks again the next
+/// frame. That is what `creature::plan_routes` was doing at seventy-six
+/// milliseconds of an eighty-one millisecond frame.
+///
+/// With the ground charted, "can I get there" is two lookups and an integer
+/// comparison, and the failing search never runs at all. This is the standard
+/// answer to the problem - label the connected regions, compare the labels -
+/// and the reason it took a workaround first is that the textbook version
+/// assumes a bounded, baked map and this world has neither.
+///
+/// **It is deliberately a one-way test.** The chart is drawn from the TERRAIN
+/// alone and knows nothing about buildings, so it describes a world with strictly
+/// more ways through than the real one. Different regions therefore mean "no
+/// path exists" and can be trusted; the same region means only "maybe", and the
+/// search runs exactly as it always did. A building can never join two shores,
+/// so nothing is lost by leaving them out - and leaving them out is what lets
+/// one chart serve every errand, since walls are excused per errand (see
+/// [`Walls::excused`]) and a chart that knew about them would be wrong for
+/// whoever the excusal was for.
+#[derive(Resource, Default)]
+pub struct Reachable {
+    /// Cell to the island it belongs to. Absent means unwalkable or uncharted -
+    /// the two are told apart by `covers`.
+    island: HashMap<Cell, u32>,
+    /// The middle of the charted window, and how far it reaches in cells.
+    centre: Cell,
+    reach: i32,
+    /// Cells still to visit in the fill being drawn, and what is known so far.
+    frontier: Vec<(Cell, u32)>,
+    drawing: Option<(HashMap<Cell, u32>, u32, Cell, i32)>,
+    /// Where the sweep for fresh seeds has got to, as an index into the window.
+    swept: i32,
+    /// Real seconds since the standing chart was finished.
+    age: f32,
+}
+
+impl Reachable {
+    /// Whether this position is inside the charted window at all.
+    fn covers(&self, at: Vec3) -> bool {
+        if self.reach == 0 {
+            return false;
+        }
+        let cell = to_cell(at);
+        let away = cell - self.centre;
+        away.x.abs() <= self.reach && away.y.abs() <= self.reach
+    }
+
+    /// Whether the search can be spared: `true` only when both ends are charted
+    /// and they are on different islands.
+    ///
+    /// Every other case answers `false` and the search runs, which is what makes
+    /// this safe to be wrong about.
+    pub fn hopeless(&self, from: Vec3, to: Vec3) -> bool {
+        if !self.covers(from) || !self.covers(to) {
+            return false;
+        }
+        match (
+            self.island.get(&to_cell(from)),
+            self.island.get(&to_cell(to)),
+        ) {
+            (Some(here), Some(there)) => here != there,
+            // An unwalkable end is the search's own business - it has a cheap
+            // test for that already and gives a better answer than this can.
+            _ => false,
+        }
+    }
+
+    /// How much ground is charted, for the developer's panel.
+    // Not wired into the panel yet; the chart earns a row when the panel
+    // next grows one.
+    #[allow(dead_code)]
+    pub fn charted(&self) -> usize {
+        self.island.len()
+    }
+}
+
+/// Draws the chart of what can be reached, a few hundred cells a frame.
+fn chart_the_ground(
+    time: Res<Time<Real>>,
+    terrain: Option<Res<Terrain>>,
+    site: Option<Res<crate::villager::SettlementSite>>,
+    mut chart: ResMut<Reachable>,
+    watch: Res<crate::debug::timings::Timings>,
+) {
+    let _t = watch.watch("navigation: chart_the_ground");
+    let (Some(terrain), Some(site)) = (terrain, site) else {
+        return;
+    };
+
+    // Start a fresh chart when there is none, when the village has moved out
+    // from under the old one, or when the standing one has gone stale.
+    if chart.drawing.is_none() {
+        let centre = to_cell(site.centre);
+        let reach = (CHARTED_REACH / CELL) as i32;
+        let moved = (centre - chart.centre).abs().max_element() > reach / 3;
+        chart.age += time.delta_secs();
+        if chart.reach != 0 && !moved && chart.age < REDRAW_AFTER {
+            return;
+        }
+        chart.drawing = Some((HashMap::default(), 0, centre, reach));
+        chart.frontier.clear();
+        chart.swept = 0;
+    }
+
+    let Some((mut found, mut islands, centre, reach)) = chart.drawing.take() else {
+        return;
+    };
+    let mut frontier = std::mem::take(&mut chart.frontier);
+    let mut swept = chart.swept;
+    let side = reach * 2 + 1;
+    let mut spent = 0;
+
+    while spent < CHARTED_PER_FRAME {
+        // Spread whatever island is already growing before starting another.
+        if let Some((cell, island)) = frontier.pop() {
+            for dz in -1..=1 {
+                for dx in -1..=1 {
+                    if dx == 0 && dz == 0 {
+                        continue;
+                    }
+                    let next = cell + IVec2::new(dx, dz);
+                    let away = next - centre;
+                    if away.x.abs() > reach || away.y.abs() > reach {
+                        continue;
+                    }
+                    if found.contains_key(&next) {
+                        continue;
+                    }
+                    spent += 1;
+                    let (x, z) = (next.x as f32 * CELL, next.y as f32 * CELL);
+                    if !terrain.is_walkable(x, z) {
+                        continue;
+                    }
+                    // Diagonals join only where the search would take one, so
+                    // the chart's idea of connected is the pathfinder's own.
+                    // Read it the other way and the chart would promise a way
+                    // through a gap `step_cost` refuses to cut.
+                    if dx != 0 && dz != 0 {
+                        let side_a = IVec2::new(next.x, cell.y);
+                        let side_b = IVec2::new(cell.x, next.y);
+                        let open =
+                            |c: Cell| terrain.is_walkable(c.x as f32 * CELL, c.y as f32 * CELL);
+                        if !open(side_a) || !open(side_b) {
+                            continue;
+                        }
+                    }
+                    found.insert(next, island);
+                    frontier.push((next, island));
+                }
+            }
+            continue;
+        }
+
+        // No island growing: sweep on for a walkable cell nobody has claimed.
+        if swept >= side * side {
+            break;
+        }
+        let cell = centre + IVec2::new(swept % side - reach, swept / side - reach);
+        swept += 1;
+        spent += 1;
+        if found.contains_key(&cell) {
+            continue;
+        }
+        let (x, z) = (cell.x as f32 * CELL, cell.y as f32 * CELL);
+        if !terrain.is_walkable(x, z) {
+            continue;
+        }
+        islands += 1;
+        found.insert(cell, islands);
+        frontier.push((cell, islands));
+    }
+
+    if swept >= side * side && frontier.is_empty() {
+        // Finished: the new chart takes over from the old one whole, so nobody
+        // ever reads a half-drawn map and is told the village is an island.
+        chart.island = found;
+        chart.centre = centre;
+        chart.reach = reach;
+        chart.age = 0.0;
+        chart.drawing = None;
+        chart.frontier.clear();
+        chart.swept = 0;
+    } else {
+        chart.drawing = Some((found, islands, centre, reach));
+        chart.frontier = frontier;
+        chart.swept = swept;
     }
 }
 
@@ -67,7 +289,9 @@ fn survey_the_walls(
         ),
     >,
     mut standing: Local<usize>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("navigation: survey_the_walls");
     let count = shells.iter().count();
     if changed.is_empty() && count == *standing {
         return;
@@ -107,10 +331,7 @@ impl Footprint {
     pub fn contains(&self, p: Vec2) -> bool {
         let (sin, cos) = (-self.yaw).sin_cos();
         let local = p - self.at;
-        let turned = Vec2::new(
-            local.x * cos - local.y * sin,
-            local.x * sin + local.y * cos,
-        );
+        let turned = Vec2::new(local.x * cos - local.y * sin, local.x * sin + local.y * cos);
         turned.x.abs() < self.half.x && turned.y.abs() < self.half.y
     }
 
@@ -128,13 +349,30 @@ impl Footprint {
     /// stretch of the walk that is inside, and if any of it survives, the walk
     /// goes through.
     pub fn crosses(&self, a: Vec2, b: Vec2) -> bool {
+        // Two circles first, and only then the trigonometry.
+        //
+        // This is asked once per building per EDGE of the search: a
+        // three-thousand-node search steps eight ways from every node, so a
+        // village of a few dozen halls is millions of these in one path — and
+        // every one of them opened with a `sin_cos` before it could decide the
+        // building was two hundred metres away.
+        //
+        // The footprint's circumscribed circle against the segment's own. Both
+        // are exact bounds whatever the yaw, so a rejection here is a rejection
+        // the slab clip would also have made, and anything that survives goes
+        // on to be answered properly. A LONG segment keeps a large radius and
+        // is never waved through on this — which is the case that matters,
+        // since a walk that clips a far corner has its middle nowhere near the
+        // building it crosses.
+        let reach = self.half.length() + a.distance(b) * 0.5;
+        if ((a + b) * 0.5).distance_squared(self.at) > reach * reach {
+            return false;
+        }
+
         let (sin, cos) = (-self.yaw).sin_cos();
         let into = |p: Vec2| {
             let local = p - self.at;
-            Vec2::new(
-                local.x * cos - local.y * sin,
-                local.x * sin + local.y * cos,
-            )
+            Vec2::new(local.x * cos - local.y * sin, local.x * sin + local.y * cos)
         };
         let (a, b) = (into(a), into(b));
         let run = b - a;
@@ -195,12 +433,9 @@ impl Walls {
     /// Whether a straight walk from `a` to `b` passes through any building it
     /// is not excused from. See `Footprint::crosses`.
     fn barred(&self, a: Vec2, b: Vec2, excused: &[bool; MOST_BUILDINGS]) -> bool {
-        self.buildings
-            .iter()
-            .enumerate()
-            .any(|(slot, building)| {
-                !excused.get(slot).copied().unwrap_or(false) && building.crosses(a, b)
-            })
+        self.buildings.iter().enumerate().any(|(slot, building)| {
+            !excused.get(slot).copied().unwrap_or(false) && building.crosses(a, b)
+        })
     }
 }
 
@@ -258,13 +493,60 @@ fn heuristic(a: Cell, b: Cell) -> f32 {
     (long - short) + short * std::f32::consts::SQRT_2
 }
 
-/// Cost of stepping between two adjacent cells, or `None` if it cannot be walked.
+/// What one cell is, worked out once and kept for the rest of the search.
+#[derive(Clone, Copy)]
+struct Spot {
+    at: Vec3,
+    walkable: bool,
+}
+
+/// The terrain's answers, remembered per cell.
+///
+/// This is where the frame time was. The search asked the terrain afresh for
+/// every EDGE, and every cell has eight of them: `step_cost` derived the cell it
+/// was leaving, the cell it was stepping to and both shoulders of a diagonal,
+/// then the caller derived two of those a THIRD time for the wall test. Every
+/// one of those answers is a multi-octave noise field plus a walk of the
+/// drainage bins for the rivers, and a three-thousand-node search was asking
+/// for tens of thousands of them to learn a few thousand facts.
+///
+/// Measured before: `creature: plan_routes` at 76ms of an 81ms frame, four
+/// searches a frame, so about nineteen milliseconds each. Asked once per cell
+/// instead, a cell costs what it costs and no more.
+#[derive(Default)]
+struct Ground {
+    known: HashMap<Cell, Spot>,
+}
+
+impl Ground {
+    fn spot(&mut self, cell: Cell, terrain: &Terrain) -> Spot {
+        *self.known.entry(cell).or_insert_with(|| {
+            let x = cell.x as f32 * CELL;
+            let z = cell.y as f32 * CELL;
+            Spot {
+                // Stand height, not ground height: a waypoint on a dock's deck
+                // is at plank level, so the climb charge prices the ramp and
+                // not the seabed.
+                at: Vec3::new(x, terrain.stand_height_at(x, z), z),
+                walkable: terrain.is_walkable(x, z),
+            }
+        })
+    }
+}
+
+/// Cost of stepping between two adjacent cells and where it lands, or `None` if
+/// it cannot be walked.
 ///
 /// Slope is charged for rather than forbidden outright, so a creature will take the
 /// gentle way round a hill when one exists but still climb when it must.
-fn step_cost(terrain: &Terrain, from: Cell, to: Cell) -> Option<f32> {
-    let target = to_world(to, terrain);
-    if !terrain.is_walkable(target.x, target.z) {
+fn step_cost(
+    ground: &mut Ground,
+    terrain: &Terrain,
+    from: Cell,
+    to: Cell,
+) -> Option<(f32, Vec3, Vec3)> {
+    let target = ground.spot(to, terrain);
+    if !target.walkable {
         return None;
     }
 
@@ -272,9 +554,9 @@ fn step_cost(terrain: &Terrain, from: Cell, to: Cell) -> Option<f32> {
     if diagonal {
         // Refuse to cut a corner between two blocked cells, or creatures clip
         // through the diagonal gap between rocks.
-        let side_a = to_world(IVec2::new(to.x, from.y), terrain);
-        let side_b = to_world(IVec2::new(from.x, to.y), terrain);
-        if !terrain.is_walkable(side_a.x, side_a.z) || !terrain.is_walkable(side_b.x, side_b.z) {
+        let side_a = ground.spot(IVec2::new(to.x, from.y), terrain);
+        let side_b = ground.spot(IVec2::new(from.x, to.y), terrain);
+        if !side_a.walkable || !side_b.walkable {
             return None;
         }
     }
@@ -284,8 +566,10 @@ fn step_cost(terrain: &Terrain, from: Cell, to: Cell) -> Option<f32> {
     } else {
         1.0
     };
-    let climb = (target.y - to_world(from, terrain).y).abs();
-    Some(base + climb * 0.35)
+    let here = ground.spot(from, terrain);
+    let climb = (target.at.y - here.at.y).abs();
+    // Both ends handed back, so the wall test below does not derive them again.
+    Some((base + climb * 0.35, here.at, target.at))
 }
 
 /// Finds a walkable path from `start` to `goal`, or `None` if there is not one
@@ -308,15 +592,13 @@ pub fn find_path(
     if !terrain.is_walkable(goal.x, goal.z) {
         return None;
     }
-    let excused = walls.excused(
-        Vec2::new(start.x, start.z),
-        Vec2::new(goal.x, goal.z),
-    );
+    let excused = walls.excused(Vec2::new(start.x, start.z), Vec2::new(goal.x, goal.z));
 
     let mut open = BinaryHeap::new();
     let mut came_from: HashMap<Cell, Cell> = HashMap::default();
     let mut cost: HashMap<Cell, f32> = HashMap::default();
     let mut closed: HashSet<Cell> = HashSet::default();
+    let mut ground = Ground::default();
 
     open.push(Candidate {
         score: heuristic(start_cell, goal_cell),
@@ -349,7 +631,8 @@ pub fn find_path(
                 if closed.contains(&next) {
                     continue;
                 }
-                let Some(step) = step_cost(terrain, cell, next) else {
+                let Some((step, here_at, stands)) = step_cost(&mut ground, terrain, cell, next)
+                else {
                     continue;
                 };
                 // Through a wall is not a step - and the STEP is what has to
@@ -366,8 +649,9 @@ pub fn find_path(
                 // happened to want that particular diagonal, which is worth
                 // remembering: the test had been passing for want of the
                 // geometry rather than for want of the bug.
-                let stands = to_world(next, terrain);
-                let here_at = to_world(cell, terrain);
+                //
+                // Both ends come back from `step_cost`, which has just had to
+                // work them out anyway.
                 if walls.barred(
                     Vec2::new(here_at.x, here_at.z),
                     Vec2::new(stands.x, stands.z),
@@ -466,6 +750,210 @@ fn walkable_line(
 mod tests {
     use super::*;
 
+    /// Draws a chart the way the system does, but all at once.
+    ///
+    /// The same fill, not a second implementation of it - a test that agreed
+    /// with a copy of the code rather than with the code would prove nothing.
+    fn chart_around(terrain: &Terrain, centre: Vec3, reach_units: f32) -> Reachable {
+        let mut chart = Reachable {
+            centre: to_cell(centre),
+            reach: (reach_units / CELL) as i32,
+            ..Default::default()
+        };
+        let (centre_cell, reach) = (chart.centre, chart.reach);
+        let side = reach * 2 + 1;
+        let mut islands = 0;
+        for step in 0..side * side {
+            let cell = centre_cell + IVec2::new(step % side - reach, step / side - reach);
+            if chart.island.contains_key(&cell) {
+                continue;
+            }
+            if !terrain.is_walkable(cell.x as f32 * CELL, cell.y as f32 * CELL) {
+                continue;
+            }
+            islands += 1;
+            chart.island.insert(cell, islands);
+            let mut frontier = vec![cell];
+            while let Some(at) = frontier.pop() {
+                for dz in -1..=1 {
+                    for dx in -1..=1 {
+                        if dx == 0 && dz == 0 {
+                            continue;
+                        }
+                        let next = at + IVec2::new(dx, dz);
+                        let away = next - centre_cell;
+                        if away.x.abs() > reach || away.y.abs() > reach {
+                            continue;
+                        }
+                        if chart.island.contains_key(&next) {
+                            continue;
+                        }
+                        let open =
+                            |c: Cell| terrain.is_walkable(c.x as f32 * CELL, c.y as f32 * CELL);
+                        if !open(next) {
+                            continue;
+                        }
+                        if dx != 0
+                            && dz != 0
+                            && (!open(IVec2::new(next.x, at.y)) || !open(IVec2::new(at.x, next.y)))
+                        {
+                            continue;
+                        }
+                        chart.island.insert(next, islands);
+                        frontier.push(next);
+                    }
+                }
+            }
+        }
+        chart
+    }
+
+    /// The chart must never refuse an errand the search could have walked.
+    ///
+    /// This is the whole safety of the thing. It is allowed to be ignorant —
+    /// "I do not know" costs a search and nothing else — but it is never
+    /// allowed to be WRONG, because a false refusal is a villager standing
+    /// still beside work they could have done, and that is far worse than the
+    /// frame time it was written to save.
+    #[test]
+    fn the_chart_never_refuses_a_walk_that_exists() {
+        let terrain = Terrain::new(4242);
+        let walls = Walls::default();
+        let here = walkable_near(&terrain);
+        let chart = chart_around(&terrain, here, 180.0);
+
+        let mut refused = 0;
+        let mut walked = 0;
+        for i in 0..260 {
+            // A spread of destinations across the charted ground, most
+            // reachable and some deliberately not.
+            let turn = i as f32 * 0.618 * std::f32::consts::TAU;
+            let (sin, cos) = turn.sin_cos();
+            let reach = 20.0 + (i % 13) as f32 * 12.0;
+            let (x, z) = (here.x + cos * reach, here.z + sin * reach);
+            let there = Vec3::new(x, terrain.height_at(x, z), z);
+
+            let path = find_path(&terrain, &walls, here, there, DEFAULT_BUDGET);
+            if path.is_some() {
+                walked += 1;
+                assert!(
+                    !chart.hopeless(here, there),
+                    "the chart called {there:?} hopeless and the search walked \
+                     there - a villager would stand still beside work they \
+                     could have done"
+                );
+            } else if chart.hopeless(here, there) {
+                refused += 1;
+            }
+        }
+        assert!(
+            walked > 40,
+            "only {walked} destinations were walkable at all"
+        );
+        let _ = refused;
+    }
+
+    /// And it does spare searches — on ground where there is anything to spare.
+    ///
+    /// Kept apart from the safety test above deliberately. That one sweeps
+    /// ordinary ground and proves the chart is never WRONG; this one has to go
+    /// looking for a coast, because the case worth saving only exists where
+    /// water or cliff genuinely cuts the ground in two, and the first fixture
+    /// tried had none within a hundred and eighty units. A test that asserted
+    /// both things at once would have gone green the day somebody moved it to
+    /// a meadow.
+    #[test]
+    fn the_chart_spares_the_search_where_the_ground_is_cut_in_two() {
+        let walls = Walls::default();
+        let mut spared = 0;
+        let mut looked = 0;
+
+        'seeds: for seed in [4242u32, 7, 99, 2024, 31337, 555] {
+            let terrain = Terrain::new(seed);
+            // A shore, which is where ground gets cut in two.
+            let Some(here) = shore_near(&terrain) else {
+                continue;
+            };
+            let chart = chart_around(&terrain, here, 200.0);
+            for i in 0..900 {
+                let turn = i as f32 * 0.618 * std::f32::consts::TAU;
+                let (sin, cos) = turn.sin_cos();
+                let reach = 30.0 + (i % 17) as f32 * 9.0;
+                let (x, z) = (here.x + cos * reach, here.z + sin * reach);
+                if !terrain.is_walkable(x, z) {
+                    continue;
+                }
+                let there = Vec3::new(x, terrain.height_at(x, z), z);
+                looked += 1;
+                if !chart.hopeless(here, there) {
+                    continue;
+                }
+                // The chart says no. The search must agree - this is the same
+                // claim as the safety test, asked of the cases that matter.
+                assert!(
+                    find_path(&terrain, &walls, here, there, DEFAULT_BUDGET).is_none(),
+                    "seed {seed}: the chart refused a walk the search made"
+                );
+                spared += 1;
+                if spared >= 3 {
+                    break 'seeds;
+                }
+            }
+        }
+
+        assert!(looked > 100, "only {looked} walkable destinations examined");
+        assert!(
+            spared >= 3,
+            "over six worlds the chart never once spared a failing search, so \
+             it is pure cost - either no seed here has a cut coastline within \
+             two hundred units, or the fill is joining ground it should not"
+        );
+    }
+
+    /// Walkable ground with water close by, or `None` if this world has no
+    /// coast near the origin.
+    fn shore_near(terrain: &Terrain) -> Option<Vec3> {
+        for i in 0..40_000 {
+            let turn = i as f32 * 0.618 * std::f32::consts::TAU;
+            let (sin, cos) = turn.sin_cos();
+            let reach = 40.0 + (i % 400) as f32 * 6.0;
+            let (x, z) = (cos * reach, sin * reach);
+            if !terrain.is_walkable(x, z) {
+                continue;
+            }
+            // Water within a short walk, in any direction.
+            let wet = [(30.0, 0.0), (-30.0, 0.0), (0.0, 30.0), (0.0, -30.0)]
+                .iter()
+                .any(|(dx, dz)| terrain.is_submerged(x + dx, z + dz));
+            if wet {
+                return Some(Vec3::new(x, terrain.height_at(x, z), z));
+            }
+        }
+        None
+    }
+
+    /// And it says nothing at all about ground it has not charted.
+    #[test]
+    fn uncharted_ground_is_never_refused() {
+        let terrain = Terrain::new(4242);
+        let here = walkable_near(&terrain);
+        let chart = chart_around(&terrain, here, 60.0);
+        let far = here + Vec3::new(4_000.0, 0.0, 4_000.0);
+        assert!(
+            !chart.hopeless(here, far),
+            "somewhere off the edge of the map was refused on no evidence"
+        );
+        assert!(
+            !chart.hopeless(far, here),
+            "and the same the other way round"
+        );
+        let empty = Reachable::default();
+        assert!(
+            !empty.hopeless(here, here + Vec3::new(30.0, 0.0, 0.0)),
+            "a chart that has not been drawn yet refused an errand"
+        );
+    }
+
     /// Finds somewhere walkable near the origin to test from.
     fn walkable_near(terrain: &Terrain) -> Vec3 {
         for i in 0..40_000 {
@@ -500,6 +988,54 @@ mod tests {
             }
         }
         None
+    }
+
+    #[test]
+    fn the_cheap_rejection_never_waves_a_crossing_through() {
+        // `crosses` opens with a circle-against-circle test so it can throw out
+        // a distant building without paying for two trig calls. A cheap
+        // rejection that is ever WRONG is worse than no rejection at all -
+        // people would walk through walls, and only for buildings far from the
+        // middle of their stride, which is about the nastiest bug shape there
+        // is.
+        //
+        // Swept rather than sampled: a hall turned every which way, and a long
+        // walk swung all the way round it. Every claim of "does not cross" is
+        // checked against the geometry directly.
+        let hall = |yaw: f32| Footprint {
+            at: Vec2::new(30.0, -12.0),
+            half: Vec2::new(6.0, 2.5),
+            yaw,
+        };
+        for turn in 0..12 {
+            let footprint = hall(turn as f32 * 0.26);
+            for step in 0..72 {
+                let angle = step as f32 * std::f32::consts::TAU / 72.0;
+                let arm = Vec2::from_angle(angle) * 40.0;
+                // A long walk right past the hall, and a short one nowhere
+                // near it, and a walk that ends on top of it.
+                for (a, b) in [
+                    (footprint.at - arm, footprint.at + arm),
+                    (footprint.at + arm, footprint.at + arm * 1.5),
+                    (footprint.at + arm, footprint.at),
+                ] {
+                    if footprint.crosses(a, b) {
+                        continue;
+                    }
+                    // It says no. Then no point along it may be inside, and
+                    // that is a different computation from the one that said
+                    // so.
+                    for i in 0..=400 {
+                        let along = a + (b - a) * (i as f32 / 400.0);
+                        assert!(
+                            !footprint.contains(along),
+                            "crosses() said no but ({along}) is inside a hall \
+                             turned {turn} at step {step}"
+                        );
+                    }
+                }
+            }
+        }
     }
 
     #[test]
@@ -596,7 +1132,10 @@ mod tests {
     fn a_path_to_where_you_stand_is_empty() {
         let t = Terrain::new(77);
         let here = walkable_near(&t);
-        assert_eq!(find_path(&t, &Walls::default(), here, here, DEFAULT_BUDGET), Some(Vec::new()));
+        assert_eq!(
+            find_path(&t, &Walls::default(), here, here, DEFAULT_BUDGET),
+            Some(Vec::new())
+        );
     }
 
     #[test]
@@ -615,7 +1154,10 @@ mod tests {
             }
         }
         let sea = sea.expect("no water found");
-        assert_eq!(find_path(&t, &Walls::default(), start, sea, DEFAULT_BUDGET), None);
+        assert_eq!(
+            find_path(&t, &Walls::default(), start, sea, DEFAULT_BUDGET),
+            None
+        );
     }
 
     #[test]
@@ -640,7 +1182,13 @@ mod tests {
             let mut cursor = start;
             for step in &path {
                 assert!(
-                    walkable_line(&t, &Walls::default(), &[false; MOST_BUILDINGS], to_cell(cursor), to_cell(*step)),
+                    walkable_line(
+                        &t,
+                        &Walls::default(),
+                        &[false; MOST_BUILDINGS],
+                        to_cell(cursor),
+                        to_cell(*step)
+                    ),
                     "path crosses unwalkable ground",
                 );
                 cursor = *step;

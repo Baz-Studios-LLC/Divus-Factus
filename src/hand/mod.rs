@@ -117,6 +117,210 @@ fn apply_hand_style(
     }
 }
 
+/// Where the cargo sits relative to the fist, in fractions of the hand's own
+/// scale - so one tuning works at every zoom.
+///
+/// A tuning harness, Brett's idea after four rounds of adjust-by-screenshot:
+/// "what if I am holding the NPC and I get some keyboard shortcuts to move
+/// the NPC, then you can record where it has to be." Behind
+/// `DIVUS_FACTUS_CARRY_TUNE=1`: hold something, nudge it with I/K (up/down),
+/// J/L (left/right), U/O (nearer/further), Backspace to reset - and the
+/// numbers land in the log and on screen. Whatever reads right gets baked
+/// into the defaults below and the dial goes back in the drawer.
+#[derive(Resource)]
+pub struct CarryTune {
+    /// Cargo offset from the fist, in the camera-yaw frame: x right, y up,
+    /// z toward the camera.
+    pub offset: Vec3,
+}
+
+impl Default for CarryTune {
+    fn default() -> Self {
+        CarryTune { offset: Vec3::ZERO }
+    }
+}
+
+/// Nudges [`CarryTune`] while something is held, and says the numbers.
+fn tune_the_carry(
+    keys: Res<ButtonInput<KeyCode>>,
+    hand: Res<DivineHand>,
+    mut tune: ResMut<CarryTune>,
+    mut notices: MessageWriter<crate::ui::Notice>,
+) {
+    if hand.held.is_none() {
+        return;
+    }
+    let step = 0.05;
+    let mut nudge = Vec3::ZERO;
+    if keys.just_pressed(KeyCode::KeyI) {
+        nudge.y += step;
+    }
+    if keys.just_pressed(KeyCode::KeyK) {
+        nudge.y -= step;
+    }
+    if keys.just_pressed(KeyCode::KeyL) {
+        nudge.x += step;
+    }
+    if keys.just_pressed(KeyCode::KeyJ) {
+        nudge.x -= step;
+    }
+    if keys.just_pressed(KeyCode::KeyU) {
+        nudge.z -= step;
+    }
+    if keys.just_pressed(KeyCode::KeyO) {
+        nudge.z += step;
+    }
+    let reset = keys.just_pressed(KeyCode::Backspace);
+    if nudge == Vec3::ZERO && !reset {
+        return;
+    }
+    tune.offset = if reset {
+        Vec3::ZERO
+    } else {
+        tune.offset + nudge
+    };
+    let line = format!(
+        "carry tune: x {:+.2} y {:+.2} z {:+.2} (of hand scale)",
+        tune.offset.x, tune.offset.y, tune.offset.z
+    );
+    info!("{line}");
+    notices.write(crate::ui::Notice::new(line));
+}
+
+/// Moves a held thing (and everything hanging off it) between the world's
+/// render pass and the hand's own.
+///
+/// The hand is drawn by an overlay camera so the cursor is never occluded -
+/// which means the WORLD pass can never draw anything in front of it. A
+/// carried villager could not poke out of the fist however the numbers were
+/// tuned; Brett finally named it exactly: "does the hand exist in the same
+/// 3d world? ... it's always layered on top like a UI element." It is. So
+/// while something is carried it joins the hand's layer instead: one pass,
+/// one depth buffer, fingers in front of the body and the body in front of
+/// the palm. The sun already lights that layer (see `lit_layers` in main).
+///
+/// Layers do not inherit, so the whole subtree is walked. On release the
+/// component is removed outright, which is the default world layer.
+fn relayer(
+    commands: &mut Commands,
+    children: &Query<&Children>,
+    root: Entity,
+    into_the_hand: bool,
+) {
+    for entity in std::iter::once(root).chain(children.iter_descendants(root)) {
+        if into_the_hand {
+            commands
+                .entity(entity)
+                .insert(RenderLayers::layer(HAND_LAYER));
+        } else {
+            commands.entity(entity).remove::<RenderLayers>();
+        }
+    }
+}
+
+/// One shell of the hover glow: an inflated copy of a mesh under the hand,
+/// unlit gold, back-faces only, so it reads as a bold outline with a bloom
+/// glow rather than a second object.
+#[derive(Component)]
+struct HoverShell;
+
+/// The one gold coat every shell wears, made once.
+#[derive(Resource)]
+struct HoverGlow {
+    coat: Handle<StandardMaterial>,
+}
+
+/// How far the outline stands off the thing it outlines.
+const OUTLINE: f32 = 1.07;
+
+fn brew_hover_glow(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>) {
+    commands.insert_resource(HoverGlow {
+        coat: materials.add(StandardMaterial {
+            // A black body whose whole OUTPUT is overdriven emissive - the
+            // one glow recipe this renderer has proven three times over (the
+            // hand's lantern, the sky, the clouds). Unlit gold was tried
+            // twice and came out olive both times: unlit paint takes the
+            // tonemapper on the chin. Emissive is measured to survive it.
+            base_color: Color::BLACK,
+            // A SATURATED yellow at a moderate boost. At six and a half the
+            // gold clipped to cream - overdriven colours whiten as they blow
+            // out - so the chroma does the work and the boost only feeds the
+            // bloom. "It's kind of pale, can we make it more yellow?"
+            emissive: LinearRgba::from(Color::srgb(1.0, 0.8, 0.08)) * 3.0,
+            // Back faces only - the whole trick. The inflated shell is drawn
+            // where the object is not, and only its far side shows: a rim.
+            cull_mode: Some(bevy::render::render_resource::Face::Front),
+            ..default()
+        }),
+    });
+}
+
+/// Dresses whatever the hand points at in a golden outline, and undresses
+/// whatever it just left. Brett: "we need a way to show what the hand is
+/// pointing at, can we get a yellow outline glow?"
+///
+/// A shell per mesh, spawned as that mesh's own child so it inherits the
+/// part's transform - and, through it, the world bend - and its visibility,
+/// so the hidden bricks of a half-empty pile do not glow through the gaps.
+/// Standing trees are meshless bookkeeping inside their grove, so they wear
+/// a shell baked from their own body instead.
+fn outline_the_hovered(
+    mut commands: Commands,
+    hand: Res<DivineHand>,
+    glow: Option<Res<HoverGlow>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    shells: Query<Entity, With<HoverShell>>,
+    children: Query<&Children>,
+    meshed: Query<&Mesh3d>,
+    bodies: Query<&crate::scatter::TreeBody>,
+    mut last: Local<Option<Entity>>,
+) {
+    let Some(glow) = glow else {
+        return;
+    };
+    // Only the hand's aim matters here: a held thing needs no outline, the
+    // fist is statement enough.
+    let aimed = hand.held.is_none().then_some(hand.hovered).flatten();
+    if *last == aimed {
+        return;
+    }
+    *last = aimed;
+
+    for shell in &shells {
+        commands.entity(shell).despawn();
+    }
+    let Some(entity) = aimed else {
+        return;
+    };
+
+    let mut dressed_any = false;
+    for part in std::iter::once(entity).chain(children.iter_descendants(entity)) {
+        let Ok(mesh) = meshed.get(part) else {
+            continue;
+        };
+        dressed_any = true;
+        commands.spawn((
+            HoverShell,
+            Mesh3d(mesh.0.clone()),
+            MeshMaterial3d(glow.coat.clone()),
+            Transform::from_scale(Vec3::splat(OUTLINE)),
+            bevy::light::NotShadowCaster,
+            ChildOf(part),
+        ));
+    }
+    // The meshless standing tree: outline its own baked body.
+    if !dressed_any && let Ok(body) = bodies.get(entity) {
+        commands.spawn((
+            HoverShell,
+            Mesh3d(body.bake(&mut meshes)),
+            MeshMaterial3d(glow.coat.clone()),
+            Transform::from_scale(Vec3::splat(OUTLINE)),
+            bevy::light::NotShadowCaster,
+            ChildOf(entity),
+        ));
+    }
+}
+
 pub struct HandPlugin;
 
 impl Plugin for HandPlugin {
@@ -128,12 +332,19 @@ impl Plugin for HandPlugin {
                 apply_hand_style.run_if(resource_changed::<HandStyle>),
             )
             .add_systems(Startup, spawn_hand_cursor)
+            .add_systems(Startup, brew_hover_glow)
+            .init_resource::<CarryTune>()
             .add_systems(Update, breathe_hand_glow)
+            .add_systems(
+                Update,
+                tune_the_carry.run_if(|| std::env::var("DIVUS_FACTUS_CARRY_TUNE").is_ok()),
+            )
             .add_systems(
                 Update,
                 (
                     update_hand_ray,
                     update_hover,
+                    outline_the_hovered,
                     toggle_follow,
                     handle_grab_and_release,
                     carry_held_object,
@@ -222,6 +433,10 @@ struct HandRig {
     /// hand closes around the pole and turns on the way in rather than
     /// snapping into a fist the instant the founding begins.
     carry: f32,
+    /// How far into actually HOLDING cargo the hand is, 0 to 1. Not `grip` -
+    /// grip half-closes on a hover and closes for the flag walk - and not
+    /// `carry`, which the flag drives too. Only cargo weights the centering.
+    cradle: f32,
 }
 
 /// The roll that turns the flat palm into a fist held sideways, as a hand
@@ -238,9 +453,17 @@ const CARRY_PITCH: f32 = 0.35;
 /// One scalar drives every joint. The poses only need to be distinguishable —
 /// open drifting over the world, flexed and ready above something grabbable,
 /// closed around a carry.
+///
+/// The held hover is nearly NOTHING, and that is the fix for a real
+/// complaint. The carried object springs toward the grip point; the hand
+/// used to draw at that same point plus a zoom-scaled hover — over a unit
+/// of daylight between fist and cargo, different at every zoom. Brett,
+/// holding a villager: "they are not centered in the hand to look like it
+/// is holding them." The fist now closes ON the grip point, and the only
+/// gap left is the spring's own lag, which is the dangle and is wanted.
 fn pose(held: bool, hovering: bool) -> (f32, f32) {
     if held {
-        (1.0, 1.1)
+        (1.0, 0.15)
     } else if hovering {
         (0.45, 1.8)
     } else {
@@ -253,6 +476,12 @@ pub struct HeldObject {
     pub entity: Entity,
     /// How far above the ground the object is being carried.
     pub hold_height: f32,
+    /// How big the thing is, from its own `PickRadius` - so the fist can
+    /// close on its TOP rather than its middle. A hand that grips a villager
+    /// round the waist hides them behind the palm; gripped by the scruff,
+    /// the way Black and White carried them, the body swings below the
+    /// knuckles where the god can see what they are holding.
+    pub girth: f32,
     /// Recent hand positions, for estimating throw velocity on release.
     recent: Vec<Vec3>,
 }
@@ -414,9 +643,16 @@ fn update_hover(
 
 /// A clean right-click on a creature pins the camera to them; on the same
 /// creature again, drops to their shoulder; once more — or on empty ground —
-/// lets go. A right-*drag* is an orbit and is left alone.
+/// lets go.
+///
+/// The right button is the Action button, so it does both: hold it and you are
+/// carrying somebody, tap it and you are choosing whom to watch. They tell each
+/// other apart by whether the hand MOVED — the same six pixels a click has
+/// always been allowed. The orbit that used to live on a right-drag has gone to
+/// the middle button, where Black and White keeps it.
 fn toggle_follow(
     buttons: Res<ButtonInput<MouseButton>>,
+    mouse: Res<crate::keymap::MouseScheme>,
     windows: Query<&Window, With<PrimaryWindow>>,
     pointer: Res<PointerContext>,
     hand: Res<DivineHand>,
@@ -442,10 +678,10 @@ fn toggle_follow(
     let Ok(window) = windows.single() else {
         return;
     };
-    if buttons.just_pressed(MouseButton::Right) {
+    if buttons.just_pressed(mouse.action()) {
         *press_at = window.cursor_position();
     }
-    if !buttons.just_released(MouseButton::Right) {
+    if !buttons.just_released(mouse.action()) {
         return;
     }
     let (Some(down), Some(up)) = (press_at.take(), window.cursor_position()) else {
@@ -480,6 +716,7 @@ fn handle_grab_and_release(
     mut commands: Commands,
     time: Res<Time>,
     buttons: Res<ButtonInput<MouseButton>>,
+    mouse: Res<crate::keymap::MouseScheme>,
     terrain: Option<Res<Terrain>>,
     mut hand: ResMut<DivineHand>,
     mut motions: Query<&mut CreatureMotion>,
@@ -497,7 +734,22 @@ fn handle_grab_and_release(
         ResMut<crate::scatter::DirtyGroves>,
         ResMut<crate::scatter::StrippedGround>,
     ),
-    matters: Query<&crate::matter::Matter>,
+    // Paired: this system sits on Bevy's sixteen-parameter limit, so the
+    // new query rides with a relative - both are "what is this thing I am
+    // about to close a hand around".
+    mut matters: (
+        Query<&crate::matter::Matter>,
+        Query<&PickRadius>,
+        Query<&Children>,
+        Query<&mut crate::matter::Deposit>,
+        ResMut<Assets<StandardMaterial>>,
+        Query<&Transform>,
+        Query<(
+            &crate::villager::work::StorePile,
+            &crate::villager::MemberOf,
+        )>,
+        Query<&mut crate::villager::work::Stockpile>,
+    ),
     pointer: Res<PointerContext>,
     armed: Res<crate::miracles::SelectedMiracle>,
     mut witnessed: MessageWriter<DivineEvent>,
@@ -509,7 +761,235 @@ fn handle_grab_and_release(
     // Grab — but never through a panel. Releases are still honoured over the
     // interface, so carrying a villager across the HUD cannot trap them in
     // the hand. The rooted cannot be grabbed at all.
-    if buttons.just_pressed(MouseButton::Left)
+    // A press on a PILE draws a parcel of the stores into the hand - the
+    // piles are sources as well as sinks. "I should be able to pick up out
+    // of the stores too": two loads a scoop, carried wherever the god wills,
+    // paying back exactly what was drawn when offered.
+    if buttons.just_pressed(mouse.action())
+        && !pointer.over_ui
+        && armed.0.is_none()
+        && hand.held.is_none()
+        && let Some(pile) = hand.hovered
+        && let Ok((store_pile, owner)) = matters.6.get(pile)
+        && let Ok(mut stock) = matters.7.get_mut(owner.0)
+        && let Some(ground) = hand.cursor_world
+    {
+        use crate::villager::work::PileKind;
+        const PARCEL: f32 = 2.0;
+        let kind = store_pile.0;
+        let drawn = match kind {
+            PileKind::Timber => {
+                let take = PARCEL.min(stock.timber);
+                stock.timber -= take;
+                take
+            }
+            PileKind::Stone => {
+                let take = PARCEL.min(stock.stone);
+                stock.stone -= take;
+                take
+            }
+            PileKind::Clay => {
+                let take = PARCEL.min(stock.clay);
+                stock.clay -= take;
+                take
+            }
+            PileKind::Ore => {
+                let take = PARCEL.min(stock.ore);
+                stock.ore -= take;
+                take
+            }
+            PileKind::Food => {
+                let want = PARCEL.min(stock.larder.total());
+                if want > 0.0 {
+                    stock.larder.draw(want);
+                }
+                want
+            }
+        };
+        if drawn > 0.5 {
+            let (name, tint, size) = match kind {
+                PileKind::Timber => (
+                    "Logs off the pile",
+                    palette::shade(&palette::WOOD, 0.5),
+                    Vec3::new(1.0, 0.35, 0.35),
+                ),
+                PileKind::Stone => (
+                    "A block from the pile",
+                    palette::shade(&palette::STONE, 0.55),
+                    Vec3::new(0.6, 0.5, 0.6),
+                ),
+                PileKind::Clay => (
+                    "A load of clay",
+                    Color::srgb(0.62, 0.36, 0.24),
+                    Vec3::new(0.6, 0.4, 0.5),
+                ),
+                PileKind::Ore => (
+                    "A load of ore",
+                    Color::srgb(0.4, 0.29, 0.22),
+                    Vec3::new(0.55, 0.45, 0.55),
+                ),
+                PileKind::Food => (
+                    "A basket from the stores",
+                    palette::shade(&palette::BONE, 0.65),
+                    Vec3::new(0.55, 0.45, 0.55),
+                ),
+            };
+            let coat = matters.4.add(StandardMaterial {
+                base_color: tint,
+                perceptual_roughness: 1.0,
+                ..default()
+            });
+            let (meshes, ..) = &mut grove_kit;
+            let held_at = ground + Vec3::Y * 2.0;
+            // Honest substance, so a timber parcel floats a river and a
+            // stone one sinks - and so nothing downstream prices the parcel
+            // by a body it only borrowed.
+            let body = match kind {
+                PileKind::Timber => crate::matter::Matter::felled_tree(0.2),
+                PileKind::Food => crate::matter::Matter::bush(),
+                _ => crate::matter::Matter::boulder(40.0, 0.45),
+            };
+            let parcel = commands
+                .spawn((
+                    Name::new(name),
+                    crate::villager::work::Goods {
+                        kind,
+                        amount: drawn,
+                    },
+                    body,
+                    Mesh3d(meshes.add(Cuboid::new(size.x, size.y, size.z))),
+                    MeshMaterial3d(coat),
+                    Transform::from_translation(held_at),
+                    PickRadius(0.8),
+                    Held,
+                ))
+                .id();
+            crate::matter::gather_to(
+                &mut commands,
+                meshes,
+                &mut matters.4,
+                ground,
+                held_at,
+                &[tint],
+            );
+            relayer(&mut commands, &matters.2, parcel, true);
+            hand.held = Some(HeldObject {
+                entity: parcel,
+                hold_height: 2.0,
+                girth: 0.8,
+                recent: Vec::with_capacity(VELOCITY_SAMPLES),
+            });
+            hand.hovered = None;
+        }
+    }
+
+    // A press on a DEPOSIT scoops a lump off it rather than lifting it -
+    // clay banks, iron veins and quarry faces are rooted places, and the
+    // god's hauling verb needed a way to carry their kind home. Brett:
+    // "the places resources should let me suck up the particles and turn
+    // into an item in my hand which I can bring back." The essence streams
+    // from the ground into the grip, and the lump is what it condenses to.
+    if buttons.just_pressed(mouse.action())
+        && !pointer.over_ui
+        && armed.0.is_none()
+        && hand.held.is_none()
+        && let Some(place) = hand.hovered
+        && let Ok(mut deposit) = matters.3.get_mut(place)
+        && deposit.amount > 0.5
+        && let Some(ground) = hand.cursor_world
+    {
+        const LUMP_BITE: f32 = 2.0;
+        let bite = LUMP_BITE.min(deposit.amount);
+        deposit.amount -= bite;
+        // A worked-out place settles back into the earth, exactly as it
+        // does under a miner's pick.
+        if deposit.amount <= 0.5 {
+            commands
+                .entity(place)
+                .remove::<PickRadius>()
+                .insert(crate::scatter::Sinking::default());
+        }
+
+        use crate::matter::DepositKind;
+        let (name, tint, colors) = match deposit.kind {
+            DepositKind::Clay => (
+                "A double handful of clay",
+                Color::srgb(0.62, 0.36, 0.24),
+                [Color::srgb(0.62, 0.36, 0.24), Color::srgb(0.5, 0.28, 0.2)],
+            ),
+            DepositKind::Iron => (
+                "A lump of iron ore",
+                Color::srgb(0.38, 0.28, 0.22),
+                [Color::srgb(0.48, 0.26, 0.14), Color::srgb(0.3, 0.3, 0.34)],
+            ),
+            DepositKind::Stone => (
+                "A block of quarried stone",
+                palette::shade(&palette::STONE, 0.6),
+                [
+                    palette::shade(&palette::STONE, 0.6),
+                    palette::shade(&palette::STONE, 0.85),
+                ],
+            ),
+        };
+
+        let (meshes, ..) = &mut grove_kit;
+        let coat = matters.4.add(StandardMaterial {
+            base_color: tint,
+            perceptual_roughness: 1.0,
+            ..default()
+        });
+        let held_at = ground + Vec3::Y * 2.0;
+        let lump = commands
+            .spawn((
+                Name::new(name),
+                crate::matter::Lump {
+                    kind: deposit.kind,
+                    amount: bite,
+                },
+                // Physics like a small stone, so a dropped lump lands and a
+                // thrown one arcs.
+                crate::matter::Matter::boulder(45.0, 0.45),
+                Mesh3d(meshes.add(Cuboid::new(0.7, 0.55, 0.7))),
+                MeshMaterial3d(coat),
+                Transform::from_translation(held_at),
+                PickRadius(0.8),
+                // Born HELD - the ordinary grab inserts this, and the scoop
+                // forgot to: the carry system only moves `With<Held>`, so a
+                // fresh lump hung where it spawned until Brett set it down
+                // and picked it up through the path that remembers.
+                Held,
+            ))
+            .id();
+        // The suck: the bank's essence streams into the grip the lump now
+        // fills. Drawn from the deposit's ground toward the hand.
+        crate::matter::gather_to(
+            &mut commands,
+            meshes,
+            &mut matters.4,
+            ground,
+            held_at,
+            &colors,
+        );
+        relayer(&mut commands, &matters.2, lump, true);
+        hand.held = Some(HeldObject {
+            entity: lump,
+            hold_height: 2.0,
+            girth: 0.8,
+            recent: Vec::with_capacity(VELOCITY_SAMPLES),
+        });
+        hand.hovered = None;
+        witnessed.write(DivineEvent {
+            kind: DivineEventKind::Uprooted,
+            position: ground,
+            subject: None,
+            intensity: 0.4,
+        });
+    }
+
+    // The ACTION button, which Black and White puts on the right: pick up,
+    // carry, drop, throw. The left button is the land — see
+    // `camera::orbit_and_pan`.
+    if buttons.just_pressed(mouse.action())
         && !pointer.over_ui
         && armed.0.is_none()
         && hand.held.is_none()
@@ -533,15 +1013,23 @@ fn handle_grab_and_release(
             .insert(MoveTarget(None));
 
         // Anything living in a chunk's coordinate space leaves it the
-        // moment the god's hand closes: held transforms are written in
-        // world coordinates, and a boulder still parented to its chunk
-        // would teleport by the chunk's whole offset at the first tug —
-        // a stone that vanishes from the hand.
+        // moment the god's hand closes - and it leaves carrying its FLAT
+        // transform, not its global. This line is where every "grabbed
+        // thing teleports to the bottom of the screen and slides into the
+        // hand" came from: `compute_transform()` off the GLOBAL writes the
+        // BENT seat into sim space - thirteen hundred units low at four
+        // thousand from home - and the carry spring then hauls it up from
+        // there in plain view. A chunk stands at identity, so a child's own
+        // Transform already IS its flat world position; reasserting it wins
+        // over the engine's unparent behaviour, which preserves the WORLD
+        // (bent) position by default.
         if parents.get(entity).is_ok() {
-            commands
-                .entity(entity)
-                .remove::<ChildOf>()
-                .insert(transform.compute_transform());
+            let flat = matters
+                .5
+                .get(entity)
+                .copied()
+                .unwrap_or_else(|_| transform.compute_transform());
+            commands.entity(entity).remove::<ChildOf>().insert(flat);
         }
 
         // Grabbing a living tree is an uprooting: it leaves the ground's
@@ -560,21 +1048,37 @@ fn handle_grab_and_release(
                 home,
                 dirty_groves,
             );
-            // The ground remembers the uprooting: no chunk rebuild quietly
-            // replants what the god tore out.
-            stripped.strip(position.x, position.z);
+            // In FLAT coordinates, all of it. A tree is a child of its chunk
+            // and the chunk stands at identity, so the tree's own Transform
+            // already IS its flat world position - which is why no Transform
+            // is written here at all. The first version wrote the tree's
+            // GlobalTransform back instead, and that is the BENT seat: the
+            // bend then seated those coordinates a second time, double-bent,
+            // seventeen units low at this village's distance from home.
+            // Every uprooted tree teleported to the bottom of the screen and
+            // slid up into the fist as the carry spring caught it - Brett's
+            // exact words, twice. The bend's oldest trap, in its newest coat.
+            let flat = matters
+                .5
+                .get(entity)
+                .map(|t| t.translation)
+                .unwrap_or(position);
+            if std::env::var("DIVUS_FACTUS_CARRY_PROBE").is_ok() {
+                info!("grab probe: tree Transform {flat:?}, bent global {position:?}");
+            }
+            stripped.strip(flat.x, flat.z);
+            // The unparenting above already reasserted the flat Transform;
+            // one writer, one truth.
             commands
                 .entity(entity)
-                .remove::<ChildOf>()
                 .remove::<crate::scatter::FellableTree>()
                 .insert((
                     Name::new("A torn-up tree"),
                     crate::matter::Matter::felled_tree(tree.maturity),
-                    Transform::from_translation(position),
                 ));
             witnessed.write(DivineEvent {
                 kind: DivineEventKind::Uprooted,
-                position,
+                position: flat,
                 subject: None,
                 intensity: 0.7,
             });
@@ -592,9 +1096,13 @@ fn handle_grab_and_release(
             intensity: 0.5,
         });
 
+        // Into the hand's own render pass, so the fist and its cargo can
+        // occlude one another. See `relayer`.
+        relayer(&mut commands, &matters.2, entity, true);
         hand.held = Some(HeldObject {
             entity,
             hold_height,
+            girth: matters.1.get(entity).map_or(1.0, |pick| pick.0),
             recent: Vec::with_capacity(VELOCITY_SAMPLES),
         });
         hand.hovered = None;
@@ -602,14 +1110,17 @@ fn handle_grab_and_release(
 
     // Release. Velocity is read before the hand lets go, since it is derived from
     // the hand's own recorded path.
-    if buttons.just_released(MouseButton::Left) && hand.held.is_some() {
+    if buttons.just_released(mouse.action()) && hand.held.is_some() {
         let hand_velocity = hand.velocity(time.delta_secs());
         let held = hand.held.take().expect("checked above");
+        // Back into the world's pass before anything else happens to it.
+        relayer(&mut commands, &matters.2, held.entity, false);
 
         let speed = hand_velocity.length();
         // Mass tells in the arc: a bush sails, a boulder barely clears the
         // fingers. Creatures carry no Matter and fly as they always did.
         let heft = matters
+            .0
             .get(held.entity)
             .map(|m| m.throw_factor())
             .unwrap_or(1.0);
@@ -688,6 +1199,15 @@ fn carry_held_object(
     let t = 1.0 - (-HOLD_SPRING * dt).exp();
     let previous = transform.translation;
     transform.translation = previous.lerp(grip, t);
+    // The carry, narrated frame by frame - because the tree slide survived
+    // one confident diagnosis already. `DIVUS_FACTUS_CARRY_PROBE=1`.
+    if std::env::var("DIVUS_FACTUS_CARRY_PROBE").is_ok() {
+        info!(
+            "carry probe: from {previous:?} toward {grip:?} (cursor {:?}, lift {:.1})",
+            hand.cursor_world,
+            hand.held.as_ref().map_or(0.0, |h| h.hold_height),
+        );
+    }
 
     // Dangle: lean away from the direction of travel, proportional to how far
     // behind the grip the object is trailing.
@@ -881,6 +1401,7 @@ fn spawn_hand_cursor(
         fingers,
         thumb: [thumb_base, thumb_tip],
         carry: 0.0,
+        cradle: 0.0,
         grip: 0.1,
         bank: Vec2::ZERO,
         point: 0.0,
@@ -954,6 +1475,8 @@ fn animate_hand(
     hand: Res<DivineHand>,
     pointer: Res<PointerContext>,
     buttons: Res<ButtonInput<MouseButton>>,
+    mouse: Res<crate::keymap::MouseScheme>,
+    tune: Res<CarryTune>,
     state: Res<State<crate::GameState>>,
     cameras: Query<&CameraRig>,
     anchors: Query<&GlobalTransform>,
@@ -1012,7 +1535,7 @@ fn animate_hand(
     // The click, made visible: while pointing, a press dips the index finger
     // into whatever it is over. Attack much faster than release so the tap
     // *lands*, then lifts.
-    let tap_target = if pointing && buttons.pressed(MouseButton::Left) {
+    let tap_target = if pointing && buttons.pressed(mouse.action()) {
         1.0
     } else {
         0.0
@@ -1024,7 +1547,15 @@ fn animate_hand(
     // Where the hand belongs in the world: over the carry, over what it is about
     // to grab, or over the ground.
     let anchor = if held {
-        hand.grip_point()
+        // Lifted to the cargo's scruff: the fist hollow lands near the TOP
+        // of the thing, in world units of the thing's own size - a boulder's
+        // crown, a villager's collar - and the body hangs below in view.
+        // A touch above centre, scaled by the thing's own size, so the fist
+        // closes on the WAIST and half the body rises out of the top of it -
+        // "so half their body is coming out of the fist". The rest of the
+        // lift is the hover above, sized to put the finger cage at that line.
+        let scruff = hand.held.as_ref().map_or(0.0, |h| h.girth * 0.15);
+        hand.grip_point().map(|grip| grip + Vec3::Y * scruff)
     } else if let Some(position) = hovered {
         // Lean toward the hovered thing rather than locking onto it: the
         // cursor still steers, the hand just shows interest.
@@ -1041,9 +1572,8 @@ fn animate_hand(
         // depth: that snap changed its screen size by a factor of three the
         // instant the cursor crossed the skyline, and on a round world the
         // skyline is in frame most of the way out.
-        hand.cursor_ray.map(|ray| {
-            crate::globe::unbend(ray.origin + *ray.direction * camera.distance.max(1.0))
-        })
+        hand.cursor_ray
+            .map(|ray| crate::globe::unbend(ray.origin + *ray.direction * camera.distance.max(1.0)))
     };
 
     // The interface placement, available whenever there is a cursor at all.
@@ -1072,12 +1602,17 @@ fn animate_hand(
         Visibility::Visible
     };
 
-    // Carrying the flag: the whole of the choosing is one gesture, somebody
-    // walking the country with a standard in their fist. An open palm laid
-    // flat over the ground is the pose for picking things up, and it read as
-    // the god hovering a hand near a pole rather than holding it.
-    let carrying = matches!(state.get(), crate::GameState::Choosing);
+    // Carrying: the sideways fist bearing weight. Born as the flag pose - the
+    // whole of the choosing is one gesture, somebody walking the country with
+    // a standard in their fist - and now the pose for carrying ANYTHING.
+    // Brett, watching the flat-palm hold: "when I pick up a person or a tree
+    // or rock or anything it should use the same hand animation it uses when
+    // grabbing the flag." The flat palm read as the god hovering a hand NEAR
+    // the thing rather than holding it, and it read that way for the flag
+    // first.
+    let carrying = matches!(state.get(), crate::GameState::Choosing) || held;
     rig.carry += ((carrying as u32 as f32) - rig.carry) * fade_ease;
+    rig.cradle += ((held as u32 as f32) - rig.cradle) * fade_ease;
 
     let (open_grip, hover) = pose(held, hovered.is_some());
     // A fist, and it wins outright over whatever the hover was doing.
@@ -1112,6 +1647,31 @@ fn animate_hand(
     // planet.
     let position = position + seated_camera.forward() * (rig.tap * blend * 0.7 * scale);
 
+    // Centre the fist's MASS on the cargo, not its root: the palm slab sits
+    // at the root and the fingers reach off its leading edge, so a cargo
+    // anchored at the root showed up pressed against the wrist. Slid back
+    // along the hand's own heading BY YAW ALONE - the full rotation is the
+    // mistake that sent an earlier version sideways - and the tune (the
+    // live-placement dial) rides the same vector as the cargo's own offset,
+    // inverted, because moving the hand is how the cargo moves in the fist.
+    //
+    // Into the TARGET, before the smoothing. Applied after it, the shift
+    // compounded through the lerp's feedback - each frame re-added what the
+    // smoothing had only partly removed - and settled at several times its
+    // own size, swimming with framerate. Brett, tuning against it: "the hand
+    // never seemed to reach the NPC... they didn't even seem to move in sync".
+    // Where the cargo sits in the fist, in the yaw frame, as fractions of
+    // the hand's scale. Not derived and not guessed: Brett placed a carried
+    // forester by hand with the CARRY_TUNE keys until it read right and the
+    // harness printed these (2026-08-08, "PERFECT"). The live tune still
+    // subtracts on top for the next time taste moves.
+    const FIST_SEAT: Vec3 = Vec3::new(0.35, -0.25, 0.17);
+    let position = position
+        + camera.facing
+            * (Quat::from_rotation_y(camera.yaw) * ((FIST_SEAT - tune.offset) * scale))
+            * rig.cradle
+            * (1.0 - blend);
+
     let previous = transform.translation;
     // Over the world the hand glides; as a cursor it snaps, because a
     // pointer that trails the mouse reads as a pointer that misses.
@@ -1128,7 +1688,14 @@ fn animate_hand(
     // camera's yaw means what it says. Left in seated space the same westward
     // flick banked the hand differently depending on where on the planet it
     // happened.
-    let upright = world_seat.map_or(Quat::IDENTITY, |(_, turn)| turn);
+    // The CAMERA'S frame, not the chart's. Every mesh in the world wears
+    // `bend_frame`'s turn, but the camera rides the carried frame - parallel
+    // transport, poleless on purpose - and the two drift apart across the
+    // world by a roll (holonomy: the price of the pole-free camera). The
+    // hand is screen furniture: composed in the chart's frame it came out
+    // visibly rotated against the view on far ground - "my hand is facing
+    // the wrong direction on the other side."
+    let upright = camera.facing;
     let local = Quat::from_rotation_y(-camera.yaw) * (upright.inverse() * velocity);
     let target_bank = Vec2::new(
         (local.x * 0.035).clamp(-0.55, 0.55),
@@ -1149,12 +1716,26 @@ fn animate_hand(
         * Quat::from_rotation_z(sway_roll - rig.bank.x + CARRY_ROLL * rig.carry);
     // Turned into the frame of the ground it hovers over, so the hand stands
     // upright on the curve wherever it is.
-    let world_rotation = world_seat.map_or(flat_rotation, |(_, turn)| turn * flat_rotation);
+    let world_rotation = camera.facing * flat_rotation;
     transform.rotation = match ui_placement {
         Some((_, ui_rotation)) => world_rotation.slerp(ui_rotation, blend),
         None => world_rotation,
     };
     transform.scale = Vec3::splat(scale * rig.fade.max(0.001));
+
+    // A fist holds things in its FINGERS, and the fingers are not at the
+    // root. The hand's origin is the palm slab - the fingers hang off its
+    // leading edge and curl below it - so a carry centred on the root put the
+    // cargo at the wrist, spilling out of the back of the hand while the
+    // curled fingers held air. Brett saw exactly that twice: first a villager
+    // dangling under a fist a unit above them, then, with the hover taken
+    // out, one wedged against the heel of the hand.
+    //
+    // So the cargo stays on the grip point, and the HAND is drawn pulled back
+    // so the hollow of the curled fingers lands on that point. In the palm's
+    // own frame the hollow sits below and forward of the origin; rotated,
+    // scaled, and weighted by how far into the fist the hand actually is, so
+    // an open hand drifting over the ground is not shoved about.
 
     // Fingers: knuckle takes the curl, the mid-joint slightly more, and an idle
     // ripple runs through them while the hand is open. Pointing overrides all of
@@ -1218,6 +1799,7 @@ mod tests {
         hand.held = Some(HeldObject {
             entity: Entity::from_raw_u32(0).unwrap(),
             hold_height: 2.0,
+            girth: 1.0,
             // Moving +2 units on X per frame.
             recent: (0..VELOCITY_SAMPLES)
                 .map(|i| Vec3::new(i as f32 * 2.0, 0.0, 0.0))
@@ -1236,6 +1818,7 @@ mod tests {
         hand.held = Some(HeldObject {
             entity: Entity::from_raw_u32(0).unwrap(),
             hold_height: 2.0,
+            girth: 1.0,
             recent: vec![Vec3::new(3.0, 1.0, 2.0); VELOCITY_SAMPLES],
         });
         assert!(hand.velocity(1.0 / 60.0).length() < 1e-5);
@@ -1250,6 +1833,7 @@ mod tests {
         hand.held = Some(HeldObject {
             entity: Entity::from_raw_u32(0).unwrap(),
             hold_height: 3.0,
+            girth: 1.0,
             recent: Vec::new(),
         });
         assert_eq!(hand.grip_point(), Some(Vec3::new(1.0, 8.0, 2.0)));

@@ -62,7 +62,7 @@ const SHUN_RADIUS: f32 = 5.0;
 /// them - so ten people spent their days walking half a kilometre for
 /// one bush each and every one of them starved with food in the store.
 /// The walk has to be worth the load at the end of it.
-const RANGE_REACH: f32 = 330.0;
+pub(crate) const RANGE_REACH: f32 = 330.0;
 
 /// When a hand first came up empty. A trade comes up empty for all sorts
 /// of ordinary reasons — a bush picked bare a moment ago, a footing being
@@ -221,7 +221,20 @@ pub(crate) fn take_up_work(
             Without<crate::avatar::Ridden>,
         ),
     >,
-    bushes: Query<(Entity, &GlobalTransform, &FoodSource), Without<Villager>>,
+    // `Transform`, never `GlobalTransform`, for EVERYTHING a job can be sited
+    // on. The sim runs in flat coordinates and the bend rewrites every global
+    // onto the sphere - so a site read from a global sits below the flat
+    // ground by the bend's own drop, about seventeen units at four hundred
+    // and fifty from the origin. The 3D arrival check could then never pass:
+    // a forester walked to the tree, stood ON it, counted as sixteen units
+    // short, ran out of patience, shunned the spot and picked the next tree.
+    // For ever. Timber read a flat nought on every seed while food (farmers
+    // and hunters, sited flat) flowed - which was the shape of the mystery.
+    //
+    // Third time this class of bug has bitten: `wood_known` and
+    // `survey_the_walls` each learned it separately. If a job is ever sited
+    // from a new component, it reads the flat `Transform` too.
+    bushes: Query<(Entity, &Transform, &FoodSource), Without<Villager>>,
     build_sites: Query<(
         Entity,
         &Transform,
@@ -229,14 +242,14 @@ pub(crate) fn take_up_work(
         &Blueprint,
         &crate::villager::MemberOf,
     )>,
-    trees: Query<(Entity, &GlobalTransform, &crate::scatter::FellableTree)>,
-    boulders: Query<(Entity, &GlobalTransform), With<crate::matter::Boulder>>,
+    trees: Query<(Entity, &Transform, &crate::scatter::FellableTree)>,
+    boulders: Query<(Entity, &Transform), With<crate::matter::Boulder>>,
     town: (
-        Query<(Entity, &GlobalTransform, &Building)>,
+        Query<(Entity, &Transform, &Building)>,
         Query<(Entity, &Transform, &Field)>,
         Query<(Entity, &Transform, &Vitality), (With<Villager>, Without<Corpse>)>,
-        Query<(Entity, &GlobalTransform, &crate::matter::Deposit)>,
-        Query<(Entity, &GlobalTransform, &crate::scatter::SacredFlora)>,
+        Query<(Entity, &Transform, &crate::matter::Deposit)>,
+        Query<(Entity, &Transform, &crate::scatter::SacredFlora)>,
     ),
     mut towns: Query<(&crate::villager::SettlementGround, &mut Stockpile)>,
     game: Query<
@@ -374,7 +387,7 @@ pub(crate) fn take_up_work(
                     bushes
                         .iter()
                         .filter(|(_, _, source)| source.amount > 0.5)
-                        .map(|(bush, t, _)| (bush, t.translation())),
+                        .map(|(bush, t, _)| (bush, t.translation)),
                     transform.translation,
                     WORK_REACH,
                     &known_far,
@@ -385,7 +398,7 @@ pub(crate) fn take_up_work(
                         sacred
                             .iter()
                             .filter(|(_, _, flora)| flora.amount > 0.5)
-                            .map(|(stand, t, _)| (stand, t.translation())),
+                            .map(|(stand, t, _)| (stand, t.translation)),
                         transform.translation,
                         WORK_REACH,
                         &known_far,
@@ -436,8 +449,7 @@ pub(crate) fn take_up_work(
                         // The post is out at the deck's end, past the shallows —
                         // the planks are ground now, and the fish run under the
                         // far rail.
-                        let at =
-                            dock_at.translation() + dock_at.rotation() * Vec3::new(0.0, 0.0, 4.6);
+                        let at = dock_at.translation + dock_at.rotation * Vec3::new(0.0, 0.0, 4.6);
                         Job::at(at, Some(dock), at.distance(transform.translation))
                     })
                     .or_else(|| {
@@ -461,13 +473,39 @@ pub(crate) fn take_up_work(
                     .iter()
                     .find(|(_, _, b)| b.kind == BuildingKind::Mine)
                     .map(|(works, works_at, _)| {
-                        let at = works_at.translation();
+                        let at = works_at.translation;
                         Job::at(at, Some(works), at.distance(transform.translation))
                     });
+                // Then the quarry, which is where a village's stone actually
+                // comes from now that the ground is not strewn with it. Ahead
+                // of loose boulders because it is a face worth returning to
+                // rather than one barrow's worth, and behind the mine only
+                // because a drift under cover beats an open working.
+                //
+                // It has to be ahead of the boulders and not merely in the
+                // list: a miner who takes the nearest stone first spends the
+                // village's whole morning on the three pebbles left in the
+                // meadow and never walks to the quarry at all.
+                let quarry_job = || {
+                    nearest_job(
+                        deposits
+                            .iter()
+                            .filter(|(_, _, deposit)| {
+                                deposit.kind == crate::matter::DepositKind::Stone
+                                    && deposit.amount > 0.5
+                            })
+                            .map(|(face, t, _)| (face, t.translation)),
+                        transform.translation,
+                        WORK_REACH,
+                        &known_far,
+                        &permitted,
+                    )
+                };
                 let stone_job = mine_job
+                    .or_else(quarry_job)
                     .or_else(|| {
                         nearest_job(
-                            boulders.iter().map(|(rock, t)| (rock, t.translation())),
+                            boulders.iter().map(|(rock, t)| (rock, t.translation)),
                             transform.translation,
                             WORK_REACH,
                             &known_far,
@@ -488,7 +526,7 @@ pub(crate) fn take_up_work(
                         .filter(|(_, _, deposit)| {
                             deposit.kind == crate::matter::DepositKind::Iron && deposit.amount > 0.5
                         })
-                        .map(|(vein, t, _)| (vein, t.translation())),
+                        .map(|(vein, t, _)| (vein, t.translation)),
                     transform.translation,
                     WORK_REACH,
                     &known_far,
@@ -509,7 +547,7 @@ pub(crate) fn take_up_work(
                 trees
                     .iter()
                     .filter(|(_, _, tree)| tree.harvestable())
-                    .map(|(tree, t, _)| (tree, t.translation())),
+                    .map(|(tree, t, _)| (tree, t.translation)),
                 transform.translation,
                 WORK_REACH,
                 &known_far,
@@ -569,7 +607,7 @@ pub(crate) fn take_up_work(
                 laying
                     .or_else(|| {
                         nearest_job(
-                            boulders.iter().map(|(rock, t)| (rock, t.translation())),
+                            boulders.iter().map(|(rock, t)| (rock, t.translation)),
                             transform.translation,
                             WORK_REACH,
                             &known_far,
@@ -587,7 +625,7 @@ pub(crate) fn take_up_work(
                                     deposit.kind == crate::matter::DepositKind::Clay
                                         && deposit.amount > 0.5
                                 })
-                                .map(|(bank, t, _)| (bank, t.translation())),
+                                .map(|(bank, t, _)| (bank, t.translation)),
                             transform.translation,
                             WORK_REACH,
                             &known_far,
@@ -641,7 +679,7 @@ pub(crate) fn take_up_work(
                                     .all(|(_, t, _)| t.translation.distance(at) > 3.6)
                                 && trees
                                     .iter()
-                                    .all(|(_, t, _)| t.translation().distance(at) > 3.5)
+                                    .all(|(_, t, _)| t.translation.distance(at) > 3.5)
                                 && permitted(at)
                         };
                         let anchor = fields
@@ -694,7 +732,7 @@ pub(crate) fn take_up_work(
                 .iter()
                 .find(|(_, _, b)| b.kind == BuildingKind::Tavern)
                 .map(|(tavern, at, _)| {
-                    let at = at.translation();
+                    let at = at.translation;
                     Job::at(at, Some(tavern), at.distance(transform.translation))
                 }),
 
@@ -721,7 +759,7 @@ pub(crate) fn take_up_work(
                 .iter()
                 .find(|(_, _, b)| b.kind == BuildingKind::Shrine)
                 .map(|(shrine, at, _)| {
-                    let at = at.translation();
+                    let at = at.translation;
                     Job::at(at, Some(shrine), at.distance(transform.translation))
                 }),
 
@@ -737,7 +775,7 @@ pub(crate) fn take_up_work(
                 let post = buildings
                     .iter()
                     .find(|(_, _, b)| b.kind == BuildingKind::Watchtower)
-                    .map(|(_, at, _)| at.translation())
+                    .map(|(_, at, _)| at.translation)
                     .unwrap_or_else(|| {
                         let angle = rng.0.range(0.0, std::f32::consts::TAU);
                         let (sin, cos) = angle.sin_cos();
@@ -781,21 +819,21 @@ pub(crate) fn take_up_work(
             match vocation {
                 Vocation::Miner => far(&mut boulders
                     .iter()
-                    .map(|(rock, t)| (rock, t.translation()))
+                    .map(|(rock, t)| (rock, t.translation))
                     .chain(
                         deposits
                             .iter()
                             .filter(|(_, _, deposit)| deposit.amount > 0.5)
-                            .map(|(vein, t, _)| (vein, t.translation())),
+                            .map(|(vein, t, _)| (vein, t.translation)),
                     )),
                 Vocation::Forester => far(&mut trees
                     .iter()
                     .filter(|(_, _, tree)| tree.harvestable())
-                    .map(|(tree, t, _)| (tree, t.translation()))),
+                    .map(|(tree, t, _)| (tree, t.translation))),
                 Vocation::Gatherer => far(&mut bushes
                     .iter()
                     .filter(|(_, _, source)| source.amount > 0.5)
-                    .map(|(bush, t, _)| (bush, t.translation()))),
+                    .map(|(bush, t, _)| (bush, t.translation))),
                 Vocation::Hunter => far(&mut game
                     .iter()
                     .filter(|(_, _, genome)| genome.species != Species::Human)
@@ -822,7 +860,7 @@ pub(crate) fn take_up_work(
             }
             let cut = || {
                 nearest_job(
-                    boulders.iter().map(|(rock, t)| (rock, t.translation())),
+                    boulders.iter().map(|(rock, t)| (rock, t.translation)),
                     transform.translation,
                     WORK_REACH,
                     &known_far,
@@ -835,7 +873,7 @@ pub(crate) fn take_up_work(
                     trees
                         .iter()
                         .filter(|(_, _, tree)| tree.harvestable())
-                        .map(|(tree, t, _)| (tree, t.translation())),
+                        .map(|(tree, t, _)| (tree, t.translation)),
                     transform.translation,
                     WORK_REACH,
                     &known_far,
@@ -848,7 +886,7 @@ pub(crate) fn take_up_work(
                     bushes
                         .iter()
                         .filter(|(_, _, source)| source.amount > 0.5)
-                        .map(|(bush, t, _)| (bush, t.translation())),
+                        .map(|(bush, t, _)| (bush, t.translation)),
                     transform.translation,
                     WORK_REACH,
                     &known_far,

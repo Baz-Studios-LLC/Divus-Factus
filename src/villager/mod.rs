@@ -214,7 +214,9 @@ impl Plugin for VillagerPlugin {
                         work::grow_crops,
                         work::sermons,
                         work::eat_from_store,
-                        work::haul_wood,
+                        // Paired: the chain tuple is at Bevy's ceiling, and
+                        // these two are one subject - things becoming stores.
+                        (work::haul_wood, work::receive_offerings),
                         work::redress_carriers,
                         work::salvage_timber,
                         work::lend_a_hand,
@@ -1148,6 +1150,7 @@ pub(crate) fn raise_town_fixtures(
         let pile = commands
             .spawn((
                 Name::new("The woodpile"),
+                crate::globe::RigidlySeated,
                 work::StorePile(work::PileKind::Timber),
                 MemberOf(settlement),
                 Transform::from_translation(at),
@@ -1193,6 +1196,7 @@ pub(crate) fn raise_town_fixtures(
         let pile = commands
             .spawn((
                 Name::new("The stone pile"),
+                crate::globe::RigidlySeated,
                 work::StorePile(work::PileKind::Stone),
                 MemberOf(settlement),
                 Transform::from_translation(at),
@@ -1218,6 +1222,96 @@ pub(crate) fn raise_town_fixtures(
             ));
         }
     }
+    // The clay pile and the ore heap: small faces, but a store the god can
+    // haul home deserves to be countable at a glance like the others.
+    {
+        let (sin, cos) = (fire_angle + std::f32::consts::PI * 1.30).sin_cos();
+        let (px_, pz) = (centre.x + cos * 6.2, centre.z + sin * 6.2);
+        let at = Vec3::new(px_, terrain.height_at(px_, pz), pz);
+        let brick_mesh = meshes.add(Cuboid::new(0.44, 0.22, 0.3));
+        let brick_material = materials.add(StandardMaterial {
+            base_color: Color::srgb(0.62, 0.36, 0.24),
+            perceptual_roughness: 1.0,
+            ..default()
+        });
+        let pile = commands
+            .spawn((
+                Name::new("The clay pile"),
+                crate::globe::RigidlySeated,
+                work::StorePile(work::PileKind::Clay),
+                MemberOf(settlement),
+                Transform::from_translation(at),
+                Visibility::default(),
+                crate::hand::PickRadius(1.2),
+                crate::hand::Rooted,
+            ))
+            .id();
+        for i in 0..8u8 {
+            let layer = i / 4;
+            let slot = (i % 4) as f32;
+            commands.spawn((
+                work::ClayPileBrick(i),
+                Mesh3d(brick_mesh.clone()),
+                MeshMaterial3d(brick_material.clone()),
+                Transform::from_xyz(
+                    (slot % 2.0) * 0.48 - 0.24 + layer as f32 * 0.06,
+                    0.11 + layer as f32 * 0.23,
+                    (slot / 2.0).floor() * 0.34 - 0.17,
+                ),
+                Visibility::Hidden,
+                ChildOf(pile),
+            ));
+        }
+    }
+    {
+        let (sin, cos) = (fire_angle + std::f32::consts::PI * 1.62).sin_cos();
+        let (px_, pz) = (centre.x + cos * 6.2, centre.z + sin * 6.2);
+        let at = Vec3::new(px_, terrain.height_at(px_, pz), pz);
+        let chunk_mesh = meshes.add(Cuboid::new(0.36, 0.3, 0.36));
+        let chunk_material = materials.add(StandardMaterial {
+            base_color: Color::srgb(0.34, 0.27, 0.23),
+            perceptual_roughness: 1.0,
+            ..default()
+        });
+        let rust_material = materials.add(StandardMaterial {
+            base_color: Color::srgb(0.48, 0.26, 0.14),
+            perceptual_roughness: 1.0,
+            ..default()
+        });
+        let pile = commands
+            .spawn((
+                Name::new("The ore heap"),
+                crate::globe::RigidlySeated,
+                work::StorePile(work::PileKind::Ore),
+                MemberOf(settlement),
+                Transform::from_translation(at),
+                Visibility::default(),
+                crate::hand::PickRadius(1.2),
+                crate::hand::Rooted,
+            ))
+            .id();
+        for i in 0..8u8 {
+            let layer = i / 4;
+            let slot = (i % 4) as f32;
+            commands.spawn((
+                work::OrePileChunk(i),
+                Mesh3d(chunk_mesh.clone()),
+                MeshMaterial3d(if i % 3 == 0 {
+                    rust_material.clone()
+                } else {
+                    chunk_material.clone()
+                }),
+                Transform::from_xyz(
+                    (slot % 2.0) * 0.4 - 0.2 + layer as f32 * 0.07,
+                    0.15 + layer as f32 * 0.3,
+                    (slot / 2.0).floor() * 0.4 - 0.2,
+                )
+                .with_rotation(Quat::from_rotation_y(i as f32 * 0.7)),
+                Visibility::Hidden,
+                ChildOf(pile),
+            ));
+        }
+    }
     {
         let (sin, cos) = (fire_angle + std::f32::consts::PI * 0.98).sin_cos();
         let (px_, pz) = (centre.x + cos * 6.2, centre.z + sin * 6.2);
@@ -1231,6 +1325,7 @@ pub(crate) fn raise_town_fixtures(
         let pile = commands
             .spawn((
                 Name::new("The food store"),
+                crate::globe::RigidlySeated,
                 work::StorePile(work::PileKind::Food),
                 MemberOf(settlement),
                 Transform::from_translation(at),
@@ -1300,6 +1395,120 @@ pub(crate) fn found_settlement(
         woodpile,
     });
     (settlement, woodpile)
+}
+
+/// How many quarries a village is given, and the furthest one may sit.
+///
+/// Closer than iron and far more numerous, and both on purpose. Iron is a
+/// reason to explore; stone is an everyday errand that every footing in the
+/// civic ladder waits on, so a village that has to walk four hundred units for
+/// it simply never builds.
+/// FEW and deep, not many and shallow. Six of them within an easy walk put
+/// three in one view, and Brett — "they weirdly bought three of them" — read
+/// them as things the village had built rather than as places in the land.
+/// Three, far enough apart that you come across one at a time, each holding
+/// what two of the old ones held.
+const QUARRIES: usize = 3;
+const QUARRY_NEAREST: f32 = 90.0;
+const QUARRY_FURTHEST: f32 = 300.0;
+/// How far apart, so working the stone is not one pit emptied — and so that
+/// two are never in the frame together.
+const QUARRY_APART: f32 = 90.0;
+
+/// The pit a quarry cuts for itself: how deep, how wide, and how sharply the
+/// rim comes back to open ground.
+///
+/// A quarry is a hole with a face. The first cut of this modelled one as
+/// geometry standing ON the ground, and since the pieces sat at fixed heights
+/// around a single origin, any slope left half of them hanging in the air —
+/// Brett: "it looks weird lol". So the ground is worked first and the stone
+/// stands on a floor that has been levelled for it.
+///
+/// A tight falloff, deliberately, against the graded one a building pad uses.
+/// [`Terrain::terrace`] describes its own gentle grade as "graded earth rather
+/// than a quarry face" — this is the thing that comment is defined against.
+const QUARRY_DEPTH: f32 = 2.2;
+const QUARRY_PIT: f32 = 6.5;
+const QUARRY_RIM: f32 = 4.0;
+/// Tries spent insisting on broken ground before any walkable ground will do.
+const QUARRY_PATIENCE: usize = 900;
+const QUARRY_TRIES: usize = 1_200;
+
+/// Where a village's quarries go: faces of workable stone within an easy
+/// errand of the square, on the most broken ground that can be found.
+///
+/// Pure, and lifted out of the founding so the one thing here that must never
+/// fail can be tested across many worlds. A village with no stone cannot raise
+/// a single footing, and "the seed was unlucky" is not an answer — see
+/// `every_village_is_given_stone_to_build_with`.
+///
+/// The preference for broken ground is a PREFERENCE. That is the whole
+/// difference between this and [`BuildingKind::Mine`], whose siting demands a
+/// genuine face to drive a drift into and therefore never finds one in rolling
+/// or coastal country — the mine's own comment admits it: "a village on merely
+/// rolling country never found any, so it never wanted a mine, and its only
+/// stone was the loose boulders, which run out". Those loose boulders are gone
+/// now, so this may not have the same hole in it.
+/// Where a founding flock may seed, as (nearest, furthest) from the square.
+///
+/// Prey splits between the view and the wilds: half close enough to be part
+/// of the scenery, half out where the hunters have to go find it.
+///
+/// PREDATORS open past the furthest any trade will range. Seed 4242 dealt a
+/// wolf pack inside the old ninety-unit ring and seven of the ten founders
+/// were dead before the first hall was framed; three other seeds dealt no
+/// close pack and lost nobody, which is the difference between a game and a
+/// coin toss. Brett: "we should prevent close wolf spawns in the beginning.
+/// It should initially be peaceful." A head start and not a wall - wolves
+/// still roam, and hunger still walks them in - but the opening days belong
+/// to the village.
+pub(crate) fn founding_flock_range(species: Species, flock: usize) -> (f32, f32) {
+    match species {
+        Species::Wolf => (
+            crate::villager::work::RANGE_REACH + 20.0,
+            crate::villager::work::RANGE_REACH + 170.0,
+        ),
+        _ if flock % 2 == 0 => (0.0, 90.0),
+        _ => (0.0, 210.0),
+    }
+}
+
+pub(crate) fn quarry_sites(terrain: &Terrain, centre: Vec3, rng: &mut Rng) -> Vec<Vec3> {
+    let mut sites: Vec<Vec3> = Vec::new();
+    for attempt in 0..QUARRY_TRIES {
+        if sites.len() >= QUARRIES {
+            break;
+        }
+        let angle = rng.range(0.0, std::f32::consts::TAU);
+        let reach = rng.range(QUARRY_NEAREST, QUARRY_FURTHEST);
+        let (sin, cos) = angle.sin_cos();
+        let (x, z) = (centre.x + cos * reach, centre.z + sin * reach);
+        if !terrain.is_walkable(x, z) {
+            continue;
+        }
+        let height = terrain.height_at(x, z);
+        if height < crate::terrain::WATER_LEVEL + 2.0 {
+            continue;
+        }
+        let at = Vec3::new(x, height, z);
+        if sites.iter().any(|q| q.distance(at) < QUARRY_APART) {
+            continue;
+        }
+        // Broken ground while there are tries left to spend looking for it,
+        // and anywhere walkable once they run thin.
+        //
+        // Gated on the TRY and not on how many have been placed. Gated on the
+        // count — which is how this was first written — a world with no stony
+        // ground anywhere would never place a first quarry, so the relaxation
+        // that exists to save exactly that village would never fire: the
+        // failure it was written to prevent, written into the thing meant to
+        // prevent it.
+        if attempt < QUARRY_PATIENCE && terrain.slope_at(x, z) <= 0.18 {
+            continue;
+        }
+        sites.push(at);
+    }
+    sites
 }
 
 pub(crate) fn spawn_settlement(
@@ -1438,9 +1647,62 @@ pub(crate) fn spawn_settlement(
             );
             clay_banks.push(at);
         }
+        // And the quarries, which are where the village's stone comes from
+        // now that the ground is not strewn with it.
+        //
+        // CLOSER than iron and far more numerous, and both on purpose. Iron is
+        // a reason to explore; stone is an everyday errand that every footing
+        // in the civic ladder waits on, so a village that has to walk four
+        // hundred units for it simply never builds. The nearest ring starts
+        // just outside the home circle - far enough that the square is not a
+        // building site, near enough that a miner is back before noon.
+        //
+        // Sited on the most BROKEN ground each try can find, so a quarry
+        // stands where a quarry would: a bank, a bluff, a stony shoulder. That
+        // is a preference and not a requirement, which is the whole difference
+        // between this and the mine - see `BuildingKind::Mine`, whose siting
+        // wants a genuine face and so never finds one in rolling or coastal
+        // country. A village on a flat green shore gets its quarry regardless,
+        // because the alternative is a village that cannot build.
+        let quarries = quarry_sites(&ground.0, centre, &mut rng);
+        for at in &quarries {
+            // The pit first, then the stone standing in it. See `QUARRY_DEPTH`
+            // for why the ground is worked rather than the model made taller.
+            // `flatten` leaves the floor BARE, which is what a working quarry
+            // is, and keeps the scatter from seeding trees in the middle of it.
+            let floor = at.y - QUARRY_DEPTH;
+            ground.0.flatten(at.x, at.z, QUARRY_PIT, QUARRY_RIM, floor);
+            crate::matter::spawn_deposit(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                Vec3::new(at.x, floor, at.z),
+                crate::matter::DepositKind::Stone,
+                // Deeper, because there are half as many. A village's whole
+                // civic ladder is under a hundred stone; one of these is
+                // several ladders, and running dry is the failure mode that
+                // matters - see `every_village_is_given_stone_to_build_with`.
+                rng.range(200.0, 300.0),
+            );
+        }
+        // Any chunk already standing was built before the pits were cut, so it
+        // still shows unbroken ground with a quarry sitting on top of it.
+        for at in &quarries {
+            crate::terrain::rebuild_chunks_near(
+                &mut commands,
+                &mut meshes,
+                &ground.2,
+                &ground.0,
+                &mut ground.1,
+                at.x,
+                at.z,
+                QUARRY_PIT + QUARRY_RIM,
+            );
+        }
         info!(
-            "the land holds {placed_iron} iron veins and {} clay banks",
-            clay_banks.len()
+            "the land holds {placed_iron} iron veins, {} clay banks and {} quarries",
+            clay_banks.len(),
+            quarries.len()
         );
     }
 
@@ -1636,11 +1898,14 @@ pub(crate) fn spawn_settlement(
             Species::Boar,
             Species::Wolf,
         ]);
-        // Half the wilderness lives close enough to be part of the view from
-        // the village; the rest is out where the hunters have to go find it.
-        let reach = if flock % 2 == 0 { 90.0 } else { 210.0 };
-        let Some(position) = random_walkable_point(&terrain, &mut wildlife_rng, centre, reach)
-        else {
+        let (nearest, reach) = founding_flock_range(species, flock);
+        let Some(position) = crate::creature::random_walkable_ring(
+            &terrain,
+            &mut wildlife_rng,
+            centre,
+            nearest,
+            reach,
+        ) else {
             continue;
         };
         let genome = CreatureGenome::random(species, &mut wildlife_rng);
@@ -2671,6 +2936,99 @@ fn pursue_activity(
 mod tests {
     use super::*;
     use bevy::ecs::system::RunSystemOnce;
+
+    /// The opening days belong to the village: no predator seeds inside the
+    /// widest walk any trade will make.
+    ///
+    /// Seed 4242 dealt a pack inside ninety units and seven of ten founders
+    /// died before the first hall was framed; three sibling seeds dealt no
+    /// close pack and lost nobody. A founding that lives or dies on that draw
+    /// is a coin toss, not an opening.
+    #[test]
+    fn no_wolf_opens_within_a_working_walk_of_the_square() {
+        for flock in 0..40 {
+            let (nearest, furthest) = founding_flock_range(Species::Wolf, flock);
+            assert!(
+                nearest > crate::villager::work::RANGE_REACH,
+                "a founding wolf may seed {nearest} out, inside the {} a \
+                 villager will range",
+                crate::villager::work::RANGE_REACH,
+            );
+            assert!(furthest > nearest);
+            // And prey still opens close, or the view from the first morning
+            // is an empty stage.
+            let (deer_near, deer_far) = founding_flock_range(Species::Deer, flock);
+            assert_eq!(deer_near, 0.0);
+            assert!(deer_far <= 210.0);
+        }
+    }
+
+    /// Every village, on every world, is given stone it can build out of.
+    ///
+    /// The one that must not fail. The loose rock came off the ground when
+    /// Brett asked for it — "there is still entirely too many rocks on the
+    /// ground… lets go back to removing about 90% of the small rocks and add
+    /// quarries" — and the quarries are what took its place. A seed that hands
+    /// a village no quarry hands it no masonry, and therefore no hall, no
+    /// granary and no shrine: a village that cannot grow up.
+    ///
+    /// This is the failure the mine already has, written down in its own
+    /// comment, and the reason the stone was left strewn over the world for so
+    /// long. It must not be inherited.
+    #[test]
+    fn every_village_is_given_stone_to_build_with() {
+        for seed in [7u32, 99, 2024, 4242, 31337, 555, 8080, 1] {
+            let terrain = Terrain::new(seed);
+            let mut rng = Rng::stream(seed as u64, "quarry test");
+            // Several sites per world, so this is a claim about villages and
+            // not about one lucky spot on eight maps.
+            for _ in 0..6 {
+                let here = terrain.somewhere_inland();
+                let centre = Vec3::new(here.x, terrain.height_at(here.x, here.y), here.y);
+                let sites = quarry_sites(&terrain, centre, &mut rng);
+                assert!(
+                    !sites.is_empty(),
+                    "seed {seed} founds a village at {centre:?} with no quarry \
+                     in reach - it can never raise a footing"
+                );
+                for at in &sites {
+                    let reach = Vec2::new(at.x - centre.x, at.z - centre.z).length();
+                    assert!(
+                        reach <= QUARRY_FURTHEST + 1.0,
+                        "a quarry sits {reach} away, past the errand a miner will make"
+                    );
+                    assert!(
+                        terrain.is_walkable(at.x, at.z),
+                        "a quarry was put where nobody can stand"
+                    );
+                    assert!(
+                        at.y >= crate::terrain::WATER_LEVEL,
+                        "a quarry was put under water"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn quarries_are_spread_rather_than_heaped_in_one_pit() {
+        // Six faces in one place is one quarry with extra steps, and a village
+        // that empties it has nothing. They have to be worth walking between.
+        let terrain = Terrain::new(4242);
+        let mut rng = Rng::stream(4242, "quarry spread");
+        let here = terrain.somewhere_inland();
+        let centre = Vec3::new(here.x, terrain.height_at(here.x, here.y), here.y);
+        let sites = quarry_sites(&terrain, centre, &mut rng);
+        for (i, a) in sites.iter().enumerate() {
+            for b in &sites[i + 1..] {
+                assert!(
+                    a.distance(*b) >= QUARRY_APART,
+                    "two quarries {} apart",
+                    a.distance(*b)
+                );
+            }
+        }
+    }
 
     #[test]
     fn retellings_stack_and_witnesses_are_spared() {

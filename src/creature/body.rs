@@ -920,7 +920,9 @@ mod bake {
                 materials: assets.materials.clone(),
             };
             let world = app.world_mut();
-            let root = world.spawn((Transform::default(), Visibility::default())).id();
+            let root = world
+                .spawn((Transform::default(), Visibility::default()))
+                .id();
             let mut queue = bevy::ecs::world::CommandQueue::default();
             let rig = {
                 let mut commands = Commands::new(&mut queue, world);
@@ -948,7 +950,15 @@ mod bake {
                 })
                 .collect();
             let mut slabs = Vec::new();
-            gather(world, root, "body", Transform::default(), &named, &cloth, &mut slabs);
+            gather(
+                world,
+                root,
+                "body",
+                Transform::default(),
+                &named,
+                &cloth,
+                &mut slabs,
+            );
 
             // The joints themselves, each in its parent's frame.
             let parent_of = |name: &str| -> Option<&'static str> {

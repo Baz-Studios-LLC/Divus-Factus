@@ -178,7 +178,14 @@ pub fn eye_forward(genome: &crate::creature::genome::CreatureGenome) -> f32 {
 /// is being followed.
 fn apply_follow(
     mut follow: ResMut<FollowTarget>,
-    targets: Query<&GlobalTransform>,
+    // The FLAT transform, and this line is why the Avatar miracle broke on
+    // the round world. The rig's focus lives in sim coordinates; the global
+    // is the BENT seat, and feeding its y into the focus put the first-person
+    // eye at radius-minus-eighty - inside the planet, sky below the horizon,
+    // the cloud deck overhead as a ceiling. The probe read seat_alt -82.7
+    // with the frame at 0.00 degrees of error: perfect orientation, seated
+    // underground. The bend's SIXTH bite, all six the same species.
+    targets: Query<&Transform>,
     bodies: Query<&crate::creature::genome::CreatureGenome>,
     mut rigs: Query<&mut CameraRig>,
 ) {
@@ -201,7 +208,7 @@ fn apply_follow(
     };
     rig.in_a_body = follow.style == FollowStyle::Eyes;
 
-    let at = target.translation();
+    let at = target.translation;
     rig.target_focus.x = at.x;
     rig.target_focus.z = at.z;
     // A followed zoom anchor fights the pin; the pin wins.
@@ -604,6 +611,7 @@ fn read_camera_input(
     keys: Res<ButtonInput<KeyCode>>,
     keymap: Res<crate::keymap::Keymap>,
     buttons: Res<ButtonInput<MouseButton>>,
+    mouse: Res<crate::keymap::MouseScheme>,
     mouse_motion: Res<AccumulatedMouseMotion>,
     mouse_scroll: Res<AccumulatedMouseScroll>,
     pointer: Res<crate::ui::PointerContext>,
@@ -670,8 +678,7 @@ fn read_camera_input(
         let up_here = rig.facing * Vec3::Y;
         if let Some(axis) = heading.cross(up_here).try_normalize() {
             let stance = crate::globe::planet_stance();
-            let was = stance
-                * crate::terrain::direction_at(rig.target_focus.x, rig.target_focus.z);
+            let was = stance * crate::terrain::direction_at(rig.target_focus.x, rig.target_focus.z);
             let turn = Quat::from_axis_angle(axis, speed / crate::terrain::PLANET_RADIUS);
             let now = stance.inverse() * (turn * was);
             rig.target_focus = canonical_near(rig.target_focus, now);
@@ -695,12 +702,18 @@ fn read_camera_input(
     // the drag-pan it replaces; from altitude the same pull spins continents.
     // One mechanism, every height.
     //
-    // On the LEFT button, which is where the hand reaches for it. Middle keeps
-    // working because it is what this was bound to first and fingers remember,
-    // but left is the gesture: you put your hand on the world and you move it.
-    let taking_hold =
-        buttons.just_pressed(MouseButton::Left) || buttons.just_pressed(MouseButton::Middle);
-    let holding_on = buttons.pressed(MouseButton::Left) || buttons.pressed(MouseButton::Middle);
+    // On the LEFT button and nothing else. Black and White's own table: left
+    // is Grab Land, right is Action, middle is Rotate and Pitch. Middle used to
+    // do this too, from before the gesture had a name, and it cannot any more -
+    // it is the rotate now.
+    //
+    // Worth writing down because I got this wrong out loud: the Black and White
+    // TWO manual has them the other way about, left for Action and right to
+    // move, and I quoted it at Brett as though he had misremembered his own
+    // game. He had not. The sequel flipped them, and this world follows the
+    // first one.
+    let taking_hold = buttons.just_pressed(mouse.land());
+    let holding_on = buttons.pressed(mouse.land());
     if taking_hold {
         // A press that lands on a panel is the panel's. Judged ONCE, at the
         // press: a drag that starts on a roster and slides off it must not
@@ -739,7 +752,8 @@ fn read_camera_input(
         }
     }
 
-    // Orbiting, on right mouse — or freely, with no button at all, when the
+    // Orbiting, on the MIDDLE button — "Rotate; Pitch" in Black and White's
+    // own table — or freely, with no button at all, when the
     // god is behind somebody's eyes. In a body there is no orbit to speak of
     // and nothing else for the mouse to do: the pointer is locked away and
     // the hand withdrawn, so the mouse simply IS the neck, the way it is in
@@ -753,7 +767,7 @@ fn read_camera_input(
     // pitch wandered from 0.85 to -1.25 and back with no input at all.
     let attended = windows.single().is_ok_and(|window| window.focused);
     let looking_about = rig.in_a_body && attended;
-    if buttons.pressed(MouseButton::Right) || looking_about {
+    if buttons.pressed(MouseButton::Middle) || looking_about {
         let delta = mouse_motion.delta;
         // A jump this big in one frame is a warp or a focus change, never a
         // wrist.
@@ -813,9 +827,10 @@ fn read_camera_input(
         // back None and the zoom fell to the centre of the screen - which is
         // precisely the altitude at which aiming the zoom matters most.
         let focus = rig.focus;
-        rig.zoom_anchor = cursor_ground_point(&windows, &cameras, terrain.as_deref()).or_else(
-            || cursor_sphere_direction(&windows, &cameras).map(|dir| canonical_near(focus, dir)),
-        );
+        rig.zoom_anchor =
+            cursor_ground_point(&windows, &cameras, terrain.as_deref()).or_else(|| {
+                cursor_sphere_direction(&windows, &cameras).map(|dir| canonical_near(focus, dir))
+            });
     }
 
     // Leaving for the sky. Past the play ceiling the view steepens toward
@@ -984,9 +999,57 @@ pub(crate) fn carried(facing: Quat, focus: Vec3) -> Quat {
     }
 }
 
+/// How fast the focus may climb or fall while the world is being dragged, in
+/// units a second.
+///
+/// The ground-following below is one arm of a FEEDBACK LOOP, and the world-grab
+/// closes it: the focus moves, the ground under it decides the focus's height,
+/// the height moves the eye, the eye recasts the cursor's ray onto the planet,
+/// and the new reading moves the focus again. Its gain is the slope of the
+/// land, so on the flat it is nothing and on a mountainside it runs away —
+/// Brett: "when I click to drag the ground it spazzes out on mountains".
+///
+/// Worse under the grab than anywhere else, because a held world is SNAPPED
+/// rather than smoothed (see `held_by_hand`), so the loop runs with no damping
+/// at all and takes a full swing every frame.
+///
+/// Rate-limiting the height is what opens the loop. The focus still rides the
+/// land — a long drag up a mountain still climbs it, which a hard freeze would
+/// not — but it can no longer answer a sideways step with a hundred-unit lurch,
+/// so there is nothing left for the ray to amplify.
+///
+/// Squeezed from both sides, and the suite holds both. Slow enough to damp: at
+/// sixty frames this is two units of eye movement in a frame, against the
+/// hundred-and-more a cliff edge was handing it. Fast enough not to lag: the
+/// whole world is three hundred and twenty units of relief, so even dragging
+/// from the sea to the highest summit the focus is never more than about two
+/// and a half seconds behind the ground. The first number this was written
+/// with failed the second test — seven seconds to climb a mountain — which is
+/// the sort of thing that reads as the camera being broken in the other
+/// direction.
+const HELD_CLIMB: f32 = 120.0;
+
+/// The focus height for this frame: the ground, or as much of the way there as
+/// a held world is allowed to travel.
+fn focus_climb(was: f32, ground: f32, held: bool, delta: f32) -> f32 {
+    if !held {
+        // Free of the hand it snaps, and the smoothing pass eases the picture.
+        // Snapping matters: a jump to a village or the founding itself moves
+        // the focus across the world, and a rate limit would spend seconds
+        // crawling up to the new ground.
+        return ground;
+    }
+    let most = HELD_CLIMB * delta;
+    was + (ground - was).clamp(-most, most)
+}
+
 /// Keeps the focus point riding the ground, so orbiting over a hill does not
 /// bury the camera inside it.
-fn follow_ground(terrain: Option<Res<Terrain>>, mut rigs: Query<&mut CameraRig>) {
+fn follow_ground(
+    time: Res<Time<Real>>,
+    terrain: Option<Res<Terrain>>,
+    mut rigs: Query<&mut CameraRig>,
+) {
     let (Some(terrain), Ok(mut rig)) = (terrain, rigs.single_mut()) else {
         return;
     };
@@ -1007,7 +1070,14 @@ fn follow_ground(terrain: Option<Res<Terrain>>, mut rigs: Query<&mut CameraRig>)
     let ground = terrain
         .height_at(rig.target_focus.x, rig.target_focus.z)
         .max(WATER_LEVEL);
-    rig.target_focus.y = ground;
+    // On REAL time, not the world's. The clamp is about how fast a hand is
+    // dragging, and the god can run the day at eight times speed.
+    rig.target_focus.y = focus_climb(
+        rig.target_focus.y,
+        ground,
+        rig.held_by_hand,
+        time.delta_secs(),
+    );
 }
 
 fn apply_camera_smoothing(time: Res<Time>, mut rigs: Query<&mut CameraRig>) {
@@ -1127,6 +1197,60 @@ mod tests {
         Some((pose.translation + direction * (along - depth) - centre).normalize())
     }
 
+    #[test]
+    fn a_held_world_cannot_lurch_up_a_mountain() {
+        // The loop that made the grab unusable on high ground, run as a loop.
+        //
+        // The focus is dragged onto a mountainside, so the ground under it
+        // jumps by most of the world's relief in one frame. Free of the hand
+        // that snap is correct and wanted. HELD, it moves the eye, which
+        // recasts the cursor's ray, which moves the focus again - and Brett
+        // got a camera that "spazzes out on mountains".
+        let relief = crate::terrain::TERRAIN_HEIGHT;
+        let frame = 1.0 / 60.0;
+
+        let free = focus_climb(20.0, relief, false, frame);
+        assert_eq!(free, relief, "a free focus must still snap to its ground");
+
+        let held = focus_climb(20.0, relief, true, frame);
+        let step = held - 20.0;
+        assert!(
+            step <= HELD_CLIMB * frame + 1e-3,
+            "a held focus climbed {step} units in one frame - the eye moves \
+             with it and the grab reads a different world every frame"
+        );
+
+        // The other side of the squeeze, and the one the first attempt at this
+        // failed: a limit slow enough to damp is worthless if it is so slow
+        // that the camera visibly trails the land under it. Dragging from the
+        // sea to the highest ground in the world is the worst case there is.
+        let worst = relief / HELD_CLIMB;
+        assert!(
+            worst < 3.0,
+            "climbing the world's whole relief takes {worst:.1}s of dragging - \
+             the focus trails the ground, which reads as broken in the other \
+             direction"
+        );
+
+        // And it does get there: rate-limited is not frozen.
+        let mut y = 20.0;
+        for _ in 0..((worst + 0.5) * 60.0) as i32 {
+            y = focus_climb(y, relief, true, frame);
+        }
+        assert!(
+            (y - relief).abs() < 0.5,
+            "the focus settled at {y} and the ground is at {relief}"
+        );
+
+        // Downhill the same, or coming off a peak lurches instead.
+        let down = focus_climb(relief, 20.0, true, frame);
+        assert!(
+            relief - down <= HELD_CLIMB * frame + 1e-3,
+            "the focus fell {} units in one frame",
+            relief - down
+        );
+    }
+
     /// The world-grab has to work in BOTH screen axes, at every height, and it
     /// did not: dragging north or south stopped dead a few degrees short of the
     /// pole, because the focus's `z` was clamped to a brim inside it. Zoomed
@@ -1141,8 +1265,9 @@ mod tests {
                 target_distance: distance,
                 ..default()
             };
-            let held = cursor_on_the_ball(&rig, Vec2::ZERO)
-                .unwrap_or_else(|| panic!("the middle of the screen missed the planet at {distance}"));
+            let held = cursor_on_the_ball(&rig, Vec2::ZERO).unwrap_or_else(|| {
+                panic!("the middle of the screen missed the planet at {distance}")
+            });
 
             for (axis, drag) in [
                 ("sideways", Vec2::new(0.35, 0.0)),
@@ -1261,13 +1386,15 @@ mod tests {
             focus = fold_onto_the_sphere(focus);
             facing = carried(facing, focus);
         }
-        assert!((facing.length() - 1.0).abs() < 1e-3, "drifted off unit length");
+        assert!(
+            (facing.length() - 1.0).abs() < 1e-3,
+            "drifted off unit length"
+        );
         let east = facing * Vec3::X;
         let up = facing * Vec3::Y;
         assert!(east.dot(up).abs() < 1e-3, "east and up came out of square");
         // And it is still standing on the ground it says it is.
-        let want =
-            crate::globe::planet_stance() * crate::terrain::direction_at(focus.x, focus.z);
+        let want = crate::globe::planet_stance() * crate::terrain::direction_at(focus.x, focus.z);
         assert!(up.distance(want) < 1e-2, "the frame drifted off the focus");
     }
 

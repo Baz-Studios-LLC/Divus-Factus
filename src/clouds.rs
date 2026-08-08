@@ -56,6 +56,52 @@ const DECK_SCALE: f32 = 22.0;
 const CALM_WIND: f32 = 0.00065;
 const STORM_WIND: f32 = 0.0031;
 
+/// Where the deck begins to thin as the god rises through it, and where it has
+/// gone entirely — both heights above sea level.
+///
+/// Just under the deck rather than at it, so the god does not fly into a solid
+/// white wall on the way up, and twice its height to be clear of it.
+const CLEAR_FROM: f32 = DECK_HEIGHT * 0.8;
+const CLEAR_BY: f32 = DECK_HEIGHT * 2.0;
+
+/// And where it comes back, and is whole again.
+///
+/// Above these the deck is no longer between the god and anything: the ground
+/// is thousands of units down, the cloud's own height is a rounding error
+/// against that, and what it reads as is weather lying ON the world — which is
+/// the picture the deck was built for. Chosen to land above the streamed
+/// world's own ceiling, so the clouds return over ground the planet's patches
+/// are already drawing whole.
+const RETURN_FROM: f32 = 1_200.0;
+const RETURN_BY: f32 = 2_600.0;
+
+/// How much of the deck is drawn, for an eye this far above sea level.
+///
+/// The deck is a shell a hundred and fifty units up and the god's camera goes
+/// straight through it at a very ordinary zoom — at play pitch, somewhere
+/// around two hundred units of orbit distance. Above that line every cloud in
+/// the world is between the eye and the ground. Brett, on finding himself
+/// there: "when I zoom out I dont end up on top of them looking at them instead
+/// of the ground".
+///
+/// So the deck thins as the god rises through it and goes; and then it returns,
+/// because far enough up it stops being a lid over the world and becomes
+/// weather on it. "At a certain height they can become revisible (fade in)."
+///
+/// One consequence worth knowing: a village on a high enough summit stands
+/// above `CLEAR_FROM` on its own, and its sky thins without the god having
+/// moved. That is the same rule applied honestly — up there you ARE above the
+/// cloud — but it is the case to look at if the sky ever seems thin for no
+/// reason.
+fn deck_opacity(above_sea: f32) -> f32 {
+    // Smoothstepped at both ends, so neither edge of the band is a line the
+    // god can find by nudging the wheel.
+    let ease = |t: f32| t * t * (3.0 - 2.0 * t);
+    let gone = ease(((above_sea - CLEAR_FROM) / (CLEAR_BY - CLEAR_FROM)).clamp(0.0, 1.0));
+    let back = ease(((above_sea - RETURN_FROM) / (RETURN_BY - RETURN_FROM)).clamp(0.0, 1.0));
+    (1.0 - gone).max(back)
+}
+
 /// Whether the god has sent the weather away.
 ///
 /// Its own resource rather than a hidden debug dial, because a god who cannot
@@ -207,9 +253,21 @@ fn drive_the_deck(
     time: Res<Time>,
     sky: Res<crate::calendar::Sky>,
     weather: Option<Res<crate::weather::Weather>>,
+    cameras: Query<&crate::camera::CameraRig, With<crate::camera::GodCamera>>,
     mut materials: ResMut<Assets<CloudMaterial>>,
     mut turned: Local<f32>,
 ) {
+    // How high the eye stands over the sea, which is the only thing the fade
+    // needs to know. Through `bent_camera_pose` rather than off the camera's
+    // own `GlobalTransform`, because that one is rewritten by the world bend a
+    // stage later and would be a frame behind; this is the one definition of
+    // where the camera is. A missing rig reads as ground level, so a world
+    // without a god keeps its weather.
+    let above_sea = cameras.single().map_or(0.0, |rig| {
+        let eye = crate::globe::bent_camera_pose(rig).translation;
+        eye.distance(crate::globe::planet_centre()) - crate::terrain::PLANET_RADIUS
+    });
+    let clarity = deck_opacity(above_sea);
     // A clear day still has weather in it. Handing the weather's own intensity
     // straight through meant a fair sky - which is most skies, and every first
     // day - came out with no cloud in it at all, so the deck only existed in
@@ -244,7 +302,11 @@ fn drive_the_deck(
             // Thicker weather is a heavier deck, and a storm closes over.
             // Nearly opaque at the core: from orbit a thin deck reads as a
             // smear of haze rather than as cloud lying on the world.
-            0.80 + coverage * 0.18,
+            //
+            // And then thinned by how far the god has climbed through it. See
+            // `deck_opacity` - this is the whole of that feature, because the
+            // deck's opacity was always one number and this multiplies it.
+            (0.80 + coverage * 0.18) * clarity,
         );
         // Cloud the sun has left. Not black and not slate: an overcast at night
         // still catches the moon and the sky, so it stays a pale cold grey —
@@ -256,5 +318,109 @@ fn drive_the_deck(
         ))
         .to_vec3()
         .extend(1.0);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Roughly how high the eye rides for a given orbit distance, at the pitch
+    /// the game is actually played at, over ground a village would sit on.
+    ///
+    /// Not exact and does not need to be — the fade reads the camera's real
+    /// position. This is here so the bands below can be argued about in the
+    /// units Brett moves the wheel in.
+    fn eye_at(orbit: f32) -> f32 {
+        const VILLAGE_GROUND: f32 = 40.0;
+        const PLAY_PITCH: f32 = 0.85;
+        VILLAGE_GROUND + orbit * PLAY_PITCH.sin()
+    }
+
+    #[test]
+    fn the_village_keeps_its_sky() {
+        // Standing in it, and at the zoom the game lands on, the deck is whole:
+        // this was never a feature about taking the clouds away.
+        for orbit in [0.0, 12.0, 62.0, 90.0] {
+            let drawn = deck_opacity(eye_at(orbit));
+            assert!(
+                drawn > 0.99,
+                "at {orbit} units of zoom the sky is already thinning: {drawn}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_god_surveying_sees_the_ground_and_not_the_weather() {
+        // The complaint itself. Brett's screenshot was at 431 units of zoom,
+        // where the eye stands about three hundred and sixty over the sea -
+        // well above a deck that rides at a hundred and fifty - and the frame
+        // was half white.
+        let surveying = eye_at(431.0);
+        assert!(
+            surveying > DECK_HEIGHT,
+            "the fixture does not even clear the deck: {surveying}"
+        );
+        assert!(
+            deck_opacity(surveying) < 0.01,
+            "the god is above the clouds and still looking at them"
+        );
+        // And it stays gone across the whole band a god surveys from.
+        for orbit in [400.0, 700.0, 1_000.0, 1_400.0] {
+            assert!(
+                deck_opacity(eye_at(orbit)) < 0.01,
+                "the weather came back at {orbit} units of zoom, over ground"
+            );
+        }
+    }
+
+    #[test]
+    fn the_weather_comes_back_from_high_enough_up() {
+        // The other half of what Brett asked for: a planet seen from a
+        // distance has weather on it. Nothing at the top of the climb may be
+        // missing it, or the title screen loses its clouds.
+        assert!(
+            deck_opacity(RETURN_BY + 1.0) > 0.99,
+            "the deck never comes back"
+        );
+        for high in [4_000.0, 12_000.0, crate::globe::CEILING] {
+            assert!(
+                deck_opacity(high) > 0.99,
+                "no weather on the world from {high} up"
+            );
+        }
+    }
+
+    #[test]
+    fn the_fade_goes_one_way_and_then_the_other() {
+        // Down once, up once, and never a step backwards inside either run -
+        // a deck that brightened while the god kept rising would read as a
+        // flicker, and a god parked on an edge would find it.
+        let mut lowest_seen = 1.0f32;
+        let mut over = 0.0f32;
+        let mut climbing = false;
+        let mut step = 0.0f32;
+        while step <= RETURN_BY * 1.5 {
+            let drawn = deck_opacity(step);
+            if !climbing && drawn > lowest_seen + 1e-4 {
+                climbing = true;
+            }
+            if climbing {
+                assert!(
+                    drawn >= over - 1e-4,
+                    "the deck thinned again at {step} on the way back in"
+                );
+            } else {
+                assert!(
+                    drawn <= lowest_seen + 1e-4,
+                    "the deck thickened at {step} while the god was still rising through it"
+                );
+                lowest_seen = drawn;
+            }
+            over = drawn;
+            step += 2.0;
+        }
+        assert!(climbing, "the deck never came back at all");
+        assert!(lowest_seen < 0.01, "the deck never fully cleared");
     }
 }

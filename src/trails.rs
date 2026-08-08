@@ -153,7 +153,9 @@ fn paint(
     mut meshes: ResMut<Assets<Mesh>>,
     chunks: Query<(&TerrainChunk, &Mesh3d)>,
     fresh: Query<&TerrainChunk, Added<TerrainChunk>>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("trails: paint");
     // Newly streamed-in chunks always need their trails painted on, even
     // on a pass where no wear changed — a loaded save's roads come back
     // this way too.

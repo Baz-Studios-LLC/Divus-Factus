@@ -285,6 +285,7 @@ pub(super) fn expeditions(
                 match kind {
                     crate::matter::DepositKind::Iron => ("a hillside veined with iron", 45.0),
                     crate::matter::DepositKind::Clay => ("a bank of good red clay", 40.0),
+                    crate::matter::DepositKind::Stone => ("a face of good building stone", 50.0),
                 }
             } else if near_trees >= 6 {
                 ("a green wood past the cairns", 55.0)

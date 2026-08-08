@@ -169,12 +169,48 @@ pub struct Route {
     goal: Option<Vec3>,
     /// Set when pathfinding failed, so it is not retried every frame.
     unreachable: bool,
+    /// Where the last refusal was, and when it was given up on.
+    ///
+    /// This is the one field `clear` does not touch, and that is its whole
+    /// purpose. `unreachable` above says it is not retried every frame, and it
+    /// was not true: `locomotion` reads the flag, abandons the destination and
+    /// calls `clear`, which puts the flag back to false — so whatever wanted to
+    /// go there asked again on the very next frame, and got the most expensive
+    /// answer there is. A search that FAILS expands its entire three-thousand
+    /// node budget before it can say so.
+    ///
+    /// Measured: `creature: plan_routes` at 76ms of an 81ms frame, held there
+    /// for thirty seconds at a stretch, which is about eighteen hundred
+    /// consecutive full-budget searches for the same handful of places nobody
+    /// could get to. That is the "fps all over the place".
+    denied: Option<(Vec3, f32)>,
 }
+
+/// How long a refused destination stays refused, in seconds of world time.
+///
+/// It forgets rather than bans, because the world does change — a bridge gets
+/// laid, a hall goes up and opens a way round. Long enough that a creature
+/// fixed on somewhere unreachable costs one search instead of sixty a second,
+/// short enough that nobody stands about after the way opens.
+const GIVE_UP_FOR: f32 = 8.0;
+
+/// How near a destination has to be to a refused one to count as the same
+/// errand, squared. Two and a half metres — the navigation grid's own cell,
+/// which is the finest distinction any of this can make anyway.
+const SAME_ERRAND: f32 = crate::navigation::CELL * crate::navigation::CELL;
 
 impl Route {
     /// The next point to walk toward.
     pub fn next(&self) -> Option<Vec3> {
         self.waypoints.first().copied()
+    }
+
+    /// Whether this destination was refused recently enough to not be worth
+    /// asking about again.
+    fn still_refused(&self, goal: Vec3, now: f32) -> bool {
+        self.denied.is_some_and(|(refused, when)| {
+            refused.distance_squared(goal) < SAME_ERRAND && now - when < GIVE_UP_FOR
+        })
     }
 
     fn clear(&mut self) {
@@ -268,6 +304,7 @@ pub fn spawn_creature(
 pub(crate) fn plan_routes(
     terrain: Option<Res<Terrain>>,
     walls: Res<crate::navigation::Walls>,
+    chart: Res<crate::navigation::Reachable>,
     mut creatures: Query<
         (&Transform, &MoveTarget, &mut Route),
         (
@@ -284,10 +321,14 @@ pub(crate) fn plan_routes(
             Without<crate::avatar::Ridden>,
         ),
     >,
+    time: Res<Time>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("creature: plan_routes");
     let Some(terrain) = terrain else {
         return;
     };
+    let now = time.elapsed_secs();
     // The budget grows with the crowd: four routes a frame was sized for
     // a hamlet, and a city of eighty would starve for paths and stand
     // still in the street.
@@ -303,6 +344,32 @@ pub(crate) fn plan_routes(
 
         // Already routed there.
         if route.goal.is_some_and(|g| g.distance_squared(goal) < 0.25) {
+            continue;
+        }
+        // Or refused it a moment ago. The world has not changed since, and a
+        // refusal is the most expensive answer the search can give - see
+        // `Route::denied`, which is the whole of this fix. The flag still goes
+        // up so `locomotion` abandons the errand exactly as before; what does
+        // not happen is the search.
+        if route.still_refused(goal, now) {
+            route.unreachable = true;
+            continue;
+        }
+        // Or the chart already knows the two ends are on different islands, in
+        // which case there is nothing to search FOR. See
+        // `navigation::Reachable`: this is the real fix, and the refusal above
+        // is the workaround it replaces - the refusal still has to pay for one
+        // full failed search before it can remember anything, and this pays for
+        // none. It never blocks a possible errand, because "different islands"
+        // is the only answer it will give.
+        //
+        // Costs nothing against the budget either: no search is run, so a
+        // village whose errands are all across a bay does not spend its whole
+        // per-frame allowance discovering that.
+        if chart.hopeless(transform.translation, goal) {
+            route.waypoints.clear();
+            route.unreachable = true;
+            route.denied = Some((goal, now));
             continue;
         }
         if budget == 0 {
@@ -321,10 +388,12 @@ pub(crate) fn plan_routes(
             Some(waypoints) => {
                 route.waypoints = waypoints;
                 route.unreachable = false;
+                route.denied = None;
             }
             None => {
                 route.waypoints.clear();
                 route.unreachable = true;
+                route.denied = Some((goal, now));
             }
         }
     }
@@ -352,7 +421,9 @@ fn locomotion(
             Without<Corpse>,
         ),
     >,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("creature: locomotion");
     let Some(terrain) = terrain else {
         return;
     };
@@ -927,9 +998,28 @@ pub fn random_walkable_point(
     origin: Vec3,
     radius: f32,
 ) -> Option<Vec3> {
+    random_walkable_ring(terrain, rng, origin, 0.0, radius)
+}
+
+/// [`random_walkable_point`], held outside an inner ring.
+///
+/// The disc sampler runs from NOUGHT: "within ninety units" includes the
+/// middle of the village square, which is how a founding world came to deal
+/// a wolf pack onto the doorstep. Anything that must start at arm's length -
+/// predators, above all - asks for a floor as well as a ceiling.
+pub fn random_walkable_ring(
+    terrain: &Terrain,
+    rng: &mut Rng,
+    origin: Vec3,
+    nearest: f32,
+    radius: f32,
+) -> Option<Vec3> {
     for _ in 0..24 {
         let angle = rng.range(0.0, std::f32::consts::TAU);
-        let distance = radius * rng.f32().sqrt();
+        // Area-uniform over the ring, so a wide ring does not bunch its
+        // spawns against the inner edge.
+        let (r0, r1) = (nearest * nearest, radius * radius);
+        let distance = (r0 + (r1 - r0) * rng.f32()).sqrt();
         let x = origin.x + angle.cos() * distance;
         let z = origin.z + angle.sin() * distance;
 
@@ -1085,5 +1175,59 @@ mod tests {
             }
         }
         assert!(landed, "thrown creature never came down");
+    }
+
+    /// The frame-time bug, as a test.
+    ///
+    /// Measured before the fix: `creature: plan_routes` at 76ms of an 81ms
+    /// frame, held there for thirty seconds. The cause was not the search being
+    /// slow — it was the same failed search being run again every single frame,
+    /// because `locomotion` reads `unreachable`, abandons the errand and calls
+    /// `clear`, which puts `unreachable` back to false. Whatever wanted to go
+    /// there asked again on the next frame and got the most expensive answer
+    /// the pathfinder has: a full three-thousand-node expansion ending in
+    /// "no".
+    #[test]
+    fn a_place_that_cannot_be_reached_is_not_asked_about_every_frame() {
+        let mut route = Route::default();
+        let nowhere = Vec3::new(900.0, 12.0, -400.0);
+
+        // The search fails, and the refusal is remembered.
+        route.unreachable = true;
+        route.denied = Some((nowhere, 0.0));
+
+        // What `locomotion` does with a failed route. This is the step that
+        // used to undo the guard.
+        route.clear();
+
+        assert!(
+            route.still_refused(nowhere, 0.0),
+            "the refusal did not survive the abandonment, so the next frame \
+             will pay for the whole search again - which IS the bug"
+        );
+        // And the same errand a moment later, which is what a villager who has
+        // not changed their mind actually asks.
+        assert!(route.still_refused(nowhere, GIVE_UP_FOR * 0.5));
+    }
+
+    #[test]
+    fn a_refusal_is_forgotten_and_is_only_about_that_one_place() {
+        let mut route = Route::default();
+        let nowhere = Vec3::new(900.0, 12.0, -400.0);
+        route.denied = Some((nowhere, 0.0));
+
+        // The world changes - a bridge, a hall, a felled tree opening a way -
+        // so this forgets rather than bans.
+        assert!(
+            !route.still_refused(nowhere, GIVE_UP_FOR + 0.1),
+            "a place refused once is refused for ever, and the way there may \
+             have opened since"
+        );
+        // And somewhere else entirely was never refused at all, however near
+        // in time.
+        assert!(
+            !route.still_refused(nowhere + Vec3::new(80.0, 0.0, 0.0), 0.0),
+            "one unreachable place is holding up errands to every other"
+        );
     }
 }

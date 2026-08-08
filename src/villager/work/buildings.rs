@@ -762,6 +762,61 @@ impl ConstructionSite {
     }
 }
 
+/// Cuts the yard at a mine's mouth and banks the hill over its back.
+///
+/// Lifted out of the raising and made pure, because this is where the mine has
+/// been going wrong since it was written. Brett: "the mine building was
+/// supposed to attach to the side of a mountain, but it never worked right…
+/// they used to somehow build the mines underground."
+///
+/// They did, and here is the arithmetic. The crown that banks the hill over
+/// the portal's back was centred `half_d * 1.2` — one and nine tenths of a
+/// unit — uphill of the mouth, with a FULL-HEIGHT radius of `half_w * 1.4`,
+/// about two and a tenth. Its flat top therefore reached back to two tenths of
+/// a unit BEHIND the mouth: it covered the doorway. It raised that ground to
+/// `wall_h + 1.4` above the floor, and a mine's walls are one and four tenths
+/// tall — so the building finished a clear unit and a half under the hill. And
+/// because worked ground is applied in the order it is registered, the crown
+/// went on after the yard and won every argument between them.
+///
+/// Three rules keep it above ground AND under a hill, and they are geometric
+/// rather than tuned — which matters, because the first two alone quietly
+/// traded one failure for the other:
+///
+/// 1. The crown's flat top starts BEHIND the back wall, so no part of the
+///    raised disc can sit over the portal.
+/// 2. The yard is registered LAST, so where the two overlap it is the yard —
+///    the level ground the mine actually stands on — that has the final say.
+/// 3. And therefore the yard must not REACH the crown's flat top at all,
+///    radius and falloff together. With only the first two rules the mine
+///    came out of the ground and the hill went with it: the yard's falloff
+///    ran straight through the crown and pulled a bank of two and eight
+///    tenths down to seven tenths, leaving a portal with open sky behind it,
+///    which reads as a shed. The suite has both halves of that.
+///
+/// Returns where the hill stands at its full height, so nothing has to
+/// reproduce this arithmetic to ask about it.
+pub(crate) fn bank_the_mine(terrain: &Terrain, face: Vec3, uphill: Vec3, plan: &Blueprint) -> Vec3 {
+    // The yard: the level ground the mine stands on, and an apron at its
+    // mouth. Kept tight, because rule three prices every unit of it.
+    let yard_radius = plan.half_w + 1.0;
+    let yard_falloff = 1.6;
+
+    // The crown, placed so its flat top begins past the yard's whole reach.
+    let crown_radius = plan.half_w;
+    let crown_offset = yard_radius + yard_falloff + crown_radius;
+    let crown = face + uphill * crown_offset;
+    terrain.flatten(
+        crown.x,
+        crown.z,
+        crown_radius,
+        3.2,
+        face.y + plan.wall_h + 1.4,
+    );
+    terrain.flatten(face.x, face.z, yard_radius, yard_falloff, face.y);
+    crown
+}
+
 /// A finished building of any kind.
 #[derive(Component, Debug)]
 pub struct Building {
@@ -1326,6 +1381,11 @@ pub(crate) fn raise_the_founding_hall(
     let hall = commands
         .spawn((
             Name::new(BuildingKind::Longhouse.name()),
+            // One piece on any latitude - the founding hall was the building
+            // Brett watched come out of the ground as cubism on the far side
+            // of the world, because it rises through its own path and missed
+            // the marking the ground-broken sites got.
+            crate::globe::RigidlySeated,
             crate::villager::MemberOf(settlement),
             plan.clone(),
             Transform::from_translation(at - Vec3::Y * buried)
@@ -1403,7 +1463,15 @@ pub(crate) fn raise_stage(
         }
     }
     if let Some(work) = super::baked::drawing_at(plan.kind, plan.plan) {
-        super::baked::raise_baked(commands, meshes, materials, site, stage, work, plan.mirrored);
+        super::baked::raise_baked(
+            commands,
+            meshes,
+            materials,
+            site,
+            stage,
+            work,
+            plan.mirrored,
+        );
         return;
     }
 
@@ -1590,6 +1658,41 @@ pub(crate) fn raise_stage(
                     0.0,
                     &stonework,
                 );
+
+                // The spur the adit is driven into.
+                //
+                // A mine wants a hillside, and the ground where the stone is
+                // does not always have one. Brett, looking at a portal
+                // standing on flat grass with its back open to the sky: "this
+                // is the back of a mine, can we make this taper into the
+                // ground since it cant attach to the side of a cliff?"
+                //
+                // So the mine brings its own rock. A spur of bedrock stands
+                // over the lintel and steps down and back until it meets the
+                // earth, with the doorway cut in its face — which reads as a
+                // mine on ANY ground and asks the terrain for nothing. The
+                // hill banked behind it by `bank_the_mine` still helps where
+                // there is a hill to bank; this is what happens where there
+                // is not.
+                //
+                // Stepped rather than a true wedge, because every other piece
+                // of stone in this world is boxes and a smooth ramp here
+                // would be the one thing in the frame with a diagonal on it.
+                let spur = h + 1.1;
+                for (back, tall, wide) in [
+                    (0.75, 1.00, 2.2),
+                    (1.45, 0.76, 2.0),
+                    (2.15, 0.52, 1.7),
+                    (2.85, 0.28, 1.3),
+                ] {
+                    let height = spur * tall;
+                    part(
+                        Vec3::new(0.0, height * 0.5, d * back),
+                        Vec3::new(w * wide, height, d * 0.75),
+                        0.0,
+                        &stonework,
+                    );
+                }
             }
             // The working yard: a spoil heap grown to one side, crates,
             // and a lantern post for the shift that comes out after dark.
@@ -2543,6 +2646,9 @@ pub(crate) fn plan_houses(
     // A mine is sited by the rock, not by the rings: the nearest walkable
     // ground beside rising stone takes the portal, driven uphill so the
     // works read as underground.
+    //
+    // See [`bank_the_mine`] for the ground work, and for the bug that made
+    // this whole building a disappointment for as long as it has existed.
     if kind == BuildingKind::Mine {
         // Thrown as wide as the question that decided to want one. Asking
         // with forty darts what was answered with two hundred is how a
@@ -2565,19 +2671,7 @@ pub(crate) fn plan_houses(
         // hillside for it to stand against.
         let face = face + uphill * 1.4;
 
-        // A worked yard at the mouth; the hill keeps its shape past it.
-        terrain.flatten(face.x, face.z, plan.half_w + 1.6, 2.4, face.y);
-        // And the hill is banked OVER the portal's back: whatever the
-        // face's true shape, the door reads as a door into the earth —
-        // nobody walks behind the mine and finds the back of the set.
-        let crown = face + uphill * (plan.half_d * 1.2);
-        terrain.flatten(
-            crown.x,
-            crown.z,
-            plan.half_w * 1.4,
-            3.2,
-            face.y + plan.wall_h + 1.4,
-        );
+        bank_the_mine(&terrain, face, uphill, &plan);
         let (chunks, grass, chunk_assets, stripped, dirty_groves) = &mut ground;
         // The felling comes FIRST, before the chunks are swapped. A
         // scattered tree is a child of its chunk, and a chunk despawn
@@ -2900,6 +2994,9 @@ pub(crate) fn plan_houses(
         let building = commands
             .spawn((
                 Name::new(format!("{}, rising", plan.kind.name())),
+                // Seated as one piece, or a far-latitude village rises as
+                // cubism. See `globe::RigidlySeated`.
+                crate::globe::RigidlySeated,
                 ConstructionSite {
                     timber_footing,
                     ..default()
@@ -3097,6 +3194,84 @@ pub(crate) fn sermons(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A mine stands ABOVE the ground it is cut into.
+    ///
+    /// Brett, on a building that has never once worked: "they used to somehow
+    /// build the mines underground." They did — see [`bank_the_mine`] for the
+    /// arithmetic of how. This is that failure written down, so it cannot come
+    /// back the next time somebody tunes the hill behind the door.
+    ///
+    /// Measured over the building's whole footprint, on a slope steep enough
+    /// that the mine's own siting test would accept it, and from several
+    /// bearings — a bug that only shows when the hill climbs north-east is
+    /// still a bug.
+    #[test]
+    fn a_mine_is_never_buried_by_the_hill_banked_behind_it() {
+        for bearing in 0..8 {
+            let terrain = crate::terrain::Terrain::new(4242);
+            let turn = std::f32::consts::TAU * bearing as f32 / 8.0;
+            let (sin, cos) = turn.sin_cos();
+            let uphill = Vec3::new(cos, 0.0, sin);
+
+            let face = Vec3::new(0.0, 40.0, 0.0);
+            let plan = Blueprint {
+                kind: BuildingKind::Mine,
+                half_w: 1.55,
+                half_d: 1.6,
+                wall_h: 1.4,
+                ..Blueprint::roll(BuildingKind::Mine, &mut crate::rng::Rng::new(1))
+            };
+            let _ = bank_the_mine(&terrain, face, uphill, &plan);
+
+            // Every corner and edge of the floor the mine stands on.
+            for dw in [-1.0f32, -0.5, 0.0, 0.5, 1.0] {
+                for dd in [-1.0f32, -0.5, 0.0, 0.5, 1.0] {
+                    // Local +Z is uphill; across it is the width.
+                    let across = Vec3::new(-uphill.z, 0.0, uphill.x);
+                    let at = face + across * (dw * plan.half_w) + uphill * (dd * plan.half_d);
+                    let ground = terrain.height_at(at.x, at.z);
+                    assert!(
+                        ground <= face.y + 0.35,
+                        "on bearing {bearing} the ground under the mine stands at \
+                         {ground}, {:.2} above a floor at {} - the doorway is \
+                         {:.2} under the hill and the walls are only {} tall",
+                        ground - face.y,
+                        face.y,
+                        ground - face.y - plan.wall_h,
+                        plan.wall_h,
+                    );
+                }
+            }
+        }
+    }
+
+    /// And the hill still rises behind it, which is the whole point of the
+    /// crown: a portal with flat ground behind it reads as a shed.
+    #[test]
+    fn the_hill_still_stands_over_the_mines_back() {
+        let terrain = crate::terrain::Terrain::new(4242);
+        let uphill = Vec3::Z;
+        let face = Vec3::new(0.0, 40.0, 0.0);
+        let plan = Blueprint {
+            kind: BuildingKind::Mine,
+            half_w: 1.55,
+            half_d: 1.6,
+            wall_h: 1.4,
+            ..Blueprint::roll(BuildingKind::Mine, &mut crate::rng::Rng::new(1))
+        };
+        // Asked exactly where the code says the hill stands, rather than at a
+        // distance guessed here - two copies of that arithmetic is how the
+        // burial got in.
+        let crown = bank_the_mine(&terrain, face, uphill, &plan);
+        let ground = terrain.height_at(crown.x, crown.z);
+        assert!(
+            ground > face.y + plan.wall_h,
+            "the ground behind the portal stands at {ground} against a floor of \
+             {} - the mine has open sky behind it and reads as a shed",
+            face.y,
+        );
+    }
     use crate::villager::home::{HOUSE_CAPACITY, LONGHOUSE_CAPACITY};
 
     /// A village whose roofs exactly fit its people, with nothing rising.

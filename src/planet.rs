@@ -35,7 +35,9 @@ pub fn run() {
         DefaultPlugins
             .set(bevy::render::RenderPlugin {
                 render_creation: bevy::render::settings::WgpuSettings {
-                    backends: Some(bevy::render::settings::Backends::from_env().unwrap_or_default()),
+                    backends: Some(
+                        bevy::render::settings::Backends::from_env().unwrap_or_default(),
+                    ),
                     ..default()
                 }
                 .into(),
@@ -100,7 +102,10 @@ pub fn run() {
     .add_systems(Startup, crate::spawn_lighting)
     // Straight past the splash and the title: there is no game to open.
     .add_systems(Startup, open_the_world)
-    .add_systems(Update, (jump_about, read_the_position, are_the_trees_upright))
+    .add_systems(
+        Update,
+        (jump_about, read_the_position, are_the_trees_upright),
+    )
     .run();
 }
 

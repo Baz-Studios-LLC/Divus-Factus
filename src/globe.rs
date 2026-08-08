@@ -37,6 +37,11 @@ use crate::terrain::{PLANET_RADIUS, Terrain, WATER_LEVEL};
 
 /// The globe's own render layer. The planet and its sun live here alone, so
 /// what the camera renders is staged with single component writes.
+/// TWO. Layer 0 is the world, 1 the hand, 3 the deity alcove, 4 the paperdoll
+/// - which was on 2 first, and whose studio key relit the whole night sky when
+/// this constant moved in beside it. If a new layer is ever needed, count the
+/// neighbours first: a light on a layer the god camera renders lights
+/// EVERYTHING the god camera sees.
 pub const GLOBE_LAYER: usize = 2;
 
 /// Where the climb starts telling: the sky begins turning from horizon to
@@ -197,6 +202,59 @@ impl PatchKey {
         let quarter = std::f32::consts::FRAC_PI_2 * PLANET_RADIUS;
         quarter / (PATCH_CELLS as f32 * (1u32 << self.level) as f32)
     }
+
+    /// Half this patch's own angular reach, centre to corner, in radians.
+    ///
+    /// Generous on purpose. [`cell_arc`](Self::cell_arc) is an AVERAGE over a
+    /// cube face and the projection is not even: a patch in the middle of a
+    /// face covers about a quarter more arc per cube unit than the average
+    /// says, and one out at a corner rather less. Under-reaching here culls
+    /// patches with a corner still in view, so the widest case is the one
+    /// taken.
+    fn half_span(self) -> f32 {
+        // Half a diagonal (root two over two), times the face-middle stretch
+        // (one over pi-quarters).
+        self.cell_arc() * PATCH_CELLS as f32 * 0.901 / PLANET_RADIUS
+    }
+
+    /// Whether every part of this patch lies beyond the planet's own limb from
+    /// an eye at `eye`, in the planet's frame.
+    ///
+    /// This is ground the camera cannot see however it turns, because the world
+    /// itself is in the way — and the tree was refining it, drawing it and
+    /// keeping it in memory anyway. It has no frustum test and deliberately
+    /// still has none: turn the camera and ground outside the frame must
+    /// already be sharp, or every pan sweeps a wave of coarse ground across
+    /// the screen. The limb is different. Nothing brings that ground into view
+    /// but MOVING, and moving rebuilds the cut anyway.
+    ///
+    /// The size of it: from four hundred units up, the visible cap is about six
+    /// percent of the sphere. Ninety-four percent of the planet was being
+    /// tended for nobody, and because the shallow levels are evergreen (see
+    /// `EVERGREEN`) two thousand of those patches never even went away.
+    fn over_the_limb(self, eye: Vec3) -> bool {
+        let height = eye.length();
+        // The horizon of the LOWEST ground there is, not of sea level, so a
+        // mountain standing on the far slope still counts as visible. Clamped
+        // so an eye somehow inside the world cannot hand `acos` a number over
+        // one and cull the entire planet on a NaN.
+        let floor = (PLANET_RADIUS - crate::terrain::TERRAIN_HEIGHT).min(height * 0.999);
+        let horizon = (floor / height).acos();
+
+        // How far round the world this patch sits from the point under the
+        // eye. By `atan2` and not `acos`: near the nadir the two vectors are
+        // nearly parallel and `acos` throws away most of the significant
+        // figures right where the answer decides the finest patches in the
+        // world. The same lesson as `Place::angle_to`.
+        let nadir = eye.normalize_or(Vec3::Y);
+        let here = self.centre_dir();
+        let away = here.cross(nadir).length().atan2(here.dot(nadir));
+
+        // Its own half-span back off, so a patch STRADDLING the limb is kept.
+        // Without this a root face is culled while a quarter of it is still on
+        // screen, and the cull walks a bite out of the world's edge.
+        away - self.half_span() > horizon
+    }
 }
 
 /// The six faces of the cube, each an outward axis spanned by two others.
@@ -233,6 +291,48 @@ impl PlanetTree {
     /// How many patches are built. For the planet bench's readout.
     pub(crate) fn standing(&self) -> usize {
         self.built.len()
+    }
+}
+
+/// "Seat my ROOT, and my parts follow ME" - for anything assembled from
+/// pieces that must stay square to one another.
+///
+/// The bend seats every entity individually by its own flat position, and
+/// near home the pieces of a house disagree by millimetres. Near the POLES
+/// they do not: the flat chart's longitude lines converge there, each part
+/// of one roof gets a visibly different frame, and a village founded on the
+/// far side of the world came out of the ground as cubism - Brett: "my
+/// house looks like a picasso painting, lol." A building is rigid the way
+/// the camera is a look-at: one part of the picture the bend must not tear.
+#[derive(Component)]
+pub struct RigidlySeated;
+
+/// Reseats every part of a rigid assembly in ITS ROOT'S bent frame, after
+/// the bend has seated the roots. Children were already seated one by one -
+/// wrongly, near the poles - and this overwrites them with the root's frame
+/// carried down the tree, which is what "rigid" means.
+fn seat_the_rigid(
+    roots: Query<(Entity, &GlobalTransform), With<RigidlySeated>>,
+    children: Query<&Children>,
+    mut parts: Query<(&Transform, &mut GlobalTransform), Without<RigidlySeated>>,
+) {
+    for (root, root_seat) in &roots {
+        let mut walk: Vec<(Entity, GlobalTransform)> = children
+            .get(root)
+            .into_iter()
+            .flatten()
+            .map(|child| (*child, *root_seat))
+            .collect();
+        while let Some((part, above)) = walk.pop() {
+            let Ok((local, mut seat)) = parts.get_mut(part) else {
+                continue;
+            };
+            let seated = above.mul_transform(*local);
+            *seat.bypass_change_detection() = seated;
+            for grandchild in children.get(part).into_iter().flatten() {
+                walk.push((*grandchild, seated));
+            }
+        }
     }
 }
 
@@ -406,7 +506,9 @@ impl Plugin for GlobePlugin {
             // simulation keeps its flat world, the picture gets the sphere.
             .add_systems(
                 PostUpdate,
-                bend_the_world.after(bevy::transform::TransformSystems::Propagate),
+                (bend_the_world, seat_the_rigid)
+                    .chain()
+                    .after(bevy::transform::TransformSystems::Propagate),
             );
     }
 }
@@ -463,6 +565,20 @@ pub(crate) fn bent_camera_pose(rig: &CameraRig) -> Transform {
     let focus_seat = planet_centre() + (frame * Vec3::Y) * (PLANET_RADIUS + rig.focus.y);
     let eye_seat = focus_seat + (frame * rig.eye_offset());
     if rig.distance < crate::camera::FIRST_PERSON {
+        // The ride, narrated: where the frame thinks up is against where up
+        // really is, and how high the eye actually sits. The avatar broke on
+        // the round world and three code readings cleared three suspects -
+        // the probe rule stands. `DIVUS_FACTUS_AVATAR_PROBE=1`.
+        if std::env::var("DIVUS_FACTUS_AVATAR_PROBE").is_ok() {
+            let outward = planet_stance() * crate::terrain::direction_at(rig.focus.x, rig.focus.z);
+            let up_err = (frame * Vec3::Y).angle_between(outward).to_degrees();
+            bevy::log::info!(
+                "avatar probe: focus {:?} seat_alt {:.1} up_err {up_err:.2}deg fwd_dot_up {:.2}",
+                rig.focus,
+                eye_seat.distance(planet_centre()) - PLANET_RADIUS,
+                (frame * rig.forward()).dot((eye_seat - planet_centre()).normalize()),
+            );
+        }
         // No separation to look along; carry the flat gaze into the seat.
         Transform {
             translation: eye_seat,
@@ -877,14 +993,10 @@ fn build_patch(
             let v = v0 + (gj as f32 - 1.0) * step;
             let dir = (outward + along_u * u + along_v * v).normalize();
             let (x, z) = ground_coordinates(dir);
-            let h = terrain.base_height_at(x, z);
-            // The water surface standing over this ground, if any: the sea,
-            // or a river or lake the courses know about.
-            let surface = match terrain.river_surface_at(x, z) {
-                Some(level) if level > h => level,
-                _ => WATER_LEVEL,
-            };
-            let wet = surface.max(WATER_LEVEL);
+            // The ground as the world actually stands - channels cut, village
+            // ground levelled - and the water on it, asked once. See
+            // `Terrain::ground_and_water_at` for what asking twice cost.
+            let (h, wet) = terrain.ground_and_water_at(x, z);
             grid.push(dir * drawn_radial(h));
             ground.push((x, z, h, wet));
         }
@@ -923,7 +1035,7 @@ fn build_patch(
             // after the lighting - see `PlanetMaterial`. Blending the veil's
             // colour into the rgb here instead put a LIT version of it on the
             // world, which is a different colour from the unlit cloths that
-              // hide the same ground at play height, and a different colour
+            // hide the same ground at play height, and a different colour
             // again where the sun grazes the limb.
             if let Some(known) = veil
                 && !known.knows(Vec3::new(x, h, z))
@@ -1086,12 +1198,9 @@ fn build_patch_water(terrain: &Terrain, key: PatchKey) -> Option<Mesh> {
             let v = v0 + gj as f32 * step;
             let dir = (outward + along_u * u + along_v * v).normalize();
             let (x, z) = ground_coordinates(dir);
-            let h = terrain.base_height_at(x, z);
-            let surface = match terrain.river_surface_at(x, z) {
-                Some(level) if level > h => level,
-                _ => WATER_LEVEL,
-            };
-            let wet = surface.max(WATER_LEVEL);
+            // The same question the ground asked, so the two agree vertex for
+            // vertex. See `Terrain::ground_and_water_at`.
+            let (h, wet) = terrain.ground_and_water_at(x, z);
             let under = h < wet;
             any |= under;
             drowned[gj * stride + gi] = under;
@@ -1263,6 +1372,12 @@ fn tend_the_tree(
         })
         .collect();
     while let Some(key) = walk.pop() {
+        // Ground the planet itself hides is neither split nor shown. A whole
+        // root face going this way takes its entire subtree with it, which is
+        // the point. See `PatchKey::over_the_limb`.
+        if key.over_the_limb(cam_mesh) {
+            continue;
+        }
         let centre = key.centre_dir() * (PLANET_RADIUS + WATER_LEVEL);
         let reach = key.cell_arc() * PATCH_CELLS as f32 * 0.75;
         let distance = (cam_mesh.distance(centre) - reach).max(REFINE_FLOOR);
@@ -1544,6 +1659,65 @@ mod tests {
         );
     }
 
+    /// A house on the far side of the world is still a house.
+    ///
+    /// The bend seats every entity by its own flat position, and near the
+    /// poles the chart's longitudes converge - each part of one roof got a
+    /// visibly different frame, and a far village rose as cubism: "my house
+    /// looks like a picasso painting." Rigid assemblies are reseated in
+    /// their ROOT'S frame after the bend; this holds the whole claim.
+    #[test]
+    fn a_rigid_house_stays_square_at_the_far_latitudes() {
+        let mut app = App::new();
+        app.add_systems(Update, (bend_the_world, seat_the_rigid).chain());
+
+        // High latitude: two thirds of the way to the pole.
+        let site = Vec3::new(700.0, 40.0, -6_300.0);
+        let ridge = Transform::from_xyz(-3.0, 4.0, 0.0);
+        let slab = Transform::from_xyz(3.0, 0.2, 0.0);
+        let root = app
+            .world_mut()
+            .spawn((
+                RigidlySeated,
+                Transform::from_translation(site),
+                GlobalTransform::from(Transform::from_translation(site)),
+            ))
+            .id();
+        let parts = [ridge, slab].map(|local| {
+            let flat_world = Transform::from_translation(site + local.translation);
+            let part = app
+                .world_mut()
+                .spawn((local, GlobalTransform::from(flat_world)))
+                .id();
+            app.world_mut().entity_mut(part).insert(ChildOf(root));
+            part
+        });
+
+        app.update();
+
+        let world = app.world();
+        let seat = *world.get::<GlobalTransform>(root).unwrap();
+        for (part, local) in parts.iter().zip([ridge, slab]) {
+            let got = *world.get::<GlobalTransform>(*part).unwrap();
+            let want = seat.mul_transform(local);
+            assert!(
+                got.translation().distance(want.translation()) < 1e-3,
+                "a part sits {} from its place in the root's frame",
+                got.translation().distance(want.translation()),
+            );
+        }
+        // And the claim is not vacuous: seated individually, the ridge lands
+        // measurably elsewhere at this latitude.
+        let individually = bend_frame(site + ridge.translation).0;
+        let rigidly = seat.mul_transform(ridge).translation();
+        assert!(
+            individually.distance(rigidly) > 0.05,
+            "at this latitude the two seatings agree ({}) - the fixture \
+             proves nothing",
+            individually.distance(rigidly),
+        );
+    }
+
     /// The god's hand, and everything hanging off it, is left exactly where it
     /// put itself.
     ///
@@ -1647,16 +1821,24 @@ mod tests {
     }
 
     /// And the curve is REAL at the scale the eye sees: across the streamed
-    /// world the far edge drops a couple of hundred units below the tangent
-    /// plane, which is the difference between a horizon and a plate.
+    /// world the far edge drops well below the tangent plane, which is the
+    /// difference between a horizon and a plate.
+    ///
+    /// Measured against the world's own relief rather than in bare units,
+    /// because the plate's radius is a tuning knob and this claim is not. It
+    /// was a couple of hundred units when the plate reached twenty rings; at
+    /// twelve it is nearer sixty, and sixty against three hundred and twenty
+    /// units of relief is still a horizon and not a table top.
     #[test]
     fn the_streamed_world_visibly_curves() {
         let rim = crate::terrain::CHUNK_SIZE * crate::terrain::VIEW_CHUNKS as f32;
         let far = bend_frame(Vec3::new(rim, WATER_LEVEL, 0.0)).0;
         let drop = -far.y;
+        let relief = crate::terrain::TERRAIN_HEIGHT;
         assert!(
-            drop > 100.0,
-            "the streamed rim only drops {drop} units - the world is flat"
+            drop > relief * 0.1,
+            "the streamed rim drops {drop} units against {relief} of relief - \
+             the world is flat"
         );
     }
 
@@ -1783,5 +1965,114 @@ mod tests {
         assert_eq!(positions, expected_grid + expected_skirt);
         let colors = mesh.attribute(Mesh::ATTRIBUTE_COLOR).unwrap().len();
         assert_eq!(colors, positions);
+    }
+
+    /// An eye that height above the ground under `face`'s centre.
+    fn eye_over(face: u8, height: f32) -> Vec3 {
+        let root = PatchKey {
+            face,
+            level: 0,
+            x: 0,
+            y: 0,
+        };
+        root.centre_dir() * (PLANET_RADIUS + height)
+    }
+
+    #[test]
+    fn the_far_side_of_the_world_is_not_tended() {
+        // The tree had no cull at all, so from four hundred units up it was
+        // refining, drawing and keeping in memory a whole planet of ground the
+        // planet itself was standing in front of.
+        let eye = eye_over(0, 431.0);
+        let behind = PatchKey {
+            face: 1,
+            level: 0,
+            x: 0,
+            y: 0,
+        };
+        assert!(
+            behind.over_the_limb(eye),
+            "the opposite face of the cube is being tended from 431 units up"
+        );
+        // Whatever it is made of. A deep patch out there is no more visible
+        // than the root it hangs from.
+        let deep = PatchKey {
+            face: 1,
+            level: 5,
+            x: 16,
+            y: 16,
+        };
+        assert!(deep.over_the_limb(eye), "and neither is anything inside it");
+    }
+
+    #[test]
+    fn the_ground_underfoot_is_always_tended() {
+        // The cull must never touch what the god is looking at, at any height
+        // from the treetops to the top of the climb.
+        for height in [50.0, 431.0, 1_500.0, crate::globe::CEILING] {
+            let eye = eye_over(2, height);
+            for level in 0..=MAX_LEVEL {
+                let middle = 1u32 << level.saturating_sub(1);
+                let under = PatchKey {
+                    face: 2,
+                    level,
+                    x: middle,
+                    y: middle,
+                };
+                assert!(
+                    !under.over_the_limb(eye),
+                    "the ground under the god was culled at L{level}, {height} up"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn nothing_with_a_corner_in_view_is_ever_culled() {
+        // What the half span is FOR. The cull reads a patch's centre, and a
+        // patch whose middle is over the horizon can still have a near corner
+        // in plain sight; culling by the middle alone walks a visible bite out
+        // of the edge of the world.
+        //
+        // Checked against each patch's own four corners, worked out from its
+        // rect rather than from the half span the cull uses - so this is a
+        // second opinion and not a restatement. The middle column of a face is
+        // swept deliberately: that is where the cube projection stretches most
+        // and where an average-based span under-reaches worst.
+        for height in [120.0, 431.0, 2_000.0, CEILING] {
+            let eye = eye_over(0, height);
+            let nadir = eye.normalize();
+            let horizon = ((PLANET_RADIUS - crate::terrain::TERRAIN_HEIGHT) / eye.length()).acos();
+            for level in [3u8, 5, 6, 8] {
+                let span = 1u32 << level;
+                for y in 0..span {
+                    let key = PatchKey {
+                        face: 0,
+                        level,
+                        x: span / 2,
+                        y,
+                    };
+                    if !key.over_the_limb(eye) {
+                        continue;
+                    }
+                    let (u0, v0, side) = key.rect();
+                    let (outward, along_u, along_v) = face_axes(key.face);
+                    let nearest = [(0.0, 0.0), (side, 0.0), (0.0, side), (side, side)]
+                        .into_iter()
+                        .map(|(du, dv)| {
+                            let dir =
+                                (outward + along_u * (u0 + du) + along_v * (v0 + dv)).normalize();
+                            dir.cross(nadir).length().atan2(dir.dot(nadir))
+                        })
+                        .fold(f32::INFINITY, f32::min);
+                    assert!(
+                        nearest > horizon,
+                        "an L{level} patch was culled from {height} up with a \
+                         corner {nearest} from the nadir, inside the horizon at \
+                         {horizon}"
+                    );
+                }
+            }
+        }
     }
 }

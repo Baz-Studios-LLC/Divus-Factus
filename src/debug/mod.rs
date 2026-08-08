@@ -23,12 +23,12 @@ mod capture;
 mod god;
 mod history;
 mod hud;
-pub(crate) mod layers;
-pub(crate) mod ordo_trial;
-pub(crate) mod timings;
 mod inspector;
+pub(crate) mod layers;
 mod manifest;
+pub(crate) mod ordo_trial;
 mod people;
+pub(crate) mod timings;
 pub(crate) mod village;
 mod world;
 
@@ -117,6 +117,7 @@ impl Plugin for DebugPlugin {
                     village::settings_panel,
                     village::keybind_panel,
                     village::sound_panel,
+                    village::swap_mouse_buttons,
                     apply_codex_page,
                     dress_ledger_banner,
                     update_dossier,

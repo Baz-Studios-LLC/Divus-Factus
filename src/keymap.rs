@@ -119,6 +119,58 @@ impl Deed {
     }
 }
 
+/// Which mouse button grabs the land and which one works the god's will.
+///
+/// Black and White put Grab Land on the left and Action on the right, and
+/// Black and White TWO swapped them — left to act, right to move. This world
+/// follows the first, because the first is the one people played: two to three
+/// million copies against a sequel whose sales were poor enough to be named as
+/// a cause of Lionhead's troubles.
+///
+/// But anyone who came to it through the sequel has the opposite reflex, and
+/// a reflex is not something a player can argue themselves out of. So it is a
+/// switch. Brett's call: "Maybe we should use B&W 1 controls but let people
+/// reverse the mouse buttons in the settings?"
+///
+/// Everything that reads the mouse for the world or the hand asks HERE rather
+/// than naming a button, so there is exactly one place the two schemes differ
+/// and no way for half the game to end up on the other one.
+#[derive(Resource, Default, Clone, Copy)]
+pub struct MouseScheme {
+    /// `false` is Black and White; `true` is its sequel.
+    pub reversed: bool,
+}
+
+impl MouseScheme {
+    /// The button that seizes the ground and drags the world.
+    pub fn land(self) -> MouseButton {
+        if self.reversed {
+            MouseButton::Right
+        } else {
+            MouseButton::Left
+        }
+    }
+
+    /// The button that picks a thing up, carries it, drops it and throws it —
+    /// and, tapped cleanly, chooses whom to watch.
+    pub fn action(self) -> MouseButton {
+        if self.reversed {
+            MouseButton::Left
+        } else {
+            MouseButton::Right
+        }
+    }
+
+    /// What to call them on screen, so the help never contradicts the setting.
+    pub fn land_name(self) -> &'static str {
+        if self.reversed { "RMB" } else { "LMB" }
+    }
+
+    pub fn action_name(self) -> &'static str {
+        if self.reversed { "LMB" } else { "RMB" }
+    }
+}
+
 /// Which key answers to which deed. One key per deed, always: binding a
 /// key that already serves another deed trades the two, so nothing is ever
 /// left unbound.
@@ -279,36 +331,51 @@ fn keys_path() -> Option<std::path::PathBuf> {
 /// The defaults, with whatever the player has written over them. Lines are
 /// applied through [`Keymap::bind`], so a hand-edited file can never leave
 /// two deeds on one key.
-fn load() -> Keymap {
+fn load() -> (Keymap, MouseScheme) {
     let mut map = Keymap::default();
+    let mut mouse = MouseScheme::default();
     let Some(text) = keys_path().and_then(|path| std::fs::read_to_string(path).ok()) else {
-        return map;
+        return (map, mouse);
     };
     for line in text.lines() {
-        let Some((deed_name, key_name)) = line.split_once(' ') else {
+        let Some((name, value)) = line.split_once(' ') else {
             continue;
         };
-        let deed = Deed::ALL.into_iter().find(|d| d.written() == deed_name);
-        if let (Some(deed), Some(key)) = (deed, key_from_name(key_name.trim())) {
+        // The mouse scheme rides in the same file, under a name no deed can
+        // have. Unknown lines were already skipped, so a file written by an
+        // older build simply has no opinion and gets the default.
+        if name == MOUSE_LINE {
+            mouse.reversed = value.trim() == "reversed";
+            continue;
+        }
+        let deed = Deed::ALL.into_iter().find(|d| d.written() == name);
+        if let (Some(deed), Some(key)) = (deed, key_from_name(value.trim())) {
             map.bind(deed, key);
         }
     }
-    map
+    (map, mouse)
 }
+
+/// What the mouse scheme is called in the keys file.
+const MOUSE_LINE: &str = "mouse";
 
 /// Writes the whole map down. Called after every change; seventeen lines
 /// is not a cost worth batching.
-pub fn save(map: &Keymap) {
+pub fn save(map: &Keymap, mouse: &MouseScheme) {
     let Some(path) = keys_path() else {
         return;
     };
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    let text: String = Deed::ALL
+    let mut text: String = Deed::ALL
         .into_iter()
         .filter_map(|deed| Some(format!("{} {}\n", deed.written(), key_name(map.key(deed))?)))
         .collect();
+    text.push_str(&format!(
+        "{MOUSE_LINE} {}\n",
+        if mouse.reversed { "reversed" } else { "plain" }
+    ));
     let _ = std::fs::write(path, text);
 }
 
@@ -316,7 +383,8 @@ pub struct KeymapPlugin;
 
 impl Plugin for KeymapPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(load());
+        let (map, mouse) = load();
+        app.insert_resource(map).insert_resource(mouse);
     }
 }
 

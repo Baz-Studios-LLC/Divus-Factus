@@ -234,7 +234,9 @@ fn drape_the_veil(
         Or<(With<TerrainChunk>, With<WaterPlane>)>,
     >,
     veils: Query<Entity, With<Veil>>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("fog: drape_the_veil");
     // Chunks are born hidden so that no unveiled ground is ever seen. Whoever
     // decides they may be seen has to be whoever knows the veil is on them —
     // which is this system, and, when there is no veil to wait for, this
@@ -401,8 +403,8 @@ fn follow_the_known(
     let live = known.pockets.len().min(MAX_POCKETS);
     for (_, material) in materials.iter_mut() {
         material.params.home = known.centre.extend(known.radius);
-        material.params.planet = crate::globe::planet_centre()
-            .extend(crate::terrain::PLANET_RADIUS);
+        material.params.planet =
+            crate::globe::planet_centre().extend(crate::terrain::PLANET_RADIUS);
         material.params.dials.x = live as f32;
         for (slot, pocket) in known.pockets.iter().take(live).enumerate() {
             material.params.pockets[slot] = pocket.at.extend(pocket.radius);

@@ -60,9 +60,7 @@ fn lend_ramps(mut ramps: ResMut<Ramps>) {
     ramps.register("cloth_gold", |t| {
         crate::palette::shade(&crate::palette::CLOTH_GOLD, t)
     });
-    ramps.register("bone", |t| {
-        crate::palette::shade(&crate::palette::BONE, t)
-    });
+    ramps.register("bone", |t| crate::palette::shade(&crate::palette::BONE, t));
     ramps.register("cloth_gold_smooth", |t| {
         crate::palette::shade_smooth(&crate::palette::CLOTH_GOLD, t)
     });

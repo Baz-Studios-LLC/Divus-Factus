@@ -30,8 +30,192 @@ pub struct MatterPlugin;
 
 impl Plugin for MatterPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (loose_ballistics, roll, float).chain());
+        app.add_systems(Update, (loose_ballistics, roll, float, settle).chain())
+            .add_systems(Update, drive_sparks);
     }
+}
+
+// ------------------------------------------------------------------ sparks
+
+/// One fleck of a thing becoming its essence: a tree bursting into the
+/// timber it was, a rock into stone, a bush into the meal on it.
+///
+/// Little cubes, because everything in this world is little cubes - the
+/// same shape the glory miracle scatters, cut down to a hand-sized burst.
+#[derive(Component)]
+pub struct Spark {
+    velocity: Vec3,
+    age: f32,
+    life: f32,
+    /// The size it was born at; the shrink is measured from here by AGE.
+    /// The first cut multiplied the standing scale by a constant every
+    /// FRAME - fifteen percent gone sixty times a second - and the whole
+    /// burst lived about six frames. Brett: "I am not seeing the particles."
+    born: f32,
+    /// Where the essence is bound: the pile or site that took the offering.
+    /// Brett's shape for the gesture - "explode and then shrink into the
+    /// focal point of the pile" - so the burst has a DESTINATION, and what
+    /// the pop means (the stores got richer) is readable in the motion.
+    home: Vec3,
+}
+
+/// How much of a spark's life is the explosion; the rest is the gathering-in.
+const SPARK_SCATTER: f32 = 0.38;
+
+/// Throws a burst of flecks where something was just taken as an offering.
+///
+/// Brett: "can we have the tree pop in a kind of particle burst animation?"
+/// The colours are the thing's own - bark and leaf for a tree, grey for
+/// stone, berry-red for food - so what it WAS is readable in the pop.
+pub fn burst_of(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    at: Vec3,
+    home: Vec3,
+    colors: &[Color],
+) {
+    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+    let coats: Vec<Handle<StandardMaterial>> = colors
+        .iter()
+        .map(|color| {
+            materials.add(StandardMaterial {
+                base_color: *color,
+                emissive: LinearRgba::from(*color) * 0.6,
+                perceptual_roughness: 1.0,
+                ..default()
+            })
+        })
+        .collect();
+    // Golden-angle spread, no two flecks alike - the same trick the glory
+    // motes use, so bursts read as one family of magic.
+    for i in 0..18 {
+        let angle = i as f32 * 2.399963;
+        let (sin, cos) = angle.sin_cos();
+        let pace = 3.0 + (i % 3) as f32 * 1.4;
+        let born = 0.3 + (i % 3) as f32 * 0.12;
+        commands.spawn((
+            Spark {
+                velocity: Vec3::new(cos * pace, 4.2 + (i % 4) as f32 * 1.1, sin * pace),
+                age: 0.0,
+                life: 0.9 + (i % 5) as f32 * 0.12,
+                born,
+                home: home + Vec3::Y * 0.5,
+            },
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(coats[i % coats.len()].clone()),
+            Transform::from_translation(at + Vec3::new(cos * 0.4, 0.8, sin * 0.4))
+                .with_scale(Vec3::splat(born)),
+            bevy::light::NotShadowCaster,
+        ));
+    }
+}
+
+/// The suck: sparks that skip the explosion and go straight to gathering.
+///
+/// The reverse gesture of an offering's burst, for scooping a lump OFF a
+/// deposit: flecks of the bank stream from the ground into the god's grip
+/// and the lump is what they condense into. Brett: "the places resources
+/// should let me suck up the particles and turn into an item in my hand."
+/// Implemented as sparks born with act one already spent - same component,
+/// same driver, no new machinery.
+pub fn gather_to(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    from: Vec3,
+    to: Vec3,
+    colors: &[Color],
+) {
+    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+    let coats: Vec<Handle<StandardMaterial>> = colors
+        .iter()
+        .map(|color| {
+            materials.add(StandardMaterial {
+                base_color: *color,
+                emissive: LinearRgba::from(*color) * 0.6,
+                perceptual_roughness: 1.0,
+                ..default()
+            })
+        })
+        .collect();
+    for i in 0..14 {
+        let angle = i as f32 * 2.399963;
+        let (sin, cos) = angle.sin_cos();
+        let reach = 0.6 + (i % 4) as f32 * 0.5;
+        let born = 0.22 + (i % 3) as f32 * 0.09;
+        let life = 0.55 + (i % 5) as f32 * 0.09;
+        commands.spawn((
+            Spark {
+                velocity: Vec3::ZERO,
+                // Born past the scatter, so the driver goes straight to the
+                // gather - staggered a touch so they stream rather than swarm.
+                age: life * (SPARK_SCATTER + (i % 4) as f32 * 0.04),
+                life,
+                born,
+                home: to,
+            },
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(coats[i % coats.len()].clone()),
+            Transform::from_translation(from + Vec3::new(cos * reach, 0.25, sin * reach))
+                .with_scale(Vec3::splat(born)),
+            bevy::light::NotShadowCaster,
+        ));
+    }
+}
+
+/// Flies every spark through its two acts: OUT, in a burst under gravity,
+/// then HOME - swooping into the pile that took the offering, shrinking as
+/// it closes, gone as it arrives. The gather is an ease-in, so the flecks
+/// hang at the top of their scatter for a beat and then commit.
+fn drive_sparks(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut sparks: Query<(Entity, &mut Spark, &mut Transform)>,
+) {
+    let dt = time.delta_secs();
+    for (fleck, mut spark, mut transform) in &mut sparks {
+        spark.age += dt;
+        let t = spark.age / spark.life;
+        if t >= 1.0 {
+            commands.entity(fleck).despawn();
+            continue;
+        }
+        if t < SPARK_SCATTER {
+            // The explosion: ballistic, full size.
+            spark.velocity.y -= 12.0 * dt;
+            let velocity = spark.velocity;
+            transform.translation += velocity * dt;
+        } else {
+            // The gathering: pulled to the pile ever harder, shrinking as
+            // it goes. Position is steered rather than integrated - a
+            // fraction of the remaining gap per second - so every fleck
+            // arrives no matter where its scatter left it.
+            let gather = (t - SPARK_SCATTER) / (1.0 - SPARK_SCATTER);
+            let pull = 1.0 - (-(3.0 + gather * 14.0) * dt).exp();
+            let home = spark.home;
+            transform.translation = transform.translation.lerp(home, pull);
+            transform.scale = Vec3::splat(spark.born * (1.0 - gather * 0.9));
+            if transform.translation.distance(home) < 0.25 {
+                commands.entity(fleck).despawn();
+            }
+        }
+    }
+}
+
+/// A double handful scooped off a deposit by the god: clay from the bank,
+/// ore from the vein, stone from the quarry face.
+///
+/// Deposits are PLACES - rooted, worked by miners, sunk when spent - and the
+/// hand does not uproot places. But the god as hauler needs SOMETHING to
+/// carry off them, or clay and iron are the two resources providence cannot
+/// touch. Brett: "there are other resources like clay, let's make sure we can
+/// pick up everything we need too." So a grab on a deposit tears off a lump:
+/// a real object, thrown and offered like any rock, paid by its kind.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct Lump {
+    pub kind: DepositKind,
+    pub amount: f32,
 }
 
 /// What a thing is made of.
@@ -56,6 +240,14 @@ pub struct Matter {
     pub buoyant: bool,
     /// Visual radius, for spin rate and ground clearance.
     pub radius: f32,
+    /// How far the body's visual CENTRE sits above its origin. A tree is
+    /// built from its trunk base, so its heart is half its height up; a
+    /// boulder is built around its middle and its heart is nought. Tumbling
+    /// happens about the heart - about the origin, a thrown tree pivoted on
+    /// its root and swept its crown through the turf on every turn: "it
+    /// spins super fast and clips through the ground. It spins from the
+    /// base of the trunk."
+    pub heart: f32,
 }
 
 impl Matter {
@@ -66,6 +258,7 @@ impl Matter {
             roundness: 0.82,
             buoyant: false,
             radius,
+            heart: 0.0,
         }
     }
 
@@ -76,6 +269,8 @@ impl Matter {
             roundness: 0.55,
             buoyant: true,
             radius: 0.5,
+            // Half a tree's height: baked from the trunk base, crown above.
+            heart: 2.2 + maturity * 1.0,
         }
     }
 
@@ -86,6 +281,7 @@ impl Matter {
             roundness: 0.15,
             buoyant: true,
             radius: 0.4,
+            heart: 0.35,
         }
     }
 
@@ -146,8 +342,53 @@ fn loose_ballistics(
         body.velocity.y -= GRAVITY * dt;
         transform.translation += body.velocity * dt;
 
-        let spin = body.velocity.length() * dt / matter.radius.max(0.2) * 0.4;
-        transform.rotate_local_x(spin);
+        // End over end ABOUT THE HEART, the way a hurled log actually goes.
+        // Rotating about the origin pivoted a tree on its trunk base: the
+        // crown swept a six-unit arc - enormous tip speed no angular cap
+        // could tame - and dipped under the turf on every turn.
+        let speed = body.velocity.length();
+        if let Ok(axis) = bevy::math::Dir3::new(Vec3::Y.cross(body.velocity)) {
+            let rate = (speed / matter.radius.max(0.4) * 0.07).min(2.4);
+            let pivot = transform.translation + transform.rotation * (Vec3::Y * matter.heart);
+            transform.rotate_around(pivot, Quat::from_axis_angle(axis.as_vec3(), rate * dt));
+        }
+
+        // And the ground repels the swinging BODY, not the origin: the heart
+        // stays a whole half-length above the floor while tumbling, so no
+        // part of the turn goes below the turf.
+        if matter.heart > 0.0 {
+            let ground_here = terrain
+                .height_at(transform.translation.x, transform.translation.z)
+                .max(WATER_LEVEL);
+            let clearance = matter.heart + matter.radius;
+            let pivot_y =
+                transform.translation.y + (transform.rotation * (Vec3::Y * matter.heart)).y;
+            if pivot_y < ground_here + clearance && body.velocity.y < 0.0 {
+                // Hit hard, and it BOUNCES - one diminishing hop, wood keeping
+                // about a third of its fall - before the landing proper.
+                // "When they hit the ground they just stop. Can we add just a
+                // tad physics?"
+                if body.velocity.y < -4.5 {
+                    body.velocity.y = -body.velocity.y * 0.32;
+                    body.velocity.x *= 0.62;
+                    body.velocity.z *= 0.62;
+                    transform.translation.y += ground_here + clearance - pivot_y;
+                    continue;
+                }
+                // Close enough and slow enough to touch down: land it here
+                // rather than clip, skidding out what remains of the throw.
+                transform.translation.y = ground_here + matter.radius * 0.5;
+                commands.entity(entity).remove::<Airborne>();
+                if matter.roundness <= 0.6 {
+                    let laid = lying_flat(transform.rotation);
+                    commands.entity(entity).insert(Settling {
+                        target: laid,
+                        slide: Vec3::new(body.velocity.x, 0.0, body.velocity.z) * 0.5,
+                    });
+                }
+                continue;
+            }
+        }
 
         let ground = terrain.height_at(transform.translation.x, transform.translation.z);
         let water_here = ground < WATER_LEVEL;
@@ -176,9 +417,80 @@ fn loose_ballistics(
                     .entity(entity)
                     .remove::<Airborne>()
                     .insert(Rolling { velocity: lateral });
+            } else if body.velocity.y < -4.5 {
+                // The same single hop the heart-landing takes.
+                body.velocity.y = -body.velocity.y * 0.32;
+                body.velocity.x *= 0.62;
+                body.velocity.z *= 0.62;
             } else {
                 commands.entity(entity).remove::<Airborne>();
+                // The long and the flat come to REST rather than freezing
+                // mid-tumble: a felled tree crashing down on its crown held
+                // that pose, half its length under the turf. It lies down
+                // instead - see `settle`.
+                if matter.roundness <= 0.6 {
+                    let laid = lying_flat(transform.rotation);
+                    commands.entity(entity).insert(Settling {
+                        target: laid,
+                        slide: Vec3::new(body.velocity.x, 0.0, body.velocity.z) * 0.5,
+                    });
+                }
             }
+        }
+    }
+}
+
+/// The nearest lying-down orientation: the thing's own long axis (local Y,
+/// which is how trees and most props are built) brought level with the
+/// ground, keeping as much of the current tumble as possible.
+fn lying_flat(rotation: Quat) -> Quat {
+    let long = rotation * Vec3::Y;
+    // Where that axis points once flattened; if the tumble left it dead
+    // vertical, any horizontal will do.
+    let level = (long - Vec3::Y * long.dot(Vec3::Y)).normalize_or(Vec3::X);
+    Quat::from_rotation_arc(long, level) * rotation
+}
+
+/// What a landed thing still owes its resting pose.
+#[derive(Component)]
+pub struct Settling {
+    target: Quat,
+    /// What was left of the throw when it touched down: skidded out along
+    /// the ground while the body rolls over, dying fast. The tad of physics
+    /// between "airborne" and "furniture".
+    slide: Vec3,
+}
+
+/// Eases the landed onto their sides: a short, dying tumble instead of a
+/// freeze-frame - the "ragdoll" half of the ask.
+fn settle(
+    mut commands: Commands,
+    time: Res<Time>,
+    terrain: Option<Res<Terrain>>,
+    mut landed: Query<(Entity, &mut Transform, &mut Settling, &Matter), Without<Airborne>>,
+) {
+    let Some(terrain) = terrain else {
+        return;
+    };
+    // Gently - the first cut snapped flat at nine a second, and the whip at
+    // the end of the arc read as MORE spin, not a landing.
+    let dt = time.delta_secs();
+    let ease = 1.0 - (-3.6 * dt).exp();
+    let drag = (-4.2 * dt).exp();
+    for (entity, mut transform, mut settling, matter) in &mut landed {
+        // The skid: what the throw had left, spent along the ground and
+        // gone in under half a second.
+        transform.translation += settling.slide * dt;
+        settling.slide *= drag;
+        transform.rotation = transform.rotation.slerp(settling.target, ease);
+        // Pinned to the turf while it rolls over, so no part of the turn
+        // dips below ground.
+        let floor = terrain
+            .height_at(transform.translation.x, transform.translation.z)
+            .max(WATER_LEVEL);
+        transform.translation.y = floor + matter.radius * 0.5;
+        if transform.rotation.angle_between(settling.target) < 0.02 {
+            commands.entity(entity).remove::<Settling>();
         }
     }
 }
@@ -267,12 +579,28 @@ fn float(time: Res<Time>, mut floating: Query<(&mut Transform, &Matter), With<Fl
 }
 
 /// What a placed deposit holds. Deposits are the map making demands:
-/// iron wants the far hills, clay wants the wet banks, and wanting either
-/// means walking there and carrying it home.
+/// iron wants the far hills, clay wants the wet banks, stone wants the
+/// broken ground, and wanting any of them means walking there and carrying
+/// it home.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DepositKind {
     Iron,
     Clay,
+    /// A quarry: a face of workable rock, cut rather than gathered.
+    ///
+    /// Added when the loose stone came off the ground. Every scatter point in
+    /// the world had a one-in-twenty chance of a pebble, which is ten a chunk
+    /// over every chunk there is, and Brett — twice now — "there is still
+    /// entirely too many rocks on the ground". The village still has to build
+    /// out of something, so the stone that was strewn everywhere is gathered
+    /// into places worth walking to.
+    ///
+    /// It is a deposit and not a building on purpose. Miners already work
+    /// deposits, the survey overlay already has a colour called "quarry rock",
+    /// and there is already a `Mine` for the other half of this — a drift
+    /// driven into a hillside, which only hill country can offer. A quarry is
+    /// what flat country gets instead.
+    Stone,
 }
 
 impl DepositKind {
@@ -280,6 +608,7 @@ impl DepositKind {
         match self {
             DepositKind::Iron => "A hillside veined with iron",
             DepositKind::Clay => "A bank of good red clay",
+            DepositKind::Stone => "A quarry of good building stone",
         }
     }
 }
@@ -311,6 +640,7 @@ pub(crate) fn spawn_deposit(
             Visibility::default(),
             crate::hand::PickRadius(2.2),
             crate::hand::Rooted,
+            crate::globe::RigidlySeated,
         ))
         .id();
     match kind {
@@ -355,6 +685,77 @@ pub(crate) fn spawn_deposit(
                     Transform::from_xyz(x, 0.14, z)
                         .with_rotation(Quat::from_rotation_y(x - z))
                         .with_scale(Vec3::new(s, 0.3, s * 0.8)),
+                    ChildOf(root),
+                ));
+            }
+        }
+        // A quarry is a natural outcrop somebody has been at with a chisel,
+        // and it has to read as BOTH halves of that at once.
+        //
+        // The first cut was all squared benches, and Brett: "it looks weird
+        // lol". Two things were wrong. It stood on unworked ground, so on any
+        // slope half of it hung in the air — fixed by cutting a pit first, see
+        // `villager::QUARRY_DEPTH`, which is why everything below can assume a
+        // flat floor at zero. And it was squared all the way through, which
+        // reads as a BUILDING; three of them in view had him asking why the
+        // village had put them up.
+        //
+        // So: a rough mass at the back, turned off-axis and unequal the way
+        // the outcrops are, and the worked part squared, pale and axis-aligned
+        // against it. The contrast is the whole story — the eye reads the
+        // straight edges as somebody's work precisely because the rest is not.
+        DepositKind::Stone => {
+            let rock = materials.add(StandardMaterial {
+                base_color: pal::shade(&pal::STONE, 0.45),
+                perceptual_roughness: 1.0,
+                ..default()
+            });
+            let cut = materials.add(StandardMaterial {
+                base_color: pal::shade(&pal::STONE, 0.80),
+                perceptual_roughness: 0.9,
+                ..default()
+            });
+
+            // The living rock: a mass standing out of the pit floor, no two
+            // pieces alike and none of them square to the working.
+            for (x, y, z, w, h, d, turn) in [
+                (-0.6, 1.5, -3.0, 5.2, 3.0, 2.2, 0.13),
+                (2.4, 1.0, -2.6, 2.6, 2.0, 2.0, -0.31),
+                (-3.2, 0.9, -1.6, 2.2, 1.8, 2.4, 0.42),
+                (0.9, 0.6, -1.7, 2.0, 1.2, 1.6, -0.18),
+            ] {
+                commands.spawn((
+                    Mesh3d(cube.clone()),
+                    MeshMaterial3d(rock.clone()),
+                    Transform::from_xyz(x, y, z)
+                        .with_rotation(Quat::from_rotation_y(turn))
+                        .with_scale(Vec3::new(w, h, d)),
+                    ChildOf(root),
+                ));
+            }
+
+            // The cut: a squared face taken out of the mass, and one bench
+            // below it. Dead straight, dead level, and paler where the stone
+            // has been opened.
+            for (x, y, z, w, h, d) in [
+                (-0.6, 1.05, -1.75, 4.0, 2.1, 0.5),
+                (-0.6, 0.30, -1.15, 4.0, 0.6, 0.9),
+            ] {
+                commands.spawn((
+                    Mesh3d(cube.clone()),
+                    MeshMaterial3d(cut.clone()),
+                    Transform::from_xyz(x, y, z).with_scale(Vec3::new(w, h, d)),
+                    ChildOf(root),
+                ));
+            }
+
+            // And the blocks got out of it, squared and stacked on the floor
+            // where a barrow would come for them.
+            for (x, y, z) in [(2.1, 0.4, 0.6), (3.0, 0.4, 0.9), (2.1, 1.15, 0.6)] {
+                commands.spawn((
+                    Mesh3d(cube.clone()),
+                    MeshMaterial3d(cut.clone()),
+                    Transform::from_xyz(x, y, z).with_scale(Vec3::splat(0.75)),
                     ChildOf(root),
                 ));
             }

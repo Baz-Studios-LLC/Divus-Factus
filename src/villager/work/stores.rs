@@ -152,16 +152,42 @@ pub struct StonePileBlock(pub u8);
 pub struct FoodSack(pub u8);
 
 /// Which store a visible pile stands for.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PileKind {
     Food,
     Timber,
     Stone,
+    /// Dug clay, puddled and stacked in bricks. Brett: "why is there no clay
+    /// pile at the village... piles for stone, food and wood, but not clay" -
+    /// a store the god can now haul deserves a face in the square.
+    Clay,
+    /// Raw ore off the vein, heaped dark and rust-streaked.
+    Ore,
 }
 
 /// Marks a pile in the square as an inspectable face of the stockpile.
 #[derive(Component)]
 pub struct StorePile(pub PileKind);
+
+/// A parcel of the stores in the god's hand: two logs, a block, a basket.
+///
+/// The piles are not only where offerings LAND - the god can draw from them
+/// too, and carry the goods where they are wanted: a stuck frame, a hungry
+/// colony. "I should be able to pick up out of the stores too." Offered
+/// anywhere the offerings land, it pays back exactly what was drawn.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct Goods {
+    pub kind: PileKind,
+    pub amount: f32,
+}
+
+/// One brick of the clay pile; hidden until the store holds its number.
+#[derive(Component)]
+pub struct ClayPileBrick(pub u8);
+
+/// One chunk of the ore heap; likewise.
+#[derive(Component)]
+pub struct OrePileChunk(pub u8);
 
 /// A rolling record of the stores, so a hovered pile can say not just how
 /// much is there but which way it is going.
@@ -184,6 +210,9 @@ impl StoreTrends {
             PileKind::Food => sample.1,
             PileKind::Timber => sample.2,
             PileKind::Stone => sample.3,
+            // The trends ledger predates these two; they read as steady
+            // until it grows columns for them.
+            PileKind::Clay | PileKind::Ore => 0.0,
         };
         (pick(newest) - pick(oldest)) / span * 60.0
     }
@@ -302,6 +331,8 @@ pub(crate) fn stores_move_indoors(
                             (Vec3::new(-0.9, 0.0, 0.5), store.timber.min(24.0) as u8)
                         }
                         PileKind::Stone => (Vec3::new(0.9, 0.0, -0.5), store.stone.min(12.0) as u8),
+                        PileKind::Clay => (Vec3::new(-0.9, 0.0, -0.5), store.clay.min(8.0) as u8),
+                        PileKind::Ore => (Vec3::new(0.9, 0.0, 0.5), store.ore.min(8.0) as u8),
                         // Food shelters here too, until a granary stands.
                         PileKind::Food if !granary_stands => (
                             Vec3::new(0.0, 0.0, 0.9),
@@ -417,7 +448,7 @@ pub(crate) fn rehouse_stores(
                         PileKind::Timber => {
                             shoulder_wood(&mut commands, &mut meshes, &mut materials, carrier)
                         }
-                        PileKind::Stone => {
+                        PileKind::Stone | PileKind::Clay | PileKind::Ore => {
                             shoulder_stone(&mut commands, &mut meshes, &mut materials, carrier)
                         }
                         PileKind::Food => {
@@ -450,11 +481,42 @@ pub(crate) fn rehouse_stores(
 }
 
 /// The stone and food stores, countable at a glance like the woodpile.
+#[allow(clippy::type_complexity)]
 pub(crate) fn update_store_piles(
     stores: Query<&Stockpile>,
     owners: Query<&crate::villager::MemberOf>,
-    mut blocks: Query<(&StonePileBlock, &ChildOf, &mut Visibility), Without<FoodSack>>,
-    mut sacks: Query<(&FoodSack, &ChildOf, &mut Visibility), Without<StonePileBlock>>,
+    mut blocks: Query<
+        (&StonePileBlock, &ChildOf, &mut Visibility),
+        (
+            Without<FoodSack>,
+            Without<ClayPileBrick>,
+            Without<OrePileChunk>,
+        ),
+    >,
+    mut sacks: Query<
+        (&FoodSack, &ChildOf, &mut Visibility),
+        (
+            Without<StonePileBlock>,
+            Without<ClayPileBrick>,
+            Without<OrePileChunk>,
+        ),
+    >,
+    mut bricks: Query<
+        (&ClayPileBrick, &ChildOf, &mut Visibility),
+        (
+            Without<StonePileBlock>,
+            Without<FoodSack>,
+            Without<OrePileChunk>,
+        ),
+    >,
+    mut chunks: Query<
+        (&OrePileChunk, &ChildOf, &mut Visibility),
+        (
+            Without<StonePileBlock>,
+            Without<FoodSack>,
+            Without<ClayPileBrick>,
+        ),
+    >,
 ) {
     // A block belongs to a pile and a pile to a town: every settlement's
     // square shows its own stores.
@@ -483,6 +545,32 @@ pub(crate) fn update_store_piles(
         };
         // Two food to the sack, or the pile would dwarf the village.
         let wanted = if (sack.0 as f32) * 2.0 < store.food().min(24.0) {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+        if *visibility != wanted {
+            *visibility = wanted;
+        }
+    }
+    for (brick, parent, mut visibility) in &mut bricks {
+        let Some(store) = store_of(parent.parent()) else {
+            continue;
+        };
+        let wanted = if (brick.0 as f32) < store.clay.min(8.0) {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+        if *visibility != wanted {
+            *visibility = wanted;
+        }
+    }
+    for (chunk, parent, mut visibility) in &mut chunks {
+        let Some(store) = store_of(parent.parent()) else {
+            continue;
+        };
+        let wanted = if (chunk.0 as f32) < store.ore.min(8.0) {
             Visibility::Inherited
         } else {
             Visibility::Hidden

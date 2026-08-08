@@ -1651,6 +1651,39 @@ pub(crate) fn update_faith_roster(
 #[derive(Component)]
 pub(crate) struct HandSwatch(pub usize);
 
+/// The button that trades the mouse's two hands, and the line that says
+/// which way they stand. See [`crate::keymap::MouseScheme`].
+#[derive(Component)]
+pub(crate) struct MouseSchemeButton;
+
+#[derive(Component)]
+pub(crate) struct MouseSchemeLabel;
+
+/// Flips the scheme on a press and keeps the label honest.
+pub(crate) fn swap_mouse_buttons(
+    buttons: Query<&Interaction, (Changed<Interaction>, With<MouseSchemeButton>)>,
+    mut mouse: ResMut<crate::keymap::MouseScheme>,
+    keymap: Res<crate::keymap::Keymap>,
+    mut labels: Query<&mut Text, With<MouseSchemeLabel>>,
+) {
+    for interaction in &buttons {
+        if *interaction == Interaction::Pressed {
+            mouse.reversed = !mouse.reversed;
+            crate::keymap::save(&keymap, &mouse);
+        }
+    }
+    // Rewritten every frame it might have changed; two short strings.
+    if mouse.is_changed() {
+        for mut label in &mut labels {
+            label.0 = format!(
+                "{} grabs the land - {} picks up and works",
+                mouse.land_name(),
+                mouse.action_name()
+            );
+        }
+    }
+}
+
 /// The line naming the style the hand wears now.
 #[derive(Component)]
 pub(crate) struct HandStyleName;
@@ -2013,6 +2046,46 @@ pub(crate) fn build_settings_page(commands: &mut Commands, page: Entity) {
         ChildOf(hand_card),
     ));
 
+    // The mouse, beside the hand it drives. Black and White's own controls -
+    // left grabs the land, right is the hand - and one switch for anyone whose
+    // reflexes were trained by the sequel, which dealt them the other way
+    // round. Brett: "use B&W 1 controls but let people reverse the mouse
+    // buttons in the settings".
+    let mouse_card = ui::card_well(commands, hand_row, "THE MOUSE");
+    commands.spawn((
+        ui::dim("left hand on the world, right hand at work."),
+        ChildOf(mouse_card),
+    ));
+    let mouse_row = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: px(10),
+                margin: UiRect::top(px(6)),
+                ..default()
+            },
+            ChildOf(mouse_card),
+        ))
+        .id();
+    commands.spawn((
+        MouseSchemeButton,
+        ui::UiButton,
+        ui::KeepFace,
+        ui::HoverHint::new("swap the buttons", "for hands the sequel taught"),
+        Node {
+            padding: UiRect::axes(px(12), px(6)),
+            border: UiRect::all(px(1)),
+            border_radius: BorderRadius::all(px(5)),
+            ..default()
+        },
+        BackgroundColor(ui::theme::title_bg()),
+        BorderColor::all(ui::theme::panel_border().with_alpha(0.5)),
+        Interaction::default(),
+        ChildOf(mouse_row),
+    ));
+    commands.spawn((MouseSchemeLabel, ui::body(""), ChildOf(mouse_row)));
+
     // VIDEO & SOUND: spoken for honestly, small as they are.
     let av_row = row_of(commands, tabs[2]);
     let video = ui::card_well(commands, av_row, "VIDEO");
@@ -2171,6 +2244,7 @@ pub(crate) fn settings_panel(
 pub(crate) fn keybind_panel(
     mut arming: ResMut<Rebinding>,
     mut keymap: ResMut<crate::keymap::Keymap>,
+    mouse: Res<crate::keymap::MouseScheme>,
     clicked: Query<(&Interaction, &BindButton), Changed<Interaction>>,
     reset: Query<&Interaction, (Changed<Interaction>, With<ResetBinds>)>,
     tabs: Query<&Interaction, (Changed<Interaction>, With<ui::TabButton>)>,
@@ -2195,7 +2269,7 @@ pub(crate) fn keybind_panel(
     for interaction in &reset {
         if *interaction == Interaction::Pressed {
             keymap.restore_defaults();
-            crate::keymap::save(&keymap);
+            crate::keymap::save(&keymap, &mouse);
             arming.0 = None;
         }
     }
@@ -2230,6 +2304,7 @@ pub(crate) fn catch_rebind(
     mut keys: ResMut<ButtonInput<KeyCode>>,
     mut arming: ResMut<Rebinding>,
     mut keymap: ResMut<crate::keymap::Keymap>,
+    mouse: Res<crate::keymap::MouseScheme>,
     codex: Option<Res<Codex>>,
     panels: Query<&Visibility, With<VillagePanel>>,
 ) {
@@ -2256,7 +2331,7 @@ pub(crate) fn catch_rebind(
         return;
     };
     keymap.bind(deed, key);
-    crate::keymap::save(&keymap);
+    crate::keymap::save(&keymap, &mouse);
     arming.0 = None;
     // The whole press is eaten, held state included - a pan key caught
     // here must not also glide the world behind the book while held.

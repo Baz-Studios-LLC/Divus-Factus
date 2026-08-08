@@ -240,7 +240,8 @@ impl WorldClock {
         let midnight = (DAYLIGHT_FRACTION + 1.0) * 0.5;
         // East of the meridian before noon and after midnight, west between.
         let easterly = t < noon || t >= midnight;
-        let angle = self.sun_elevation().clamp(-1.0, 1.0).acos() * if easterly { 1.0 } else { -1.0 };
+        let angle =
+            self.sun_elevation().clamp(-1.0, 1.0).acos() * if easterly { 1.0 } else { -1.0 };
 
         (up * angle.cos() + east * angle.sin()).normalize_or(Vec3::Y)
     }
@@ -431,7 +432,11 @@ fn sky_toward(sun_direction: Vec3, elevation: f32) -> Sky {
     Sky {
         sun_direction,
         sun_color,
-        sun_illuminance: 17_000.0 * lit,
+        // Thirty-two: the day every colour in this game was measured against
+        // was seventeen thousand of sun PLUS sixteen thousand of leaked
+        // portrait key (see DOLL_LAYER). The leak is fixed; the sun carries
+        // what it carried, so midday still looks like the game Brett built.
+        sun_illuminance: 32_000.0 * lit,
         horizon,
         ambient_color: mix_colors(
             palette::shade(&palette::SKY, 0.25),
@@ -440,6 +445,13 @@ fn sky_toward(sun_direction: Vec3, elevation: f32) -> Sky {
         ),
         // Never fully dark: the player must always be able to read the world
         // they are god of. Night is a mood, not a lost turn.
+        //
+        // These floors were briefly quartered while hunting "the night time
+        // doesn't get dark" - wrongly. The night was bright because the
+        // paperdoll's portrait key was lighting the whole world through a
+        // shared render layer (see DOLL_LAYER), and every number here was
+        // invisible under sixteen thousand lux of studio light. With the leak
+        // gone the original floors mean what they always said.
         ambient_brightness: 36.0 + 94.0 * lit,
         // The fill's night floor came down when the moon arrived. It used to
         // carry the whole night by itself from a fixed bearing, which is why
@@ -594,6 +606,21 @@ fn apply_sky_to_lights(
 ) {
     ambient.color = sky.ambient_color;
     ambient.brightness = sky.ambient_brightness;
+
+    // A probe, because the night stopped getting dark and the numbers in this
+    // file all say it should: what the lights are ACTUALLY told, frame by
+    // frame. `DIVUS_FACTUS_SKY_PROBE=1`.
+    if std::env::var("DIVUS_FACTUS_SKY_PROBE").is_ok() {
+        info!(
+            "sky probe: daylight {:.3} sun_dir_y {:.3} ambient {:.0} sun {:.0} fill {:.0} moon {:.0}",
+            sky.daylight,
+            sky.sun_direction.y,
+            sky.ambient_brightness,
+            sky.sun_illuminance,
+            sky.fill_illuminance,
+            sky.moon_illuminance,
+        );
+    }
 
     let centre = crate::globe::planet_centre();
     for (mut light, mut transform) in &mut suns {

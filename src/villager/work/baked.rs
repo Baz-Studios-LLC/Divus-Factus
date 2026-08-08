@@ -104,11 +104,7 @@ fn reflect_turn(turn: Quat, mirrored: bool) -> Quat {
 /// this - a door in the front wall stays in the front wall, and a bed's sleeper
 /// lies with their head the other way about.
 fn reflect_yaw(yaw: f32, mirrored: bool) -> f32 {
-    if mirrored {
-        -yaw
-    } else {
-        yaw
-    }
+    if mirrored { -yaw } else { yaw }
 }
 
 /// Every door the maker marked, where they marked it, facing the way its nose
@@ -872,7 +868,6 @@ mod tests {
             }
         }
     }
-
 
     /// A maker's stated kind outranks whatever their file name begins with. The
     /// whole point of the bench asking is that `millhouse-tavern` can be a

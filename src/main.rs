@@ -4,8 +4,8 @@
 mod attention;
 mod avatar;
 mod calendar;
-mod carried;
 mod camera;
+mod carried;
 mod clouds;
 mod creature;
 mod debug;
@@ -34,8 +34,8 @@ mod save;
 mod scatter;
 mod sigil;
 mod sky;
-mod starfield;
 mod speed;
+mod starfield;
 mod survey;
 mod telling;
 mod terrain;
@@ -185,22 +185,22 @@ fn main() {
                     ..default()
                 })
                 .set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Divus Factus".into(),
-                resolution: (1600u32, 900u32).into(),
-                // Measurement tooling: vsync pins every healthy frame to the
-                // display's beat, which QUANTIZES costs — a frame one
-                // millisecond over budget reads as double. With the dial set,
-                // frames run free and the telemetry reads true cost.
-                present_mode: if std::env::var("DIVUS_FACTUS_NOVSYNC").is_ok() {
-                    bevy::window::PresentMode::AutoNoVsync
-                } else {
-                    bevy::window::PresentMode::default()
-                },
-                ..default()
-            }),
-            // The divine hand is the pointer. The operating system's arrow floating
-            // over it breaks the one illusion the game is named after.
+                    primary_window: Some(Window {
+                        title: "Divus Factus".into(),
+                        resolution: (1600u32, 900u32).into(),
+                        // Measurement tooling: vsync pins every healthy frame to the
+                        // display's beat, which QUANTIZES costs — a frame one
+                        // millisecond over budget reads as double. With the dial set,
+                        // frames run free and the telemetry reads true cost.
+                        present_mode: if std::env::var("DIVUS_FACTUS_NOVSYNC").is_ok() {
+                            bevy::window::PresentMode::AutoNoVsync
+                        } else {
+                            bevy::window::PresentMode::default()
+                        },
+                        ..default()
+                    }),
+                    // The divine hand is the pointer. The operating system's arrow floating
+                    // over it breaks the one illusion the game is named after.
                     primary_cursor_options: Some(bevy::window::CursorOptions {
                         visible: false,
                         ..default()

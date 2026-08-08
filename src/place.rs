@@ -26,7 +26,7 @@
 use bevy::prelude::*;
 
 use crate::globe::{planet_centre, planet_stance};
-use crate::terrain::{direction_at, PLANET_RADIUS};
+use crate::terrain::{PLANET_RADIUS, direction_at};
 
 /// A point on the planet: which way from its centre, and how high.
 ///
@@ -126,7 +126,10 @@ impl Place {
     /// on a six thousand unit world came back wrong in the second decimal
     /// place. `atan2` of the cross against the dot is exact at both ends.
     fn angle_to(&self, other: Place) -> f32 {
-        self.dir.cross(other.dir).length().atan2(self.dir.dot(other.dir))
+        self.dir
+            .cross(other.dir)
+            .length()
+            .atan2(self.dir.dot(other.dir))
     }
 
     /// One step of `dist` units toward another place, never overshooting it.
@@ -228,7 +231,11 @@ mod tests {
             Vec3::new(-2_000.0, 30.0, 1_500.0),
             Vec3::new(9_000.0, 0.0, -400.0),
             // Within a whisker of the north pole: a quarter circumference up.
-            Vec3::new(50.0, 0.0, -PLANET_RADIUS * std::f32::consts::FRAC_PI_2 + 20.0),
+            Vec3::new(
+                50.0,
+                0.0,
+                -PLANET_RADIUS * std::f32::consts::FRAC_PI_2 + 20.0,
+            ),
         ]
     }
 
@@ -274,7 +281,11 @@ mod tests {
         let there = Place::from_flat(Vec3::new(90.0, 0.0, -120.0));
         // 3-4-5: a hundred and fifty units, and over that span a six thousand
         // unit sphere is flat to well under a tenth of one.
-        assert!((here.apart(there) - 150.0).abs() < 0.1, "{}", here.apart(there));
+        assert!(
+            (here.apart(there) - 150.0).abs() < 0.1,
+            "{}",
+            here.apart(there)
+        );
     }
 
     #[test]
@@ -318,7 +329,11 @@ mod tests {
         let here = Place::from_flat(Vec3::ZERO);
         let there = Place::from_flat(Vec3::new(30.0, 0.0, -40.0));
         let past = here.toward(there, 500.0);
-        assert!(past.apart(there) < 0.01, "overshot by {}", past.apart(there));
+        assert!(
+            past.apart(there) < 0.01,
+            "overshot by {}",
+            past.apart(there)
+        );
         let part = here.toward(there, 25.0);
         assert!((here.apart(part) - 25.0).abs() < 0.01);
         assert!((part.apart(there) - 25.0).abs() < 0.01);

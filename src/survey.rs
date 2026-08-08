@@ -248,10 +248,18 @@ fn refresh_survey(
                 *k == crate::matter::DepositKind::Clay && v.distance(Vec2::new(x, z)) < 9.0
             }) {
                 Some([0.82, 0.45, 0.12, 0.70])
+            } else if veins.iter().any(|(v, k)| {
+                *k == crate::matter::DepositKind::Stone && v.distance(Vec2::new(x, z)) < 11.0
+            }) {
+                // A worked quarry reads STRONGER than the broken ground below
+                // it. Once the loose stone came off the world this is the one
+                // answer to "where is our masonry", and a wash that says
+                // "somewhere on that slope" is not an answer.
+                Some([0.50, 0.56, 0.70, 0.85])
             } else if terrain.slope_at(x, z) > 0.42
                 || stones.iter().any(|s| s.distance(Vec2::new(x, z)) < 5.0)
             {
-                Some([0.50, 0.56, 0.70, 0.60])
+                Some([0.50, 0.56, 0.70, 0.45])
             } else if terrain.forest_at(x, z) > 0.50 && terrain.moisture_at(x, z) > 0.38 {
                 // Promise what the biome will deliver, as the founding
                 // survey does — thin arid scrub reads faint.

@@ -79,6 +79,14 @@ fn spin(v: vec3<f32>, axis: vec3<f32>, angle: f32) -> vec3<f32> {
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
+    // A deck the god has climbed above is faded out entirely, and a fully
+    // transparent shell is still a full-screen pass of two five-octave fields
+    // if it is allowed to get that far. Out here, before any of it. See
+    // `clouds::deck_opacity`.
+    if (cloud.tint.a <= 0.002) {
+        discard;
+    }
+
     // The shell's own outward normal IS the direction from the planet's centre,
     // which is the only coordinate this field needs. Seen from inside, that
     // normal points away from the eye; the direction is the same either way.

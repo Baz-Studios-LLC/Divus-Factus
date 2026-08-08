@@ -415,7 +415,9 @@ fn solve_region(inner: &mut Inner, terrain: &Terrain, region: IVec2) {
     //
     // Upstream first. The flood rises away from its outlets, so walking its
     // order backwards visits every cell after everything that drains into it.
-    let mut order: Vec<usize> = (0..SIDE * SIDE).filter(|i| rank[*i] != usize::MAX).collect();
+    let mut order: Vec<usize> = (0..SIDE * SIDE)
+        .filter(|i| rank[*i] != usize::MAX)
+        .collect();
     order.sort_unstable_by_key(|i| std::cmp::Reverse(rank[*i]));
 
     let mut flow = vec![1.0f32; SIDE * SIDE];
@@ -814,7 +816,12 @@ mod tests {
         let inner = index.inner.read().unwrap();
         let mut ponds = 0;
         for still in inner.still.values() {
-            let wet: Vec<f32> = still.level.iter().copied().filter(|l| !l.is_nan()).collect();
+            let wet: Vec<f32> = still
+                .level
+                .iter()
+                .copied()
+                .filter(|l| !l.is_nan())
+                .collect();
             ponds += wet.len();
         }
         assert!(ponds > 0, "the fill made no standing water anywhere");
@@ -831,8 +838,10 @@ mod tests {
         for (dx, dz) in [(10.0, 40.0), (-300.0, 220.0), (900.0, -640.0), (55.0, 55.0)] {
             let (x, z) = (middle.x + dx, middle.y + dz);
             assert_eq!(
-                one.nearest(x, z).map(|(l, _, w)| (l.to_bits(), w.to_bits())),
-                two.nearest(x, z).map(|(l, _, w)| (l.to_bits(), w.to_bits())),
+                one.nearest(x, z)
+                    .map(|(l, _, w)| (l.to_bits(), w.to_bits())),
+                two.nearest(x, z)
+                    .map(|(l, _, w)| (l.to_bits(), w.to_bits())),
                 "the network is not deterministic at ({x}, {z})",
             );
         }

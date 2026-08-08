@@ -34,45 +34,81 @@ pub const CHUNK_SIZE: f32 = 64.0;
 pub const CHUNK_CELLS: usize = 32;
 /// The furthest the world ever streams, in chunks.
 ///
-/// Reached only at full zoom-out. See [`stream_radius`].
-pub const VIEW_CHUNKS: i32 = 20;
+/// Reached only near the top of the play zoom. See [`stream_radius`].
+pub const VIEW_CHUNKS: i32 = 12;
 
 /// The closest the world ever streams, in chunks.
 const MIN_VIEW_CHUNKS: i32 = 6;
 
+/// How far the god may pull back before no chunk is built at all.
+///
+/// Brett's number, and his own screenshot is the measurement behind it. At four
+/// hundred and thirty-one units up the game was holding nine hundred chunks,
+/// seventeen thousand mesh entities and nine thousand shadow casters, and
+/// running at thirty to ninety milliseconds a frame — while every system in the
+/// game that reports its own time added up to half of ONE millisecond. None of
+/// the cost was in the simulation, and none of it was in the streaming. All of
+/// it was in how much world was standing.
+///
+/// And it is standing for nobody. Brett, looking at that frame: "even at this
+/// height people look like pixels." They do — a villager is a couple of units
+/// tall, which at four hundred units away is about seven pixels. Above here the
+/// planet's own patches are the whole picture, and their cells at this height
+/// are finer than a chunk's own.
+pub const CHUNK_CEILING: f32 = 700.0;
+
+/// Where the plate starts pulling in toward that ceiling.
+///
+/// Chosen to sit under the scenery's dissolve (see
+/// [`crate::debug::layers::scenery_dissolved`]) so the two eases overlap: the
+/// forests begin thinning first, the ground they stand on follows, and by the
+/// ceiling there is nothing left to take away.
+const CHUNK_DISSOLVE: f32 = 450.0;
+
 /// How far to stream for a given camera distance.
 ///
-/// A god camera has to pull back far enough to survey a region, but streaming that
-/// radius the whole time means paying for a thousand chunks while looking at one
-/// village. Tying the radius to the zoom keeps close work cheap and still opens the
-/// world up when the player rises.
+/// A god camera has to pull back far enough to survey a region, but streaming
+/// that radius the whole time means paying for a thousand chunks while looking
+/// at one village. Tying the radius to the zoom keeps close work cheap and
+/// still opens the world up when the player rises.
 pub fn stream_radius(camera_distance: f32) -> i32 {
-    let chunks = (camera_distance / CHUNK_SIZE) * 1.6 + MIN_VIEW_CHUNKS as f32;
+    // The bubble follows the FRAME. At play pitch the ground in view reaches
+    // something like one and a fifth times the camera's distance past the
+    // focus, so eight tenths of a chunk per unit of distance, on top of the
+    // close-in floor, covers it with room to pan into.
+    //
+    // It was twice that. At four hundred units up it asked for seventeen rings
+    // — eleven hundred units of ground — around a frame that used about five
+    // hundred, and every one of those chunks carried its own trees, its own
+    // veil sheet and its own shadow casters.
+    //
+    // Low pitch overruns any bubble and always will: at the eleven-degree
+    // floor the view runs to the horizon, two thousand units out at play
+    // height, and no radius covers that. That ground is the patches' job, and
+    // it always was.
+    let chunks = (camera_distance / CHUNK_SIZE) * 1.1 + MIN_VIEW_CHUNKS as f32;
     let wanted = (chunks.round() as i32).clamp(MIN_VIEW_CHUNKS, VIEW_CHUNKS);
 
-    // And back DOWN again past the play zoom. The flat world is drawn in its
-    // tangent frame, and a twenty-five-hundred-unit plate on a six-thousand
-    // radius sphere lifts half a thousand units off the curve at its edge -
-    // from orbit it read as a square sticker jutting off the planet into
-    // space. High up, the planet's own patches are the better picture of
-    // this ground anyway; the plate tapers to a sliver whose lift off the
-    // curve is a dozen units, and a thousand chunks stop being drawn from
-    // heights where they were smaller than the pixels they cost.
-    // To NOTHING, not to a small disc.
+    // And back DOWN again to NOTHING, not to a small disc. Three reasons, and
+    // they were found in that order.
     //
-    // Past the top of that climb the planet's own patches are the whole picture
-    // and a chunk is smaller than a pixel - but the streamer kept six rings of
-    // them around the focus anyway, and asked about them every frame. Standing
-    // still that hardly shows, because they load once and stay. The title
-    // screen is where it does: the vantage circles the planet, so the whole
-    // disc is dragged round with it the entire way.
+    // The flat world is drawn in its tangent frame, and a twenty-five-hundred
+    // unit plate on a six-thousand radius sphere lifts half a thousand units
+    // off the curve at its edge — from orbit it read as a square sticker
+    // jutting off the planet into space.
     //
-    // Measured at the title, by the systems reporting their own time rather
-    // than by bisecting the frame: `stream_chunks` was one and a half
-    // milliseconds a frame, and every other system in the world together was
-    // under a tenth of one. Ground nobody can see, costing more than all the
-    // ground they can.
-    let receding = ((camera_distance - 1_400.0) / 4_000.0).clamp(0.0, 1.0);
+    // Then: past the top of the climb a chunk is smaller than a pixel, but the
+    // streamer kept six rings of them around the focus anyway and asked about
+    // them every frame. Standing still that hardly shows, because they load
+    // once and stay; the title screen is where it did, because the vantage
+    // circles the planet and drags the whole disc round with it.
+    //
+    // And now the one that matters most, because it is inside the play zoom
+    // rather than above it: the plate and the patches draw the SAME ground,
+    // and between them they were drawing it twice at full detail over a disc a
+    // kilometre wide. See [`CHUNK_CEILING`].
+    let receding =
+        ((camera_distance - CHUNK_DISSOLVE) / (CHUNK_CEILING - CHUNK_DISSOLVE)).clamp(0.0, 1.0);
     let ceiling = VIEW_CHUNKS as f32 * (1.0 - receding);
     wanted.min(ceiling.round() as i32).max(0)
 }
@@ -175,10 +211,8 @@ pub struct TerrainPlugin;
 
 impl Plugin for TerrainPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_terrain).add_systems(
-            Update,
-            stream_chunks.in_set(TerrainSet),
-        );
+        app.add_systems(Startup, setup_terrain)
+            .add_systems(Update, stream_chunks.in_set(TerrainSet));
     }
 }
 
@@ -806,26 +840,54 @@ impl Terrain {
     /// `None` below sea level, where the ocean already covers everything and a
     /// second surface would only fight it.
     pub fn river_surface_at(&self, x: f32, z: f32) -> Option<f32> {
+        let (ground, surface) = self.ground_and_surface(x, z);
+        surface.filter(|level| *level > ground + 0.12 && *level > WATER_LEVEL + 0.8)
+    }
+
+    /// The drawn ground, and any river or lake surface standing over it, both
+    /// out of ONE walk of the drainage bins.
+    fn ground_and_surface(&self, x: f32, z: f32) -> (f32, Option<f32>) {
         let query = self.river_query(x, z);
+        let ground = self.carved(x, z, query);
 
         // Flowing water, if a channel holds this point.
         let mut surface = query
-            .filter(|(_, distance, width)| {
-                *distance <= rivers::CHANNEL_HALF_WIDTH * width * 1.05
-            })
+            .filter(|(_, distance, width)| *distance <= rivers::CHANNEL_HALF_WIDTH * width * 1.05)
             .map(|(level, _, _)| level);
 
         // And standing water, which needs no channel and has no drawn edge -
         // a lake covers whatever ground lies under its level, so its shore is a
         // contour of the land and follows every inlet and headland for free.
-        if let Some(pond) = self.still_query(x, z) {
-            if surface.is_none_or(|had| pond > had) {
-                surface = Some(pond);
-            }
+        if let Some(pond) = self.still_query(x, z)
+            && surface.is_none_or(|had| pond > had)
+        {
+            surface = Some(pond);
         }
 
-        let ground = self.carved(x, z, query);
-        surface.filter(|level| *level > ground + 0.12 && *level > WATER_LEVEL + 0.8)
+        (ground, surface)
+    }
+
+    /// The ground and the water on it, for a surface that needs both at every
+    /// vertex - which the planet's own patches do, twice over.
+    ///
+    /// They used to ask `base_height_at` for the ground and `river_surface_at`
+    /// for the water, and that was wrong twice. It walked the drainage bins
+    /// TWICE per vertex for one answer, throwing the carved ground away in
+    /// between. And it drew the ground BEFORE the world had been worked on it:
+    /// no channel cut under any river, and no terrace under any village. The
+    /// planet wore a river as a blue ribbon painted flat across unbroken
+    /// hillside, and a settlement's levelled ground came back as raw slope.
+    ///
+    /// That never mattered while the chunks covered every acre anyone could
+    /// look at. It matters now the chunks end at [`CHUNK_CEILING`], because
+    /// past there this IS the ground.
+    pub fn ground_and_water_at(&self, x: f32, z: f32) -> (f32, f32) {
+        let (ground, surface) = self.ground_and_surface(x, z);
+        let wet = surface
+            .filter(|level| *level > ground + 0.12 && *level > WATER_LEVEL + 0.8)
+            .unwrap_or(WATER_LEVEL)
+            .max(WATER_LEVEL);
+        (ground, wet)
     }
 
     /// Whether a position lies in flowing water.
@@ -1001,12 +1063,28 @@ pub struct LoadedChunks {
     wanted: usize,
     /// Stream radius in chunks, as of the last update.
     radius: i32,
-    /// The widest radius this view has ever asked for. Chunks are kept out
-    /// to it even after the camera comes back in: the memory was already
-    /// paid at the widest moment, and throwing them away only means
-    /// building them again the next time the god leans back.
+    /// The widest radius this view has recently asked for. Chunks are kept
+    /// out to it for a moment after the camera comes back in: the memory was
+    /// already paid at the widest moment, and throwing it away at once only
+    /// means building it again the next time the god leans back.
+    ///
+    /// For a MOMENT. It used to be for ever, and that turned one zoom-out into
+    /// a permanent tax: the widest ring the session ever asked for stayed
+    /// anchored to the camera, and every pan afterwards dragged it along. In
+    /// the frame that started this work it was the difference between the nine
+    /// hundred chunks the view wanted and the twelve hundred that were
+    /// standing. See `HELD_FOR`.
     held: i32,
+    /// Seconds since the view last wanted the width it is holding.
+    let_go: f32,
 }
+
+/// How long a ring outlives the view that asked for it, in seconds.
+///
+/// Long enough that leaning back and in again — which takes a beat of the
+/// wheel — costs nothing, short enough that a zoom-out does not follow the god
+/// around for the rest of the session.
+const HELD_FOR: f32 = 0.5;
 
 impl LoadedChunks {
     pub fn count(&self) -> usize {
@@ -1292,8 +1370,7 @@ pub(crate) fn surface_color(
     const EQUATOR_SNOW: f32 = 300.0;
     const POLE_SNOW: f32 = -40.0;
     let toward_the_pole = polarity.clamp(0.0, 1.0).powf(1.6);
-    let snowline =
-        EQUATOR_SNOW + (POLE_SNOW - EQUATOR_SNOW) * toward_the_pole + variation * 38.0;
+    let snowline = EQUATOR_SNOW + (POLE_SNOW - EQUATOR_SNOW) * toward_the_pole + variation * 38.0;
     let snow = ((height - WATER_LEVEL - snowline) / 62.0).clamp(0.0, 1.0);
     let composed = blend(
         with_rock,
@@ -1774,6 +1851,7 @@ fn stream_chunks(
     mut loaded: ResMut<LoadedChunks>,
     cameras: Query<&crate::camera::CameraRig>,
     state: Res<State<crate::GameState>>,
+    time: Res<Time<Real>>,
     watch: Res<crate::debug::timings::Timings>,
 ) {
     let _t = watch.watch("terrain: stream_chunks");
@@ -1788,11 +1866,20 @@ fn stream_chunks(
     // when the camera comes back in: zooming out, watching the world
     // assemble, then zooming in and out again and watching it assemble a
     // second time is the whole complaint, and it happens because the
-    // chunks were thrown away in between. They are not thrown away now.
-    // Panning still frees them - the kept ring travels with the camera -
-    // so the cost is bounded by the widest view, which is a cost the game
-    // already pays at full zoom-out.
-    loaded.held = loaded.held.max(radius);
+    // chunks were thrown away in between.
+    //
+    // So the wide ring outlives the view that wanted it — but it lets go
+    // again, a ring at a time. See `LoadedChunks::held`.
+    if radius >= loaded.held {
+        loaded.held = radius;
+        loaded.let_go = 0.0;
+    } else {
+        loaded.let_go += time.delta_secs();
+        if loaded.let_go >= HELD_FOR {
+            loaded.held -= 1;
+            loaded.let_go = 0.0;
+        }
+    }
     let wanted = chunks_in_view(centre, radius);
     let wanted_set: HashSet<IVec2> = wanted.iter().copied().collect();
     let kept: HashSet<IVec2> = if loaded.held > radius {
@@ -1942,17 +2029,148 @@ pub(crate) fn rebuild_chunks_near(
             let Some(old) = loaded.entities.remove(&coord) else {
                 continue;
             };
+            // The replacement FIRST, wearing the old chunk's own visibility,
+            // and only then the felling - all in one command flush, so there
+            // is no frame with a hole in the world.
+            //
+            // The visibility has to be COPIED, not defaulted: chunks are born
+            // hidden so no unveiled ground is ever seen, and the veil decides
+            // when each one may show (see `fog::drape_the_veil`). A rebuild
+            // used to inherit that rule blindly - the old chunk vanished this
+            // frame, its replacement stood invisible until the veil's next
+            // pass, and every ground-breaking flashed a chunk-sized hole.
+            // Brett: "I see chunk flash and regenerate when they build new
+            // houses." The old chunk's visibility IS the veil's decision
+            // about this ground, already made; the replacement wears it from
+            // its first frame, shown or veiled alike.
+            let new = spawn_chunk(commands, meshes, assets, terrain, loaded, coord);
+            commands.queue(move |world: &mut bevy::prelude::World| {
+                let worn = world
+                    .get::<Visibility>(old)
+                    .copied()
+                    .unwrap_or(Visibility::Hidden);
+                if let Ok(mut replacement) = world.get_entity_mut(new) {
+                    replacement.insert(worn);
+                }
+            });
             commands.entity(old).despawn();
-            spawn_chunk(commands, meshes, assets, terrain, loaded, coord);
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use bevy::mesh::VertexAttributeValues;
+
+    /// A little world with real chunk machinery, for tests that need to spawn
+    /// and rebuild ground rather than only ask it questions.
+    fn chunk_bench() -> bevy::app::App {
+        let mut app = bevy::app::App::new();
+        let mut meshes = Assets::<Mesh>::default();
+        let mut materials = Assets::<StandardMaterial>::default();
+        let ground_material = materials.add(StandardMaterial::default());
+        let river_material = materials.add(StandardMaterial::default());
+        let sea_material = materials.add(StandardMaterial::default());
+        let _ = &mut meshes;
+        app.insert_resource(meshes)
+            .insert_resource(materials)
+            .insert_resource(Terrain::new(4242))
+            .insert_resource(LoadedChunks::default())
+            .insert_resource(TerrainAssets {
+                ground_material,
+                river_material,
+                sea_material,
+            });
+        app
+    }
+
+    /// A rebuilt chunk wears the old chunk's visibility from its first frame.
+    ///
+    /// Chunks are born hidden until the veil dresses them, and a rebuild used
+    /// to inherit that blindly: the old chunk vanished in the same flush its
+    /// replacement stood invisible, so every ground-breaking flashed a
+    /// chunk-sized hole - "I see chunk flash and regenerate when they build
+    /// new houses." Both directions matter: shown ground is reborn shown, and
+    /// VEILED ground is reborn veiled, because the veil's decision about this
+    /// ground was already made and a rebuild is not the veil's business.
+    #[test]
+    fn a_rebuilt_chunk_wears_the_visibility_the_old_one_had() {
+        for worn in [Visibility::Inherited, Visibility::Hidden] {
+            let mut app = chunk_bench();
+            let coord = IVec2::new(3, -2);
+
+            // A chunk, standing, with the veil's decision already applied.
+            let old = {
+                let world = app.world_mut();
+                let mut state: bevy::ecs::system::SystemState<(
+                    Commands,
+                    ResMut<Assets<Mesh>>,
+                    Res<TerrainAssets>,
+                    Res<Terrain>,
+                    ResMut<LoadedChunks>,
+                )> = bevy::ecs::system::SystemState::new(world);
+                let (mut commands, mut meshes, assets, terrain, mut loaded) =
+                    state.get_mut(world).expect("bench resources present");
+                let old = spawn_chunk(
+                    &mut commands,
+                    &mut meshes,
+                    &assets,
+                    &terrain,
+                    &mut loaded,
+                    coord,
+                );
+                state.apply(world);
+                world.entity_mut(old).insert(worn);
+                old
+            };
+
+            // The ground is worked and the chunk rebuilt in place.
+            {
+                let world = app.world_mut();
+                let mut state: bevy::ecs::system::SystemState<(
+                    Commands,
+                    ResMut<Assets<Mesh>>,
+                    Res<TerrainAssets>,
+                    Res<Terrain>,
+                    ResMut<LoadedChunks>,
+                )> = bevy::ecs::system::SystemState::new(world);
+                let (mut commands, mut meshes, assets, terrain, mut loaded) =
+                    state.get_mut(world).expect("bench resources present");
+                let (x, z) = (coord.x as f32 * CHUNK_SIZE, coord.y as f32 * CHUNK_SIZE);
+                rebuild_chunks_near(
+                    &mut commands,
+                    &mut meshes,
+                    &assets,
+                    &terrain,
+                    &mut loaded,
+                    x,
+                    z,
+                    1.0,
+                );
+                state.apply(world);
+            }
+
+            let world = app.world_mut();
+            assert!(
+                world.get_entity(old).is_err(),
+                "the old chunk should be felled by the rebuild"
+            );
+            let replacement = world
+                .resource::<LoadedChunks>()
+                .entities
+                .get(&coord)
+                .copied()
+                .expect("the rebuild must register a replacement");
+            assert_ne!(replacement, old, "the replacement is a new entity");
+            assert_eq!(
+                world.get::<Visibility>(replacement).copied(),
+                Some(worn),
+                "the replacement must wear the old chunk's visibility from \
+                 its first frame - {worn:?} in, {worn:?} out"
+            );
+        }
+    }
 
     /// A house's pad is the house's own rectangle. The circle it used to be
     /// levelled the ground off the ends of a long building as flat as the floor
@@ -2088,49 +2306,113 @@ mod tests {
         // Close in it must stay cheap; pulled back it must open up. Neither end may
         // leave the bounds, or the fog that reads this would fall out of step.
         let near = stream_radius(12.0);
-        let far = stream_radius(1_400.0);
+        let far = stream_radius(CHUNK_DISSOLVE);
 
         assert!(near < far, "radius did not grow with zoom");
         assert_eq!(near, MIN_VIEW_CHUNKS, "close in should be the minimum");
-        assert_eq!(far, VIEW_CHUNKS, "far out should reach the maximum");
+        assert_eq!(far, VIEW_CHUNKS, "the widest view should reach the maximum");
 
-        // Within the play zoom. Past it the radius tapers to nothing, which is
-        // the point of the taper, so the floor does not apply up there.
-        for distance in [0.0, 5.0, 60.0, 300.0, 900.0, 1_400.0] {
+        // Up to the dissolve. Past it the radius comes back in, which is the
+        // point of it, so the floor does not apply up there.
+        for distance in [0.0, 5.0, 60.0, 300.0, CHUNK_DISSOLVE] {
             let r = stream_radius(distance);
             assert!(
                 (MIN_VIEW_CHUNKS..=VIEW_CHUNKS).contains(&r),
-                "{r} out of bounds"
+                "{r} out of bounds at {distance}"
             );
         }
     }
 
     #[test]
-    fn the_stream_radius_tapers_past_the_play_zoom() {
-        // Rising through the play zoom grows the view; rising past it hands
-        // the ground to the planet's patches and the plate shrinks away - to
-        // NOTHING, not to a small disc. A chunk up there is smaller than a
-        // pixel, and the streamer was spending more time on those than every
-        // other system in the world put together.
-        assert_eq!(stream_radius(1_400.0), VIEW_CHUNKS);
-        assert!(stream_radius(3_500.0) < VIEW_CHUNKS);
-        assert_eq!(stream_radius(5_400.0), 0, "the taper ends at nothing");
-        assert_eq!(stream_radius(20_000.0), 0);
-        assert_eq!(stream_radius(31_000.0), 0, "and the title holds none at all");
+    fn no_ground_is_built_above_the_ceiling() {
+        // Brett's number and the whole point of it: no real chunk is generated
+        // from more than seven hundred units up, because up there a villager is
+        // seven pixels tall and the planet's own patches are already drawing
+        // that ground at a finer cell than a chunk's.
+        assert_eq!(stream_radius(CHUNK_DISSOLVE), VIEW_CHUNKS);
+        assert!(stream_radius((CHUNK_DISSOLVE + CHUNK_CEILING) * 0.5) < VIEW_CHUNKS);
+        for distance in [CHUNK_CEILING, 1_400.0, 5_400.0, 20_000.0, 31_000.0] {
+            assert_eq!(
+                stream_radius(distance),
+                0,
+                "chunks are still being built {distance} units up"
+            );
+        }
     }
 
     #[test]
-    fn the_stream_radius_never_shrinks_within_the_play_zoom() {
-        // Inside the play zoom, rising only ever widens the view. Past it
-        // the radius tapers by design - the planet's patches carry the far
-        // ground - so the old any-height version of this invariant died
-        // with the flat plate it protected.
+    fn the_stream_radius_never_shrinks_on_the_way_out_to_the_dissolve() {
+        // Below the dissolve, rising only ever widens the view.
         let mut previous = 0;
-        for step in 0..175 {
-            let r = stream_radius(step as f32 * 8.0);
-            assert!(r >= previous, "radius shrank while zooming out in play");
+        let mut distance = 0.0;
+        while distance <= CHUNK_DISSOLVE {
+            let r = stream_radius(distance);
+            assert!(
+                r >= previous,
+                "radius shrank while zooming out at {distance}"
+            );
             previous = r;
+            distance += 4.0;
         }
+    }
+
+    #[test]
+    fn the_plate_only_ever_pulls_in_above_the_dissolve() {
+        // And once it has started coming in it never goes back out, or a god
+        // hanging in that band watches the edge of the world breathe.
+        let mut previous = VIEW_CHUNKS;
+        let mut distance = CHUNK_DISSOLVE;
+        while distance <= CHUNK_CEILING + 200.0 {
+            let r = stream_radius(distance);
+            assert!(r <= previous, "the plate grew again at {distance}");
+            previous = r;
+            distance += 4.0;
+        }
+    }
+
+    #[test]
+    fn the_planet_is_drawn_on_the_ground_the_game_is_played_on() {
+        // The patches asked `base_height_at`, which is the land BEFORE the
+        // world has been worked on it: no channel under any river, no terrace
+        // under any village. That was survivable while the chunks covered
+        // every acre anyone could look at from close enough to tell. Above
+        // `CHUNK_CEILING` the patches ARE the ground, so they have to answer
+        // the same question the villagers walk on.
+        let t = Terrain::new(4242);
+
+        let mut rivers_seen = 0;
+        for i in 0..400 {
+            let x = (i as f32 * 137.0) % 9_000.0 - 4_500.0;
+            let z = (i as f32 * -211.0) % 9_000.0 + 2_000.0;
+            let (ground, wet) = t.ground_and_water_at(x, z);
+            assert_eq!(
+                ground,
+                t.height_at(x, z),
+                "the planet stands at a different height from the world at ({x}, {z})"
+            );
+            match t.river_surface_at(x, z) {
+                Some(level) => {
+                    rivers_seen += 1;
+                    assert_eq!(wet, level.max(WATER_LEVEL), "water disagrees at ({x}, {z})");
+                }
+                None => assert_eq!(wet, WATER_LEVEL, "invented water at ({x}, {z})"),
+            }
+        }
+        assert!(
+            rivers_seen > 0,
+            "no sample landed in water, so this proved nothing about it"
+        );
+
+        // And the worked ground, which is the one a player would actually
+        // catch: a village levels its site, and the planet used to hand that
+        // hillside straight back the moment the chunks bowed out.
+        let site = t.somewhere_inland();
+        t.flatten(site.x, site.y, 30.0, 12.0, 40.0);
+        let (levelled, _) = t.ground_and_water_at(site.x, site.y);
+        assert!(
+            (levelled - 40.0).abs() < 0.01,
+            "the terrace is at 40 and the planet draws {levelled}"
+        );
     }
 
     #[test]
@@ -2753,8 +3035,6 @@ mod tests {
         assert!(a.angle_between(b) < 0.06, "{}", a.angle_between(b));
     }
 }
-
-
 
 #[cfg(test)]
 mod the_shape_of_the_world {

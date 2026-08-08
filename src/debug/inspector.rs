@@ -105,6 +105,14 @@ pub(crate) fn update_inspector(
         )>,
         Query<&crate::matter::Deposit>,
         Query<(&Interaction, &ui::HoverHint)>,
+        // What a held thing is WORTH, for the card. Bundled with its
+        // relatives; the sixteen-parameter ceiling is close.
+        Query<(
+            Option<&crate::matter::Matter>,
+            Option<&crate::matter::Lump>,
+            Option<&crate::scatter::FoodSource>,
+            Option<&crate::scatter::SacredFlora>,
+        )>,
     ),
     households: Query<
         (&Person, &crate::villager::home::Home, &Activity),
@@ -214,6 +222,8 @@ pub(crate) fn update_inspector(
             (PileKind::Food, Some(s)) => ("The food store", s.larder.total()),
             (PileKind::Timber, Some(s)) => ("The woodpile", s.timber),
             (PileKind::Stone, Some(s)) => ("The stone pile", s.stone),
+            (PileKind::Clay, Some(s)) => ("The clay pile", s.clay),
+            (PileKind::Ore, Some(s)) => ("The ore heap", s.ore),
             (_, None) => ("The stores", 0.0),
         };
         if let Ok(mut name) = texts.p0().single_mut() {
@@ -224,6 +234,8 @@ pub(crate) fn update_inspector(
                 PileKind::Food => format!("{amount:.0} food laid by"),
                 PileKind::Timber => format!("{amount:.0} logs on the pile"),
                 PileKind::Stone => format!("{amount:.0} blocks cut and stacked"),
+                PileKind::Clay => format!("{amount:.0} loads of clay, puddled and stacked"),
+                PileKind::Ore => format!("{amount:.0} loads of ore for the fire"),
             };
             if subtitle.0 != fresh {
                 *subtitle = Text::new(fresh);
@@ -278,6 +290,8 @@ pub(crate) fn update_inspector(
                             PileKind::Food => s.food(),
                             PileKind::Timber => s.timber,
                             PileKind::Stone => s.stone,
+                            PileKind::Clay => s.clay,
+                            PileKind::Ore => s.ore,
                         });
                         // Food opens its sacks: the kinds inside, named.
                         if *kind == PileKind::Food
@@ -569,7 +583,11 @@ pub(crate) fn update_inspector(
         let frame = plan.kind.timber_cost();
         let mut bill: Vec<(String, f32, f32)> = Vec::new();
         let mut want = |name: &str, have: f32, needs: f32| {
-            if needs <= 0.0 && have <= 0.0 && name != "Stone" {
+            // A material the build neither wants nor holds is not part of
+            // the bill. The dock is all carpentry and was still billed
+            // "Stone: 0/0" - Brett: "if it doesn't take any stone it should
+            // just not mention it."
+            if needs <= 0.0 && have <= 0.0 {
                 return;
             }
             // A stone-built house founded on stone wants one line, not two.
@@ -587,7 +605,18 @@ pub(crate) fn update_inspector(
         want(&stuff, construction.progress.min(frame), frame);
         let lines: Vec<String> = bill
             .iter()
-            .map(|(name, have, needs)| format!("{name}: {have:.0}/{needs:.0}"))
+            .map(|(name, have, needs)| {
+                // The last half-measure of the frame is the carpenter's, by
+                // the same rule that governs helpers: materials and even the
+                // god speed a build, a person finishes it. Written on the
+                // card, because "4/5" reads as one-more-log when no log will
+                // move it - Brett fed a full frame twice before asking.
+                if *have >= needs - 0.5 && *have < *needs {
+                    format!("{name}: ready - a carpenter finishes it")
+                } else {
+                    format!("{name}: {have:.0}/{needs:.0}")
+                }
+            })
             .collect();
         (format!("{}, rising", plan.kind.name()), lines.join("\n"))
     } else if let Ok((settlement, store)) = settlement_info.get(entity) {
@@ -637,14 +666,47 @@ pub(crate) fn update_inspector(
             .get(entity)
             .map(|n| n.as_str().to_string())
             .unwrap_or_else(|_| "something".into());
+        // A held resource says what it is worth, so the god knows what the
+        // fist is carrying before it opens - "the tooltip should say how
+        // much of what resource you have in your hand".
+        let worth = held.then(|| rising.3.get(entity).ok()).flatten().and_then(
+            |(matter, lump, food, sacred)| {
+                if let Some(lump) = lump {
+                    let kind = match lump.kind {
+                        crate::matter::DepositKind::Clay => "clay",
+                        crate::matter::DepositKind::Iron => "ore",
+                        crate::matter::DepositKind::Stone => "stone",
+                    };
+                    Some(format!("{:.0} {kind}", lump.amount))
+                } else if let Some(flora) = sacred {
+                    let kind = match flora.kind {
+                        crate::scatter::SacredKind::Incense => "incense",
+                        crate::scatter::SacredKind::Dye => "dye",
+                    };
+                    Some(format!("{:.0} {kind}", flora.amount))
+                } else if let Some(source) = food {
+                    Some(format!("{:.0} food", source.amount))
+                } else if let Some(matter) = matter {
+                    let (timber, stone) = crate::villager::work::offering_worth(matter);
+                    if timber > 0.0 {
+                        Some(format!("{timber:.0} timber"))
+                    } else if stone > 0.0 {
+                        Some(format!("{stone:.0} stone"))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            },
+        );
         (
             what,
-            if held {
-                "in your grasp"
-            } else {
-                "beneath your hand"
-            }
-            .to_string(),
+            match worth {
+                Some(worth) => format!("in your grasp - {worth}"),
+                None if held => "in your grasp".to_string(),
+                None => "beneath your hand".to_string(),
+            },
         )
     };
 
