@@ -111,7 +111,13 @@ impl Plugin for DebugPlugin {
                 Update,
                 (
                     update_faith_roster,
-                    update_ledger_details,
+                    // Grouped: the chain tuple is at Bevy's ceiling, and
+                    // these three are one subject - codex pages keeping up.
+                    (
+                        update_ledger_details,
+                        village::update_prayer_board,
+                        village::answer_the_board,
+                    ),
                     handle_codex_tabs,
                     people::meet_someone,
                     village::settings_panel,

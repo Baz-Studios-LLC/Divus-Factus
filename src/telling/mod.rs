@@ -1,31 +1,25 @@
-//! The teller: a villager's own words for what they saw.
+//! The village's voice: a tagged corpus of authored lines.
 //!
-//! Every rumour in the game is a hand-written phrasing picked from
-//! [`crate::witness::DivineEventKind::rumors`]. Those stay, forever, as what
-//! the game says when nothing else is available. This module is an optional
-//! layer *over* them: a small language model, running on the player's own
-//! machine, asked to put the same event into the mouth of this particular
-//! person — a doubting fisher who only heard about it speaks differently from
-//! a devout mason who watched it happen.
+//! Every word a villager says or thinks is picked from a hand-written,
+//! hand-tagged corpus (`assets/voice/`), chosen by the tags of the moment
+//! — who is speaking, what they hold by, what the moment is — and scored
+//! for specificity and freshness. Picking is instant and free, which is
+//! the load-bearing fact: nothing in the simulation ever waits on words,
+//! gates on words, or spends anything to have them.
 //!
-//! Three rules hold this in its place, and all three are load-bearing:
+//! An LLM teller lived here once, composing lines at runtime; it was
+//! retired for this book. Its economies — compose only for watched heads,
+//! show only composed lines — outlived it for a while and kept whole
+//! conversations silent, and they are gone too. What remains of that era
+//! is the authoring toolchain: [`admissible`] and [`speaks_only_of`] gate
+//! the corpus batches, the want-list (`voice-wanted.txt`) records the
+//! moments that went without words, and `divus-factus --voice` is the
+//! bench the lines are read at.
 //!
-//! 1. **Nothing waits on it.** The simulation never blocks. A line that has
-//!    not come back yet is simply a written line instead.
-//! 2. **Nothing depends on it.** With the dial off — the default — this module
-//!    inserts no resource, opens no socket, and spawns no thread. Every test
-//!    and every soak run behaves exactly as it did before it existed.
-//! 3. **Nothing generated is ever saved.** The chronicle keeps storing the
-//!    structured event, never the prose. A world remains rebuildable from its
-//!    seed, which is the property the whole save format rests on.
+//! Nothing picked is ever saved: the chronicle stores the structured
+//! event, never the prose, and a world stays rebuildable from its seed.
 //!
-//! The model runs IN THIS PROCESS. There is no daemon to install, no server to
-//! reach, nothing for a player to do but launch the game — which is the whole
-//! requirement. Weights are not compiled in: they sit beside the saves, the
-//! launcher fetches them once, and their absence costs nothing because the
-//! written lines are always there.
-//!
-//! `DIVUS_FACTUS_TELLER=0` turns it off.
+//! `DIVUS_FACTUS_TELLER=0` silences the village, for capture runs.
 
 use std::collections::HashMap;
 
@@ -33,8 +27,6 @@ use bevy::prelude::*;
 
 pub mod bench;
 mod corpus;
-#[allow(deprecated)]
-use crate::villager::traits::Bearing;
 use crate::villager::work::Vocation;
 use crate::witness::{DivineEventKind, Whom};
 
@@ -57,9 +49,6 @@ const ANACHRONISMS: &[&str] = &[
     "guys",
     "dude",
 ];
-
-/// How a teller came by their story.
-///
 
 /// How a teller came by their story.
 ///
@@ -98,85 +87,43 @@ impl FaithBand {
     }
 }
 
-/// The shape of a telling: everything that should change the words, and
-/// nothing that should not.
-///
-/// This is the cache key, and keying on a *shape* rather than on a person is
-/// what makes the whole thing affordable. A village of twenty produces a few
-/// dozen shapes over a long session, not thousands of requests — while the
-/// lines still differ by who is speaking and how they came by the story.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct TellingKey {
+/// One villager's telling of one act: everything that changes which line
+/// the corpus answers with, and nothing that does not. It was once a cache
+/// key for composed lines; the corpus needs no cache, so it is now just
+/// the shape of the ask.
+#[derive(Clone, Debug)]
+pub struct Retelling {
     pub kind: DivineEventKind,
     pub hand: Hand,
     pub voice: Option<Vocation>,
     pub faith: FaithBand,
-    /// Which way this person's manner bends their words. Part of the key and
-    /// not merely the prompt: a shape that mentions a manner but does not key
-    /// on one would hand a gloomy villager a line composed for a cheerful
-    /// one, which is worse than handing them a generic line.
-    pub bearing: Bearing,
-    /// Who it happened to, in the teller's own terms. In the key for the same
-    /// reason the manner is: a line composed about "Feitreh, your brother" put
-    /// in the mouth of someone he is nothing to would be the model telling the
-    /// player something false about the world. The key holding a name is what
-    /// stops a cached specific from ever crossing to the wrong teller.
+    /// Who it happened to, in the teller's own terms — fills the `{whom}`
+    /// slot, so a line about "Feitreh, your brother" is never put in the
+    /// mouth of someone he is nothing to.
     pub whom: Option<Whom>,
-}
-
-/// One villager's telling of one act, as fields rather than prose.
-#[derive(Clone, Debug)]
-// boldness waits for the deep context builder: a timid teller's telling
-// should read different, and will, as a tag.
-#[allow(dead_code)]
-pub struct Retelling {
-    pub key: TellingKey,
-    /// 0 bolts at anything, 1 walks toward it.
-    pub boldness: f32,
     /// How many times they have told this before. A worn story is flatter.
     pub told: u32,
 }
 
-/// One villager's inward moment: everything true about them right now,
-/// assembled on the main thread where the components live, shipped to the
-/// worker as plain data.
-///
-/// Unlike a [`Retelling`] this is not cached by shape — a thought is this
-/// person, this place, this moment, and serving it to anyone else would be
-/// the lie the whole design exists to prevent. What makes that affordable is
-/// that thoughts have no listener and therefore no deadline: they are asked
-/// for ahead of need, by [`Regard::Close`](crate::attention::Regard), for the
-/// handful of people the god is actually watching.
+/// One villager's inward moment, as the tags of it: who is thinking, what
+/// they hold by, what the body is saying, and — when it is an answer to
+/// someone — what they just heard.
 #[derive(Clone, Debug)]
-// bearing, place, mind and known all await the deep context builder -
-// they were prompt fodder, they become tags and slots.
-#[allow(dead_code)]
 pub struct Musing {
     /// Whose thought this is; the answer comes back keyed on it.
     pub who: Entity,
     pub voice: Option<Vocation>,
-    pub bearing: Bearing,
     pub faith: FaithBand,
     /// What the body is saying: "hungry", "worn out". Empty when it is quiet.
     pub body: Vec<&'static str>,
-    /// The settlement's now, from [`crate::now::WorldNow`].
-    pub place: Vec<String>,
-    /// The one thing pressing on them, chosen by the sim.
-    pub mind: String,
     /// What was just said to them, when this is a reply rather than an idle
-    /// thought. Changes the instruction from inward to answering, and the
-    /// words come back spoken rather than mused.
+    /// thought. A reply waits for the conversation's beat instead of showing
+    /// as a thought.
     pub heard: Option<String>,
     /// Whether this is truly VOICED — a scream, a cry for help. An idle
     /// musing is a thought and shows as one: people who talk to the wind
     /// unsettle their neighbours.
     pub aloud: bool,
-    /// Whether these words are addressed to the god — a prayer wears its
-    /// own colour, because it is the one channel aimed at the player.
-    pub prayer: bool,
-    /// Every proper noun the thought is allowed to contain: their own name,
-    /// their place, their people. The truth gate holds the words to this.
-    pub known: Vec<String>,
 }
 
 impl Musing {
@@ -187,27 +134,20 @@ impl Musing {
 }
 
 impl Retelling {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         kind: DivineEventKind,
         hand: Hand,
         voice: Option<Vocation>,
         trust: f32,
-        bearing: Bearing,
         whom: Option<Whom>,
-        boldness: f32,
         told: u32,
     ) -> Retelling {
         Retelling {
-            key: TellingKey {
-                kind,
-                hand,
-                voice,
-                faith: FaithBand::of(trust),
-                bearing,
-                whom,
-            },
-            boldness,
+            kind,
+            hand,
+            voice,
+            faith: FaithBand::of(trust),
+            whom,
             told,
         }
     }
@@ -226,14 +166,13 @@ impl Retelling {
 
 #[derive(Resource)]
 /// The village's whole voice: the corpus, and the words waiting to be
-/// shown. The API is the old teller's exactly - line, muse, take_musing,
-/// take_reply, mused_heads - so the nine callers never learned the model
-/// beneath them was replaced by a book.
+/// shown.
 pub struct Tongue {
     voice: corpus::Corpus,
     dice: crate::rng::Rng,
-    /// Thoughts picked and waiting to be shown.
-    mused: HashMap<Entity, (String, bool, bool)>,
+    /// Thoughts picked and waiting to be shown: the words, and whether
+    /// they are voiced aloud.
+    mused: HashMap<Entity, (String, bool)>,
     /// Replies picked and waiting for the conversation's beat.
     replies: HashMap<Entity, String>,
 }
@@ -242,14 +181,14 @@ impl Tongue {
     /// A line for this telling, if the corpus has one. `None` falls back
     /// to the written phrasing at every caller, same as always.
     pub fn line(&mut self, of: &Retelling) -> Option<String> {
-        let kind = format!("event:{:?}", of.key.kind).to_lowercase();
-        let hand = match of.key.hand {
+        let kind = format!("event:{:?}", of.kind).to_lowercase();
+        let hand = match of.hand {
             Hand::Witnessed => "saw",
             Hand::Heard => "heard",
             Hand::Distant => "distant",
         };
-        let mut tags = vec!["tell", kind.as_str(), hand, faith_tag(of.key.faith)];
-        let trade = of.key.voice.map(trade_tag);
+        let mut tags = vec!["tell", kind.as_str(), hand, faith_tag(of.faith)];
+        let trade = of.voice.map(trade_tag);
         tags.extend(trade);
         if of.told > 2 {
             // `retold`, and not `worn`: a story worn thin from repetition and
@@ -259,7 +198,7 @@ impl Tongue {
             // thirteen against the other, and nothing warned either author.
             tags.push("retold");
         }
-        let whom = of.key.whom.as_ref().map(|w| w.name.clone());
+        let whom = of.whom.as_ref().map(|w| w.name.clone());
         let mut slots: Vec<(&str, &str)> = Vec::new();
         if let Some(whom) = whom.as_deref() {
             slots.push(("whom", whom));
@@ -313,8 +252,9 @@ impl Tongue {
             .map(|said| tidy(&said))
     }
 
-    /// Picks someone's thought (or their reply) on the spot. The old
-    /// teller composed ahead of the beat; the corpus needs no head start.
+    /// Picks someone's thought (or their reply) on the spot, and holds it
+    /// for its showing - a thought until regard finds it, a reply until
+    /// the conversation's beat.
     pub fn muse(&mut self, of: Musing) {
         let waiting = if of.is_reply() {
             self.replies.contains_key(&of.who)
@@ -330,9 +270,6 @@ impl Tongue {
         ];
         tags.extend(of.voice.map(trade_tag));
         tags.extend(of.body.iter().copied());
-        if of.prayer {
-            tags.push("prayer");
-        }
         let Some(said) = self
             .voice
             .pick(of.who.to_bits(), &tags, &[], &mut self.dice)
@@ -343,8 +280,32 @@ impl Tongue {
         if of.is_reply() {
             self.replies.insert(of.who, said);
         } else {
-            self.mused.insert(of.who, (said, of.aloud, of.prayer));
+            self.mused.insert(of.who, (said, of.aloud));
         }
+    }
+
+    /// Picks a prayer's words, for the moment knees touch ground.
+    ///
+    /// Unlike `muse`, this is not gated on being watched and holds nothing
+    /// in the mused map: the words go onto the PRAYER itself, where the
+    /// codex board reads them even if no eye ever does and the pink bubble
+    /// replays them for every fresh look. The watched-head economy belonged
+    /// to the retired teller, which paid real compute per line; the corpus
+    /// picks for nothing.
+    pub fn pray(
+        &mut self,
+        who: Entity,
+        body: &[&str],
+        faith: FaithBand,
+        whom: Option<&str>,
+    ) -> Option<String> {
+        let mut tags = vec!["muse", faith_tag(faith)];
+        tags.extend(body.iter().copied());
+        tags.push("prayer");
+        let slots: Vec<(&str, &str)> = whom.map(|whom| ("whom", whom)).into_iter().collect();
+        self.voice
+            .pick(who.to_bits(), &tags, &slots, &mut self.dice)
+            .map(|said| tidy(&said))
     }
 
     /// A shout, with nobody in particular to shout at.
@@ -375,12 +336,13 @@ impl Tongue {
             // Straight into the mouth, over anything they were musing:
             // nobody finishes a thought about their boots while a wolf
             // has hold of them.
-            self.mused.insert(who, (said, true, false));
+            self.mused.insert(who, (said, true));
         }
     }
 
-    /// The thought waiting for this person, if any.
-    pub fn take_musing(&mut self, who: Entity) -> Option<(String, bool, bool)> {
+    /// The thought waiting for this person, if any: the words, and whether
+    /// they are voiced aloud.
+    pub fn take_musing(&mut self, who: Entity) -> Option<(String, bool)> {
         self.mused.remove(&who)
     }
 
@@ -397,6 +359,11 @@ impl Tongue {
     /// Writes the authoring want-list beside the game.
     pub fn note_wanting(&self) {
         self.voice.write_wanting();
+    }
+
+    /// How many lines the village can speak - the workbench readout.
+    pub fn lines(&self) -> usize {
+        self.voice.len()
     }
 }
 
@@ -426,14 +393,6 @@ fn trade_tag(voice: Vocation) -> &'static str {
     }
 }
 
-/// Which weights the teller actually took up, by name - so the instrument
-/// panel can say it out loud. Worth saying: the choice is made from what
-/// is on disk, and a village speaking in a smaller voice than you meant it
-/// to is otherwise invisible.
-#[derive(Resource)]
-pub struct SpeakingWith(pub String);
-
-/// Installs the teller. Silent and free when there are no weights to read.
 /// Flushes the authoring want-list every little while. A minute is
 /// nothing to a file this small, and it means a crash loses at most a
 /// minute of assignments - the want-list is the whole reason silent
@@ -460,7 +419,7 @@ impl Plugin for TellingPlugin {
             return;
         }
         let voice = corpus::Corpus::load();
-        app.insert_resource(SpeakingWith(format!("the corpus - {} lines", voice.len())));
+        info!("the village speaks from the corpus - {} lines", voice.len());
         app.insert_resource(Tongue {
             voice,
             dice: crate::rng::Rng::new(0x1e11),
@@ -652,15 +611,10 @@ mod corpus_wiring_tests {
         tongue.muse(Musing {
             who,
             voice: None,
-            bearing: Default::default(),
             faith: FaithBand::Wavering,
             body: vec!["hungry", "roofless"],
-            place: Vec::new(),
-            mind: String::new(),
             heard: None,
             aloud: false,
-            prayer: false,
-            known: Vec::new(),
         });
         let (line, ..) = tongue.take_musing(who).expect("the book must answer");
         assert!(!line.is_empty());

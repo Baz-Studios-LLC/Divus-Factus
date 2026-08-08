@@ -24,7 +24,6 @@ mod miracles;
 mod music;
 mod navigation;
 mod noise;
-mod now;
 mod palette;
 mod place;
 mod planet;
@@ -244,10 +243,8 @@ fn main() {
             speed::SpeedPlugin,
             survey::SurveyPlugin,
             markers::MarkersPlugin,
-            // Before the teller: they decide what the teller is asked for,
-            // and what the asking is allowed to say.
+            // Before the tongue: attention decides which words are SHOWN.
             attention::AttentionPlugin,
-            now::NowPlugin,
             telling::TellingPlugin,
         ))
         .add_plugins((

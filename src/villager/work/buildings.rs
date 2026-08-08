@@ -1439,6 +1439,68 @@ pub(crate) fn raise_the_founding_hall(
     Some(Vec3::new(step.x, terrain.height_at(step.x, step.z), step.z))
 }
 
+/// Shows the mason's slab and doorstep, the moment the last block is laid.
+///
+/// One author, called by the mason's final block and by the save restoring a
+/// site already laid — the save used to carry its own copy of the slab, so
+/// the two could disagree, and did.
+///
+/// FOR THE VILLAGE'S OWN HAND ONLY. A carried-in drawing builds nothing that
+/// is not in its own stages — its footing stood up with ground-breaking, the
+/// way the maker staged it. The generated slab put under a carried-in house
+/// wrapped a second, fatter plinth around the maker's own, sized to the
+/// drawing's whole bounding box, eaves and chimney included. Brett: "weird
+/// foundations showing up that are bigger than the house... there should be
+/// nothing built outside of the design from atelier."
+pub(crate) fn reveal_foundation(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    site: Entity,
+    plan: &Blueprint,
+) {
+    if super::baked::drawing_at(plan.kind, plan.plan).is_some() {
+        return;
+    }
+
+    // The village's own hand - the kinds the bench has not replaced yet -
+    // still gets the mason's slab.
+    let (w, d) = (plan.half_w, plan.half_d);
+    let slab = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+    let stone = materials.add(StandardMaterial {
+        base_color: crate::palette::shade(&crate::palette::STONE, 0.4),
+        perceptual_roughness: 1.0,
+        ..default()
+    });
+    commands.spawn((
+        Mesh3d(slab.clone()),
+        MeshMaterial3d(stone.clone()),
+        Transform::from_xyz(0.0, PLINTH_TOP - 0.6, 0.0).with_scale(Vec3::new(
+            w * 2.0 + 0.3,
+            1.2,
+            d * 2.0 + 0.3,
+        )),
+        ChildOf(site),
+    ));
+    // Two stone steps down from the threshold, on the door side. (Not for
+    // the well - nobody steps up into a well.)
+    if plan.kind == BuildingKind::Well {
+        return;
+    }
+    for (out, top, depth) in [(0.32_f32, 0.24_f32, 0.6_f32), (0.78, 0.1, 0.55)] {
+        commands.spawn((
+            Mesh3d(slab.clone()),
+            MeshMaterial3d(stone.clone()),
+            Transform::from_xyz(w + out, top - 0.02, 0.0).with_scale(Vec3::new(
+                depth,
+                top * 2.0,
+                1.2,
+            )),
+            ChildOf(site),
+        ));
+    }
+}
+
 pub(crate) fn raise_stage(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
@@ -3052,7 +3114,6 @@ pub(crate) fn sermons(
     shrines: Query<(&GlobalTransform, &Building)>,
     attention: Option<Res<crate::attention::Attention>>,
     mut tongue: Option<ResMut<crate::telling::Tongue>>,
-    manners: Query<&crate::villager::traits::Traits>,
     mut congregation: Query<
         (
             Entity,
@@ -3105,36 +3166,21 @@ pub(crate) fn sermons(
     let sermon = memory.kind;
     let god = name.as_ref().map_or("the god", |n| n.0.as_str());
 
-    // A watched pulpit preaches in the priest's own words — the same teller,
-    // the same truth gate, the same key as any retelling, so a sermon about
-    // "Feitreh, your neighbour" can never be served to the wrong parish. A
-    // watched sermon whose words never came back is a silent blessing; the
-    // written line keeps serving the middle distance and the model-less.
+    // The pulpit preaches in the priest's own words — the same corpus, the
+    // same shape as any retelling, picked whether or not anyone is looking:
+    // an unwatched pulpit still sways its congregation below, and only the
+    // bubble waits on the god's regard.
     let regard = crate::attention::regard(attention.as_deref(), at);
-    let composed = tongue
-        .as_mut()
-        .filter(|_| regard.worth_composing())
-        .and_then(|tongue| {
-            tongue.line(&crate::telling::Retelling::new(
-                sermon,
-                hand,
-                Some(Vocation::Priest),
-                trust,
-                manners
-                    .get(preacher)
-                    .map(|m| m.bearing())
-                    .unwrap_or_default(),
-                memory.whom.clone(),
-                0.5,
-                told,
-            ))
-        });
-    let own_words = composed.is_some();
-    if let Some(line) = &composed {
-        info!("the priest preaches it in their own words: {line}");
-    }
-    // Composed or silent: an unwatched pulpit still sways its congregation
-    // below; only the bubble is withheld.
+    let composed = tongue.as_mut().and_then(|tongue| {
+        tongue.line(&crate::telling::Retelling::new(
+            sermon,
+            hand,
+            Some(Vocation::Priest),
+            trust,
+            memory.whom.clone(),
+            told,
+        ))
+    });
     if let Some(line) = composed
         && regard.worth_saying()
     {
@@ -3143,7 +3189,6 @@ pub(crate) fn sermons(
             text: format!("hear how {}", line.replace("the god", god)),
             thought: false,
             prayer: false,
-            own_words,
         });
     }
 

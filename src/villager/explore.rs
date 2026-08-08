@@ -307,32 +307,19 @@ pub(super) fn expeditions(
             // Every return stretches the cairn ring a little: even a walk
             // that found nothing proves the ground between.
             known.radius += 9.0;
-            // A watched homecoming is told in the explorer's own words.
-            let composed = say
-                .0
-                .as_mut()
-                .filter(|_| {
-                    crate::attention::regard(say.1.as_deref(), at.translation).worth_composing()
-                })
-                .map(|tongue| {
-                    tongue.muse(crate::telling::Musing {
-                        who: entity,
-                        voice: Some(crate::villager::work::Vocation::Explorer),
-                        bearing: crate::villager::traits::Bearing::Plain,
-                        faith: crate::telling::FaithBand::Wavering,
-                        body: Vec::new(),
-                        place: Vec::new(),
-                        mind: format!("you walked far past the cairns and found {what}"),
-                        heard: None,
-                        aloud: true,
-                        prayer: false,
-                        known: Vec::new(),
-                    })
-                })
-                .is_some();
-            // Unwatched or unanswered: the moment passes quietly. Nothing
-            // written plays anywhere any more.
-            let _ = composed;
+            // The homecoming is told in the explorer's own words - tagged
+            // `returned`, so the want-list demands homecoming lines until
+            // the corpus holds them.
+            if let Some(tongue) = say.0.as_mut() {
+                tongue.muse(crate::telling::Musing {
+                    who: entity,
+                    voice: Some(crate::villager::work::Vocation::Explorer),
+                    faith: crate::telling::FaithBand::Wavering,
+                    body: vec!["returned"],
+                    heard: None,
+                    aloud: true,
+                });
+            }
             if let Some(mut chronicle) = chronicle {
                 chronicle.record(
                     clock.day(),

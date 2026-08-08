@@ -1358,8 +1358,13 @@ pub(super) fn do_work(
             shed_wood(&mut commands, entity, &children, &loads);
             construction.stone_laid += 1.0;
             // The block lands where it was laid: courses appear around the
-            // perimeter, corners first.
-            {
+            // perimeter, corners first - but only for buildings raised by
+            // the village's own hand. A carried-in drawing builds NOTHING
+            // that is not in its own stages; its half-extents span the eaves
+            // and the chimney, so blocks placed by them ringed the house a
+            // stride out from its walls. Brett: "there should be nothing
+            // built outside of the design from atelier."
+            if baked::drawing_at(plan.kind, plan.plan).is_none() {
                 let (w, d) = (plan.half_w, plan.half_d);
                 let slots = [
                     (-w, -d),
@@ -1386,40 +1391,17 @@ pub(super) fn do_work(
                 ));
             }
             if construction.stone_laid >= construction.footing_stone(plan.kind) {
-                // The foundation shows itself the moment the last block lands.
-                let slab = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
-                let stone_material = materials.add(StandardMaterial {
-                    base_color: crate::palette::shade(&crate::palette::STONE, 0.4),
-                    perceptual_roughness: 1.0,
-                    ..default()
-                });
-                commands.spawn((
-                    Mesh3d(slab),
-                    MeshMaterial3d(stone_material.clone()),
-                    Transform::from_xyz(0.0, PLINTH_TOP - 0.6, 0.0).with_scale(Vec3::new(
-                        plan.half_w * 2.0 + 0.3,
-                        1.2,
-                        plan.half_d * 2.0 + 0.3,
-                    )),
-                    ChildOf(site_entity),
-                ));
-                // Two stone steps down from the threshold, on the door side.
-                // (Not for the well - nobody steps up into a well.)
-                let step_mesh = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
-                let steps: &[(f32, f32, f32)] = if plan.kind == BuildingKind::Well {
-                    &[]
-                } else {
-                    &[(0.32, 0.24, 0.6), (0.78, 0.1, 0.55)]
-                };
-                for &(out, top, depth) in steps {
-                    commands.spawn((
-                        Mesh3d(step_mesh.clone()),
-                        MeshMaterial3d(stone_material.clone()),
-                        Transform::from_xyz(plan.half_w + out, top - 0.02, 0.0)
-                            .with_scale(Vec3::new(depth, top * 2.0, 1.2)),
-                        ChildOf(site_entity),
-                    ));
-                }
+                // The foundation shows itself the moment the last block
+                // lands - the mason's slab for the village's own kinds,
+                // and NOTHING for a carried-in drawing, whose own footing
+                // has stood since ground-breaking.
+                reveal_foundation(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    site_entity,
+                    plan,
+                );
                 info!(
                     "the foundation of {} is laid",
                     plan.kind.name().to_lowercase()

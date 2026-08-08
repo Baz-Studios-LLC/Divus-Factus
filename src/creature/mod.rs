@@ -728,23 +728,16 @@ fn drowning(
 
         if *say_timer > 6.0 && rng.chance(0.3) {
             *say_timer = 0.0;
-            // A drowning cry in their own words — urgent enough that the
-            // teller answers within a second, and honest silence otherwise.
-            if let Some(tongue) = telling.0.as_mut()
-                && crate::attention::regard(telling.1.as_deref(), at.translation).worth_composing()
-            {
+            // A drowning cry, picked on the spot; the showing decides who
+            // hears it.
+            if let Some(tongue) = telling.0.as_mut() {
                 tongue.muse(crate::telling::Musing {
                     who: entity,
                     voice: None,
-                    bearing: crate::villager::traits::Bearing::Plain,
                     faith: crate::telling::FaithBand::Wavering,
                     body: vec!["drowning"],
-                    place: Vec::new(),
-                    mind: "you are in deep water and cannot swim — cry for help".into(),
                     heard: None,
                     aloud: true,
-                    prayer: false,
-                    known: Vec::new(),
                 });
             }
         }

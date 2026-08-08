@@ -18,6 +18,7 @@ pub mod work;
 
 pub mod gossip;
 pub mod kin;
+pub mod regard;
 pub(crate) use gossip::*;
 
 use bevy::prelude::*;
@@ -146,6 +147,19 @@ impl Plugin for VillagerPlugin {
             .init_resource::<belief::Belief>()
             .init_resource::<belief::FaithHistory>()
             .init_resource::<belief::Legend>()
+            .init_resource::<belief::PrayerLedger>()
+            .add_message::<home::Knock>()
+            .add_message::<home::KnockReport>()
+            .add_systems(Update, home::answer_the_knock)
+            .add_systems(
+                Update,
+                (
+                    regard::ensure_regard,
+                    regard::feelings_cool,
+                    regard::kin_warmth,
+                    ensure_stirrings,
+                ),
+            )
             // The village is founded when the flag goes in, not when the
             // program starts. A world with nobody in it is the opening.
             .init_resource::<ChosenGround>()
@@ -230,9 +244,12 @@ impl Plugin for VillagerPlugin {
                         .chain(),
                     (
                         belief::endow_faith,
-                        belief::kneel,
+                        // Paired: the chain tuple is at Bevy's ceiling, and
+                        // these are one subject - the kneelings and their
+                        // answers.
+                        (belief::kneel, belief::kneel_in_hatred),
                         belief::take_a_knee,
-                        belief::answer_prayers,
+                        (belief::answer_prayers, belief::answer_dark_prayers),
                         belief::despair,
                         belief::faith_of_witnesses.after(crate::witness::WitnessSet),
                         belief::tally_belief,
@@ -240,6 +257,11 @@ impl Plugin for VillagerPlugin {
                         belief::ascend,
                         belief::record_faith,
                         belief::animate_motes,
+                        belief::show_prayer_bubbles,
+                        belief::close_the_prayers_of_the_dead,
+                        // Paired: the chain tuple nears Bevy's ceiling, and
+                        // these two are one subject - faith marks floating.
+                        (belief::mark_the_faith_moved, belief::fade_faith_marks),
                         work::bake,
                         work::smelt,
                         work::dye_cloth,
@@ -444,6 +466,50 @@ pub struct DivineName(pub String);
 pub struct LifeEvent {
     pub day: u32,
     pub text: String,
+}
+
+/// One movement of the heart, and why: the ledger under the numbers.
+#[derive(Debug)]
+pub struct Stirring {
+    pub day: u32,
+    pub text: String,
+}
+
+/// What has MOVED this person lately — every discrete shift of faith,
+/// spirits or feeling, with its cause. The chronicle keeps what they did;
+/// this keeps what got to them. Brett: "everytime something changes their
+/// stats there should be a log on what changed and why."
+///
+/// Discrete events only, never climate: rain wearing on the spirits and
+/// kin warmth holding steady are weather, and a ledger of weather buries
+/// the signal. Deliberately short — the question a heart page answers is
+/// what they are like NOW, not a biography.
+#[derive(Component, Debug, Default)]
+pub struct Stirrings(pub Vec<Stirring>);
+
+/// How many stirrings are worth keeping.
+const STIRRINGS_KEPT: usize = 14;
+
+impl Stirrings {
+    pub fn stir(&mut self, day: u32, text: impl Into<String>) {
+        self.0.push(Stirring {
+            day,
+            text: text.into(),
+        });
+        let over = self.0.len().saturating_sub(STIRRINGS_KEPT);
+        self.0.drain(..over);
+    }
+}
+
+/// Everyone can be moved: villagers get an empty ledger the moment they
+/// exist, souls from old saves included.
+pub(crate) fn ensure_stirrings(
+    mut commands: Commands,
+    unmoved: Query<Entity, (With<Villager>, Without<Stirrings>)>,
+) {
+    for soul in &unmoved {
+        commands.entity(soul).insert(Stirrings::default());
+    }
 }
 
 /// A person's own history, in their own order: born, wed, bereaved, seized by
@@ -748,10 +814,13 @@ pub fn will_take_a_village(terrain: &Terrain, x: f32, z: f32) -> Option<&'static
         // The banner itself stands well above the tide, always.
         return Some("the tide would come up to it");
     }
-    // And never on the mountain: summits are for mines, not banners.
-    // The founding fire belongs on low country, with the rock a walk
-    // away - not under the bedrolls.
-    if height > WATER_LEVEL + 30.0 {
+    // And never on the mountain: summits are for mines, not banners. The
+    // line is the ALPINE BIOME - the game's own word for "on the mountain"
+    // - not an absolute height. The old check refused anything 30 units
+    // over the sea in a world whose ordinary rolling interior sits at 50+,
+    // so most of every continent claimed to be a mountain; Brett planted
+    // on gentle riverside forest and was told "too high up the mountain."
+    if terrain.biome_for(x, z, height) == crate::terrain::Biome::Alpine {
         return Some("too high up the mountain");
     }
     if level_room(terrain, x, z) < MIN_SETTLEMENT_LAND {
@@ -2484,6 +2553,7 @@ fn births(
         Query<(), With<work::Longhouse>>,
         Query<&work::Stockpile>,
         Query<&Motherhood>,
+        Query<&regard::Regard>,
     ),
     mut rng: ResMut<SimRng>,
     villagers: Query<
@@ -2509,7 +2579,7 @@ fn births(
     let Some(culture) = culture else {
         return;
     };
-    let (huts, longhouses, stores, borne) = shelter;
+    let (huts, longhouses, stores, borne, hearts) = shelter;
 
     let living = villagers.iter().count();
     let average_hunger = if living == 0 {
@@ -2562,9 +2632,26 @@ fn births(
     // bears is then gated on the same number. The first keeps births moving to
     // the couples with room for them; the second is what actually slows a
     // village down as its families fill up.
+    //
+    // And by the marriage's WARMTH: children come likelier to couples who
+    // hold each other dear. A floor, never a gate - the coldest marriage
+    // still bears at three quarters the rate, because a village must
+    // thrive whatever its heart is doing - but across a whole village the
+    // difference is a demographic: a feared god's cold marriages thin the
+    // nursery, a loved god's warm ones fill it.
+    let warmth_of = |mother: Entity, father: Entity| -> f32 {
+        let hers = hearts.get(mother).map_or(0.0, |h| h.toward(father));
+        let his = hearts.get(father).map_or(0.0, |h| h.toward(mother));
+        let mutual = (hers + his) * 0.5;
+        0.75 + 0.5 * mutual.max(0.0)
+    };
     let weights: Vec<f32> = mothers
         .iter()
-        .map(|(who, ..)| fertility(borne.get(*who).map_or(0, |m| m.borne)))
+        .map(|(who, _, _, _, _, spouse, _, _)| {
+            let base = fertility(borne.get(*who).map_or(0, |m| m.borne));
+            let warmth = spouse.map_or(1.0, |s| warmth_of(*who, s.0));
+            base * warmth
+        })
         .collect();
     let total: f32 = weights.iter().sum();
     if total <= 0.0 {

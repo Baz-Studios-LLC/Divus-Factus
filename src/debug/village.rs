@@ -101,6 +101,7 @@ pub(crate) enum CodexPage {
     People,
     Chronicle,
     Deity,
+    Prayers,
     World,
     Settings,
 }
@@ -115,11 +116,13 @@ pub(crate) struct Codex {
     pub people_page: Entity,
     pub chronicle_page: Entity,
     pub deity_page: Entity,
+    pub prayers_page: Entity,
     pub world_page: Entity,
     pub ledger_tab: Entity,
     pub people_tab: Entity,
     pub chronicle_tab: Entity,
     pub deity_tab: Entity,
+    pub prayers_tab: Entity,
     pub world_tab: Entity,
     pub settings_page: Entity,
     pub settings_tab: Entity,
@@ -142,6 +145,19 @@ pub(crate) struct BuildingRows;
 
 #[derive(Component)]
 pub(crate) struct TradeRows;
+
+/// The prayer board's well of open prayers, rebuilt while the Deity page
+/// shows. The first resident of the Deity page: what the faithful ask.
+#[derive(Component)]
+pub(crate) struct PrayerRows;
+
+/// The strip of recently closed prayers beneath the board — the receipts.
+#[derive(Component)]
+pub(crate) struct PrayerHistoryRows;
+
+/// A clickable prayer row: pressing it flies the god to whoever is asking.
+#[derive(Component)]
+pub(crate) struct PrayerRow(pub Entity);
 
 // ---------------------------------------------------------------------------
 // Glyphs: little engraved marks drawn from nodes, same hand as everything.
@@ -214,6 +230,22 @@ pub(crate) fn hands_glyph(commands: &mut Commands, parent: Entity, tint: Color) 
     let c = glyph_canvas(commands, parent, 18.0);
     bar(commands, c, (4.0, 4.0, 3.0, 11.0), 22.0, tint, false);
     bar(commands, c, (11.0, 4.0, 3.0, 11.0), -22.0, tint, false);
+}
+
+/// The prayer mote: the turned spark that hangs over the praying, with its
+/// fall of light beneath — the mark prayers wear in the world, worn again
+/// on their page's tab.
+pub(crate) fn mote_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+    let c = glyph_canvas(commands, parent, 18.0);
+    bar(commands, c, (6.5, 3.0, 5.0, 5.0), 45.0, tint, false);
+    bar(
+        commands,
+        c,
+        (8.25, 11.0, 1.5, 5.0),
+        0.0,
+        tint.with_alpha(0.55),
+        false,
+    );
 }
 
 /// A scroll: a page bearing written lines.
@@ -485,6 +517,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
     let people_page = bound_page();
     let chronicle_page = bound_page();
     let deity_page = bound_page();
+    let prayers_page = bound_page();
     let world_page = bound_page();
     let settings_page = bound_page();
 
@@ -550,6 +583,13 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         ui::HoverHint::new("The Deity", "you are the unseen; they are the faithful"),
     ));
 
+    let prayers_tab = tab(&mut commands, false, true);
+    mote_glyph(&mut commands, prayers_tab, ink.with_alpha(0.8));
+    commands.entity(prayers_tab).insert((
+        CodexTab(CodexPage::Prayers),
+        ui::HoverHint::new("The Prayers", "what the faithful ask of you"),
+    ));
+
     let world_tab = tab(&mut commands, false, true);
     tree_glyph(&mut commands, world_tab, ink.with_alpha(0.8));
     commands.entity(world_tab).insert((
@@ -581,6 +621,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         ui::HoverHint::new("The Settings", "the god's own preferences"),
     ));
     build_settings_page(&mut commands, settings_page);
+    build_prayers_page(&mut commands, prayers_page);
 
     commands.insert_resource(Codex {
         page: CodexPage::Ledger,
@@ -591,11 +632,13 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         people_page,
         chronicle_page,
         deity_page,
+        prayers_page,
         world_page,
         ledger_tab,
         people_tab,
         chronicle_tab,
         deity_tab,
+        prayers_tab,
         world_tab,
         title_text: window.title_text,
         subtitle_text: window.subtitle_text,
@@ -1061,6 +1104,7 @@ pub(crate) fn apply_codex_page(
         (codex.people_page, codex.page == CodexPage::People),
         (codex.chronicle_page, codex.page == CodexPage::Chronicle),
         (codex.deity_page, codex.page == CodexPage::Deity),
+        (codex.prayers_page, codex.page == CodexPage::Prayers),
         (codex.world_page, codex.page == CodexPage::World),
     ];
     for (page, open) in pages {
@@ -1090,6 +1134,7 @@ pub(crate) fn apply_codex_page(
         (codex.people_tab, codex.page == CodexPage::People),
         (codex.chronicle_tab, codex.page == CodexPage::Chronicle),
         (codex.deity_tab, codex.page == CodexPage::Deity),
+        (codex.prayers_tab, codex.page == CodexPage::Prayers),
         (codex.world_tab, codex.page == CodexPage::World),
     ];
     for (tab, open) in tabs {
@@ -1116,6 +1161,7 @@ pub(crate) fn apply_codex_page(
             "The tale of your people, written moment by moment.",
         ),
         CodexPage::Deity => ("THE DEITY", "You are the unseen. They are the faithful."),
+        CodexPage::Prayers => ("THE PRAYERS", "What the faithful ask of you."),
         CodexPage::World => (
             "THE WORLD",
             "The lands your people walk. The seasons turn. The world endures.",
@@ -1474,6 +1520,243 @@ pub(crate) fn update_ledger_details(
     }
 }
 
+/// THE PRAYERS page: the prayer board. Every open prayer in the world in
+/// the praying's own words, and what lately became of the closed ones.
+/// Brett: "It should work almost like a quest board. So the prayer should
+/// come up there even if I dont see it." Its own page — the first cut
+/// squatted on the Deity page, on the strength of a spawn-time grep that
+/// missed the god panel building its home at runtime, and the two crushed
+/// each other.
+fn build_prayers_page(commands: &mut Commands, page: Entity) {
+    let board = ui::card_well(commands, page, "PRAYERS OF THE FAITHFUL");
+    commands.spawn((
+        ui::dim("press a prayer to fly to whoever is asking"),
+        ChildOf(board),
+    ));
+    commands.spawn((
+        PrayerRows,
+        Node {
+            width: percent(100),
+            flex_grow: 1.0,
+            min_height: px(0),
+            flex_direction: FlexDirection::Column,
+            row_gap: px(4),
+            overflow: Overflow::scroll_y(),
+            ..default()
+        },
+        ui::Scrollable,
+        ScrollPosition::DEFAULT,
+        Interaction::default(),
+        ChildOf(board),
+    ));
+
+    // The receipts, in a short fixed band under the board: answered,
+    // unanswered, and the dark third kind.
+    let lately = ui::card_well(commands, page, "LATELY");
+    commands.entity(lately).insert(Node {
+        width: percent(100),
+        height: px(168),
+        flex_grow: 0.0,
+        flex_shrink: 0.0,
+        flex_direction: FlexDirection::Column,
+        row_gap: px(6),
+        padding: UiRect::all(px(10)),
+        border: UiRect::all(px(1)),
+        border_radius: BorderRadius::all(px(0)),
+        overflow: Overflow::clip(),
+        ..default()
+    });
+    commands.spawn((
+        PrayerHistoryRows,
+        Node {
+            width: percent(100),
+            flex_grow: 1.0,
+            min_height: px(0),
+            flex_direction: FlexDirection::Column,
+            row_gap: px(3),
+            overflow: Overflow::scroll_y(),
+            ..default()
+        },
+        ui::Scrollable,
+        ScrollPosition::DEFAULT,
+        Interaction::default(),
+        ChildOf(lately),
+    ));
+}
+
+/// How firmly hope still holds, in coarse words — coarse ON PURPOSE: a
+/// countdown ticking every second forces the rows to rebuild every second,
+/// and a page that flinches on a timer is the exact fault the ledger's
+/// fingerprint idiom exists to prevent.
+fn hope_band(remaining: f32) -> &'static str {
+    if remaining > 60.0 {
+        "hope holds"
+    } else if remaining > 20.0 {
+        "hope fading"
+    } else {
+        "the last moments"
+    }
+}
+
+/// Rebuilds the prayer board on a slow clock while the Deity page is open.
+#[allow(clippy::type_complexity)]
+pub(crate) fn update_prayer_board(
+    mut commands: Commands,
+    codex: Res<Codex>,
+    time: Res<Time>,
+    mut last_rebuild: Local<f32>,
+    mut fingerprint: Local<u64>,
+    panels: Query<&Visibility, With<VillagePanel>>,
+    boards: Query<Entity, With<PrayerRows>>,
+    histories: Query<Entity, With<PrayerHistoryRows>>,
+    ledger: Res<crate::villager::belief::PrayerLedger>,
+    praying: Query<
+        (Entity, &Person, &crate::villager::belief::Prayer),
+        (With<Villager>, Without<crate::creature::Corpse>),
+    >,
+) {
+    if codex.page != CodexPage::Prayers || !panels.iter().any(|v| *v != Visibility::Hidden) {
+        return;
+    }
+    *last_rebuild += time.delta_secs();
+    if *last_rebuild < 1.0 {
+        return;
+    }
+    *last_rebuild = 0.0;
+    let (Ok(board), Ok(history)) = (boards.single(), histories.single()) else {
+        return;
+    };
+
+    // Most urgent first: the board is a to-do list, and the top of a to-do
+    // list is the thing about to be lost.
+    let mut open: Vec<_> = praying.iter().collect();
+    open.sort_by(|a, b| {
+        a.2.remaining
+            .partial_cmp(&b.2.remaining)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let fresh = {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::hash::DefaultHasher::new();
+        for (entity, _, prayer) in &open {
+            entity.to_bits().hash(&mut hasher);
+            hope_band(prayer.remaining).hash(&mut hasher);
+        }
+        ledger.closed.len().hash(&mut hasher);
+        hasher.finish()
+    };
+    if fresh == *fingerprint {
+        return;
+    }
+    *fingerprint = fresh;
+
+    let pink = crate::palette::shade(&crate::palette::CLOTH_PINK, 1.0);
+    commands.entity(board).despawn_related::<Children>();
+    if open.is_empty() {
+        commands.spawn((
+            ui::dim("nobody is asking anything of you"),
+            ChildOf(board),
+        ));
+    }
+    for (who, person, prayer) in &open {
+        let row = commands
+            .spawn((
+                PrayerRow(*who),
+                Interaction::default(),
+                ui::HoverHint::new(&person.name, "press to fly to them"),
+                Node {
+                    width: percent(100),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: px(1),
+                    padding: UiRect::axes(px(8), px(5)),
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::all(px(0)),
+                    flex_shrink: 0.0,
+                    ..default()
+                },
+                BackgroundColor(Color::BLACK.with_alpha(0.16)),
+                BorderColor::all(pink.with_alpha(0.35)),
+                ChildOf(board),
+            ))
+            .id();
+        let top = commands
+            .spawn((
+                Node {
+                    width: percent(100),
+                    flex_direction: FlexDirection::Row,
+                    justify_content: JustifyContent::SpaceBetween,
+                    align_items: AlignItems::Baseline,
+                    ..default()
+                },
+                ChildOf(row),
+            ))
+            .id();
+        let ask = match &prayer.kind {
+            crate::villager::belief::PrayerKind::Food => {
+                format!("{} asks for food", person.name)
+            }
+            crate::villager::belief::PrayerKind::Dark { name, over, .. } => match over {
+                Some(over) => format!(
+                    "{} asks that {} be struck down - over {}",
+                    person.name, name, over
+                ),
+                None => format!("{} asks that {} be struck down", person.name, name),
+            },
+        };
+        commands.spawn((ui::body(ask), ChildOf(top)));
+        commands.spawn((ui::dim(hope_band(prayer.remaining)), ChildOf(top)));
+        if let Some(words) = &prayer.words {
+            let quoted = commands
+                .spawn((ui::dim(format!("\u{201c}{words}\u{201d}")), ChildOf(row)))
+                .id();
+            commands
+                .entity(quoted)
+                .insert(TextColor(pink.with_alpha(0.75)));
+        }
+    }
+
+    commands.entity(history).despawn_related::<Children>();
+    if ledger.closed.is_empty() {
+        commands.spawn((ui::dim("no prayer has closed yet"), ChildOf(history)));
+    }
+    for closed in ledger.closed.iter().rev() {
+        let line = commands
+            .spawn((
+                ui::dim(format!("{} - {}", closed.name, closed.outcome.describe())),
+                Interaction::default(),
+                ChildOf(history),
+            ))
+            .id();
+        // What they asked, kept a hover away rather than crowding the strip.
+        if let Some(words) = &closed.words {
+            commands
+                .entity(line)
+                .insert(ui::HoverHint::new(&closed.name, format!("\u{201c}{words}\u{201d}")));
+        }
+    }
+}
+
+/// Pressing a prayer flies the god to whoever is asking: the codex closes
+/// and the camera pins to them — the same follow a right-click takes —
+/// with the orbit and zoom left free for the answering.
+pub(crate) fn answer_the_board(
+    mut follow: ResMut<crate::camera::FollowTarget>,
+    mut panels: Query<&mut Visibility, With<VillagePanel>>,
+    rows: Query<(&Interaction, &PrayerRow), Changed<Interaction>>,
+) {
+    for (interaction, row) in &rows {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        follow.entity = Some(row.0);
+        follow.style = crate::camera::FollowStyle::Overhead;
+        for mut panel in &mut panels {
+            *panel = Visibility::Hidden;
+        }
+    }
+}
+
 /// The FAITH roster: rows are torn down only when someone joins or leaves
 /// the roll. When souls merely trade places in the ranking, the standing
 /// rows are reordered in place - despawning them cost a layout frame and
@@ -1748,10 +2031,9 @@ walls down as well",
             ),
             Bind::Deed(
                 Deed::Doings,
-                "every soul says what they are at,
-and the trade they hold",
+                "nameplates: off, names,
+then the whole soul",
             ),
-            Bind::Deed(Deed::Trades, "every soul says their trade"),
             Bind::Deed(Deed::Fog, "only the ground your people know"),
         ],
     ),

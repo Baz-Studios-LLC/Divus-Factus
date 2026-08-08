@@ -30,8 +30,11 @@ pub struct MatterPlugin;
 
 impl Plugin for MatterPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (loose_ballistics, roll, float, settle).chain())
-            .add_systems(Update, drive_sparks);
+        app.add_systems(
+            Update,
+            (loose_ballistics, roll, float, the_water_claims, sink).chain(),
+        )
+        .add_systems(Update, (settle, drive_sparks));
     }
 }
 
@@ -436,6 +439,102 @@ fn loose_ballistics(
                     });
                 }
             }
+        }
+    }
+}
+
+/// Going under: the water has claimed this thing, and it is on its way
+/// down and out of the world.
+#[derive(Component)]
+pub struct Sinking {
+    /// The water surface it went under, for knowing when it is truly gone.
+    surface: f32,
+}
+
+/// The water claims what falls in. Anything loose sitting at or under a
+/// water surface — thrown there, dropped there, or bobbing on it from the
+/// days when floaters floated forever — splashes, sinks, and is gone.
+/// Brett: "I threw all of the villagers food into the ocean... and the
+/// food just sat on the surface of the water... tons of it, lol."
+///
+/// A sweep on a slow tick rather than a hook in every landing path: the
+/// ballistics, the roll, the drop and the legacy flotsam all end up
+/// resting somewhere, and resting on water is the one condition that
+/// matters. Creatures are never claimed — a thrown villager wading out
+/// of the shallows is their own story, not the sea's.
+#[allow(clippy::type_complexity)]
+fn the_water_claims(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut since: Local<f32>,
+    terrain: Option<Res<Terrain>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    loose: Query<
+        (Entity, &Transform, &Matter),
+        (
+            Without<crate::creature::Held>,
+            Without<crate::creature::Airborne>,
+            Without<Sinking>,
+            Without<CreatureGenome>,
+            Without<crate::hand::Rooted>,
+        ),
+    >,
+) {
+    let Some(terrain) = terrain else {
+        return;
+    };
+    *since += time.delta_secs();
+    if *since < 1.2 {
+        return;
+    }
+    *since = 0.0;
+
+    for (entity, transform, matter) in &loose {
+        let (ground, wet) =
+            terrain.ground_and_water_at(transform.translation.x, transform.translation.z);
+        // Only where water genuinely stands over the ground, and only for
+        // things sitting at or under its surface - a log on the bank is dry.
+        if wet <= ground + 0.15 || transform.translation.y > wet + matter.radius * 0.6 {
+            continue;
+        }
+        commands
+            .entity(entity)
+            .remove::<(Floating, Rolling, Settling)>()
+            .insert(Sinking { surface: wet });
+        // The splash: water-coloured flecks, gathering back to the ring.
+        burst_of(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            transform.translation.with_y(wet),
+            transform.translation.with_y(wet),
+            &[
+                crate::palette::shade(&crate::palette::CLOTH_BLUE, 0.8),
+                crate::palette::shade(&crate::palette::CLOTH_BLUE, 0.55),
+                crate::palette::shade(&crate::palette::BONE, 0.95),
+            ],
+        );
+    }
+}
+
+/// Down and gone: a claimed thing settles through the water, and once it
+/// is properly under, the world lets go of it.
+fn sink(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut sinking: Query<
+        (Entity, &mut Transform, &Matter, &Sinking),
+        Without<crate::creature::Held>,
+    >,
+) {
+    let dt = time.delta_secs();
+    for (entity, mut transform, matter, depth) in &mut sinking {
+        transform.translation.y -= dt * 1.1;
+        // A slow roll on the way down, the way sunk things turn.
+        transform.rotation = Quat::from_rotation_x(dt * 0.3) * transform.rotation;
+        if transform.translation.y < depth.surface - matter.radius * 1.6 - 0.8 {
+            commands.entity(entity).despawn();
         }
     }
 }

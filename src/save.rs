@@ -90,6 +90,11 @@ struct PersonSave {
     /// their first child were still ahead of them.
     #[serde(default)]
     borne: u32,
+    /// Whom this heart holds feelings about: (person index, warmth). Absent
+    /// in saves written before regard; such souls load indifferent and the
+    /// feeders warm them back up within a day.
+    #[serde(default)]
+    bonds: Vec<(usize, f32)>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -474,6 +479,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
             Option<(Entity, Entity)>,
             Option<Entity>,
             u32,
+            Vec<(Entity, f32)>,
         ),
     )> = Vec::new();
     for (entity, transform, person, genome, needs, morale, temperament, witnessed, extras, ties) in
@@ -502,12 +508,13 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                     Option<&Parentage>,
                     Option<&crate::villager::home::Home>,
                     Option<&crate::villager::Motherhood>,
+                    Option<&crate::villager::regard::Regard>,
                 ),
             ), (With<Villager>, Without<Corpse>)>()
             .iter(world)
     {
         let (faith, traits, chronicle, vocation, skills, vitality, prime, childhood) = extras;
-        let (spouse, parentage, home, motherhood) = ties;
+        let (spouse, parentage, home, motherhood, regard) = ties;
         people_ids.push(entity);
         raw.push((
             entity,
@@ -536,6 +543,9 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                 parentage.map(|p| (p.mother, p.father)),
                 home.map(|h| h.0),
                 motherhood.map_or(0, |m| m.borne),
+                regard.map_or_else(Vec::new, |r| {
+                    r.bonds.iter().map(|b| (b.toward, b.warmth)).collect()
+                }),
             ),
         ));
     }
@@ -560,7 +570,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                 harm,
                 prime,
                 childhood,
-                (spouse, parents, home, borne),
+                (spouse, parents, home, borne, bonds),
             )| {
                 PersonSave {
                     pos,
@@ -583,6 +593,13 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                     father: parents.and_then(|(_, f)| index_of(f, &people_ids)),
                     home: home.and_then(|e| index_of(e, &building_ids)),
                     borne,
+                    // Feelings toward the dead or the vanished are not
+                    // carried across a save: only indexable souls keep
+                    // their place in a heart.
+                    bonds: bonds
+                        .into_iter()
+                        .filter_map(|(e, w)| index_of(e, &people_ids).map(|i| (i, w)))
+                        .collect(),
                 }
             },
         )
@@ -1065,34 +1082,22 @@ fn apply(world: &mut World, save: SaveGame) {
                         &b.blueprint,
                     );
                 }
-                // The mason's plinth and steps, if the foundation was laid.
+                // The mason's plinth and steps, if the foundation was laid -
+                // through the mason's own reveal, so a reload cannot dress a
+                // building differently than the build did. (It also knows a
+                // carried-in drawing gets nothing: the drawing's stages are
+                // the whole of the building. The copy of the slab that used
+                // to live here predated that rule and re-wrapped every baked
+                // house on every load.)
                 let cost = b.blueprint.kind.stone_cost();
                 if cost > 0.0 && (b.done || b.stone_laid >= cost) {
-                    let slab = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
-                    let stone = materials.add(StandardMaterial {
-                        base_color: crate::palette::shade(&crate::palette::STONE, 0.4),
-                        perceptual_roughness: 1.0,
-                        ..default()
-                    });
-                    commands.spawn((
-                        Mesh3d(slab.clone()),
-                        MeshMaterial3d(stone.clone()),
-                        Transform::from_xyz(0.0, -0.25, 0.0).with_scale(Vec3::new(
-                            b.blueprint.half_w * 2.0 + 0.3,
-                            1.2,
-                            b.blueprint.half_d * 2.0 + 0.3,
-                        )),
-                        ChildOf(entity),
-                    ));
-                    for (out, top, depth) in [(0.32_f32, 0.24_f32, 0.6_f32), (0.78, 0.1, 0.55)] {
-                        commands.spawn((
-                            Mesh3d(slab.clone()),
-                            MeshMaterial3d(stone.clone()),
-                            Transform::from_xyz(b.blueprint.half_w + out, top - 0.02, 0.0)
-                                .with_scale(Vec3::new(depth, top * 2.0, 1.2)),
-                            ChildOf(entity),
-                        ));
-                    }
+                    crate::villager::work::reveal_foundation(
+                        &mut commands,
+                        &mut meshes,
+                        &mut materials,
+                        entity,
+                        &b.blueprint,
+                    );
                 }
             });
         });
@@ -1184,6 +1189,25 @@ fn apply(world: &mut World, save: SaveGame) {
         }
         if let Some(home) = p.home.and_then(|i| building_ids.get(i).copied()) {
             e.insert(crate::villager::home::Home(home));
+        }
+        if !p.bonds.is_empty() {
+            e.insert(crate::villager::regard::Regard {
+                bonds: p
+                    .bonds
+                    .iter()
+                    .filter_map(|(i, warmth)| {
+                        people_ids.get(*i).copied().map(|toward| {
+                            crate::villager::regard::Bond {
+                                toward,
+                                warmth: *warmth,
+                                // A grudge keeps its heat across a save and
+                                // loses its citation - how old wounds work.
+                                over: None,
+                            }
+                        })
+                    })
+                    .collect(),
+            });
         }
     }
     world.flush();

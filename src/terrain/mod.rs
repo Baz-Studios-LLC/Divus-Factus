@@ -205,7 +205,12 @@ fn spherical(k: f32) -> f32 {
 }
 
 /// Nothing generates above this. Used to bound ray marching.
-pub const TERRAIN_HEIGHT: f32 = 320.0;
+///
+/// A BOUND, not a sculptor: it must sit above the tallest honest summit, or
+/// the final clamp planes every strong peak into a mesa at exactly this
+/// height. The mountain formula tops out asymptotically around 355; the
+/// margin is headroom, not budget.
+pub const TERRAIN_HEIGHT: f32 = 380.0;
 
 pub struct TerrainPlugin;
 
@@ -762,13 +767,27 @@ impl Terrain {
             2.0,
             0.5,
         );
-        // Threshold and exponents tuned by measuring, not by eye. Cubing the ridged
-        // noise and squaring the mask looked reasonable in the source and produced a
-        // world where the highest point within 1.5km of spawn was 61 units and the
-        // nearest real mountain was nine kilometres away. Ridged noise rarely
-        // approaches 1, so every extra power crushes what little there is.
-        let belt_mask = ((belt - 0.46) / 0.16).clamp(0.0, 1.0) * ridge_mask;
-        if belt_mask > 0.0 {
+        // Threshold and shape tuned by measuring, not by eye — twice now, once
+        // in each direction. The first tuning chased spawn-side drama (cubed
+        // ridges and a squared mask left the highest point within 1.5km of
+        // spawn at 61 units) and overshot: the threshold landed BELOW the belt
+        // field's own median over land (p50 0.498, measured over the whole
+        // sphere), so a third of all land stood above the mountain line and
+        // the globe from orbit was grey. Brett: "Mountains everywhere lol."
+        // At 0.56 the mountain fraction of land comes down to about an eighth,
+        // which reads as ranges a world HAS rather than ranges a world IS.
+        //
+        // The mask must never saturate. The old one clamped at 1.0, and the
+        // belt field rides the same wavelength as the continents, so the whole
+        // interior of every range — nearly a tenth of all land — sat pinned at
+        // the clamp: a dome with no gradient, which is a plateau. The ridged
+        // peaks riding on top swing harder than a flat top by definition, so
+        // their every low patch was ringed by high ground, and a closed basin
+        // is exactly what a lake is. 107 summit tarns, counted. Brett:
+        // "mountains should come up to more of a point and not plateau with
+        // lakes on top."
+        let mass = ((belt - 0.56) / 0.16).max(0.0) * ridge_mask;
+        if mass > 0.0 {
             // FIVE octaves here, unlike the hills and the ridges below the
             // treeline. What was cut from those was a twelve unit wavelength
             // wearing the ground like orange peel; the finest octave of this
@@ -802,14 +821,16 @@ impl Terrain {
             // crater, and the fill then puts a lake in it, because a closed
             // basin is exactly what a lake is.
             //
-            // Split it. Most of the height is now a smooth dome that falls away
-            // in every direction, so wherever you stand there is always lower
-            // ground somewhere near - and the ridges ride on top of that
-            // instead of being the whole of it. A mountain reads as one mass
-            // with creases rather than a field of bumps, and the water has
-            // somewhere to go.
-            let dome = belt_mask.powf(1.3);
-            height += dome * 150.0 + peaks.powf(1.4) * dome * 95.0;
+            // So most of the height is a dome the ridges merely ride, and the
+            // dome is shaped so its gradient never dies: squared at the foot,
+            // so height concentrates into the field's crests and the flanks
+            // steepen into something that ends in a POINT — and asymptotic at
+            // the head instead of clamped, so however strong the belt runs
+            // there is always lower ground a step away and the water always
+            // has somewhere to go. `mass` is unbounded on purpose; the curve
+            // does the capping, at a ceiling nothing quite reaches.
+            let dome = mass * mass / (mass * mass + 0.35);
+            height += dome * 175.0 + peaks.powf(1.4) * dome * 100.0;
         }
 
         height.clamp(0.0, TERRAIN_HEIGHT)
@@ -2669,35 +2690,202 @@ mod tests {
         }
     }
 
+    /// Throwaway measuring probe: run with
+    /// `cargo test probe_mountain_coverage -- --nocapture --ignored`.
+    /// Prints global mountain coverage, clamp-sliced summits, closed hollows
+    /// in the high country, and the belt field's percentiles so a threshold
+    /// can be CHOSEN from numbers rather than eyeballed from orbit.
     #[test]
-    fn the_world_grows_mountains() {
-        // Without a mountain belt field the map comes out uniformly rolling. There
-        // should be somewhere genuinely high, and it should be the exception.
+    #[ignore]
+    fn probe_mountain_coverage() {
         let t = Terrain::new(2024);
-        let mut peak: f32 = 0.0;
-        let mut high = 0;
-        let mut total = 0;
+        let (cols, rows) = (240usize, 120usize);
+        let mut grid = vec![0.0f32; cols * rows];
+        let mut weight_land = 0.0f64;
+        let mut weight_all = 0.0f64;
+        let mut weight_mountain = 0.0f64;
+        let mut weight_sliced = 0.0f64;
+        let mut belts = Vec::new();
 
-        for iz in 0..120 {
-            for ix in 0..120 {
-                let x = ix as f32 * 70.0 - 4200.0;
-                let z = iz as f32 * 70.0 - 4200.0;
-                let h = t.height_at(x, z);
-                peak = peak.max(h);
-                total += 1;
-                if h > WATER_LEVEL + 90.0 {
-                    high += 1;
+        for row in 0..rows {
+            let lat = (row as f32 + 0.5) / rows as f32 * std::f32::consts::PI
+                - std::f32::consts::FRAC_PI_2;
+            let weight = lat.cos() as f64;
+            for col in 0..cols {
+                let lon = (col as f32 + 0.5) / cols as f32 * std::f32::consts::TAU
+                    - std::f32::consts::PI;
+                let x = lon * PLANET_RADIUS;
+                let z = -lat * PLANET_RADIUS;
+                let h = t.base_height_at(x, z);
+                grid[row * cols + col] = h;
+                weight_all += weight;
+                if h > WATER_LEVEL {
+                    weight_land += weight;
+                    if h > WATER_LEVEL + 90.0 {
+                        weight_mountain += weight;
+                    }
+                    if h >= TERRAIN_HEIGHT - 0.5 {
+                        weight_sliced += weight;
+                    }
+                    // The belt field, duplicated from base_height_at for the
+                    // probe alone: the mapping threshold -> coverage needs the
+                    // raw field, which the height does not hand back.
+                    let dir = direction_at(x, z);
+                    let belt = fbm_3d(
+                        dir * spherical(0.00055) + Vec3::new(300.0, -120.0, 60.0),
+                        t.seed ^ 0x3721,
+                        4,
+                        2.0,
+                        0.5,
+                    );
+                    belts.push((belt, weight));
                 }
             }
         }
 
-        assert!(peak > WATER_LEVEL + 110.0, "highest point was only {peak}");
-        let fraction = high as f32 / total as f32;
-        assert!(
-            fraction < 0.2,
-            "{fraction} of the world is mountain — too much"
+        // Closed hollows in the high country: a sample lower than all four
+        // neighbours has no way out, and the lake fill will oblige.
+        let mut hollows = 0;
+        for row in 1..rows - 1 {
+            for col in 0..cols {
+                let h = grid[row * cols + col];
+                if h < WATER_LEVEL + 110.0 {
+                    continue;
+                }
+                let east = grid[row * cols + (col + 1) % cols];
+                let west = grid[row * cols + (col + cols - 1) % cols];
+                let north = grid[(row - 1) * cols + col];
+                let south = grid[(row + 1) * cols + col];
+                if h < east && h < west && h < north && h < south {
+                    hollows += 1;
+                }
+            }
+        }
+
+        belts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        let total: f64 = belts.iter().map(|(_, w)| w).sum();
+        let percentile = |p: f64| -> f32 {
+            let mut run = 0.0;
+            for (belt, weight) in &belts {
+                run += weight;
+                if run >= total * p {
+                    return *belt;
+                }
+            }
+            belts.last().unwrap().0
+        };
+
+        let peak = grid.iter().copied().fold(0.0f32, f32::max);
+        println!("peak                 {peak:.1}");
+        println!("land fraction        {:.3}", weight_land / weight_all);
+        println!(
+            "mountain / land      {:.3}  (> WATER_LEVEL + 90)",
+            weight_mountain / weight_land
         );
-        assert!(high > 0, "no mountains at all");
+        println!(
+            "clamp-sliced / land  {:.4}  (>= TERRAIN_HEIGHT - 0.5)",
+            weight_sliced / weight_land
+        );
+        println!("closed hollows above +110: {hollows}");
+        println!(
+            "belt over land: p50 {:.3} p75 {:.3} p90 {:.3} p95 {:.3} p99 {:.3} max {:.3}",
+            percentile(0.50),
+            percentile(0.75),
+            percentile(0.90),
+            percentile(0.95),
+            percentile(0.99),
+            belts.last().unwrap().0
+        );
+        for threshold in [0.46f32, 0.50, 0.54, 0.58, 0.62] {
+            let over: f64 = belts
+                .iter()
+                .filter(|(belt, _)| *belt > threshold)
+                .map(|(_, w)| w)
+                .sum();
+            println!("belt > {threshold:.2} on land: {:.3}", over / total);
+        }
+    }
+
+    #[test]
+    fn the_world_grows_mountains() {
+        // Without a mountain belt field the map comes out uniformly rolling.
+        // There should be somewhere genuinely high, and it should be the
+        // EXCEPTION — measured over the whole sphere, because the first
+        // version of this test only sampled an 8km window near the origin,
+        // and a tuning that put a third of all land above the mountain line
+        // sailed through it. Brett, from orbit: "Mountains everywhere lol."
+        //
+        // Bounds, not points: the belt threshold was chosen (probe above) so
+        // roughly a tenth of the land is mountain. Drifting past a sixth is
+        // "everywhere" again; under one part in twenty-five and ranges stop
+        // being worth walking to.
+        let t = Terrain::new(2024);
+        let (cols, rows) = (240usize, 120usize);
+        let mut grid = vec![0.0f32; cols * rows];
+        let mut peak: f32 = 0.0;
+        let mut land = 0.0f64;
+        let mut mountain = 0.0f64;
+        let mut sliced = 0.0f64;
+
+        for row in 0..rows {
+            let lat = (row as f32 + 0.5) / rows as f32 * std::f32::consts::PI
+                - std::f32::consts::FRAC_PI_2;
+            let weight = lat.cos() as f64;
+            for col in 0..cols {
+                let lon = (col as f32 + 0.5) / cols as f32 * std::f32::consts::TAU
+                    - std::f32::consts::PI;
+                let h = t.base_height_at(lon * PLANET_RADIUS, -lat * PLANET_RADIUS);
+                grid[row * cols + col] = h;
+                peak = peak.max(h);
+                if h > WATER_LEVEL {
+                    land += weight;
+                    if h > WATER_LEVEL + 90.0 {
+                        mountain += weight;
+                    }
+                    if h >= TERRAIN_HEIGHT - 0.5 {
+                        sliced += weight;
+                    }
+                }
+            }
+        }
+
+        assert!(peak > WATER_LEVEL + 200.0, "highest point was only {peak}");
+        let fraction = mountain / land;
+        assert!(
+            fraction < 0.16,
+            "{fraction:.3} of the land is mountain — everywhere again"
+        );
+        assert!(
+            fraction > 0.04,
+            "{fraction:.3} of the land is mountain — the ranges have gone"
+        );
+        // The ceiling is headroom, not a sculptor: any ground AT it has had
+        // its summit planed into a mesa.
+        assert!(sliced == 0.0, "summits sliced flat at TERRAIN_HEIGHT");
+
+        // Closed hollows in the high country become tarns. A dome with a
+        // gradient everywhere leaves almost none; the saturated-mask plateau
+        // held 107 of them. Brett: "not plateau with lakes on top".
+        let mut hollows = 0;
+        for row in 1..rows - 1 {
+            for col in 0..cols {
+                let h = grid[row * cols + col];
+                if h < WATER_LEVEL + 110.0 {
+                    continue;
+                }
+                let east = grid[row * cols + (col + 1) % cols];
+                let west = grid[row * cols + (col + cols - 1) % cols];
+                let north = grid[(row - 1) * cols + col];
+                let south = grid[(row + 1) * cols + col];
+                if h < east && h < west && h < north && h < south {
+                    hollows += 1;
+                }
+            }
+        }
+        assert!(
+            hollows < 30,
+            "{hollows} closed hollows in the high country — summit tarns are back"
+        );
     }
 
     #[test]

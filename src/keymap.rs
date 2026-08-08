@@ -31,14 +31,13 @@ pub enum Deed {
     Survey,
     Roofs,
     Doings,
-    Trades,
     Fog,
     Avatar,
     Sprint,
 }
 
 impl Deed {
-    pub const ALL: [Deed; 22] = [
+    pub const ALL: [Deed; 21] = [
         Deed::PanNorth,
         Deed::PanSouth,
         Deed::PanWest,
@@ -57,7 +56,6 @@ impl Deed {
         Deed::Survey,
         Deed::Roofs,
         Deed::Doings,
-        Deed::Trades,
         Deed::Fog,
         Deed::Avatar,
         Deed::Sprint,
@@ -84,7 +82,6 @@ impl Deed {
             Deed::Survey => "survey",
             Deed::Roofs => "roofs",
             Deed::Doings => "doings",
-            Deed::Trades => "trades",
             Deed::Fog => "fog",
             Deed::Avatar => "avatar",
             Deed::Sprint => "sprint",
@@ -111,7 +108,6 @@ impl Deed {
             Deed::Survey => KeyCode::KeyR,
             Deed::Roofs => KeyCode::KeyH,
             Deed::Doings => KeyCode::KeyL,
-            Deed::Trades => KeyCode::KeyK,
             Deed::Fog => KeyCode::KeyF,
             Deed::Avatar => KeyCode::Digit5,
             Deed::Sprint => KeyCode::ShiftLeft,

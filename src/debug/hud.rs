@@ -182,6 +182,7 @@ pub(crate) fn spawn_hud(mut commands: Commands, mouse: Res<crate::keymap::MouseS
         (InspectorValue::FaithIn, "faith"),
         (InspectorValue::Work, "work"),
         (InspectorValue::Family, "family"),
+        (InspectorValue::Feelings, "feelings"),
         (InspectorValue::Seen, "seen you"),
     ];
     for (value, label) in person_rows {
@@ -331,7 +332,7 @@ pub(crate) fn update_hud(
     corpses: Query<(), (With<crate::creature::Corpse>, With<Person>)>,
     reactions: Query<(), (With<Reaction>, With<Person>)>,
     stores: Query<&crate::villager::work::Stockpile>,
-    voice: Option<Res<crate::telling::SpeakingWith>>,
+    voice: Option<Res<crate::telling::Tongue>>,
     mut panels: Query<&mut Visibility, With<HudPanel>>,
     mut values: Query<(&HudValue, &mut Text)>,
 ) {
@@ -449,9 +450,10 @@ pub(crate) fn update_hud(
             HudValue::Hungry => hungry.to_string(),
             HudValue::Eating => eating.to_string(),
             HudValue::Watching => watching.to_string(),
-            HudValue::Teller => voice
-                .as_ref()
-                .map_or_else(|| "silent".to_string(), |v| v.0.clone()),
+            HudValue::Teller => voice.as_ref().map_or_else(
+                || "silent".to_string(),
+                |tongue| format!("the corpus - {} lines", tongue.lines()),
+            ),
             HudValue::Aperture => format!("f/{:.0}", look.aperture),
             HudValue::Focus => format!("{:.2}x", look.focus_bias),
             HudValue::Exposure => format!("{:+.1}", look.exposure),

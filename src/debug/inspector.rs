@@ -34,7 +34,37 @@ pub(crate) enum InspectorValue {
     FaithIn,
     Work,
     Family,
+    /// The social weather: whom they hold dearest, whom they cannot stand.
+    Feelings,
     Seen,
+}
+
+/// The social weather in one line: the strongest of each pole, by name —
+/// "fond of Doenna - sour on Marruck". A heart with nothing notable says
+/// so. Shared by the hover inspector and the People page dossier.
+pub(crate) fn feelings_phrase(
+    regard: Option<&crate::villager::regard::Regard>,
+    names: &Query<&crate::villager::Person>,
+) -> String {
+    let name_of = |bond: &crate::villager::regard::Bond| {
+        names
+            .get(bond.toward)
+            .map(|p| p.name.clone())
+            .ok()
+            .zip(crate::villager::regard::band(bond.warmth))
+            .map(|(name, word)| format!("{word} {name}"))
+    };
+    let poles: Vec<String> = regard
+        .into_iter()
+        .flat_map(|r| [r.fondest(), r.sourest()])
+        .flatten()
+        .filter_map(name_of)
+        .collect();
+    if poles.is_empty() {
+        "nothing notable".to_string()
+    } else {
+        poles.join(" - ")
+    }
 }
 
 /// Everything shown only for a living person — the stat rows, the memory
@@ -79,6 +109,7 @@ pub(crate) fn update_inspector(
             Option<&crate::villager::belief::Faith>,
             Option<&crate::villager::traits::Traits>,
             Option<&crate::villager::speech::RecentlySaid>,
+            Option<&crate::villager::regard::Regard>,
         ),
     )>,
     corpse_check: Query<Option<&crate::creature::Vitality>, With<crate::creature::Corpse>>,
@@ -392,7 +423,7 @@ pub(crate) fn update_inspector(
         member_of,
         chronicle,
         vocation,
-        (morale, faith, manner, said),
+        (morale, faith, manner, said, regard),
     )) = people.get(entity)
         && corpse.is_err()
     {
@@ -443,6 +474,7 @@ pub(crate) fn update_inspector(
                 InspectorValue::Family => {
                     family_phrase(spouse, parentage, &kin_names, &corpse_check)
                 }
+                InspectorValue::Feelings => feelings_phrase(regard, &kin_names),
                 InspectorValue::Seen => {
                     if witnessed.is_innocent() && witnessed.secondhand > 0 {
                         "only in stories".to_string()

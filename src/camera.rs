@@ -1019,15 +1019,15 @@ pub(crate) fn carried(facing: Quat, focus: Vec3) -> Quat {
 /// so there is nothing left for the ray to amplify.
 ///
 /// Squeezed from both sides, and the suite holds both. Slow enough to damp: at
-/// sixty frames this is two units of eye movement in a frame, against the
-/// hundred-and-more a cliff edge was handing it. Fast enough not to lag: the
-/// whole world is three hundred and twenty units of relief, so even dragging
-/// from the sea to the highest summit the focus is never more than about two
-/// and a half seconds behind the ground. The first number this was written
-/// with failed the second test — seven seconds to climb a mountain — which is
-/// the sort of thing that reads as the camera being broken in the other
-/// direction.
-const HELD_CLIMB: f32 = 120.0;
+/// sixty frames this is under three units of eye movement in a frame, against
+/// the hundred-and-more a cliff edge was handing it. Fast enough not to lag:
+/// the whole world is `TERRAIN_HEIGHT` units of relief, so even dragging from
+/// the sea to the highest summit the focus is never more than about two and a
+/// half seconds behind the ground — and when the relief grows, this must grow
+/// with it, or the second squeeze fails. The first number this was written
+/// with failed that test — seven seconds to climb a mountain — which is the
+/// sort of thing that reads as the camera being broken in the other direction.
+const HELD_CLIMB: f32 = 145.0;
 
 /// The focus height for this frame: the ground, or as much of the way there as
 /// a held world is allowed to travel.

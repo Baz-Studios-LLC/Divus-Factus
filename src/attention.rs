@@ -60,14 +60,13 @@ pub enum Regard {
 }
 
 impl Regard {
-    /// Whether anything should be said aloud here.
+    /// Whether anything should be said aloud here. The one question the
+    /// presentation asks; the simulation underneath never asks anything.
+    /// (`worth_composing` lived here once — the retired teller's economy,
+    /// which composed only for closely watched heads. The corpus picks for
+    /// nothing, so the question died with the model.)
     pub fn worth_saying(self) -> bool {
         self != Regard::Unseen
-    }
-
-    /// Whether it is worth asking the teller for words of its own.
-    pub fn worth_composing(self) -> bool {
-        self == Regard::Close
     }
 }
 
@@ -267,19 +266,16 @@ mod tests {
     }
 
     #[test]
-    fn someone_being_watched_up_close_gets_the_tellers_time() {
-        assert!(judge(20.0, true, 1.0).worth_composing());
-        assert!(judge(CLOSE_RANGE, true, 1.0).worth_composing());
+    fn someone_being_watched_up_close_is_regarded_closely() {
+        assert_eq!(judge(20.0, true, 1.0), Regard::Close);
+        assert_eq!(judge(CLOSE_RANGE, true, 1.0), Regard::Close);
     }
 
     #[test]
-    fn the_middle_distance_speaks_but_in_written_words() {
-        // Visible, so worth saying something; too small to be worth a second
-        // and a half of a model's time.
+    fn the_middle_distance_still_speaks() {
         let far = judge(CLOSE_RANGE + 1.0, true, 1.0);
         assert_eq!(far, Regard::Distant);
         assert!(far.worth_saying());
-        assert!(!far.worth_composing());
     }
 
     #[test]

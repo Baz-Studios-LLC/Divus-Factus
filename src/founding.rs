@@ -375,11 +375,15 @@ fn say_the_ground(
 /// The flag goes in, and the world begins.
 fn plant_the_flag(
     mouse: Res<ButtonInput<MouseButton>>,
+    scheme: Res<crate::keymap::MouseScheme>,
     reading: Res<GroundUnderTheFlag>,
     mut chosen: ResMut<ChosenGround>,
     mut next: ResMut<NextState<GameState>>,
 ) {
-    if !mouse.just_pressed(MouseButton::Left) {
+    // The ACTION button, like every act of the god's will - planting the
+    // flag is the first one. The left button keeps its own job even here:
+    // grab the land, turn the world, look for better ground.
+    if !mouse.just_pressed(scheme.action()) {
         return;
     }
     // Refused ground simply will not take it. The flag has been reading

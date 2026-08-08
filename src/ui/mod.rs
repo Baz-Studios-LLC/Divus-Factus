@@ -23,6 +23,12 @@ pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
+        // Ordo is the UI kit, for the whole game and not just the trial.
+        // Brett: "make sure all UI stuff is using Ordo... if Ordo is missing
+        // something we should add it to Ordo not hand roll it in game." The
+        // game lends the kit its own pigment; the kit paints from roles.
+        app.add_plugins(ordo::OrdoPlugin::with_theme("theme.ordo.toml"))
+            .add_systems(Startup, lend_ramps);
         app.init_resource::<PointerContext>()
             .init_resource::<WindowDrag>()
             .add_message::<Notice>()
@@ -172,13 +178,6 @@ pub struct Say {
     /// Addressed to the god: a prayer's bubble wears pink — the one channel
     /// aimed at the player, worth catching from the corner of an eye.
     pub prayer: bool,
-    /// Whether these are the villager's OWN words, put together for this
-    /// telling, rather than one of the written phrasings.
-    ///
-    /// Carried only so a bubble can be told apart while the teller is being
-    /// judged: a generated line wears a green border. Nothing in the
-    /// simulation reads this, and it is not saved.
-    pub own_words: bool,
 }
 
 /// Dresses a line for its bubble: a capital to open, a full stop to close
@@ -233,15 +232,12 @@ fn speak(
     let started = std::time::Instant::now();
     let mut spawned = 0u32;
     for say in messages.read() {
-        // Only their OWN words reach the screen — no written line, however
-        // handsome, plays anywhere at any distance. A moment nothing was
-        // composed for is a quiet moment; the simulation underneath keeps
-        // every consequence either way. (The green border stays while the
-        // feature is judged: now it should be on every bubble, and one
-        // without it is a bug showing itself.)
-        if !say.own_words {
-            continue;
-        }
+        // Every Say sent is meant for the screen: the senders own the
+        // question of WHETHER a moment speaks (and gate it on being
+        // watched); this system only owns the bubble. The composed-only
+        // rule that used to live here belonged to the retired teller's
+        // judging days, and its last effect was silencing written lines
+        // that had every right to play.
         if live.iter().count() >= BUBBLE_CAP || live.iter().any(|b| b.speaker == say.speaker) {
             continue;
         }
@@ -275,8 +271,9 @@ fn speak(
                     lift: if say.thought { 26.0 } else { 8.0 },
                 },
                 // Under all interface chrome: a window dragged over a bubble
-                // must cover it.
-                GlobalZIndex(-10),
+                // must cover it. Ordo's own rung for world-anchored things.
+                ordo::Layer::World,
+                UiTransform::default(),
                 Node {
                     position_type: PositionType::Absolute,
                     left: px(-1000),
@@ -405,7 +402,14 @@ fn float_bubbles(
     time: Res<Time<Real>>,
     cameras: Query<(&bevy::camera::Camera, &GlobalTransform)>,
     speakers: Query<&GlobalTransform, Without<Bubble>>,
-    mut bubbles: Query<(Entity, &Bubble, &mut Node, &ComputedNode, &mut Visibility)>,
+    mut bubbles: Query<(
+        Entity,
+        &Bubble,
+        &mut Node,
+        &ComputedNode,
+        &mut Visibility,
+        &mut UiTransform,
+    )>,
 ) {
     let Some((camera, camera_at)) = cameras
         .iter()
@@ -415,7 +419,7 @@ fn float_bubbles(
     };
     // Bubbles already settled this frame, so later ones can stack clear.
     let mut placed: Vec<Rect> = Vec::new();
-    for (entity, bubble, mut node, computed, mut visibility) in &mut bubbles {
+    for (entity, bubble, mut node, computed, mut visibility, mut ui) in &mut bubbles {
         if time.elapsed_secs() > bubble.until {
             commands.entity(entity).despawn();
             continue;
@@ -425,6 +429,13 @@ fn float_bubbles(
             continue;
         };
         let overhead = speaker.translation() + Vec3::Y * 2.3;
+        // Ordo's one depth curve, borrowed until the bubbles become
+        // placards themselves: far talk shrinks to presence instead of
+        // stacking a wall of full-sized text over a busy square.
+        let scale = ordo::depth_scale(overhead.distance(camera_at.translation()), 55.0);
+        if ui.scale != Vec2::splat(scale) {
+            ui.scale = Vec2::splat(scale);
+        }
         match camera.world_to_viewport(camera_at, overhead) {
             Ok(at) => {
                 let size = computed.size() * computed.inverse_scale_factor();
@@ -464,11 +475,13 @@ fn float_bubbles(
 
 /// Something worth telling the player, sent from anywhere in the simulation.
 /// Ordinary notices pass quietly through the bottom-right; fanfares are for
-/// the moments a village remembers — a founding, a naming.
+/// the moments a village remembers — a founding, a naming; prayers wear the
+/// pink border the whole prayer channel wears, corner of the eye included.
 #[derive(Message)]
 pub struct Notice {
     pub text: String,
     pub fanfare: bool,
+    pub prayer: bool,
 }
 
 impl Notice {
@@ -476,6 +489,7 @@ impl Notice {
         Notice {
             text: text.into(),
             fanfare: false,
+            prayer: false,
         }
     }
 
@@ -483,6 +497,15 @@ impl Notice {
         Notice {
             text: text.into(),
             fanfare: true,
+            prayer: false,
+        }
+    }
+
+    pub fn prayer(text: impl Into<String>) -> Self {
+        Notice {
+            text: text.into(),
+            fanfare: false,
+            prayer: true,
         }
     }
 }
@@ -498,6 +521,7 @@ struct Toast {
     /// Border alpha when fully present, so the fade knows where it started.
     border_alpha: f32,
     fanfare: bool,
+    prayer: bool,
 }
 
 /// How many notices may be on screen before the oldest is pushed out.
@@ -542,7 +566,10 @@ fn show_notices(
             commands.entity(oldest).despawn();
         }
 
-        let border = if notice.fanfare {
+        let border = if notice.prayer {
+            // The prayer channel's pink, the same the bubble wears.
+            palette::shade(&palette::CLOTH_PINK, 1.0).with_alpha(0.85)
+        } else if notice.fanfare {
             theme::accent().with_alpha(0.75)
         } else {
             theme::panel_border()
@@ -550,9 +577,14 @@ fn show_notices(
         let toast = commands
             .spawn((
                 Toast {
-                    remaining: if notice.fanfare { 9.0 } else { 6.0 },
-                    border_alpha: if notice.fanfare { 0.75 } else { 0.35 },
+                    remaining: if notice.fanfare || notice.prayer { 9.0 } else { 6.0 },
+                    border_alpha: if notice.fanfare || notice.prayer {
+                        0.85
+                    } else {
+                        0.35
+                    },
                     fanfare: notice.fanfare,
+                    prayer: notice.prayer,
                 },
                 Node {
                     padding: UiRect::axes(px(12), px(8)),
@@ -600,7 +632,9 @@ fn age_toasts(
 
         let fade = (toast.remaining / 1.6).clamp(0.0, 1.0);
         bg.0 = theme::panel_bg().with_alpha(0.94 * fade);
-        let border_color = if toast.fanfare {
+        let border_color = if toast.prayer {
+            palette::shade(&palette::CLOTH_PINK, 1.0)
+        } else if toast.fanfare {
             theme::accent()
         } else {
             theme::panel_border()
@@ -617,6 +651,25 @@ fn age_toasts(
             }
         }
     }
+}
+
+/// The game hands Ordo its own pigment.
+///
+/// Ordo names roles and never ships colours, so the interface stays dyed from
+/// the very ramps the villagers' clothes are dyed from — which is the whole
+/// reason a kit that shipped its own palette would be no use here. Moved out
+/// of the trial the day Ordo stopped being a trial.
+fn lend_ramps(mut ramps: ResMut<ordo::Ramps>) {
+    ramps.register("cloth_gold", |t| {
+        crate::palette::shade(&crate::palette::CLOTH_GOLD, t)
+    });
+    ramps.register("bone", |t| crate::palette::shade(&crate::palette::BONE, t));
+    ramps.register("cloth_gold_smooth", |t| {
+        crate::palette::shade_smooth(&crate::palette::CLOTH_GOLD, t)
+    });
+    ramps.register("bone_smooth", |t| {
+        crate::palette::shade_smooth(&crate::palette::BONE, t)
+    });
 }
 
 /// Colours and metrics, all derived from the master palette.

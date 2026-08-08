@@ -590,32 +590,18 @@ pub(super) fn wolves_stalk(
             }
             if rng.0.chance(dt * 0.4)
                 && let Some(tongue) = telling.0.as_mut()
+                && walkers.get(*quarry).is_ok()
             {
-                // The scream is composed for the one being torn at; the
-                // attention gate keeps off-screen drama from spending the
-                // teller's slots.
-                let seen = walkers
-                    .get(*quarry)
-                    .map(|(_, at, ..)| {
-                        crate::attention::regard(telling.1.as_deref(), at.translation)
-                            .worth_composing()
-                    })
-                    .unwrap_or(false);
-                if seen {
-                    tongue.muse(crate::telling::Musing {
-                        who: *quarry,
-                        voice: None,
-                        bearing: crate::villager::traits::Bearing::Plain,
-                        faith: crate::telling::FaithBand::Wavering,
-                        body: vec!["hurt"],
-                        place: Vec::new(),
-                        mind: "a wolf is upon you, teeth in your leg — scream".into(),
-                        heard: None,
-                        aloud: true,
-                        prayer: false,
-                        known: Vec::new(),
-                    });
-                }
+                // Picked for the one being torn at; whether anyone SEES the
+                // words is the showing's business, not the scream's.
+                tongue.muse(crate::telling::Musing {
+                    who: *quarry,
+                    voice: None,
+                    faith: crate::telling::FaithBand::Wavering,
+                    body: vec!["hurt"],
+                    heard: None,
+                    aloud: true,
+                });
             }
         }
         wild.hunger = (wild.hunger - dt * 0.1).max(0.0);

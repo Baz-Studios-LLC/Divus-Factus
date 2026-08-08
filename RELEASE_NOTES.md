@@ -1,82 +1,82 @@
-## The god provides
+## The village has a heart
 
-**Pick up a tree and drop it on the woodpile, and it becomes the timber it is
-made of.** Rocks become stone, berry bushes and wild game become food, and all
-of it bursts into flecks of its own colours that stream into whatever took the
-gift. Drop materials on a rising building and they go into THAT building —
-stone into its footing, timber into its frame, with the last half-log left for
-a carpenter's hands, because even the god's help is finished by a person.
-Villagers who see providence land believe accordingly. It was always going to
-be this: helping a young village through its fragile first days is what the
-hand is for.
+**Your people now hold feelings about each other — love and hate, person by
+person — and those feelings run the village.** Every conversation lands on
+both hearts: most talk warms, and now and again somebody walks away rubbed
+the wrong way, which is where grudges honestly come from. Weddings seed
+devotion; blood holds its warmth; feelings unfed cool back to indifference.
 
-- **Clay banks, iron veins and quarry faces can be scooped**: press on one and
-  its essence streams up into your grip, condensing into a lump you can carry
-  home. Worked-out ground settles back into the earth.
-- **The stores give as well as take.** Press on any pile in the square and
-  draw a parcel — logs, a block, clay, ore, a basket from the larder — to
-  ferry wherever it is needed. It pays back exactly what was drawn.
-- **The tooltip reads your fist**: hold anything and it says what it is worth.
-- New in the square: **a clay pile and an ore heap**, countable at a glance
-  like the others, carried indoors when a storehouse rises.
+- **Courtship is chosen by the heart, not the map.** A woman walks out with
+  the man she holds warmest — all those tavern evenings were building toward
+  exactly this — and a man she has soured on is nobody, however close he
+  stands. Children come likelier to couples who hold each other dear.
+- **Gossip moves hearts.** Hearing what befell somebody changes how the
+  listener feels about them: good fortune endears, the god's violence makes
+  the village step back from its target, plain misfortune draws sympathy.
+- **Doubt spreads exactly as faith does.** A skeptic who saw nothing divine
+  in the lightning will talk the neighbours out of it — and the harder a
+  thing is to explain away, the less an argument against it carries.
+- **News weighs on the spirits.** A village fed on frightening stories grows
+  heavy-hearted without ever seeing a thing — and heavy hearts wed less.
+  Fear buys belief today; love fills the nursery.
 
-## The hand of Black & White
+## Prayers, and the board that keeps them
 
-**The controls are the classic's own**: left hand on the world — grab the land
-and drag it — right hand at work: pick up, carry, flick to throw, and the
-middle button turns the view. If the sequel taught your reflexes the other way
-round, one switch in settings trades the buttons.
+**The codex has a new page: THE PRAYERS — every open prayer in the world,
+in the praying's own words, the moment it is made.** Press a prayer to fly
+to whoever is asking; answer it with your own hands. A strip below keeps
+the receipts: answered, unanswered, and died waiting.
 
-- Whatever the hand points at now wears a **golden outline glow**.
-- A carried villager sits **in the fist**, half out of the top of it, exactly
-  where you tuned them to sit.
-- **Thrown things tumble honestly**: end over end about their middle, a bounce
-  on a hard landing, a skid, and a settle onto their side. No more propeller
-  trees drilling through the turf.
+- Prayers wear **pink** everywhere now — the notice, and the thought bubble
+  over the kneeling, which replays every time you come back to look.
+- **The desperate pray against their neighbours.** Hatred deep enough, in a
+  heart faithful enough, kneels and asks the god to strike somebody down —
+  and the board names both the target and the grudge: *over a quarrel*,
+  *over what the god did to them*. Answer it with lightning and the asker's
+  faith surges past anything providence pays — and the world learns what
+  kind of god answers hate.
+- **Belief made visible:** a pink **+** floats up from anyone whose faith
+  grows; an ash **−** from anyone who doubts.
 
-## A village that builds again
+## The god's hand, again
 
-**Foresters fell, miners mine, and the civic ladder rises** — a coordinate bug
-as old as the round world had every tree in every village silently out of
-reach, and timber sat at nought on every save while the stores filled with
-everything else. Ten minutes now raises the longhouse, a sawmill, a shrine and
-three houses, with births outrunning funerals.
+- **Grab the land and the hand plants**: palm flat on the turf, fingers
+  spread and tips dug in, nailed to the ground it seized — Black and
+  White's own gesture, at every height.
+- **Knock on a roof.** A clean tap on a house raps knuckles on the
+  shingles and turns the household out of doors, with a little card over
+  the door telling you how many were home. Roused sleep is lost sleep, and
+  nobody loves the god who hammers at midnight — unless food follows.
+- Planting the founding flag is on the **action button** now, like every
+  act of the god's will.
 
-- **Villages are given quarries at founding** — faces of good building stone
-  within an easy walk, cut into the ground the way worked stone should be. The
-  loose rock strewn over every meadow is a tenth of what it was; what remains
-  is scenery, and everything that looks worth carrying home can be picked up.
-- **The opening days are peaceful**: no predator seeds inside the widest walk
-  any villager makes. Wolves still roam, and hunger still walks them in.
+## The world underfoot
 
-## The far side of the world is home too
+- **Mountains are the exception again**: a third of all land stood above
+  the mountain line; now a tenth does, and what remains rises to real
+  summits instead of plateaus with lakes on top.
+- **The flag plants anywhere honest ground allows.** The old founding check
+  called most of every continent "too high up the mountain"; only true
+  alpine ground refuses now.
+- **A building is exactly its drawing.** Houses carried in from the bench
+  no longer grow a second, fatter foundation around the one their maker
+  drew — nothing is built that is not in the design.
+- **The water claims what falls in.** Anything loose that ends up in sea,
+  lake or river splashes, sinks, and is gone — including the food you
+  hurled into the ocean, which used to bob there forever. The god's hand
+  is the one rescue.
 
-**Found a village anywhere on the planet and everything works**: buildings
-rise square instead of shearing apart, the Avatar miracle stands you on the
-ground with a level horizon instead of inside the planet, walking goes where
-you look, and the hand faces your view at every latitude.
+## Read your people
 
-## Night, at last
-
-**The small hours are dark.** A studio light meant for the character portraits
-had been flooding the whole world through a shared render layer since the
-planet went round — the real sun and moon were running their honest cycle
-underneath a permanent noon. The leak is fixed, midday looks as it always did,
-and the hand swells into a lantern against a moonlit world.
-
-## Odds and ends
-
-- Frame times: the world stops streaming chunks above the play zoom, the
-  planet no longer tends ground behind its own horizon, and the pathfinder
-  stopped re-running failed searches every frame. The worst sustained frame
-  went from eighty milliseconds to under six.
-- Ground-breaking no longer flashes a chunk-sized hole in the world; tilled
-  fields rebuild in place.
-- The studio mark shows on every launch instead of being swallowed by the
-  first slow frame.
-- Clouds fade out as you climb through the deck and return as weather on the
-  world from high above.
-- A dock's bill no longer lists the stone it never wanted, and a frame that
-  is ready says "a carpenter finishes it" instead of a number that will not
-  move.
-- The mine banks into its own spur of rock, wherever it stands.
+- **Nameplates, three states on one key**: off, names only, or the whole
+  soul — trade and doing, faith, body, house — on a card whose colour
+  answers the god's own question: gold for believers, bone for waverers,
+  ash for doubters.
+- **THE HEART**: a new page in every villager's dossier — every shift of
+  faith, feeling or spirits, with its cause. Watch a rumour reach someone
+  and read exactly what it did to them.
+- **Conversations show their words.** Villagers labelled "talking" with no
+  bubble over either head are done: the words were always being said, and
+  now they play.
+- Far cards and bubbles **shrink with distance** instead of stacking a
+  wall of text over a busy square.

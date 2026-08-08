@@ -29,44 +29,22 @@ impl Plugin for OrdoTrialPlugin {
         if !asked_for() {
             return;
         }
-        app.add_plugins(ordo::OrdoPlugin::with_theme("theme.ordo.toml"))
-            .add_systems(Startup, lend_ramps)
-            // NOT at Startup: `Fonts` is loaded a beat later, so a panel raised
-            // there dies asking for it. Ordo's own widgets do not care - they
-            // carry a `Face` tag and the repaint pass finds the font whenever it
-            // arrives - which is the first thing the port has said in Ordo's
-            // favour, and it said it by killing the hand-built twin.
-            .add_systems(
-                Update,
-                raise_the_pair
-                    .run_if(resource_exists::<crate::ui::Fonts>)
-                    .run_if(run_once),
-            );
+        // OrdoPlugin and the ramps are the GAME's now, added in `ui` for
+        // every run - the day the kit stopped being a trial. Only the
+        // side-by-side panels remain behind the dial.
+        //
+        // NOT at Startup: `Fonts` is loaded a beat later, so a panel raised
+        // there dies asking for it. Ordo's own widgets do not care - they
+        // carry a `Face` tag and the repaint pass finds the font whenever it
+        // arrives - which is the first thing the port has said in Ordo's
+        // favour, and it said it by killing the hand-built twin.
+        app.add_systems(
+            Update,
+            raise_the_pair
+                .run_if(resource_exists::<crate::ui::Fonts>)
+                .run_if(run_once),
+        );
     }
-}
-
-/// The game hands Ordo its own pigment.
-///
-/// Ordo names roles and never ships colours, so the interface stays dyed from
-/// the very ramps the villagers' clothes are dyed from - which is the whole
-/// reason a kit that shipped its own palette would be no use here.
-///
-/// `palette::shade` snaps to one of five stops, so a `shade` in the theme file
-/// has five distinct outcomes and not a continuum. That is exactly what this
-/// game's interface does today, so it is right - but it does mean the "tune the
-/// shade live" idea is worth less than it sounds, and the smooth twin is
-/// registered beside each one for anything that wants a real knob.
-fn lend_ramps(mut ramps: ResMut<Ramps>) {
-    ramps.register("cloth_gold", |t| {
-        crate::palette::shade(&crate::palette::CLOTH_GOLD, t)
-    });
-    ramps.register("bone", |t| crate::palette::shade(&crate::palette::BONE, t));
-    ramps.register("cloth_gold_smooth", |t| {
-        crate::palette::shade_smooth(&crate::palette::CLOTH_GOLD, t)
-    });
-    ramps.register("bone_smooth", |t| {
-        crate::palette::shade_smooth(&crate::palette::BONE, t)
-    });
 }
 
 /// The same panel twice: Ordo's on the left, the game's own on the right.

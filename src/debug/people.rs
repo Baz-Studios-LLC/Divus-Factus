@@ -95,6 +95,10 @@ pub(crate) struct KinWell;
 #[derive(Component)]
 pub(crate) struct LifeWell;
 
+/// The heart's ledger, rebuilt with the dossier: what moved them, and why.
+#[derive(Component)]
+pub(crate) struct HeartWell;
+
 /// The LATELY card's dated rows, rebuilt with the dossier.
 #[derive(Component)]
 pub(crate) struct LatelyWell;
@@ -387,17 +391,21 @@ pub(crate) fn spawn_people_panel(
         ChildOf(reading),
     ));
 
-    // Two faces of a person: the soul as it stands, and the life as it
-    // was lived. The chronicle deserves its own page, not a footnote.
+    // Four faces of a person: the soul as it stands, the kin and craft,
+    // the heart as it was moved, and the life as it was lived. The Soul is
+    // what they ARE, the Life what they DID - the Heart is what GOT TO
+    // them: every discrete shift of faith, spirits or feeling, with its
+    // cause. Brett: "everytime something changes their stats there should
+    // be a log on what changed and why."
     let tabs = ui::tab_bar(
         &mut commands,
         reading,
-        &["THE SOUL", "KIN & CRAFT", "THE LIFE"],
+        &["THE SOUL", "KIN & CRAFT", "THE HEART", "THE LIFE"],
     );
-    let (soul, kin_tab, life_tab) = (tabs[0], tabs[1], tabs[2]);
+    let (soul, kin_tab, heart_tab, life_tab) = (tabs[0], tabs[1], tabs[2], tabs[3]);
     // Pages stretch to the plate's foot, so the reading column and the
     // portrait close on one shared bottom edge - the puzzle contract.
-    for (index, tab_page) in [soul, kin_tab, life_tab].into_iter().enumerate() {
+    for (index, tab_page) in [soul, kin_tab, heart_tab, life_tab].into_iter().enumerate() {
         commands.entity(tab_page).insert((
             Node {
                 width: percent(100),
@@ -598,6 +606,25 @@ pub(crate) fn spawn_people_panel(
         },
         BackgroundColor(Color::BLACK.with_alpha(0.25)),
         ChildOf(kin_tab),
+    ));
+
+    // THE HEART: what moved them lately, newest first, each stir with
+    // its cause.
+    commands.spawn((
+        HeartWell,
+        Node {
+            width: percent(100),
+            max_height: px(330),
+            flex_direction: FlexDirection::Column,
+            overflow: Overflow::scroll_y(),
+            padding: UiRect::all(px(8)),
+            row_gap: px(2),
+            border_radius: BorderRadius::all(px(0)),
+            ..default()
+        },
+        BackgroundColor(Color::BLACK.with_alpha(0.35)),
+        ui::Scrollable,
+        ChildOf(heart_tab),
     ));
 
     // THE LIFE: the whole story, newest first, set in the chronicle's own
@@ -1011,6 +1038,7 @@ pub(crate) fn update_person_detail(
                 Option<&crate::villager::work::Skills>,
                 Option<&crate::villager::traits::Traits>,
                 Has<crate::creature::Childhood>,
+                Option<&crate::villager::regard::Regard>,
             ),
         ),
         Without<crate::creature::Corpse>,
@@ -1042,7 +1070,7 @@ pub(crate) fn update_person_detail(
         (person, genome, member_of),
         (needs, activity, vitality, morale),
         (temperament, witnessed, faith, _chronicle),
-        (spouse, parentage, home, vocation, skills, manner, child),
+        (spouse, parentage, home, vocation, skills, manner, child, regard),
     )) = selected.0.and_then(|entity| people.get(entity).ok())
     else {
         // Hidden means GONE: Visibility alone leaves the node's empty
@@ -1103,6 +1131,7 @@ pub(crate) fn update_person_detail(
                 skills.map_or_else(|| v.describe().to_string(), |s| s.describe(*v))
             }),
             InspectorValue::Family => family_phrase(spouse, parentage, &kin_names, &corpse_check),
+            InspectorValue::Feelings => super::inspector::feelings_phrase(regard, &kin_names),
             InspectorValue::Seen => match witnessed {
                 Some(w) if w.is_innocent() && w.secondhand > 0 => "only in stories".to_string(),
                 Some(w) if w.is_innocent() => "never".to_string(),
@@ -1220,6 +1249,12 @@ fn stat_chip(commands: &mut Commands, parent: Entity, which: InspectorValue) {
         InspectorValue::State => {
             mark(at(7.0, 7.0, 8.0, 8.0, 0.0), true, false);
             mark(at(9.5, 9.5, 3.0, 3.0, 0.0), true, true);
+        }
+        // A heart: two lobes and the turned point beneath.
+        InspectorValue::Feelings => {
+            mark(at(5.0, 5.5, 5.0, 5.0, 5.0), false, false);
+            mark(at(9.5, 5.5, 5.0, 5.0, 5.0), false, false);
+            mark(at(6.8, 7.6, 6.0, 6.0, 0.0), true, false);
         }
         // A bowl.
         InspectorValue::Hunger => {
@@ -1356,6 +1391,8 @@ pub(crate) fn update_dossier(
     craft_wells: Query<Entity, With<CraftWell>>,
     kin_wells: Query<Entity, With<KinWell>>,
     life_wells: Query<Entity, With<LifeWell>>,
+    heart_wells: Query<Entity, With<HeartWell>>,
+    stirred: Query<&crate::villager::Stirrings>,
     lately_wells: Query<Entity, With<LatelyWell>>,
     souls: Query<(
         Option<&crate::villager::work::Skills>,
@@ -1601,6 +1638,56 @@ pub(crate) fn update_dossier(
                     ..default()
                 },
                 ChildOf(well),
+            ));
+        }
+    }
+
+    // THE HEART: what moved them, newest first, each stir with its cause.
+    for well in &heart_wells {
+        commands.entity(well).despawn_related::<Children>();
+        let moved = selected.0.and_then(|who| stirred.get(who).ok());
+        let Some(moved) = moved.filter(|s| !s.0.is_empty()) else {
+            commands.spawn((
+                ui::dim("nothing has moved them yet"),
+                Node {
+                    padding: UiRect::axes(px(10), px(8)),
+                    ..default()
+                },
+                ChildOf(well),
+            ));
+            continue;
+        };
+        let mut stripe = false;
+        for stirring in moved.0.iter().rev() {
+            let row = commands
+                .spawn((
+                    Node {
+                        width: percent(100),
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: px(8),
+                        padding: UiRect::axes(px(6), px(4)),
+                        border_radius: BorderRadius::all(px(0)),
+                        ..default()
+                    },
+                    BackgroundColor(if stripe {
+                        Color::WHITE.with_alpha(0.028)
+                    } else {
+                        Color::NONE
+                    }),
+                    ChildOf(well),
+                ))
+                .id();
+            stripe = !stripe;
+            commands.spawn((ui::dim(format!("d{}", stirring.day)), ChildOf(row)));
+            commands.spawn((
+                ui::body(stirring.text.clone()),
+                Node {
+                    flex_grow: 1.0,
+                    min_width: px(0),
+                    ..default()
+                },
+                ChildOf(row),
             ));
         }
     }

@@ -123,37 +123,19 @@ pub(super) fn mark_the_dead(
                 chronicle.record(day, format!("wept for {}", person.name));
             }
             if family {
-                // Watched grief is composed: this mourner, over this body,
-                // today. The dead one's name is the only name grief may say.
-                let composed = telling
-                    .0
-                    .as_mut()
-                    .filter(|_| {
-                        crate::attention::regard(telling.1.as_deref(), at.translation)
-                            .worth_composing()
-                    })
-                    .map(|tongue| {
-                        tongue.muse(crate::telling::Musing {
-                            who: mourner,
-                            voice: None,
-                            bearing: crate::villager::traits::Bearing::Plain,
-                            faith: crate::telling::FaithBand::Wavering,
-                            body: Vec::new(),
-                            place: Vec::new(),
-                            mind: format!(
-                                "you stand over the body of {}, dead this day",
-                                person.name
-                            ),
-                            heard: None,
-                            aloud: false,
-                            prayer: false,
-                            known: vec![person.name.clone()],
-                        })
-                    })
-                    .is_some();
-                // Unwatched or unanswered: the moment passes quietly. Nothing
-                // written plays anywhere any more.
-                let _ = composed;
+                // Grief thinks in grief's words - tagged `grieving`, so the
+                // pick can never hand a mourner a cheerful idle thought, and
+                // the want-list demands mourning lines until they exist.
+                if let Some(tongue) = telling.0.as_mut() {
+                    tongue.muse(crate::telling::Musing {
+                        who: mourner,
+                        voice: None,
+                        faith: crate::telling::FaithBand::Wavering,
+                        body: vec!["grieving"],
+                        heard: None,
+                        aloud: false,
+                    });
+                }
             }
         }
     }

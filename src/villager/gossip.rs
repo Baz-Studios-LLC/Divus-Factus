@@ -39,6 +39,9 @@ pub(crate) fn form_bonds(
         ),
     >,
     shrines: Query<(&GlobalTransform, &crate::villager::work::Building)>,
+    mut hearts: Query<&mut super::regard::Regard>,
+    spirits: Query<&Morale>,
+    mut stirred: Query<&mut super::Stirrings>,
 ) {
     *since_last += time.delta_secs();
     if *since_last < BOND_INTERVAL {
@@ -110,26 +113,60 @@ pub(crate) fn form_bonds(
             }
             Some(_) => continue,
             None => {
-                // Not walking out with anyone: the nearest unwed man may
-                // become the one she does.
-                let Some((slot, _)) = men
+                // Not walking out with anyone: THE HEART CHOOSES NOW, not
+                // the map. Among the men near enough, the one she holds
+                // warmest wins the walk — all those tavern evenings and
+                // good talks were building toward exactly this — with
+                // nearness only breaking ties. A man she has soured on is
+                // nobody, however close he stands.
+                let warmth_toward = |man: Entity| -> f32 {
+                    hearts.get(woman).map_or(0.0, |h| h.toward(man))
+                };
+                let Some((slot, warmth)) = men
                     .iter()
                     .enumerate()
-                    .map(|(i, (_, position, _))| (i, position.distance(at)))
-                    .filter(|(_, d)| *d <= COURTSHIP_DISTANCE)
-                    .min_by(|a, b| a.1.total_cmp(&b.1))
+                    .filter(|(_, (_, position, _))| position.distance(at) <= COURTSHIP_DISTANCE)
+                    .map(|(i, (man, position, _))| {
+                        (i, warmth_toward(*man), position.distance(at))
+                    })
+                    .filter(|(_, warmth, _)| *warmth > -0.25)
+                    .max_by(|a, b| {
+                        (a.1, -a.2)
+                            .partial_cmp(&(b.1, -b.2))
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .map(|(i, warmth, _)| (i, warmth))
                 else {
                     continue;
                 };
                 // Nearness is necessary, not sufficient. Some pairs just
-                // never happen.
-                if !rng.0.chance(0.4) {
+                // never happen - and romance blooms in good spirits: a
+                // heavy heart barely looks up, a light one notices who
+                // keeps standing nearby. Fondness already built makes the
+                // walk likelier still. This is the door through which a
+                // village's MOOD becomes its future: grim news weighs on
+                // spirits, low spirits court less, fewer weddings mean
+                // fewer children. A dread god's flock worships hard and
+                // dwindles; a loved one's booms.
+                let cheer = spirits.get(woman).map_or(0.7, |m| m.spirits);
+                let odds =
+                    (0.4 * (0.5 + cheer * 0.7) * (1.0 + warmth.max(0.0))).min(0.85);
+                if !rng.0.chance(odds) {
                     continue;
                 }
+                let him = men[slot].0;
                 commands.entity(woman).insert(Courting {
-                    with: men[slot].0,
+                    with: him,
                     since: today,
                 });
+                // The walk begins, and both hearts note it.
+                let his_name = men[slot].2.name.clone();
+                if let Ok(mut moved) = stirred.get_mut(woman) {
+                    moved.stir(today, format!("began walking out with {his_name}"));
+                }
+                if let Ok(mut moved) = stirred.get_mut(him) {
+                    moved.stir(today, format!("{} walks out with them now", her.name));
+                }
                 continue;
             }
         };
@@ -143,6 +180,20 @@ pub(crate) fn form_bonds(
         )));
         commands.entity(woman).insert(Spouse(man));
         commands.entity(man).insert(Spouse(woman));
+        // Vows land on the heart on the day, not by drift: the wedding
+        // seeds devotion at once, and `kin_warmth` maintains it after.
+        if let Ok(mut heart) = hearts.get_mut(woman) {
+            heart.warm(man, 0.7);
+        }
+        if let Ok(mut heart) = hearts.get_mut(man) {
+            heart.warm(woman, 0.7);
+        }
+        if let Ok(mut moved) = stirred.get_mut(woman) {
+            moved.stir(today, format!("wed {} - devotion", him.full_name()));
+        }
+        if let Ok(mut moved) = stirred.get_mut(man) {
+            moved.stir(today, format!("wed {} - devotion", her.full_name()));
+        }
 
         // She takes his house. `born_surname` is deliberately left as it was:
         // it is the only thread left back to the parents who raised her, and
@@ -469,8 +520,6 @@ pub(crate) fn hold_conversations(
     // about it, what goes in their chronicle — happens whether or not anyone
     // is watching, because that is the simulation and not its presentation.
     attention: Option<Res<crate::attention::Attention>>,
-    now: Option<Res<crate::now::WorldNow>>,
-    members: Query<&MemberOf>,
     mut pairs: Query<
         (
             Entity,
@@ -486,6 +535,9 @@ pub(crate) fn hold_conversations(
         &mut crate::witness::Witnessed,
         Option<&mut Chronicle>,
         Option<&mut belief::Faith>,
+        Option<&mut Morale>,
+        Option<&mut super::regard::Regard>,
+        Option<&mut Stirrings>,
     )>,
     // Who each teller is, for putting the story in their own mouth. Absent
     // unless the teller is switched on, in which case none of this runs.
@@ -507,6 +559,56 @@ pub(crate) fn hold_conversations(
 
     for (entity, at, mut talk, mut activity, mut target) in &mut pairs {
         if *activity != Activity::Chatting || clock.elapsed > talk.until {
+            // Parting is where the conversation lands on the heart. Most
+            // talk warms the two of them a little; now and then somebody
+            // walks away rubbed the wrong way — each side rolls alone, so
+            // one can leave annoyed by a chat the other thought went fine,
+            // which is where half the village's grudges will honestly come
+            // from. Only conversations that actually happened count.
+            if talk.spoke_at.is_some() {
+                let soured = rng.0.chance(0.12);
+                let by = if soured { -0.07 } else { 0.05 };
+                let partner_name = minds
+                    .get(talk.partner)
+                    .map(|(p, ..)| p.name.clone())
+                    .unwrap_or_default();
+                let shift = if let Ok((_, _, _, _, morale, regard, stirred)) =
+                    minds.get_mut(entity)
+                {
+                    // Company lands on the spirits too: people are social
+                    // creatures, and a good talk is worth a little cheer -
+                    // a bad one is carried the rest of the day.
+                    if let Some(mut morale) = morale {
+                        let cheer = if soured { -0.02 } else { 0.02 };
+                        morale.spirits = (morale.spirits + cheer).clamp(0.0, 1.0);
+                    }
+                    if let Some(mut stirred) = stirred
+                        && !partner_name.is_empty()
+                    {
+                        stirred.stir(
+                            clock.day(),
+                            if soured {
+                                format!("left a talk with {partner_name} rubbed wrong")
+                            } else {
+                                format!("a good talk with {partner_name}")
+                            },
+                        );
+                    }
+                    regard.map(|mut r| {
+                        r.warm_over(talk.partner, by, soured.then_some("a quarrel"))
+                    })
+                } else {
+                    None
+                };
+                if let Some((before, after)) = shift
+                    && super::regard::band(before) != super::regard::band(after)
+                    && let Some(word) = super::regard::band(after)
+                    && let (Ok((me, ..)), Ok((them, ..))) =
+                        (minds.get(entity), minds.get(talk.partner))
+                {
+                    info!("{} is now {} {}", me.name, word, them.name);
+                }
+            }
             commands
                 .entity(entity)
                 .remove::<Conversing>()
@@ -543,148 +645,100 @@ pub(crate) fn hold_conversations(
                 .unwrap_or_default();
             // The same story never wears the same words twice in a row.
             //
-            // If the teller is listening, the line comes from this villager's
-            // own circumstances — what they saw with their own eyes against
-            // what they were merely told, their trade, their belief. If it is
-            // not, or has nothing ready, the written phrasings answer. There
-            // is one fallback and it is always there.
-            //
-            // Asked for only when the god is close enough to read the answer.
-            // A composed line is a second and a half of a model's time, and
-            // spending it on a conversation happening off the frame buys
-            // nothing — the written phrasing is instant and reads identically
-            // to nobody.
+            // The line comes from this villager's own circumstances — what
+            // they saw with their own eyes against what they were merely
+            // told, their trade, their belief — picked from the corpus, and
+            // picked ALWAYS. The watched-head gate that used to stand here
+            // belonged to the retired teller, which paid real compute per
+            // line; the corpus picks for nothing, and the gate's only
+            // remaining effect was villagers labelled "talking" with no
+            // words over either head.
             let regard = crate::attention::regard(attention.as_deref(), at.translation);
-            let spoken = tongue
-                .as_mut()
-                .filter(|_| regard.worth_composing())
-                .and_then(|tongue| {
-                    let (voice, nature, bearing) = voices
-                        .get(entity)
-                        .map(|(v, t, manner)| {
-                            (
-                                v.copied(),
-                                t,
-                                manner.map(|m| m.bearing()).unwrap_or_default(),
-                            )
-                        })
-                        .unwrap_or((None, None, traits::Bearing::default()));
-                    let (hand, told_before) = minds
-                        .get(entity)
-                        .map(|(_, witnessed, ..)| {
-                            (
-                                crate::telling::Retelling::hand_of(witnessed),
-                                witnessed.told,
-                            )
-                        })
-                        .unwrap_or((crate::telling::Hand::Heard, 0));
-                    let trust = minds
-                        .get(entity)
-                        .ok()
-                        .and_then(|(_, _, _, faith)| faith.map(|f| f.trust))
-                        .unwrap_or(0.3);
-                    tongue.line(&crate::telling::Retelling::new(
-                        kind,
-                        hand,
-                        voice,
-                        trust,
-                        bearing,
-                        memory.whom.clone(),
-                        nature.map_or(0.5, |t| t.boldness),
-                        told_before,
-                    ))
-                });
-            // Logged when it is the model's, so a run can be read back and
-            // judged: everything else in the square is a written line.
-            if let Some(line) = &spoken {
-                info!("{teller_name} tells it in their own words: {line}");
-            }
+            let spoken = tongue.as_mut().and_then(|tongue| {
+                let voice = voices.get(entity).ok().and_then(|(v, ..)| v.copied());
+                let (hand, told_before) = minds
+                    .get(entity)
+                    .map(|(_, witnessed, ..)| {
+                        (
+                            crate::telling::Retelling::hand_of(witnessed),
+                            witnessed.told,
+                        )
+                    })
+                    .unwrap_or((crate::telling::Hand::Heard, 0));
+                let trust = minds
+                    .get(entity)
+                    .ok()
+                    .and_then(|(_, _, _, faith, _, _, _)| faith.map(|f| f.trust))
+                    .unwrap_or(0.3);
+                tongue.line(&crate::telling::Retelling::new(
+                    kind,
+                    hand,
+                    voice,
+                    trust,
+                    memory.whom.clone(),
+                    told_before,
+                ))
+            });
             // Drawn every telling whether or not it is the one used, so that
-            // the simulation's draw from the shared stream does not depend on
-            // whether a model happened to answer in time. The written
-            // phrasing never reaches a bubble any more — it serves the
-            // chronicle and the reply prompt, the world's record of what
-            // passed between them.
+            // the simulation's draw from the shared stream does not depend
+            // on whether the corpus had a line for this moment. When it did
+            // not, the written phrasing serves the bubble too: a plain line
+            // over a talking head beats a talking head with no words, which
+            // is what the old composed-only rule left on screen.
             let written = (*rng.0.pick(kind.rumors())).to_string();
-            let composed = spoken.is_some();
             // Kept in the world's own register — "the god", never the name —
-            // because it goes back INTO a prompt as what the listener heard.
-            let told_plain = spoken.clone().unwrap_or(written);
+            // because the listener's reply quotes what they heard.
+            let told_plain = spoken.unwrap_or(written);
             let told = told_plain.replace("the god", god);
 
             // The listener's answer starts composing NOW, while the telling
             // hangs in the air: the reply beat lands several seconds from
-            // here, which is more than a line takes, so the answer is
-            // almost always waiting when their turn comes.
-            if composed
-                && let Some(tongue) = tongue.as_mut()
-                && let Some(partner_at) = spot_of(talk.partner)
-                && crate::attention::regard(attention.as_deref(), partner_at).worth_composing()
+            // here, so the answer is always waiting when their turn comes.
+            // Unconditionally, like the telling itself: the reply's OWN
+            // showing is gated where showings are gated, in `show_musings`.
+            if let Some(tongue) = tongue.as_mut()
+                && spot_of(talk.partner).is_some()
             {
-                let (voice, _, bearing) = voices
-                    .get(talk.partner)
-                    .map(|(v, t, manner)| {
-                        (
-                            v.copied(),
-                            t,
-                            manner.map(|m| m.bearing()).unwrap_or_default(),
-                        )
-                    })
-                    .unwrap_or((None, None, traits::Bearing::default()));
-                let (saw_it_too, trust, listener_name) = minds
-                    .get(talk.partner)
-                    .map(|(person, witnessed, _, faith)| {
-                        (
-                            witnessed.remembers(kind),
-                            faith.map_or(0.3, |f| f.trust),
-                            person.name.clone(),
-                        )
-                    })
-                    .unwrap_or((false, 0.3, String::new()));
-                let place = members
+                let voice = voices
                     .get(talk.partner)
                     .ok()
-                    .and_then(|member| now.as_ref()?.places.get(&member.0).cloned());
-                // Every name the answer may use: their own, the teller's,
-                // their place, and whoever the story itself is about.
-                let mut known: Vec<String> = vec![listener_name, teller_name.clone()];
-                known.extend(place.as_ref().map(|p| p.name.clone()));
-                known.extend(memory.whom.as_ref().map(|w| w.name.clone()));
+                    .and_then(|(v, ..)| v.copied());
+                let trust = minds
+                    .get(talk.partner)
+                    .ok()
+                    .and_then(|(_, _, _, faith, _, _, _)| faith.map(|f| f.trust))
+                    .unwrap_or(0.3);
                 tongue.muse(crate::telling::Musing {
                     who: talk.partner,
                     voice,
-                    bearing,
                     faith: crate::telling::FaithBand::of(trust),
                     body: Vec::new(),
-                    place: place.map(|p| p.lines()).unwrap_or_default(),
-                    mind: if saw_it_too {
-                        "you stood there and saw it happen too".into()
-                    } else {
-                        "whether to believe a word of it".into()
-                    },
                     heard: Some(told_plain.clone()),
                     aloud: true,
-                    prayer: false,
-                    known,
                 });
             }
             // The bubble is for the player; the telling is for the village.
-            // Only composed words are shown — a telling whose words never
-            // came back happens quietly, and everything below still happens.
-            if let Some(line) = &spoken
-                && regard.worth_saying()
-            {
+            // Whatever words the telling wore — the corpus's or the written
+            // fallback's — they show when the god is watching.
+            if regard.worth_saying() {
                 say.write(crate::ui::Say {
                     speaker: entity,
-                    text: line.replace("the god", god),
+                    text: told.clone(),
                     thought: false,
                     prayer: false,
-                    own_words: true,
                 });
             }
-            if let Ok((listener_person, mut witnessed, chronicle, faith)) =
-                minds.get_mut(talk.partner)
+            if let Ok((
+                _,
+                mut witnessed,
+                chronicle,
+                faith,
+                listener_morale,
+                listener_regard,
+                listener_stirred,
+            )) = minds.get_mut(talk.partner)
             {
+                let mut stirred = listener_stirred;
                 if !witnessed.remembers(kind) {
                     // Whether the listener BUYS the god in it is their own
                     // grain's business: a skeptic pockets the story and none
@@ -709,14 +763,98 @@ pub(crate) fn hold_conversations(
                     if let Some(mut chronicle) = chronicle {
                         chronicle.hear(clock.day(), &teller_name, &told);
                     }
-                    if believed && let Some(mut faith) = faith {
-                        faith.trust = (faith.trust + 0.02).min(0.8);
+                    if let Some(mut faith) = faith {
+                        if believed {
+                            faith.trust = (faith.trust + 0.02).min(0.8);
+                            if let Some(stirred) = stirred.as_mut() {
+                                stirred.stir(
+                                    clock.day(),
+                                    format!("believed {teller_name}'s tale - faith rose"),
+                                );
+                            }
+                        } else if !memory.divine {
+                            // Doubt spreads exactly as faith does. A teller
+                            // whose own verdict was "the world did it"
+                            // argues the god OUT of the story — and how far
+                            // the argument carries is graded by the same
+                            // scale that grades belief: lightning is easy
+                            // to talk someone out of, a levitation nearly
+                            // impossible. The sure of heart barely move.
+                            let pull = 0.02
+                                * (1.0 - kind.unmistakably_divine())
+                                * if faith.trust > 0.6 { 0.4 } else { 1.0 };
+                            if pull > 0.003 {
+                                faith.trust = (faith.trust - pull).max(0.0);
+                                if let Some(stirred) = stirred.as_mut() {
+                                    stirred.stir(
+                                        clock.day(),
+                                        format!(
+                                            "{teller_name} talked the god out of it - doubt"
+                                        ),
+                                    );
+                                }
+                            } else {
+                                faith.trust = (faith.trust - pull).max(0.0);
+                            }
+                        }
+                    }
+                    // And the gossip reaches the heart: hearing what befell
+                    // somebody moves the listener toward or away from THEM.
+                    // Good fortune endears; the god's violence makes the
+                    // village step back from its target; plain misfortune
+                    // draws sympathy. Reputation, one mouth at a time.
+                    if let Some(whom) = memory.whom.as_ref()
+                        && let Some(subject) = whom.subject
+                        && subject != talk.partner
+                        && let Some(mut regard) = listener_regard
+                    {
+                        let by = kind.warms_toward_subject();
+                        if by != 0.0 {
+                            regard.warm_over(
+                                subject,
+                                by,
+                                (by < 0.0).then_some("what the god did to them"),
+                            );
+                            if let Some(stirred) = stirred.as_mut() {
+                                stirred.stir(
+                                    clock.day(),
+                                    if by > 0.0 {
+                                        format!("warmed to {} - heard their good fortune", whom.name)
+                                    } else {
+                                        format!(
+                                            "cooled toward {} - the god's hand found them",
+                                            whom.name
+                                        )
+                                    },
+                                );
+                            }
+                        }
+                    }
+                    // News weighs on the spirits by its own alarm: word of
+                    // a smiting or a death darkens the day it was heard in;
+                    // word of providence or a safe birth brightens it. A
+                    // village fed on frightening stories grows heavy-
+                    // hearted without ever seeing a thing - and heavy
+                    // hearts wed less, which is where a dread god's
+                    // demographics quietly begin.
+                    if let Some(mut morale) = listener_morale {
+                        let alarm = kind.alarm();
+                        if alarm > 0.5 {
+                            morale.spirits = (morale.spirits - alarm * 0.05).max(0.0);
+                            if let Some(stirred) = stirred.as_mut() {
+                                stirred.stir(clock.day(), "dark word weighed on them");
+                            }
+                        } else if alarm < 0.1 {
+                            morale.spirits = (morale.spirits + 0.03).min(1.0);
+                            if let Some(stirred) = stirred.as_mut() {
+                                stirred.stir(clock.day(), "good word lifted them");
+                            }
+                        }
                     }
                 }
-                let _ = listener_person;
             }
             // The telling itself spends the teller's fire.
-            if let Ok((_, mut own_witnessed, _, _)) = minds.get_mut(entity) {
+            if let Ok((_, mut own_witnessed, _, _, _, _, _)) = minds.get_mut(entity) {
                 own_witnessed.told = own_witnessed.told.saturating_add(1);
             }
         }
@@ -736,7 +874,6 @@ pub(crate) fn hold_conversations(
                         text: line.replace("the god", god),
                         thought: false,
                         prayer: false,
-                        own_words: true,
                     });
                 }
                 continue;
@@ -749,7 +886,7 @@ pub(crate) fn hold_conversations(
                 let trust = minds
                     .get(entity)
                     .ok()
-                    .and_then(|(_, _, _, faith)| faith.map(|f| f.trust))
+                    .and_then(|(_, _, _, faith, _, _, _)| faith.map(|f| f.trust))
                     .unwrap_or(0.3);
                 let voice = voices.get(entity).ok().and_then(|(v, ..)| v.copied());
                 let answered = tongue.as_mut().and_then(|tongue| {
@@ -770,7 +907,6 @@ pub(crate) fn hold_conversations(
                         text: line.replace("the god", god),
                         thought: false,
                         prayer: false,
-                        own_words: true,
                     });
                 }
             }
@@ -811,7 +947,7 @@ pub(crate) fn hold_conversations(
                     let trust = minds
                         .get(entity)
                         .ok()
-                        .and_then(|(_, _, _, faith)| faith.map(|f| f.trust))
+                        .and_then(|(_, _, _, faith, _, _, _)| faith.map(|f| f.trust))
                         .unwrap_or(0.3);
                     let whom = talk
                         .kind
@@ -838,7 +974,6 @@ pub(crate) fn hold_conversations(
                     text: line.replace("the god", god),
                     thought: false,
                     prayer: false,
-                    own_words: true,
                 });
             }
         }

@@ -46,46 +46,9 @@ impl Trait {
     }
 }
 
-/// How a manner bends someone's WORDS, as against the mechanics it bends.
-///
-/// Deliberately coarser than the trait list, for two reasons. The teller keys
-/// its cache on the shape of a telling, and anything the prompt mentions has to
-/// be part of that key — put all ten traits in and the shape space multiplies
-/// by thirty, the cache never fills, and everyone falls back to written lines.
-/// And most traits say nothing about how a person describes a bolt of
-/// lightning: whether they are diligent or slothful does not come into it,
-/// while whether they expect the worst comes into all of it.
-///
-/// Devout and Skeptic are absent on purpose — they already reach the teller as
-/// [`crate::telling::FaithBand`], and saying it twice would only make the
-/// prompt longer.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
-pub enum Bearing {
-    /// Quiet: says as little as will do.
-    Terse,
-    /// Gloomy: expects the worst, and mentions it.
-    Bleak,
-    /// Cheerful: finds the good in it.
-    Bright,
-    /// Nothing in the manner that bends the words.
-    #[default]
-    Plain,
-}
-
-impl Bearing {
-    /// How the teller is told about it. `None` for a manner that changes
-    /// nothing, so the plainly-spoken get a shorter prompt rather than a line
-    /// telling the model to ignore something.
-    #[allow(dead_code)] // spoke in the LLM prompts; the corpus may want it back as a tag
-    pub fn word(self) -> Option<&'static str> {
-        match self {
-            Bearing::Terse => Some("says as little as will do"),
-            Bearing::Bleak => Some("expects the worst of everything"),
-            Bearing::Bright => Some("looks for the good in everything"),
-            Bearing::Plain => None,
-        }
-    }
-}
+// (A `Bearing` enum lived here — Terse, Bleak, Bright — bending the retired
+// teller's prompts by manner. When manner reaches the corpus it will do so
+// as TAGS on the lines, e.g. `gloomy`, which the trait list already names.)
 
 /// The traits a person carries: at most one virtue and one flaw, rolled at
 /// birth and kept for life.
@@ -197,21 +160,6 @@ impl Traits {
         if self.has(Trait::Glutton) { 1.4 } else { 1.0 }
     }
 
-    /// Which way this manner bends the person's words.
-    ///
-    /// Brevity is tested first because it governs the delivery of whatever else
-    /// is true: a quiet cheerful person is short about the good news.
-    pub fn bearing(&self) -> Bearing {
-        if self.has(Trait::Quiet) {
-            Bearing::Terse
-        } else if self.has(Trait::Gloomy) {
-            Bearing::Bleak
-        } else if self.has(Trait::Cheerful) {
-            Bearing::Bright
-        } else {
-            Bearing::Plain
-        }
-    }
 }
 
 #[cfg(test)]

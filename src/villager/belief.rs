@@ -29,7 +29,12 @@ use crate::witness::{DivineEvent, DivineEventKind};
 const DESPERATE_HUNGER: f32 = 0.65;
 
 /// How long a prayer stays open before it curdles into doubt.
-const PRAYER_PATIENCE: f32 = 75.0;
+///
+/// Long enough to read the pink notice, open nothing, and fly there — the
+/// prayer board makes prayers answerable, and a horizon nobody can reach is
+/// a doubt machine. Not longer, because a food prayer is made by someone
+/// starving: hope that outlives the hopeful helps no one.
+const PRAYER_PATIENCE: f32 = 120.0;
 
 /// How near the answer must land to be *their* answer.
 const ANSWER_RADIUS: f32 = 9.0;
@@ -71,15 +76,89 @@ impl Faith {
         self.trust > Self::BELIEVER
     }
 
-    fn shift(&mut self, amount: f32) {
+    pub(super) fn shift(&mut self, amount: f32) {
         self.trust = (self.trust + amount).clamp(0.0, 1.0);
     }
+}
+
+/// What a prayer asks for.
+#[derive(Debug, Clone)]
+pub enum PrayerKind {
+    /// The crisis kind: starving, with an empty larder.
+    Food,
+    /// The dark kind: against a neighbor. Hatred deep enough, in a heart
+    /// faithful enough to believe asking might work.
+    Dark {
+        against: Entity,
+        name: String,
+        /// What the grudge is over, as the bond remembers it — the board
+        /// reads it out, so the god knows what is being avenged.
+        over: Option<String>,
+    },
 }
 
 /// An open prayer: what they are asking for, and how long hope lasts.
 #[derive(Component, Debug)]
 pub struct Prayer {
     pub remaining: f32,
+    /// Their own words, picked from the corpus the moment they knelt —
+    /// carried HERE rather than through the watched-head musing channel,
+    /// because a prayer is addressed to the player: the codex board reads
+    /// it sight unseen, and the bubble replays it for every fresh look.
+    pub words: Option<String>,
+    /// Whether the pink bubble is up for the current look. Cleared when
+    /// regard moves off them, so coming back to a praying villager shows
+    /// the words again instead of exactly once per prayer.
+    pub bubbled: bool,
+    pub kind: PrayerKind,
+}
+
+/// What became of a prayer, for the board's "lately" strip.
+pub enum PrayerOutcome {
+    Answered,
+    Curdled,
+    Died,
+}
+
+impl PrayerOutcome {
+    pub fn describe(&self) -> &'static str {
+        match self {
+            PrayerOutcome::Answered => "answered",
+            PrayerOutcome::Curdled => "went unanswered",
+            PrayerOutcome::Died => "died waiting",
+        }
+    }
+}
+
+/// A closed prayer, kept so the board can show what the god did and did
+/// not do. Session-scoped: the receipts of the living world, not a save.
+pub struct ClosedPrayer {
+    pub name: String,
+    pub words: Option<String>,
+    pub outcome: PrayerOutcome,
+}
+
+/// The recent history of prayers, newest last. The open ones live on the
+/// praying themselves as [`Prayer`] components; this holds only the closed.
+#[derive(Resource, Default)]
+pub struct PrayerLedger {
+    pub closed: Vec<ClosedPrayer>,
+}
+
+impl PrayerLedger {
+    /// How many closed prayers the board remembers.
+    const KEPT: usize = 8;
+
+    pub fn close(&mut self, name: &str, words: Option<String>, outcome: PrayerOutcome) {
+        self.closed.push(ClosedPrayer {
+            name: name.to_string(),
+            words,
+            outcome,
+        });
+        if self.closed.len() > Self::KEPT {
+            self.closed.remove(0);
+        }
+    }
 }
 
 /// The visible mote of a prayer, hanging over the praying — the player's cue
@@ -151,11 +230,7 @@ pub(super) fn kneel(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut notices: MessageWriter<crate::ui::Notice>,
-    // Bundled: some of these systems already press Bevy's parameter ceiling.
-    mut telling: (
-        Option<ResMut<crate::telling::Tongue>>,
-        Option<Res<crate::attention::Attention>>,
-    ),
+    mut tongue: Option<ResMut<crate::telling::Tongue>>,
     mut hungry: Query<
         (
             Entity,
@@ -202,8 +277,20 @@ pub(super) fn kneel(
 
         *activity = Activity::Praying;
         target.0 = None;
+        // The words are picked NOW, watched or not. The old attention gate
+        // belonged to the retired teller, which paid real compute per line
+        // and so composed only for watched heads — with the corpus the pick
+        // is free, and it left the prayer wordless unless the player was
+        // already staring at the right villager on the right frame. Brett
+        // saw the notices and never once the pink bubble.
+        let words = tongue.as_mut().and_then(|tongue| {
+            tongue.pray(entity, &["hungry"], crate::telling::FaithBand::Sure, None)
+        });
         commands.entity(entity).insert(Prayer {
             remaining: PRAYER_PATIENCE,
+            words,
+            bubbled: false,
+            kind: PrayerKind::Food,
         });
 
         // The mote: a small golden light over their head, for the god to see.
@@ -224,41 +311,132 @@ pub(super) fn kneel(
         ));
 
         info!("{} prays to {god} for food", person.name);
-        // A watched prayer is composed — this person, this hunger, kneeling
-        // now — and arrives over their head a breath later. Elsewhere, the
-        // written words serve as they always have.
-        let composed = telling
-            .0
-            .as_mut()
-            .filter(|_| {
-                crate::attention::regard(telling.1.as_deref(), transform.translation)
-                    .worth_composing()
-            })
-            .map(|tongue| {
-                tongue.muse(crate::telling::Musing {
-                    who: entity,
-                    voice: None,
-                    bearing: crate::villager::traits::Bearing::Plain,
-                    faith: crate::telling::FaithBand::Sure,
-                    body: vec!["hungry"],
-                    place: Vec::new(),
-                    mind: "you kneel and beg the god for food".into(),
-                    heard: None,
-                    aloud: false,
-                    prayer: true,
-                    known: Vec::new(),
-                })
-            })
-            .is_some();
-        // Unwatched or unanswered: the moment passes quietly. Nothing
-        // written plays anywhere any more.
-        let _ = composed;
-        notices.write(crate::ui::Notice::new(format!(
+        notices.write(crate::ui::Notice::prayer(format!(
             "{} prays to {god} for food",
             person.name
         )));
         if let Some(mut chronicle) = chronicle {
             chronicle.record(clock.day(), format!("prayed to {god} for food"));
+        }
+    }
+}
+
+/// The dark kneel: hatred deep enough, in a heart faithful enough.
+///
+/// Someone who has come to HATE a neighbor — the regard graph's floor,
+/// fed by soured talks and ugly gossip — and who believes in the god
+/// enough to think asking might work, kneels and prays AGAINST them.
+/// The ask lands on the board like any prayer, named: granting it is
+/// the god's own choice, made with lightning, and the kind of god you
+/// are is the sum of which prayers you answer.
+pub(super) fn kneel_in_hatred(
+    mut commands: Commands,
+    time: Res<Time>,
+    clock: Res<crate::calendar::WorldClock>,
+    name: Option<Res<DivineName>>,
+    mut rng: ResMut<super::SimRng>,
+    mut tongue: Option<ResMut<crate::telling::Tongue>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut notices: MessageWriter<crate::ui::Notice>,
+    names: Query<&Person>,
+    mut hateful: Query<
+        (
+            Entity,
+            &Person,
+            &super::regard::Regard,
+            &Faith,
+            &mut Activity,
+            &mut MoveTarget,
+            Option<&mut super::Stirrings>,
+        ),
+        (
+            With<Villager>,
+            Without<Prayer>,
+            Without<Held>,
+            Without<crate::avatar::Ridden>,
+            Without<Airborne>,
+            Without<Corpse>,
+        ),
+    >,
+) {
+    let god = name.as_ref().map_or("their god", |n| n.0.as_str());
+    let dt = time.delta_secs();
+
+    for (entity, person, regard, faith, mut activity, mut target, stirred) in &mut hateful {
+        // Rare by construction: hatred at the floor of the heart, faith
+        // worth praying with, and even then only now and again - a dark
+        // prayer is a breaking point, not a habit. The doubt that follows
+        // an unanswered one (-0.15) is what keeps it from looping: pray
+        // into silence often enough and you stop believing asking works.
+        if !rng.0.chance(dt * 0.01) {
+            continue;
+        }
+        if faith.trust < 0.45 {
+            continue;
+        }
+        if matches!(*activity, Activity::Eating(_) | Activity::Sleeping) {
+            continue;
+        }
+        let Some(hated) = regard.sourest().filter(|bond| bond.warmth <= -0.6) else {
+            continue;
+        };
+        let Ok(enemy) = names.get(hated.toward) else {
+            continue;
+        };
+        let against = hated.toward;
+        let enemy_name = enemy.name.clone();
+        let over = hated.over.clone();
+
+        *activity = Activity::Praying;
+        target.0 = None;
+        let words = tongue.as_mut().and_then(|tongue| {
+            tongue.pray(
+                entity,
+                &["grudge"],
+                crate::telling::FaithBand::of(faith.trust),
+                Some(&enemy_name),
+            )
+        });
+        commands.entity(entity).insert(Prayer {
+            remaining: PRAYER_PATIENCE,
+            words,
+            bubbled: false,
+            kind: PrayerKind::Dark {
+                against,
+                name: enemy_name.clone(),
+                over,
+            },
+        });
+
+        // The mote over a dark prayer is the same gold: the god sees every
+        // asking the same way, and what kind it is waits on the board.
+        commands.spawn((
+            PrayerMote,
+            Mesh3d(meshes.add(Cuboid::new(0.22, 0.22, 0.22))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: crate::palette::shade(&crate::palette::CLOTH_GOLD, 0.95),
+                emissive: LinearRgba::from(crate::palette::shade(
+                    &crate::palette::CLOTH_GOLD,
+                    0.95,
+                )) * 6.0,
+                ..default()
+            })),
+            Transform::from_xyz(0.0, 2.6, 0.0),
+            bevy::light::NotShadowCaster,
+            ChildOf(entity),
+        ));
+
+        info!("{} prays to {god} against {enemy_name}", person.name);
+        notices.write(crate::ui::Notice::prayer(format!(
+            "{} prays to {god} against {enemy_name}",
+            person.name
+        )));
+        if let Some(mut stirred) = stirred {
+            stirred.stir(
+                clock.day(),
+                format!("prayed against {enemy_name} - hatred spoke"),
+            );
         }
     }
 }
@@ -269,6 +447,147 @@ pub(super) fn animate_motes(time: Res<Time>, mut motes: Query<&mut Transform, Wi
     for mut mote in &mut motes {
         mote.translation.y = 2.6 + (t * 2.1).sin() * 0.18;
         mote.rotation = Quat::from_rotation_y(t * 0.9);
+    }
+}
+
+/// Shows a praying villager's words in the pink bubble, for as long as the
+/// prayer is open — not once at the kneel, which is what left Brett flying
+/// to every prayer notice and arriving to silence. Regard leaving them
+/// re-arms the bubble, so every fresh look reads the prayer again.
+pub(super) fn show_prayer_bubbles(
+    attention: Option<Res<crate::attention::Attention>>,
+    name: Option<Res<DivineName>>,
+    mut say: MessageWriter<crate::ui::Say>,
+    mut praying: Query<
+        (Entity, &Transform, &mut Prayer),
+        (With<Villager>, Without<Corpse>, Without<Held>),
+    >,
+) {
+    let god = name.as_ref().map_or("the god", |n| n.0.as_str());
+    for (entity, at, mut prayer) in &mut praying {
+        let watched =
+            crate::attention::regard(attention.as_deref(), at.translation).worth_saying();
+        if !watched {
+            if prayer.bubbled {
+                prayer.bubbled = false;
+            }
+            continue;
+        }
+        if prayer.bubbled {
+            continue;
+        }
+        let Some(words) = prayer.words.clone() else {
+            continue;
+        };
+        prayer.bubbled = true;
+        say.write(crate::ui::Say {
+            speaker: entity,
+            text: words.replace("the god", god),
+            thought: true,
+            prayer: true,
+        });
+    }
+}
+
+/// One floating mark of faith moving: a pink "+" rising off the newly
+/// convinced, an ash "-" off the doubting. The pin and the climb are
+/// Ordo's; the age, the fade and the colours are this game's.
+#[derive(Component)]
+pub(super) struct FaithMark {
+    left: f32,
+}
+
+/// How long a faith mark lives, rising and then thinning to nothing.
+const MARK_LIFE: f32 = 1.4;
+
+/// Puts a mark over anyone whose faith just moved. Brett: "when a villager
+/// gains belief can we have some pink + float up from them and when they
+/// disbelieve can we get some other colored -?" Watching `Changed<Faith>`
+/// against a remembered value catches every author of a shift — prayers
+/// answered, witnesses awed, sleepers hammered awake at midnight — without
+/// a single one of them knowing about it.
+pub(super) fn mark_the_faith_moved(
+    mut commands: Commands,
+    fonts: Option<Res<crate::ui::Fonts>>,
+    mut remembered: Local<std::collections::HashMap<Entity, f32>>,
+    moved: Query<(Entity, &Faith), (With<Villager>, Changed<Faith>, Without<Corpse>)>,
+) {
+    let Some(fonts) = fonts else {
+        return;
+    };
+    for (entity, faith) in &moved {
+        let before = remembered.insert(entity, faith.trust);
+        // First sighting is the endowment at birth, not a change of heart.
+        let Some(before) = before else {
+            continue;
+        };
+        let delta = faith.trust - before;
+        if delta.abs() < 0.005 {
+            continue;
+        }
+        let (glyph, ink) = if delta > 0.0 {
+            // The prayer channel's pink: belief moving toward the god.
+            ("+", crate::palette::shade(&crate::palette::CLOTH_PINK, 1.0))
+        } else {
+            // Doubt goes out to ash, the same ash a doubter's nameplate wears.
+            ("-", crate::palette::shade(&crate::palette::STONE, 0.78))
+        };
+        let pin = ordo::pin(&mut commands, entity, 2.3, Some(170.0), 55.0);
+        commands.entity(pin).insert((
+            ordo::Rising(0.85),
+            FaithMark { left: MARK_LIFE },
+        ));
+        commands.spawn((
+            Text::new(glyph),
+            TextFont {
+                font: fonts.display_bold.clone().into(),
+                font_size: bevy::text::FontSize::Px(19.0),
+                ..default()
+            },
+            TextColor(ink),
+            ChildOf(pin),
+        ));
+    }
+}
+
+/// Ages the marks: they thin over their last half and go out.
+pub(super) fn fade_faith_marks(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut marks: Query<(Entity, &mut FaithMark, &Children)>,
+    mut inks: Query<&mut TextColor>,
+) {
+    for (entity, mut mark, children) in &mut marks {
+        mark.left -= time.delta_secs();
+        if mark.left <= 0.0 {
+            commands.entity(entity).despawn();
+            continue;
+        }
+        let thin = (mark.left / (MARK_LIFE * 0.5)).clamp(0.0, 1.0);
+        for child in children {
+            if let Ok(mut ink) = inks.get_mut(*child) {
+                let faded = ink.0.with_alpha(thin);
+                if ink.0 != faded {
+                    ink.0 = faded;
+                }
+            }
+        }
+    }
+}
+
+/// A prayer does not survive the praying. Whoever dies mid-devotion has
+/// their prayer closed on the board as the dark receipt it is — and their
+/// mote taken down, which nothing else would ever do for a corpse.
+pub(super) fn close_the_prayers_of_the_dead(
+    mut commands: Commands,
+    children: Query<&Children>,
+    motes: Query<Entity, With<PrayerMote>>,
+    mut ledger: ResMut<PrayerLedger>,
+    dead: Query<(Entity, &Person, &Prayer), With<Corpse>>,
+) {
+    for (entity, person, prayer) in &dead {
+        ledger.close(&person.name, prayer.words.clone(), PrayerOutcome::Died);
+        end_prayer(&mut commands, entity, &children, &motes);
     }
 }
 
@@ -299,21 +618,26 @@ pub(super) fn answer_prayers(
     offerings: Query<(&GlobalTransform, &FoodSource), (With<DivinelyPlaced>, Without<Held>)>,
     mut notices: MessageWriter<crate::ui::Notice>,
     mut witnessed: MessageWriter<DivineEvent>,
+    mut ledger: ResMut<PrayerLedger>,
     mut praying: Query<
         (
             Entity,
             &Transform,
             &Person,
+            &Prayer,
             &mut Activity,
             &mut Faith,
             Option<&mut Chronicle>,
+            Option<&mut super::Stirrings>,
         ),
-        (With<Prayer>, Without<Corpse>),
+        Without<Corpse>,
     >,
 ) {
     let god = name.as_ref().map_or("their god", |n| n.0.as_str());
 
-    for (entity, transform, person, mut activity, mut faith, chronicle) in &mut praying {
+    for (entity, transform, person, prayer, mut activity, mut faith, chronicle, stirred) in
+        &mut praying
+    {
         let answered = offerings.iter().any(|(offering, source)| {
             source.amount > 0.2
                 && offering.translation().distance(transform.translation) < ANSWER_RADIUS
@@ -324,6 +648,10 @@ pub(super) fn answer_prayers(
 
         faith.shift(0.3);
         *activity = Activity::Idle;
+        if let Some(mut stirred) = stirred {
+            stirred.stir(clock.day(), "prayed, and the god answered - faith surged");
+        }
+        ledger.close(&person.name, prayer.words.clone(), PrayerOutcome::Answered);
         end_prayer(&mut commands, entity, &children, &motes);
 
         info!("{}'s prayer to {god} was answered", person.name);
@@ -345,6 +673,89 @@ pub(super) fn answer_prayers(
     }
 }
 
+/// The dark prayers, watching the sky for their answer.
+///
+/// A smite that lands on the hated WHILE the prayer is open is the god
+/// siding with the asker, and everyone learns what kind of god that is:
+/// the asker's faith surges past what providence ever pays, and the
+/// legend's dread swells — answering hate on request is a darker act
+/// than any unprompted bolt, because it makes the god an instrument
+/// anyone hateful enough might reach for. Which is the point, and the
+/// path.
+pub(super) fn answer_dark_prayers(
+    mut commands: Commands,
+    clock: Res<crate::calendar::WorldClock>,
+    name: Option<Res<DivineName>>,
+    children: Query<&Children>,
+    motes: Query<Entity, With<PrayerMote>>,
+    mut smitings: MessageReader<DivineEvent>,
+    mut notices: MessageWriter<crate::ui::Notice>,
+    mut ledger: ResMut<PrayerLedger>,
+    mut legend: ResMut<Legend>,
+    mut praying: Query<
+        (
+            Entity,
+            &Person,
+            &Prayer,
+            &mut Activity,
+            &mut Faith,
+            Option<&mut Chronicle>,
+            Option<&mut super::Stirrings>,
+        ),
+        Without<Corpse>,
+    >,
+) {
+    let struck: Vec<Entity> = smitings
+        .read()
+        .filter(|event| matches!(event.kind, DivineEventKind::Smote))
+        .filter_map(|event| event.subject)
+        .collect();
+    if struck.is_empty() {
+        return;
+    }
+    let god = name.as_ref().map_or("their god", |n| n.0.as_str());
+
+    for (entity, person, prayer, mut activity, mut faith, chronicle, stirred) in &mut praying {
+        let PrayerKind::Dark {
+            against,
+            name: enemy,
+            ..
+        } = &prayer.kind
+        else {
+            continue;
+        };
+        if !struck.contains(against) {
+            continue;
+        }
+
+        faith.shift(0.35);
+        legend.dread += 2.0;
+        *activity = Activity::Idle;
+        info!(
+            "{}'s prayer against {enemy} was answered by {god}",
+            person.name
+        );
+        notices.write(crate::ui::Notice::fanfare(format!(
+            "{}'s dark prayer was answered",
+            person.name
+        )));
+        if let Some(mut chronicle) = chronicle {
+            chronicle.record(
+                clock.day(),
+                format!("prayed against {enemy}, and the lightning came"),
+            );
+        }
+        if let Some(mut stirred) = stirred {
+            stirred.stir(
+                clock.day(),
+                format!("the god struck {enemy} for them - dark faith"),
+            );
+        }
+        ledger.close(&person.name, prayer.words.clone(), PrayerOutcome::Answered);
+        end_prayer(&mut commands, entity, &children, &motes);
+    }
+}
+
 /// Hope has a horizon. A prayer left open long enough closes itself, and
 /// takes something with it.
 pub(super) fn despair(
@@ -354,6 +765,7 @@ pub(super) fn despair(
     children: Query<&Children>,
     motes: Query<Entity, With<PrayerMote>>,
     mut notices: MessageWriter<crate::ui::Notice>,
+    mut ledger: ResMut<PrayerLedger>,
     mut praying: Query<
         (
             Entity,
@@ -362,11 +774,13 @@ pub(super) fn despair(
             &mut Activity,
             &mut Faith,
             Option<&mut Chronicle>,
+            Option<&mut super::Stirrings>,
         ),
         Without<Corpse>,
     >,
 ) {
-    for (entity, mut prayer, person, mut activity, mut faith, chronicle) in &mut praying {
+    for (entity, mut prayer, person, mut activity, mut faith, chronicle, stirred) in &mut praying
+    {
         prayer.remaining -= time.delta_secs();
         if prayer.remaining > 0.0 {
             continue;
@@ -376,6 +790,10 @@ pub(super) fn despair(
         if *activity == Activity::Praying {
             *activity = Activity::Idle;
         }
+        if let Some(mut stirred) = stirred {
+            stirred.stir(clock.day(), "prayed into silence - doubt crept in");
+        }
+        ledger.close(&person.name, prayer.words.clone(), PrayerOutcome::Curdled);
         end_prayer(&mut commands, entity, &children, &motes);
 
         info!("{}'s prayer went unanswered", person.name);
@@ -685,6 +1103,7 @@ mod tests {
         app.add_message::<crate::ui::Notice>();
         app.add_message::<crate::ui::Say>();
         app.add_message::<DivineEvent>();
+        app.init_resource::<PrayerLedger>();
         app.add_systems(Update, (kneel, answer_prayers, despair).chain());
 
         let settlement = app
@@ -757,6 +1176,27 @@ mod tests {
             "the answer must enter the chronicle: {:?}",
             chronicle.events,
         );
+        // And the board gets its receipt.
+        let ledger = app.world().resource::<PrayerLedger>();
+        assert!(
+            ledger
+                .closed
+                .iter()
+                .any(|closed| matches!(closed.outcome, PrayerOutcome::Answered)),
+            "an answered prayer must reach the board's ledger",
+        );
+    }
+
+    #[test]
+    fn the_ledger_keeps_only_the_recent_receipts() {
+        let mut ledger = PrayerLedger::default();
+        for n in 0..12 {
+            ledger.close(&format!("Soul {n}"), None, PrayerOutcome::Curdled);
+        }
+        assert_eq!(ledger.closed.len(), PrayerLedger::KEPT);
+        // Oldest fell off the front; the newest is the last.
+        assert_eq!(ledger.closed.first().unwrap().name, "Soul 4");
+        assert_eq!(ledger.closed.last().unwrap().name, "Soul 11");
     }
 
     #[test]
@@ -785,6 +1225,14 @@ mod tests {
                 .any(|e| e.text.contains("no answer came")),
             "the silence must enter the chronicle: {:?}",
             chronicle.events,
+        );
+        let ledger = app.world().resource::<PrayerLedger>();
+        assert!(
+            ledger
+                .closed
+                .iter()
+                .any(|closed| matches!(closed.outcome, PrayerOutcome::Curdled)),
+            "a curdled prayer must reach the board's ledger",
         );
     }
 

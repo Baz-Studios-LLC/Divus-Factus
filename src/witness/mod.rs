@@ -217,6 +217,30 @@ impl DivineEventKind {
         }
     }
 
+    /// How hearing this befell somebody moves the listener's heart toward
+    /// them. The gossip mill's reach into the regard graph: good fortune
+    /// retold makes its subject a little dearer, the god's violence makes
+    /// the village step back from its target — the smited must have earned
+    /// it, and nobody stands too near the earner — and plain misfortune
+    /// draws sympathy. Signed regard per hearing, small on purpose: a
+    /// reputation is made of many mouths.
+    pub fn warms_toward_subject(self) -> f32 {
+        match self {
+            DivineEventKind::Provided
+            | DivineEventKind::Delivered
+            | DivineEventKind::Flourished
+            | DivineEventKind::Mended
+            | DivineEventKind::Lifted
+            | DivineEventKind::SetDown => 0.04,
+            DivineEventKind::Smote
+            | DivineEventKind::Quaked
+            | DivineEventKind::Thrown
+            | DivineEventKind::Impact => -0.06,
+            DivineEventKind::Perished | DivineEventKind::Mauled => 0.03,
+            DivineEventKind::Uprooted => 0.0,
+        }
+    }
+
     /// Whether the one it happened TO carries the memory themselves.
     ///
     /// For the god's own acts they do not: being thrown across a field is
@@ -412,6 +436,13 @@ pub struct Whom {
     pub name: String,
     /// What they are to the witness: "your brother", "your neighbour".
     pub tie: String,
+    /// Who they ARE, for the gossip mill: hearing what befell somebody
+    /// moves the listener's regard toward that somebody, and regard is
+    /// kept by entity. Never written to disk — a memory that survives a
+    /// save speaks only in names and ties, and gossip about the long-gone
+    /// simply stops reaching hearts, which is what forgetting is.
+    #[serde(skip)]
+    pub subject: Option<Entity>,
 }
 
 impl Whom {
@@ -693,6 +724,7 @@ fn perceive_events(
                     )
                     .word()
                     .to_string(),
+                    subject: Some(subject),
                 }),
                 _ => None,
             };
@@ -999,6 +1031,7 @@ mod tests {
             Some(Whom {
                 name: "Feitreh".into(),
                 tie: "your neighbour".into(),
+                subject: None,
             }),
             true,
             1,
@@ -1046,6 +1079,7 @@ mod tests {
             Some(Whom {
                 name: "Feitreh".into(),
                 tie: "your brother".into(),
+                subject: None,
             }),
             false,
             3,

@@ -1,11 +1,9 @@
 //! What people say when nobody asked.
 //!
-//! Every word here is composed for its speaker in the moment — the sim picks
-//! the topic from what is true about them right now (their belly, their bed,
-//! their marriage, their god, the sky, what lately happened), and the teller
-//! finds the words. The written murmur that once served this module retired
-//! when the no-canned rule landed: a moment nothing was composed for is a
-//! quiet moment.
+//! Every idle thought is picked from the corpus by the tags of the moment —
+//! what is true about this person right now: their belly, their bed, their
+//! marriage, their trade, their god. The sim describes the moment; the
+//! corpus finds the words.
 
 use bevy::prelude::*;
 
@@ -53,83 +51,21 @@ pub(super) fn remember_what_was_said(
 }
 
 use crate::creature::{Corpse, Held, Vitality};
-use crate::rng::Rng;
-use crate::weather::WeatherKind;
 
 use super::{Activity, Morale, Needs, SimRng, Villager, home, work};
 
-/// The one thing pressing on someone right now, for a thought to circle.
+/// Gives an idle soul a thought, every little while.
 ///
-/// The sim chooses the topic and the model finds the words — never the other
-/// way round. Priority runs body, then roof, then what they saw, then heart,
-/// then the ordinary day; ties inside a band go to the dice so a hungry
-/// village does not think in unison.
-fn pressing_matter(
-    needs: &Needs,
-    hurt: bool,
-    housed: bool,
-    saw: Option<&str>,
-    spirits: f32,
-    spouse: bool,
-    sky: Option<WeatherKind>,
-    rng: &mut Rng,
-) -> String {
-    let mut matters: Vec<&str> = Vec::new();
-    if needs.hunger > 0.6 {
-        matters.push("the empty belly");
-    }
-    if needs.rest > 0.75 {
-        matters.push("how long this day has been");
-    }
-    if hurt {
-        matters.push("the wound, still mending");
-    }
-    if !matters.is_empty() {
-        return (*rng.pick(&matters)).to_string();
-    }
-    if let Some(what) = saw {
-        // What they saw the god do outweighs the ordinary worries, phrased
-        // as the memory holds it: "saw lightning called down".
-        return format!("what you {what}");
-    }
-    if !housed {
-        matters.push("no roof of your own yet");
-    }
-    if spirits < 0.35 {
-        matters.push("how heavy the days feel");
-    } else if spirits > 0.7 {
-        matters.push("how good the day feels");
-    }
-    if spouse {
-        matters.push("the one waiting at home");
-    } else {
-        matters.push("having no one to come home to");
-    }
-    matters.push(match sky {
-        Some(WeatherKind::Storm) => "the storm overhead",
-        Some(WeatherKind::Rain) => "the rain coming down",
-        Some(WeatherKind::Overcast) => "the grey sky",
-        Some(WeatherKind::Clear) | None => "the day itself",
-    });
-    (*rng.pick(&matters)).to_string()
-}
-
-/// Asks the teller, ahead of time, for the thoughts of whoever the god is
-/// actually watching.
-///
-/// A thought has no listener, so it has no deadline: it can be composed a
-/// few seconds before it is shown, which is what makes per-person generation
-/// affordable at all. Only the closely watched are asked for, only while
-/// idle, and each head at most once a minute.
-#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+/// One head per tick, at most once a minute each, tagged with everything
+/// true about them right now. Everyone thinks, watched or not - the pick
+/// is free, and `show_musings` keeps unwatched thoughts to itself.
+#[allow(clippy::type_complexity)]
 pub(super) fn muse_the_watched(
     time: Res<Time>,
     mut since_last: Local<f32>,
     mut last_mused: Local<std::collections::HashMap<Entity, f32>>,
     mut clock: Local<f32>,
     tongue: Option<ResMut<crate::telling::Tongue>>,
-    attention: Option<Res<crate::attention::Attention>>,
-    now: Option<Res<crate::now::WorldNow>>,
     mut rng: ResMut<SimRng>,
     villagers: Query<
         (
@@ -146,13 +82,10 @@ pub(super) fn muse_the_watched(
                 Option<&super::Spouse>,
                 Option<&home::Home>,
                 Option<&work::Vocation>,
-                Option<&super::traits::Traits>,
-                Option<&super::MemberOf>,
             ),
         ),
         (With<Villager>, Without<Corpse>, Without<Held>),
     >,
-    names: Query<&super::Person>,
 ) {
     let Some(mut tongue) = tongue else {
         return;
@@ -170,29 +103,25 @@ pub(super) fn muse_the_watched(
     }
     *since_last = 0.0;
 
-    // The watched and idle, not asked recently.
+    // The idle, not asked recently. Everyone thinks, watched or not: the
+    // pick is free, and the showing already keeps unwatched thoughts to
+    // itself.
     let candidates: Vec<_> = villagers
         .iter()
-        .filter(|(entity, at, _, _, activity, ..)| {
+        .filter(|(entity, _, _, _, activity, ..)| {
             matches!(**activity, Activity::Idle | Activity::Wandering)
-                && crate::attention::regard(attention.as_deref(), at.translation).worth_composing()
                 && last_mused.get(entity).is_none_or(|at| *clock - at > 60.0)
         })
         .collect();
     if candidates.is_empty() {
         return;
     }
-    let (entity, _, needs, morale, _, person, extras) =
+    let (entity, _, needs, _, _, person, extras) =
         candidates[(rng.0.f32() * candidates.len() as f32) as usize % candidates.len()];
-    let (vitality, faith, witnessed, spouse, house, vocation, manner, member) = extras;
+    let (vitality, faith, _witnessed, spouse, house, vocation) = extras;
 
-    // The place, from the settlement's digest; a person of no town thinks
-    // with no place lines, which is honest.
-    let place = member
-        .and_then(|member| now.as_ref()?.places.get(&member.0).cloned())
-        .map(|place| place.lines())
-        .unwrap_or_default();
-
+    // The corpus reads these as tags: the deeper the moment's true
+    // description, the sharper the line it can reach for.
     let mut body: Vec<&'static str> = Vec::new();
     if needs.hunger > 0.6 {
         body.push("hungry");
@@ -203,8 +132,6 @@ pub(super) fn muse_the_watched(
     if vitality.is_some_and(|v| v.harm > 0.3) {
         body.push("hurt");
     }
-    // The corpus reads these as tags: the deeper the moment's true
-    // description, the sharper the line it can reach for.
     body.push(if house.is_some() {
         "housed"
     } else {
@@ -214,53 +141,15 @@ pub(super) fn muse_the_watched(
         body.push("married");
     }
 
-    let saw = witnessed
-        .and_then(|w| w.recent.first())
-        .map(|memory| memory.kind.describe());
-    let mind = pressing_matter(
-        needs,
-        vitality.is_some_and(|v| v.harm > 0.3),
-        house.is_some(),
-        saw,
-        morale.spirits,
-        spouse.is_some(),
-        None,
-        &mut rng.0,
-    );
-
-    // Every name this thought is allowed to say: their own, their place,
-    // their spouse, and whoever their freshest memory is about.
-    let mut known: Vec<String> = vec![person.name.clone()];
-    if let Some(place_name) = member
-        .and_then(|member| now.as_ref()?.places.get(&member.0))
-        .map(|p| p.name.clone())
-    {
-        known.push(place_name);
-    }
-    if let Some(dear) = spouse.and_then(|s| names.get(s.0).ok()) {
-        known.push(dear.name.clone());
-    }
-    if let Some(whom) = witnessed
-        .and_then(|w| w.recent.first())
-        .and_then(|m| m.whom.as_ref())
-    {
-        known.push(whom.name.clone());
-    }
-
     last_mused.insert(entity, *clock);
     debug!("{} is asked for words", person.name);
     tongue.muse(crate::telling::Musing {
         who: entity,
         voice: vocation.copied(),
-        bearing: manner.map(|m| m.bearing()).unwrap_or_default(),
         faith: crate::telling::FaithBand::of(faith.map_or(0.3, |f| f.trust)),
         body,
-        place,
-        mind,
         heard: None,
         aloud: false,
-        prayer: false,
-        known,
     });
 }
 
@@ -298,7 +187,7 @@ pub(super) fn show_musings(
         let Some(line) = tongue.take_musing(who) else {
             continue;
         };
-        let (line, aloud, prayer) = line;
+        let (line, aloud) = line;
         info!(
             "a watched head finds its own words{}: {line}",
             if aloud { ", aloud" } else { "" }
@@ -307,8 +196,7 @@ pub(super) fn show_musings(
             speaker: who,
             text: line.replace("the god", god),
             thought: !aloud,
-            prayer,
-            own_words: true,
+            prayer: false,
         });
         showed += 1;
     }
@@ -320,66 +208,3 @@ pub(super) fn show_musings(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_pressing_matter_is_the_body_first() {
-        let mut rng = Rng::new(5);
-        let starving = Needs {
-            hunger: 0.9,
-            rest: 0.2,
-        };
-        assert_eq!(
-            pressing_matter(&starving, false, true, None, 0.5, true, None, &mut rng),
-            "the empty belly"
-        );
-        // A miracle outweighs the ordinary worries, but not the body.
-        let fine = Needs {
-            hunger: 0.1,
-            rest: 0.1,
-        };
-        assert_eq!(
-            pressing_matter(
-                &fine,
-                false,
-                true,
-                Some("saw lightning called down"),
-                0.5,
-                true,
-                None,
-                &mut rng
-            ),
-            "what you saw lightning called down"
-        );
-        assert_eq!(
-            pressing_matter(
-                &starving,
-                false,
-                true,
-                Some("saw lightning called down"),
-                0.5,
-                true,
-                None,
-                &mut rng
-            ),
-            "the empty belly"
-        );
-    }
-
-    #[test]
-    fn an_ordinary_day_still_finds_a_matter() {
-        // Nothing pressing at all: the draw must still land somewhere, and
-        // somewhere true — the spouse, the sky, the day.
-        let mut rng = Rng::new(11);
-        let fine = Needs {
-            hunger: 0.1,
-            rest: 0.1,
-        };
-        for _ in 0..20 {
-            let matter = pressing_matter(&fine, false, true, None, 0.5, false, None, &mut rng);
-            assert!(!matter.is_empty());
-        }
-    }
-}

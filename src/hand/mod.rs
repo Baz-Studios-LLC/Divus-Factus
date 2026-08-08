@@ -346,6 +346,7 @@ impl Plugin for HandPlugin {
                     update_hover,
                     outline_the_hovered,
                     toggle_follow,
+                    knock_on_roofs,
                     handle_grab_and_release,
                     carry_held_object,
                     fade_divine_mark,
@@ -437,6 +438,21 @@ struct HandRig {
     /// grip half-closes on a hover and closes for the flag walk - and not
     /// `carry`, which the flag drives too. Only cargo weights the centering.
     cradle: f32,
+    /// How far into SEIZING THE GROUND the hand is, 0 to 1: the land-drag's
+    /// pose. Fingers spread, palm flattened onto the turf - Black and
+    /// White's own gesture, a hand planted on the world to turn it. Brett:
+    /// "fingers spread and palm flattens out like it grabs the ground."
+    clutch: f32,
+    /// The exact turf the clutch seized, latched flat at the grab and held
+    /// for its whole life. Anchoring to the LIVE ground under the cursor
+    /// let the hand slide whenever the camera's solver was still catching
+    /// up to the drag - "it slides a little bit while moving". The ground
+    /// never moves in flat coordinates, so this point IS the turf.
+    clutch_at: Option<Vec3>,
+    /// Seconds left in the rap - the knock-on-the-roof gesture. A one-shot,
+    /// unlike the eased states: set to `RAP_TIME` when a knock lands and
+    /// run down to nothing, driving a quick fist and two strikes downward.
+    rap: f32,
 }
 
 /// The roll that turns the flat palm into a fist held sideways, as a hand
@@ -447,6 +463,16 @@ const CARRY_ROLL: f32 = -FRAC_PI_2;
 /// And a little tip forward with it, so the fist reads as bearing weight
 /// rather than merely being turned over.
 const CARRY_PITCH: f32 = 0.35;
+
+/// What the ground-clutch does to the resting pitch: CANCELS it. The idle
+/// pose tips the fingertips down a shade to show intent (negative pitch is
+/// tips-down in this frame — the first cut of this constant went further
+/// negative and Brett watched the hand dive nose-first: "the palm leaned
+/// forward not flat"). A planted palm lies level with the turf.
+const CLUTCH_PITCH: f32 = 0.10;
+
+/// How long the knock gesture plays: a fist, two strikes, and out.
+const RAP_TIME: f32 = 0.5;
 
 /// Grip closure and hover height for each state of the hand.
 ///
@@ -693,6 +719,8 @@ fn toggle_follow(
 
     let hovered_creature = hand.hovered.filter(|e| creatures.get(*e).is_ok());
     match (follow.entity, hovered_creature) {
+        // (The same clean tap on a DWELLING is a knock — `knock_on_roofs`
+        // watches beside this system with the same six-pixel rule.)
         // A different creature: switch the follow to them.
         (Some(current), Some(other)) if other != current => {
             follow.entity = Some(other);
@@ -710,6 +738,50 @@ fn toggle_follow(
         }
         (None, None) => {}
     }
+}
+
+/// A clean action-tap on a dwelling knocks on the roof.
+///
+/// Black and White's wake-up call: the household inside is turned out of
+/// bed. Detected here, where the pointer lives, with the same six-pixel
+/// cleanness rule as `toggle_follow`; answered in `villager::home`, where
+/// the sleep machinery lives.
+#[allow(clippy::type_complexity)]
+fn knock_on_roofs(
+    buttons: Res<ButtonInput<MouseButton>>,
+    mouse: Res<crate::keymap::MouseScheme>,
+    windows: Query<&Window, With<PrimaryWindow>>,
+    pointer: Res<PointerContext>,
+    hand: Res<DivineHand>,
+    dwellings: Query<
+        (),
+        Or<(
+            With<crate::villager::work::Hut>,
+            With<crate::villager::work::Longhouse>,
+        )>,
+    >,
+    mut knocks: MessageWriter<crate::villager::home::Knock>,
+    mut press_at: Local<Option<Vec2>>,
+) {
+    let Ok(window) = windows.single() else {
+        return;
+    };
+    if buttons.just_pressed(mouse.action()) {
+        *press_at = window.cursor_position();
+    }
+    if !buttons.just_released(mouse.action()) {
+        return;
+    }
+    let (Some(down), Some(up)) = (press_at.take(), window.cursor_position()) else {
+        return;
+    };
+    if down.distance(up) > 6.0 || pointer.over_ui {
+        return;
+    }
+    let Some(building) = hand.hovered.filter(|e| dwellings.get(*e).is_ok()) else {
+        return;
+    };
+    knocks.write(crate::villager::home::Knock { building });
 }
 
 fn handle_grab_and_release(
@@ -1010,6 +1082,9 @@ fn handle_grab_and_release(
             .remove::<Airborne>()
             .remove::<crate::matter::Rolling>()
             .remove::<crate::matter::Floating>()
+            // Snatched out of the drink: the god's hand is the one rescue
+            // from the water's claim.
+            .remove::<crate::matter::Sinking>()
             .insert(MoveTarget(None));
 
         // Anything living in a chunk's coordinate space leaves it the
@@ -1407,6 +1482,9 @@ fn spawn_hand_cursor(
         point: 0.0,
         tap: 0.0,
         fade: 1.0,
+        clutch: 0.0,
+        clutch_at: None,
+        rap: 0.0,
     });
 }
 
@@ -1478,6 +1556,7 @@ fn animate_hand(
     mouse: Res<crate::keymap::MouseScheme>,
     tune: Res<CarryTune>,
     state: Res<State<crate::GameState>>,
+    mut knocks: MessageReader<crate::villager::home::Knock>,
     cameras: Query<&CameraRig>,
     anchors: Query<&GlobalTransform>,
     mut roots: Query<(&mut Transform, &mut Visibility, &mut HandRig), With<HandModel>>,
@@ -1514,6 +1593,35 @@ fn animate_hand(
     let ease = 1.0 - (-14.0 * dt).exp();
     let pointing = pointer.over_ui && !held;
     rig.point += ((pointing as u32 as f32) - rig.point) * ease;
+
+    // Seizing the ground: the land-drag plants the hand. Quick to take
+    // hold, easier letting go — a grab is a gesture, a release is a breath.
+    // Never while carrying: a fist full of villager stays a fist, however
+    // the world is being turned under it.
+    let clutching = camera.held_by_hand && !held;
+    let clutch_rate = if clutching { 18.0 } else { 8.0 };
+    let clutch_ease = 1.0 - (-clutch_rate * dt).exp();
+    rig.clutch += ((clutching as u32 as f32) - rig.clutch) * clutch_ease;
+    // Latched on the boolean, not the eased value: the turf is seized the
+    // frame the button lands, and let go the frame it lifts - the ease is
+    // for the fingers, never for where the hand is nailed.
+    if clutching {
+        if rig.clutch_at.is_none() {
+            rig.clutch_at = hand.cursor_world;
+        }
+    } else {
+        rig.clutch_at = None;
+    }
+
+    // The rap: a knock landed this frame starts the gesture, and the timer
+    // plays it out. `strike` pulses twice over the rap's life - the two
+    // knuckle-blows - and drives the dip and the wrist together.
+    if knocks.read().next().is_some() {
+        rig.rap = RAP_TIME;
+    }
+    rig.rap = (rig.rap - dt).max(0.0);
+    let rap = rig.rap / RAP_TIME;
+    let strike = (rap * std::f32::consts::TAU * 2.0).sin().max(0.0);
 
     // Behind a mortal's eyes the hand withdraws entirely — at that range it
     // would fill the whole frame, and a god wearing a body has no business
@@ -1556,6 +1664,12 @@ fn animate_hand(
         // lift is the hover above, sized to put the finger cage at that line.
         let scruff = hand.held.as_ref().map_or(0.0, |h| h.girth * 0.15);
         hand.grip_point().map(|grip| grip + Vec3::Y * scruff)
+    } else if let Some(seized) = rig.clutch_at {
+        // Nailed to the turf it took hold of - not the live ground under
+        // the cursor, which drifts off the seized point while the camera
+        // solver is still catching the drag up. The drag owns the hand:
+        // no hover-lean can lift a planted palm.
+        Some(seized)
     } else if let Some(position) = hovered {
         // Lean toward the hovered thing rather than locking onto it: the
         // cursor still steers, the hand just shows interest.
@@ -1615,25 +1729,41 @@ fn animate_hand(
     rig.cradle += ((held as u32 as f32) - rig.cradle) * fade_ease;
 
     let (open_grip, hover) = pose(held, hovered.is_some());
-    // A fist, and it wins outright over whatever the hover was doing.
-    let target_grip = open_grip.max(rig.carry);
-    rig.grip += (target_grip - rig.grip) * ease;
+    // A fist, and it wins outright over whatever the hover was doing - and
+    // the rap makes one too, knuckles first, for as long as it plays. A
+    // FULL fist, held for the whole gesture: scaling the target by the
+    // time remaining let it decay as the rap played, and the hand knocked
+    // half-open. It also closes at double time - the fist must be made
+    // before the first strike lands, not after the second.
+    let target_grip = open_grip
+        .max(rig.carry)
+        .max(if rig.rap > 0.0 { 1.0 } else { 0.0 });
+    let grip_ease = if rig.rap > 0.0 {
+        1.0 - (-30.0 * dt).exp()
+    } else {
+        ease
+    };
+    rig.grip += (target_grip - rig.grip) * grip_ease;
 
     let world_scale = world_scale_at(camera.distance);
     let scale = world_scale + (UI_CURSOR_SCALE - world_scale) * blend;
 
     // Two incommensurate sines so the drift never reads as a loop. Gripping
     // steadies it — a hand carrying something concentrates — and so does
-    // pointing: a cursor that bobs is a cursor that misses.
-    let calm = (1.0 - rig.grip * 0.7) * (1.0 - blend);
+    // pointing: a cursor that bobs is a cursor that misses. A hand PLANTED
+    // on the ground does not float at all.
+    let calm = (1.0 - rig.grip * 0.7) * (1.0 - blend) * (1.0 - rig.clutch);
     let bob = ((t * 1.1).sin() * 0.16 + (t * 1.9 + 2.0).sin() * 0.07) * calm;
 
     // Seated. The anchor is a flat position - the ground under the cursor, or
     // an un-bent hovered thing - lifted along flat up, then placed on the
-    // sphere.
-    let world_seat = anchor.map(|anchor| {
-        crate::globe::bend_frame(anchor + Vec3::Y * (hover * world_scale * 0.5 + bob))
-    });
+    // sphere. The clutch takes the hover away: a hand seizing the ground is
+    // ON the ground, palm to the turf, not hovering over it.
+    let lift = (hover * world_scale * 0.5 + bob) * (1.0 - rig.clutch)
+        + rig.clutch * world_scale * 0.05
+        // Each strike of the rap drops the fist toward the shingles.
+        - strike * world_scale * 0.45;
+    let world_seat = anchor.map(|anchor| crate::globe::bend_frame(anchor + Vec3::Y * lift));
     let world_position = world_seat.map(|(seat, _)| seat);
     let position = match (world_position, ui_placement) {
         (Some(world), Some((ui, _))) => world.lerp(ui, blend),
@@ -1674,9 +1804,11 @@ fn animate_hand(
 
     let previous = transform.translation;
     // Over the world the hand glides; as a cursor it snaps, because a
-    // pointer that trails the mouse reads as a pointer that misses.
+    // pointer that trails the mouse reads as a pointer that misses — and a
+    // hand PLANTED on the ground is rigid with it: any glide left in the
+    // follow reads as the palm skating over the turf it is holding.
     let follow = 1.0 - (-14.0 * dt).exp();
-    let follow = follow + (1.0 - follow) * blend;
+    let follow = follow + (1.0 - follow) * blend.max(rig.clutch);
     transform.translation = transform.translation.lerp(position, follow);
 
     // Bank into travel, the way anything moving through air does. This, more than
@@ -1697,10 +1829,14 @@ fn animate_hand(
     // the wrong direction on the other side."
     let upright = camera.facing;
     let local = Quat::from_rotation_y(-camera.yaw) * (upright.inverse() * velocity);
+    // A planted hand does not bank either: while the clutch holds, the hand
+    // travels WITH the ground it is gripping, and heeling into that motion
+    // read as the palm leaning forward off its own grip.
     let target_bank = Vec2::new(
         (local.x * 0.035).clamp(-0.55, 0.55),
         (local.z * 0.03).clamp(-0.45, 0.45),
-    ) * (1.0 - blend);
+    ) * (1.0 - blend)
+        * (1.0 - rig.clutch);
     let settle = 1.0 - (-7.0 * dt).exp();
     let bank_delta = (target_bank - rig.bank) * settle;
     rig.bank += bank_delta;
@@ -1710,9 +1846,18 @@ fn animate_hand(
     let sway_pitch = (t * 0.7 + 1.3).sin() * 0.04 * calm;
 
     // Back of the hand to the camera, fingers up-screen, palm laid nearly flat —
-    // tipped just enough toward the ground to show intent.
+    // tipped just enough toward the ground to show intent. The clutch tips it
+    // the rest of the way and a shade past, so the fingertips press IN.
     let flat_rotation = Quat::from_rotation_y(camera.yaw)
-        * Quat::from_rotation_x(-0.12 + sway_pitch + rig.bank.y + CARRY_PITCH * rig.carry)
+        * Quat::from_rotation_x(
+            -0.12
+                + sway_pitch
+                + rig.bank.y
+                + CARRY_PITCH * rig.carry
+                + CLUTCH_PITCH * rig.clutch
+                // The wrist tips into each strike, knuckles leading.
+                - 0.4 * strike,
+        )
         * Quat::from_rotation_z(sway_roll - rig.bank.x + CARRY_ROLL * rig.carry);
     // Turned into the frame of the ground it hovers over, so the hand stands
     // upright on the curve wherever it is.
@@ -1740,8 +1885,11 @@ fn animate_hand(
     // Fingers: knuckle takes the curl, the mid-joint slightly more, and an idle
     // ripple runs through them while the hand is open. Pointing overrides all of
     // it — index straight, the rest folded — blended by the same scalar as the
-    // flight, so pose and position arrive together.
+    // flight, so pose and position arrive together. The ground-clutch overrides
+    // the other way: every finger nearly straight and SPLAYED, a palm planted
+    // on the world — but never through a carry, whose fist owns the fingers.
     let point = rig.point;
+    let splay = rig.clutch * (1.0 - rig.carry);
     for (index, [proximal, distal]) in rig.fingers.iter().enumerate() {
         let ripple = (t * 1.1 + index as f32 * 1.5).sin() * 0.09 * (1.0 - rig.grip);
         // The index stays straight while pointing — until a click taps it down
@@ -1752,13 +1900,31 @@ fn animate_hand(
             (1.02 + index as f32 * 0.05, 1.1)
         };
 
-        let proximal_curl =
-            (0.28 + rig.grip * 0.95 + ripple) * (1.0 - point) + point_proximal * point;
-        let distal_curl =
-            (0.22 + rig.grip * 1.1 + ripple * 0.6) * (1.0 - point) + point_distal * point;
+        // Knuckles nearly flat, TIPS bent into the turf: a planted hand
+        // holds on with its fingertips, not with a stiff paddle.
+        let proximal_curl = ((0.28 + rig.grip * 0.95 + ripple) * (1.0 - point)
+            + point_proximal * point)
+            * (1.0 - splay)
+            + 0.16 * splay;
+        let distal_curl = ((0.22 + rig.grip * 1.1 + ripple * 0.6) * (1.0 - point)
+            + point_distal * point)
+            * (1.0 - splay)
+            + 0.45 * splay;
+        // Spread from the knuckle, fanned about the middle finger, so the
+        // planted hand reads as a star of fingers rather than a paddle.
+        // Wide on purpose: at these stubby finger lengths a subtle fan
+        // reads as no fan at all - "the fingers are joind not spread".
+        //
+        // SIGN, from the model: fingers point along -Z, finger 0 sits at
+        // x=-0.36, and positive yaw swings a -Z bone toward -X - the thumb
+        // splays left off the left side with +0.85 to prove it. So the
+        // LEFTMOST finger fans with POSITIVE yaw. The first cut had it
+        // backwards and every finger swung into the middle: "the fingers
+        // are even MORE together lol".
+        let fan = (1.5 - index as f32) * 0.30 * splay;
 
         if let Ok(mut joint) = joints.get_mut(*proximal) {
-            joint.rotation = Quat::from_rotation_x(-proximal_curl);
+            joint.rotation = Quat::from_rotation_y(fan) * Quat::from_rotation_x(-proximal_curl);
         }
         if let Ok(mut joint) = joints.get_mut(*distal) {
             joint.rotation = Quat::from_rotation_x(-distal_curl);
@@ -1766,13 +1932,19 @@ fn animate_hand(
     }
 
     let [thumb_base, thumb_tip] = rig.thumb;
-    let thumb_curl = (0.1 + rig.grip * 0.8) * (1.0 - point) + 0.8 * point;
+    let thumb_curl = ((0.1 + rig.grip * 0.8) * (1.0 - point) + 0.8 * point) * (1.0 - splay)
+        + 0.08 * splay;
     if let Ok(mut joint) = joints.get_mut(thumb_base) {
-        joint.rotation = Quat::from_rotation_y(0.85) * Quat::from_rotation_x(-thumb_curl);
+        // The thumb spreads WIDE when the palm plants - the whole reach of
+        // the hand laid claim to the ground.
+        joint.rotation =
+            Quat::from_rotation_y(0.85 + 0.55 * splay) * Quat::from_rotation_x(-thumb_curl);
     }
     if let Ok(mut joint) = joints.get_mut(thumb_tip) {
         joint.rotation = Quat::from_rotation_x(
-            -(0.1 * (1.0 - point) + 0.85 * point + rig.grip * 0.9 * (1.0 - point)),
+            -((0.1 * (1.0 - point) + 0.85 * point + rig.grip * 0.9 * (1.0 - point))
+                * (1.0 - splay)
+                + 0.32 * splay),
         );
     }
 }

@@ -14,7 +14,7 @@
 
 use bevy::prelude::*;
 
-use super::work::{Bed, Hut, Longhouse, Stockpile};
+use super::work::{Bed, Hut, Longhouse, Shell, Stockpile};
 use super::{Activity, Chronicle, Needs, Parentage, Person, SimRng, Spouse, Villager};
 use crate::creature::anim::CreatureMotion;
 use crate::creature::genome::{Age, CreatureGenome};
@@ -1220,6 +1220,118 @@ pub(super) fn night_routine(
                     facing,
                 });
             }
+        }
+    }
+}
+
+/// The god's knuckle on the shingles: a clean action-tap on a dwelling.
+///
+/// Black and White's wake-up call, carried over whole: knock on a house
+/// and the household comes out. The hand detects the tap (it owns the
+/// pointer); this module answers it, because the sleep machinery lives
+/// here and waking is its business.
+#[derive(Message)]
+pub struct Knock {
+    pub building: Entity,
+}
+
+/// What the knock found: how many of the household were home. Read by the
+/// placard that pops over the door — the knock's census, "3 of 8 home".
+#[derive(Message)]
+pub struct KnockReport {
+    pub building: Entity,
+    /// How many were actually in the house when the knuckle landed.
+    pub home: u32,
+    /// How many live there.
+    pub household: u32,
+}
+
+/// Turns the knocked household out of doors.
+///
+/// Only the ones actually IN the house answer - the asleep and the
+/// sheltering. Whoever is out working never hears it. The woken step out
+/// to the front door and stand blinking; roused sleep is lost sleep, and
+/// a sleeper woken in the dark thinks a little less of the god who did it
+/// - Black and White's own trade, productivity now against grumbling
+/// later. Knock and then provide, and the two systems already square the
+/// account the other way.
+#[allow(clippy::type_complexity)]
+pub(super) fn answer_the_knock(
+    mut commands: Commands,
+    mut knocks: MessageReader<Knock>,
+    mut reports: MessageWriter<KnockReport>,
+    clock: Res<crate::calendar::WorldClock>,
+    dwellings: Query<(&Transform, Option<&Shell>), Without<Villager>>,
+    mut folk: Query<
+        (
+            Entity,
+            &Home,
+            &mut Activity,
+            &mut MoveTarget,
+            &mut Needs,
+            &mut super::belief::Faith,
+            &mut CreatureMotion,
+            Option<&mut super::Stirrings>,
+        ),
+        (
+            With<Villager>,
+            Without<Held>,
+            Without<crate::avatar::Ridden>,
+            Without<Airborne>,
+            Without<Corpse>,
+        ),
+    >,
+) {
+    for knock in knocks.read() {
+        let Ok((site, shell)) = dwellings.get(knock.building) else {
+            continue;
+        };
+        // Where the roused step out to: just past the front door.
+        let stand = shell.and_then(|shell| {
+            shell.doors.first().map(|door| {
+                let (_, outside) = shell.door_stand(door);
+                site.translation + site.rotation * Vec3::new(outside.x, 0.0, outside.y)
+            })
+        });
+        let night = clock.is_night();
+        let mut woken = 0u32;
+        let mut household = 0u32;
+        for (entity, home, mut activity, mut target, mut needs, mut faith, mut motion, stirred) in
+            &mut folk
+        {
+            if home.0 != knock.building {
+                continue;
+            }
+            household += 1;
+            let asleep = matches!(*activity, Activity::Sleeping);
+            if !asleep && !matches!(*activity, Activity::Sheltering) {
+                continue;
+            }
+            *activity = Activity::Idle;
+            commands.entity(entity).remove::<Abed>();
+            motion.speed = 1.0;
+            target.0 = stand;
+            woken += 1;
+            if asleep {
+                needs.rest = (needs.rest + 0.08).min(1.0);
+                if night {
+                    faith.shift(-0.02);
+                    if let Some(mut stirred) = stirred {
+                        stirred
+                            .stir(clock.day(), "hammered awake in the dead of night - doubt");
+                    }
+                }
+            }
+        }
+        // The census goes up even when nobody answered: "0 of 5 home" is
+        // exactly what a knock on an empty house should say.
+        reports.write(KnockReport {
+            building: knock.building,
+            home: woken,
+            household,
+        });
+        if woken > 0 {
+            info!("a knock on the roof turned out {woken} souls");
         }
     }
 }
