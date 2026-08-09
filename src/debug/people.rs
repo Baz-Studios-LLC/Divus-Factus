@@ -34,6 +34,13 @@ pub(crate) struct TradeChip(pub crate::villager::work::Vocation);
 #[derive(Component)]
 pub(crate) struct TradeChipCount(pub crate::villager::work::Vocation);
 
+/// The chip before the trades: press to let everyone back in.
+#[derive(Component)]
+pub(crate) struct AllChip;
+
+#[derive(Component)]
+pub(crate) struct AllChipCount;
+
 /// The roster narrowed to one calling, when a chip is pressed.
 #[derive(Resource, Default)]
 pub(crate) struct RosterFilter(pub Option<crate::villager::work::Vocation>);
@@ -57,7 +64,19 @@ pub(crate) fn people_pulse(
     panels: Query<&Visibility, With<PeoplePanel>>,
     mut plates: Query<(&PulsePlate, &mut Text)>,
     mut counts: Query<(&TradeChipCount, &mut Text), Without<PulsePlate>>,
+    mut all_counts: Query<
+        &mut Text,
+        (
+            With<AllChipCount>,
+            Without<PulsePlate>,
+            Without<TradeChipCount>,
+        ),
+    >,
     mut chips: Query<(&TradeChip, &mut BackgroundColor, &mut BorderColor)>,
+    mut all_chips: Query<
+        (&mut BackgroundColor, &mut BorderColor),
+        (With<AllChip>, Without<TradeChip>),
+    >,
     folk: Query<
         (
             Option<&crate::villager::work::Vocation>,
@@ -113,6 +132,12 @@ pub(crate) fn people_pulse(
             *text = Text::new(fresh);
         }
     }
+    for mut text in &mut all_counts {
+        let fresh = souls.to_string();
+        if text.0 != fresh {
+            *text = Text::new(fresh);
+        }
+    }
     for (chip, mut fill, mut edge) in &mut chips {
         let tone = crate::villager::attire::livery(chip.0).cloth;
         let color = crate::palette::color_at(tone.palette_index());
@@ -120,13 +145,20 @@ pub(crate) fn people_pulse(
         fill.0 = color.with_alpha(if active { 0.38 } else { 0.13 });
         *edge = BorderColor::all(color.with_alpha(if active { 1.0 } else { 0.8 }));
     }
+    for (mut fill, mut edge) in &mut all_chips {
+        let color = ui::theme::accent();
+        let active = filter.0.is_none();
+        fill.0 = color.with_alpha(if active { 0.38 } else { 0.13 });
+        *edge = BorderColor::all(color.with_alpha(if active { 1.0 } else { 0.8 }));
+    }
 }
 
-/// A pressed chip narrows the roster to its calling; pressed again, it
-/// lets everyone back in.
+/// A pressed chip narrows the roster to its calling; pressed again — or
+/// with the All chip — it lets everyone back in.
 pub(crate) fn filter_by_chip(
     mut filter: ResMut<RosterFilter>,
     chips: Query<(&Interaction, &TradeChip), Changed<Interaction>>,
+    alls: Query<&Interaction, (With<AllChip>, Changed<Interaction>)>,
 ) {
     for (interaction, chip) in &chips {
         if *interaction != Interaction::Pressed {
@@ -137,6 +169,11 @@ pub(crate) fn filter_by_chip(
         } else {
             Some(chip.0)
         };
+    }
+    for interaction in &alls {
+        if *interaction == Interaction::Pressed {
+            filter.0 = None;
+        }
     }
 }
 
@@ -313,6 +350,15 @@ pub(crate) fn spawn_people_panel(
             ChildOf(masthead),
         ))
         .id();
+    // The way back: an All chip before the trades, burning gold while no
+    // narrowing is on. Brett: "the chips need an all button too."
+    let all = ordo::chip(&mut commands, chips_row, "All", ui::theme::accent());
+    commands.entity(all.root).insert((
+        AllChip,
+        ui::UiButton,
+        ui::HoverHint::new("All", "press to see everyone"),
+    ));
+    commands.entity(all.value).insert(AllChipCount);
     for vocation in TRADE_CHIPS {
         let tone = crate::villager::attire::livery(vocation).cloth;
         let color = crate::palette::color_at(tone.palette_index());
@@ -2155,6 +2201,21 @@ mod tests {
             rows.iter(app.world()).count(),
             2,
             "the release kept the narrowing"
+        );
+    }
+
+    /// The All chip is the way back: one press clears any narrowing.
+    #[test]
+    fn the_all_chip_lets_everyone_back_in() {
+        let mut app = App::new();
+        app.init_resource::<RosterFilter>();
+        app.world_mut().resource_mut::<RosterFilter>().0 =
+            Some(crate::villager::work::Vocation::Miner);
+        app.world_mut().spawn((AllChip, Interaction::Pressed));
+        app.world_mut().run_system_once(filter_by_chip).unwrap();
+        assert!(
+            app.world().resource::<RosterFilter>().0.is_none(),
+            "the All chip did not clear the narrowing"
         );
     }
 }
