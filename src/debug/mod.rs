@@ -102,7 +102,13 @@ impl Plugin for DebugPlugin {
             )
             .add_systems(
                 Update,
-                (paint_world_map, handle_map_zoom, update_world_markers).chain(),
+                (
+                    world::fit_the_sheets,
+                    paint_world_map,
+                    handle_map_zoom,
+                    update_world_markers,
+                )
+                    .chain(),
             )
             // The portrait studio: booking before seating before stamping,
             // and the gallery hung last, all in one frame's walk.

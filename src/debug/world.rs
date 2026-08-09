@@ -27,11 +27,20 @@ pub(crate) struct WorldMap {
     pub centre: Vec2,
     /// Rows painted so far, per sheet; the painter rests at full height.
     pub painted: [u32; 3],
+    /// The sheets' pixel height. The width is always [`MAP_W`]; the
+    /// height follows the map frame's own shape, so the picture fills
+    /// the pane instead of letterboxing inside it. Brett: "this map
+    /// doesnt fit this frame."
+    pub face_h: u32,
 }
 
 /// The face the map pane shows: swapped between the sheets on zoom.
 #[derive(Component)]
 pub(crate) struct MapFace;
+
+/// The pane the map fills: measured so the sheets can be cut to its shape.
+#[derive(Component)]
+pub(crate) struct MapFrame;
 
 /// The zoom radii the +/- buttons walk.
 const ZOOM_STEPS: [f32; 3] = [260.0, 440.0, 760.0];
@@ -164,11 +173,29 @@ fn season_name(season: u8) -> &'static str {
 // The page.
 // ---------------------------------------------------------------------------
 
-/// The map texture's face, in pixels: the pane's own widescreen shape.
+/// The map texture's width, in pixels. The height is cut to the pane's
+/// own measured shape once the book lays out - see [`fit_the_sheets`].
 const MAP_W: u32 = 512;
+/// The height the sheets are born with, before the pane is measured.
 const MAP_H: u32 = 288;
 /// Rows the cartographer paints per frame.
 const ROWS_PER_FRAME: u32 = 6;
+
+/// A blank parchment cut to the pane's shape, near-black until the
+/// cartographer works.
+fn parchment(images: &mut Assets<Image>, height: u32) -> Handle<Image> {
+    images.add(Image::new(
+        bevy::render::render_resource::Extent3d {
+            width: MAP_W,
+            height,
+            depth_or_array_layers: 1,
+        },
+        bevy::render::render_resource::TextureDimension::D2,
+        vec![0u8; (MAP_W * height * 4) as usize],
+        bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+        bevy::asset::RenderAssetUsages::MAIN_WORLD | bevy::asset::RenderAssetUsages::RENDER_WORLD,
+    ))
+}
 
 pub(crate) fn spawn_world_panel(
     mut commands: Commands,
@@ -181,26 +208,13 @@ pub(crate) fn spawn_world_panel(
         .insert((Name::new("World Page"), WorldPanel));
 
     // The unpainted parchments: near-black until the cartographer works.
-    let mut sheet = || {
-        images.add(Image::new(
-            bevy::render::render_resource::Extent3d {
-                width: MAP_W,
-                height: MAP_H,
-                depth_or_array_layers: 1,
-            },
-            bevy::render::render_resource::TextureDimension::D2,
-            vec![0u8; (MAP_W * MAP_H * 4) as usize],
-            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-            bevy::asset::RenderAssetUsages::MAIN_WORLD
-                | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-        ))
-    };
-    let sheets = [sheet(), sheet(), sheet()];
+    let sheets = std::array::from_fn(|_| parchment(&mut images, MAP_H));
     let image = sheets[MapZoom::default().0].clone();
     commands.insert_resource(WorldMap {
         sheets,
         centre: Vec2::ZERO,
         painted: [0; 3],
+        face_h: MAP_H,
     });
     commands.init_resource::<MapZoom>();
 
@@ -392,6 +406,7 @@ pub(crate) fn spawn_world_panel(
         .id();
     let map_frame = commands
         .spawn((
+            MapFrame,
             Node {
                 width: percent(100),
                 height: percent(100),
@@ -405,9 +420,13 @@ pub(crate) fn spawn_world_panel(
             ChildOf(map_row),
         ))
         .id();
+    // Stretched, not contain-fit: Auto mode letterboxed the widescreen
+    // sheet inside the taller page and left the pane half dark. The
+    // sheets are recut to the pane's own measured shape, so the stretch
+    // is uniform and the picture true.
     commands.spawn((
         MapFace,
-        bevy::ui::widget::ImageNode::new(image),
+        bevy::ui::widget::ImageNode::new(image).with_mode(bevy::ui::widget::NodeImageMode::Stretch),
         Node {
             position_type: PositionType::Absolute,
             left: px(0),
@@ -722,6 +741,38 @@ pub(crate) fn spawn_world_panel(
 
 /// The cartographer: paints a few rows of the map each frame while the page
 /// is open, sampling the same terrain function the world is built from.
+/// Cuts the sheets to the pane's measured shape, so the map fills its
+/// frame at any window size instead of letterboxing. Runs ahead of the
+/// painter: a recut restarts the cartography before rows are wasted on
+/// parchment of the wrong shape.
+pub(crate) fn fit_the_sheets(
+    frames: Query<&ComputedNode, With<MapFrame>>,
+    zoom: Res<MapZoom>,
+    mut map: ResMut<WorldMap>,
+    mut images: ResMut<Assets<Image>>,
+    mut faces: Query<&mut bevy::ui::widget::ImageNode, With<MapFace>>,
+) {
+    let Ok(computed) = frames.single() else {
+        return;
+    };
+    let size = computed.size();
+    // Unmeasured (the book not yet laid out, or hidden): keep the sheets.
+    if size.x < 8.0 || size.y < 8.0 {
+        return;
+    }
+    let wanted = (MAP_W as f32 * size.y / size.x).round().clamp(96.0, 1024.0) as u32;
+    // A few pixels of drift is not worth burning three repaints over.
+    if wanted.abs_diff(map.face_h) <= 4 {
+        return;
+    }
+    map.face_h = wanted;
+    map.painted = [0; 3];
+    map.sheets = std::array::from_fn(|_| parchment(&mut images, wanted));
+    for mut face in &mut faces {
+        face.image = map.sheets[zoom.0].clone();
+    }
+}
+
 pub(crate) fn paint_world_map(
     codex: Res<super::village::Codex>,
     panels: Query<&Visibility, With<super::village::VillagePanel>>,
@@ -761,8 +812,9 @@ pub(crate) fn paint_world_map(
         map.centre = Vec2::new(site.centre.x, site.centre.z);
     }
     // The current zoom paints first; the other sheets warm behind it.
+    let face_h = map.face_h;
     let order = [zoom.0, 0, 1, 2];
-    let Some(sheet) = order.into_iter().find(|step| map.painted[*step] < MAP_H) else {
+    let Some(sheet) = order.into_iter().find(|step| map.painted[*step] < face_h) else {
         return;
     };
     let Some(mut image) = images.get_mut(&map.sheets[sheet].clone()) else {
@@ -773,7 +825,7 @@ pub(crate) fn paint_world_map(
     };
 
     let radius = ZOOM_STEPS[sheet];
-    let radius_z = radius * MAP_H as f32 / MAP_W as f32;
+    let radius_z = radius * face_h as f32 / MAP_W as f32;
     let centre = map.centre;
     let known_centre = known.as_ref().map(|k| Vec2::new(k.centre.x, k.centre.z));
     let known_radius = known.as_ref().map_or(0.0, |k| k.radius);
@@ -784,11 +836,11 @@ pub(crate) fn paint_world_map(
             .collect()
     });
 
-    let rows_to_paint = ROWS_PER_FRAME.min(MAP_H - map.painted[sheet]);
+    let rows_to_paint = ROWS_PER_FRAME.min(face_h - map.painted[sheet]);
     for row in map.painted[sheet]..map.painted[sheet] + rows_to_paint {
         for col in 0..MAP_W {
             let u = col as f32 / (MAP_W - 1) as f32;
-            let v = row as f32 / (MAP_H - 1) as f32;
+            let v = row as f32 / (face_h - 1) as f32;
             let x = centre.x + (u - 0.5) * 2.0 * radius;
             let z = centre.y + (v - 0.5) * 2.0 * radius_z;
             let height = terrain.height_at(x, z);
@@ -944,7 +996,7 @@ pub(crate) fn update_world_markers(
     commands.entity(well).despawn_related::<Children>();
 
     let radius = ZOOM_STEPS[zoom.0];
-    let radius_z = radius * MAP_H as f32 / MAP_W as f32;
+    let radius_z = radius * map.face_h as f32 / MAP_W as f32;
     let place = |world: Vec2| -> Option<(f32, f32)> {
         let u = (world.x - map.centre.x) / (2.0 * radius) + 0.5;
         let v = (world.y - map.centre.y) / (2.0 * radius_z) + 0.5;
