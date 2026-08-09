@@ -622,25 +622,33 @@ pub(super) fn mark_the_faith_moved(
         commands
             .entity(pin)
             .insert((ordo::Rising(0.85), FaithMark { left: MARK_LIFE }));
+        // Big and shadowed: at 19px the mark drowned in the world behind
+        // it. Brett: "these need to be bolder and bigger so they are
+        // easier to see, same with the -."
         commands.spawn((
             Text::new(glyph),
             TextFont {
                 font: fonts.display_bold.clone().into(),
-                font_size: bevy::text::FontSize::Px(19.0),
+                font_size: bevy::text::FontSize::Px(32.0),
                 ..default()
             },
             TextColor(ink),
+            bevy::ui::widget::TextShadow {
+                offset: Vec2::splat(2.0),
+                color: Color::BLACK.with_alpha(0.6),
+            },
             ChildOf(pin),
         ));
     }
 }
 
-/// Ages the marks: they thin over their last half and go out.
+/// Ages the marks: they thin over their last half and go out. The shadow
+/// thins with the ink, or the glyph would leave its own dark ghost.
 pub(super) fn fade_faith_marks(
     mut commands: Commands,
     time: Res<Time>,
     mut marks: Query<(Entity, &mut FaithMark, &Children)>,
-    mut inks: Query<&mut TextColor>,
+    mut inks: Query<(&mut TextColor, Option<&mut bevy::ui::widget::TextShadow>)>,
 ) {
     for (entity, mut mark, children) in &mut marks {
         mark.left -= time.delta_secs();
@@ -650,10 +658,13 @@ pub(super) fn fade_faith_marks(
         }
         let thin = (mark.left / (MARK_LIFE * 0.5)).clamp(0.0, 1.0);
         for child in children {
-            if let Ok(mut ink) = inks.get_mut(*child) {
+            if let Ok((mut ink, shadow)) = inks.get_mut(*child) {
                 let faded = ink.0.with_alpha(thin);
                 if ink.0 != faded {
                     ink.0 = faded;
+                }
+                if let Some(mut shadow) = shadow {
+                    shadow.color = Color::BLACK.with_alpha(0.6 * thin);
                 }
             }
         }
