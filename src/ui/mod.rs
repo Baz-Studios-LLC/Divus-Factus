@@ -226,7 +226,10 @@ fn speak(
     mut messages: MessageReader<Say>,
     attention: Option<Res<crate::attention::Attention>>,
     names: Query<&crate::villager::Person>,
-    speakers: Query<&GlobalTransform, Without<Bubble>>,
+    // The FLAT transform: `regard` speaks sim coordinates and bends them
+    // itself. (`float_bubbles` keeps the bent GlobalTransform - screen
+    // projection is render-space work.)
+    speakers: Query<&Transform, Without<Bubble>>,
     live: Query<&Bubble>,
 ) {
     let started = std::time::Instant::now();
@@ -247,7 +250,7 @@ fn speak(
         // box of text with nothing under it to belong to. Neither is worth a
         // slot out of the seven, and neither is worth the words.
         let seen = speakers.get(say.speaker).is_ok_and(|at| {
-            crate::attention::regard(attention.as_deref(), at.translation()).worth_saying()
+            crate::attention::regard(attention.as_deref(), at.translation).worth_saying()
         });
         if !seen {
             continue;
@@ -577,7 +580,11 @@ fn show_notices(
         let toast = commands
             .spawn((
                 Toast {
-                    remaining: if notice.fanfare || notice.prayer { 9.0 } else { 6.0 },
+                    remaining: if notice.fanfare || notice.prayer {
+                        9.0
+                    } else {
+                        6.0
+                    },
                     border_alpha: if notice.fanfare || notice.prayer {
                         0.85
                     } else {

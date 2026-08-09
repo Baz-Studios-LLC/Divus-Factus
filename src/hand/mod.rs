@@ -824,8 +824,14 @@ fn handle_grab_and_release(
     ),
     pointer: Res<PointerContext>,
     armed: Res<crate::miracles::SelectedMiracle>,
-    mut witnessed: MessageWriter<DivineEvent>,
+    // Paired: the sixteen-parameter limit again - both are "tell the world
+    // what the hand just did".
+    mut told: (
+        MessageWriter<DivineEvent>,
+        MessageWriter<crate::sfx::PlaySfx>,
+    ),
 ) {
+    let (witnessed, sounds) = (&mut told.0, &mut told.1);
     let Some(terrain) = terrain else {
         return;
     };
@@ -1086,6 +1092,10 @@ fn handle_grab_and_release(
             // from the water's claim.
             .remove::<crate::matter::Sinking>()
             .insert(MoveTarget(None));
+        sounds.write(crate::sfx::PlaySfx {
+            kind: crate::sfx::SfxKind::Grab,
+            at: None,
+        });
 
         // Anything living in a chunk's coordinate space leaves it the
         // moment the god's hand closes - and it leaves carrying its FLAT
@@ -1236,6 +1246,13 @@ fn handle_grab_and_release(
             .remove::<Held>()
             .insert(Airborne { velocity: launch })
             .insert(DivinelyPlaced { remaining: 25.0 });
+
+        if speed > THROW_THRESHOLD {
+            sounds.write(crate::sfx::PlaySfx {
+                kind: crate::sfx::SfxKind::Whoosh,
+                at: None,
+            });
+        }
 
         if let Ok(mut motion) = motions.get_mut(held.entity) {
             motion.flail = 1.0;
@@ -1932,8 +1949,8 @@ fn animate_hand(
     }
 
     let [thumb_base, thumb_tip] = rig.thumb;
-    let thumb_curl = ((0.1 + rig.grip * 0.8) * (1.0 - point) + 0.8 * point) * (1.0 - splay)
-        + 0.08 * splay;
+    let thumb_curl =
+        ((0.1 + rig.grip * 0.8) * (1.0 - point) + 0.8 * point) * (1.0 - splay) + 0.08 * splay;
     if let Ok(mut joint) = joints.get_mut(thumb_base) {
         // The thumb spreads WIDE when the palm plants - the whole reach of
         // the hand laid claim to the ground.

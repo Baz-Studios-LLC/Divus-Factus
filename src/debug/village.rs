@@ -1654,10 +1654,7 @@ pub(crate) fn update_prayer_board(
     let pink = crate::palette::shade(&crate::palette::CLOTH_PINK, 1.0);
     commands.entity(board).despawn_related::<Children>();
     if open.is_empty() {
-        commands.spawn((
-            ui::dim("nobody is asking anything of you"),
-            ChildOf(board),
-        ));
+        commands.spawn((ui::dim("nobody is asking anything of you"), ChildOf(board)));
     }
     for (who, person, prayer) in &open {
         let row = commands
@@ -1730,9 +1727,10 @@ pub(crate) fn update_prayer_board(
             .id();
         // What they asked, kept a hover away rather than crowding the strip.
         if let Some(words) = &closed.words {
-            commands
-                .entity(line)
-                .insert(ui::HoverHint::new(&closed.name, format!("\u{201c}{words}\u{201d}")));
+            commands.entity(line).insert(ui::HoverHint::new(
+                &closed.name,
+                format!("\u{201c}{words}\u{201d}"),
+            ));
         }
     }
 }

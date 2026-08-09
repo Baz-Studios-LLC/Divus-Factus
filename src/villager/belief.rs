@@ -26,7 +26,7 @@ use crate::scatter::FoodSource;
 use crate::witness::{DivineEvent, DivineEventKind};
 
 /// Hunger past this, with nothing to eat anywhere, sends a person to their knees.
-const DESPERATE_HUNGER: f32 = 0.65;
+pub(super) const DESPERATE_HUNGER: f32 = 0.65;
 
 /// How long a prayer stays open before it curdles into doubt.
 ///
@@ -114,10 +114,14 @@ pub struct Prayer {
 }
 
 /// What became of a prayer, for the board's "lately" strip.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PrayerOutcome {
     Answered,
     Curdled,
     Died,
+    /// The world fed them before the god got around to it — a meal from the
+    /// larder, a fisher home heavy. No credit claimed, no doubt seeded.
+    Fed,
 }
 
 impl PrayerOutcome {
@@ -126,12 +130,14 @@ impl PrayerOutcome {
             PrayerOutcome::Answered => "answered",
             PrayerOutcome::Curdled => "went unanswered",
             PrayerOutcome::Died => "died waiting",
+            PrayerOutcome::Fed => "ended with a meal",
         }
     }
 }
 
 /// A closed prayer, kept so the board can show what the god did and did
-/// not do. Session-scoped: the receipts of the living world, not a save.
+/// not do — and kept across saves: the receipts are the point.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ClosedPrayer {
     pub name: String,
     pub words: Option<String>,
@@ -190,9 +196,12 @@ impl Belief {
 
 /// The desperate kneel and pray.
 ///
-/// Desperation means real absence: hungry, an empty store, and no fruiting
-/// bush within reach. A player who steals a village's bushes *causes* prayer —
-/// famine is a lever, and so is generosity.
+/// Desperation means real absence: hungry, with an empty larder — the
+/// village eats from its stores and nowhere else, so an empty larder IS
+/// hunger with nowhere to turn. A player who empties a village's sacks
+/// *causes* prayer — famine is a lever, and so is generosity. And whoever
+/// is starving outright prays even if the larder reads full: stores go
+/// unreachable, and a full sack nobody can walk to feeds nobody.
 /// Prayer is something you can see now: whoever is praying goes down on
 /// their knees, and stands back up when the prayer leaves them. One writer
 /// for the posture, so there are no cleanup edges to miss.
@@ -226,7 +235,6 @@ pub(super) fn kneel(
     name: Option<Res<DivineName>>,
     members: Query<&MemberOf>,
     stores: Query<&super::work::Stockpile>,
-    bushes: Query<(&GlobalTransform, &FoodSource)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut notices: MessageWriter<crate::ui::Notice>,
@@ -234,7 +242,6 @@ pub(super) fn kneel(
     mut hungry: Query<
         (
             Entity,
-            &Transform,
             &Needs,
             &Person,
             &mut Activity,
@@ -253,7 +260,7 @@ pub(super) fn kneel(
 ) {
     let god = name.as_ref().map_or("their god", |n| n.0.as_str());
 
-    for (entity, transform, needs, person, mut activity, mut target, chronicle) in &mut hungry {
+    for (entity, needs, person, mut activity, mut target, chronicle) in &mut hungry {
         // Prayer answers an empty larder — this person's OWN larder. A full
         // store in the next town over is no comfort here.
         let store_has_food = members
@@ -261,17 +268,17 @@ pub(super) fn kneel(
             .ok()
             .and_then(|member| stores.get(member.0).ok())
             .is_some_and(|store| store.food() >= 1.0);
-        if needs.hunger < DESPERATE_HUNGER || store_has_food {
+        // A stocked larder is only comfort if it can actually feed them. At
+        // the edge of death the prayer goes up REGARDLESS: stores go
+        // unreachable — a square terraced for the hall, a route refused —
+        // and "there is food somewhere in town" must never again silence
+        // someone starving beside it. Six villagers died in VisitingStore at
+        // hunger 1.00 with the larder reading full, and not one prayer rose.
+        let dying_regardless = needs.hunger >= 0.92;
+        if needs.hunger < DESPERATE_HUNGER || (store_has_food && !dying_regardless) {
             continue;
         }
         if matches!(*activity, Activity::Eating(_) | Activity::Sleeping) {
-            continue;
-        }
-        // A bush in reach with fruit on it is hope enough to keep walking.
-        let food_in_reach = bushes.iter().any(|(bush, source)| {
-            source.amount > 0.2 && bush.translation().distance(transform.translation) < 45.0
-        });
-        if food_in_reach {
             continue;
         }
 
@@ -465,8 +472,7 @@ pub(super) fn show_prayer_bubbles(
 ) {
     let god = name.as_ref().map_or("the god", |n| n.0.as_str());
     for (entity, at, mut prayer) in &mut praying {
-        let watched =
-            crate::attention::regard(attention.as_deref(), at.translation).worth_saying();
+        let watched = crate::attention::regard(attention.as_deref(), at.translation).worth_saying();
         if !watched {
             if prayer.bubbled {
                 prayer.bubbled = false;
@@ -533,10 +539,9 @@ pub(super) fn mark_the_faith_moved(
             ("-", crate::palette::shade(&crate::palette::STONE, 0.78))
         };
         let pin = ordo::pin(&mut commands, entity, 2.3, Some(170.0), 55.0);
-        commands.entity(pin).insert((
-            ordo::Rising(0.85),
-            FaithMark { left: MARK_LIFE },
-        ));
+        commands
+            .entity(pin)
+            .insert((ordo::Rising(0.85), FaithMark { left: MARK_LIFE }));
         commands.spawn((
             Text::new(glyph),
             TextFont {
@@ -591,6 +596,27 @@ pub(super) fn close_the_prayers_of_the_dead(
     }
 }
 
+/// A meal ends a food prayer, however the meal arrived — the larder came
+/// back, a fisher walked in heavy, the god's own loaf landed. The hunger is
+/// gone and the prayer goes with it. Without this a fed villager's stale
+/// prayer ran its whole patience out and CURDLED, and the village lost
+/// faith over dinners that were eaten on time.
+pub(super) fn meals_answer_prayers(
+    mut commands: Commands,
+    children: Query<&Children>,
+    motes: Query<Entity, With<PrayerMote>>,
+    mut ledger: ResMut<PrayerLedger>,
+    fed: Query<(Entity, &Person, &Needs, &Prayer)>,
+) {
+    for (entity, person, needs, prayer) in &fed {
+        if !matches!(prayer.kind, PrayerKind::Food) || needs.hunger > 0.35 {
+            continue;
+        }
+        ledger.close(&person.name, prayer.words.clone(), PrayerOutcome::Fed);
+        end_prayer(&mut commands, entity, &children, &motes);
+    }
+}
+
 /// Removes a villager's prayer state and its mote.
 fn end_prayer(
     commands: &mut Commands,
@@ -615,7 +641,7 @@ pub(super) fn answer_prayers(
     name: Option<Res<DivineName>>,
     children: Query<&Children>,
     motes: Query<Entity, With<PrayerMote>>,
-    offerings: Query<(&GlobalTransform, &FoodSource), (With<DivinelyPlaced>, Without<Held>)>,
+    offerings: Query<(&Transform, &FoodSource), (With<DivinelyPlaced>, Without<Held>)>,
     mut notices: MessageWriter<crate::ui::Notice>,
     mut witnessed: MessageWriter<DivineEvent>,
     mut ledger: ResMut<PrayerLedger>,
@@ -640,7 +666,7 @@ pub(super) fn answer_prayers(
     {
         let answered = offerings.iter().any(|(offering, source)| {
             source.amount > 0.2
-                && offering.translation().distance(transform.translation) < ANSWER_RADIUS
+                && offering.translation.distance(transform.translation) < ANSWER_RADIUS
         });
         if !answered {
             continue;
@@ -779,8 +805,7 @@ pub(super) fn despair(
         Without<Corpse>,
     >,
 ) {
-    for (entity, mut prayer, person, mut activity, mut faith, chronicle, stirred) in &mut praying
-    {
+    for (entity, mut prayer, person, mut activity, mut faith, chronicle, stirred) in &mut praying {
         prayer.remaining -= time.delta_secs();
         if prayer.remaining > 0.0 {
             continue;
@@ -1184,6 +1209,76 @@ mod tests {
                 .iter()
                 .any(|closed| matches!(closed.outcome, PrayerOutcome::Answered)),
             "an answered prayer must reach the board's ledger",
+        );
+    }
+
+    /// A stocked larder must never silence someone dying beside it.
+    ///
+    /// Six villagers starved in VisitingStore at hunger 1.00 with the larder
+    /// reading full — the square had gone unwalkable, no meal could be
+    /// reached — and the old gate treated "there is food somewhere in town"
+    /// as a reason not to pray. Dying of hunger is the unambiguous case: the
+    /// prayer goes up regardless of what the ledgers say.
+    #[test]
+    fn the_dying_pray_past_a_stocked_larder() {
+        let (mut app, soul) = starving_world();
+        let settlement = app.world().resource::<SettlementSite>().settlement;
+        app.world_mut()
+            .get_mut::<super::super::work::Stockpile>(settlement)
+            .unwrap()
+            .larder
+            .add(super::super::work::FoodKind::Berries, 10.0);
+        app.world_mut()
+            .entity_mut(soul)
+            .insert(super::super::MemberOf(settlement));
+
+        // Merely desperate: the stocked larder is a better answer than the
+        // god, and no prayer should rise over a solvable meal.
+        app.world_mut().get_mut::<Needs>(soul).unwrap().hunger = 0.8;
+        app.update();
+        assert!(
+            app.world().get::<Prayer>(soul).is_none(),
+            "hunger a full larder can still fix should not kneel",
+        );
+
+        // Dying: whatever the ledgers say, the prayer goes up.
+        app.world_mut().get_mut::<Needs>(soul).unwrap().hunger = 0.97;
+        app.update();
+        assert!(
+            app.world().get::<Prayer>(soul).is_some(),
+            "someone starving to death must pray even beside a full larder",
+        );
+    }
+
+    /// A meal ends a food prayer no matter where the meal came from.
+    ///
+    /// Without this, a villager fed from the larder kept their stale prayer
+    /// open until it curdled, and the village lost faith over dinners that
+    /// were eaten on time.
+    #[test]
+    fn a_meal_ends_a_food_prayer() {
+        let (mut app, soul) = starving_world();
+        app.update();
+        assert!(app.world().get::<Prayer>(soul).is_some());
+
+        // The larder comes back and they eat — by whatever table fed them.
+        app.world_mut().get_mut::<Needs>(soul).unwrap().hunger = 0.1;
+        use bevy::ecs::system::RunSystemOnce;
+        app.world_mut()
+            .run_system_once(meals_answer_prayers)
+            .unwrap();
+
+        assert!(
+            app.world().get::<Prayer>(soul).is_none(),
+            "a fed villager's food prayer should close",
+        );
+        let ledger = app.world().resource::<PrayerLedger>();
+        assert!(
+            ledger
+                .closed
+                .iter()
+                .any(|closed| matches!(closed.outcome, PrayerOutcome::Fed)),
+            "the board should show the prayer ended with a meal",
         );
     }
 

@@ -750,6 +750,7 @@ fn drowning(
 /// one strange chimera.
 #[allow(clippy::type_complexity)]
 fn keep_apart(
+    time: Res<Time>,
     mut creatures: Query<
         (
             Entity,
@@ -775,6 +776,10 @@ fn keep_apart(
         })
         .collect();
 
+    // The ease is a RATE, not a per-frame fraction: framerate must not
+    // change how firm a shoulder is.
+    let ease = (time.delta_secs() * 14.0).min(0.5);
+
     let mut nudges: Vec<(Entity, Vec3)> = Vec::new();
     for (i, (a, at_a, r_a)) in bodies.iter().enumerate() {
         for (b, at_b, r_b) in bodies.iter().skip(i + 1) {
@@ -785,10 +790,20 @@ fn keep_apart(
             if d2 >= min * min {
                 continue;
             }
-            let d = d2.sqrt().max(0.01);
-            // Ease, not teleport: half the overlap each, softened, so a
-            // crowd settles instead of popping.
-            let push = between / d * (min - d) * 0.25;
+            let d = d2.sqrt();
+            // Two bodies on the SAME SPOT have no honest direction apart,
+            // and a direction recomputed from noise every frame is a
+            // violent vibration - Brett watched two neighbours buzz
+            // against each other like flies. The tie is broken by WHO
+            // they are instead: stable across frames, so a stack slides
+            // apart in one smooth motion.
+            let apart = if d > 0.05 {
+                between / d
+            } else {
+                let angle = (a.to_bits() ^ b.to_bits().rotate_left(17)) as f32 * 0.0001;
+                Vec3::new(angle.cos(), 0.0, angle.sin())
+            };
+            let push = apart * (min - d).max(0.0) * ease;
             nudges.push((*a, push));
             nudges.push((*b, -push));
         }

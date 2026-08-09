@@ -2712,8 +2712,8 @@ mod tests {
                 - std::f32::consts::FRAC_PI_2;
             let weight = lat.cos() as f64;
             for col in 0..cols {
-                let lon = (col as f32 + 0.5) / cols as f32 * std::f32::consts::TAU
-                    - std::f32::consts::PI;
+                let lon =
+                    (col as f32 + 0.5) / cols as f32 * std::f32::consts::TAU - std::f32::consts::PI;
                 let x = lon * PLANET_RADIUS;
                 let z = -lat * PLANET_RADIUS;
                 let h = t.base_height_at(x, z);
@@ -2832,8 +2832,8 @@ mod tests {
                 - std::f32::consts::FRAC_PI_2;
             let weight = lat.cos() as f64;
             for col in 0..cols {
-                let lon = (col as f32 + 0.5) / cols as f32 * std::f32::consts::TAU
-                    - std::f32::consts::PI;
+                let lon =
+                    (col as f32 + 0.5) / cols as f32 * std::f32::consts::TAU - std::f32::consts::PI;
                 let h = t.base_height_at(lon * PLANET_RADIUS, -lat * PLANET_RADIUS);
                 grid[row * cols + col] = h;
                 peak = peak.max(h);

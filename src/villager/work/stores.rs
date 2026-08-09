@@ -297,18 +297,79 @@ pub(crate) fn shoulder_sack(
     commands.entity(carrier).insert(crate::creature::Laden);
 }
 
+/// Where a pile stands under the storehouse roof, and how many armloads
+/// carry it there. `None` for a kind this roof does not take.
+fn storehouse_seat(kind: PileKind, store: &Stockpile, granary_stands: bool) -> Option<(Vec3, u8)> {
+    Some(match kind {
+        PileKind::Timber => (Vec3::new(-0.9, 0.0, 0.5), store.timber.min(24.0) as u8),
+        PileKind::Stone => (Vec3::new(0.9, 0.0, -0.5), store.stone.min(12.0) as u8),
+        PileKind::Clay => (Vec3::new(-0.9, 0.0, -0.5), store.clay.min(8.0) as u8),
+        PileKind::Ore => (Vec3::new(0.9, 0.0, 0.5), store.ore.min(8.0) as u8),
+        // Food shelters here too, until a granary stands.
+        PileKind::Food if !granary_stands => (
+            Vec3::new(0.0, 0.0, 0.9),
+            ((store.food().min(24.0) / 2.0).ceil() as u8).max(1),
+        ),
+        PileKind::Food => return None,
+    })
+}
+
 /// When the storehouse rises, the village carries its piles in under the
 /// eaves - and the granary takes the food sacks. Nothing teleports: each
 /// armload is walked across the square.
+///
+/// Two triggers, one rule — nothing lives outside a standing roof. A new
+/// roof sweeps the piles that already exist, and a NEW PILE born into a
+/// town whose roof already stands heads indoors the moment it appears.
+/// The second trigger is the one that was missing: a town that mined its
+/// first ore after the storehouse went up kept that pile at the square
+/// forever. Brett: "they shouldn't live outside."
 #[allow(clippy::type_complexity)]
 pub(crate) fn stores_move_indoors(
     mut commands: Commands,
     stores: Query<&Stockpile>,
     mut notices: MessageWriter<crate::ui::Notice>,
     new_buildings: Query<(&Transform, &Building, &crate::villager::MemberOf), Added<Building>>,
-    standing: Query<(&Building, &crate::villager::MemberOf)>,
+    standing: Query<(&Transform, &Building, &crate::villager::MemberOf)>,
     piles: Query<(Entity, &StorePile, &crate::villager::MemberOf), Without<Rehouse>>,
+    late_piles: Query<
+        (Entity, &StorePile, &crate::villager::MemberOf),
+        (Added<StorePile>, Without<Rehouse>),
+    >,
 ) {
+    // A pile born under an already-standing roof goes straight in.
+    for (pile, kind, pile_owner) in &late_piles {
+        let town = pile_owner.0;
+        let Ok(store) = stores.get(town) else {
+            continue;
+        };
+        let granary_stands = standing
+            .iter()
+            .any(|(_, b, m)| b.kind == BuildingKind::Granary && m.0 == town);
+        let shelter = if kind.0 == PileKind::Food && granary_stands {
+            standing
+                .iter()
+                .find(|(_, b, m)| b.kind == BuildingKind::Granary && m.0 == town)
+                .map(|(at, ..)| (*at, Vec3::new(0.0, 0.0, 0.4), 1u8))
+        } else {
+            standing
+                .iter()
+                .find(|(_, b, m)| b.kind == BuildingKind::Storehouse && m.0 == town)
+                .and_then(|(at, ..)| {
+                    storehouse_seat(kind.0, store, granary_stands)
+                        .map(|(local, goal)| (*at, local, goal))
+                })
+        };
+        if let Some((at, local, goal)) = shelter {
+            commands.entity(pile).insert(Rehouse {
+                to: at.translation + at.rotation * local,
+                to_rot: at.rotation,
+                hauled: 0,
+                goal: goal.max(1),
+            });
+        }
+    }
+
     for (at, building, owner) in &new_buildings {
         // A storehouse shelters its OWN town's piles. Without this, the first
         // colony to raise one would have reorganised the mother town's square
@@ -321,24 +382,13 @@ pub(crate) fn stores_move_indoors(
             BuildingKind::Storehouse => {
                 let granary_stands = standing
                     .iter()
-                    .any(|(b, m)| b.kind == BuildingKind::Granary && m.0 == town);
+                    .any(|(_, b, m)| b.kind == BuildingKind::Granary && m.0 == town);
                 for (pile, kind, pile_owner) in &piles {
                     if pile_owner.0 != town {
                         continue;
                     }
-                    let (local, goal) = match kind.0 {
-                        PileKind::Timber => {
-                            (Vec3::new(-0.9, 0.0, 0.5), store.timber.min(24.0) as u8)
-                        }
-                        PileKind::Stone => (Vec3::new(0.9, 0.0, -0.5), store.stone.min(12.0) as u8),
-                        PileKind::Clay => (Vec3::new(-0.9, 0.0, -0.5), store.clay.min(8.0) as u8),
-                        PileKind::Ore => (Vec3::new(0.9, 0.0, 0.5), store.ore.min(8.0) as u8),
-                        // Food shelters here too, until a granary stands.
-                        PileKind::Food if !granary_stands => (
-                            Vec3::new(0.0, 0.0, 0.9),
-                            ((store.food().min(24.0) / 2.0).ceil() as u8).max(1),
-                        ),
-                        PileKind::Food => continue,
+                    let Some((local, goal)) = storehouse_seat(kind.0, store, granary_stands) else {
+                        continue;
                     };
                     commands.entity(pile).insert(Rehouse {
                         to: at.translation + at.rotation * local,
@@ -377,7 +427,6 @@ pub(crate) fn stores_move_indoors(
 #[allow(clippy::type_complexity)]
 pub(crate) fn rehouse_stores(
     mut commands: Commands,
-    mut site: Option<ResMut<SettlementSite>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     children: Query<&Children>,
@@ -402,15 +451,11 @@ pub(crate) fn rehouse_stores(
     >,
 ) {
     for (pile, kind, mut pile_at, mut rehouse) in &mut piles {
-        // Finished: the pile stands at its new spot; the fetch point follows.
+        // Finished: the pile stands at its new spot. The delivery points on
+        // the town's ground follow on their own — see `pile_points_follow`.
         if rehouse.hauled >= rehouse.goal {
             pile_at.translation = rehouse.to;
             pile_at.rotation = rehouse.to_rot;
-            if kind.0 == PileKind::Timber
-                && let Some(site) = site.as_mut()
-            {
-                site.woodpile = rehouse.to;
-            }
             commands.entity(pile).remove::<Rehouse>();
             for (carrier, _, mut activity, mut target, hauler, _) in &mut carriers {
                 if hauler.is_some_and(|h| h.0 == pile) {
@@ -818,16 +863,29 @@ pub(crate) fn eat_from_store(
         let Ok((ground, mut store)) = towns.get_mut(home) else {
             continue;
         };
-        let centre = ground.centre;
+        // The table is wherever the food sacks stand — the square first,
+        // the storehouse when one rises, the granary after that. Meals used
+        // to be eaten at the square's exact centre point, and the day that
+        // point went unwalkable under the hall's terraces, every route to a
+        // meal was refused and six villagers starved beside a full larder.
+        let table = ground.foodpile;
         match *activity {
             Activity::VisitingStore => {
                 if store.food() < 1.0 {
-                    *activity = Activity::Idle;
-                    target.0 = None;
+                    // An empty larder turns away the peckish, not the
+                    // desperate: whoever is starving keeps coming to the
+                    // sacks anyway, because the square is where the hungry
+                    // kneel and where the god looks first.
+                    if needs.hunger < crate::villager::belief::DESPERATE_HUNGER {
+                        *activity = Activity::Idle;
+                        target.0 = None;
+                    } else if transform.translation.distance(table) > 4.0 {
+                        target.0 = Some(table);
+                    }
                     continue;
                 }
-                if transform.translation.distance(centre) > 4.0 {
-                    target.0 = Some(centre);
+                if transform.translation.distance(table) > 4.0 {
+                    target.0 = Some(table);
                     continue;
                 }
                 // The meal comes out of the larder by kind — bread first
@@ -871,15 +929,49 @@ pub(crate) fn eat_from_store(
             }
             Activity::Idle | Activity::Wandering => {
                 // The store is the table: anyone hungry enough to put
-                // their tools down comes to the banner, bushes or no
+                // their tools down comes to the sacks, bushes or no
                 // bushes. Picking from the heath is the gatherer's work,
                 // not everybody's dinner.
                 if needs.hunger > DOWN_TOOLS_HUNGER && store.food() >= 1.0 {
                     *activity = Activity::VisitingStore;
-                    target.0 = Some(centre);
+                    target.0 = Some(table);
                 }
             }
             _ => {}
+        }
+    }
+}
+
+/// Every town's delivery points follow its piles. The pile entities are the
+/// truth — rehousing walks them under the storehouse roof, the granary takes
+/// the sacks — and the points on the ground record where they stand NOW.
+///
+/// Before this, only the founding town's `SettlementSite` resource ever
+/// followed the timber, and nothing at all followed the food: every trade
+/// kept delivering armloads, gathering essence and eating meals at the bare
+/// patch of square the piles had left. Brett, watching the granary rise and
+/// the harvest keep landing outside it: "the storage building is for food
+/// too and I think that is broken. Once built the particles should also go
+/// there as well."
+pub(crate) fn pile_points_follow(
+    mut site: Option<ResMut<SettlementSite>>,
+    piles: Query<(&StorePile, &Transform, &crate::villager::MemberOf), Changed<Transform>>,
+    mut grounds: Query<&mut crate::villager::SettlementGround>,
+) {
+    for (kind, at, owner) in &piles {
+        let Ok(mut ground) = grounds.get_mut(owner.0) else {
+            continue;
+        };
+        match kind.0 {
+            PileKind::Timber => ground.woodpile = at.translation,
+            PileKind::Food => ground.foodpile = at.translation,
+            _ => continue,
+        }
+        if kind.0 == PileKind::Timber
+            && let Some(site) = site.as_mut()
+            && site.settlement == owner.0
+        {
+            site.woodpile = at.translation;
         }
     }
 }
@@ -925,6 +1017,116 @@ pub(crate) fn log_stores(
             store.food(),
             store.timber,
             store.stone,
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bevy::ecs::system::RunSystemOnce;
+
+    fn town_with(foodpile: Vec3) -> (App, Entity) {
+        let mut app = App::new();
+        app.init_resource::<crate::calendar::WorldClock>();
+        app.init_resource::<KitchenWarm>();
+        let town = app
+            .world_mut()
+            .spawn((
+                crate::villager::SettlementGround {
+                    centre: Vec3::ZERO,
+                    radius: 36.0,
+                    woodpile: Vec3::ZERO,
+                    foodpile,
+                },
+                Stockpile::default(),
+            ))
+            .id();
+        (app, town)
+    }
+
+    /// An empty larder turns away the peckish, never the starving.
+    ///
+    /// The starving keep coming to the sacks — the square is where the
+    /// hungry kneel and where the god looks first. Sending them back to
+    /// Idle bounced them between "nothing to eat here" and "go to the
+    /// store" while they starved out of sight of the banner.
+    #[test]
+    fn the_starving_hold_vigil_at_an_empty_larder() {
+        let sacks = Vec3::new(3.0, 0.0, 0.0);
+        let (mut app, town) = town_with(sacks);
+        let soul = app
+            .world_mut()
+            .spawn((
+                crate::villager::Villager,
+                Transform::from_xyz(63.0, 0.0, 0.0),
+                Needs {
+                    hunger: 0.95,
+                    ..default()
+                },
+                crate::villager::Morale::default(),
+                Activity::VisitingStore,
+                crate::creature::MoveTarget::default(),
+                crate::villager::MemberOf(town),
+            ))
+            .id();
+
+        app.world_mut().run_system_once(eat_from_store).unwrap();
+        assert_eq!(
+            *app.world().get::<Activity>(soul).unwrap(),
+            Activity::VisitingStore,
+            "an empty larder must not turn away the starving",
+        );
+        assert_eq!(
+            app.world()
+                .get::<crate::creature::MoveTarget>(soul)
+                .unwrap()
+                .0,
+            Some(sacks),
+            "the vigil is kept at the sacks, not wherever hunger struck",
+        );
+
+        // The merely peckish go back to their day and wait for the trades.
+        app.world_mut().get_mut::<Needs>(soul).unwrap().hunger = 0.5;
+        app.world_mut().run_system_once(eat_from_store).unwrap();
+        assert_eq!(
+            *app.world().get::<Activity>(soul).unwrap(),
+            Activity::Idle,
+            "hunger the gatherers will fix should not besiege an empty larder",
+        );
+    }
+
+    /// Delivery points follow the piles — into the storehouse, into the
+    /// granary, wherever the rehousing walks them.
+    #[test]
+    fn delivery_points_follow_the_piles() {
+        let (mut app, town) = town_with(Vec3::ZERO);
+        app.world_mut().spawn((
+            StorePile(PileKind::Food),
+            Transform::from_xyz(8.0, 0.0, -3.0),
+            crate::villager::MemberOf(town),
+        ));
+        app.world_mut().spawn((
+            StorePile(PileKind::Timber),
+            Transform::from_xyz(-6.0, 0.0, 2.0),
+            crate::villager::MemberOf(town),
+        ));
+
+        app.world_mut().run_system_once(pile_points_follow).unwrap();
+
+        let ground = app
+            .world()
+            .get::<crate::villager::SettlementGround>(town)
+            .unwrap();
+        assert_eq!(
+            ground.foodpile,
+            Vec3::new(8.0, 0.0, -3.0),
+            "meals and harvests move with the sacks",
+        );
+        assert_eq!(
+            ground.woodpile,
+            Vec3::new(-6.0, 0.0, 2.0),
+            "timber deliveries move with the woodpile",
         );
     }
 }

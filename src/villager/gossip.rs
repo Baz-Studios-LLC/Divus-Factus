@@ -38,7 +38,7 @@ pub(crate) fn form_bonds(
             Without<crate::creature::Corpse>,
         ),
     >,
-    shrines: Query<(&GlobalTransform, &crate::villager::work::Building)>,
+    shrines: Query<(&Transform, &crate::villager::work::Building)>,
     mut hearts: Query<&mut super::regard::Regard>,
     spirits: Query<&Morale>,
     mut stirred: Query<&mut super::Stirrings>,
@@ -91,7 +91,7 @@ pub(crate) fn form_bonds(
             Some((slot, since)) if men[slot].1.distance(at) <= COURTSHIP_DISTANCE => {
                 let god_house = shrines.iter().any(|(shrine_at, building)| {
                     building.kind == crate::villager::work::BuildingKind::Shrine
-                        && shrine_at.translation().distance(at) < SHRINE_REACH
+                        && shrine_at.translation.distance(at) < SHRINE_REACH
                 });
                 // Vows are made in the god's house. A village with none
                 // has couples waiting on it, and that waiting is what
@@ -119,16 +119,13 @@ pub(crate) fn form_bonds(
                 // good talks were building toward exactly this — with
                 // nearness only breaking ties. A man she has soured on is
                 // nobody, however close he stands.
-                let warmth_toward = |man: Entity| -> f32 {
-                    hearts.get(woman).map_or(0.0, |h| h.toward(man))
-                };
+                let warmth_toward =
+                    |man: Entity| -> f32 { hearts.get(woman).map_or(0.0, |h| h.toward(man)) };
                 let Some((slot, warmth)) = men
                     .iter()
                     .enumerate()
                     .filter(|(_, (_, position, _))| position.distance(at) <= COURTSHIP_DISTANCE)
-                    .map(|(i, (man, position, _))| {
-                        (i, warmth_toward(*man), position.distance(at))
-                    })
+                    .map(|(i, (man, position, _))| (i, warmth_toward(*man), position.distance(at)))
                     .filter(|(_, warmth, _)| *warmth > -0.25)
                     .max_by(|a, b| {
                         (a.1, -a.2)
@@ -149,8 +146,7 @@ pub(crate) fn form_bonds(
                 // fewer children. A dread god's flock worships hard and
                 // dwindles; a loved one's booms.
                 let cheer = spirits.get(woman).map_or(0.7, |m| m.spirits);
-                let odds =
-                    (0.4 * (0.5 + cheer * 0.7) * (1.0 + warmth.max(0.0))).min(0.85);
+                let odds = (0.4 * (0.5 + cheer * 0.7) * (1.0 + warmth.max(0.0))).min(0.85);
                 if !rng.0.chance(odds) {
                     continue;
                 }
@@ -572,8 +568,7 @@ pub(crate) fn hold_conversations(
                     .get(talk.partner)
                     .map(|(p, ..)| p.name.clone())
                     .unwrap_or_default();
-                let shift = if let Ok((_, _, _, _, morale, regard, stirred)) =
-                    minds.get_mut(entity)
+                let shift = if let Ok((_, _, _, _, morale, regard, stirred)) = minds.get_mut(entity)
                 {
                     // Company lands on the spirits too: people are social
                     // creatures, and a good talk is worth a little cheer -
@@ -594,9 +589,7 @@ pub(crate) fn hold_conversations(
                             },
                         );
                     }
-                    regard.map(|mut r| {
-                        r.warm_over(talk.partner, by, soured.then_some("a quarrel"))
-                    })
+                    regard.map(|mut r| r.warm_over(talk.partner, by, soured.then_some("a quarrel")))
                 } else {
                     None
                 };
@@ -699,10 +692,7 @@ pub(crate) fn hold_conversations(
             if let Some(tongue) = tongue.as_mut()
                 && spot_of(talk.partner).is_some()
             {
-                let voice = voices
-                    .get(talk.partner)
-                    .ok()
-                    .and_then(|(v, ..)| v.copied());
+                let voice = voices.get(talk.partner).ok().and_then(|(v, ..)| v.copied());
                 let trust = minds
                     .get(talk.partner)
                     .ok()
@@ -788,9 +778,7 @@ pub(crate) fn hold_conversations(
                                 if let Some(stirred) = stirred.as_mut() {
                                     stirred.stir(
                                         clock.day(),
-                                        format!(
-                                            "{teller_name} talked the god out of it - doubt"
-                                        ),
+                                        format!("{teller_name} talked the god out of it - doubt"),
                                     );
                                 }
                             } else {
@@ -819,7 +807,10 @@ pub(crate) fn hold_conversations(
                                 stirred.stir(
                                     clock.day(),
                                     if by > 0.0 {
-                                        format!("warmed to {} - heard their good fortune", whom.name)
+                                        format!(
+                                            "warmed to {} - heard their good fortune",
+                                            whom.name
+                                        )
                                     } else {
                                         format!(
                                             "cooled toward {} - the god's hand found them",
@@ -1121,9 +1112,11 @@ mod tests {
             "they wed with no shrine to be wed in",
         );
 
-        // Raise one, and they marry.
+        // Raise one, and they marry. The FLAT transform, like every
+        // sim-side position: the wedding check reads `Transform` now,
+        // after the bent shrine seat broke weddings far from the origin.
         app.world_mut().spawn((
-            GlobalTransform::from(Transform::from_xyz(4.0, 0.0, 0.0)),
+            Transform::from_xyz(4.0, 0.0, 0.0),
             crate::villager::work::Building {
                 kind: crate::villager::work::BuildingKind::Shrine,
             },

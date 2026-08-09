@@ -159,7 +159,6 @@ impl Traits {
     pub fn appetite(&self) -> f32 {
         if self.has(Trait::Glutton) { 1.4 } else { 1.0 }
     }
-
 }
 
 #[cfg(test)]

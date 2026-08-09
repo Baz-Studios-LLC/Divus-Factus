@@ -377,6 +377,7 @@ fn plant_the_flag(
     mouse: Res<ButtonInput<MouseButton>>,
     scheme: Res<crate::keymap::MouseScheme>,
     reading: Res<GroundUnderTheFlag>,
+    mut sounds: MessageWriter<crate::sfx::PlaySfx>,
     mut chosen: ResMut<ChosenGround>,
     mut next: ResMut<NextState<GameState>>,
 ) {
@@ -392,6 +393,10 @@ fn plant_the_flag(
     let Some(at) = reading.at.filter(|_| reading.will_take_it()) else {
         return;
     };
+    sounds.write(crate::sfx::PlaySfx {
+        kind: crate::sfx::SfxKind::Plant,
+        at: None,
+    });
     found_here(at, &mut chosen, &mut next);
 }
 

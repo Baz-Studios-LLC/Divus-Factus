@@ -334,6 +334,7 @@ fn loose_ballistics(
     mut commands: Commands,
     time: Res<Time>,
     terrain: Option<Res<Terrain>>,
+    mut sounds: MessageWriter<crate::sfx::PlaySfx>,
     mut objects: Query<(Entity, &mut Transform, &mut Airborne, &Matter), Without<CreatureGenome>>,
 ) {
     let Some(terrain) = terrain else {
@@ -376,6 +377,10 @@ fn loose_ballistics(
                     body.velocity.x *= 0.62;
                     body.velocity.z *= 0.62;
                     transform.translation.y += ground_here + clearance - pivot_y;
+                    sounds.write(crate::sfx::PlaySfx {
+                        kind: crate::sfx::SfxKind::Thud,
+                        at: Some(transform.translation),
+                    });
                     continue;
                 }
                 // Close enough and slow enough to touch down: land it here
@@ -425,6 +430,10 @@ fn loose_ballistics(
                 body.velocity.y = -body.velocity.y * 0.32;
                 body.velocity.x *= 0.62;
                 body.velocity.z *= 0.62;
+                sounds.write(crate::sfx::PlaySfx {
+                    kind: crate::sfx::SfxKind::Thud,
+                    at: Some(transform.translation),
+                });
             } else {
                 commands.entity(entity).remove::<Airborne>();
                 // The long and the flat come to REST rather than freezing
@@ -470,6 +479,7 @@ fn the_water_claims(
     terrain: Option<Res<Terrain>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut sounds: MessageWriter<crate::sfx::PlaySfx>,
     loose: Query<
         (Entity, &Transform, &Matter),
         (
@@ -502,6 +512,10 @@ fn the_water_claims(
             .entity(entity)
             .remove::<(Floating, Rolling, Settling)>()
             .insert(Sinking { surface: wet });
+        sounds.write(crate::sfx::PlaySfx {
+            kind: crate::sfx::SfxKind::Splash,
+            at: Some(transform.translation),
+        });
         // The splash: water-coloured flecks, gathering back to the ring.
         burst_of(
             &mut commands,
@@ -523,10 +537,7 @@ fn the_water_claims(
 fn sink(
     mut commands: Commands,
     time: Res<Time>,
-    mut sinking: Query<
-        (Entity, &mut Transform, &Matter, &Sinking),
-        Without<crate::creature::Held>,
-    >,
+    mut sinking: Query<(Entity, &mut Transform, &Matter, &Sinking), Without<crate::creature::Held>>,
 ) {
     let dt = time.delta_secs();
     for (entity, mut transform, matter, depth) in &mut sinking {

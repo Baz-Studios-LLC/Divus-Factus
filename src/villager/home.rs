@@ -38,8 +38,17 @@ pub const LONGHOUSE_CAPACITY: usize = 8;
 pub const FIRE_CIRCLE_SHELTER: usize = 8;
 
 /// How many people the village can shelter at all.
-pub fn shelter_capacity(houses: usize, longhouses: usize) -> usize {
-    FIRE_CIRCLE_SHELTER + houses * HOUSE_CAPACITY + longhouses * LONGHOUSE_CAPACITY
+/// The room a town hall makes: not beds but ROOM — administration,
+/// stores of civic patience, somewhere for a crowd to be a town instead
+/// of a camp. "The village grown into a town: room for more people",
+/// finally wired to mean it.
+pub const HALL_HEADROOM: usize = 8;
+
+pub fn shelter_capacity(houses: usize, longhouses: usize, halls: usize) -> usize {
+    FIRE_CIRCLE_SHELTER
+        + houses * HOUSE_CAPACITY
+        + longhouses * LONGHOUSE_CAPACITY
+        + halls * HALL_HEADROOM
 }
 
 /// Whether this person belongs under a family roof rather than in the
@@ -357,7 +366,7 @@ pub(super) fn take_shelter(
     clock: Res<crate::calendar::WorldClock>,
     weather: Option<Res<crate::weather::Weather>>,
     homes: Query<&Transform, (Or<(With<Hut>, With<Longhouse>)>, Without<Villager>)>,
-    fires: Query<&GlobalTransform, (With<Bonfire>, Without<Villager>)>,
+    fires: Query<&Transform, (With<Bonfire>, Without<Villager>)>,
     mut villagers: Query<
         (
             &Transform,
@@ -383,7 +392,7 @@ pub(super) fn take_shelter(
         return;
     }
     let pouring = weather.intensity > 0.6;
-    let fire_pos = fires.iter().next().map(|f| f.translation());
+    let fire_pos = fires.iter().next().map(|f| f.translation);
 
     for (transform, home, needs, mut activity, mut target) in &mut villagers {
         // The starving do not wait out the rain: wet and fed beats dry
@@ -467,7 +476,7 @@ pub(super) fn take_shelter(
 pub(super) fn well_gatherings(
     clock: Res<crate::calendar::WorldClock>,
     mut rng: ResMut<super::SimRng>,
-    wells: Query<(&GlobalTransform, &super::work::Building)>,
+    wells: Query<(&Transform, &super::work::Building)>,
     mut idlers: Query<
         (&Transform, &Activity, &mut crate::creature::MoveTarget),
         (
@@ -484,7 +493,7 @@ pub(super) fn well_gatherings(
     let Some(well) = wells
         .iter()
         .find(|(_, b)| b.kind == super::work::BuildingKind::Well)
-        .map(|(t, _)| t.translation())
+        .map(|(t, _)| t.translation)
     else {
         return;
     };
@@ -663,7 +672,7 @@ pub(super) fn tend_fire(
     mut notices: MessageWriter<crate::ui::Notice>,
     hearths: Query<&super::MemberOf>,
     mut stores: Query<&mut Stockpile>,
-    mut fires: Query<(Entity, &GlobalTransform, &mut Bonfire)>,
+    mut fires: Query<(Entity, &Transform, &mut Bonfire)>,
     mut villagers: Query<
         (
             Entity,
@@ -683,7 +692,7 @@ pub(super) fn tend_fire(
     >,
 ) {
     for (fire_entity, fire_at, mut fire) in &mut fires {
-        let fire_pos = fire_at.translation();
+        let fire_pos = fire_at.translation;
         // Each hearth burns its own town's timber, and is tended by its own
         // town's people.
         let Some(town) = hearths.get(fire_entity).ok().map(|member| member.0) else {
@@ -1025,7 +1034,7 @@ pub(super) fn night_routine(
     mut trudge: Local<std::collections::HashMap<Entity, (Vec3, f64)>>,
     homes: Query<&Transform, (Or<(With<Hut>, With<Longhouse>)>, Without<Villager>)>,
     beds: Query<(&ChildOf, &Transform, &Bed), Without<Villager>>,
-    fires: Query<&GlobalTransform, (With<Bonfire>, Without<Villager>)>,
+    fires: Query<&Transform, (With<Bonfire>, Without<Villager>)>,
     mut villagers: Query<
         (
             Entity,
@@ -1048,7 +1057,7 @@ pub(super) fn night_routine(
     >,
 ) {
     let night = clock.is_night();
-    let fire_pos = fires.iter().next().map(|f| f.translation());
+    let fire_pos = fires.iter().next().map(|f| f.translation);
 
     // Where each numbered bed stands, in the world: the building's own
     // rotation and place applied to the mattress's local offset.
@@ -1286,13 +1295,17 @@ pub(super) fn answer_the_knock(
         let Ok((site, shell)) = dwellings.get(knock.building) else {
             continue;
         };
-        // Where the roused step out to: just past the front door.
-        let stand = shell.and_then(|shell| {
+        // Where the roused step out to: just past the front door - FANNED,
+        // one berth per soul, because a whole household sent to the same
+        // exact point stands inside each other and the shoulder-room ease
+        // buzzes them like flies.
+        let door_stand = shell.and_then(|shell| {
             shell.doors.first().map(|door| {
                 let (_, outside) = shell.door_stand(door);
                 site.translation + site.rotation * Vec3::new(outside.x, 0.0, outside.y)
             })
         });
+        let mut fanned = 0u32;
         let night = clock.is_night();
         let mut woken = 0u32;
         let mut household = 0u32;
@@ -1310,15 +1323,19 @@ pub(super) fn answer_the_knock(
             *activity = Activity::Idle;
             commands.entity(entity).remove::<Abed>();
             motion.speed = 1.0;
-            target.0 = stand;
+            target.0 = door_stand.map(|stand| {
+                let angle = fanned as f32 * 2.399963;
+                let (sin, cos) = angle.sin_cos();
+                stand + Vec3::new(cos, 0.0, sin) * (0.9 + (fanned % 3) as f32 * 0.5)
+            });
+            fanned += 1;
             woken += 1;
             if asleep {
                 needs.rest = (needs.rest + 0.08).min(1.0);
                 if night {
                     faith.shift(-0.02);
                     if let Some(mut stirred) = stirred {
-                        stirred
-                            .stir(clock.day(), "hammered awake in the dead of night - doubt");
+                        stirred.stir(clock.day(), "hammered awake in the dead of night - doubt");
                     }
                 }
             }
@@ -1451,7 +1468,7 @@ pub(super) fn family_supper(
 /// and a schedule.
 pub(super) fn tavern_evenings(
     clock: Res<crate::calendar::WorldClock>,
-    taverns: Query<(&GlobalTransform, &super::work::Building)>,
+    taverns: Query<(&Transform, &super::work::Building)>,
     mut rng: ResMut<SimRng>,
     mut villagers: Query<
         (&Transform, &super::Morale, &mut Activity, &mut MoveTarget),
@@ -1472,7 +1489,7 @@ pub(super) fn tavern_evenings(
     let Some(tavern) = taverns
         .iter()
         .find(|(_, b)| b.kind == super::work::BuildingKind::Tavern)
-        .map(|(at, _)| at.translation())
+        .map(|(at, _)| at.translation)
     else {
         return;
     };
@@ -1581,7 +1598,7 @@ pub(super) fn weariness(
 pub(super) fn tavern_cheer(
     time: Res<Time>,
     clock: Res<crate::calendar::WorldClock>,
-    taverns: Query<(&GlobalTransform, &super::work::Building)>,
+    taverns: Query<(&Transform, &super::work::Building)>,
     mut villagers: Query<(&Transform, &mut super::Morale), (With<Villager>, Without<Corpse>)>,
 ) {
     let t = clock.time_of_day();
@@ -1591,7 +1608,7 @@ pub(super) fn tavern_cheer(
     let Some(tavern) = taverns
         .iter()
         .find(|(_, b)| b.kind == super::work::BuildingKind::Tavern)
-        .map(|(at, _)| at.translation())
+        .map(|(at, _)| at.translation)
     else {
         return;
     };
@@ -1642,14 +1659,16 @@ mod tests {
     }
 
     #[test]
-    fn both_roofs_count_toward_shelter() {
-        let bare = shelter_capacity(0, 0);
+    fn every_civic_roof_counts_toward_shelter() {
+        let bare = shelter_capacity(0, 0, 0);
         assert_eq!(bare, FIRE_CIRCLE_SHELTER);
-        assert_eq!(shelter_capacity(1, 0), bare + HOUSE_CAPACITY);
-        assert_eq!(shelter_capacity(0, 1), bare + LONGHOUSE_CAPACITY);
+        assert_eq!(shelter_capacity(1, 0, 0), bare + HOUSE_CAPACITY);
+        assert_eq!(shelter_capacity(0, 1, 0), bare + LONGHOUSE_CAPACITY);
+        // The hall makes room for more people - its whole promise.
+        assert_eq!(shelter_capacity(0, 0, 1), bare + HALL_HEADROOM);
         assert_eq!(
-            shelter_capacity(3, 2),
-            bare + 3 * HOUSE_CAPACITY + 2 * LONGHOUSE_CAPACITY
+            shelter_capacity(3, 2, 1),
+            bare + 3 * HOUSE_CAPACITY + 2 * LONGHOUSE_CAPACITY + HALL_HEADROOM
         );
     }
 

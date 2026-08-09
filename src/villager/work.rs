@@ -370,7 +370,10 @@ pub(super) fn receive_offerings(
             .or_else(|| {
                 towns
                     .iter()
-                    .filter(|(_, ground, _)| ground.woodpile.distance(here) < OFFERING_REACH)
+                    .filter(|(_, ground, _)| {
+                        ground.woodpile.distance(here) < OFFERING_REACH
+                            || ground.foodpile.distance(here) < OFFERING_REACH
+                    })
                     .map(|(town, _, _)| (town, None))
                     .next()
             });
@@ -380,7 +383,14 @@ pub(super) fn receive_offerings(
         let Ok((_, ground, mut store)) = towns.get_mut(town) else {
             continue;
         };
-        let home = site_home.unwrap_or(ground.woodpile);
+        // Food gathers to the food sacks, everything else to the timber
+        // side — and both points follow their piles indoors, so a gift
+        // dropped on a town with a granary visibly pours into the granary.
+        let home = site_home.unwrap_or(if berries + meat > 0.0 {
+            ground.foodpile
+        } else {
+            ground.woodpile
+        });
 
         store.timber += timber;
         store.stone += stone;
@@ -1930,6 +1940,7 @@ mod tests {
                 centre: pile,
                 radius: 40.0,
                 woodpile: pile,
+                foodpile: pile,
             },
             Stockpile::default(),
         ));

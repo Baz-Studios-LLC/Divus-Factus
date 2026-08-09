@@ -1,82 +1,77 @@
-## The village has a heart
+## The world makes sound now
 
-**Your people now hold feelings about each other — love and hate, person by
-person — and those feelings run the village.** Every conversation lands on
-both hearts: most talk warms, and now and again somebody walks away rubbed
-the wrong way, which is where grudges honestly come from. Weddings seed
-devotion; blood holds its warmth; feelings unfed cool back to indifference.
+**Nine sounds, and the world wears them at the right distance.** Everything
+the god does and everything the village suffers has a voice — near things
+loud, far things faint, and silence past the horizon of your regard.
 
-- **Courtship is chosen by the heart, not the map.** A woman walks out with
-  the man she holds warmest — all those tavern evenings were building toward
-  exactly this — and a man she has soured on is nobody, however close he
-  stands. Children come likelier to couples who hold each other dear.
-- **Gossip moves hearts.** Hearing what befell somebody changes how the
-  listener feels about them: good fortune endears, the god's violence makes
-  the village step back from its target, plain misfortune draws sympathy.
-- **Doubt spreads exactly as faith does.** A skeptic who saw nothing divine
-  in the lightning will talk the neighbours out of it — and the harder a
-  thing is to explain away, the less an argument against it carries.
-- **News weighs on the spirits.** A village fed on frightening stories grows
-  heavy-hearted without ever seeing a thing — and heavy hearts wed less.
-  Fear buys belief today; love fills the nursery.
+- The founding flag **plants** with a thump of earth; the hand **grips**
+  with a rasp and **hurls** with a whoosh; whatever it drops lands with a
+  thud where it lands.
+- **Knuckles on shingles** when you knock, a **crack of ruin** when you
+  smite, and a soft page-turn under every notice in the tray.
 
-## Prayers, and the board that keeps them
+## The town hall
 
-**The codex has a new page: THE PRAYERS — every open prayer in the world,
-in the praying's own words, the moment it is made.** Press a prayer to fly
-to whoever is asking; answer it with your own hands. A strip below keeps
-the receipts: answered, unanswered, and died waiting.
+**The flag grows up: a town hall now rises on the square itself.** The
+banner called the village into being; the hall is the village agreeing to
+stay.
 
-- Prayers wear **pink** everywhere now — the notice, and the thought bubble
-  over the kneeling, which replays every time you come back to look.
-- **The desperate pray against their neighbours.** Hatred deep enough, in a
-  heart faithful enough, kneels and asks the god to strike somebody down —
-  and the board names both the target and the grudge: *over a quarrel*,
-  *over what the god did to them*. Answer it with lightning and the asker's
-  faith surges past anything providence pays — and the world learns what
-  kind of god answers hate.
-- **Belief made visible:** a pink **+** floats up from anyone whose faith
-  grows; an ash **−** from anyone who doubts.
+- The hall takes a **seat on the square** at ground-breaking — facing the
+  woodpile across the common ground, never crowding it.
+- A finished hall **shelters eight souls** who have no roof of their own
+  yet: the village's spare room while the houses catch up.
+- Its door is kept bare on purpose — that board belongs to the **mayor**,
+  when the village is grown enough to choose one.
 
-## The god's hand, again
+## The stores live under a roof
 
-- **Grab the land and the hand plants**: palm flat on the turf, fingers
-  spread and tips dug in, nailed to the ground it seized — Black and
-  White's own gesture, at every height.
-- **Knock on a roof.** A clean tap on a house raps knuckles on the
-  shingles and turns the household out of doors, with a little card over
-  the door telling you how many were home. Roused sleep is lost sleep, and
-  nobody loves the god who hammers at midnight — unless food follows.
-- Planting the founding flag is on the **action button** now, like every
-  act of the god's will.
+**Nothing the village owns sleeps outside a standing roof.** When the
+storehouse rises, every pile on the square is carried in, armload by
+armload — and the granary takes the food sacks after it.
 
-## The world underfoot
+- **Deliveries follow the piles.** Every trade walks its armloads to where
+  the stores actually stand — into the storehouse, into the granary — and
+  the essence of an offered gift pours visibly into the roof that took it.
+- **The village eats from its stores, and nowhere else.** Bushes are the
+  gatherers' workplace, not anybody's table; meals are drawn at the sacks,
+  wherever the sacks now stand. The one exception is the god's own gift:
+  bread dropped from the sky is eaten under the sky.
+- **The starving hold vigil.** An empty larder no longer scatters the
+  hungry to graze — they gather at the sacks, kneel, and ask you. A famine
+  finally looks like what it is: a crowd at the square, praying.
 
-- **Mountains are the exception again**: a third of all land stood above
-  the mountain line; now a tenth does, and what remains rises to real
-  summits instead of plateaus with lakes on top.
-- **The flag plants anywhere honest ground allows.** The old founding check
-  called most of every continent "too high up the mountain"; only true
-  alpine ground refuses now.
-- **A building is exactly its drawing.** Houses carried in from the bench
-  no longer grow a second, fatter foundation around the one their maker
-  drew — nothing is built that is not in the design.
-- **The water claims what falls in.** Anything loose that ends up in sea,
-  lake or river splashes, sinks, and is gone — including the food you
-  hurled into the ocean, which used to bob there forever. The god's hand
-  is the one rescue.
+## The god hears the dying
 
-## Read your people
+**No villager starves silently again.** A village lost six souls in one
+summer — each one standing still, feet from a full larder, and not one
+prayer rose. Every hole that made that possible is closed.
 
-- **Nameplates, three states on one key**: off, names only, or the whole
-  soul — trade and doing, faith, body, house — on a card whose colour
-  answers the god's own question: gold for believers, bone for waverers,
-  ash for doubters.
-- **THE HEART**: a new page in every villager's dossier — every shift of
-  faith, feeling or spirits, with its cause. Watch a rumour reach someone
-  and read exactly what it did to them.
-- **Conversations show their words.** Villagers labelled "talking" with no
-  bubble over either head are done: the words were always being said, and
-  now they play.
-- Far cards and bubbles **shrink with distance** instead of stacking a
-  wall of text over a busy square.
+- **A walk to a buried goal ends beside it, not nowhere.** When the hall's
+  terraces made the square's centre unwalkable, every path to a meal was
+  refused outright. The pathfinder now walks to the nearest stand-able
+  ground beside any point it cannot stand on.
+- **The dying pray past a stocked larder.** "There is food somewhere in
+  town" no longer silences someone starving to death beside it.
+- **A prayer survives the hunger that caused it** — and a meal from any
+  table closes it kindly on the board ("ended with a meal") instead of
+  letting it curdle into doubt over a dinner eaten on time.
+- **The prayer board keeps its receipts across saves.** Answered is
+  answered forever, not until the next load.
+
+## Petitions belong to the shrine
+
+**The village pins its asks where the god actually looks.** Prayers and
+petitions gather on the shrine wall — six seats, oldest first — or around
+the banner pole while the village is still too young for a shrine.
+
+## Mended
+
+- **The fire is lit again.** The bonfire had not taken wood since the world
+  went round; the tender can reach it now, and the evening ring gathers
+  where it should.
+- **Word, thought and prayer bubbles are back** — attention itself had gone
+  flat-earthed and judged every speaker to be somewhere they were not.
+- **Neighbours no longer shake violently** when they stand close: the
+  polite step apart is a step, not a seizure.
+- **Answered knocks fan out the household** onto their own doorstep berths
+  instead of stacking the family into one shivering point.

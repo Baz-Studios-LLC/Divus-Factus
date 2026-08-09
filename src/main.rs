@@ -31,6 +31,7 @@ mod render;
 mod rng;
 mod save;
 mod scatter;
+mod sfx;
 mod sigil;
 mod sky;
 mod speed;
@@ -250,6 +251,7 @@ fn main() {
         .add_plugins((
             keymap::KeymapPlugin,
             music::MusicPlugin,
+            sfx::SfxPlugin,
             doings::DoingsPlugin,
             avatar::AvatarPlugin,
             founding::FoundingPlugin,

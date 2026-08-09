@@ -102,14 +102,22 @@ impl Default for Attention {
 }
 
 impl Attention {
-    /// How much attention a point in the world is receiving.
+    /// How much attention a point in the world is receiving. `at` is a
+    /// FLAT sim position — the bend happens here, once.
     pub fn on(&self, at: Vec3) -> Regard {
         // With no camera there is no frame to be outside of. Headless runs and
         // unit tests land here, and they must behave as they always have.
         if !self.watching {
             return Regard::Close;
         }
-        judge(self.eye.distance(at), self.in_frame(at), self.haste)
+        // The eye and the clip matrix live in the BENT render world; the
+        // callers all hold flat sim positions. Bend the point once, here —
+        // or every "is this on screen" answer is wrong away from the
+        // origin. The bend's EIGHTH bite: `worth_saying` read every far
+        // speaker as off-frame, and whole villages talked with no words
+        // over any head.
+        let (seat, _) = crate::globe::bend_frame(at);
+        judge(self.eye.distance(seat), self.in_frame(seat), self.haste)
     }
 
     /// An eye that is turned away from everything.

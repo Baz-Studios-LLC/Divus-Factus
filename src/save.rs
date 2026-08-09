@@ -139,6 +139,11 @@ struct SaveGame {
     legend_unlocked: Option<crate::miracles::Miracle>,
     legend_epithet: Option<String>,
     stores: (f32, f32, f32),
+    /// The prayer board's receipts: answered, curdled, died waiting. The
+    /// receipts are the board's whole point; a reload must not amnesty
+    /// the god's record.
+    #[serde(default)]
+    prayer_receipts: Vec<crate::villager::belief::ClosedPrayer>,
     fire_fuel: f32,
     piles: Vec<(u8, Vec3, Quat)>,
     people: Vec<PersonSave>,
@@ -386,6 +391,10 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         let b = world.resource::<Belief>();
         (b.total, b.spent)
     };
+    let prayer_receipts = world
+        .resource::<crate::villager::belief::PrayerLedger>()
+        .closed
+        .clone();
     let legend = world.resource::<Legend>();
     let legend_numbers = (
         legend.providence,
@@ -731,6 +740,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         legend_unlocked,
         legend_epithet,
         stores,
+        prayer_receipts,
         fire_fuel,
         piles,
         people,
@@ -991,6 +1001,9 @@ fn apply(world: &mut World, save: SaveGame) {
     world.insert_resource(Belief {
         total: save.belief.0,
         spent: save.belief.1,
+    });
+    world.insert_resource(crate::villager::belief::PrayerLedger {
+        closed: save.prayer_receipts.clone(),
     });
     let epithet = match save.legend_epithet.as_deref() {
         Some("the Provider") => Some("the Provider"),

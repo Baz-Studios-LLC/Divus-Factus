@@ -75,8 +75,8 @@ fn toggle_labels(
     };
     *mode = next;
     if let Some(said) = said {
-        let cap = crate::keymap::key_name(keymap.key(crate::keymap::Deed::Doings))
-            .unwrap_or("the key");
+        let cap =
+            crate::keymap::key_name(keymap.key(crate::keymap::Deed::Doings)).unwrap_or("the key");
         notices.write(crate::ui::Notice::new(format!("{said} - {cap} cycles")));
     }
 }
@@ -99,8 +99,8 @@ fn doing_word(activity: &Activity, talk: Option<&Conversing>) -> &'static str {
     match activity {
         Activity::Idle => "idle",
         Activity::Wandering => "wandering",
-        Activity::SeekingFood(_) => "foraging, hungry",
-        Activity::Eating(_) => "eating off a bush",
+        Activity::SeekingFood(_) => "going to a god-given meal",
+        Activity::Eating(_) => "eating",
         Activity::VisitingStore => "eating at the stores",
         Activity::Sleeping => "asleep",
         Activity::Working => "working",
@@ -227,7 +227,11 @@ fn tend_labels(
             continue;
         }
         let said = [
-            format!("{} - {}", trade_of(vocation, child), doing_word(activity, talk)),
+            format!(
+                "{} - {}",
+                trade_of(vocation, child),
+                doing_word(activity, talk)
+            ),
             faith.map_or("unproven", |f| f.describe()).to_string(),
             body_words(needs).0.to_string(),
             house_words(genome, person),
@@ -240,9 +244,7 @@ fn tend_labels(
                 // Faith and trouble carry their own colours; the rest is quiet.
                 let wanted = match index {
                     1 => ink.with_alpha(0.88),
-                    2 if body_words(needs).1 => {
-                        crate::palette::shade(&crate::palette::BONE, 0.97)
-                    }
+                    2 if body_words(needs).1 => crate::palette::shade(&crate::palette::BONE, 0.97),
                     _ => crate::ui::theme::text_dim(),
                 };
                 if colour.0 != wanted {
@@ -300,7 +302,11 @@ fn tend_labels(
                 ChildOf(card),
             ));
             let said = [
-                format!("{} - {}", trade_of(vocation, child), doing_word(activity, talk)),
+                format!(
+                    "{} - {}",
+                    trade_of(vocation, child),
+                    doing_word(activity, talk)
+                ),
                 faith.map_or("unproven", |f| f.describe()).to_string(),
                 body_words(needs).0.to_string(),
                 house_words(genome, person),

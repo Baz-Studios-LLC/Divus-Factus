@@ -2311,6 +2311,144 @@ pub(crate) fn raise_stage(
     }
 }
 
+/// One petition pinned up in the world, by seat number.
+#[derive(Component)]
+pub struct PetitionNote(pub usize);
+
+/// The prayer board, nailed up in the world: a parchment with a pink pin
+/// for every open prayer — the same channel the codex page reads, made a
+/// place the god can fly to.
+///
+/// Prayers are addressed to the GOD, so they hang at the god's house: the
+/// shrine's front wall. Before a shrine stands, the founding banner holds
+/// them — the flag is the level-zero everything, and the first desperate
+/// prayers tacked to the founding pole is the truth of a young village.
+/// The town hall's door is deliberately left bare: that is the MAYOR'S
+/// mail, when the town grows one, and the ratio of shrine-mail to
+/// hall-mail will be the measure of what kind of town this is. Six at
+/// most; past that the wall is simply covered, which says what it needs
+/// to.
+pub(crate) fn pin_petitions(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut since: Local<f32>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    prayers: Query<&crate::villager::MemberOf, With<crate::villager::belief::Prayer>>,
+    shrines: Query<(Entity, &Building, &Blueprint, &crate::villager::MemberOf)>,
+    settlements: Query<Entity, With<crate::villager::Settlement>>,
+    notes: Query<(Entity, &PetitionNote, &ChildOf)>,
+) {
+    *since += time.delta_secs();
+    if *since < 2.0 {
+        return;
+    }
+    *since = 0.0;
+
+    // The asks, counted per town.
+    let mut asks: std::collections::HashMap<Entity, usize> = std::collections::HashMap::new();
+    for member in &prayers {
+        *asks.entry(member.0).or_default() += 1;
+    }
+
+    // Where each town's mail hangs: its shrine, or its banner until one
+    // stands. `(post, half_w)` — a shrine hangs notes on its door wall, a
+    // banner (half_w zero) clusters them around the pole.
+    let mut posts: std::collections::HashMap<Entity, (Entity, f32)> =
+        std::collections::HashMap::new();
+    for town in &settlements {
+        posts.insert(town, (town, 0.0));
+    }
+    for (shrine, building, plan, owner) in &shrines {
+        if building.kind == BuildingKind::Shrine {
+            posts.insert(owner.0, (shrine, plan.half_w));
+        }
+    }
+
+    // Whose wall wants how many notes.
+    let wanted = |post: Entity| -> usize {
+        posts
+            .iter()
+            .find(|(_, (p, _))| *p == post)
+            .map_or(0, |(town, _)| asks.get(town).copied().unwrap_or(0).min(6))
+    };
+
+    // Take down the stale — answered prayers, and every note still on the
+    // banner the day the shrine rises.
+    let mut worn: std::collections::HashMap<(Entity, usize), bool> =
+        std::collections::HashMap::new();
+    for (note, seat, parent) in &notes {
+        let post = parent.parent();
+        if seat.0 < wanted(post) {
+            worn.insert((post, seat.0), true);
+        } else {
+            commands.entity(note).despawn();
+        }
+    }
+
+    // On the shrine, petitions flank the door; on the banner they cluster
+    // round the pole. Each a little crooked, the way real notices weather.
+    const WALL_SEATS: [(f32, f32, f32); 6] = [
+        (-1.05, 1.75, 0.09),
+        (1.05, 1.70, -0.07),
+        (-1.45, 1.42, -0.11),
+        (1.42, 1.38, 0.08),
+        (-0.92, 1.26, 0.13),
+        (0.90, 1.22, -0.10),
+    ];
+
+    for (town, (post, half_w)) in &posts {
+        let want = asks.get(town).copied().unwrap_or(0).min(6);
+        for index in 0..want {
+            if worn.contains_key(&(*post, index)) {
+                continue;
+            }
+            let parchment = materials.add(StandardMaterial {
+                base_color: crate::palette::shade(&crate::palette::BONE, 0.97),
+                perceptual_roughness: 1.0,
+                ..default()
+            });
+            let pin = materials.add(StandardMaterial {
+                base_color: crate::palette::shade(&crate::palette::CLOTH_PINK, 1.0),
+                emissive: LinearRgba::from(crate::palette::shade(&crate::palette::CLOTH_PINK, 1.0))
+                    * 0.8,
+                perceptual_roughness: 0.8,
+                ..default()
+            });
+            let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+            let seat = if *half_w > 0.0 {
+                // The shrine wall, beside the door.
+                let (z, y, tilt) = WALL_SEATS[index];
+                Transform::from_xyz(half_w + 0.12, y, z)
+                    .with_rotation(Quat::from_rotation_x(tilt))
+                    .with_scale(Vec3::new(0.05, 0.42, 0.32))
+            } else {
+                // The banner pole, notes tacked around the shaft.
+                let angle = index as f32 * std::f32::consts::TAU / 6.0 + 0.4;
+                let (sin, cos) = angle.sin_cos();
+                Transform::from_xyz(cos * 0.24, 1.15 + (index % 3) as f32 * 0.42, sin * 0.24)
+                    .with_rotation(Quat::from_rotation_y(-angle))
+                    .with_scale(Vec3::new(0.04, 0.34, 0.26))
+            };
+            let note = commands
+                .spawn((
+                    PetitionNote(index),
+                    Mesh3d(cube.clone()),
+                    MeshMaterial3d(parchment),
+                    seat,
+                    ChildOf(*post),
+                ))
+                .id();
+            commands.spawn((
+                Mesh3d(cube),
+                MeshMaterial3d(pin),
+                Transform::from_xyz(0.9, 0.42, 0.0).with_scale(Vec3::new(1.4, 0.16, 0.2)),
+                ChildOf(note),
+            ));
+        }
+    }
+}
+
 /// The village has a shape: concentric rings of building plots around the
 /// banner, each ring staggered against the last. Civic buildings take the
 /// inner ring and face the plaza; houses fill outward, doors toward the
@@ -2916,10 +3054,16 @@ pub(crate) fn plan_houses(
     let reach = match kind {
         BuildingKind::House => super::baked::widest(BuildingKind::House).unwrap_or(3.2),
         BuildingKind::Longhouse => super::baked::widest(BuildingKind::Longhouse).unwrap_or(7.2),
+        BuildingKind::TownHall => super::baked::widest(BuildingKind::TownHall).unwrap_or(3.2),
         _ => 3.0,
     };
     let (probe, clearance) = if kind == BuildingKind::Longhouse {
         (reach + 0.9, reach * 2.0 + 12.0)
+    } else if kind == BuildingKind::TownHall {
+        // The hall squeezes into the heart of a village that already
+        // stands: a tight clearance, or the founding longhouse beside the
+        // square vetoes every seat and the town never gets its hall.
+        (reach * 0.6, reach * 2.0 + 4.0)
     } else if homestead {
         // A wider probe, because the plot needs flat ground beside the house.
         (reach + 1.4, HOMESTEAD_CLEARANCE.max(reach * 2.0 + 20.0))
@@ -2928,6 +3072,29 @@ pub(crate) fn plan_houses(
     };
     if !homestead {
         plots = village_slots(site.centre, rings, reach * 2.0);
+    }
+    // THE TOWN HALL TAKES THE SQUARE, not a ring plot. It is the flag's
+    // own upgrade path: the banner was the civic seat from the founding
+    // morning, and the hall is that seat grown a roof - raised just off
+    // the plaza with its door facing the banner, so the flag ends up
+    // standing before the hall it always promised. Candidates ring the
+    // centre starting opposite the woodpile; the ordinary vetting below
+    // still gets its veto on each.
+    if kind == BuildingKind::TownHall {
+        let breadth = reach + 5.5;
+        let away = (site.centre - site.woodpile).with_y(0.0);
+        let start = away.z.atan2(away.x);
+        plots = (0..8)
+            .map(|step| {
+                let a = start + step as f32 * std::f32::consts::TAU / 8.0;
+                let (sin, cos) = a.sin_cos();
+                (
+                    site.centre.x + cos * breadth,
+                    site.centre.z + sin * breadth,
+                    std::f32::consts::PI - a,
+                )
+            })
+            .collect();
     }
     'darts: for (x, z, yaw) in plots {
         if !terrain.is_walkable(x, z) {

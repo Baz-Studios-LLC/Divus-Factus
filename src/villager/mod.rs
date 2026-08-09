@@ -150,7 +150,7 @@ impl Plugin for VillagerPlugin {
             .init_resource::<belief::PrayerLedger>()
             .add_message::<home::Knock>()
             .add_message::<home::KnockReport>()
-            .add_systems(Update, home::answer_the_knock)
+            .add_systems(Update, (home::answer_the_knock, work::pin_petitions))
             .add_systems(
                 Update,
                 (
@@ -237,7 +237,10 @@ impl Plugin for VillagerPlugin {
                         work::update_woodpile,
                         work::update_store_piles,
                         work::stores_move_indoors,
-                        work::rehouse_stores,
+                        // Paired: the chain tuple is at Bevy's ceiling, and
+                        // these two are one subject - piles moving and the
+                        // town's delivery points following them.
+                        (work::rehouse_stores, work::pile_points_follow),
                         work::track_store_trends,
                         work::log_stores,
                     )
@@ -258,7 +261,13 @@ impl Plugin for VillagerPlugin {
                         belief::record_faith,
                         belief::animate_motes,
                         belief::show_prayer_bubbles,
-                        belief::close_the_prayers_of_the_dead,
+                        // Paired: the chain tuple is at Bevy's ceiling, and
+                        // these two are one subject - prayers closing, by
+                        // death or by dinner.
+                        (
+                            belief::close_the_prayers_of_the_dead,
+                            belief::meals_answer_prayers,
+                        ),
                         // Paired: the chain tuple nears Bevy's ceiling, and
                         // these two are one subject - faith marks floating.
                         (belief::mark_the_faith_moved, belief::fade_faith_marks),
@@ -590,6 +599,10 @@ pub struct SettlementGround {
     pub radius: f32,
     /// Where the visible woodpile stands; where timber is delivered and drawn.
     pub woodpile: Vec3,
+    /// Where the food sacks stand; where meals are eaten and the harvest
+    /// gathers. Follows the sacks wherever they are rehoused — the square
+    /// first, the storehouse when one rises, the granary after that.
+    pub foodpile: Vec3,
 }
 
 /// The town the player's eye is on: the one the camera opens over, the one the
@@ -616,6 +629,9 @@ impl SettlementSite {
             centre: self.centre,
             radius: self.radius,
             woodpile: self.woodpile,
+            // Seeded beside the timber; `pile_points_follow` moves it onto
+            // the food sacks the moment they stand.
+            foodpile: self.woodpile,
         }
     }
 }
@@ -1060,6 +1076,7 @@ pub(crate) fn spawn_town(
         centre,
         radius: 36.0,
         woodpile: centre,
+        foodpile: centre,
     });
     settlement
 }
@@ -1462,6 +1479,7 @@ pub(crate) fn found_settlement(
         centre,
         radius: 36.0,
         woodpile,
+        foodpile: woodpile,
     });
     (settlement, woodpile)
 }
@@ -2592,9 +2610,15 @@ fn births(
             / living as f32
     };
     // Nobody is born into a village that cannot shelter them: houses are
-    // the roof on growth, and the only one - build more, grow more.
-    let _ = town_halls;
-    let cap = home::shelter_capacity(huts.iter().count(), longhouses.iter().count());
+    // the roof on growth - and a town hall raises it further, the way its
+    // own line always promised. (This query was taken and thrown away for
+    // an age: the hall was a building that said "room for more people"
+    // and did nothing. It does it now.)
+    let halls = town_halls
+        .iter()
+        .filter(|b| b.kind == work::BuildingKind::TownHall)
+        .count();
+    let cap = home::shelter_capacity(huts.iter().count(), longhouses.iter().count(), halls);
     let food_stored = site
         .as_ref()
         .and_then(|s| stores.get(s.settlement).ok())
@@ -2779,7 +2803,13 @@ fn choose_activity(
     site: Option<Res<SettlementSite>>,
     stores: Query<&work::Stockpile>,
     mut villagers: Query<
-        (&mut Activity, &Needs, &Transform, &MoveTarget),
+        (
+            &mut Activity,
+            &Needs,
+            &Transform,
+            &MoveTarget,
+            Option<&MemberOf>,
+        ),
         (
             With<Villager>,
             Without<Held>,
@@ -2787,32 +2817,45 @@ fn choose_activity(
             Without<Airborne>,
         ),
     >,
-    food: Query<(Entity, &GlobalTransform, &FoodSource), Without<Villager>>,
+    food: Query<
+        (Entity, &Transform, &FoodSource),
+        (With<crate::hand::DivinelyPlaced>, Without<Villager>),
+    >,
 ) {
-    let larder = site
-        .as_ref()
-        .and_then(|s| stores.get(s.settlement).ok())
-        .map_or(0.0, |s| s.food());
-    for (mut activity, needs, transform, target) in &mut villagers {
+    for (mut activity, needs, transform, target, member) in &mut villagers {
+        // Their OWN town's larder. Reading the focused settlement here
+        // would gate a colonist's meals — and now their prayers — on how
+        // full the pantry is in whichever town the player is looking at.
+        let larder = member
+            .map(|m| m.0)
+            .or_else(|| site.as_ref().map(|s| s.settlement))
+            .and_then(|town| stores.get(town).ok())
+            .map_or(0.0, |s| s.food());
         let hunger_score = food_utility(needs);
         let wander_score = wander_utility();
 
-        // Hunger outranks every social hold. Grief, gossip, prayer and the
-        // fire's tending can all wait; an empty stomach cannot. Without
-        // this, one death gathered mourners whose own hunger ran out where
-        // they stood, and the chronicle filled with a weeping crowd
-        // starving beside a stocked larder, each death calling the next.
-        if needs.hunger > 0.75
-            && matches!(
+        // Hunger outranks every social hold. Grief, gossip and the fire's
+        // tending can all wait; an empty stomach cannot. Without this, one
+        // death gathered mourners whose own hunger ran out where they
+        // stood, and the chronicle filled with a weeping crowd starving
+        // beside a stocked larder, each death calling the next.
+        if needs.hunger > 0.75 {
+            let held_by_the_moment = matches!(
                 *activity,
                 Activity::Mourning
                     | Activity::Chatting
-                    | Activity::Praying
                     | Activity::TendingFire
                     | Activity::Sheltering
-            )
-        {
-            *activity = Activity::Idle;
+            );
+            // A food prayer is not a distraction from hunger — it IS the
+            // response to it. Hunger breaks a prayer only when there is
+            // actually a meal to walk to instead; before this guard, the
+            // same starvation that sent a villager to their knees stood
+            // them straight back up, and the god never saw them kneel.
+            let praying_past_a_meal = matches!(*activity, Activity::Praying) && larder >= 1.0;
+            if held_by_the_moment || praying_past_a_meal {
+                *activity = Activity::Idle;
+            }
         }
 
         // Work, store visits, the fire and sleep are owned by the systems that
@@ -2843,37 +2886,36 @@ fn choose_activity(
         }
 
         if hunger_score > wander_score {
-            // Nearest bush that still has food on it.
-            let nearest = food
+            // The god's own gift is the one meal taken where it lands:
+            // bread dropped from the sky is eaten under the sky, not
+            // carried to a sack first.
+            let gift = food
                 .iter()
                 .filter(|(_, _, source)| source.amount > 0.1)
-                .map(|(entity, food_transform, _)| {
-                    let distance = food_transform
-                        .translation()
-                        .distance_squared(transform.translation);
-                    (entity, distance)
+                .map(|(entity, gift_at, _)| {
+                    (
+                        entity,
+                        gift_at.translation.distance_squared(transform.translation),
+                    )
                 })
+                .filter(|(_, distance)| *distance < 60.0 * 60.0)
                 .min_by(|a, b| a.1.total_cmp(&b.1));
-
-            // THE FIX for 'starved within sight of a stocked larder': a
-            // hungry villager used to march to the nearest fruiting bush
-            // WHEREVER it was - four hundred strides past a full store -
-            // and the march itself killed them. The rule now: eat from
-            // The village eats from its own stores. Gatherers, fishers
-            // and hunters fill the larder; everyone else comes to the
-            // banner for a meal. A village that eats off the land one
-            // berry at a time never has to build anything.
-            if larder >= 1.0 {
-                *activity = Activity::VisitingStore;
+            if let Some((gift, _)) = gift {
+                if *activity != Activity::SeekingFood(gift) {
+                    *activity = Activity::SeekingFood(gift);
+                }
                 continue;
             }
-            // An empty larder is the exception, and it looks like one:
-            // with nothing at the banner they go out to the bushes and
-            // eat where they stand, the way the desperate do.
-            if let Some((entity, _)) = nearest
-                && *activity != Activity::SeekingFood(entity)
-            {
-                *activity = Activity::SeekingFood(entity);
+
+            // Brett: "They should not eat from bushes, they should eat
+            // from the stores." The village eats from its larder and
+            // nowhere else — the bushes are the gatherers' workplace, not
+            // anyone's table. A stocked larder is a meal; an empty one
+            // still draws the desperate to the square, because the square
+            // is where the starving kneel, and a prayer is what is left
+            // when the sacks are empty.
+            if larder >= 1.0 || needs.hunger >= belief::DESPERATE_HUNGER {
+                *activity = Activity::VisitingStore;
                 continue;
             }
         }
@@ -2917,7 +2959,10 @@ fn pursue_activity(
             Without<crate::avatar::Ridden>,
         ),
     >,
-    mut food: Query<(&GlobalTransform, &mut FoodSource), Without<Villager>>,
+    mut food: Query<
+        (&Transform, &mut FoodSource),
+        (With<crate::hand::DivinelyPlaced>, Without<Villager>),
+    >,
 ) {
     let dt = time.delta_secs();
 
@@ -2959,19 +3004,19 @@ fn pursue_activity(
 
             Activity::SeekingFood(source) => {
                 let Ok((food_transform, _)) = food.get(source) else {
-                    // The bush was picked up or destroyed while we walked to it.
+                    // The gift was taken back or eaten out while we walked to it.
                     *activity = Activity::Idle;
                     target.0 = None;
                     continue;
                 };
 
-                let distance = food_transform.translation().distance(transform.translation);
+                let distance = food_transform.translation.distance(transform.translation);
 
                 if distance <= EATING_RANGE {
                     *activity = Activity::Eating(source);
                     target.0 = None;
                 } else {
-                    target.0 = Some(food_transform.translation());
+                    target.0 = Some(food_transform.translation);
                 }
             }
 
@@ -2981,10 +3026,9 @@ fn pursue_activity(
                     continue;
                 };
 
-                // Bushes can be carried away mid-meal — this is a god game, the
-                // player will absolutely do that.
-                if food_transform.translation().distance(transform.translation) > EATING_RANGE * 1.5
-                {
+                // The meal can be carried away mid-bite — this is a god game,
+                // the player will absolutely do that.
+                if food_transform.translation.distance(transform.translation) > EATING_RANGE * 1.5 {
                     *activity = Activity::Idle;
                     continue;
                 }

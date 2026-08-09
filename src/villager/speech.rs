@@ -207,4 +207,3 @@ pub(super) fn show_musings(
         }
     }
 }
-

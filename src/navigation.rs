@@ -452,6 +452,37 @@ fn to_cell(p: Vec3) -> Cell {
     IVec2::new((p.x / CELL).round() as i32, (p.z / CELL).round() as i32)
 }
 
+/// The nearest walkable cell to a point that is not itself walkable — beside
+/// the plinth, at the foot of the hall steps. Searched ring by ring out to
+/// three cells, nearest ring first, nearest cell within it winning. `None`
+/// only for a goal buried deeper than that, which is a true refusal.
+fn stand_beside(terrain: &Terrain, goal: Vec3) -> Option<Cell> {
+    let centre = to_cell(goal);
+    for ring in 1i32..=3 {
+        let mut best: Option<(f32, Cell)> = None;
+        for dx in -ring..=ring {
+            for dz in -ring..=ring {
+                if dx.abs().max(dz.abs()) != ring {
+                    continue;
+                }
+                let cell = centre + IVec2::new(dx, dz);
+                let (x, z) = (cell.x as f32 * CELL, cell.y as f32 * CELL);
+                if !terrain.is_walkable(x, z) {
+                    continue;
+                }
+                let near = Vec2::new(x - goal.x, z - goal.z).length_squared();
+                if best.is_none_or(|(held, _)| near < held) {
+                    best = Some((near, cell));
+                }
+            }
+        }
+        if let Some((_, cell)) = best {
+            return Some(cell);
+        }
+    }
+    None
+}
+
 fn to_world(c: Cell, terrain: &Terrain) -> Vec3 {
     let x = c.x as f32 * CELL;
     let z = c.y as f32 * CELL;
@@ -584,13 +615,21 @@ pub fn find_path(
     budget: usize,
 ) -> Option<Vec<Vec3>> {
     let start_cell = to_cell(start);
-    let goal_cell = to_cell(goal);
+    // A goal that lands on an unwalkable cell — a banner plinth, a hall
+    // slab, a freshly terraced ledge — is not a refusal, it is an errand to
+    // the nearest ground BESIDE it. Refusing it outright starved a village:
+    // the square went unwalkable while the hall rose, every meal was aimed
+    // at the square's exact centre, and every path to a full larder failed
+    // on this line. Six villagers died standing at the radius where their
+    // routes were abandoned, and not one of them ever reached a meal.
+    let goal_cell = if terrain.is_walkable(goal.x, goal.z) {
+        to_cell(goal)
+    } else {
+        stand_beside(terrain, goal)?
+    };
 
     if start_cell == goal_cell {
         return Some(Vec::new());
-    }
-    if !terrain.is_walkable(goal.x, goal.z) {
-        return None;
     }
     let excused = walls.excused(Vec2::new(start.x, start.z), Vec2::new(goal.x, goal.z));
 
@@ -1244,5 +1283,44 @@ mod tests {
         let start = walkable_near(&t);
         let far = Vec3::new(start.x + 40_000.0, 0.0, start.z + 40_000.0);
         assert_eq!(find_path(&t, &Walls::default(), start, far, 400), None);
+    }
+
+    /// A goal on unwalkable ground is an errand to its edge, not a refusal.
+    ///
+    /// `eat_from_store` aims every meal at one exact point, and when the
+    /// hall's terraces made that point unwalkable, every path to a full
+    /// larder failed on the old outright-refusal line: six villagers starved
+    /// standing at the radius where their routes were abandoned. The search
+    /// now walks to the nearest stand-able cell beside a buried goal.
+    #[test]
+    fn a_goal_on_unwalkable_ground_walks_to_its_edge() {
+        let terrain = Terrain::new(4242);
+        let walls = Walls::default();
+        let start = walkable_near(&terrain);
+
+        // The nearest spot to the start that cannot be stood on but has
+        // stand-able ground beside it — a shoreline, a ledge, a boulder.
+        let mut buried = None;
+        'hunt: for ring in 1..80 {
+            for step in 0..(ring * 8) {
+                let angle = step as f32 / (ring * 8) as f32 * std::f32::consts::TAU;
+                let spot = start + Vec3::new(angle.cos(), 0.0, angle.sin()) * (ring as f32 * CELL);
+                if !terrain.is_walkable(spot.x, spot.z) && stand_beside(&terrain, spot).is_some() {
+                    buried = Some(spot);
+                    break 'hunt;
+                }
+            }
+        }
+        let goal = buried.expect("no unwalkable ground within eighty cells of a walkable start");
+
+        let Some(waypoints) = find_path(&terrain, &walls, start, goal, DEFAULT_BUDGET) else {
+            panic!("a goal beside stand-able ground was refused outright");
+        };
+        let landed = waypoints.last().copied().unwrap_or(start);
+        let short = Vec2::new(landed.x - goal.x, landed.z - goal.z).length();
+        assert!(
+            short <= CELL * 3.0 + 0.1,
+            "the walk should end beside the buried goal, not {short} strides short",
+        );
     }
 }
