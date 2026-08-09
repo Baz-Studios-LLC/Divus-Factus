@@ -1588,7 +1588,7 @@ fn build_prayers_page(commands: &mut Commands, page: Entity) {
 /// countdown ticking every second forces the rows to rebuild every second,
 /// and a page that flinches on a timer is the exact fault the ledger's
 /// fingerprint idiom exists to prevent.
-fn hope_band(remaining: f32) -> &'static str {
+pub(crate) fn hope_band(remaining: f32) -> &'static str {
     if remaining > 60.0 {
         "hope holds"
     } else if remaining > 20.0 {
@@ -1689,18 +1689,7 @@ pub(crate) fn update_prayer_board(
                 ChildOf(row),
             ))
             .id();
-        let ask = match &prayer.kind {
-            crate::villager::belief::PrayerKind::Food => {
-                format!("{} asks for food", person.name)
-            }
-            crate::villager::belief::PrayerKind::Dark { name, over, .. } => match over {
-                Some(over) => format!(
-                    "{} asks that {} be struck down - over {}",
-                    person.name, name, over
-                ),
-                None => format!("{} asks that {} be struck down", person.name, name),
-            },
-        };
+        let ask = prayer.kind.ask_line(&person.name);
         commands.spawn((ui::body(ask), ChildOf(top)));
         commands.spawn((ui::dim(hope_band(prayer.remaining)), ChildOf(top)));
         if let Some(words) = &prayer.words {
@@ -1739,16 +1728,25 @@ pub(crate) fn update_prayer_board(
 /// and the camera pins to them — the same follow a right-click takes —
 /// with the orbit and zoom left free for the answering.
 pub(crate) fn answer_the_board(
-    mut follow: ResMut<crate::camera::FollowTarget>,
     mut panels: Query<&mut Visibility, With<VillagePanel>>,
+    askers: Query<&Transform>,
+    mut rigs: Query<&mut crate::camera::CameraRig>,
     rows: Query<(&Interaction, &PrayerRow), Changed<Interaction>>,
 ) {
     for (interaction, row) in &rows {
         if *interaction != Interaction::Pressed {
             continue;
         }
-        follow.entity = Some(row.0);
-        follow.style = crate::camera::FollowStyle::Overhead;
+        // The camera goes TO them and is handed straight back - a jump
+        // and a dive to answering height, never a lock. Brett: "it should
+        // zoom in on the person, but it shouldnt lock on." The god flies
+        // in to answer, then the world is theirs to drag again.
+        let (Ok(asker), Ok(mut rig)) = (askers.get(row.0), rigs.single_mut()) else {
+            continue;
+        };
+        rig.target_focus.x = asker.translation.x;
+        rig.target_focus.z = asker.translation.z;
+        rig.target_distance = 22.0;
         for mut panel in &mut panels {
             *panel = Visibility::Hidden;
         }
@@ -2005,12 +2003,22 @@ const KEYBINDS: &[(&str, &[Bind])] = &[
     (
         "MIRACLES",
         &[
-            Bind::Deed(Deed::Flourish, "flourish: life where you point"),
-            Bind::Deed(Deed::Smite, "smite: the storm answers"),
-            Bind::Deed(Deed::Bounty, "bounty: food for the stores"),
-            Bind::Deed(Deed::MendOrQuake, "mend or quake, once legend unlocks them"),
-            Bind::Fixed(&["click"], "work the chosen miracle"),
-            Bind::Fixed(&["right click", "Esc"], "set the miracle aside"),
+            Bind::Deed(
+                Deed::Slot1,
+                "fire hotbar slot one, wherever the hand points",
+            ),
+            Bind::Deed(Deed::Slot2, "fire hotbar slot two"),
+            Bind::Deed(Deed::Slot3, "fire hotbar slot three"),
+            Bind::Deed(Deed::Slot4, "fire hotbar slot four"),
+            Bind::Deed(Deed::Slot5, "fire hotbar slot five"),
+            Bind::Deed(Deed::Slot6, "fire hotbar slot six"),
+            Bind::Deed(Deed::Slot7, "fire hotbar slot seven"),
+            Bind::Deed(Deed::Slot8, "fire hotbar slot eight"),
+            Bind::Deed(Deed::Slot9, "fire hotbar slot nine"),
+            Bind::Deed(Deed::Slot10, "fire hotbar slot ten"),
+            Bind::Fixed(&["click"], "arm a miracle; click the world to work it"),
+            Bind::Fixed(&["drag"], "carry a miracle to another slot"),
+            Bind::Fixed(&["right click", "Esc"], "set an armed miracle aside"),
         ],
     ),
     (

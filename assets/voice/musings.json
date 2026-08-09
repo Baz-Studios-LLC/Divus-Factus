@@ -1298,5 +1298,175 @@
    "prayer",
    "grudge"
   ]
+ },
+ {
+  "t": "we found good ground {out past the cairns|a fair walk out}. bless the road and we'll raise your banner on it",
+  "tags": [
+   "muse",
+   "prayer",
+   "road"
+  ]
+ },
+ {
+  "t": "the town's {full|grown past its beds}. let us go and {start|make} another. just say it's alright",
+  "tags": [
+   "muse",
+   "prayer",
+   "road"
+  ]
+ },
+ {
+  "t": "give us your blessing for the road. I'll build your shrine before I build my own roof",
+  "tags": [
+   "muse",
+   "prayer",
+   "road"
+  ]
+ },
+ {
+  "t": "say the word and we walk. {stay silent and we walk anyway|we're going either way}, but I'd {rather|sooner} have the word",
+  "tags": [
+   "muse",
+   "prayer",
+   "road"
+  ]
+ },
+ {
+  "t": "bless the road. {that's all I ask|that's the whole prayer}. the rest we'll do ourselves",
+  "tags": [
+   "muse",
+   "prayer",
+   "road"
+  ]
+ },
+ {
+  "t": "I can't stay here {anymore|any longer}. give me your blessing and I'll take my people somewhere new",
+  "tags": [
+   "muse",
+   "prayer",
+   "road"
+  ]
+ },
+ {
+  "t": "a new town, with your name over the door same as this one. bless the road and it's done",
+  "tags": [
+   "muse",
+   "prayer",
+   "road"
+  ]
+ },
+ {
+  "t": "we're asking before we go. that ought to count for {something|a little}",
+  "tags": [
+   "muse",
+   "prayer",
+   "road"
+  ]
+ },
+ {
+  "t": "if you're there, keep the town safe tonight",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "night"
+  ]
+ },
+ {
+  "t": "watch over us while we sleep. {if you're listening|if anyone's listening}",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "night"
+  ]
+ },
+ {
+  "t": "let the storm pass over us. {we've done nothing to earn it|the roofs are new}",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "storm"
+  ]
+ },
+ {
+  "t": "hold the roofs down tonight, {will you|if you would}",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "storm"
+  ]
+ },
+ {
+  "t": "a roof went up today. felt like you had a hand in it. thank you",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "roof"
+  ]
+ },
+ {
+  "t": "another wall up, nobody hurt. {thank you|that'll do}",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "roof"
+  ]
+ },
+ {
+  "t": "I don't know if you hear us. if you do, watch the little ones",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion"
+  ]
+ },
+ {
+  "t": "show me something small. anything. I'll take it from there",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "doubting"
+  ]
+ },
+ {
+  "t": "my {mother|father} believed in you. I'm trying",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "wavering"
+  ]
+ },
+ {
+  "t": "thank you for the quiet and the full sacks",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "devout"
+  ]
+ },
+ {
+  "t": "we planted a flag and hoped. {still hoping|hope's holding}",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion"
+  ]
+ },
+ {
+  "t": "nothing to ask for today. just {checking you're there|saying hello}",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "devout"
+  ]
  }
 ]

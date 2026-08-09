@@ -23,28 +23,24 @@ use crate::hand::DivineHand;
 use crate::scatter::FoodSource;
 use crate::ui::{self, PointerContext};
 use crate::villager::SettlementSite;
-use crate::villager::belief::{Belief, FLOURISH_COST};
+use crate::villager::belief::Belief;
 use crate::witness::{DivineEvent, DivineEventKind};
 
-/// Belief the Smite miracle costs.
-// Priced so a founding congregation (about 4-5 belief) can afford exactly
-// one act of wrath from the opening pool — a taste of power, then the god
-// must earn the rest one answered prayer at a time.
-pub const SMITE_COST: f32 = 4.0;
+// The unlock ladder: congregation faith a miracle asks for BEFORE it will
+// be taught. Belief is never spent — crossing each high-water mark is the
+// whole price, and after that the calendar is the only cost. Brett: "move
+// them to cooldown only. Belief amount will be one of the unlock
+// requirements. No form of mana."
 
-/// Belief the earned tier-two miracles cost.
-pub const MEND_COST: f32 = 8.0;
-pub const QUAKE_COST: f32 = 8.0;
+/// A founding congregation holds 4-5 faith: wrath is the first thing a new
+/// god grows into, one answered prayer past the opening pool.
+pub const SMITE_UNLOCK: f32 = 4.0;
 
-/// Belief Bounty costs. Deliberately affordable from the founding pool:
-/// a new god's first act can be kindness that pays for itself, since fed
-/// witnesses convert and belief flows back.
-pub const BOUNTY_COST: f32 = 2.0;
+/// Walking in a body asks for a congregation that already half-believes.
+pub const AVATAR_UNLOCK: f32 = 6.0;
 
-/// Taking a body is cheap; STAYING in one is not. The drain is in
-/// `avatar.rs` - a god who can be a person indefinitely stops being a
-/// god, so the ride is paid for by the minute.
-pub const AVATAR_COST: f32 = 3.0;
+/// The land-wide providence, for a village whose faith has real weight.
+pub const FLOURISH_UNLOCK: f32 = 10.0;
 
 /// How far Bounty's blessing reaches from the cast point.
 const BOUNTY_RADIUS: f32 = 9.0;
@@ -63,13 +59,20 @@ pub struct MiraclesPlugin;
 impl Plugin for MiraclesPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SelectedMiracle>()
+            .init_resource::<Hotbar>()
+            .init_resource::<Grimoire>()
+            .init_resource::<Cooldowns>()
+            .init_resource::<DragState>()
+            .add_message::<FireMiracle>()
             .add_systems(Startup, spawn_hotbar)
-            .add_systems(Update, dress_slot_caps)
+            .add_systems(Update, (dress_slot_caps, dress_the_bar, cooldown_faces))
             .add_systems(
                 Update,
                 (
-                    reveal_earned_miracle,
+                    unlock_miracles,
+                    carry_miracles,
                     choose_miracle,
+                    fire_the_slots,
                     cast,
                     style_hotbar,
                     update_belief_meter,
@@ -279,7 +282,7 @@ fn glory_test_harness(
 }
 
 /// The miracles the god can work.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Miracle {
     Flourish,
     Smite,
@@ -297,6 +300,16 @@ pub enum Miracle {
 }
 
 impl Miracle {
+    /// Every miracle there is, for the unlock ladder to walk.
+    pub const ALL: [Miracle; 6] = [
+        Miracle::Bounty,
+        Miracle::Smite,
+        Miracle::Avatar,
+        Miracle::Flourish,
+        Miracle::Mend,
+        Miracle::Quake,
+    ];
+
     pub fn name(self) -> &'static str {
         match self {
             Miracle::Flourish => "Flourish",
@@ -308,14 +321,36 @@ impl Miracle {
         }
     }
 
-    pub fn cost(self) -> f32 {
+    /// Days between castings. The calendar is the cost now — no mana, no
+    /// meter, just the patience of a god who must choose what this day's
+    /// power is spent on. Brett: "maybe an ability has a 1 or 2 day
+    /// cooldown... some might even have a week."
+    pub fn cooldown_days(self) -> f32 {
         match self {
-            Miracle::Flourish => FLOURISH_COST,
-            Miracle::Smite => SMITE_COST,
-            Miracle::Bounty => BOUNTY_COST,
-            Miracle::Mend => MEND_COST,
-            Miracle::Quake => QUAKE_COST,
-            Miracle::Avatar => AVATAR_COST,
+            Miracle::Bounty => 0.5,
+            Miracle::Smite => 1.0,
+            Miracle::Avatar => 1.0,
+            Miracle::Mend => 1.0,
+            Miracle::Flourish => 1.5,
+            Miracle::Quake => 2.0,
+        }
+    }
+
+    /// The cooldown in world-clock seconds.
+    pub fn cooldown_secs(self) -> f64 {
+        (self.cooldown_days() * crate::calendar::DAY_SECONDS) as f64
+    }
+
+    /// The congregation faith that unlocks this miracle — belief as the
+    /// LADDER, never the fuel. `None` marks the two the legends award
+    /// (Mend, Quake) and the one the god starts with (Bounty).
+    pub fn unlock_at(self) -> Option<f32> {
+        match self {
+            Miracle::Bounty => None,
+            Miracle::Smite => Some(SMITE_UNLOCK),
+            Miracle::Avatar => Some(AVATAR_UNLOCK),
+            Miracle::Flourish => Some(FLOURISH_UNLOCK),
+            Miracle::Mend | Miracle::Quake => None,
         }
     }
 
@@ -330,37 +365,17 @@ impl Miracle {
             Miracle::Avatar => "wear somebody's body and walk about in it",
         }
     }
-
-    pub fn key(self, keymap: &crate::keymap::Keymap) -> KeyCode {
-        use crate::keymap::Deed;
-        keymap.key(match self {
-            Miracle::Flourish => Deed::Flourish,
-            Miracle::Smite => Deed::Smite,
-            Miracle::Bounty => Deed::Bounty,
-            // Whichever of the pair is earned takes the fourth slot.
-            Miracle::Mend | Miracle::Quake => Deed::MendOrQuake,
-            Miracle::Avatar => Deed::Avatar,
-        })
-    }
 }
 
 /// The keycap letter in a slot's corner, kept true to the keymap.
 #[derive(Component)]
 struct SlotCap(usize);
 
-/// Keeps every slot's corner naming the key that actually arms it.
+/// Keeps every slot's corner naming the key that actually fires it.
 fn dress_slot_caps(keymap: Res<crate::keymap::Keymap>, mut caps: Query<(&SlotCap, &mut Text)>) {
     use crate::keymap::{Deed, key_name};
     for (cap, mut text) in &mut caps {
-        let name = match cap.0 {
-            0 => key_name(keymap.key(Deed::Flourish)),
-            1 => key_name(keymap.key(Deed::Smite)),
-            2 => key_name(keymap.key(Deed::Bounty)),
-            3 => key_name(keymap.key(Deed::MendOrQuake)),
-            4 => key_name(keymap.key(Deed::Avatar)),
-            _ => None,
-        };
-        let fresh = name
+        let fresh = key_name(keymap.key(Deed::slot(cap.0)))
             .map(str::to_string)
             .unwrap_or_else(|| format!("{}", cap.0 + 1));
         if text.0 != fresh {
@@ -374,9 +389,116 @@ fn dress_slot_caps(keymap: Res<crate::keymap::Keymap>, mut caps: Query<(&SlotCap
 #[derive(Resource, Default)]
 pub struct SelectedMiracle(pub Option<Miracle>);
 
-/// A hotbar slot bound to a miracle (empty slots have none).
+/// The bar itself: ten slots and what the god has set in each. Drag one
+/// miracle onto another slot and they trade places — the arrangement is
+/// the god's own and it is SAVED. Brett: "10 buttons wide... drag and
+/// drop like WoW."
+#[derive(Resource, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Hotbar(pub [Option<Miracle>; 10]);
+
+impl Default for Hotbar {
+    fn default() -> Self {
+        let mut bar = [None; 10];
+        // The founding kit: kindness first. Everything else is earned.
+        bar[0] = Some(Miracle::Bounty);
+        Hotbar(bar)
+    }
+}
+
+impl Hotbar {
+    /// The slot a miracle sits in, if it sits anywhere.
+    pub fn slot_of(&self, miracle: Miracle) -> Option<usize> {
+        self.0.iter().position(|held| *held == Some(miracle))
+    }
+
+    /// Sets a freshly learned miracle in the first empty slot.
+    pub fn take_in(&mut self, miracle: Miracle) {
+        if self.slot_of(miracle).is_some() {
+            return;
+        }
+        if let Some(empty) = self.0.iter().position(Option::is_none) {
+            self.0[empty] = Some(miracle);
+        }
+    }
+}
+
+/// What the god has earned the right to, and the most faith the
+/// congregation has ever held together — the ladder is climbed on the
+/// HIGH-WATER mark, so a faith dip never takes a miracle back.
+#[derive(Resource, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Grimoire {
+    pub unlocked: Vec<Miracle>,
+    pub high_water: f32,
+}
+
+impl Default for Grimoire {
+    fn default() -> Self {
+        Grimoire {
+            unlocked: vec![Miracle::Bounty],
+            high_water: 0.0,
+        }
+    }
+}
+
+impl Grimoire {
+    pub fn knows(&self, miracle: Miracle) -> bool {
+        self.unlocked.contains(&miracle)
+    }
+}
+
+/// When each miracle is ready again, in world-clock seconds. The calendar
+/// is the whole economy now.
+#[derive(Resource, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct Cooldowns(pub Vec<(Miracle, f64)>);
+
+impl Cooldowns {
+    pub fn ready(&self, miracle: Miracle, now: f64) -> bool {
+        self.remaining(miracle, now) <= 0.0
+    }
+
+    /// Seconds until this miracle answers again. Zero when ready.
+    pub fn remaining(&self, miracle: Miracle, now: f64) -> f64 {
+        self.0
+            .iter()
+            .find(|(held, _)| *held == miracle)
+            .map_or(0.0, |(_, until)| (until - now).max(0.0))
+    }
+
+    /// The casting spends the days.
+    pub fn start(&mut self, miracle: Miracle, now: f64) {
+        self.0.retain(|(held, _)| *held != miracle);
+        self.0.push((miracle, now + miracle.cooldown_secs()));
+    }
+}
+
+/// A casting on its way: what to work and where. Written by the armed
+/// click and by the slot keys alike, so there is exactly one performer.
+#[derive(bevy::prelude::Message)]
+pub struct FireMiracle {
+    pub miracle: Miracle,
+    pub at: Vec3,
+}
+
+/// A hotbar slot, by position. What sits in it lives in [`Hotbar`].
 #[derive(Component)]
-struct MiracleSlot(Option<Miracle>);
+struct MiracleSlot(usize);
+
+/// A piece of slot dressing — icon nodes and hint, torn down and redrawn
+/// whenever the bar's arrangement changes.
+#[derive(Component)]
+struct SlotArt;
+
+/// The dark sweep rising over a slot while its miracle rests.
+#[derive(Component)]
+struct CooldownShade(usize);
+
+/// The remaining-time word under the sweep.
+#[derive(Component)]
+struct CooldownLabel(usize);
+
+/// A slot flashing with the cast it just fired.
+#[derive(Component)]
+struct FiredFlash(f32);
 
 /// A bolt of divine lightning, briefly.
 #[derive(Component)]
@@ -483,45 +605,29 @@ fn spawn_hotbar(mut commands: Commands) {
         ))
         .id();
 
-    // The fourth is held empty for whichever of Mend or Quake the legends
-    // crystallise; Avatar is the god's from the start and sits in the
-    // fifth, where its key already points.
-    for (index, miracle) in [
-        Some(Miracle::Flourish),
-        Some(Miracle::Smite),
-        Some(Miracle::Bounty),
-        None,
-        Some(Miracle::Avatar),
-        None,
-        None,
-        None,
-    ]
-    .into_iter()
-    .enumerate()
-    {
+    // Ten slots, bare. What sits in each is the Hotbar resource's business,
+    // and `dress_the_bar` draws it — the frames here are furniture. Brett:
+    // "I want the bar to be 10 buttons wide."
+    for index in 0..10 {
         let slot = commands
             .spawn((
-                MiracleSlot(miracle),
+                MiracleSlot(index),
                 ui::UiButton,
+                Interaction::default(),
+                UiTransform::default(),
                 Node {
                     width: px(42),
                     height: px(42),
                     border: UiRect::all(px(1)),
                     border_radius: BorderRadius::all(px(5)),
+                    overflow: Overflow::clip(),
                     ..default()
                 },
                 BackgroundColor(ui::theme::panel_bg().with_alpha(0.4)),
                 BorderColor::all(ui::theme::panel_border()),
-                Interaction::default(),
                 ChildOf(bar),
             ))
             .id();
-        if let Some(miracle) = miracle {
-            commands.entity(slot).insert(ui::HoverHint::new(
-                miracle.name(),
-                format!("{} - {:.0} belief", miracle.blurb(), miracle.cost()),
-            ));
-        }
 
         // The key in the corner, hotkey-style, kept true to the keymap.
         let number = commands
@@ -538,238 +644,237 @@ fn spawn_hotbar(mut commands: Commands) {
             .id();
         commands.entity(number).insert(ChildOf(slot));
 
-        // And what it costs, in the opposite corner.
-        if let Some(miracle) = miracle {
-            let cost = commands
-                .spawn((
-                    ui::dim(format!("{:.0}", miracle.cost())),
-                    Node {
-                        position_type: PositionType::Absolute,
-                        right: px(4),
-                        bottom: px(1),
-                        ..default()
-                    },
-                ))
-                .id();
-            commands.entity(cost).insert(ChildOf(slot));
-        }
-
-        // Node-drawn icons: a sprout for grace, a jagged bolt for wrath.
-        match miracle {
-            Some(Miracle::Flourish) => {
-                for (l, t, w, h) in [
-                    (20.0, 12.0, 3.0, 22.0),
-                    (12.0, 14.0, 9.0, 6.0),
-                    (22.0, 20.0, 9.0, 6.0),
-                ] {
-                    let leaf = commands
-                        .spawn((
-                            Node {
-                                position_type: PositionType::Absolute,
-                                left: px(l),
-                                top: px(t),
-                                width: px(w),
-                                height: px(h),
-                                border_radius: BorderRadius::all(px(3)),
-                                ..default()
-                            },
-                            BackgroundColor(crate::palette::shade(&crate::palette::GRASS, 0.7)),
-                        ))
-                        .id();
-                    commands.entity(leaf).insert(ChildOf(slot));
-                }
-            }
-            Some(Miracle::Smite) => {
-                for (l, t, w, h) in [(22.0, 8.0, 5.0, 14.0), (16.0, 19.0, 5.0, 15.0)] {
-                    let jag = commands
-                        .spawn((
-                            Node {
-                                position_type: PositionType::Absolute,
-                                left: px(l),
-                                top: px(t),
-                                width: px(w),
-                                height: px(h),
-                                ..default()
-                            },
-                            BackgroundColor(ui::theme::accent()),
-                        ))
-                        .id();
-                    commands.entity(jag).insert(ChildOf(slot));
-                }
-            }
-            // A cluster of berries under a leaf — the bounty.
-            Some(Miracle::Bounty) => {
-                for (l, t, s, red) in [
-                    (14.0, 20.0, 8.0, true),
-                    (22.0, 22.0, 8.0, true),
-                    (18.0, 14.0, 8.0, true),
-                    (16.0, 8.0, 12.0, false),
-                ] {
-                    let dot = commands
-                        .spawn((
-                            Node {
-                                position_type: PositionType::Absolute,
-                                left: px(l),
-                                top: px(t),
-                                width: px(s),
-                                height: px(if red { s } else { 5.0 }),
-                                border_radius: BorderRadius::all(px(4)),
-                                ..default()
-                            },
-                            BackgroundColor(if red {
-                                crate::palette::shade(&crate::palette::CLOTH_RED, 0.7)
-                            } else {
-                                crate::palette::shade(&crate::palette::GRASS, 0.7)
-                            }),
-                        ))
-                        .id();
-                    commands.entity(dot).insert(ChildOf(slot));
-                }
-            }
-            // A body, standing empty and waiting to be worn: head, trunk,
-            // two legs. The only miracle whose icon is a person, because
-            // it is the only one where the god becomes one.
-            Some(Miracle::Avatar) => {
-                for (l, t, w, h, round) in [
-                    (17.0, 9.0, 8.0, 8.0, true),
-                    (18.0, 18.0, 6.0, 9.0, false),
-                    (18.0, 27.0, 2.0, 6.0, false),
-                    (22.0, 27.0, 2.0, 6.0, false),
-                ] {
-                    let part = commands
-                        .spawn((
-                            Node {
-                                position_type: PositionType::Absolute,
-                                left: px(l),
-                                top: px(t),
-                                width: px(w),
-                                height: px(h),
-                                border_radius: BorderRadius::all(px(if round { 4.0 } else { 1.0 })),
-                                ..default()
-                            },
-                            BackgroundColor(ui::theme::accent().with_alpha(0.85)),
-                        ))
-                        .id();
-                    commands.entity(part).insert(ChildOf(slot));
-                }
-            }
-            _ => {}
-        }
+        // The rest sweep: a dark tide that drains as the days pass.
+        commands.spawn((
+            CooldownShade(index),
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(0),
+                right: px(0),
+                bottom: px(0),
+                height: percent(0),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK.with_alpha(0.62)),
+            ChildOf(slot),
+        ));
+        // And the word for how long: "2d", "14h".
+        commands.spawn((
+            CooldownLabel(index),
+            ui::dim(String::new()),
+            Node {
+                position_type: PositionType::Absolute,
+                right: px(4),
+                bottom: px(1),
+                ..default()
+            },
+            ChildOf(slot),
+        ));
     }
 }
 
-/// When a legend crystallises a new miracle, it materialises in the empty
-/// third slot, icon and all.
-fn reveal_earned_miracle(
-    mut commands: Commands,
-    legend: Res<crate::villager::belief::Legend>,
-    mut slots: Query<(Entity, &mut MiracleSlot)>,
-) {
-    let Some(earned) = legend.unlocked else {
-        return;
+/// Draws a miracle's face into a slot: the node-built icon, tagged as art
+/// so a re-dress can sweep it. The same shapes the slots always wore.
+fn draw_miracle_icon(commands: &mut Commands, slot: Entity, miracle: Miracle) {
+    let art = |commands: &mut Commands, node: Node, color: Color| {
+        let piece = commands.spawn((SlotArt, node, BackgroundColor(color))).id();
+        commands.entity(piece).insert(ChildOf(slot));
     };
-    if slots.iter().any(|(_, slot)| slot.0 == Some(earned)) {
-        return;
-    }
-    let Some((slot_entity, mut slot)) = slots.iter_mut().find(|(_, slot)| slot.0.is_none()) else {
-        return;
+    let block = |l: f32, t: f32, w: f32, h: f32, r: f32| Node {
+        position_type: PositionType::Absolute,
+        left: px(l),
+        top: px(t),
+        width: px(w),
+        height: px(h),
+        border_radius: BorderRadius::all(px(r)),
+        ..default()
     };
-    slot.0 = Some(earned);
-    commands.entity(slot_entity).insert(ui::HoverHint::new(
-        earned.name(),
-        format!("{} - {:.0} belief", earned.blurb(), earned.cost()),
-    ));
-
-    match earned {
+    match miracle {
+        // A sprout: stem and two leaves.
+        Miracle::Flourish => {
+            for (l, t, w, h) in [
+                (20.0, 12.0, 3.0, 22.0),
+                (12.0, 14.0, 9.0, 6.0),
+                (22.0, 20.0, 9.0, 6.0),
+            ] {
+                art(
+                    commands,
+                    block(l, t, w, h, 3.0),
+                    crate::palette::shade(&crate::palette::GRASS, 0.7),
+                );
+            }
+        }
+        // The jagged bolt.
+        Miracle::Smite => {
+            for (l, t, w, h) in [(22.0, 8.0, 5.0, 14.0), (16.0, 19.0, 5.0, 15.0)] {
+                art(commands, block(l, t, w, h, 0.0), ui::theme::accent());
+            }
+        }
+        // A cluster of berries under a leaf.
+        Miracle::Bounty => {
+            for (l, t, sz, red) in [
+                (14.0, 20.0, 8.0, true),
+                (22.0, 22.0, 8.0, true),
+                (18.0, 14.0, 8.0, true),
+                (16.0, 8.0, 12.0, false),
+            ] {
+                art(
+                    commands,
+                    block(l, t, sz, if red { sz } else { 5.0 }, 4.0),
+                    if red {
+                        crate::palette::shade(&crate::palette::CLOTH_RED, 0.7)
+                    } else {
+                        crate::palette::shade(&crate::palette::GRASS, 0.7)
+                    },
+                );
+            }
+        }
+        // A body, standing empty and waiting to be worn.
+        Miracle::Avatar => {
+            for (l, t, w, h, round) in [
+                (17.0, 9.0, 8.0, 8.0, true),
+                (18.0, 18.0, 6.0, 9.0, false),
+                (18.0, 27.0, 2.0, 6.0, false),
+                (22.0, 27.0, 2.0, 6.0, false),
+            ] {
+                art(
+                    commands,
+                    block(l, t, w, h, if round { 4.0 } else { 1.0 }),
+                    ui::theme::accent().with_alpha(0.85),
+                );
+            }
+        }
         // A cross of green — mending.
         Miracle::Mend => {
             for (l, t, w, h) in [(18.0, 9.0, 7.0, 24.0), (10.0, 17.0, 23.0, 7.0)] {
-                let bar = commands
-                    .spawn((
-                        Node {
-                            position_type: PositionType::Absolute,
-                            left: px(l),
-                            top: px(t),
-                            width: px(w),
-                            height: px(h),
-                            border_radius: BorderRadius::all(px(3)),
-                            ..default()
-                        },
-                        BackgroundColor(crate::palette::shade(&crate::palette::GRASS, 0.8)),
-                    ))
-                    .id();
-                commands.entity(bar).insert(ChildOf(slot_entity));
+                art(
+                    commands,
+                    block(l, t, w, h, 3.0),
+                    crate::palette::shade(&crate::palette::GRASS, 0.8),
+                );
             }
         }
         // Broken strata — the quake.
         Miracle::Quake => {
             for (l, t, w) in [(8.0, 12.0, 12.0), (23.0, 15.0, 11.0), (12.0, 24.0, 14.0)] {
-                let crack = commands
-                    .spawn((
-                        Node {
-                            position_type: PositionType::Absolute,
-                            left: px(l),
-                            top: px(t),
-                            width: px(w),
-                            height: px(4),
-                            ..default()
-                        },
-                        BackgroundColor(ui::theme::text_dim()),
-                    ))
-                    .id();
-                commands.entity(crack).insert(ChildOf(slot_entity));
+                art(commands, block(l, t, w, 4.0, 0.0), ui::theme::text_dim());
             }
         }
-        _ => {}
     }
 }
 
-/// Arming and disarming: click a slot or press its number; right-click or
-/// Escape lowers the hand empty.
-fn choose_miracle(
-    keys: Res<ButtonInput<KeyCode>>,
-    keymap: Res<crate::keymap::Keymap>,
-    buttons: Res<ButtonInput<MouseButton>>,
-    slots: Query<(&Interaction, &MiracleSlot), Changed<Interaction>>,
-    all_slots: Query<&MiracleSlot>,
+/// Redraws every slot's face whenever the bar's arrangement changes — a
+/// drag, an unlock, a load. The frames stay; the art is swept and drawn.
+#[allow(clippy::type_complexity)]
+fn dress_the_bar(
+    mut commands: Commands,
+    hotbar: Res<Hotbar>,
+    art: Query<(Entity, &ChildOf), With<SlotArt>>,
+    slots: Query<(Entity, &MiracleSlot)>,
+) {
+    if !hotbar.is_changed() {
+        return;
+    }
+    for (piece, parent) in &art {
+        let _ = parent;
+        // try_despawn: the drop that changed the Hotbar also despawns the
+        // drag ghost, whose icon pieces are art too - despawning them
+        // twice in one frame must be a no-op, not a panic.
+        commands.entity(piece).try_despawn();
+    }
+    for (slot, place) in &slots {
+        let Some(miracle) = hotbar.0[place.0] else {
+            commands.entity(slot).remove::<ui::HoverHint>();
+            continue;
+        };
+        draw_miracle_icon(&mut commands, slot, miracle);
+        commands.entity(slot).insert(ui::HoverHint::new(
+            miracle.name(),
+            format!(
+                "{} - ready every {} days",
+                miracle.blurb(),
+                miracle.cooldown_days()
+            ),
+        ));
+    }
+}
+
+/// The ladder: crossing a high-water mark of congregation faith teaches a
+/// miracle, and the legends teach their own (Mend or Quake, whichever the
+/// stories crystallise). Learning is forever — faith can ebb, the miracle
+/// stays — and each new power sets itself in the first empty slot, from
+/// which the god may drag it wherever they please.
+fn unlock_miracles(
     belief: Res<Belief>,
+    legend: Res<crate::villager::belief::Legend>,
+    mut grimoire: ResMut<Grimoire>,
+    mut hotbar: ResMut<Hotbar>,
+    mut notices: MessageWriter<ui::Notice>,
+) {
+    grimoire.high_water = grimoire.high_water.max(belief.total);
+
+    let mut learned: Vec<Miracle> = Vec::new();
+    for miracle in Miracle::ALL {
+        if grimoire.knows(miracle) {
+            continue;
+        }
+        let earned = match miracle.unlock_at() {
+            Some(rung) => grimoire.high_water >= rung,
+            // The legend-taught pair arrives when the stories say so.
+            None => legend.unlocked == Some(miracle),
+        };
+        if earned {
+            learned.push(miracle);
+        }
+    }
+    for miracle in learned {
+        grimoire.unlocked.push(miracle);
+        hotbar.take_in(miracle);
+        notices.write(ui::Notice::fanfare(format!(
+            "A miracle is yours: {}",
+            miracle.name()
+        )));
+    }
+}
+
+/// Arming and disarming, mouse-side: click a slot to arm what sits in it,
+/// click the world to work it; right-click or Escape lowers the hand. The
+/// number keys do NOT arm — they fire, over in `fire_the_slots`.
+fn choose_miracle(
+    clock: Res<crate::calendar::WorldClock>,
+    keys: Res<ButtonInput<KeyCode>>,
+    buttons: Res<ButtonInput<MouseButton>>,
+    hotbar: Res<Hotbar>,
+    cooldowns: Res<Cooldowns>,
+    dragging: Res<DragState>,
+    slots: Query<(&Interaction, &MiracleSlot), Changed<Interaction>>,
     mut selected: ResMut<SelectedMiracle>,
     mut notices: MessageWriter<ui::Notice>,
 ) {
-    // Arming an unaffordable miracle fails out loud: silence here reads as a
-    // broken button, not an empty purse.
-    let mut arm = |miracle: Miracle, selected: &mut SelectedMiracle| {
+    // A drag in progress owns the pointer; a press that began a carry must
+    // not also arm what it lifted.
+    if dragging.0.is_some() {
+        return;
+    }
+    for (interaction, slot) in &slots {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        let Some(miracle) = hotbar.0[slot.0] else {
+            continue;
+        };
         if selected.0 == Some(miracle) {
             selected.0 = None;
-        } else if belief.available() >= miracle.cost() {
+        } else if cooldowns.ready(miracle, clock.elapsed) {
             selected.0 = Some(miracle);
         } else {
+            // Arming a resting miracle fails out loud: silence here reads
+            // as a broken button, not a resting power.
             notices.write(ui::Notice::new(format!(
-                "{} needs {:.0} belief - the people hold {:.0}",
+                "{} returns in {}",
                 miracle.name(),
-                miracle.cost(),
-                belief.available(),
+                rest_word(cooldowns.remaining(miracle, clock.elapsed)),
             )));
-        }
-    };
-    for (interaction, slot) in &slots {
-        if *interaction == Interaction::Pressed
-            && let Some(miracle) = slot.0
-        {
-            arm(miracle, &mut selected);
-        }
-    }
-    for miracle in [
-        Miracle::Flourish,
-        Miracle::Smite,
-        Miracle::Bounty,
-        Miracle::Mend,
-        Miracle::Quake,
-        Miracle::Avatar,
-    ] {
-        if keys.just_pressed(miracle.key(&keymap)) && all_slots.iter().any(|s| s.0 == Some(miracle))
-        {
-            arm(miracle, &mut selected);
         }
     }
     if keys.just_pressed(KeyCode::Escape) || buttons.just_pressed(MouseButton::Right) {
@@ -777,21 +882,84 @@ fn choose_miracle(
     }
 }
 
+/// The keys FIRE. Pressing a slot's number works its miracle immediately,
+/// wherever the hand points — no arming step, no second click. Brett:
+/// "pressing the hotkey should fire the ability, not just arm it."
+fn fire_the_slots(
+    clock: Res<crate::calendar::WorldClock>,
+    keys: Res<ButtonInput<KeyCode>>,
+    keymap: Res<crate::keymap::Keymap>,
+    hotbar: Res<Hotbar>,
+    cooldowns: Res<Cooldowns>,
+    hand: Res<crate::hand::DivineHand>,
+    mut fire: MessageWriter<FireMiracle>,
+    mut wear: MessageWriter<crate::avatar::Wear>,
+    mut notices: MessageWriter<ui::Notice>,
+) {
+    for (index, held) in hotbar.0.iter().enumerate() {
+        if !keys.just_pressed(keymap.key(crate::keymap::Deed::slot(index))) {
+            continue;
+        }
+        let Some(miracle) = *held else {
+            continue;
+        };
+        if !cooldowns.ready(miracle, clock.elapsed) {
+            notices.write(ui::Notice::new(format!(
+                "{} returns in {}",
+                miracle.name(),
+                rest_word(cooldowns.remaining(miracle, clock.elapsed)),
+            )));
+            continue;
+        }
+        // The Avatar is worn, not cast at ground: fired, it takes whoever
+        // stands under the hand this instant.
+        if miracle == Miracle::Avatar {
+            if let Some(body) = hand.hovered {
+                wear.write(crate::avatar::Wear(body));
+            } else {
+                notices.write(ui::Notice::new(
+                    "The Avatar needs a body under the hand".to_string(),
+                ));
+            }
+            continue;
+        }
+        let Some(at) = hand.cursor_world else {
+            continue;
+        };
+        fire.write(FireMiracle { miracle, at });
+    }
+}
+
+/// How long a rest reads in words: days while days remain, hours after.
+fn rest_word(seconds: f64) -> String {
+    let days = seconds / crate::calendar::DAY_SECONDS as f64;
+    if days >= 1.0 {
+        format!("{:.0}d", days.ceil())
+    } else {
+        format!("{:.0}h", (days * 24.0).ceil().max(1.0))
+    }
+}
+
 /// An armed miracle casts where the hand touches the world.
+/// An armed miracle casts where the hand touches the world.
+#[allow(clippy::too_many_arguments)]
 fn cast(
     mut commands: Commands,
-    buttons: Res<ButtonInput<MouseButton>>,
-    pointer: Res<PointerContext>,
+    clock: Res<crate::calendar::WorldClock>,
+    // Bundled in pairs: this system rides Bevy's sixteen-parameter
+    // ceiling, and each pair is one subject.
+    input: (Res<ButtonInput<MouseButton>>, Res<PointerContext>),
     hand: Res<DivineHand>,
     site: Option<Res<SettlementSite>>,
     name: Option<Res<crate::villager::DivineName>>,
     mut selected: ResMut<SelectedMiracle>,
-    mut belief: ResMut<Belief>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut cooldowns: ResMut<Cooldowns>,
+    mut fired: MessageReader<FireMiracle>,
+    hotbar: Res<Hotbar>,
+    slots: Query<(Entity, &MiracleSlot)>,
+    mut visuals: (ResMut<Assets<Mesh>>, ResMut<Assets<StandardMaterial>>),
     mut bushes: Query<(&GlobalTransform, &mut FoodSource)>,
-    mut notices: MessageWriter<crate::ui::Notice>,
-    mut witnessed: MessageWriter<DivineEvent>,
+    mut told: (MessageWriter<crate::ui::Notice>, MessageWriter<DivineEvent>),
     mut victims: Query<
         (Entity, &Transform, &mut Vitality, &mut CreatureMotion),
         (
@@ -808,31 +976,97 @@ fn cast(
         With<crate::villager::Villager>,
     >,
 ) {
-    let Some(miracle) = selected.0 else {
-        return;
-    };
-    if !buttons.just_pressed(MouseButton::Left) || pointer.over_ui {
-        return;
-    }
-    let Some(at) = hand.cursor_world else {
-        return;
-    };
     let god = name.as_ref().map_or("the god", |n| n.0.as_str());
+    let mut castings: Vec<(Miracle, Vec3)> = Vec::new();
+    // Two doors, one performer: the slot keys arrive as messages, the
+    // armed click walks straight in.
+    for order in fired.read() {
+        castings.push((order.miracle, order.at));
+    }
+    if let Some(miracle) = selected.0
+        && input.0.just_pressed(MouseButton::Left)
+        && !input.1.over_ui
+        && let Some(at) = hand.cursor_world
+    {
+        // Avatar never reaches here - `take_a_body` owns the armed click
+        // on a person - so ground-cast kinds only.
+        if miracle != Miracle::Avatar {
+            castings.push((miracle, at));
+        }
+        // One cast per arming: a miracle is a sentence, not a hose.
+        selected.0 = None;
+    }
+    for (miracle, at) in castings {
+        if !cooldowns.ready(miracle, clock.elapsed) {
+            continue;
+        }
+        let worked = perform(
+            miracle,
+            at,
+            god,
+            &mut commands,
+            &site,
+            &mut visuals.0,
+            &mut visuals.1,
+            &mut bushes,
+            &mut told.0,
+            &mut told.1,
+            &mut victims,
+            &mut souls,
+        );
+        if worked {
+            cooldowns.start(miracle, clock.elapsed);
+            // The slot it fired from flashes with the act.
+            if let Some(slot_index) = hotbar.slot_of(miracle) {
+                for (slot_entity, place) in &slots {
+                    if place.0 == slot_index {
+                        commands.entity(slot_entity).insert(FiredFlash(0.45));
+                    }
+                }
+            }
+        }
+    }
+}
 
+/// Works one miracle at one place. True if the world changed - a casting
+/// that found nothing to bless costs no days.
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
+fn perform(
+    miracle: Miracle,
+    at: Vec3,
+    god: &str,
+    commands: &mut Commands,
+    site: &Option<Res<SettlementSite>>,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    bushes: &mut Query<(&GlobalTransform, &mut FoodSource)>,
+    notices: &mut MessageWriter<crate::ui::Notice>,
+    witnessed: &mut MessageWriter<DivineEvent>,
+    victims: &mut Query<
+        (Entity, &Transform, &mut Vitality, &mut CreatureMotion),
+        (
+            With<Creature>,
+            Without<Corpse>,
+            Without<crate::creature::Held>,
+        ),
+    >,
+    souls: &mut Query<
+        (
+            &mut crate::villager::Morale,
+            &mut crate::villager::belief::Faith,
+        ),
+        With<crate::villager::Villager>,
+    >,
+) -> bool {
     match miracle {
-        // Worn rather than cast: `avatar.rs` owns the whole of it,
-        // because taking a body is a click on a PERSON rather than on a
-        // patch of ground, and this system is at Bevy's parameter
-        // ceiling besides.
-        Miracle::Avatar => {}
+        // Worn rather than cast: `take_a_body` and the Wear message own
+        // it. Nothing routes Avatar here.
+        Miracle::Avatar => false,
 
         Miracle::Bounty => {
-            if belief.available() < BOUNTY_COST {
-                return;
-            }
             // The blessing needs something living to land on.
             let mut blessed = 0;
-            for (bush_at, mut bush) in &mut bushes {
+            for (bush_at, mut bush) in bushes.iter_mut() {
                 if bush_at.translation().distance(at) <= BOUNTY_RADIUS {
                     bush.amount = FoodSource::CAPACITY;
                     blessed += 1;
@@ -842,13 +1076,12 @@ fn cast(
                 notices.write(crate::ui::Notice::new(
                     "Nothing grows there for Bounty to bless".to_string(),
                 ));
-                return;
+                return false;
             }
-            belief.spent += BOUNTY_COST;
             spawn_glory(
-                &mut commands,
-                &mut meshes,
-                &mut materials,
+                commands,
+                meshes,
+                materials,
                 at,
                 crate::palette::shade(&crate::palette::GRASS, 0.9),
                 false,
@@ -863,18 +1096,17 @@ fn cast(
                 subject: None,
                 intensity: 0.8,
             });
+            true
         }
         Miracle::Flourish => {
             let Some(site) = site else {
-                return;
+                return false;
             };
-            if !crate::villager::belief::flourish(&mut belief, &site, &mut bushes) {
-                return;
-            }
+            crate::villager::belief::flourish(site, bushes);
             spawn_glory(
-                &mut commands,
-                &mut meshes,
-                &mut materials,
+                commands,
+                meshes,
+                materials,
                 site.centre,
                 crate::palette::shade(&crate::palette::GRASS, 0.85),
                 true,
@@ -897,18 +1129,14 @@ fn cast(
                 subject: None,
                 intensity: 0.9,
             });
+            true
         }
         Miracle::Smite => {
-            if belief.available() < SMITE_COST {
-                return;
-            }
-            belief.spent += SMITE_COST;
-
-            lightning_bolt(&mut commands, &mut meshes, &mut materials, at);
+            lightning_bolt(commands, meshes, materials, at);
 
             // The harm, and the first name it fell on.
             let mut struck: Option<Entity> = None;
-            for (victim, transform, mut vitality, mut motion) in &mut victims {
+            for (victim, transform, mut vitality, mut motion) in victims.iter_mut() {
                 if transform.translation.distance(at) > SMITE_RADIUS {
                     continue;
                 }
@@ -929,38 +1157,25 @@ fn cast(
                 subject: struck,
                 intensity: 1.0,
             });
+            true
         }
         Miracle::Mend | Miracle::Quake => {
-            if belief.available() < miracle.cost() {
-                return;
-            }
             // Mending arrives as warm rising light; the quake speaks for
             // itself in thrown bodies.
             if miracle == Miracle::Mend {
                 spawn_glory(
-                    &mut commands,
-                    &mut meshes,
-                    &mut materials,
+                    commands,
+                    meshes,
+                    materials,
                     at,
                     Color::srgb(1.0, 0.88, 0.55),
                     true,
                 );
             }
-            cast_earned(
-                miracle,
-                at,
-                god,
-                &mut belief,
-                &mut notices,
-                &mut witnessed,
-                &mut victims,
-                &mut souls,
-            );
+            cast_earned(miracle, at, god, notices, witnessed, victims, souls);
+            true
         }
     }
-
-    // One cast per arming: a miracle is a sentence, not a hose.
-    selected.0 = None;
 }
 
 /// The Mend and Quake arms of [`cast`], split out for length.
@@ -969,7 +1184,6 @@ fn cast_earned(
     miracle: Miracle,
     at: Vec3,
     god: &str,
-    belief: &mut Belief,
     notices: &mut MessageWriter<crate::ui::Notice>,
     witnessed: &mut MessageWriter<DivineEvent>,
     victims: &mut Query<
@@ -990,7 +1204,6 @@ fn cast_earned(
 ) {
     match miracle {
         Miracle::Mend => {
-            belief.spent += MEND_COST;
             let mut first: Option<Entity> = None;
             for (entity, transform, mut vitality, mut motion) in victims.iter_mut() {
                 if transform.translation.distance(at) > MEND_RADIUS {
@@ -1020,7 +1233,6 @@ fn cast_earned(
             });
         }
         Miracle::Quake => {
-            belief.spent += QUAKE_COST;
             let mut first: Option<Entity> = None;
             for (entity, transform, _, mut motion) in victims.iter_mut() {
                 let offset = transform.translation - at;
@@ -1044,23 +1256,157 @@ fn cast_earned(
     }
 }
 
+/// A miracle mid-carry: where it came from, and the ghost under the cursor.
+struct Drag {
+    from: usize,
+    miracle: Miracle,
+    ghost: Entity,
+    /// Where the press began, to tell a click from a carry.
+    grip: Vec2,
+    live: bool,
+}
+
+/// The carry in progress, if any.
+#[derive(Resource, Default)]
+pub struct DragState(Option<Drag>);
+
+/// Drag and drop, the way every action bar since WoW taught: press a slot
+/// and pull, and the miracle comes away under the cursor; let go over
+/// another slot and the two trade places; let go anywhere else and it
+/// settles home. A press that never pulls past a knuckle's width stays a
+/// click, and the arming system keeps it.
+#[allow(clippy::type_complexity)]
+fn carry_miracles(
+    mut commands: Commands,
+    buttons: Res<ButtonInput<MouseButton>>,
+    windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
+    mut hotbar: ResMut<Hotbar>,
+    mut dragging: ResMut<DragState>,
+    mut selected: ResMut<SelectedMiracle>,
+    slots: Query<(&Interaction, &MiracleSlot)>,
+    mut ghosts: Query<&mut Node, With<DragGhost>>,
+) {
+    let cursor = windows.single().ok().and_then(|w| w.cursor_position());
+
+    // A press on a loaded slot takes a grip.
+    if buttons.just_pressed(MouseButton::Left)
+        && dragging.0.is_none()
+        && let Some(at) = cursor
+    {
+        for (interaction, slot) in &slots {
+            if *interaction == Interaction::None {
+                continue;
+            }
+            let Some(miracle) = hotbar.0[slot.0] else {
+                continue;
+            };
+            dragging.0 = Some(Drag {
+                from: slot.0,
+                miracle,
+                ghost: Entity::PLACEHOLDER,
+                grip: at,
+                live: false,
+            });
+            break;
+        }
+    }
+
+    let Some(drag) = dragging.0.as_mut() else {
+        return;
+    };
+
+    // The pull: past a knuckle's width the grip becomes a carry, the
+    // ghost appears, and whatever was armed is lowered.
+    if let Some(at) = cursor {
+        if !drag.live && at.distance(drag.grip) > 9.0 {
+            drag.live = true;
+            selected.0 = None;
+            drag.ghost = commands
+                .spawn((
+                    DragGhost,
+                    ordo::Layer::Tooltip,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: px(at.x - 21.0),
+                        top: px(at.y - 21.0),
+                        width: px(42),
+                        height: px(42),
+                        border: UiRect::all(px(2)),
+                        border_radius: BorderRadius::all(px(5)),
+                        overflow: Overflow::clip(),
+                        ..default()
+                    },
+                    BackgroundColor(ui::theme::panel_bg().with_alpha(0.85)),
+                    BorderColor::all(ui::theme::accent()),
+                ))
+                .id();
+            draw_miracle_icon(&mut commands, drag.ghost, drag.miracle);
+        }
+        if drag.live
+            && let Ok(mut node) = ghosts.get_mut(drag.ghost)
+        {
+            node.left = px(at.x - 21.0);
+            node.top = px(at.y - 21.0);
+        }
+    }
+
+    // The release: over a slot, the two trade places; anywhere else, home.
+    if buttons.just_released(MouseButton::Left) {
+        if drag.live {
+            let landing = slots
+                .iter()
+                .find(|(interaction, _)| **interaction != Interaction::None)
+                .map(|(_, slot)| slot.0);
+            if let Some(to) = landing
+                && to != drag.from
+            {
+                hotbar.0.swap(drag.from, to);
+            }
+            commands.entity(drag.ghost).despawn();
+        }
+        dragging.0 = None;
+    }
+}
+
+/// The carried miracle's face, floating under the cursor.
+#[derive(Component)]
+struct DragGhost;
+
 /// The meter follows the people's living faith: the bar's capacity is the
 /// congregation's whole faith, the fill is what is unspent.
 fn update_belief_meter(
     belief: Res<Belief>,
+    grimoire: Res<Grimoire>,
     mut readout: Query<&mut Text, With<BeliefReadout>>,
     mut fill: Query<&mut Node, With<BeliefFill>>,
 ) {
-    if !belief.is_changed() {
+    if !belief.is_changed() && !grimoire.is_changed() {
         return;
     }
+    // No mana here: the bar is the LADDER. It fills toward the next
+    // miracle the congregation's faith has yet to earn, names it, and
+    // stands full and quiet once everything is taught.
+    let next_rung = Miracle::ALL
+        .into_iter()
+        .filter(|miracle| !grimoire.knows(*miracle))
+        .filter_map(|miracle| miracle.unlock_at().map(|rung| (miracle, rung)))
+        .filter(|(_, rung)| *rung > grimoire.high_water)
+        .min_by(|a, b| a.1.total_cmp(&b.1));
+
     for mut text in &mut readout {
-        text.0 = format!("BELIEF {:.0} / {:.0}", belief.available(), belief.total);
+        text.0 = match next_rung {
+            Some((miracle, rung)) => format!(
+                "BELIEF {:.0} - {} AT {:.0}",
+                belief.total,
+                miracle.name().to_uppercase(),
+                rung
+            ),
+            None => format!("BELIEF {:.0}", belief.total),
+        };
     }
-    let fraction = if belief.total > 0.0 {
-        (belief.available() / belief.total).clamp(0.0, 1.0)
-    } else {
-        0.0
+    let fraction = match next_rung {
+        Some((_, rung)) if rung > 0.0 => (belief.total / rung).clamp(0.0, 1.0),
+        _ => 1.0,
     };
     for mut node in &mut fill {
         node.width = percent(fraction * 100.0);
@@ -1068,33 +1414,111 @@ fn update_belief_meter(
 }
 
 /// The armed slot glows; unaffordable miracles sit dim.
+#[allow(clippy::type_complexity)]
 fn style_hotbar(
+    time: Res<Time>,
+    clock: Res<crate::calendar::WorldClock>,
     selected: Res<SelectedMiracle>,
-    belief: Res<Belief>,
-    mut slots: Query<(&MiracleSlot, &mut BorderColor, &mut BackgroundColor)>,
+    hotbar: Res<Hotbar>,
+    cooldowns: Res<Cooldowns>,
+    mut commands: Commands,
+    mut slots: Query<(
+        Entity,
+        &MiracleSlot,
+        &Interaction,
+        &mut BorderColor,
+        &mut BackgroundColor,
+        &mut UiTransform,
+        Option<&mut FiredFlash>,
+    )>,
 ) {
-    for (slot, mut border, mut bg) in &mut slots {
-        let Some(miracle) = slot.0 else {
+    for (entity, slot, interaction, mut border, mut bg, mut pose, flash) in &mut slots {
+        let Some(miracle) = hotbar.0[slot.0] else {
             *border = BorderColor::all(ui::theme::panel_border().with_alpha(0.15));
             bg.0 = ui::theme::panel_bg().with_alpha(0.2);
+            pose.scale = Vec2::splat(1.0);
             continue;
         };
-        let affordable = belief.available() >= miracle.cost();
+        let ready = cooldowns.ready(miracle, clock.elapsed);
         let armed = selected.0 == Some(miracle);
-        *border = BorderColor::all(if armed {
+        let pressed = *interaction == Interaction::Pressed;
+
+        // The press is a real gesture now: the button gives under the
+        // finger. Brett: "they need to look better when clicking."
+        pose.scale = Vec2::splat(if pressed { 0.9 } else { 1.0 });
+
+        *border = BorderColor::all(if pressed {
+            ui::theme::text()
+        } else if armed {
             ui::theme::accent()
-        } else if affordable {
+        } else if ready {
             ui::theme::panel_border()
         } else {
             ui::theme::panel_border().with_alpha(0.12)
         });
-        bg.0 = if armed {
+        bg.0 = if pressed {
+            ui::theme::accent().with_alpha(0.5)
+        } else if armed {
             ui::theme::accent().with_alpha(0.3)
-        } else if affordable {
+        } else if ready {
             ui::theme::panel_bg().with_alpha(0.4)
         } else {
             ui::theme::panel_bg().with_alpha(0.15)
         };
+
+        // And the cast itself flashes: a bright breath that fades as fast
+        // as the act was sudden.
+        if let Some(mut flash) = flash {
+            flash.0 -= time.delta_secs();
+            if flash.0 <= 0.0 {
+                commands.entity(entity).remove::<FiredFlash>();
+            } else {
+                let heat = (flash.0 / 0.45).clamp(0.0, 1.0);
+                *border = BorderColor::all(ui::theme::accent().with_alpha(0.4 + heat * 0.6));
+                bg.0 = ui::theme::accent().with_alpha(0.2 + heat * 0.45);
+                pose.scale = Vec2::splat(1.0 + heat * 0.08);
+            }
+        }
+    }
+}
+
+/// The rest sweep and its word: each resting slot drains a dark tide from
+/// full to nothing across the cooldown, labelled in days or hours.
+#[allow(clippy::type_complexity)]
+fn cooldown_faces(
+    clock: Res<crate::calendar::WorldClock>,
+    hotbar: Res<Hotbar>,
+    cooldowns: Res<Cooldowns>,
+    mut shades: Query<(&CooldownShade, &mut Node), Without<CooldownLabel>>,
+    mut labels: Query<(&CooldownLabel, &mut Text)>,
+) {
+    let fraction = |index: usize| -> (f32, f64) {
+        hotbar.0[index].map_or((0.0, 0.0), |miracle| {
+            let left = cooldowns.remaining(miracle, clock.elapsed);
+            if left <= 0.0 {
+                (0.0, 0.0)
+            } else {
+                (
+                    (left / miracle.cooldown_secs()).clamp(0.0, 1.0) as f32,
+                    left,
+                )
+            }
+        })
+    };
+    for (shade, mut node) in &mut shades {
+        let (tide, _) = fraction(shade.0);
+        node.height = percent(tide * 100.0);
+    }
+    for (label, mut text) in &mut labels {
+        let (_, left) = fraction(label.0);
+        let fresh = if left <= 0.0 {
+            String::new()
+        } else {
+            rest_word(left)
+        };
+        if text.0 != fresh {
+            *text = Text::new(fresh);
+        }
     }
 }
 
@@ -1173,9 +1597,56 @@ mod tests {
     use super::*;
 
     #[test]
-    fn wrath_is_cheaper_than_grace() {
-        // Deliberate: terror is the easy road. The interesting choice is the
-        // expensive one, and the cheap one should always be tempting.
-        assert!(SMITE_COST < FLOURISH_COST);
+    fn wrath_comes_before_grace() {
+        // Deliberate: terror is the easy road. Wrath unlocks a young god's
+        // first climb up the ladder; the land-wide grace asks for a real
+        // congregation - and the quick sin always rests sooner than the
+        // great kindness.
+        assert!(SMITE_UNLOCK < FLOURISH_UNLOCK);
+        assert!(Miracle::Smite.cooldown_days() < Miracle::Flourish.cooldown_days());
+    }
+
+    #[test]
+    fn the_ladder_never_takes_a_miracle_back() {
+        let mut grimoire = Grimoire::default();
+        assert!(
+            grimoire.knows(Miracle::Bounty),
+            "kindness is the founding kit"
+        );
+        assert!(!grimoire.knows(Miracle::Smite));
+        grimoire.high_water = grimoire.high_water.max(SMITE_UNLOCK);
+        // The unlock system reads the high-water mark; a later ebb of
+        // faith leaves it standing.
+        assert!(grimoire.high_water >= SMITE_UNLOCK);
+    }
+
+    #[test]
+    fn the_calendar_is_the_cost() {
+        let mut cooldowns = Cooldowns::default();
+        assert!(cooldowns.ready(Miracle::Smite, 0.0));
+        cooldowns.start(Miracle::Smite, 0.0);
+        assert!(!cooldowns.ready(Miracle::Smite, 1.0));
+        let rest = Miracle::Smite.cooldown_secs();
+        assert!(
+            cooldowns.ready(Miracle::Smite, rest + 1.0),
+            "a day's rest and the wrath answers again"
+        );
+        // Starting anew replaces, never stacks.
+        cooldowns.start(Miracle::Smite, 10.0);
+        assert_eq!(cooldowns.0.len(), 1);
+    }
+
+    #[test]
+    fn a_new_power_takes_the_first_empty_slot() {
+        let mut hotbar = Hotbar::default();
+        assert_eq!(hotbar.slot_of(Miracle::Bounty), Some(0));
+        hotbar.take_in(Miracle::Smite);
+        assert_eq!(hotbar.slot_of(Miracle::Smite), Some(1));
+        // Taking in what is already placed changes nothing.
+        hotbar.take_in(Miracle::Smite);
+        assert_eq!(hotbar.0.iter().filter(|m| m.is_some()).count(), 2);
+        // And the god's own arrangement is the bar's law: a swap holds.
+        hotbar.0.swap(0, 9);
+        assert_eq!(hotbar.slot_of(Miracle::Bounty), Some(9));
     }
 }

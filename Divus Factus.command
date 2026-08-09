@@ -24,9 +24,16 @@ echo
 # cargo rather than by running the binary directly. Release, always: the game
 # is tuned and tested against release performance, and debug frame rates would
 # misrepresent it.
-cargo run --release
+#
+# Every session leaves a readable trail: the same output that scrolls here is
+# teed into logs/latest.log (the previous session kept beside it), so a death
+# or a stall can be read after the fact — or watched live with
+#   tail -f logs/latest.log
+mkdir -p logs
+[ -f logs/latest.log ] && mv -f logs/latest.log logs/previous.log
+cargo run --release 2>&1 | tee logs/latest.log
 
-status=$?
+status=${PIPESTATUS[0]}
 echo
 
 if [ $status -ne 0 ]; then

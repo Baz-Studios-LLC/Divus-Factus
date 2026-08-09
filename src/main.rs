@@ -27,6 +27,7 @@ mod noise;
 mod palette;
 mod place;
 mod planet;
+mod proclaim;
 mod render;
 mod rng;
 mod save;
@@ -251,6 +252,7 @@ fn main() {
         .add_plugins((
             keymap::KeymapPlugin,
             music::MusicPlugin,
+            proclaim::ProclaimPlugin,
             sfx::SfxPlugin,
             doings::DoingsPlugin,
             avatar::AvatarPlugin,

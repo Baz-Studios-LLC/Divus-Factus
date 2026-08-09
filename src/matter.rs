@@ -481,7 +481,14 @@ fn the_water_claims(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut sounds: MessageWriter<crate::sfx::PlaySfx>,
     loose: Query<
-        (Entity, &Transform, &Matter),
+        (
+            Entity,
+            &Transform,
+            &Matter,
+            Has<Floating>,
+            Has<Rolling>,
+            Has<crate::hand::DivinelyPlaced>,
+        ),
         (
             Without<crate::creature::Held>,
             Without<crate::creature::Airborne>,
@@ -500,7 +507,7 @@ fn the_water_claims(
     }
     *since = 0.0;
 
-    for (entity, transform, matter) in &loose {
+    for (entity, transform, matter, afloat, rolling, god_given) in &loose {
         let (ground, wet) =
             terrain.ground_and_water_at(transform.translation.x, transform.translation.z);
         // Only where water genuinely stands over the ground, and only for
@@ -508,10 +515,20 @@ fn the_water_claims(
         if wet <= ground + 0.15 || transform.translation.y > wet + matter.radius * 0.6 {
             continue;
         }
+        // A splash is an ARRIVAL. Things thrown by the god, things that
+        // rolled or floated in - those hit the water and say so. Things
+        // merely DISCOVERED sitting wet (worldgen seeded a coastal rock,
+        // a chunk streamed in with its boulders) sink without a sound:
+        // nobody threw them, and Brett heard the coastline "splashing"
+        // at every game start as the sweep found them one by one.
+        let arrived = afloat || rolling || god_given;
         commands
             .entity(entity)
             .remove::<(Floating, Rolling, Settling)>()
             .insert(Sinking { surface: wet });
+        if !arrived {
+            continue;
+        }
         sounds.write(crate::sfx::PlaySfx {
             kind: crate::sfx::SfxKind::Splash,
             at: Some(transform.translation),

@@ -913,9 +913,13 @@ fn dress_the_patch_water(
         return;
     };
     for sea in &bare {
+        // try_insert, not insert: clicking Title tears the old world down
+        // in the same frame this queued, and a command applied into a
+        // freshly despawned patch panicked the whole game. Dressing a
+        // patch that died mid-frame is legitimately skippable.
         commands
             .entity(sea)
-            .insert(MeshMaterial3d(assets.sea_material.clone()));
+            .try_insert(MeshMaterial3d(assets.sea_material.clone()));
     }
 }
 
@@ -932,9 +936,10 @@ fn dress_the_patches(
         return;
     };
     for patch in &bare {
+        // try_insert for the same teardown race as the water above.
         commands
             .entity(patch)
-            .insert(MeshMaterial3d(skin.0.clone()));
+            .try_insert(MeshMaterial3d(skin.0.clone()));
     }
 }
 

@@ -164,10 +164,34 @@ impl Corpus {
         slots: &[(&str, &str)],
         rng: &mut Rng,
     ) -> Option<String> {
+        self.pick_within(speaker, context, slots, &[], rng)
+    }
+
+    /// Like [`pick`](Self::pick), but only lines wearing every tag in
+    /// `must` may answer — the register wall. A worn pool may repeat
+    /// itself, but it may never borrow from the wrong register: Tiwa's
+    /// thirteenth food prayer wore out all four hungry-prayer lines and
+    /// the picker reached for smalltalk — "quiet today. I don't mind
+    /// quiet", said on her knees. Brett: "the text doesnt match the
+    /// prayer at all." A stale prayer beats a fluent non sequitur.
+    pub fn pick_within(
+        &mut self,
+        speaker: u64,
+        context: &[&str],
+        slots: &[(&str, &str)],
+        must: &[&str],
+        rng: &mut Rng,
+    ) -> Option<String> {
         let said = self.recent.entry(speaker).or_default().clone();
         let mut best: Option<(f32, &Line, u64)> = None;
         for line in &self.lines {
             if !line.tags.iter().all(|tag| context.contains(&tag.as_str())) {
+                continue;
+            }
+            if !must
+                .iter()
+                .all(|need| line.tags.iter().any(|tag| tag == need))
+            {
                 continue;
             }
             // A slot the moment cannot fill rules the line out.
@@ -412,5 +436,35 @@ mod tests {
         // Both said, pool exhausted: a repeat beats silence, and the
         // early corpus keeps talking while the want-list keeps score.
         assert!(voice.pick(9, &["muse"], &[], &mut rng).is_some());
+    }
+
+    /// The register wall: a worn pool repeats itself before it borrows
+    /// from the wrong register. Tiwa's thirteenth food prayer wore out
+    /// every hungry-prayer line and came out as "quiet today. I don't
+    /// mind quiet" — smalltalk, said on her knees.
+    #[test]
+    fn a_worn_register_repeats_rather_than_borrowing() {
+        let mut voice = corpus(&[
+            ("quiet today. I don't mind quiet", &["muse"], false),
+            (
+                "please, anything from the sky",
+                &["muse", "prayer", "hungry"],
+                false,
+            ),
+        ]);
+        let mut rng = crate::rng::Rng::new(4);
+        let moment = ["muse", "devout", "hungry", "prayer"];
+        // Well past worn: the prayer line has gone out over and over, and
+        // the fresh smalltalk line would win on freshness — but it may not
+        // cross the wall.
+        for _ in 0..12 {
+            let said = voice
+                .pick_within(7, &moment, &[], &["prayer"], &mut rng)
+                .expect("a worn prayer still speaks");
+            assert_eq!(
+                said, "please, anything from the sky",
+                "a prayer never borrows smalltalk, however worn its pool",
+            );
+        }
     }
 }

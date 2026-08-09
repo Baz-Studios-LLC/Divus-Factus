@@ -43,6 +43,12 @@ pub struct Place {
     pub high: f32,
 }
 
+// Parked API, kept on purpose: this is the round-world walking surface from
+// the round rethink — bearings, strides and poses on a sphere. The camera and
+// the planet bench use `from_flat` today; the rest waits for sim code to walk
+// the globe natively instead of through the bend. Delete nothing here without
+// reading the rethink notes first.
+#[allow(dead_code)]
 impl Place {
     /// A place from a direction that need not be normalised, and a height.
     pub fn new(dir: Vec3, high: f32) -> Place {

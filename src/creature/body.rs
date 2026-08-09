@@ -772,6 +772,7 @@ fn build_quadruped(
 /// and a body raised in the world is these ten words and nothing else. They are
 /// SIDED - "arm.l" and not "Arm" twice - because the game names both arms the
 /// same thing and a clip that raised "an arm" would be raising either.
+#[allow(dead_code)]
 pub const JOINTS: [&str; 10] = [
     "body",
     "head",
@@ -790,6 +791,7 @@ pub const JOINTS: [&str; 10] = [
 /// Sides are read off the joint's own X rather than the order the limbs were
 /// pushed in, because the order is an implementation detail of the builder and
 /// the side is a fact about the body.
+#[allow(dead_code)]
 pub fn joints_of(rig: &CreatureRig, world: &World) -> Vec<(Entity, &'static str)> {
     name_the_joints(rig, |joint| {
         world

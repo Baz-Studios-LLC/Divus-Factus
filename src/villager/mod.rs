@@ -6,6 +6,7 @@
 //! state machine later would mean rewriting every behaviour. Adding a need here
 //! means adding a scorer, not editing a branch.
 
+pub mod attire;
 pub mod belief;
 pub mod colony;
 pub mod explore;
@@ -167,11 +168,15 @@ impl Plugin for VillagerPlugin {
             // village's own once one is founded, but the systems that
             // read it run whether or not there is a village.
             .init_resource::<explore::KnownWorld>()
+            .init_resource::<explore::GroundWanted>()
             .add_systems(Startup, deal_the_dice)
             // Its own registration rather than the chain above: that
             // tuple is at Bevy's twenty-system ceiling, and the rising
             // needs no ordering against any of it.
             .add_systems(Update, work::rise_out_of_the_earth)
+            // Likewise unordered: the trades dress whoever took up a
+            // calling this frame, whenever in the frame that happened.
+            .add_systems(Update, attire::dress_for_work)
             .add_systems(
                 Update,
                 name_the_god.run_if(not(resource_exists::<DivineName>)),
@@ -250,9 +255,23 @@ impl Plugin for VillagerPlugin {
                         // Paired: the chain tuple is at Bevy's ceiling, and
                         // these are one subject - the kneelings and their
                         // answers.
-                        (belief::kneel, belief::kneel_in_hatred),
+                        (
+                            belief::kneel,
+                            belief::kneel_in_hatred,
+                            belief::kneel_in_devotion,
+                        ),
                         belief::take_a_knee,
-                        (belief::answer_prayers, belief::answer_dark_prayers),
+                        // Tripled: the chain tuple is at Bevy's ceiling, and
+                        // these are one subject - the askings being answered.
+                        // The road's judge runs before despair on purpose:
+                        // a lapsed road prayer departs unheard rather than
+                        // curdling like a hunger nobody fed.
+                        (
+                            belief::answer_prayers,
+                            belief::answer_dark_prayers,
+                            belief::answer_devotions,
+                            colony::bless_or_bar_the_road,
+                        ),
                         belief::despair,
                         belief::faith_of_witnesses.after(crate::witness::WitnessSet),
                         belief::tally_belief,
@@ -2440,7 +2459,7 @@ fn bereave(
             let nearest_berries = bushes
                 .iter()
                 .filter(|(_, bush)| bush.amount > 0.2)
-                .map(|(t, _)| t.translation().distance(at.translation) as u32)
+                .map(|(t, _)| crate::globe::unbend(t.translation()).distance(at.translation) as u32)
                 .min();
             if larder >= 1.0 && from_home > 80.0 {
                 format!(

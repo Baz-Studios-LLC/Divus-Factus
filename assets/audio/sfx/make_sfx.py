@@ -113,3 +113,39 @@ plant = mix(plant, lowpass(noise(0.04, 100, 0.5), 0.4))
 plant = mix(plant, tone(1320, 0.7, 6.0, 0.16), 0.1)
 plant = mix(plant, tone(1980, 0.5, 8.0, 0.1), 0.16)
 write("plant.wav", plant)
+
+# ---------------------------------------------------------------------------
+# The proclamations: three trumpets for the three great colours.
+# Louder cousins of the fanfare - a super toast should sound like the day it
+# announces. Gold for works, green for life, pink for faith.
+
+def bell(freq, t, decay, amp=1.0):
+    """A round bell partial: fundamental with a soft octave halo."""
+    body = tone(freq, t, decay, amp)
+    halo = tone(freq * 2.0, t * 0.7, decay * 1.6, amp * 0.35)
+    return mix(body, halo)
+
+# GOLD - works of the village: three rising strikes landing on a held chord,
+# the sound of a roof-tree going up.
+gold = bell(392, 0.6, 5.5, 0.9)                      # G4
+gold = mix(gold, bell(494, 0.6, 5.0, 0.9), 0.13)     # B4
+gold = mix(gold, bell(587, 1.1, 3.2, 1.0), 0.26)     # D5
+gold = mix(gold, bell(784, 1.0, 2.6, 0.55), 0.26)    # G5 halo
+gold = mix(gold, lowpass(noise(0.10, 40, 0.25), 0.25), 0.26)  # mallet breath
+write("proclaim_gold.wav", gold)
+
+# GREEN - life: a warm cradle rock, two soft thirds swaying upward, rounder
+# and quieter than gold - a hearth sound, not a square sound.
+life = bell(330, 0.7, 4.5, 0.8)                      # E4
+life = mix(life, bell(415, 0.8, 4.0, 0.8), 0.16)     # G#4
+life = mix(life, bell(494, 1.2, 2.8, 0.9), 0.34)     # B4
+life = mix(life, bell(659, 1.0, 2.4, 0.4), 0.34)     # E5 halo
+write("proclaim_life.wav", life)
+
+# PINK - faith: the chime's grown-up sister, a bell arpeggio climbing past
+# the octave and left ringing - the legend tier rising.
+faith = bell(523, 0.5, 6.0, 0.7)                     # C5
+faith = mix(faith, bell(659, 0.5, 5.2, 0.75), 0.11)  # E5
+faith = mix(faith, bell(784, 0.6, 4.4, 0.8), 0.22)   # G5
+faith = mix(faith, bell(1047, 1.4, 2.2, 0.9), 0.33)  # C6, held
+write("proclaim_faith.wav", faith)

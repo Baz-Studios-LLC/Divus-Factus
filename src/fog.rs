@@ -243,7 +243,9 @@ fn drape_the_veil(
     // branch. Without it a lifted fog would leave a world of hidden chunks.
     let reveal = |commands: &mut Commands, chunk: Entity, showing: &Visibility| {
         if *showing == Visibility::Hidden {
-            commands.entity(chunk).insert(Visibility::Inherited);
+            // try_insert: the Title click tears chunks down mid-frame, and
+            // dressing a chunk that died is skippable, not fatal.
+            commands.entity(chunk).try_insert(Visibility::Inherited);
         }
     };
 
@@ -252,7 +254,7 @@ fn drape_the_veil(
     if !mode.0 || *state.get() != crate::GameState::Playing {
         if !veils.is_empty() {
             for veil in &veils {
-                commands.entity(veil).despawn();
+                commands.entity(veil).try_despawn();
             }
         }
         for (chunk, _, _, _, showing) in &chunks {

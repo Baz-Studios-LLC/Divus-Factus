@@ -144,6 +144,14 @@ struct SaveGame {
     /// the god's record.
     #[serde(default)]
     prayer_receipts: Vec<crate::villager::belief::ClosedPrayer>,
+    /// The hotbar's arrangement, the grimoire's unlocks and every
+    /// miracle's rest — the whole cooldown economy, kept.
+    #[serde(default)]
+    hotbar: Option<crate::miracles::Hotbar>,
+    #[serde(default)]
+    grimoire: Option<crate::miracles::Grimoire>,
+    #[serde(default)]
+    cooldowns: Option<crate::miracles::Cooldowns>,
     fire_fuel: f32,
     piles: Vec<(u8, Vec3, Quat)>,
     people: Vec<PersonSave>,
@@ -395,6 +403,9 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         .resource::<crate::villager::belief::PrayerLedger>()
         .closed
         .clone();
+    let hotbar = Some(world.resource::<crate::miracles::Hotbar>().clone());
+    let grimoire = Some(world.resource::<crate::miracles::Grimoire>().clone());
+    let cooldowns = Some(world.resource::<crate::miracles::Cooldowns>().clone());
     let legend = world.resource::<Legend>();
     let legend_numbers = (
         legend.providence,
@@ -741,6 +752,9 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         legend_epithet,
         stores,
         prayer_receipts,
+        hotbar,
+        grimoire,
+        cooldowns,
         fire_fuel,
         piles,
         people,
@@ -998,6 +1012,10 @@ fn apply(world: &mut World, save: SaveGame) {
         // Re-derived from the calendar on the next frame.
         chill: 0.0,
     });
+    // The bar economy: older saves carry none and get the founding kit.
+    world.insert_resource(save.hotbar.clone().unwrap_or_default());
+    world.insert_resource(save.grimoire.clone().unwrap_or_default());
+    world.insert_resource(save.cooldowns.clone().unwrap_or_default());
     world.insert_resource(Belief {
         total: save.belief.0,
         spent: save.belief.1,

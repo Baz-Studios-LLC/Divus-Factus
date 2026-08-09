@@ -618,10 +618,6 @@ impl Terrain {
         height
     }
 
-    pub(crate) fn seed(&self) -> u32 {
-        self.seed
-    }
-
     /// Ground height at a world position.
     ///
     /// Pure: the same position always returns the same height, independent of what
@@ -1128,28 +1124,6 @@ impl LoadedChunks {
     /// Removes and returns every chunk, for a full world reload.
     pub fn take_all(&mut self) -> Vec<Entity> {
         self.entities.drain().map(|(_, e)| e).collect()
-    }
-
-    /// Removes and returns the chunks whose footprint touches a circle, so a
-    /// caller can despawn them; streaming rebuilds them with current heights.
-    pub fn take_near(&mut self, x: f32, z: f32, radius: f32) -> Vec<Entity> {
-        let mut taken = Vec::new();
-        let min = IVec2::new(
-            ((x - radius) / CHUNK_SIZE).floor() as i32,
-            ((z - radius) / CHUNK_SIZE).floor() as i32,
-        );
-        let max = IVec2::new(
-            ((x + radius) / CHUNK_SIZE).floor() as i32,
-            ((z + radius) / CHUNK_SIZE).floor() as i32,
-        );
-        for cx in min.x..=max.x {
-            for cz in min.y..=max.y {
-                if let Some(entity) = self.entities.remove(&IVec2::new(cx, cz)) {
-                    taken.push(entity);
-                }
-            }
-        }
-        taken
     }
 }
 

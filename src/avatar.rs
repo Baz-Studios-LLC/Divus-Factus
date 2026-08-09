@@ -19,7 +19,7 @@ use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 
 use crate::camera::{CameraRig, FollowStyle, FollowTarget};
 use crate::creature::MoveTarget;
-use crate::miracles::{AVATAR_COST, Miracle, SelectedMiracle};
+use crate::miracles::{Miracle, SelectedMiracle};
 use crate::villager::{Activity, Villager};
 
 /// The body the god is currently wearing, and when it has to be given
@@ -34,12 +34,15 @@ pub struct Ridden {
     hidden: bool,
 }
 
-/// How long a body may be worn, before belief runs out anyway.
-const RIDE_FOR: f32 = 300.0;
+/// How long a body may be worn. The mana that used to meter the ride is
+/// gone — the god stays as long as they please and pays in days instead:
+/// the Avatar's cooldown starts the moment the body is taken.
+const RIDE_FOR: f32 = f32::INFINITY;
 
-/// Belief spent per second of wearing somebody. The cast is cheap and the
-/// staying is not.
-const DRAIN: f32 = 0.05;
+/// A body is worn by firing the Avatar slot over someone, or by the armed
+/// click. Both doors arrive here.
+#[derive(bevy::prelude::Message)]
+pub struct Wear(pub Entity);
 
 /// How far ahead of the eyes the body is told to walk.
 ///
@@ -94,37 +97,42 @@ pub struct AvatarPlugin;
 
 impl Plugin for AvatarPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (take_a_body, wear_it)
-                .chain()
-                .run_if(in_state(crate::GameState::Playing)),
-        )
-        // Driving runs in `Last`, and that is not tidiness. Better than
-        // twenty villager systems write `MoveTarget` — work, errands,
-        // doorways, gossip, wandering — and none of them are ordered
-        // against each other or against this one, so writing the god's
-        // step anywhere in `Update` is a coin toss with the villager's own
-        // errand. They kept winning: the body wandered off on its own
-        // business with the god aboard. Written here it is the last word
-        // of the frame, and `plan_routes` at the head of the next one reads
-        // it. Nothing else in the schedule can outvote it, including
-        // whatever behaviour gets added next year.
-        .add_systems(
-            Last,
-            drive_the_body.run_if(in_state(crate::GameState::Playing)),
-        );
+        app.add_message::<Wear>()
+            .add_systems(
+                Update,
+                (take_a_body, wear_it)
+                    .chain()
+                    .run_if(in_state(crate::GameState::Playing)),
+            )
+            // Driving runs in `Last`, and that is not tidiness. Better than
+            // twenty villager systems write `MoveTarget` — work, errands,
+            // doorways, gossip, wandering — and none of them are ordered
+            // against each other or against this one, so writing the god's
+            // step anywhere in `Update` is a coin toss with the villager's own
+            // errand. They kept winning: the body wandered off on its own
+            // business with the god aboard. Written here it is the last word
+            // of the frame, and `plan_routes` at the head of the next one reads
+            // it. Nothing else in the schedule can outvote it, including
+            // whatever behaviour gets added next year.
+            .add_systems(
+                Last,
+                drive_the_body.run_if(in_state(crate::GameState::Playing)),
+            );
     }
 }
 
-/// Left-click a villager with Avatar armed and the god is in them.
+/// Left-click a villager with Avatar armed — or fire the Avatar's slot
+/// over one — and the god is in them.
+#[allow(clippy::too_many_arguments)]
 fn take_a_body(
     mut commands: Commands,
+    clock: Res<crate::calendar::WorldClock>,
     buttons: Res<ButtonInput<MouseButton>>,
     pointer: Res<crate::ui::PointerContext>,
     hand: Res<crate::hand::DivineHand>,
     mut selected: ResMut<SelectedMiracle>,
-    mut belief: ResMut<crate::villager::belief::Belief>,
+    mut cooldowns: ResMut<crate::miracles::Cooldowns>,
+    mut asked: MessageReader<Wear>,
     mut follow: ResMut<FollowTarget>,
     mut notices: MessageWriter<crate::ui::Notice>,
     folk: Query<&Transform, (With<Villager>, Without<crate::creature::Corpse>)>,
@@ -132,21 +140,23 @@ fn take_a_body(
     mut rigs: Query<&mut CameraRig>,
     mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
-    if selected.0 != Some(Miracle::Avatar) {
-        return;
+    // Two doors in: the slot key fired over somebody, or the armed click.
+    let mut body: Option<Entity> = asked.read().last().map(|wear| wear.0);
+    if body.is_none()
+        && selected.0 == Some(Miracle::Avatar)
+        && buttons.just_pressed(MouseButton::Left)
+        && !pointer.over_ui
+    {
+        body = hand.hovered;
     }
-    if !buttons.just_pressed(MouseButton::Left) || pointer.over_ui {
-        return;
-    }
-    let Some((who, facing)) = hand
-        .hovered
-        .and_then(|who| folk.get(who).ok().map(|at| (who, at.rotation)))
+    let Some((who, facing)) = body.and_then(|who| folk.get(who).ok().map(|at| (who, at.rotation)))
     else {
         return;
     };
-    if belief.available() < AVATAR_COST {
+    if !cooldowns.ready(Miracle::Avatar, clock.elapsed) {
         return;
     }
+    cooldowns.start(Miracle::Avatar, clock.elapsed);
     // One body at a time — and give the last one back VISIBLE. Dropping
     // `Ridden` alone left whoever was worn before standing about the village
     // permanently invisible, since the only thing that undraws a body is the
@@ -157,7 +167,6 @@ fn take_a_body(
             .remove::<Ridden>()
             .insert(Visibility::Inherited);
     }
-    belief.spent += AVATAR_COST;
     // Taken mid-stride, and stopped there: the errand, the destination and
     // the path already found to it are all dropped, or the body would finish
     // walking wherever it was going before the god arrived.
@@ -238,13 +247,13 @@ fn hold_the_pointer(windows: &mut Query<&mut CursorOptions, With<PrimaryWindow>>
     cursor.visible = false;
 }
 
-/// The ride: it costs belief every second, and it ends.
+/// The ride: free of any meter — the cooldown was paid at the door — and
+/// ended only by choice, or by the body's own death.
 fn wear_it(
     time: Res<Time>,
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
     mut selected: ResMut<SelectedMiracle>,
-    mut belief: ResMut<crate::villager::belief::Belief>,
     mut follow: ResMut<FollowTarget>,
     mut notices: MessageWriter<crate::ui::Notice>,
     mut ridden: Query<(Entity, &mut Ridden)>,
@@ -282,9 +291,6 @@ fn wear_it(
     let arrived = rigs.single().is_ok_and(|rig| rig.distance < OUT_OF_SIGHT);
     for (who, mut ride) in &mut ridden {
         ride.left -= dt;
-        // Take what there is to take. Spending past the end of the pool
-        // would run `available` negative, and the readout with it.
-        belief.spent += (DRAIN * dt).min(belief.available().max(0.0));
         if arrived != ride.hidden {
             ride.hidden = arrived;
             // The root, so every part of them goes with it.

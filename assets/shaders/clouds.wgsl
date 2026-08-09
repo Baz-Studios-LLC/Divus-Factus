@@ -26,6 +26,10 @@ struct CloudParams {
     wind: vec4<f32>,
     // x coverage 0..1, y the noise scale, z evolution clock, w edge softness.
     dials: vec4<f32>,
+    // xyz the focus (the hand's ground) in world space, w the corridor radius.
+    sight: vec4<f32>,
+    // xyz the camera's world position, w the corridor's feather width.
+    eye: vec4<f32>,
 }
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(0) var<uniform> cloud: CloudParams;
@@ -143,5 +147,19 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let day = clamp((facing + 0.12) / 0.34, 0.0, 1.0);
     let color = mix(cloud.shade.rgb, cloud.tint.rgb, day);
 
-    return vec4<f32>(color, density * cloud.tint.a);
+    // The sight corridor: an invisible line from the hand's ground through
+    // the camera and on behind it. Cloud within the corridor's radius of
+    // that line is fully clear, feathering back to weather at the rim - so
+    // pulling out through the deck never blinds the eye, and the hole
+    // travels with the view instead of being a hole in the weather.
+    var clear = 0.0;
+    let span = cloud.eye.xyz - cloud.sight.xyz;
+    if (cloud.sight.w > 0.5 && length(span) > 1.0) {
+        let along = normalize(span);
+        let arm = in.world_position.xyz - cloud.sight.xyz;
+        let off = length(arm - along * dot(arm, along));
+        clear = 1.0 - smoothstep(cloud.sight.w, cloud.sight.w + cloud.eye.w, off);
+    }
+
+    return vec4<f32>(color, density * cloud.tint.a * (1.0 - clear));
 }

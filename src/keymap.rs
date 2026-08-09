@@ -22,22 +22,30 @@ pub enum Deed {
     Pause,
     Slower,
     Faster,
-    Flourish,
-    Smite,
-    Bounty,
-    MendOrQuake,
+    /// The hotbar's ten slots. A key FIRES what sits in its slot - the
+    /// binding belongs to the slot, not to the miracle, exactly like the
+    /// action bars Brett named: "drag and drop like WoW".
+    Slot1,
+    Slot2,
+    Slot3,
+    Slot4,
+    Slot5,
+    Slot6,
+    Slot7,
+    Slot8,
+    Slot9,
+    Slot10,
     Codex,
     Markers,
     Survey,
     Roofs,
     Doings,
     Fog,
-    Avatar,
     Sprint,
 }
 
 impl Deed {
-    pub const ALL: [Deed; 21] = [
+    pub const ALL: [Deed; 26] = [
         Deed::PanNorth,
         Deed::PanSouth,
         Deed::PanWest,
@@ -47,17 +55,22 @@ impl Deed {
         Deed::Pause,
         Deed::Slower,
         Deed::Faster,
-        Deed::Flourish,
-        Deed::Smite,
-        Deed::Bounty,
-        Deed::MendOrQuake,
+        Deed::Slot1,
+        Deed::Slot2,
+        Deed::Slot3,
+        Deed::Slot4,
+        Deed::Slot5,
+        Deed::Slot6,
+        Deed::Slot7,
+        Deed::Slot8,
+        Deed::Slot9,
+        Deed::Slot10,
         Deed::Codex,
         Deed::Markers,
         Deed::Survey,
         Deed::Roofs,
         Deed::Doings,
         Deed::Fog,
-        Deed::Avatar,
         Deed::Sprint,
     ];
 
@@ -73,19 +86,41 @@ impl Deed {
             Deed::Pause => "pause",
             Deed::Slower => "slower",
             Deed::Faster => "faster",
-            Deed::Flourish => "flourish",
-            Deed::Smite => "smite",
-            Deed::Bounty => "bounty",
-            Deed::MendOrQuake => "mend-or-quake",
+            Deed::Slot1 => "slot-1",
+            Deed::Slot2 => "slot-2",
+            Deed::Slot3 => "slot-3",
+            Deed::Slot4 => "slot-4",
+            Deed::Slot5 => "slot-5",
+            Deed::Slot6 => "slot-6",
+            Deed::Slot7 => "slot-7",
+            Deed::Slot8 => "slot-8",
+            Deed::Slot9 => "slot-9",
+            Deed::Slot10 => "slot-10",
             Deed::Codex => "codex",
             Deed::Markers => "markers",
             Deed::Survey => "survey",
             Deed::Roofs => "roofs",
             Deed::Doings => "doings",
             Deed::Fog => "fog",
-            Deed::Avatar => "avatar",
             Deed::Sprint => "sprint",
         }
+    }
+
+    /// The deed that fires hotbar slot `index` (0-based), for the bar's
+    /// own systems to look keys up by position.
+    pub fn slot(index: usize) -> Deed {
+        [
+            Deed::Slot1,
+            Deed::Slot2,
+            Deed::Slot3,
+            Deed::Slot4,
+            Deed::Slot5,
+            Deed::Slot6,
+            Deed::Slot7,
+            Deed::Slot8,
+            Deed::Slot9,
+            Deed::Slot10,
+        ][index.min(9)]
     }
 
     fn default_key(self) -> KeyCode {
@@ -99,17 +134,22 @@ impl Deed {
             Deed::Pause => KeyCode::Space,
             Deed::Slower => KeyCode::Minus,
             Deed::Faster => KeyCode::Equal,
-            Deed::Flourish => KeyCode::Digit1,
-            Deed::Smite => KeyCode::Digit2,
-            Deed::Bounty => KeyCode::Digit3,
-            Deed::MendOrQuake => KeyCode::Digit4,
+            Deed::Slot1 => KeyCode::Digit1,
+            Deed::Slot2 => KeyCode::Digit2,
+            Deed::Slot3 => KeyCode::Digit3,
+            Deed::Slot4 => KeyCode::Digit4,
+            Deed::Slot5 => KeyCode::Digit5,
+            Deed::Slot6 => KeyCode::Digit6,
+            Deed::Slot7 => KeyCode::Digit7,
+            Deed::Slot8 => KeyCode::Digit8,
+            Deed::Slot9 => KeyCode::Digit9,
+            Deed::Slot10 => KeyCode::Digit0,
             Deed::Codex => KeyCode::Tab,
             Deed::Markers => KeyCode::KeyP,
             Deed::Survey => KeyCode::KeyR,
             Deed::Roofs => KeyCode::KeyH,
             Deed::Doings => KeyCode::KeyL,
             Deed::Fog => KeyCode::KeyF,
-            Deed::Avatar => KeyCode::Digit5,
             Deed::Sprint => KeyCode::ShiftLeft,
         }
     }
@@ -391,9 +431,9 @@ mod tests {
     #[test]
     fn binding_a_taken_key_trades_places() {
         let mut map = Keymap::default();
-        map.bind(Deed::Smite, KeyCode::Digit1);
-        assert_eq!(map.key(Deed::Smite), KeyCode::Digit1);
-        assert_eq!(map.key(Deed::Flourish), KeyCode::Digit2);
+        map.bind(Deed::Slot2, KeyCode::Digit1);
+        assert_eq!(map.key(Deed::Slot2), KeyCode::Digit1);
+        assert_eq!(map.key(Deed::Slot1), KeyCode::Digit2);
     }
 
     #[test]

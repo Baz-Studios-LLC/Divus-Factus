@@ -1247,12 +1247,10 @@ fn handle_grab_and_release(
             .insert(Airborne { velocity: launch })
             .insert(DivinelyPlaced { remaining: 25.0 });
 
-        if speed > THROW_THRESHOLD {
-            sounds.write(crate::sfx::PlaySfx {
-                kind: crate::sfx::SfxKind::Whoosh,
-                at: None,
-            });
-        }
+        // The throw is silent for now. The whoosh didn't land — Brett: "I
+        // am not a fan of that and I will come up with something better
+        // later" — so the slot waits: the kind and the file stand ready
+        // for the sound that replaces it.
 
         if let Ok(mut motion) = motions.get_mut(held.entity) {
             motion.flail = 1.0;

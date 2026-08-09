@@ -1044,6 +1044,7 @@ pub(crate) fn update_god_panel(
     panels: Query<&Visibility, With<GodPanel>>,
     name: Option<Res<crate::villager::DivineName>>,
     legend: Option<Res<crate::villager::belief::Legend>>,
+    grimoire: Res<crate::miracles::Grimoire>,
     belief: Option<Res<crate::villager::belief::Belief>>,
     clock: Res<crate::calendar::WorldClock>,
     site: Option<Res<crate::villager::SettlementSite>>,
@@ -1138,11 +1139,9 @@ pub(crate) fn update_god_panel(
         set(&mut text, fresh);
     }
 
-    // The powers: three born active, two crystallised by legend.
-    let unlocked = |miracle: Miracle| match miracle {
-        Miracle::Flourish | Miracle::Smite | Miracle::Bounty | Miracle::Avatar => true,
-        m => legend.as_ref().is_some_and(|l| l.unlocked == Some(m)),
-    };
+    // The powers, as the grimoire actually holds them: earned up the
+    // belief ladder or crystallised by legend.
+    let unlocked = |miracle: Miracle| grimoire.knows(miracle);
     for (card, mut fill, mut border) in &mut cards {
         let lit = unlocked(card.0);
         fill.0 = if lit {
@@ -1164,9 +1163,11 @@ pub(crate) fn update_god_panel(
         let fresh = match label.field {
             0 => {
                 if lit {
-                    format!("{:.0} belief", label.miracle.cost())
+                    format!("every {} days", label.miracle.cooldown_days())
+                } else if let Some(rung) = label.miracle.unlock_at() {
+                    format!("at {rung:.0} belief")
                 } else {
-                    String::new()
+                    "by legend".to_string()
                 }
             }
             1 => if lit { "Active" } else { "Locked" }.to_string(),

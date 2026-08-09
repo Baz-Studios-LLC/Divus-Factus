@@ -7,3 +7,4 @@ divus-factus-*.png
 __pycache__/
 *.pyc
 /scratch_test.wav
+/logs

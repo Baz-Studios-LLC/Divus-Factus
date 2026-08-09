@@ -469,7 +469,12 @@ pub(crate) fn spawn_people_panel(
                 Node {
                     width: percent(50),
                     flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
+                    // Baseline, not Center: the dim label and the body value
+                    // wear different type sizes, and centring the boxes left
+                    // the value riding low against its label - "6 times" sat
+                    // half a step under SEEN YOU. Baseline is the rule
+                    // `ui::stat_row` already lives by; this grid keeps it.
+                    align_items: AlignItems::Baseline,
                     column_gap: px(8),
                     padding: UiRect::axes(px(4), px(3)),
                     ..default()
@@ -480,6 +485,9 @@ pub(crate) fn spawn_people_panel(
         stat_chip(&mut commands, cell, value);
         commands.spawn((
             ui::dim(label),
+            // Labels never wrap: a two-word label folding inside its fixed
+            // column would make the row two lines tall and break the table.
+            TextLayout::linebreak(LineBreak::NoWrap),
             Node {
                 width: px(72),
                 flex_shrink: 0.0,
@@ -1209,6 +1217,10 @@ fn stat_chip(commands: &mut Commands, parent: Entity, which: InspectorValue) {
                 width: px(24),
                 height: px(24),
                 flex_shrink: 0.0,
+                // A circle has no baseline to sit on: in a baseline-aligned
+                // row it would stand on the text's feet and tower. It keeps
+                // its own centre instead, whatever rule the row runs.
+                align_self: AlignSelf::Center,
                 border: UiRect::all(px(1)),
                 border_radius: BorderRadius::all(px(999)),
                 ..default()

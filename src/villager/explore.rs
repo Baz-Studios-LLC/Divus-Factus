@@ -19,7 +19,7 @@ use crate::creature::{Airborne, Corpse, Held, MoveTarget};
 use crate::scatter::FellableTree;
 use crate::terrain::{Terrain, WATER_LEVEL};
 
-use super::{Activity, Chronicle, Person, SettlementSite, Villager, work};
+use super::{Activity, Chronicle, Needs, Person, SettlementSite, Villager, work};
 
 /// How far past the cairns an expedition pushes.
 const STRIDE: f32 = 70.0;
@@ -60,6 +60,74 @@ impl KnownWorld {
             .iter()
             .any(|pocket| at.distance(pocket.at) < pocket.radius)
     }
+
+    /// Learns a patch of ground, keeping the map inside the veil shader's
+    /// budget by tidying rather than by forgetting.
+    ///
+    /// The old rule was a silent cap: at 128 pockets the map simply
+    /// stopped recording, and everything walked afterwards stayed under
+    /// fog forever — Brett found a black hole of unknown sitting over a
+    /// quarry his miners worked every day. Ground once walked is NEVER
+    /// given back to the dark: when the list runs full, the two closest
+    /// pockets merge into the circle that holds them both.
+    pub fn learn(&mut self, at: Vec3, radius: f32) {
+        self.pockets.push(Pocket { at, radius });
+        self.tidy();
+    }
+
+    fn tidy(&mut self) {
+        // Pockets the home circle has grown over are redundant.
+        let (centre, reach) = (self.centre, self.radius);
+        self.pockets
+            .retain(|pocket| pocket.at.distance(centre) + pocket.radius > reach);
+        // Pockets lying wholly inside a bigger sibling likewise.
+        let mut index = 0;
+        while index < self.pockets.len() {
+            let inner = &self.pockets[index];
+            let swallowed = self.pockets.iter().enumerate().any(|(other, outer)| {
+                other != index
+                    && outer.radius >= inner.radius
+                    && inner.at.distance(outer.at) + inner.radius <= outer.radius
+                    // Ties (identical twins) keep the first and drop the rest.
+                    && (outer.radius > inner.radius || other < index)
+            });
+            if swallowed {
+                self.pockets.swap_remove(index);
+            } else {
+                index += 1;
+            }
+        }
+        // Still full: merge the two closest pockets into the circle that
+        // holds them both. Slivers of unknown between near neighbours get
+        // claimed in the bargain, which is the honest price of a bounded
+        // map that never un-knows a walked road.
+        while self.pockets.len() > MOST_POCKETS {
+            let mut nearest = (0usize, 1usize, f32::MAX);
+            for a in 0..self.pockets.len() {
+                for b in (a + 1)..self.pockets.len() {
+                    let gap = self.pockets[a].at.distance(self.pockets[b].at)
+                        - self.pockets[a].radius
+                        - self.pockets[b].radius;
+                    if gap < nearest.2 {
+                        nearest = (a, b, gap);
+                    }
+                }
+            }
+            let (a, b, _) = nearest;
+            let merged = {
+                let (first, second) = (&self.pockets[a], &self.pockets[b]);
+                let between = second.at - first.at;
+                let span = between.length();
+                let radius = ((span + first.radius + second.radius) * 0.5)
+                    .max(first.radius.max(second.radius));
+                let at = first.at + between.normalize_or_zero() * (radius - first.radius);
+                Pocket { at, radius }
+            };
+            // `b` is the larger index, so removing it leaves `a` in place.
+            self.pockets.swap_remove(b);
+            self.pockets[a] = merged;
+        }
+    }
 }
 
 /// A waystone stack marking the edge of the known world.
@@ -79,6 +147,68 @@ pub struct Expedition {
 #[derive(Component)]
 pub struct Escorting {
     pub ward: Entity,
+}
+
+/// A standing order from a full town: find ground fit for a new village.
+///
+/// Raised by the colony muster when the doors are open but the known world
+/// holds no legal site; lowered the moment a road prayer goes up. While it
+/// stands, expeditions push out to colony distances and survey the ground
+/// they stand on as town-founders, not foragers.
+#[derive(Resource, Default)]
+pub struct GroundWanted(pub bool);
+
+/// One tick of eating on the road: the satchel first, the land second.
+///
+/// Brett: "when people are on the road (colonizers and explorers etc.)
+/// maybe we can let them eat from bushes and craft rations?" — so the
+/// stores-only law ends at the cairns. A wayfarer bites from packed
+/// rations while any remain, and past that eats straight off the heath,
+/// packing a little of every picking back into the satchel for the miles
+/// with no green on them.
+///
+/// Returns a place to walk when the next meal is a bush away, `None` when
+/// the walker is fed enough to keep to their road.
+pub(super) fn forage_tick(
+    at: Vec3,
+    dt: f32,
+    needs: &mut Needs,
+    mut rations: Option<&mut work::Rations>,
+    bushes: &mut Query<(Entity, &GlobalTransform, &mut crate::scatter::FoodSource)>,
+) -> Option<Vec3> {
+    if needs.hunger < 0.55 {
+        return None;
+    }
+    // The satchel: packed at the sacks, eaten on the move.
+    if let Some(rations) = &mut rations
+        && rations.0 >= 1.0
+    {
+        rations.0 -= 1.0;
+        needs.hunger = (needs.hunger - 0.6).max(0.0);
+        return None;
+    }
+    // The land: the nearest bush still wearing fruit. Bushes are chunk
+    // children, so their globals are BENT — unbend before any distance.
+    let nearest = bushes
+        .iter()
+        .filter(|(_, _, bush)| bush.amount > 0.3)
+        .map(|(bush, seat, _)| (bush, crate::globe::unbend(seat.translation())))
+        .filter(|(_, spot)| spot.distance(at) < 45.0)
+        .min_by(|a, b| a.1.distance(at).total_cmp(&b.1.distance(at)));
+    let (bush, spot) = nearest?;
+    if spot.distance(at) > 2.4 {
+        return Some(spot);
+    }
+    // Standing at the bush: eat, and pack a little for the road ahead.
+    if let Ok((_, _, mut source)) = bushes.get_mut(bush) {
+        let bite = (0.9 * dt).min(source.amount);
+        source.amount -= bite;
+        needs.hunger = (needs.hunger - bite * 0.9).max(0.0);
+        if let Some(rations) = &mut rations {
+            rations.0 = (rations.0 + bite * 0.4).min(2.0);
+        }
+    }
+    Some(spot)
 }
 
 /// Idle explorers walk out past the cairns, read the land, and come home
@@ -123,7 +253,7 @@ pub(super) fn walk_the_world(
         return;
     };
     for at in &walkers {
-        if known.pockets.len() >= MOST_POCKETS || known.knows(at.translation) {
+        if known.knows(at.translation) {
             continue;
         }
         // Rounded onto the grid, so the same meadow is opened once.
@@ -139,20 +269,23 @@ pub(super) fn walk_the_world(
         {
             continue;
         }
-        known.pockets.push(Pocket {
-            at: cell,
-            radius: FOOTFALL,
-        });
+        // Never capped: the map tidies itself instead of going blind.
+        known.learn(cell, FOOTFALL);
     }
 }
 
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub(super) fn expeditions(
     mut commands: Commands,
     time: Res<Time>,
     clock: Res<crate::calendar::WorldClock>,
     terrain: Option<Res<Terrain>>,
     site: Option<Res<SettlementSite>>,
-    homes: (Query<&super::MemberOf>, Query<&super::SettlementGround>),
+    homes: (
+        Query<&super::MemberOf>,
+        Query<&super::SettlementGround>,
+        Option<Res<GroundWanted>>,
+    ),
     // Bundled with a spare slot's worth of company: this system sits at
     // Bevy's parameter ceiling.
     mut known: ResMut<KnownWorld>,
@@ -163,9 +296,9 @@ pub(super) fn expeditions(
         Option<ResMut<crate::telling::Tongue>>,
         Option<Res<crate::attention::Attention>>,
     ),
-    stores: Query<&crate::villager::work::Stockpile>,
+    mut stores: Query<&mut crate::villager::work::Stockpile>,
     trees: Query<(&GlobalTransform, &FellableTree)>,
-    bushes: Query<(&GlobalTransform, &crate::scatter::FoodSource)>,
+    mut bushes: Query<(Entity, &GlobalTransform, &mut crate::scatter::FoodSource)>,
     deposits: Query<(&GlobalTransform, &crate::matter::Deposit)>,
     mut explorers: Query<
         (
@@ -177,6 +310,8 @@ pub(super) fn expeditions(
             &mut MoveTarget,
             Option<&mut Expedition>,
             Option<&mut Chronicle>,
+            &mut Needs,
+            Option<&mut work::Rations>,
         ),
         (
             With<Villager>,
@@ -190,7 +325,8 @@ pub(super) fn expeditions(
     let (Some(terrain), Some(site)) = (terrain, site) else {
         return;
     };
-    let (members, grounds) = homes;
+    let (members, grounds, wanted) = homes;
+    let wanted = wanted.is_some_and(|order| order.0);
     let dt = time.delta_secs();
 
     // What the village wants and cannot reach is what sends people out.
@@ -198,18 +334,25 @@ pub(super) fn expeditions(
     // home, an empty one with no known tree left to fell puts someone on
     // the road. The two wants that kill are timber and food.
     let timber_short = stores.iter().all(|s| s.timber < 8.0) || stores.iter().next().is_none();
-    let wood_known = trees
-        .iter()
-        .any(|(at, tree)| tree.harvestable() && known.knows(at.translation()));
+    // Trees and bushes are chunk children: their globals are BENT, and any
+    // distance or knowledge test must unbend them first or the map lies
+    // once the village is a few hundred strides from the origin.
+    let wood_known = trees.iter().any(|(at, tree)| {
+        tree.harvestable() && known.knows(crate::globe::unbend(at.translation()))
+    });
     let wood_want = timber_short && !wood_known;
     let food_short = stores.iter().all(|s| s.food() < 10.0) || stores.iter().next().is_none();
-    let berries_known = bushes
-        .iter()
-        .any(|(at, bush)| bush.amount > 0.5 && known.knows(at.translation()));
+    let berries_known = bushes.iter().any(|(_, at, bush)| {
+        bush.amount > 0.5 && known.knows(crate::globe::unbend(at.translation()))
+    });
     let food_want = food_short && !berries_known;
-    // Hungry villages muster expeditions in earnest; content ones only
-    // when wanderlust strikes.
-    let urgency = if wood_want || food_want { 0.02 } else { 0.002 };
+    // Hungry villages muster expeditions in earnest, and a town that wants
+    // colony ground likewise; content ones only when wanderlust strikes.
+    let urgency = if wood_want || food_want || wanted {
+        0.02
+    } else {
+        0.002
+    };
 
     // Idle guards, ready to fall in beside whoever sets out.
     let mut guard_pool: Vec<(Entity, Vec3)> = explorers
@@ -221,8 +364,18 @@ pub(super) fn expeditions(
         .map(|(guard, at, ..)| (guard, at.translation))
         .collect();
 
-    for (entity, at, vocation, person, mut activity, mut target, expedition, chronicle) in
-        &mut explorers
+    for (
+        entity,
+        at,
+        vocation,
+        person,
+        mut activity,
+        mut target,
+        expedition,
+        chronicle,
+        mut needs,
+        mut rations,
+    ) in &mut explorers
     {
         if *vocation != work::Vocation::Explorer {
             continue;
@@ -231,9 +384,34 @@ pub(super) fn expeditions(
         // An expedition underway runs to its end, whatever the hour.
         if let Some(mut expedition) = expedition {
             if *activity != Activity::Working {
-                // Hunger or sleep broke the journey; they will set out again.
+                // Sleep broke the journey; they will set out again.
                 commands.entity(entity).remove::<Expedition>();
                 continue;
+            }
+            // The road feeds itself: the satchel, then the heath. A meal
+            // pauses the survey and the miles both — the road waits.
+            if let Some(meal) = forage_tick(
+                at.translation,
+                dt,
+                &mut needs,
+                rations.as_deref_mut(),
+                &mut bushes,
+            ) {
+                target.0 = Some(meal);
+                continue;
+            }
+            // The road ends when the bread does. Hungry, satchel dry, and
+            // no green in reach: the only meal left is the larder at home,
+            // so turn for it NOW, while the walk back is still shorter
+            // than the hunger. Kileb starved 172 strides out with the
+            // town's sacks full — nothing on the old road ever turned him
+            // around.
+            if needs.hunger > 0.7
+                && !expedition.homeward
+                && rations.as_ref().is_none_or(|satchel| satchel.0 < 1.0)
+            {
+                expedition.homeward = true;
+                info!("{} turns for home hungry", person.name);
             }
             if expedition.homeward {
                 let square = members
@@ -265,11 +443,11 @@ pub(super) fn expeditions(
             let spot = expedition.target;
             let near_trees = trees
                 .iter()
-                .filter(|(t, _)| t.translation().distance(spot) < 45.0)
+                .filter(|(t, _)| crate::globe::unbend(t.translation()).distance(spot) < 45.0)
                 .count();
             let near_bushes = bushes
                 .iter()
-                .filter(|(b, _)| b.translation().distance(spot) < 45.0)
+                .filter(|(_, b, _)| crate::globe::unbend(b.translation()).distance(spot) < 45.0)
                 .count();
             let high_ground = terrain.height_at(spot.x, spot.z) > WATER_LEVEL + 12.0;
             // A deposit within sight of the survey is the find of a
@@ -277,11 +455,20 @@ pub(super) fn expeditions(
             let near_deposit = deposits
                 .iter()
                 .filter(|(at, deposit)| {
-                    deposit.amount > 0.5 && at.translation().distance(spot) < 45.0
+                    deposit.amount > 0.5
+                        && crate::globe::unbend(at.translation()).distance(spot) < 45.0
                 })
                 .map(|(_, deposit)| deposit.kind)
                 .next();
-            let (what, radius) = if let Some(kind) = near_deposit {
+            // Ground fit for a town is the find the whole village is
+            // waiting on, when the muster has raised the order for it.
+            let town_centres: Vec<Vec3> = grounds.iter().map(|g| g.centre).collect();
+            let good_town_ground = wanted
+                && super::colony::clear_of_towns(spot, &town_centres)
+                && super::score_town_ground(&terrain, spot.x, spot.z, 0.7).is_some();
+            let (what, radius) = if good_town_ground {
+                ("a wide vale fit for a new village", 60.0)
+            } else if let Some(kind) = near_deposit {
                 match kind {
                     crate::matter::DepositKind::Iron => ("a hillside veined with iron", 45.0),
                     crate::matter::DepositKind::Clay => ("a bank of good red clay", 40.0),
@@ -298,7 +485,7 @@ pub(super) fn expeditions(
             };
 
             if radius > 0.0 {
-                known.pockets.push(Pocket { at: spot, radius });
+                known.learn(spot, radius);
                 notices.write(crate::ui::Notice::fanfare(format!(
                     "{} found {}",
                     person.name, what
@@ -354,8 +541,9 @@ pub(super) fn expeditions(
         if wood_want {
             found = trees
                 .iter()
-                .filter(|(at, tree)| tree.harvestable() && !known.knows(at.translation()))
-                .map(|(at, _)| at.translation())
+                .map(|(at, tree)| (crate::globe::unbend(at.translation()), tree))
+                .filter(|(at, tree)| tree.harvestable() && !known.knows(*at))
+                .map(|(at, _)| at)
                 .min_by(|a, b| {
                     a.distance(known.centre)
                         .total_cmp(&b.distance(known.centre))
@@ -365,8 +553,9 @@ pub(super) fn expeditions(
         if found.is_none() && food_want {
             found = bushes
                 .iter()
-                .filter(|(at, bush)| bush.amount > 0.5 && !known.knows(at.translation()))
-                .map(|(at, _)| at.translation())
+                .map(|(_, at, bush)| (crate::globe::unbend(at.translation()), bush))
+                .filter(|(at, bush)| bush.amount > 0.5 && !known.knows(*at))
+                .map(|(at, _)| at)
                 .min_by(|a, b| {
                     a.distance(known.centre)
                         .total_cmp(&b.distance(known.centre))
@@ -379,7 +568,13 @@ pub(super) fn expeditions(
                 break;
             }
             let angle = rng.0.range(0.0, std::f32::consts::TAU);
-            let reach = known.radius + rng.0.range(STRIDE * 0.4, STRIDE);
+            // A town hunting colony ground pushes the frontier at double
+            // stride: the muster is waiting on somewhere to point at.
+            let reach = if wanted {
+                known.radius + rng.0.range(STRIDE * 0.8, STRIDE * 1.8)
+            } else {
+                known.radius + rng.0.range(STRIDE * 0.4, STRIDE)
+            };
             let (sin, cos) = angle.sin_cos();
             let x = known.centre.x + cos * reach;
             let z = known.centre.z + sin * reach;
@@ -398,6 +593,16 @@ pub(super) fn expeditions(
             homeward: false,
         });
         target.0 = Some(frontier);
+        // Packed at the sacks before the walk: bread first, whatever the
+        // larder runs deepest in after. A thin larder sends them out lean —
+        // the heath feeds the road now.
+        if let Ok(member) = members.get(entity)
+            && let Ok(mut store) = stores.get_mut(member.0)
+            && store.food() >= 6.0
+        {
+            store.larder.draw(2.0);
+            commands.entity(entity).insert(work::Rations(2.0));
+        }
         // A guard falls in if one is free: nobody should walk past the
         // cairns alone while the village can spare a spear.
         if let Some(index) = guard_pool
@@ -415,6 +620,14 @@ pub(super) fn expeditions(
             commands
                 .entity(guard)
                 .insert((Escorting { ward: entity }, Activity::Working));
+            // The guard packs a satchel too, if the sacks can spare it.
+            if let Ok(member) = members.get(guard)
+                && let Ok(mut store) = stores.get_mut(member.0)
+                && store.food() >= 6.0
+            {
+                store.larder.draw(2.0);
+                commands.entity(guard).insert(work::Rations(2.0));
+            }
             info!("{} walks out with an escort", person.name);
         }
     }
@@ -427,11 +640,28 @@ pub(super) fn escort_duty(
     mut commands: Commands,
     wards: Query<(&Transform, Has<Expedition>), With<Villager>>,
     mut escorts: Query<
-        (Entity, &Escorting, &mut MoveTarget, &mut Activity),
+        (
+            Entity,
+            &Escorting,
+            &mut MoveTarget,
+            &mut Activity,
+            &mut Needs,
+            Option<&mut work::Rations>,
+        ),
         (With<Villager>, Without<Corpse>, Without<Held>),
     >,
 ) {
-    for (guard, escorting, mut target, mut activity) in &mut escorts {
+    for (guard, escorting, mut target, mut activity, mut needs, rations) in &mut escorts {
+        // The guard eats from the satchel on the move, and never leaves
+        // the ward's side for a bush — the ward's own detours bring the
+        // pair to the green together anyway.
+        if needs.hunger > 0.55
+            && let Some(mut rations) = rations
+            && rations.0 >= 1.0
+        {
+            rations.0 -= 1.0;
+            needs.hunger = (needs.hunger - 0.6).max(0.0);
+        }
         let stand_down = match wards.get(escorting.ward) {
             Ok((_, on_expedition)) => !on_expedition,
             Err(_) => true,
@@ -535,5 +765,117 @@ mod tests {
             !known.knows(Vec3::new(200.0, 0.0, 0.0)),
             "the ground between home and a pocket stays unknown",
         );
+    }
+
+    /// The road-diet, in order: satchel first, then the heath, and every
+    /// picking packs a little back into the satchel.
+    #[test]
+    fn the_road_eats_satchel_first_then_the_heath() {
+        use bevy::ecs::system::SystemState;
+        let mut world = World::new();
+        // Seated like the world seats it: bushes are chunk children, their
+        // globals are BENT, and forage_tick unbends them — a flat global
+        // here would test a data shape production never produces.
+        let (seat, _) = crate::globe::bend_frame(Vec3::new(10.0, 0.0, 0.0));
+        world.spawn((
+            GlobalTransform::from_translation(seat),
+            crate::scatter::FoodSource {
+                amount: 3.0,
+                regrowth: 0.0,
+            },
+        ));
+        let mut bushes: SystemState<
+            Query<(Entity, &GlobalTransform, &mut crate::scatter::FoodSource)>,
+        > = SystemState::new(&mut world);
+
+        // Fed: the road holds.
+        let mut needs = Needs {
+            hunger: 0.2,
+            ..default()
+        };
+        let mut query = bushes.get_mut(&mut world).unwrap();
+        assert!(forage_tick(Vec3::ZERO, 0.1, &mut needs, None, &mut query).is_none());
+
+        // Hungry with a packed satchel: the satchel pays, no detour.
+        needs.hunger = 0.8;
+        let mut satchel = work::Rations(2.0);
+        let mut query = bushes.get_mut(&mut world).unwrap();
+        assert!(forage_tick(Vec3::ZERO, 0.1, &mut needs, Some(&mut satchel), &mut query).is_none());
+        assert!(satchel.0 < 2.0, "the satchel should be bitten");
+        assert!(needs.hunger < 0.4, "the bite should feed");
+
+        // Hungry with an empty satchel: the bush is the meal — walk to it,
+        // and standing at it, eat and pack.
+        needs.hunger = 0.9;
+        satchel.0 = 0.0;
+        let mut query = bushes.get_mut(&mut world).unwrap();
+        let meal = forage_tick(Vec3::ZERO, 0.1, &mut needs, Some(&mut satchel), &mut query)
+            .expect("a fruiting bush in reach is a meal");
+        assert!(
+            meal.distance(Vec3::new(10.0, 0.0, 0.0)) < 1.0,
+            "walk to the bush"
+        );
+
+        let hungry_before = needs.hunger;
+        let mut query = bushes.get_mut(&mut world).unwrap();
+        forage_tick(meal, 0.5, &mut needs, Some(&mut satchel), &mut query)
+            .expect("standing at the bush is still the bush's business");
+        assert!(needs.hunger < hungry_before, "the bush should feed");
+        assert!(satchel.0 > 0.0, "the picking should pack the satchel");
+
+        // Bare land, empty satchel: no detour to give — the road goes on.
+        needs.hunger = 0.9;
+        let mut world_bare = World::new();
+        let mut bare: SystemState<
+            Query<(Entity, &GlobalTransform, &mut crate::scatter::FoodSource)>,
+        > = SystemState::new(&mut world_bare);
+        let mut query = bare.get_mut(&mut world_bare).unwrap();
+        assert!(forage_tick(Vec3::ZERO, 0.1, &mut needs, Some(&mut satchel), &mut query).is_none());
+    }
+
+    /// The map never stops learning, and never un-knows a walked road.
+    ///
+    /// The old silent cap left a black hole of fog over a quarry the
+    /// miners worked daily: at 128 pockets the map went blind, forever.
+    /// Now the list tidies itself — and every spot ever learned must
+    /// still be known afterwards, however hard the merging squeezed.
+    #[test]
+    fn the_map_never_stops_learning() {
+        let mut known = KnownWorld::default();
+        let mut learned: Vec<Vec3> = Vec::new();
+        // Far more ground than the shader can hold, scattered wide on a
+        // deterministic spiral well outside the home circle.
+        for n in 0..300 {
+            let angle = n as f32 * 2.399963;
+            let reach = 220.0 + (n as f32) * 9.0;
+            let spot = Vec3::new(angle.cos() * reach, 0.0, angle.sin() * reach);
+            known.learn(spot, 34.0);
+            learned.push(spot);
+        }
+        assert!(
+            known.pockets.len() <= 128,
+            "the veil shader holds 128 pockets; the map holds {}",
+            known.pockets.len(),
+        );
+        for spot in &learned {
+            assert!(
+                known.knows(*spot),
+                "ground once learned went back to the dark at {spot}",
+            );
+        }
+    }
+
+    /// Pockets the home circle grows over are dropped as redundant.
+    #[test]
+    fn the_home_circle_swallows_its_pockets() {
+        let mut known = KnownWorld::default();
+        known.learn(Vec3::new(60.0, 0.0, 0.0), 34.0);
+        assert!(
+            known.pockets.is_empty(),
+            "a pocket wholly inside the home circle is redundant",
+        );
+        // But one straddling the edge is real knowledge and stays.
+        known.learn(Vec3::new(180.0, 0.0, 0.0), 34.0);
+        assert_eq!(known.pockets.len(), 1);
     }
 }

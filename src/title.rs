@@ -263,6 +263,10 @@ fn splash_step(delta: f32) -> f32 {
 }
 
 /// The mark's whole life: fade in, hold, fade out.
+///
+/// Only the launch tests read this — it is the spec they hold the drawn
+/// fade against, kept beside the constants it is made of.
+#[cfg(test)]
 fn splash_life() -> f32 {
     SPLASH_FADE * 2.0 + SPLASH_HOLD
 }

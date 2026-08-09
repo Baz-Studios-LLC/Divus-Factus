@@ -137,12 +137,18 @@ pub enum FollowStyle {
 ///
 /// Set by right-clicking a creature under the hand. Only right-clicks change
 /// it: the next clean click lets go, and clicking a different creature
-/// switches to them. Nothing else — not panning,
-/// not time — releases a follow.
+/// switches to them. Two things release a follow: following someone else,
+/// and seizing the land — the left-button grab is the god taking the
+/// camera back, and it must always win over a pin.
 #[derive(Resource, Default)]
 pub struct FollowTarget {
     pub entity: Option<Entity>,
     pub style: FollowStyle,
+    /// A one-shot dive: the distance to close to as the follow begins.
+    /// Taken (and cleared) on the first frame, so the god's own zoom is
+    /// never fought afterwards. The prayer cards use it — press to fly
+    /// lands at answering height instead of wherever the camera last was.
+    pub close_to: Option<f32>,
 }
 
 /// How high the eyes sit above the feet, for a body built from `genome`.
@@ -213,6 +219,10 @@ fn apply_follow(
     rig.target_focus.z = at.z;
     // A followed zoom anchor fights the pin; the pin wins.
     rig.zoom_anchor = None;
+    // The one-shot dive, spent the moment it is read.
+    if let Some(height) = follow.close_to.take() {
+        rig.target_distance = height;
+    }
 
     if follow.style == FollowStyle::Eyes {
         // Behind the eyes: the focus rises to head height and the orbit
@@ -617,6 +627,7 @@ fn read_camera_input(
     pointer: Res<crate::ui::PointerContext>,
     time: Res<Time>,
     terrain: Option<Res<Terrain>>,
+    mut follow: ResMut<FollowTarget>,
     windows: Query<&Window, With<PrimaryWindow>>,
     cameras: Query<(&Camera, &GlobalTransform), With<GodCamera>>,
     mut rigs: Query<&mut CameraRig>,
@@ -720,6 +731,15 @@ fn read_camera_input(
         // suddenly seize the planet halfway through, and one that starts on
         // the world must go on turning it even when the cursor crosses a panel.
         *ours = !pointer.over_ui;
+        // Grabbing the land takes the camera back. A follow re-pins the
+        // focus every frame, so a pinned view ate every drag — Brett,
+        // after pressing a prayer card: "it disables LMB dragging to
+        // move." Seizing the world is the god saying "mine again"; only
+        // the Avatar's behind-the-eyes ride is exempt, since it owns the
+        // pointer outright.
+        if *ours && follow.entity.is_some() && follow.style != FollowStyle::Eyes {
+            follow.entity = None;
+        }
         *grabbed = if *ours {
             cursor_sphere_direction(&windows, &cameras)
         } else {

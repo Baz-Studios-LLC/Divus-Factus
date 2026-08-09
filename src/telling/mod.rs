@@ -303,8 +303,10 @@ impl Tongue {
         tags.extend(body.iter().copied());
         tags.push("prayer");
         let slots: Vec<(&str, &str)> = whom.map(|whom| ("whom", whom)).into_iter().collect();
+        // The register wall: whatever the pool's condition, a prayer never
+        // borrows smalltalk. Stale beats absurd.
         self.voice
-            .pick(who.to_bits(), &tags, &slots, &mut self.dice)
+            .pick_within(who.to_bits(), &tags, &slots, &["prayer"], &mut self.dice)
             .map(|said| tidy(&said))
     }
 

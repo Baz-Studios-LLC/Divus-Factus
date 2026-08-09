@@ -37,10 +37,12 @@ pub(super) const DESPERATE_HUNGER: f32 = 0.65;
 const PRAYER_PATIENCE: f32 = 120.0;
 
 /// How near the answer must land to be *their* answer.
-const ANSWER_RADIUS: f32 = 9.0;
+pub(super) const ANSWER_RADIUS: f32 = 9.0;
 
-/// Belief the Flourish miracle costs.
-pub const FLOURISH_COST: f32 = 10.0;
+/// How long a devotion hangs before it fades. Longer than a food prayer's
+/// patience — nobody is dying — and its lapse costs nothing, so the length
+/// is generosity, not pressure.
+const DEVOTION_PATIENCE: f32 = 150.0;
 
 /// One person's faith in the god, 0 to 1.
 ///
@@ -95,6 +97,61 @@ pub enum PrayerKind {
         /// reads it out, so the god knows what is being avenged.
         over: Option<String>,
     },
+    /// The founding kind: a would-be colony leader asks the god's blessing
+    /// for the road before a party walks out to raise a new town. Answer it
+    /// with a gift and they go with heart; smite the ground before them and
+    /// the venture is forbidden; say nothing and they go anyway, unheard.
+    Road {
+        /// Where the new banner would go up.
+        destination: Vec3,
+        /// The name the new town already carries — a place people mean to
+        /// walk to needs a name to speak of on the road.
+        colony: String,
+        /// The town they would leave.
+        mother: Entity,
+        /// Rolled when the asking is made, so the blessing blesses a
+        /// particular flag and not an idea.
+        banner_ramp: usize,
+        sigil: usize,
+    },
+    /// The rhetorical kind: no crisis, no request the larder could meet —
+    /// a hope said out loud. "If you are there, keep the town safe
+    /// tonight." Answered by the god SHOWING THEMSELF: any unmistakably
+    /// divine act the asker witnesses while it is open. Unanswered, it
+    /// fades — it never curdles. Brett: "It would make the system feel
+    /// like its working in the begining."
+    Devotion {
+        /// Believers give thanks; doubters ask if anyone is there. The
+        /// board reads them differently.
+        grateful: bool,
+    },
+}
+
+impl PrayerKind {
+    /// The asking, in board words: what this prayer wants from the god,
+    /// named after whoever is asking. One writer, so the codex board and
+    /// the pinned tracker can never drift apart.
+    pub fn ask_line(&self, asker: &str) -> String {
+        match self {
+            PrayerKind::Food => format!("{asker} asks for food"),
+            PrayerKind::Dark { name, over, .. } => match over {
+                Some(over) => {
+                    format!("{asker} asks that {name} be struck down - over {over}")
+                }
+                None => format!("{asker} asks that {name} be struck down"),
+            },
+            PrayerKind::Road { colony, .. } => {
+                format!("{asker} asks your blessing for the road - to found {colony}")
+            }
+            PrayerKind::Devotion { grateful } => {
+                if *grateful {
+                    format!("{asker} gives thanks")
+                } else {
+                    format!("{asker} asks if you are there")
+                }
+            }
+        }
+    }
 }
 
 /// An open prayer: what they are asking for, and how long hope lasts.
@@ -122,6 +179,9 @@ pub enum PrayerOutcome {
     /// The world fed them before the god got around to it — a meal from the
     /// larder, a fisher home heavy. No credit claimed, no doubt seeded.
     Fed,
+    /// A devotion nobody answered. Hope unanswered fades; it does not
+    /// sour — no notice, no doubt, a receipt and nothing else.
+    Faded,
 }
 
 impl PrayerOutcome {
@@ -131,6 +191,7 @@ impl PrayerOutcome {
             PrayerOutcome::Curdled => "went unanswered",
             PrayerOutcome::Died => "died waiting",
             PrayerOutcome::Fed => "ended with a meal",
+            PrayerOutcome::Faded => "faded on the wind",
         }
     }
 }
@@ -171,6 +232,30 @@ impl PrayerLedger {
 /// that someone, somewhere, is asking.
 #[derive(Component)]
 pub struct PrayerMote;
+
+/// Hangs the golden mote over someone praying. Every asking looks the same
+/// from the sky — food, hatred or the road — and what kind it is waits on
+/// the board. One writer for the light, so no prayer's cue can drift.
+pub(super) fn raise_prayer_mote(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    over: Entity,
+) {
+    commands.spawn((
+        PrayerMote,
+        Mesh3d(meshes.add(Cuboid::new(0.22, 0.22, 0.22))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: crate::palette::shade(&crate::palette::CLOTH_GOLD, 0.95),
+            emissive: LinearRgba::from(crate::palette::shade(&crate::palette::CLOTH_GOLD, 0.95))
+                * 6.0,
+            ..default()
+        })),
+        Transform::from_xyz(0.0, 2.6, 0.0),
+        bevy::light::NotShadowCaster,
+        ChildOf(over),
+    ));
+}
 
 /// The god's pooled strength: the sum of every living believer's faith, less
 /// what has been spent on miracles.
@@ -235,6 +320,8 @@ pub(super) fn kneel(
     name: Option<Res<DivineName>>,
     members: Query<&MemberOf>,
     stores: Query<&super::work::Stockpile>,
+    grounds: Query<&super::SettlementGround>,
+    gifts: Query<&Transform, (With<DivinelyPlaced>, With<FoodSource>, Without<Held>)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut notices: MessageWriter<crate::ui::Notice>,
@@ -242,6 +329,7 @@ pub(super) fn kneel(
     mut hungry: Query<
         (
             Entity,
+            &Transform,
             &Needs,
             &Person,
             &mut Activity,
@@ -260,14 +348,23 @@ pub(super) fn kneel(
 ) {
     let god = name.as_ref().map_or("their god", |n| n.0.as_str());
 
-    for (entity, needs, person, mut activity, mut target, chronicle) in &mut hungry {
+    for (entity, at, needs, person, mut activity, mut target, chronicle) in &mut hungry {
         // Prayer answers an empty larder — this person's OWN larder. A full
         // store in the next town over is no comfort here.
-        let store_has_food = members
-            .get(entity)
-            .ok()
-            .and_then(|member| stores.get(member.0).ok())
-            .is_some_and(|store| store.food() >= 1.0);
+        // A stocked larder eighty strides behind you feeds you nothing
+        // NOW. Whoever hungers ON THE ROAD — explorer, colonist, anyone
+        // past the town's working ground — prays at desperate rather than
+        // at death's door, because out there the god is the only larder
+        // in reach. Kileb starved on the road while this gate read his
+        // town's full sacks as comfort.
+        let home = members.get(entity).ok().map(|member| member.0);
+        let on_the_road = home
+            .and_then(|town| grounds.get(town).ok())
+            .is_some_and(|ground| at.translation.distance(ground.centre) > 80.0);
+        let store_has_food = !on_the_road
+            && home
+                .and_then(|town| stores.get(town).ok())
+                .is_some_and(|store| store.food() >= 1.0);
         // A stocked larder is only comfort if it can actually feed them. At
         // the edge of death the prayer goes up REGARDLESS: stores go
         // unreachable — a square terraced for the hall, a route refused —
@@ -279,6 +376,17 @@ pub(super) fn kneel(
             continue;
         }
         if matches!(*activity, Activity::Eating(_) | Activity::Sleeping) {
+            continue;
+        }
+        // A gift already lying within reach IS the answer: the god has
+        // provided, and the next move is dinner, not another asking.
+        // Without this, an offering set beside a praying villager was
+        // answered, re-asked and re-answered every frame - Brett: "she
+        // prayed for food and I answered and it spammed notifications."
+        let provided = gifts
+            .iter()
+            .any(|gift| gift.translation.distance(at.translation) < 45.0);
+        if provided {
             continue;
         }
 
@@ -301,21 +409,7 @@ pub(super) fn kneel(
         });
 
         // The mote: a small golden light over their head, for the god to see.
-        commands.spawn((
-            PrayerMote,
-            Mesh3d(meshes.add(Cuboid::new(0.22, 0.22, 0.22))),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: crate::palette::shade(&crate::palette::CLOTH_GOLD, 0.95),
-                emissive: LinearRgba::from(crate::palette::shade(
-                    &crate::palette::CLOTH_GOLD,
-                    0.95,
-                )) * 6.0,
-                ..default()
-            })),
-            Transform::from_xyz(0.0, 2.6, 0.0),
-            bevy::light::NotShadowCaster,
-            ChildOf(entity),
-        ));
+        raise_prayer_mote(&mut commands, &mut meshes, &mut materials, entity);
 
         info!("{} prays to {god} for food", person.name);
         notices.write(crate::ui::Notice::prayer(format!(
@@ -418,21 +512,7 @@ pub(super) fn kneel_in_hatred(
 
         // The mote over a dark prayer is the same gold: the god sees every
         // asking the same way, and what kind it is waits on the board.
-        commands.spawn((
-            PrayerMote,
-            Mesh3d(meshes.add(Cuboid::new(0.22, 0.22, 0.22))),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: crate::palette::shade(&crate::palette::CLOTH_GOLD, 0.95),
-                emissive: LinearRgba::from(crate::palette::shade(
-                    &crate::palette::CLOTH_GOLD,
-                    0.95,
-                )) * 6.0,
-                ..default()
-            })),
-            Transform::from_xyz(0.0, 2.6, 0.0),
-            bevy::light::NotShadowCaster,
-            ChildOf(entity),
-        ));
+        raise_prayer_mote(&mut commands, &mut meshes, &mut materials, entity);
 
         info!("{} prays to {god} against {enemy_name}", person.name);
         notices.write(crate::ui::Notice::prayer(format!(
@@ -596,6 +676,227 @@ pub(super) fn close_the_prayers_of_the_dead(
     }
 }
 
+/// The small prayers: devotions, said into the air on ordinary days.
+///
+/// No crisis calls them. The first uncertain days after a founding, a storm
+/// leaning on the roofs, a house finished, a quiet dusk — someone kneels
+/// and says a hope out loud. Doubters ask if anyone is there; believers
+/// give thanks. This is the board's heartbeat while the village thrives:
+/// Brett — "It feels weird that in the begining you never see any prayers
+/// coming in."
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+pub(super) fn kneel_in_devotion(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut since_last: Local<f32>,
+    clock: Res<crate::calendar::WorldClock>,
+    weather: Option<Res<crate::weather::Weather>>,
+    name: Option<Res<DivineName>>,
+    mut rng: ResMut<super::SimRng>,
+    mut tongue: Option<ResMut<crate::telling::Tongue>>,
+    mut visuals: (ResMut<Assets<Mesh>>, ResMut<Assets<StandardMaterial>>),
+    mut notices: MessageWriter<crate::ui::Notice>,
+    towns: Query<(Entity, &super::Settlement)>,
+    new_roofs: Query<&MemberOf, Added<super::work::Building>>,
+    open: Query<&Prayer>,
+    mut folk: Query<
+        (
+            Entity,
+            &MemberOf,
+            &Person,
+            &Faith,
+            &mut Activity,
+            &mut MoveTarget,
+            Option<&mut Chronicle>,
+        ),
+        (
+            With<Villager>,
+            Without<Prayer>,
+            Without<Held>,
+            Without<crate::avatar::Ridden>,
+            Without<Airborne>,
+            Without<Corpse>,
+            Without<crate::creature::Childhood>,
+        ),
+    >,
+) {
+    // Roofs finished this frame are read every pass; the clock gate below
+    // only meters how often the QUIET occasions are rolled.
+    let roofed_towns: Vec<Entity> = new_roofs.iter().map(|member| member.0).collect();
+
+    *since_last += time.delta_secs();
+    if *since_last < 10.0 && roofed_towns.is_empty() {
+        return;
+    }
+    *since_last = 0.0;
+
+    // One devotion open at a time in the whole world: they are the board's
+    // heartbeat, not its flood.
+    if open
+        .iter()
+        .any(|prayer| matches!(prayer.kind, PrayerKind::Devotion { .. }))
+    {
+        return;
+    }
+
+    let god = name.as_ref().map_or("their god", |n| n.0.as_str());
+    let stormy = weather
+        .as_ref()
+        .is_some_and(|w| w.kind() == crate::weather::WeatherKind::Storm);
+    let night = !super::work::is_work_hour(clock.time_of_day());
+
+    for (town, settlement) in &towns {
+        let roof = roofed_towns.contains(&town);
+        // The first days after a founding are the asking days: the flag is
+        // planted, the god is a hope, and "if you are there" is the whole
+        // register of the town.
+        let young = clock.day().saturating_sub(settlement.founded) < 12;
+        let chance = if roof {
+            0.65
+        } else if stormy {
+            0.3
+        } else if young {
+            0.22
+        } else if night {
+            0.06
+        } else {
+            0.02
+        };
+        if !rng.0.chance(chance) {
+            continue;
+        }
+
+        let candidates: Vec<Entity> = folk
+            .iter()
+            .filter(|(_, member, ..)| member.0 == town)
+            .map(|(who, ..)| who)
+            .collect();
+        if candidates.is_empty() {
+            continue;
+        }
+        let who = candidates[rng.0.next_u32() as usize % candidates.len()];
+        let Ok((_, _, person, faith, mut activity, mut target, chronicle)) = folk.get_mut(who)
+        else {
+            continue;
+        };
+        if matches!(*activity, Activity::Eating(_) | Activity::Sleeping) {
+            continue;
+        }
+
+        let grateful = roof || faith.is_believer();
+        let mut body = vec!["devotion"];
+        if roof {
+            body.push("roof");
+        } else if stormy {
+            body.push("storm");
+        } else if night {
+            body.push("night");
+        }
+        let band = if faith.trust > 0.6 {
+            crate::telling::FaithBand::Sure
+        } else if faith.trust > 0.3 {
+            crate::telling::FaithBand::Wavering
+        } else {
+            crate::telling::FaithBand::Doubting
+        };
+        let words = tongue
+            .as_mut()
+            .and_then(|tongue| tongue.pray(who, &body, band, None));
+
+        *activity = Activity::Praying;
+        target.0 = None;
+        commands.entity(who).insert(Prayer {
+            remaining: DEVOTION_PATIENCE,
+            words,
+            bubbled: false,
+            kind: PrayerKind::Devotion { grateful },
+        });
+        raise_prayer_mote(&mut commands, &mut visuals.0, &mut visuals.1, who);
+
+        info!("{} offers a small prayer to {god}", person.name);
+        notices.write(crate::ui::Notice::prayer(if grateful {
+            format!("{} gives thanks to {god}", person.name)
+        } else {
+            format!("{} wonders if {god} is there", person.name)
+        }));
+        if let Some(mut chronicle) = chronicle {
+            chronicle.record(clock.day(), "offered a small prayer");
+        }
+        // One asking per pass, everywhere.
+        return;
+    }
+}
+
+/// A devotion is answered by the god SHOWING THEMSELF: any unmistakably
+/// divine act the asker witnesses while their small prayer hangs — a stone
+/// lifted, a gift set down, a roof mended by no hand they can see. The
+/// asking was "are you there"; the answer is anything only a god does.
+pub(super) fn answer_devotions(
+    mut commands: Commands,
+    clock: Res<crate::calendar::WorldClock>,
+    mut ledger: ResMut<PrayerLedger>,
+    mut notices: MessageWriter<crate::ui::Notice>,
+    children: Query<&Children>,
+    motes: Query<Entity, With<PrayerMote>>,
+    mut seen: MessageReader<DivineEvent>,
+    gifts: Query<&Transform, (With<DivinelyPlaced>, Without<Held>)>,
+    mut praying: Query<(
+        Entity,
+        &Transform,
+        &Person,
+        &Prayer,
+        &mut Faith,
+        &mut Activity,
+        Option<&mut Chronicle>,
+        Option<&mut super::Stirrings>,
+    )>,
+) {
+    let shows: Vec<Vec3> = seen
+        .read()
+        .filter(|event| event.kind.unmistakably_divine() >= 0.5)
+        .map(|event| event.position)
+        .collect();
+
+    for (entity, at, person, prayer, mut faith, mut activity, chronicle, stirred) in &mut praying {
+        let PrayerKind::Devotion { grateful } = prayer.kind else {
+            continue;
+        };
+        let shown = shows
+            .iter()
+            .any(|show| show.distance(at.translation) < 60.0)
+            || gifts
+                .iter()
+                .any(|gift| gift.translation.distance(at.translation) < 20.0);
+        if !shown {
+            continue;
+        }
+
+        faith.shift(0.15);
+        ledger.close(&person.name, prayer.words.clone(), PrayerOutcome::Answered);
+        if let Some(mut chronicle) = chronicle {
+            chronicle.record(
+                clock.day(),
+                if grateful {
+                    "gave thanks, and was heard"
+                } else {
+                    "asked if you were there, and saw the answer"
+                },
+            );
+        }
+        if let Some(mut stirred) = stirred {
+            stirred.stir(clock.day(), "saw the answer with their own eyes");
+        }
+        notices.write(crate::ui::Notice::fanfare(format!(
+            "{}'s small prayer was answered",
+            person.name
+        )));
+        if *activity == Activity::Praying {
+            *activity = Activity::Idle;
+        }
+        end_prayer(&mut commands, entity, &children, &motes);
+    }
+}
+
 /// A meal ends a food prayer, however the meal arrived — the larder came
 /// back, a fisher walked in heavy, the god's own loaf landed. The hunger is
 /// gone and the prayer goes with it. Without this a fed villager's stale
@@ -618,7 +919,7 @@ pub(super) fn meals_answer_prayers(
 }
 
 /// Removes a villager's prayer state and its mote.
-fn end_prayer(
+pub(super) fn end_prayer(
     commands: &mut Commands,
     entity: Entity,
     children: &Query<&Children>,
@@ -811,6 +1112,22 @@ pub(super) fn despair(
             continue;
         }
 
+        // Hope unanswered fades; it does not sour. A devotion asked for
+        // nothing the larder could meet, so its lapse seeds no doubt,
+        // raises no notice, and costs the god nothing — the receipt on
+        // the board is the whole of it.
+        if matches!(prayer.kind, PrayerKind::Devotion { .. }) {
+            ledger.close(&person.name, prayer.words.clone(), PrayerOutcome::Faded);
+            if *activity == Activity::Praying {
+                *activity = Activity::Idle;
+            }
+            if let Some(mut chronicle) = chronicle {
+                chronicle.record(clock.day(), "offered a small prayer; the wind kept it");
+            }
+            end_prayer(&mut commands, entity, &children, &motes);
+            continue;
+        }
+
         faith.shift(-0.15);
         if *activity == Activity::Praying {
             *activity = Activity::Idle;
@@ -969,21 +1286,12 @@ pub(super) fn tally_belief(
 ///
 /// The first purchase belief can make — famine, ended wholesale, at the price
 /// of credibility earned one answered prayer at a time.
-pub fn flourish(
-    belief: &mut Belief,
-    site: &SettlementSite,
-    bushes: &mut Query<(&GlobalTransform, &mut FoodSource)>,
-) -> bool {
-    if belief.available() < FLOURISH_COST {
-        return false;
-    }
-    belief.spent += FLOURISH_COST;
+pub fn flourish(site: &SettlementSite, bushes: &mut Query<(&GlobalTransform, &mut FoodSource)>) {
     for (at, mut source) in bushes.iter_mut() {
         if at.translation().distance(site.centre) < 160.0 {
             source.amount = source.amount.max(3.0);
         }
     }
-    true
 }
 
 /// What kind of god the people have witnessed, accumulating toward a name.
@@ -1129,7 +1437,10 @@ mod tests {
         app.add_message::<crate::ui::Say>();
         app.add_message::<DivineEvent>();
         app.init_resource::<PrayerLedger>();
-        app.add_systems(Update, (kneel, answer_prayers, despair).chain());
+        app.add_systems(
+            Update,
+            (kneel, answer_prayers, answer_devotions, despair).chain(),
+        );
 
         let settlement = app
             .world_mut()
@@ -1209,6 +1520,152 @@ mod tests {
                 .iter()
                 .any(|closed| matches!(closed.outcome, PrayerOutcome::Answered)),
             "an answered prayer must reach the board's ledger",
+        );
+
+        // THE LOOP: the gift still lies in reach and the hunger is still
+        // high, and Tiwa knelt again the very next frame — answered again,
+        // asked again, thirteen receipts and a tray full of spam. Brett:
+        // "she prayed for food and I answered and it spammed
+        // notifications." A gift in reach IS the answer: no re-kneeling.
+        app.update();
+        app.update();
+        assert!(
+            app.world().get::<Prayer>(soul).is_none(),
+            "a gift within reach must hold the next asking",
+        );
+        let receipts = app
+            .world()
+            .resource::<PrayerLedger>()
+            .closed
+            .iter()
+            .filter(|closed| matches!(closed.outcome, PrayerOutcome::Answered))
+            .count();
+        assert_eq!(receipts, 1, "one gift, one answer, one receipt");
+    }
+
+    /// A stocked larder eighty strides behind you feeds you nothing now:
+    /// whoever hungers on the road prays at desperate, not at death's
+    /// door. Kileb starved 172 strides out while the old gate read his
+    /// town's full sacks as comfort.
+    #[test]
+    fn the_road_prays_at_desperate_not_at_deaths_door() {
+        let (mut app, soul) = starving_world();
+        let settlement = app.world().resource::<SettlementSite>().settlement;
+        app.world_mut()
+            .entity_mut(settlement)
+            .insert(crate::villager::SettlementGround {
+                centre: Vec3::ZERO,
+                radius: 36.0,
+                woodpile: Vec3::ZERO,
+                foodpile: Vec3::ZERO,
+            });
+        app.world_mut()
+            .get_mut::<super::super::work::Stockpile>(settlement)
+            .unwrap()
+            .larder
+            .add(super::super::work::FoodKind::Berries, 20.0);
+        app.world_mut()
+            .entity_mut(soul)
+            .insert(super::super::MemberOf(settlement));
+        app.world_mut().get_mut::<Needs>(soul).unwrap().hunger = 0.75;
+
+        // At home, that hunger waits for the walk to the sacks.
+        app.update();
+        assert!(
+            app.world().get::<Prayer>(soul).is_none(),
+            "a stocked larder in walking reach should hold the prayer",
+        );
+
+        // On the road, the same hunger kneels: the larder is no comfort
+        // a hundred strides behind you.
+        app.world_mut()
+            .get_mut::<Transform>(soul)
+            .unwrap()
+            .translation = Vec3::new(120.0, 0.0, 0.0);
+        app.update();
+        assert!(
+            app.world().get::<Prayer>(soul).is_some(),
+            "hunger on the road must pray while the walk home can still be made",
+        );
+    }
+
+    /// Hope unanswered fades; it does not sour. A lapsed devotion costs
+    /// no faith, raises no notice, and leaves only its receipt.
+    #[test]
+    fn a_devotion_fades_free() {
+        let (mut app, soul) = starving_world();
+        // Fed, so the crisis machinery stays out of the way.
+        app.world_mut().get_mut::<Needs>(soul).unwrap().hunger = 0.2;
+        let faith_before = app.world().get::<Faith>(soul).unwrap().trust;
+        app.world_mut().entity_mut(soul).insert(Prayer {
+            remaining: 0.05,
+            words: None,
+            bubbled: false,
+            kind: PrayerKind::Devotion { grateful: false },
+        });
+
+        app.world_mut()
+            .resource_mut::<Time>()
+            .advance_by(std::time::Duration::from_secs(1));
+        app.update();
+
+        assert!(
+            app.world().get::<Prayer>(soul).is_none(),
+            "the devotion should close",
+        );
+        let faith_after = app.world().get::<Faith>(soul).unwrap().trust;
+        assert_eq!(
+            faith_before, faith_after,
+            "a faded devotion must cost nothing",
+        );
+        let ledger = app.world().resource::<PrayerLedger>();
+        assert!(
+            ledger
+                .closed
+                .iter()
+                .any(|closed| matches!(closed.outcome, PrayerOutcome::Faded)),
+            "the board keeps the faded receipt",
+        );
+    }
+
+    /// A devotion is answered by the god showing themself: any
+    /// unmistakably divine act the asker witnesses while it hangs.
+    #[test]
+    fn a_devotion_is_answered_by_any_divine_sign() {
+        let (mut app, soul) = starving_world();
+        app.world_mut().get_mut::<Needs>(soul).unwrap().hunger = 0.2;
+        let faith_before = app.world().get::<Faith>(soul).unwrap().trust;
+        app.world_mut().entity_mut(soul).insert(Prayer {
+            remaining: DEVOTION_PATIENCE,
+            words: None,
+            bubbled: false,
+            kind: PrayerKind::Devotion { grateful: false },
+        });
+
+        // The god lifts a stone across the square, in plain sight.
+        app.world_mut().write_message(DivineEvent {
+            kind: DivineEventKind::Lifted,
+            position: Vec3::new(20.0, 0.0, 0.0),
+            subject: None,
+            intensity: 0.6,
+        });
+        app.update();
+
+        assert!(
+            app.world().get::<Prayer>(soul).is_none(),
+            "the sign should answer the asking",
+        );
+        assert!(
+            app.world().get::<Faith>(soul).unwrap().trust > faith_before,
+            "seeing the answer deepens faith",
+        );
+        let ledger = app.world().resource::<PrayerLedger>();
+        assert!(
+            ledger
+                .closed
+                .iter()
+                .any(|closed| matches!(closed.outcome, PrayerOutcome::Answered)),
+            "the board records the answered devotion",
         );
     }
 
@@ -1379,15 +1836,13 @@ mod tests {
     }
 
     #[test]
-    fn belief_spends_down_but_never_negative() {
-        let mut belief = Belief {
+    fn belief_never_reads_negative() {
+        // Belief is the LADDER now, not the fuel - nothing spends it - but
+        // the arithmetic guard stays for whatever old saves carry.
+        let belief = Belief {
             total: 12.0,
-            spent: 0.0,
+            spent: 100.0,
         };
-        assert!(belief.available() >= FLOURISH_COST);
-        belief.spent += FLOURISH_COST;
-        assert!((belief.available() - 2.0).abs() < 1e-5);
-        belief.spent += 100.0;
         assert_eq!(belief.available(), 0.0);
     }
 }

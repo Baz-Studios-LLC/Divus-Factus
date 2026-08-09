@@ -37,12 +37,18 @@ pub enum SfxKind {
     Chime,
     /// Two warm strikes rising: a village remembering a good day.
     Fanfare,
+    /// The gold trumpet: works of the village — a hall raised, a town founded.
+    ProclaimGold,
+    /// The green cradle-bells: a life beginning.
+    ProclaimLife,
+    /// The pink bell-climb: the legend rising.
+    ProclaimFaith,
     /// The founding flag driven home.
     Plant,
 }
 
 impl SfxKind {
-    pub const ALL: [SfxKind; 9] = [
+    pub const ALL: [SfxKind; 12] = [
         SfxKind::Knock,
         SfxKind::Splash,
         SfxKind::Thud,
@@ -52,6 +58,9 @@ impl SfxKind {
         SfxKind::Chime,
         SfxKind::Fanfare,
         SfxKind::Plant,
+        SfxKind::ProclaimGold,
+        SfxKind::ProclaimLife,
+        SfxKind::ProclaimFaith,
     ];
 
     pub fn path(self) -> &'static str {
@@ -65,6 +74,9 @@ impl SfxKind {
             SfxKind::Chime => "audio/sfx/chime.wav",
             SfxKind::Fanfare => "audio/sfx/fanfare.wav",
             SfxKind::Plant => "audio/sfx/plant.wav",
+            SfxKind::ProclaimGold => "audio/sfx/proclaim_gold.wav",
+            SfxKind::ProclaimLife => "audio/sfx/proclaim_life.wav",
+            SfxKind::ProclaimFaith => "audio/sfx/proclaim_faith.wav",
         }
     }
 
@@ -77,6 +89,9 @@ impl SfxKind {
             SfxKind::Splash | SfxKind::Whoosh => 0.7,
             SfxKind::Grab => 0.55,
             SfxKind::Chime | SfxKind::Fanfare => 0.6,
+            // The trumpets: a proclamation is the loudest thing the
+            // interface ever says, just under the weather itself.
+            SfxKind::ProclaimGold | SfxKind::ProclaimLife | SfxKind::ProclaimFaith => 0.9,
         }
     }
 }
@@ -93,7 +108,7 @@ pub struct PlaySfx {
 /// The loaded kit.
 #[derive(Resource)]
 struct SfxBank {
-    handles: [Handle<bevy::audio::AudioSource>; 9],
+    handles: [Handle<bevy::audio::AudioSource>; 12],
 }
 
 /// The player's effects loudness, kept beside the music's own dial.

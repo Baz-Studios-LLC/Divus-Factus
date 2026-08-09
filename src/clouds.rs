@@ -102,6 +102,14 @@ fn deck_opacity(above_sea: f32) -> f32 {
     (1.0 - gone).max(back)
 }
 
+/// The clear radius around the sight line, in world units. Wide enough
+/// that pulling back through the deck never puts cloud across the view;
+/// narrow enough that the weather still reads as weather around it.
+const CORRIDOR_CLEAR: f32 = 110.0;
+
+/// How far past the clear radius the corridor feathers back to full cloud.
+const CORRIDOR_FEATHER: f32 = 70.0;
+
 /// Whether the god has sent the weather away.
 ///
 /// Its own resource rather than a hidden debug dial, because a god who cannot
@@ -174,6 +182,11 @@ pub struct CloudParams {
     pub wind: Vec4,
     /// x coverage, y noise scale, z evolution clock, w edge softness.
     pub dials: Vec4,
+    /// The sight corridor's anchor: xyz the focus (the hand's ground) in
+    /// WORLD space, w the corridor's clear radius. Radius 0 = no corridor.
+    pub sight: Vec4,
+    /// xyz the camera's world position, w the corridor's feather width.
+    pub eye: Vec4,
 }
 
 impl Default for CloudParams {
@@ -189,6 +202,8 @@ impl Default for CloudParams {
             // haze from pole to pole. Tight enough now that a cloud has an edge
             // and the sky between clouds is sky.
             dials: Vec4::new(0.35, DECK_SCALE, 0.0, 0.07),
+            sight: Vec4::ZERO,
+            eye: Vec4::ZERO,
         }
     }
 }
@@ -263,9 +278,14 @@ fn drive_the_deck(
     // stage later and would be a frame behind; this is the one definition of
     // where the camera is. A missing rig reads as ground level, so a world
     // without a god keeps its weather.
-    let above_sea = cameras.single().map_or(0.0, |rig| {
+    let (above_sea, sightline) = cameras.single().map_or((0.0, None), |rig| {
         let eye = crate::globe::bent_camera_pose(rig).translation;
-        eye.distance(crate::globe::planet_centre()) - crate::terrain::PLANET_RADIUS
+        let above = eye.distance(crate::globe::planet_centre()) - crate::terrain::PLANET_RADIUS;
+        // The sight corridor: the line from the hand's ground to the eye,
+        // carried on behind it. Both ends in WORLD space, the shell's own
+        // frame - the focus is a flat sim point and must be seated first.
+        let (focus, _) = crate::globe::bend_frame(rig.focus);
+        (above, Some((focus, eye)))
     });
     let clarity = deck_opacity(above_sea);
     // A clear day still has weather in it. Handing the weather's own intensity
@@ -283,6 +303,14 @@ fn drive_the_deck(
         params.wind = (crate::globe::planet_stance() * Vec3::Y).extend(*turned);
         params.dials.x = coverage;
         params.dials.z = time.elapsed_secs();
+        // Nothing stands between the eye and the hand - nor sits on the
+        // camera's own back. Clouds inside this corridor go fully clear,
+        // feathered at the rim so the hole has no edge to find. Brett:
+        // "I constantly zoom out and get blinded by clouds."
+        if let Some((focus, eye)) = sightline {
+            params.sight = focus.extend(CORRIDOR_CLEAR);
+            params.eye = eye.extend(CORRIDOR_FEATHER);
+        }
         // Cloud takes the light the ground takes: white at noon, gilded at
         // dusk, and the sunless side goes the colour of the night sky rather
         // than to black, so an overcast night is still a sky and not a lid.

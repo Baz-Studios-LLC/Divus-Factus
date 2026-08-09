@@ -1,77 +1,85 @@
-## The world makes sound now
+## The bar is yours
 
-**Nine sounds, and the world wears them at the right distance.** Everything
-the god does and everything the village suffers has a voice — near things
-loud, far things faint, and silence past the horizon of your regard.
+**The miracle bar is rebuilt: ten slots, arranged by your own hand.** Drag
+a miracle to any slot and it stays there — through saves, through seasons —
+and its number key **fires it on the spot**, wherever the hand points. No
+arming, no second click; press 2 and the lightning falls where you're
+looking. Clicking a slot still arms it for a placed cast, buttons give
+under the finger, and the slot flashes with the act.
 
-- The founding flag **plants** with a thump of earth; the hand **grips**
-  with a rasp and **hurls** with a whoosh; whatever it drops lands with a
-  thud where it lands.
-- **Knuckles on shingles** when you knock, a **crack of ruin** when you
-  smite, and a soft page-turn under every notice in the tray.
+- **No more mana.** Miracles run on **cooldowns** — half a day for Bounty,
+  a day for wrath, two for the quake — and the resting slot drains a dark
+  tide until its power answers again.
+- **Belief is the ladder now, not the fuel.** The congregation's faith
+  UNLOCKS each power as it grows — wrath first, the land-wide grace last —
+  and once a miracle is learned it is never taken back. The old mana bar
+  now climbs toward the next unlock and names it.
+- Wearing a body costs nothing while you stay: the Avatar pays a day's
+  cooldown at the door and the ride is yours as long as you please.
 
-## The town hall
+## The village spreads
 
-**The flag grows up: a town hall now rises on the square itself.** The
-banner called the village into being; the hall is the village agreeing to
-stay.
+**Towns bud.** A thriving town grown past its beds sends out founders; a
+soul nursing real grudges walks out in bitterness and takes whoever loves
+them along — whole households, spouses together, children with their
+parents, never a family split by a banner.
 
-- The hall takes a **seat on the square** at ground-breaking — facing the
-  woodpile across the common ground, never crowding it.
-- A finished hall **shelters eight souls** who have no roof of their own
-  yet: the village's spare room while the houses catch up.
-- Its door is kept bare on purpose — that board belongs to the **mayor**,
-  when the village is grown enough to choose one.
+- **The god is asked first.** The would-be leader kneels and prays for the
+  road. Set a gift beside them and the venture goes blessed; smite the
+  ground at their feet and it is forbidden; stay silent and they go anyway,
+  unheard.
+- **The road feeds itself.** Explorers and colonists pack ration satchels
+  at the sacks, eat from them on the move, forage the heath when they run
+  dry — and turn for home while the walk back is still shorter than the
+  hunger. Nobody starves marching away from a full larder again.
 
-## The stores live under a roof
+## The prayers reach you
 
-**Nothing the village owns sleeps outside a standing roof.** When the
-storehouse rises, every pile on the square is carried in, armload by
-armload — and the granary takes the food sacks after it.
+- **THE ASKINGS**: every open prayer pinned to the left of the screen as a
+  card, quest-tracker style — the ask, their own words in pink, and how
+  long hope holds. **Press to dive** to the asker at answering height (no
+  camera lock — grab the land and it's yours again); right-press to set a
+  card aside.
+- **Small prayers keep the board alive.** On quiet days — the uncertain
+  first mornings, a storm, a roof finished — someone kneels and says a hope
+  out loud: "if you're there, keep the town safe tonight." Any unmistakably
+  divine act they witness answers it. Ignored, it fades without a mark
+  against you — hope doesn't sour, it just drifts off on the wind.
+- Prayers never borrow the wrong words again, and one gift now means one
+  answer — no more notification storms from a single loaf.
 
-- **Deliveries follow the piles.** Every trade walks its armloads to where
-  the stores actually stand — into the storehouse, into the granary — and
-  the essence of an offered gift pours visibly into the roof that took it.
-- **The village eats from its stores, and nowhere else.** Bushes are the
-  gatherers' workplace, not anybody's table; meals are drawn at the sacks,
-  wherever the sacks now stand. The one exception is the god's own gift:
-  bread dropped from the sky is eaten under the sky.
-- **The starving hold vigil.** An empty larder no longer scatters the
-  hungry to graze — they gather at the sacks, kneel, and ask you. A famine
-  finally looks like what it is: a crowd at the square, praying.
+## The great days announce themselves
 
-## The god hears the dying
+**Center-stage proclamations for the moments that earn a trumpet** — a
+child born, the town hall raised, a colony founded, your legend rising.
+Each card swells in with confetti in its own color, gold for works, green
+for life, pink for faith, each with its own fanfare — and pressing it
+takes you to the moment.
 
-**No villager starves silently again.** A village lost six souls in one
-summer — each one standing still, feet from a full larder, and not one
-prayer rose. Every hole that made that possible is closed.
+## The trades wear their work
 
-- **A walk to a buried goal ends beside it, not nowhere.** When the hall's
-  terraces made the square's centre unwalkable, every path to a meal was
-  refused outright. The pathfinder now walks to the nearest stand-able
-  ground beside any point it cannot stand on.
-- **The dying pray past a stocked larder.** "There is food somewhere in
-  town" no longer silences someone starving to death beside it.
-- **A prayer survives the hunger that caused it** — and a meal from any
-  table closes it kindly on the board ("ended with a meal") instead of
-  letting it curdle into doubt over a dinner eaten on time.
-- **The prayer board keeps its receipts across saves.** Answered is
-  answered forever, not until the next load.
+**Villagers dress for their callings**: the fisher in sea-blue, the hunter
+hooded in leather, the priest robed in purple, the guard in dark stone
+with a red sash — twelve liveries, readable across the square. Changing
+trades happens inside a puff of the new cloth's own color.
 
-## Petitions belong to the shrine
+## The god's view
 
-**The village pins its asks where the god actually looks.** Prayers and
-petitions gather on the shrine wall — six seats, oldest first — or around
-the banner pole while the village is still too young for a shrine.
+- **The clouds part before your gaze**: a clear corridor follows the line
+  from your hand through the camera, so pulling out through the deck never
+  blinds you — and the weather still lies over the rest of the world.
+- **The map never stops learning.** Long games used to hit a hidden limit
+  and leave black holes of fog over ground your people worked daily; the
+  known world now tidies itself and ground once walked never goes dark.
+- Clicking **Title** mid-game no longer crashes to desktop.
 
-## Mended
+## Mended besides
 
-- **The fire is lit again.** The bonfire had not taken wood since the world
-  went round; the tender can reach it now, and the evening ring gathers
-  where it should.
-- **Word, thought and prayer bubbles are back** — attention itself had gone
-  flat-earthed and judged every speaker to be somewhere they were not.
-- **Neighbours no longer shake violently** when they stand close: the
-  polite step apart is a step, not a seizure.
-- **Answered knocks fan out the household** onto their own doorstep berths
-  instead of stacking the family into one shivering point.
+- The codex's soul page lines its labels and values up on a true baseline.
+- Chat bubbles wear the same border weight as thoughts — same pen, all
+  three inks.
+- Rocks the world seeded in shallow water no longer "splash" at every game
+  start; only things that genuinely arrive in water make the sound.
+- The throw's whoosh is retired while a better sound is found.
+- Every session now writes `logs/latest.log`, so a bug you see is a bug
+  that can be read.

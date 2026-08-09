@@ -30,10 +30,19 @@ impl Plugin for UiPlugin {
         app.add_plugins(ordo::OrdoPlugin::with_theme("theme.ordo.toml"))
             .add_systems(Startup, lend_ramps);
         app.init_resource::<PointerContext>()
+            .init_resource::<SetAside>()
             .init_resource::<WindowDrag>()
             .add_message::<Notice>()
             .add_message::<Say>()
-            .add_systems(Startup, (spawn_toast_shelf, load_fonts, spawn_date_card))
+            .add_systems(
+                Startup,
+                (
+                    spawn_toast_shelf,
+                    spawn_prayer_shelf,
+                    load_fonts,
+                    spawn_date_card,
+                ),
+            )
             .add_systems(PreUpdate, track_pointer.after(bevy::ui::UiSystems::Focus))
             .add_systems(
                 Update,
@@ -43,6 +52,8 @@ impl Plugin for UiPlugin {
                     // chatter, thoughts and notices stay backstage until the
                     // player has actually come down to the village.
                     show_notices.run_if(in_state(crate::GameState::Playing)),
+                    keep_the_prayer_shelf.run_if(in_state(crate::GameState::Playing)),
+                    set_askings_aside.run_if(in_state(crate::GameState::Playing)),
                     age_toasts,
                     style_buttons,
                     drag_windows,
@@ -255,16 +266,19 @@ fn speak(
         if !seen {
             continue;
         }
-        // Speech wears the gold border everything divine-adjacent wears;
-        // thoughts wear blue — readable as "inner" at a glance. The green
-        // authorship marker served while written and composed lines shared
-        // the screen; with every bubble composed, it retired.
+        // Speech wears gold, thoughts wear blue, prayers wear pink — kind
+        // readable at a glance before a word is read. All three inks at
+        // the same strength: speech used to borrow the panel chrome's
+        // whisper-gold (0.35 alpha against the others' 0.95) and its 2px
+        // border read thinner than the thought bubble's despite being the
+        // same width. Brett: "the chat borders feel thiner for some
+        // reason." The reason was paint, not pixels.
         let border = if say.prayer {
             palette::shade(&palette::CLOTH_PINK, 1.0).with_alpha(0.95)
         } else if say.thought {
             palette::shade(&palette::CLOTH_BLUE, 0.75).with_alpha(0.95)
         } else {
-            theme::panel_border()
+            palette::shade(&palette::CLOTH_GOLD, 0.85).with_alpha(0.95)
         };
         let bubble = commands
             .spawn((
@@ -530,20 +544,210 @@ struct Toast {
 /// How many notices may be on screen before the oldest is pushed out.
 const TOAST_CAP: usize = 6;
 
+/// The prayer tracker: every open asking, pinned to the middle of the
+/// left edge like a quest log. Brett: "Prayers are in the codex, but how
+/// about we pin them to the middle of the left side of the screen in
+/// cards like a quest tracker?" Cards wear the prayer bubble's own dress
+/// — 2px pink, softly rounded — and pressing one flies to the asker, the
+/// same press the codex board answers to.
+#[derive(Component)]
+struct PrayerShelf;
+
+/// Askings the god has set aside: right-pressed off the shelf. The prayer
+/// itself runs on — the codex board still shows it, hope still fades, the
+/// receipt still lands — the shelf just stops holding it up. Pruned as
+/// prayers close, so a soul who asks again gets a fresh card.
+#[derive(Resource, Default)]
+struct SetAside(bevy::platform::collections::HashSet<Entity>);
+
+/// The action button on a card sets it aside. Brett: "maybe we can make
+/// right click to dismiss and ignore the card?" Honours the mouse scheme,
+/// so swapped buttons swap here too.
+fn set_askings_aside(
+    buttons: Res<ButtonInput<MouseButton>>,
+    mouse: Res<crate::keymap::MouseScheme>,
+    mut aside: ResMut<SetAside>,
+    shelf: Query<Entity, With<PrayerShelf>>,
+    cards: Query<(&Interaction, &crate::debug::village::PrayerRow, &ChildOf)>,
+) {
+    if !buttons.just_pressed(mouse.action()) {
+        return;
+    }
+    let Ok(shelf) = shelf.single() else {
+        return;
+    };
+    for (interaction, row, parent) in &cards {
+        // Shelf cards only: the codex board's rows keep their one gesture.
+        if parent.parent() != shelf || *interaction == Interaction::None {
+            continue;
+        }
+        aside.0.insert(row.0);
+    }
+}
+
+/// How many cards the shelf holds before it sums the rest in one line.
+const SHELF_CARDS: usize = 4;
+
+fn spawn_prayer_shelf(mut commands: Commands) {
+    let shelf = commands
+        .spawn((
+            Name::new("The prayers, pinned"),
+            PrayerShelf,
+            GameHud,
+            // Ordo's furniture: an edge-docked card stack, centred halfway
+            // up the left wall. The kit owns WHERE a shelf stands and how
+            // it stacks; the cards stay the game's.
+            ordo::shelf(ordo::Anchor::Left),
+        ))
+        .id();
+    commands
+        .entity(shelf)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.width = px(238);
+            node.row_gap = px(8);
+            // Empty most of the time: no layout until there is an asking.
+            node.display = Display::None;
+        });
+}
+
+/// Keeps the pinned cards matching the open prayers — most urgent first,
+/// rebuilt only when the askings actually change (the board's own
+/// fingerprint idiom; a tracker that flinches every frame is noise).
+#[allow(clippy::type_complexity)]
+fn keep_the_prayer_shelf(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut last_look: Local<f32>,
+    mut fingerprint: Local<u64>,
+    mut aside: ResMut<SetAside>,
+    shelf: Query<Entity, With<PrayerShelf>>,
+    praying: Query<
+        (
+            Entity,
+            &crate::villager::Person,
+            &crate::villager::belief::Prayer,
+        ),
+        (
+            With<crate::villager::Villager>,
+            Without<crate::creature::Corpse>,
+        ),
+    >,
+) {
+    *last_look += time.delta_secs();
+    if *last_look < 0.5 {
+        return;
+    }
+    *last_look = 0.0;
+    let Ok(shelf) = shelf.single() else {
+        return;
+    };
+
+    // Closed prayers leave the set-aside list, so a fresh asking from the
+    // same soul earns a fresh card.
+    aside
+        .0
+        .retain(|who| praying.iter().any(|(open, ..)| open == *who));
+
+    let mut open: Vec<_> = praying
+        .iter()
+        .filter(|(who, ..)| !aside.0.contains(who))
+        .collect();
+    open.sort_by(|a, b| {
+        a.2.remaining
+            .partial_cmp(&b.2.remaining)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let asking = praying.iter().count();
+
+    let fresh = {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::hash::DefaultHasher::new();
+        for (who, _, prayer) in open.iter().take(SHELF_CARDS) {
+            who.to_bits().hash(&mut hasher);
+            crate::debug::village::hope_band(prayer.remaining).hash(&mut hasher);
+        }
+        asking.hash(&mut hasher);
+        open.len().hash(&mut hasher);
+        hasher.finish()
+    };
+    if fresh == *fingerprint {
+        return;
+    }
+    *fingerprint = fresh;
+
+    commands.entity(shelf).despawn_related::<Children>();
+    // Display follows content: no askings, no layout.
+    let showing = !open.is_empty();
+    commands
+        .entity(shelf)
+        .entry::<Node>()
+        .and_modify(move |mut node| {
+            node.display = if showing {
+                Display::Flex
+            } else {
+                Display::None
+            };
+        });
+
+    let pink = crate::palette::shade(&crate::palette::CLOTH_PINK, 1.0);
+    for (who, person, prayer) in open.iter().take(SHELF_CARDS) {
+        let card = commands
+            .spawn((
+                crate::debug::village::PrayerRow(*who),
+                Interaction::default(),
+                HoverHint::new(&person.name, "press to fly - action-press to set aside"),
+                Node {
+                    width: percent(100),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: px(2),
+                    padding: UiRect::axes(px(9), px(6)),
+                    border: UiRect::all(px(2)),
+                    border_radius: BorderRadius::all(px(8)),
+                    ..default()
+                },
+                BackgroundColor(theme::panel_bg()),
+                BorderColor::all(pink.with_alpha(0.95)),
+                ChildOf(shelf),
+            ))
+            .id();
+        commands.spawn((body(prayer.kind.ask_line(&person.name)), ChildOf(card)));
+        if let Some(words) = &prayer.words {
+            let quoted = commands
+                .spawn((dim(format!("\u{201c}{words}\u{201d}")), ChildOf(card)))
+                .id();
+            commands
+                .entity(quoted)
+                .insert(TextColor(pink.with_alpha(0.75)));
+        }
+        commands.spawn((
+            dim(crate::debug::village::hope_band(prayer.remaining)),
+            ChildOf(card),
+        ));
+    }
+    let carded = open.len().min(SHELF_CARDS);
+    if asking > carded {
+        commands.spawn((
+            dim(format!("and {} more asking", asking - carded)),
+            ChildOf(shelf),
+        ));
+    }
+}
+
 fn spawn_toast_shelf(mut commands: Commands) {
     commands.spawn((
         Name::new("Notices"),
         ToastShelf,
         GameHud,
-        Node {
-            position_type: PositionType::Absolute,
-            right: px(theme::MARGIN),
-            bottom: px(theme::MARGIN),
-            flex_direction: FlexDirection::Column,
-            align_items: AlignItems::FlexEnd,
-            row_gap: px(6),
-            ..default()
-        },
+        // The same Ordo furniture the prayer shelf stands on, in its
+        // bottom-right setting.
+        ordo::shelf(ordo::Anchor::BottomRight),
+    ));
+    // And centre stage, for the days that earn a trumpet.
+    commands.spawn((
+        Name::new("The proclamation stage"),
+        GameHud,
+        ordo::proclamation_stage(),
     ));
 }
 
