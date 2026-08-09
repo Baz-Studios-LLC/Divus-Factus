@@ -316,11 +316,11 @@ pub(crate) fn spawn_people_panel(
     for vocation in TRADE_CHIPS {
         let tone = crate::villager::attire::livery(vocation).cloth;
         let color = crate::palette::color_at(tone.palette_index());
-        let chip = ordo::chip(&mut commands, chips_row, vocation.describe(), color);
+        let chip = ordo::chip(&mut commands, chips_row, vocation.title(), color);
         commands.entity(chip.root).insert((
             TradeChip(vocation),
             ui::UiButton,
-            ui::HoverHint::new(vocation.describe(), "press to see only this calling"),
+            ui::HoverHint::new(vocation.title(), "press to see only this calling"),
         ));
         commands.entity(chip.value).insert(TradeChipCount(vocation));
     }
@@ -1062,7 +1062,10 @@ pub(crate) fn update_people_panel(
             entity,
             livery.with_alpha(0.9),
         );
-        // Name over calling, the calling in its own colour.
+        // Name over title, both a step brighter and larger than the old
+        // roster wore them - white ink for the name, the trade's colour
+        // lifted toward bone for the title, since raw livery tones sank
+        // into the card. Brett: "the text is a little hard to read."
         let words = commands
             .spawn((
                 Node {
@@ -1074,12 +1077,18 @@ pub(crate) fn update_people_panel(
                 ChildOf(name_button),
             ))
             .id();
-        commands.spawn((
-            RowLabel(entity),
-            ui::label(person.full_name()),
-            TextLayout::linebreak(LineBreak::NoWrap),
-            ChildOf(words),
-        ));
+        let name = commands
+            .spawn((
+                RowLabel(entity),
+                ui::body(person.full_name()),
+                TextLayout::linebreak(LineBreak::NoWrap),
+                ChildOf(words),
+            ))
+            .id();
+        commands.entity(name).insert(TextFont {
+            font_size: FontSize::Px(15.0),
+            ..default()
+        });
         let standing = commands
             .spawn((
                 ui::dim(vocation.map_or_else(
@@ -1090,16 +1099,20 @@ pub(crate) fn update_people_panel(
                             village.as_deref().unwrap_or("the wilds")
                         )
                     },
-                    |trade| trade.describe().to_string(),
+                    |trade| trade.title().to_string(),
                 )),
                 TextLayout::linebreak(LineBreak::NoWrap),
                 ChildOf(words),
             ))
             .id();
+        commands.entity(standing).insert(TextFont {
+            font_size: FontSize::Px(ui::theme::BODY_SIZE),
+            ..default()
+        });
         if vocation.is_some() {
             commands
                 .entity(standing)
-                .insert(TextColor(livery.with_alpha(0.9)));
+                .insert(TextColor(livery.mix(&Color::WHITE, 0.35)));
         }
         // The eye flies the camera to them.
         let follow_button = commands

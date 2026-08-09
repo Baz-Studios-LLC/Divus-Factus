@@ -122,6 +122,26 @@ impl Vocation {
         }
     }
 
+    /// The trade dressed for a plaque: the name wearing its capital, the
+    /// way the ledger's roster and chips write it. Brett: "I want the
+    /// jobs to be written like this: Miner, Fisher, Explorer..."
+    pub fn title(self) -> &'static str {
+        match self {
+            Vocation::Gatherer => "Gatherer",
+            Vocation::Fisher => "Fisher",
+            Vocation::Hunter => "Hunter",
+            Vocation::Miner => "Miner",
+            Vocation::Forester => "Forester",
+            Vocation::Builder => "Builder",
+            Vocation::Farmer => "Farmer",
+            Vocation::Cook => "Cook",
+            Vocation::Healer => "Healer",
+            Vocation::Priest => "Priest",
+            Vocation::Explorer => "Explorer",
+            Vocation::Guard => "Guard",
+        }
+    }
+
     /// The vocation as the inspector names it.
     pub fn describe(self) -> &'static str {
         match self {

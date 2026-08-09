@@ -1862,7 +1862,7 @@ pub(crate) fn update_prayer_board(
             commands.spawn((
                 ui::dim(
                     vocation
-                        .map(|trade| trade.describe().to_string())
+                        .map(|trade| trade.title().to_string())
                         .unwrap_or_else(|| "of the village".to_string()),
                 ),
                 ChildOf(names),
