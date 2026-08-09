@@ -909,8 +909,11 @@ pub(crate) fn update_people_panel(
     if !open {
         return;
     }
+    // A pressed chip answers NOW: two seconds of pacing on a click reads
+    // as a filter that does not work at all.
+    let refiltered = filter.is_changed();
     *last_rebuild += time.delta_secs();
-    if *last_rebuild < 2.0 && !just_opened {
+    if *last_rebuild < 2.0 && !just_opened && !refiltered {
         return;
     }
     *last_rebuild = 0.0;
@@ -952,7 +955,10 @@ pub(crate) fn update_people_panel(
         ))
         .id();
     commands.spawn((
-        ui::dim("ALL PEOPLE"),
+        ui::dim(filter.0.map_or_else(
+            || "ALL PEOPLE".to_string(),
+            |trade| format!("{}S", trade.title().to_uppercase()),
+        )),
         Node {
             flex_grow: 1.0,
             ..default()
@@ -981,7 +987,12 @@ pub(crate) fn update_people_panel(
     commands.spawn((ui::dim(format!("{}", roster.len())), ChildOf(head)));
 
     let village = settlements.iter().next().map(|s| s.name.clone());
-    let mut names: Vec<_> = people.iter().collect();
+    // The same narrowing the fingerprint used, or a pressed chip changes
+    // the fingerprint and the list rebuilds - with everyone still on it.
+    let mut names: Vec<_> = people
+        .iter()
+        .filter(|(.., vocation)| filter.0.is_none() || vocation.copied() == filter.0)
+        .collect();
     names.sort_by(|a, b| a.1.name.cmp(&b.1.name));
     if sort.0 {
         names.reverse();
@@ -2067,5 +2078,83 @@ pub(crate) fn handle_people_rows(
                 *visibility = Visibility::Hidden;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bevy::ecs::system::RunSystemOnce;
+
+    /// A pressed chip narrows the LIST, not just the fingerprint. The
+    /// filter once narrowed only the rebuild-detection roll, so the
+    /// roster rebuilt on the press - with everyone still on it.
+    #[test]
+    fn a_pressed_chip_narrows_the_roster() {
+        use crate::creature::genome::{CreatureGenome, Sex, Species};
+        use crate::villager::work::Vocation;
+
+        let mut app = App::new();
+        app.init_resource::<Assets<Image>>();
+        app.init_resource::<Assets<Mesh>>();
+        app.init_resource::<Assets<StandardMaterial>>();
+        app.init_resource::<Time>();
+        app.init_resource::<RosterSort>();
+        app.init_resource::<RosterFilter>();
+        app.init_resource::<super::super::portrait::Portraits>();
+        app.init_resource::<crate::villager::WorldChronicle>();
+
+        // The book, so the people page and its rows container exist -
+        // and the page held open, or the roster never rebuilds at all.
+        app.world_mut()
+            .run_system_once(super::super::village::spawn_village_panel)
+            .unwrap();
+        app.world_mut().run_system_once(spawn_people_panel).unwrap();
+        let page = app
+            .world()
+            .resource::<super::super::village::Codex>()
+            .people_page;
+        app.world_mut()
+            .entity_mut(page)
+            .insert(Visibility::Inherited);
+
+        // Two souls, one calling between them.
+        let mut rng = crate::rng::Rng::new(3);
+        let genome = CreatureGenome::adult(Species::Human, Sex::Male, &mut rng);
+        for (name, trade) in [("Ka", Some(Vocation::Miner)), ("Tu", None)] {
+            let mut soul = app.world_mut().spawn((
+                Villager,
+                Person::born(name.to_string(), "Testu".to_string()),
+                genome.clone(),
+                Activity::Idle,
+            ));
+            if let Some(trade) = trade {
+                soul.insert(trade);
+            }
+        }
+
+        // Narrowed to miners: one plaque on the wall, not two.
+        app.world_mut().resource_mut::<RosterFilter>().0 = Some(Vocation::Miner);
+        app.world_mut()
+            .run_system_once(update_people_panel)
+            .unwrap();
+        let mut rows = app.world_mut().query::<&PersonRow>();
+        assert_eq!(
+            rows.iter(app.world()).count(),
+            1,
+            "the filter left the list whole"
+        );
+
+        // Released: everyone returns.
+        app.world_mut().resource_mut::<RosterFilter>().0 = None;
+        app.world_mut()
+            .run_system_once(update_people_panel)
+            .unwrap();
+        let mut rows = app.world_mut().query::<&PersonRow>();
+        assert_eq!(
+            rows.iter(app.world()).count(),
+            2,
+            "the release kept the narrowing"
+        );
     }
 }
