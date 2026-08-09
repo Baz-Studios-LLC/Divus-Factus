@@ -359,6 +359,10 @@ pub(crate) fn spawn_people_panel(
             border_radius: BorderRadius::all(px(0)),
             ..default()
         },
+        // The wheel: the roster is a scroll region like the dossier's
+        // tab pages — without the marker the overflow clips but never moves.
+        ui::Scrollable,
+        bevy::ui::ScrollPosition::default(),
         BackgroundColor(Color::BLACK.with_alpha(0.32)),
         BorderColor::all(ui::theme::panel_border().with_alpha(0.35)),
     ));
@@ -982,183 +986,161 @@ pub(crate) fn update_people_panel(
     if sort.0 {
         names.reverse();
     }
-    // The hall itself: true portraits two abreast, each soul a plaque —
-    // the face above, the name and calling on the mount below. Brett's
-    // Phase 2: "TRUE portraits" — the studio's plates, not painted busts.
-    for pair in names.chunks(2) {
-        let rank = commands
+    // The hall itself: one full-width plaque per soul, short enough to
+    // scan — the true portrait at the left edge, name and calling to its
+    // right, the eye at the far end. Brett: "full width but much shorter
+    // ... portrait on the left and info on the right of the card."
+    for &(entity, person, genome, _, vocation) in &names {
+        let livery = vocation
+            .map(|trade| crate::villager::attire::livery(*trade).cloth)
+            .map(|tone| crate::palette::color_at(tone.palette_index()))
+            .unwrap_or_else(ui::theme::text_dim);
+        let card = commands
             .spawn((
+                RowFace {
+                    person: entity,
+                    base: 0.0,
+                },
                 Node {
                     width: percent(100),
+                    height: px(58),
                     flex_shrink: 0.0,
                     flex_direction: FlexDirection::Row,
-                    column_gap: px(8),
+                    align_items: AlignItems::Center,
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::all(px(6)),
+                    overflow: Overflow::clip(),
                     ..default()
                 },
+                BackgroundColor(ui::theme::title_bg().with_alpha(0.55)),
+                BorderColor::all(ui::theme::text_dim().with_alpha(0.14)),
                 ChildOf(container),
             ))
             .id();
-        for &(entity, person, genome, _, vocation) in pair {
-            let livery = vocation
-                .map(|trade| crate::villager::attire::livery(*trade).cloth)
-                .map(|tone| crate::palette::color_at(tone.palette_index()))
-                .unwrap_or_else(ui::theme::text_dim);
-            let card = commands
-                .spawn((
-                    RowFace {
-                        person: entity,
-                        base: 0.0,
-                    },
-                    Node {
-                        flex_grow: 1.0,
-                        flex_basis: px(0),
-                        min_width: px(0),
-                        flex_direction: FlexDirection::Column,
-                        border: UiRect::all(px(1)),
-                        border_radius: BorderRadius::all(px(6)),
-                        overflow: Overflow::clip(),
-                        ..default()
-                    },
-                    BackgroundColor(ui::theme::title_bg().with_alpha(0.55)),
-                    BorderColor::all(ui::theme::text_dim().with_alpha(0.14)),
-                    ChildOf(rank),
-                ))
-                .id();
-            // The face, on the trade's own ground, ruled off from the
-            // mount beneath in the same livery.
-            let frame = commands
-                .spawn((
-                    Node {
-                        width: percent(100),
-                        aspect_ratio: Some(super::portrait::PLATE_ASPECT),
-                        flex_shrink: 0.0,
-                        border: UiRect::bottom(px(1)),
-                        overflow: Overflow::clip(),
-                        ..default()
-                    },
-                    BackgroundColor(livery.with_alpha(0.1)),
-                    BorderColor::all(livery.with_alpha(0.55)),
-                    ChildOf(card),
-                ))
-                .id();
-            super::portrait::set_the_face(
-                &mut commands,
-                frame,
-                &portraits,
-                entity,
-                livery.with_alpha(0.9),
-            );
-            // The mount: name over calling, the calling in its own colour.
-            let words = commands
-                .spawn((
-                    Node {
-                        width: percent(100),
-                        flex_direction: FlexDirection::Column,
-                        padding: UiRect::axes(px(8), px(6)),
-                        ..default()
-                    },
-                    ChildOf(card),
-                ))
-                .id();
-            commands.spawn((
-                RowLabel(entity),
-                ui::label(person.full_name()),
-                TextLayout::linebreak(LineBreak::NoWrap),
-                ChildOf(words),
-            ));
-            let standing = commands
-                .spawn((
-                    ui::dim(vocation.map_or_else(
-                        || {
-                            format!(
-                                "{} of {}",
-                                super::person_phrase(genome.sex, genome.age),
-                                village.as_deref().unwrap_or("the wilds")
-                            )
-                        },
-                        |trade| trade.describe().to_string(),
-                    )),
-                    TextLayout::linebreak(LineBreak::NoWrap),
-                    ChildOf(words),
-                ))
-                .id();
-            if vocation.is_some() {
-                commands
-                    .entity(standing)
-                    .insert(TextColor(livery.with_alpha(0.9)));
-            }
-            // The whole plaque opens their page; the eye above it flies
-            // to them. The overlay comes before the eye so the eye stays
-            // on top for the pointer.
-            commands.spawn((
+        // The plaque opens their page; only the eye at the end is its own
+        // button, so it needs no overlay tricks in a row this simple.
+        let name_button = commands
+            .spawn((
                 PersonRow(entity),
                 ui::UiButton,
                 Node {
-                    position_type: PositionType::Absolute,
-                    left: px(0),
-                    right: px(0),
-                    top: px(0),
-                    bottom: px(0),
-                    border_radius: BorderRadius::all(px(6)),
+                    flex_grow: 1.0,
+                    min_width: px(0),
+                    height: percent(100),
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: px(10),
+                    border_radius: BorderRadius::all(px(0)),
                     ..default()
                 },
                 BackgroundColor(ui::theme::panel_bg().with_alpha(0.0)),
                 Interaction::default(),
                 ChildOf(card),
-            ));
-            let follow_button = commands
-                .spawn((
-                    FollowButton(entity),
-                    ui::UiButton,
-                    Node {
-                        position_type: PositionType::Absolute,
-                        top: px(6),
-                        right: px(6),
-                        width: px(22),
-                        height: px(22),
-                        border: UiRect::all(px(1)),
-                        border_radius: BorderRadius::all(px(999)),
-                        ..default()
-                    },
-                    BackgroundColor(ui::theme::title_bg().with_alpha(0.85)),
-                    BorderColor::all(ui::theme::accent().with_alpha(0.4)),
-                    Interaction::default(),
-                    ChildOf(card),
-                ))
-                .id();
-            for (l, t, w, h, r, bright) in [
-                (4.5, 7.5, 12.0, 6.0, 6.0, false),
-                (8.5, 8.5, 4.0, 4.0, 4.0, true),
-            ] {
-                commands.spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        left: px(l),
-                        top: px(t),
-                        width: px(w),
-                        height: px(h),
-                        border_radius: BorderRadius::all(px(r)),
-                        ..default()
-                    },
-                    BackgroundColor(if bright {
-                        crate::palette::shade(&crate::palette::BONE, 0.95)
-                    } else {
-                        ui::theme::accent().with_alpha(0.85)
-                    }),
-                    ChildOf(follow_button),
-                ));
-            }
-        }
-        // A lone card on the last rank keeps to its half of the row.
-        if pair.len() == 1 {
-            commands.spawn((
+            ))
+            .id();
+        // The face bleeds the card's full height at its left edge, ruled
+        // off from the words in the trade's own colour.
+        let frame = commands
+            .spawn((
                 Node {
-                    flex_grow: 1.0,
-                    flex_basis: px(0),
-                    min_width: px(0),
+                    height: percent(100),
+                    aspect_ratio: Some(super::portrait::PLATE_ASPECT),
+                    flex_shrink: 0.0,
+                    border: UiRect::right(px(1)),
+                    overflow: Overflow::clip(),
                     ..default()
                 },
-                ChildOf(rank),
+                BackgroundColor(livery.with_alpha(0.1)),
+                BorderColor::all(livery.with_alpha(0.55)),
+                ChildOf(name_button),
+            ))
+            .id();
+        super::portrait::set_the_face(
+            &mut commands,
+            frame,
+            &portraits,
+            entity,
+            livery.with_alpha(0.9),
+        );
+        // Name over calling, the calling in its own colour.
+        let words = commands
+            .spawn((
+                Node {
+                    flex_grow: 1.0,
+                    min_width: px(0),
+                    flex_direction: FlexDirection::Column,
+                    ..default()
+                },
+                ChildOf(name_button),
+            ))
+            .id();
+        commands.spawn((
+            RowLabel(entity),
+            ui::label(person.full_name()),
+            TextLayout::linebreak(LineBreak::NoWrap),
+            ChildOf(words),
+        ));
+        let standing = commands
+            .spawn((
+                ui::dim(vocation.map_or_else(
+                    || {
+                        format!(
+                            "{} of {}",
+                            super::person_phrase(genome.sex, genome.age),
+                            village.as_deref().unwrap_or("the wilds")
+                        )
+                    },
+                    |trade| trade.describe().to_string(),
+                )),
+                TextLayout::linebreak(LineBreak::NoWrap),
+                ChildOf(words),
+            ))
+            .id();
+        if vocation.is_some() {
+            commands
+                .entity(standing)
+                .insert(TextColor(livery.with_alpha(0.9)));
+        }
+        // The eye flies the camera to them.
+        let follow_button = commands
+            .spawn((
+                FollowButton(entity),
+                ui::UiButton,
+                Node {
+                    width: px(22),
+                    height: px(22),
+                    flex_shrink: 0.0,
+                    margin: UiRect::right(px(8)),
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::all(px(999)),
+                    ..default()
+                },
+                BackgroundColor(ui::theme::title_bg().with_alpha(0.85)),
+                BorderColor::all(ui::theme::accent().with_alpha(0.4)),
+                Interaction::default(),
+                ChildOf(card),
+            ))
+            .id();
+        for (l, t, w, h, r, bright) in [
+            (4.5, 7.5, 12.0, 6.0, 6.0, false),
+            (8.5, 8.5, 4.0, 4.0, 4.0, true),
+        ] {
+            commands.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(l),
+                    top: px(t),
+                    width: px(w),
+                    height: px(h),
+                    border_radius: BorderRadius::all(px(r)),
+                    ..default()
+                },
+                BackgroundColor(if bright {
+                    crate::palette::shade(&crate::palette::BONE, 0.95)
+                } else {
+                    ui::theme::accent().with_alpha(0.85)
+                }),
+                ChildOf(follow_button),
             ));
         }
     }
