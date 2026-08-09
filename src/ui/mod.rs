@@ -54,6 +54,9 @@ impl Plugin for UiPlugin {
                     show_notices.run_if(in_state(crate::GameState::Playing)),
                     keep_the_prayer_shelf.run_if(in_state(crate::GameState::Playing)),
                     set_askings_aside.run_if(in_state(crate::GameState::Playing)),
+                    // The frosted glass and the standing-down shelves: one
+                    // subject - the book owning the screen.
+                    (frost_the_world, hud_stands_down),
                     age_toasts,
                     style_buttons,
                     drag_windows,
@@ -133,6 +136,7 @@ fn update_date_card(
     state: Res<State<crate::GameState>>,
     clock: Option<Res<crate::calendar::WorldClock>>,
     debug: Option<Res<crate::debug::DebugState>>,
+    books: Query<&Visibility, (With<crate::debug::village::VillagePanel>, Without<DateCard>)>,
     mut card: Query<&mut Visibility, With<DateCard>>,
     mut big: Query<&mut Text, (With<DateBig>, Without<DateSmall>)>,
     mut small: Query<&mut Text, (With<DateSmall>, Without<DateBig>)>,
@@ -144,8 +148,12 @@ fn update_date_card(
     *since = 0.0;
     // The F1 instrument panel owns this corner while it is up, and it
     // carries the date already.
-    let playing =
-        *state.get() == crate::GameState::Playing && !debug.is_some_and(|d| d.hud_visible);
+    let book_open = books.iter().any(|v| *v != Visibility::Hidden);
+    let playing = *state.get() == crate::GameState::Playing
+        && !debug.is_some_and(|d| d.hud_visible)
+        // The book's footer carries the date while it is open; the card
+        // over the rail was two clocks fighting for one corner.
+        && !book_open;
     for mut visibility in &mut card {
         *visibility = if playing {
             Visibility::Visible
@@ -287,6 +295,9 @@ fn speak(
                     until: time.elapsed_secs() + 4.5,
                     lift: if say.thought { 26.0 } else { 8.0 },
                 },
+                // The stand-down covers bubbles with the rest of the HUD:
+                // a word said under an open book plays to the frost.
+                GameHud,
                 // Under all interface chrome: a window dragged over a bubble
                 // must cover it. Ordo's own rung for world-anchored things.
                 ordo::Layer::World,
@@ -529,7 +540,7 @@ impl Notice {
 
 /// The bottom-right column toasts stack into, newest at the bottom.
 #[derive(Component)]
-struct ToastShelf;
+pub(crate) struct ToastShelf;
 
 /// One visible notice, counting down to its exit.
 #[derive(Component)]
@@ -551,7 +562,7 @@ const TOAST_CAP: usize = 6;
 /// — 2px pink, softly rounded — and pressing one flies to the asker, the
 /// same press the codex board answers to.
 #[derive(Component)]
-struct PrayerShelf;
+pub(crate) struct PrayerShelf;
 
 /// Askings the god has set aside: right-pressed off the shelf. The prayer
 /// itself runs on — the codex board still shows it, hope still fades, the
@@ -621,12 +632,14 @@ fn keep_the_prayer_shelf(
     mut last_look: Local<f32>,
     mut fingerprint: Local<u64>,
     mut aside: ResMut<SetAside>,
+    portraits: Res<crate::debug::portrait::Portraits>,
     shelf: Query<Entity, With<PrayerShelf>>,
     praying: Query<
         (
             Entity,
             &crate::villager::Person,
             &crate::villager::belief::Prayer,
+            Option<&crate::villager::work::Vocation>,
         ),
         (
             With<crate::villager::Villager>,
@@ -663,7 +676,7 @@ fn keep_the_prayer_shelf(
     let fresh = {
         use std::hash::{Hash, Hasher};
         let mut hasher = std::hash::DefaultHasher::new();
-        for (who, _, prayer) in open.iter().take(SHELF_CARDS) {
+        for (who, _, prayer, _) in open.iter().take(SHELF_CARDS) {
             who.to_bits().hash(&mut hasher);
             crate::debug::village::hope_band(prayer.remaining).hash(&mut hasher);
         }
@@ -691,7 +704,7 @@ fn keep_the_prayer_shelf(
         });
 
     let pink = crate::palette::shade(&crate::palette::CLOTH_PINK, 1.0);
-    for (who, person, prayer) in open.iter().take(SHELF_CARDS) {
+    for (who, person, prayer, vocation) in open.iter().take(SHELF_CARDS) {
         let card = commands
             .spawn((
                 crate::debug::village::PrayerRow(*who),
@@ -711,7 +724,57 @@ fn keep_the_prayer_shelf(
                 ChildOf(shelf),
             ))
             .id();
-        commands.spawn((body(prayer.kind.ask_line(&person.name)), ChildOf(card)));
+        // The asker's own face beside their ask — the studio's true
+        // portrait, framed in the trade's colour (or the prayer's pink
+        // for souls without a calling yet).
+        let livery = vocation
+            .map(|trade| crate::villager::attire::livery(*trade).cloth)
+            .map(|tone| crate::palette::color_at(tone.palette_index()))
+            .unwrap_or(pink);
+        let head = commands
+            .spawn((
+                Node {
+                    width: percent(100),
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: px(8),
+                    ..default()
+                },
+                ChildOf(card),
+            ))
+            .id();
+        let face = commands
+            .spawn((
+                Node {
+                    width: px(28),
+                    height: px(28),
+                    flex_shrink: 0.0,
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::all(px(4)),
+                    overflow: Overflow::clip(),
+                    ..default()
+                },
+                BackgroundColor(livery.with_alpha(0.16)),
+                BorderColor::all(livery.with_alpha(0.9)),
+                ChildOf(head),
+            ))
+            .id();
+        crate::debug::portrait::set_the_face(
+            &mut commands,
+            face,
+            &portraits,
+            *who,
+            livery.with_alpha(0.9),
+        );
+        commands.spawn((
+            body(prayer.kind.ask_line(&person.name)),
+            Node {
+                flex_grow: 1.0,
+                min_width: px(0),
+                ..default()
+            },
+            ChildOf(head),
+        ));
         if let Some(words) = &prayer.words {
             let quoted = commands
                 .spawn((dim(format!("\u{201c}{words}\u{201d}")), ChildOf(card)))
@@ -1477,6 +1540,7 @@ impl HoverHint {
 
 /// A titled, subtitled window shell with nothing inside, for callers
 /// building their own bands. `centred` opens it dead centre of the screen.
+#[allow(dead_code)] // The codex outgrew it; other panels may yet want one.
 pub fn titled_window(
     commands: &mut Commands,
     title: &str,
@@ -1490,6 +1554,7 @@ pub fn titled_window(
 /// A row splitting into an inset list rail and a framed detail pane — the
 /// People window's anatomy as a kit piece, for pages that carry their own
 /// bands above and below the split. Returns (list, detail).
+#[allow(dead_code)] // Retired by the page grid; kept for panels outside the book.
 pub fn split_row(
     commands: &mut Commands,
     parent: Entity,
@@ -2336,5 +2401,69 @@ mod tests {
         assert!(theme::panel_bg().alpha() < 1.0);
         assert!(theme::text().alpha() > 0.99);
         assert!(theme::accent().alpha() > 0.99);
+    }
+}
+
+/// The frosted glass: while the book is open, the world behind it blurs
+/// heavily — alive in motion, unreadable in detail, so nothing fights the
+/// text. Brett: "can we apply a heavy blur to the game world when the menu
+/// is open?" Done with the renderer's own depth of field, focus pulled to
+/// the god's nose and the aperture thrown wide.
+pub(crate) fn frost_the_world(
+    mut commands: Commands,
+    books: Query<&Visibility, With<crate::debug::village::VillagePanel>>,
+    cameras: Query<
+        (Entity, Has<bevy::post_process::dof::DepthOfField>),
+        With<crate::camera::GodCamera>,
+    >,
+) {
+    let reading = books.iter().any(|v| *v != Visibility::Hidden);
+    for (camera, frosted) in &cameras {
+        if reading && !frosted {
+            commands
+                .entity(camera)
+                .insert(bevy::post_process::dof::DepthOfField {
+                    mode: bevy::post_process::dof::DepthOfFieldMode::Gaussian,
+                    focal_distance: 0.05,
+                    sensor_height: 0.01866,
+                    // Thrown as wide as the lens goes: under the book the
+                    // world is pure colour and motion, nothing legible.
+                    // Brett: "crank it up a ton."
+                    aperture_f_stops: 0.008,
+                    max_circle_of_confusion_diameter: 400.0,
+                    max_depth: f32::INFINITY,
+                });
+        } else if !reading && frosted {
+            commands
+                .entity(camera)
+                .remove::<bevy::post_process::dof::DepthOfField>();
+        }
+    }
+}
+
+/// The shelves stand down while the book is open: toasts and prayer cards
+/// live on the toast layer, ABOVE the book, and a tray ghosting over the
+/// page is clutter. They return, queue intact, when the book closes.
+#[allow(clippy::type_complexity)]
+pub(crate) fn hud_stands_down(
+    books: Query<&Visibility, With<crate::debug::village::VillagePanel>>,
+    mut hud: Query<&mut Node, With<GameHud>>,
+) {
+    // The whole HUD stands down while the book is open: shelves, hotbar,
+    // belief ladder, speed apron, date card — the book owns the screen,
+    // and its footer carries what a reader still needs. Brett: "maybe all
+    // in game UI should hide when the codex opens?"
+    let reading = books.iter().any(|v| *v != Visibility::Hidden);
+    for mut node in &mut hud {
+        if reading {
+            if node.display != Display::None {
+                node.display = Display::None;
+            }
+        } else if node.display != Display::Flex {
+            // Owners with their own display rules (the prayer shelf
+            // empties itself) correct this on their next pass; a
+            // childless Flex node draws nothing in the meantime.
+            node.display = Display::Flex;
+        }
     }
 }

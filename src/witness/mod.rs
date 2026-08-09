@@ -142,6 +142,15 @@ pub enum DivineEventKind {
     /// god's — but the village does not sort its fears by author, and this
     /// is the memory a guard's post is eventually built out of.
     Mauled,
+    /// Rain called onto a point: crops drink, fires die. Deniable — rain
+    /// is weather to almost everyone, which is the miracle's cover.
+    Rained,
+    /// A pillar of light stood in the world and people walked to it.
+    Beckoned,
+    /// A stone fell OUT OF THE SKY. The sky does not do that.
+    Fell,
+    /// A shadow crossed every heart at once, and nobody can say why.
+    DoubtSown,
 }
 
 impl DivineEventKind {
@@ -167,6 +176,13 @@ impl DivineEventKind {
             // these are known only because the one it happened to walked
             // home and said so.
             DivineEventKind::Mauled => 28.0,
+            // Rain is only remarked on when the crops answer it.
+            DivineEventKind::Rained => 22.0,
+            // A pillar of light is visible from every field.
+            DivineEventKind::Beckoned => 60.0,
+            DivineEventKind::Fell => 55.0,
+            // The dread spreads mouth to mouth, which IS the miracle.
+            DivineEventKind::DoubtSown => 30.0,
         }
     }
 
@@ -186,6 +202,10 @@ impl DivineEventKind {
             DivineEventKind::Delivered => 0.04,
             DivineEventKind::Flourished => 0.03,
             DivineEventKind::Mauled => 0.85,
+            DivineEventKind::Rained => 0.04,
+            DivineEventKind::Beckoned => 0.1,
+            DivineEventKind::Fell => 0.92,
+            DivineEventKind::DoubtSown => 0.75,
         }
     }
 
@@ -214,6 +234,11 @@ impl DivineEventKind {
             // and they are the ones who will say the woods were owed
             // something.
             DivineEventKind::Mauled => 0.05,
+            // Rain is weather; a stone from a clear sky is not.
+            DivineEventKind::Rained => 0.18,
+            DivineEventKind::Beckoned => 0.88,
+            DivineEventKind::Fell => 0.55,
+            DivineEventKind::DoubtSown => 0.1,
         }
     }
 
@@ -237,7 +262,11 @@ impl DivineEventKind {
             | DivineEventKind::Thrown
             | DivineEventKind::Impact => -0.06,
             DivineEventKind::Perished | DivineEventKind::Mauled => 0.03,
-            DivineEventKind::Uprooted => 0.0,
+            DivineEventKind::Uprooted
+            | DivineEventKind::Rained
+            | DivineEventKind::Beckoned
+            | DivineEventKind::Fell
+            | DivineEventKind::DoubtSown => 0.0,
         }
     }
 
@@ -273,6 +302,10 @@ impl DivineEventKind {
             DivineEventKind::Delivered => "saw a child come safe into the world",
             DivineEventKind::Flourished => "saw the fields come in heavy",
             DivineEventKind::Mauled => "saw a wolf set upon one of their own",
+            DivineEventKind::Rained => "stood in rain that came when it was called",
+            DivineEventKind::Beckoned => "saw a pillar of light stand on the ground",
+            DivineEventKind::Fell => "saw a stone fall out of the empty sky",
+            DivineEventKind::DoubtSown => "felt a shadow cross every heart at once",
         }
     }
 
@@ -359,6 +392,24 @@ impl DivineEventKind {
                 "there are wolves in the woods and they are not afraid of us",
                 "somebody came home torn open today",
                 "it went for the throat and it nearly had it",
+            ],
+            DivineEventKind::Beckoned => &[
+                "there was a light standing on the ground like a tree of it",
+                "I walked to the light and I don't remember deciding to",
+                "the light stood there until everyone had seen it",
+            ],
+            DivineEventKind::Fell => &[
+                "a stone fell out of a clear sky",
+                "the sky threw a rock at us. the sky",
+                "there's a boulder where there wasn't one, and no hill it rolled from",
+            ],
+            DivineEventKind::DoubtSown => &[
+                "something walked through us all at once, cold",
+                "everyone went quiet at the same breath. everyone",
+            ],
+            DivineEventKind::Rained => &[
+                "the rain came the moment the fields wanted it",
+                "it rained on our rows and nowhere else, I'm telling you",
             ],
         }
     }

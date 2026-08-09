@@ -235,6 +235,7 @@ pub(crate) fn hands_glyph(commands: &mut Commands, parent: Entity, tint: Color) 
 /// The prayer mote: the turned spark that hangs over the praying, with its
 /// fall of light beneath — the mark prayers wear in the world, worn again
 /// on their page's tab.
+#[allow(dead_code)] // Waits for the rail's icon pass.
 pub(crate) fn mote_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     let c = glyph_canvas(commands, parent, 18.0);
     bar(commands, c, (6.5, 3.0, 5.0, 5.0), 45.0, tint, false);
@@ -249,6 +250,7 @@ pub(crate) fn mote_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
 }
 
 /// A scroll: a page bearing written lines.
+#[allow(dead_code)] // Waits for the rail's icon pass.
 pub(crate) fn scroll_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     let c = glyph_canvas(commands, parent, 18.0);
     bar(
@@ -265,6 +267,7 @@ pub(crate) fn scroll_glyph(commands: &mut Commands, parent: Entity, tint: Color)
 }
 
 /// Sliders: three rails, knobs at their own stations — the settings mark.
+#[allow(dead_code)] // Waits for the rail's icon pass.
 pub(crate) fn sliders_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     let c = glyph_canvas(commands, parent, 18.0);
     for (top, knob_left) in [(3.5, 11.0), (8.0, 4.5), (12.5, 8.0)] {
@@ -438,7 +441,7 @@ pub(crate) fn banner_glyph(commands: &mut Commands, parent: Entity) {
 /// between every band and column. The codex body's padding is overridden
 /// to match, and the maths stays integral: the inner well is 1120 wide,
 /// and 1120 = 3 x 366 + 2 x 11.
-const RHYTHM: f32 = 11.0;
+pub(crate) const RHYTHM: f32 = 11.0;
 
 /// The main split band's height. The plates (96) and the land strip (40)
 /// ride above and below it with the rhythm between; the sum is the page
@@ -447,54 +450,38 @@ const MAIN_BAND: f32 = 494.0;
 
 /// Every page's full height: the ledger's bands sum to it (96 + 5 + 501 +
 /// 5 + 45), and the people page is pinned to it directly.
+#[allow(dead_code)] // The old fixed-window rhythm; pages fill the book now.
 const PAGE_BAND: f32 = 652.0;
 
 pub(crate) fn spawn_village_panel(mut commands: Commands) {
-    let window = ui::titled_window(
-        &mut commands,
-        "THE LEDGER",
-        Some("The heart of a living world."),
-        1160.0,
-        // Dead centre, both axes, and it stays there: the codex is the one
-        // grand window, not a floating panel to be shuffled about.
-        true,
-    );
-    commands.entity(window.title_bar).remove::<ui::DragHandle>();
-    commands.entity(window.root).insert((
-        Name::new("Codex Panel"),
-        VillagePanel,
-        Visibility::Hidden,
-        Node {
-            width: px(1160),
-            flex_direction: FlexDirection::Column,
-            padding: px(5).into(),
-            border: UiRect::all(px(2)),
-            border_radius: BorderRadius::all(px(0)),
-            ..default()
-        },
-    ));
-    // The body breathes in the page's own rhythm on every side.
-    commands.entity(window.body).insert(Node {
-        width: percent(100),
-        flex_direction: FlexDirection::Column,
-        row_gap: px(RHYTHM),
-        padding: px(RHYTHM).into(),
-        ..default()
-    });
+    // The Illuminated Ledger: no longer a floating panel with dead space
+    // around it, but the whole screen — Ordo's book, chapters down the
+    // left, the world running live and dimmed behind the page. Brett:
+    // "the codex should be full screen, since the area around the current
+    // panel is unused space."
+    let book = ordo::book(&mut commands, "THE LEDGER", "The heart of a living world.");
+    commands
+        .entity(book.root)
+        .insert((Name::new("Codex Panel"), VillagePanel, Visibility::Hidden));
 
-    // The pages, as siblings in the body: exactly one shows at a time, and
-    // every page's bands sum to the same height, so the book never changes
-    // shape when a page turns.
+    // The pages, as siblings in the book's content: exactly one shows at
+    // a time, each owning the whole reading surface.
     let ledger_page = commands
         .spawn((
             Node {
                 width: percent(100),
+                flex_grow: 1.0,
+                min_height: px(0),
                 flex_direction: FlexDirection::Column,
                 row_gap: px(RHYTHM),
+                overflow: Overflow::scroll_y(),
                 ..default()
             },
+            ui::Scrollable,
+            bevy::ui::ScrollPosition::default(),
+            Interaction::default(),
             Visibility::Inherited,
-            ChildOf(window.body),
+            ChildOf(book.content),
         ))
         .id();
     let mut bound_page = || {
@@ -502,15 +489,19 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
             .spawn((
                 Node {
                     width: percent(100),
-                    height: px(PAGE_BAND),
-                    flex_shrink: 0.0,
+                    flex_grow: 1.0,
+                    min_height: px(0),
                     flex_direction: FlexDirection::Column,
                     row_gap: px(ui::theme::GAP),
+                    overflow: Overflow::scroll_y(),
                     display: Display::None,
                     ..default()
                 },
+                ui::Scrollable,
+                bevy::ui::ScrollPosition::default(),
+                Interaction::default(),
                 Visibility::Hidden,
-                ChildOf(window.body),
+                ChildOf(book.content),
             ))
             .id()
     };
@@ -521,111 +512,144 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
     let world_page = bound_page();
     let settings_page = bound_page();
 
-    // The codex strip: five pages, two residents. Dark tabs are pages still
-    // being written.
-    let strip = commands
-        .spawn(Node {
-            position_type: PositionType::Absolute,
-            left: px(0),
-            right: px(0),
-            top: px(0),
-            bottom: px(0),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            column_gap: px(6),
-            ..default()
-        })
+    // The chapters, down the rail: the book's own table of contents.
+    let chapter = |commands: &mut Commands,
+                   label: &str,
+                   page: CodexPage,
+                   hint_title: &str,
+                   hint_line: &str|
+     -> Entity {
+        let button = ordo::chapter(commands, book.rail, label);
+        commands
+            .entity(button)
+            .insert((CodexTab(page), ui::HoverHint::new(hint_title, hint_line)));
+        button
+    };
+    let ledger_tab = chapter(
+        &mut commands,
+        "THE TOWNS",
+        CodexPage::Ledger,
+        "The Towns",
+        "the heart of a living world",
+    );
+    let people_tab = chapter(
+        &mut commands,
+        "THE PEOPLE",
+        CodexPage::People,
+        "The People",
+        "the mortals of your world",
+    );
+    let deity_tab = chapter(
+        &mut commands,
+        "THE MIRACLES",
+        CodexPage::Deity,
+        "The Miracles",
+        "you are the unseen; they are the faithful",
+    );
+    let prayers_tab = chapter(
+        &mut commands,
+        "THE PRAYERS",
+        CodexPage::Prayers,
+        "The Prayers",
+        "what the faithful ask of you",
+    );
+    let chronicle_tab = chapter(
+        &mut commands,
+        "THE CHRONICLE",
+        CodexPage::Chronicle,
+        "The Chronicle",
+        "the tale of your people, written moment by moment",
+    );
+    let world_tab = chapter(
+        &mut commands,
+        "THE WORLD",
+        CodexPage::World,
+        "The World",
+        "the lands your people walk; the seasons turn",
+    );
+    let settings_tab = chapter(
+        &mut commands,
+        "SETTINGS",
+        CodexPage::Settings,
+        "The Settings",
+        "the god's own preferences",
+    );
+
+    // The world's pulse, docked in the footer: the same speed buttons the
+    // apron wears (one system serves every copy), and the book's close.
+    let footer_note = commands
+        .spawn((
+            ui::dim("the world turns while you read"),
+            ChildOf(book.footer),
+        ))
         .id();
-    commands
-        .entity(window.title_bar)
-        .insert_children(1, &[strip]);
-    let tab = |commands: &mut Commands, active: bool, interactive: bool| -> Entity {
-        let mut button = commands.spawn((
+    let _ = footer_note;
+    for (speed, label) in [
+        (None, "II"),
+        (Some(1.0), "1x"),
+        (Some(2.0), "2x"),
+        (Some(4.0), "4x"),
+        (Some(8.0), "8x"),
+    ] {
+        let button = commands
+            .spawn((
+                crate::speed::SpeedButton(speed),
+                ui::UiButton,
+                Node {
+                    width: px(30),
+                    height: px(24),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::all(px(5)),
+                    ..default()
+                },
+                BackgroundColor(ui::theme::panel_bg().with_alpha(0.4)),
+                BorderColor::all(ui::theme::panel_border()),
+                Interaction::default(),
+                ChildOf(book.footer),
+            ))
+            .id();
+        commands.spawn((ui::dim(label), ChildOf(button)));
+    }
+    let date = commands
+        .spawn((
+            FooterDate,
+            ui::dim(""),
             Node {
-                width: px(54),
-                height: px(40),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(0)),
+                margin: UiRect::left(px(10)),
                 ..default()
             },
-            BackgroundColor(if active {
-                ui::theme::panel_bg()
-            } else {
-                Color::BLACK.with_alpha(0.18)
-            }),
-            BorderColor::all(if active {
-                ui::theme::accent().with_alpha(0.85)
-            } else {
-                ui::theme::panel_border().with_alpha(0.4)
-            }),
-            ChildOf(strip),
-        ));
-        if interactive {
-            button.insert(Interaction::default());
-        }
-        button.id()
-    };
-    let ink = ui::theme::accent();
+            ChildOf(book.footer),
+        ))
+        .id();
+    let _ = date;
+    let close = commands
+        .spawn((
+            CodexClose,
+            ui::UiButton,
+            Interaction::default(),
+            Node {
+                margin: UiRect::left(auto()),
+                padding: UiRect::axes(px(12), px(4)),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(3)),
+                ..default()
+            },
+            BackgroundColor(ui::theme::panel_bg().with_alpha(0.4)),
+            BorderColor::all(ui::theme::panel_border()),
+            ui::HoverHint::new("Close", "or press the codex key"),
+            ChildOf(book.footer),
+        ))
+        .id();
+    commands.spawn((ui::dim("CLOSE"), ChildOf(close)));
 
-    let ledger_tab = tab(&mut commands, true, true);
-    house_glyph(&mut commands, ledger_tab, ink);
-    commands.entity(ledger_tab).insert((
-        CodexTab(CodexPage::Ledger),
-        ui::HoverHint::new("The Ledger", "the heart of a living world"),
-    ));
-
-    let deity_tab = tab(&mut commands, false, true);
-    hands_glyph(&mut commands, deity_tab, ink.with_alpha(0.8));
-    commands.entity(deity_tab).insert((
-        CodexTab(CodexPage::Deity),
-        ui::HoverHint::new("The Deity", "you are the unseen; they are the faithful"),
-    ));
-
-    let prayers_tab = tab(&mut commands, false, true);
-    mote_glyph(&mut commands, prayers_tab, ink.with_alpha(0.8));
-    commands.entity(prayers_tab).insert((
-        CodexTab(CodexPage::Prayers),
-        ui::HoverHint::new("The Prayers", "what the faithful ask of you"),
-    ));
-
-    let world_tab = tab(&mut commands, false, true);
-    tree_glyph(&mut commands, world_tab, ink.with_alpha(0.8));
-    commands.entity(world_tab).insert((
-        CodexTab(CodexPage::World),
-        ui::HoverHint::new("The World", "the lands your people walk; the seasons turn"),
-    ));
-
-    let people_tab = tab(&mut commands, false, true);
-    people_glyph(&mut commands, people_tab, ink.with_alpha(0.8));
-    commands.entity(people_tab).insert((
-        CodexTab(CodexPage::People),
-        ui::HoverHint::new("The People", "the mortals of your world"),
-    ));
-
-    let chronicle_tab = tab(&mut commands, false, true);
-    scroll_glyph(&mut commands, chronicle_tab, ink.with_alpha(0.8));
-    commands.entity(chronicle_tab).insert((
-        CodexTab(CodexPage::Chronicle),
-        ui::HoverHint::new(
-            "The Chronicle",
-            "the tale of your people, written moment by moment",
-        ),
-    ));
-
-    let settings_tab = tab(&mut commands, false, true);
-    sliders_glyph(&mut commands, settings_tab, ink.with_alpha(0.8));
-    commands.entity(settings_tab).insert((
-        CodexTab(CodexPage::Settings),
-        ui::HoverHint::new("The Settings", "the god's own preferences"),
-    ));
     build_settings_page(&mut commands, settings_page);
     build_prayers_page(&mut commands, prayers_page);
 
     commands.insert_resource(Codex {
         page: CodexPage::Ledger,
-        root: window.root,
+        root: book.root,
         settings_page,
         settings_tab,
         ledger_page,
@@ -640,8 +664,8 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         deity_tab,
         prayers_tab,
         world_tab,
-        title_text: window.title_text,
-        subtitle_text: window.subtitle_text,
+        title_text: book.title,
+        subtitle_text: Some(book.subtitle),
     });
 
     // ---- Band one: the three great numbers. -------------------------------
@@ -674,17 +698,50 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         .spawn((
             Node {
                 width: percent(100),
-                height: px(MAIN_BAND),
-                flex_shrink: 0.0,
+                flex_grow: 1.0,
+                min_height: px(MAIN_BAND),
                 flex_direction: FlexDirection::Column,
                 ..default()
             },
             ChildOf(ledger_page),
         ))
         .id();
-    // One integral geometry, shared with the plates row: the rail IS a
-    // plate's width, and every seam lands on the same whole pixel.
-    let (rail, detail) = ui::split_row(&mut commands, main, 366.0, RHYTHM);
+    // The page grid: the same three tracts the plates rule above. The
+    // rail takes column one, the reading takes columns two and three, and
+    // every seam lands under a plate's edge. Brett: "If everything fit
+    // these three column widths then everything would always align."
+    let band = commands.spawn((ordo::grid_row(RHYTHM), ChildOf(main))).id();
+    commands
+        .entity(band)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.flex_grow = 1.0;
+            node.min_height = px(0);
+        });
+    let rail = commands.spawn((ordo::col(1, RHYTHM), ChildOf(band))).id();
+    commands
+        .entity(rail)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.row_gap = px(RHYTHM);
+            // Vertical breathing only: horizontal padding would inset
+            // every card off the tract edge, and the rule of three reads
+            // by the VISIBLE boxes, not the invisible columns.
+            node.padding = UiRect::axes(px(0), px(8));
+            node.border = UiRect::all(px(1));
+            node.min_height = px(0);
+        });
+    commands.entity(rail).insert((
+        BackgroundColor(Color::BLACK.with_alpha(0.32)),
+        BorderColor::all(ui::theme::panel_border().with_alpha(0.35)),
+    ));
+    let detail = commands.spawn((ordo::col(2, RHYTHM), ChildOf(band))).id();
+    commands
+        .entity(detail)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.min_height = px(0);
+        });
 
     // The rail: OVERVIEW lists the villages of this world (one banner so
     // far, honestly); FAITH ranks every soul by their trust.
@@ -1055,9 +1112,51 @@ pub(crate) fn dress_ledger_banner(
 }
 
 /// Pressing a live tab turns the codex to that page.
+/// The book's own close, docked in the footer.
+#[derive(Component)]
+pub(crate) struct CodexClose;
+
+/// The date, spoken in the footer while the book covers the world's card.
+#[derive(Component)]
+pub(crate) struct FooterDate;
+
+/// Keeps the footer's date true while the book is open.
+pub(crate) fn footer_date(
+    time: Res<Time>,
+    mut since: Local<f32>,
+    clock: Option<Res<crate::calendar::WorldClock>>,
+    panels: Query<&Visibility, With<VillagePanel>>,
+    mut dates: Query<&mut Text, With<FooterDate>>,
+) {
+    if !panels.iter().any(|v| *v != Visibility::Hidden) {
+        return;
+    }
+    *since += time.delta_secs();
+    if *since < 0.5 {
+        return;
+    }
+    *since = 0.0;
+    let Some(clock) = clock else {
+        return;
+    };
+    let season = clock.season().name().to_uppercase();
+    let fresh = format!(
+        "{season} {}  -  YEAR {}",
+        clock.day_of_season(),
+        clock.year()
+    );
+    for mut text in &mut dates {
+        if text.0 != fresh {
+            *text = Text::new(fresh.clone());
+        }
+    }
+}
+
 pub(crate) fn handle_codex_tabs(
     tabs: Query<(&Interaction, &CodexTab), Changed<Interaction>>,
+    closes: Query<&Interaction, (With<CodexClose>, Changed<Interaction>)>,
     codex: Option<ResMut<Codex>>,
+    mut panels: Query<&mut Visibility, With<VillagePanel>>,
 ) {
     let Some(mut codex) = codex else {
         return;
@@ -1065,6 +1164,13 @@ pub(crate) fn handle_codex_tabs(
     for (interaction, tab) in &tabs {
         if *interaction == Interaction::Pressed && codex.page != tab.0 {
             codex.page = tab.0;
+        }
+    }
+    for interaction in &closes {
+        if *interaction == Interaction::Pressed {
+            for mut panel in &mut panels {
+                *panel = Visibility::Hidden;
+            }
         }
     }
 }
@@ -1137,19 +1243,21 @@ pub(crate) fn apply_codex_page(
         (codex.prayers_tab, codex.page == CodexPage::Prayers),
         (codex.world_tab, codex.page == CodexPage::World),
     ];
+    // The open chapter is unmistakable: a filled gold band in the rail.
+    // Everything else waits quietly with no box at all until hovered.
     for (tab, open) in tabs {
         if let Ok(mut fill) = fills.get_mut(tab) {
             fill.0 = if open {
-                ui::theme::panel_bg()
+                ui::theme::accent().with_alpha(0.24)
             } else {
-                Color::BLACK.with_alpha(0.18)
+                Color::NONE
             };
         }
         if let Ok(mut border) = borders.get_mut(tab) {
             *border = BorderColor::all(if open {
-                ui::theme::accent().with_alpha(0.85)
+                ui::theme::accent()
             } else {
-                ui::theme::panel_border().with_alpha(0.4)
+                Color::NONE
             });
         }
     }
@@ -1528,10 +1636,10 @@ pub(crate) fn update_ledger_details(
 /// missed the god panel building its home at runtime, and the two crushed
 /// each other.
 fn build_prayers_page(commands: &mut Commands, page: Entity) {
-    let board = ui::card_well(commands, page, "PRAYERS OF THE FAITHFUL");
+    let leaf = ordo::page(commands, page, RHYTHM);
     commands.spawn((
         ui::dim("press a prayer to fly to whoever is asking"),
-        ChildOf(board),
+        ChildOf(leaf.header),
     ));
     commands.spawn((
         PrayerRows,
@@ -1540,19 +1648,19 @@ fn build_prayers_page(commands: &mut Commands, page: Entity) {
             flex_grow: 1.0,
             min_height: px(0),
             flex_direction: FlexDirection::Column,
-            row_gap: px(4),
+            row_gap: px(RHYTHM),
             overflow: Overflow::scroll_y(),
             ..default()
         },
         ui::Scrollable,
         ScrollPosition::DEFAULT,
         Interaction::default(),
-        ChildOf(board),
+        ChildOf(leaf.body),
     ));
 
     // The receipts, in a short fixed band under the board: answered,
     // unanswered, and the dark third kind.
-    let lately = ui::card_well(commands, page, "LATELY");
+    let lately = ui::card_well(commands, leaf.footer, "LATELY");
     commands.entity(lately).insert(Node {
         width: percent(100),
         height: px(168),
@@ -1609,9 +1717,15 @@ pub(crate) fn update_prayer_board(
     panels: Query<&Visibility, With<VillagePanel>>,
     boards: Query<Entity, With<PrayerRows>>,
     histories: Query<Entity, With<PrayerHistoryRows>>,
+    portraits: Res<super::portrait::Portraits>,
     ledger: Res<crate::villager::belief::PrayerLedger>,
     praying: Query<
-        (Entity, &Person, &crate::villager::belief::Prayer),
+        (
+            Entity,
+            &Person,
+            &crate::villager::belief::Prayer,
+            Option<&crate::villager::work::Vocation>,
+        ),
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
 ) {
@@ -1639,7 +1753,7 @@ pub(crate) fn update_prayer_board(
     let fresh = {
         use std::hash::{Hash, Hasher};
         let mut hasher = std::hash::DefaultHasher::new();
-        for (entity, _, prayer) in &open {
+        for (entity, _, prayer, _) in &open {
             entity.to_bits().hash(&mut hasher);
             hope_band(prayer.remaining).hash(&mut hasher);
         }
@@ -1656,49 +1770,164 @@ pub(crate) fn update_prayer_board(
     if open.is_empty() {
         commands.spawn((ui::dim("nobody is asking anything of you"), ChildOf(board)));
     }
-    for (who, person, prayer) in &open {
-        let row = commands
-            .spawn((
-                PrayerRow(*who),
-                Interaction::default(),
-                ui::HoverHint::new(&person.name, "press to fly to them"),
-                Node {
-                    width: percent(100),
-                    flex_direction: FlexDirection::Column,
-                    row_gap: px(1),
-                    padding: UiRect::axes(px(8), px(5)),
-                    border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(px(0)),
-                    flex_shrink: 0.0,
-                    ..default()
-                },
-                BackgroundColor(Color::BLACK.with_alpha(0.16)),
-                BorderColor::all(pink.with_alpha(0.35)),
-                ChildOf(board),
-            ))
+    // Three prayers to a row, on the page grid: every card's edges land
+    // on the same three verticals as every other chapter's. Brett: "the
+    // prayers can be more polished with the name of the person, their
+    // portrait and the prayer and stuff better laid out."
+    for third in open.chunks(3) {
+        let grid_line = commands
+            .spawn((ordo::grid_row(RHYTHM), ChildOf(board)))
             .id();
-        let top = commands
-            .spawn((
-                Node {
-                    width: percent(100),
-                    flex_direction: FlexDirection::Row,
-                    justify_content: JustifyContent::SpaceBetween,
-                    align_items: AlignItems::Baseline,
-                    ..default()
-                },
-                ChildOf(row),
-            ))
-            .id();
-        let ask = prayer.kind.ask_line(&person.name);
-        commands.spawn((ui::body(ask), ChildOf(top)));
-        commands.spawn((ui::dim(hope_band(prayer.remaining)), ChildOf(top)));
-        if let Some(words) = &prayer.words {
-            let quoted = commands
-                .spawn((ui::dim(format!("\u{201c}{words}\u{201d}")), ChildOf(row)))
+        commands
+            .entity(grid_line)
+            .entry::<Node>()
+            .and_modify(|mut node| {
+                node.flex_shrink = 0.0;
+            });
+        for (who, person, prayer, vocation) in third {
+            let card = commands
+                .spawn((
+                    PrayerRow(*who),
+                    ordo::col(1, RHYTHM),
+                    Interaction::default(),
+                    ui::HoverHint::new(&person.name, "press to fly to them"),
+                    BackgroundColor(Color::BLACK.with_alpha(0.32)),
+                    BorderColor::all(pink.with_alpha(0.55)),
+                    ChildOf(grid_line),
+                ))
                 .id();
             commands
-                .entity(quoted)
-                .insert(TextColor(pink.with_alpha(0.75)));
+                .entity(card)
+                .entry::<Node>()
+                .and_modify(|mut node| {
+                    node.row_gap = px(6);
+                    node.padding = UiRect::all(px(10));
+                    node.border = UiRect::all(px(2));
+                    node.border_radius = BorderRadius::all(px(8));
+                });
+
+            // The head: the TRUE portrait in a frame of their trade's own
+            // colour, the name beside it, hope in the corner. The studio's
+            // stand-in bust holds the frame until their sitting comes up.
+            let head = commands
+                .spawn((
+                    Node {
+                        width: percent(100),
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: px(8),
+                        ..default()
+                    },
+                    ChildOf(card),
+                ))
+                .id();
+            let livery = vocation
+                .map(|trade| crate::villager::attire::livery(*trade).cloth)
+                .map(|tone| crate::palette::color_at(tone.palette_index()))
+                .unwrap_or_else(ui::theme::text_dim);
+            let bust = commands
+                .spawn((
+                    Node {
+                        width: px(34),
+                        height: px(34),
+                        flex_shrink: 0.0,
+                        border: UiRect::all(px(1)),
+                        border_radius: BorderRadius::all(px(4)),
+                        overflow: Overflow::clip(),
+                        ..default()
+                    },
+                    BackgroundColor(livery.with_alpha(0.16)),
+                    BorderColor::all(livery.with_alpha(0.9)),
+                    ChildOf(head),
+                ))
+                .id();
+            super::portrait::set_the_face(
+                &mut commands,
+                bust,
+                &portraits,
+                *who,
+                livery.with_alpha(0.9),
+            );
+            let names = commands
+                .spawn((
+                    Node {
+                        flex_grow: 1.0,
+                        flex_direction: FlexDirection::Column,
+                        ..default()
+                    },
+                    ChildOf(head),
+                ))
+                .id();
+            commands.spawn((ui::body(person.name.clone()), ChildOf(names)));
+            commands.spawn((
+                ui::dim(
+                    vocation
+                        .map(|trade| trade.describe().to_string())
+                        .unwrap_or_else(|| "of the village".to_string()),
+                ),
+                ChildOf(names),
+            ));
+            commands.spawn((ui::dim(hope_band(prayer.remaining)), ChildOf(head)));
+
+            // The asking, and their own words under it.
+            commands.spawn((ui::body(prayer.kind.ask_line(&person.name)), ChildOf(card)));
+            if let Some(words) = &prayer.words {
+                let quoted = commands
+                    .spawn((ui::dim(format!("\u{201c}{words}\u{201d}")), ChildOf(card)))
+                    .id();
+                commands
+                    .entity(quoted)
+                    .insert(TextColor(pink.with_alpha(0.8)));
+            }
+
+            // The kind, sealed in its own colour at the card's foot.
+            let (kind_word, kind_color) = match &prayer.kind {
+                crate::villager::belief::PrayerKind::Food => ("BREAD", ui::theme::accent()),
+                crate::villager::belief::PrayerKind::Dark { .. } => (
+                    "WRATH",
+                    crate::palette::shade(&crate::palette::CLOTH_WINE, 0.8),
+                ),
+                crate::villager::belief::PrayerKind::Road { .. } => (
+                    "THE ROAD",
+                    crate::palette::shade(&crate::palette::CLOTH_GOLD, 0.85),
+                ),
+                crate::villager::belief::PrayerKind::Devotion { .. } => ("DEVOTION", pink),
+            };
+            let foot = commands
+                .spawn((
+                    Node {
+                        width: percent(100),
+                        flex_direction: FlexDirection::Row,
+                        justify_content: JustifyContent::SpaceBetween,
+                        align_items: AlignItems::Center,
+                        margin: UiRect::top(auto()),
+                        ..default()
+                    },
+                    ChildOf(card),
+                ))
+                .id();
+            let seal = commands
+                .spawn((
+                    Node {
+                        padding: UiRect::axes(px(7), px(2)),
+                        border: UiRect::all(px(1)),
+                        border_radius: BorderRadius::all(px(999)),
+                        ..default()
+                    },
+                    BackgroundColor(kind_color.with_alpha(0.14)),
+                    BorderColor::all(kind_color.with_alpha(0.85)),
+                    ChildOf(foot),
+                ))
+                .id();
+            let seal_word = commands.spawn((ui::dim(kind_word), ChildOf(seal))).id();
+            commands
+                .entity(seal_word)
+                .insert(TextColor(kind_color.with_alpha(0.95)));
+            commands.spawn((ui::dim("press to fly"), ChildOf(foot)));
+        }
+        // Empty tracts hold the seams where cards are missing.
+        for _ in third.len()..3 {
+            commands.spawn((ordo::col(1, RHYTHM), ChildOf(grid_line)));
         }
     }
 

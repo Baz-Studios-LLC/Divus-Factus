@@ -95,6 +95,10 @@ struct PersonSave {
     /// feeders warm them back up within a day.
     #[serde(default)]
     bonds: Vec<(usize, f32)>,
+    /// Whether this soul wears the mayor's chain. Absent in saves from
+    /// before the office existed; such towns elect within the day.
+    #[serde(default)]
+    mayor: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -500,6 +504,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
             Option<Entity>,
             u32,
             Vec<(Entity, f32)>,
+            bool,
         ),
     )> = Vec::new();
     for (entity, transform, person, genome, needs, morale, temperament, witnessed, extras, ties) in
@@ -529,12 +534,13 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                     Option<&crate::villager::home::Home>,
                     Option<&crate::villager::Motherhood>,
                     Option<&crate::villager::regard::Regard>,
+                    Has<crate::villager::civic::Mayor>,
                 ),
             ), (With<Villager>, Without<Corpse>)>()
             .iter(world)
     {
         let (faith, traits, chronicle, vocation, skills, vitality, prime, childhood) = extras;
-        let (spouse, parentage, home, motherhood, regard) = ties;
+        let (spouse, parentage, home, motherhood, regard, mayor) = ties;
         people_ids.push(entity);
         raw.push((
             entity,
@@ -566,6 +572,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                 regard.map_or_else(Vec::new, |r| {
                     r.bonds.iter().map(|b| (b.toward, b.warmth)).collect()
                 }),
+                mayor,
             ),
         ));
     }
@@ -590,7 +597,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                 harm,
                 prime,
                 childhood,
-                (spouse, parents, home, borne, bonds),
+                (spouse, parents, home, borne, bonds, mayor),
             )| {
                 PersonSave {
                     pos,
@@ -620,6 +627,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                         .into_iter()
                         .filter_map(|(e, w)| index_of(e, &people_ids).map(|i| (i, w)))
                         .collect(),
+                    mayor,
                 }
             },
         )
@@ -1171,6 +1179,9 @@ fn apply(world: &mut World, save: SaveGame) {
                 Activity::Idle,
                 MemberOf(settlement_entity),
             ));
+            if p.mayor {
+                e.insert(crate::villager::civic::Mayor(settlement_entity));
+            }
             if let Some(faith) = &p.faith {
                 e.insert(faith.clone());
             }

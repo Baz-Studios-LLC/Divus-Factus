@@ -8,6 +8,7 @@
 
 pub mod attire;
 pub mod belief;
+pub mod civic;
 pub mod colony;
 pub mod explore;
 pub mod home;
@@ -177,6 +178,9 @@ impl Plugin for VillagerPlugin {
             // Likewise unordered: the trades dress whoever took up a
             // calling this frame, whenever in the frame that happened.
             .add_systems(Update, attire::dress_for_work)
+            // Civic life: the ballot and the decree, neither ordered
+            // against anything - a mayor chosen a frame late is chosen.
+            .add_systems(Update, (civic::hold_elections, civic::set_the_agenda))
             .add_systems(
                 Update,
                 name_the_god.run_if(not(resource_exists::<DivineName>)),
@@ -2535,10 +2539,16 @@ fn chronicle_divine_touch(
             crate::witness::DivineEventKind::Quaked => "was thrown down when the earth buckled",
             crate::witness::DivineEventKind::Mauled => "was set upon by a wolf, and got home",
             // The worldly turns write their own chronicle lines at their own
-            // sites (the death, the birth, the harvest); nothing to add here.
+            // sites (the death, the birth, the harvest); nothing to add here
+            // - and the placeless wonders (rain, the beacon, the falling
+            // stone, the sown doubt) have no single subject to write for.
             crate::witness::DivineEventKind::Perished
             | crate::witness::DivineEventKind::Delivered
-            | crate::witness::DivineEventKind::Flourished => continue,
+            | crate::witness::DivineEventKind::Flourished
+            | crate::witness::DivineEventKind::Rained
+            | crate::witness::DivineEventKind::Beckoned
+            | crate::witness::DivineEventKind::Fell
+            | crate::witness::DivineEventKind::DoubtSown => continue,
         };
         chronicle.record(clock.day(), text);
     }

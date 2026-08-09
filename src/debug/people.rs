@@ -14,6 +14,132 @@ pub(crate) struct PeoplePanel;
 #[derive(Component)]
 pub(crate) struct PeopleRows;
 
+/// Which of the masthead's great numbers a plate shows.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PulseKind {
+    Souls,
+    Believers,
+    Hungry,
+    Roofless,
+}
+
+/// A masthead numeral to keep current.
+#[derive(Component)]
+pub(crate) struct PulsePlate(pub PulseKind);
+
+/// A trade chip (the pressable pill) and its live count.
+#[derive(Component)]
+pub(crate) struct TradeChip(pub crate::villager::work::Vocation);
+
+#[derive(Component)]
+pub(crate) struct TradeChipCount(pub crate::villager::work::Vocation);
+
+/// The roster narrowed to one calling, when a chip is pressed.
+#[derive(Resource, Default)]
+pub(crate) struct RosterFilter(pub Option<crate::villager::work::Vocation>);
+
+/// Every calling the masthead wears, in the order the eye scans.
+const TRADE_CHIPS: [crate::villager::work::Vocation; 12] = {
+    use crate::villager::work::Vocation::*;
+    [
+        Gatherer, Fisher, Hunter, Farmer, Forester, Miner, Builder, Cook, Healer, Priest, Explorer,
+        Guard,
+    ]
+};
+
+/// Keeps the masthead honest: the plates, the chip counts, and the chip
+/// dress (the pressed filter burns brighter).
+#[allow(clippy::type_complexity)]
+pub(crate) fn people_pulse(
+    time: Res<Time>,
+    mut since: Local<f32>,
+    filter: Res<RosterFilter>,
+    panels: Query<&Visibility, With<PeoplePanel>>,
+    mut plates: Query<(&PulsePlate, &mut Text)>,
+    mut counts: Query<(&TradeChipCount, &mut Text), Without<PulsePlate>>,
+    mut chips: Query<(&TradeChip, &mut BackgroundColor, &mut BorderColor)>,
+    folk: Query<
+        (
+            Option<&crate::villager::work::Vocation>,
+            Option<&crate::villager::belief::Faith>,
+            &crate::villager::Needs,
+            Has<crate::villager::home::Home>,
+            Has<crate::creature::Childhood>,
+        ),
+        (With<Villager>, Without<crate::creature::Corpse>),
+    >,
+) {
+    if !panels.iter().any(|v| *v != Visibility::Hidden) {
+        return;
+    }
+    *since += time.delta_secs();
+    if *since < 0.5 {
+        return;
+    }
+    *since = 0.0;
+
+    let souls = folk.iter().count();
+    let believers = folk
+        .iter()
+        .filter(|(_, faith, ..)| faith.is_some_and(|f| f.is_believer()))
+        .count();
+    let hungry = folk
+        .iter()
+        .filter(|(_, _, needs, ..)| needs.hunger > 0.65)
+        .count();
+    let roofless = folk
+        .iter()
+        .filter(|(.., housed, child)| !housed && !child)
+        .count();
+    for (plate, mut text) in &mut plates {
+        let fresh = match plate.0 {
+            PulseKind::Souls => souls,
+            PulseKind::Believers => believers,
+            PulseKind::Hungry => hungry,
+            PulseKind::Roofless => roofless,
+        }
+        .to_string();
+        if text.0 != fresh {
+            *text = Text::new(fresh);
+        }
+    }
+    for (count, mut text) in &mut counts {
+        let n = folk
+            .iter()
+            .filter(|(vocation, ..)| *vocation == Some(&count.0))
+            .count();
+        let fresh = n.to_string();
+        if text.0 != fresh {
+            *text = Text::new(fresh);
+        }
+    }
+    for (chip, mut fill, mut edge) in &mut chips {
+        let tone = crate::villager::attire::livery(chip.0).cloth;
+        let color = crate::palette::color_at(tone.palette_index());
+        let active = filter.0 == Some(chip.0);
+        fill.0 = color.with_alpha(if active { 0.38 } else { 0.13 });
+        *edge = BorderColor::all(color.with_alpha(if active { 1.0 } else { 0.8 }));
+    }
+}
+
+/// A pressed chip narrows the roster to its calling; pressed again, it
+/// lets everyone back in.
+pub(crate) fn filter_by_chip(
+    mut filter: ResMut<RosterFilter>,
+    chips: Query<(&Interaction, &TradeChip), Changed<Interaction>>,
+) {
+    for (interaction, chip) in &chips {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        filter.0 = if filter.0 == Some(chip.0) {
+            None
+        } else {
+            Some(chip.0)
+        };
+    }
+}
+
 /// One roster row, pointing at its person.
 #[derive(Component)]
 pub(crate) struct PersonRow(Entity);
@@ -135,23 +261,113 @@ pub(crate) fn spawn_people_panel(
     commands
         .entity(page)
         .insert((Name::new("People Page"), PeoplePanel));
-    let (list, detail) = ui::split_row(&mut commands, page, 320.0, ui::theme::PAD);
+
+    // The hall's masthead: the numbers a god reaches for first, then every
+    // trade as a chip in its own livery with a live count. Brett: "If I
+    // want to know how many people are hunters that information needs to
+    // be readily available." Press a chip and the roster below narrows to
+    // that calling; press it again and everyone returns.
+    let leaf = ordo::page(&mut commands, page, 11.0);
+    let masthead = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                flex_shrink: 0.0,
+                flex_direction: FlexDirection::Column,
+                row_gap: px(8),
+                ..default()
+            },
+            ChildOf(leaf.header),
+        ))
+        .id();
+    let plates_row = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                flex_direction: FlexDirection::Row,
+                column_gap: px(8),
+                ..default()
+            },
+            ChildOf(masthead),
+        ))
+        .id();
+    for (kind, label) in [
+        (PulseKind::Souls, "SOULS"),
+        (PulseKind::Believers, "BELIEVERS"),
+        (PulseKind::Hungry, "HUNGRY"),
+        (PulseKind::Roofless, "ROOFLESS"),
+    ] {
+        let value = ordo::plate(&mut commands, plates_row, label);
+        commands.entity(value).insert(PulsePlate(kind));
+    }
+    let chips_row = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                flex_direction: FlexDirection::Row,
+                flex_wrap: FlexWrap::Wrap,
+                column_gap: px(6),
+                row_gap: px(6),
+                ..default()
+            },
+            ChildOf(masthead),
+        ))
+        .id();
+    for vocation in TRADE_CHIPS {
+        let tone = crate::villager::attire::livery(vocation).cloth;
+        let color = crate::palette::color_at(tone.palette_index());
+        let chip = ordo::chip(&mut commands, chips_row, vocation.describe(), color);
+        commands.entity(chip.root).insert((
+            TradeChip(vocation),
+            ui::UiButton,
+            ui::HoverHint::new(vocation.describe(), "press to see only this calling"),
+        ));
+        commands.entity(chip.value).insert(TradeChipCount(vocation));
+    }
+
+    // The page grid: the roster takes tract one, the dossier tracts two
+    // and three — the same three verticals as every other chapter.
+    let band = commands
+        .spawn((ordo::grid_row(11.0), ChildOf(leaf.body)))
+        .id();
+    commands
+        .entity(band)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.flex_grow = 1.0;
+            node.min_height = px(0);
+        });
+    let list = commands.spawn((ordo::col(1, 11.0), ChildOf(band))).id();
+    let detail = commands.spawn((ordo::col(2, 11.0), ChildOf(band))).id();
+    commands
+        .entity(detail)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.min_height = px(0);
+        });
     commands.entity(list).insert((
         PeopleRows,
-        // The roster holds its ground: without flex_shrink 0 the stat
-        // grid's minimum widths crushed the list to a ribbon.
         Node {
-            width: px(320),
-            flex_shrink: 0.0,
-            max_height: px(640),
+            flex_grow: 1.0,
+            flex_basis: px(0),
+            min_width: px(0),
+            min_height: px(0),
             flex_direction: FlexDirection::Column,
-            row_gap: px(5),
+            row_gap: px(8),
             overflow: Overflow::scroll_y(),
             padding: UiRect::all(px(6)),
             border_radius: BorderRadius::all(px(0)),
             ..default()
         },
+        BackgroundColor(Color::BLACK.with_alpha(0.32)),
+        BorderColor::all(ui::theme::panel_border().with_alpha(0.35)),
     ));
+    commands
+        .entity(list)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.border = UiRect::all(px(1));
+        });
 
     // The paperdoll: a private little stage far under the world, drawn by its
     // own camera to a texture the detail pane shows. The doll is the person's
@@ -668,6 +884,8 @@ pub(crate) fn update_people_panel(
     mut labels: Query<(&RowLabel, &mut Text)>,
     sort: Res<RosterSort>,
     mut last_sort: Local<bool>,
+    filter: Res<RosterFilter>,
+    portraits: Res<super::portrait::Portraits>,
     settlements: Query<&Settlement>,
     people: Query<
         (
@@ -675,6 +893,7 @@ pub(crate) fn update_people_panel(
             &Person,
             &crate::creature::genome::CreatureGenome,
             &Activity,
+            Option<&crate::villager::work::Vocation>,
         ),
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
@@ -698,7 +917,11 @@ pub(crate) fn update_people_panel(
 
     // Rebuild only when the roll of the living - or the sort - changes.
     let _ = &mut labels;
-    let mut current: Vec<Entity> = people.iter().map(|(e, ..)| e).collect();
+    let mut current: Vec<Entity> = people
+        .iter()
+        .filter(|(.., vocation)| filter.0.is_none() || vocation.copied() == filter.0)
+        .map(|(e, ..)| e)
+        .collect();
     current.sort();
     if current == *roster && *last_sort == sort.0 && !just_opened {
         return;
@@ -759,164 +982,183 @@ pub(crate) fn update_people_panel(
     if sort.0 {
         names.reverse();
     }
-    for (entity, person, genome, _) in names {
-        let base = 0.0;
-        let row = commands
+    // The hall itself: true portraits two abreast, each soul a plaque —
+    // the face above, the name and calling on the mount below. Brett's
+    // Phase 2: "TRUE portraits" — the studio's plates, not painted busts.
+    for pair in names.chunks(2) {
+        let rank = commands
             .spawn((
-                RowFace {
-                    person: entity,
-                    base,
-                },
                 Node {
                     width: percent(100),
+                    flex_shrink: 0.0,
                     flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    column_gap: px(6),
-                    padding: UiRect::new(px(12), px(10), px(6), px(6)),
-                    border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(px(0)),
+                    column_gap: px(8),
                     ..default()
                 },
-                BackgroundColor(ui::theme::title_bg().with_alpha(0.55)),
-                BorderColor::all(ui::theme::text_dim().with_alpha(0.14)),
                 ChildOf(container),
             ))
             .id();
-        let name_button = commands
-            .spawn((
+        for &(entity, person, genome, _, vocation) in pair {
+            let livery = vocation
+                .map(|trade| crate::villager::attire::livery(*trade).cloth)
+                .map(|tone| crate::palette::color_at(tone.palette_index()))
+                .unwrap_or_else(ui::theme::text_dim);
+            let card = commands
+                .spawn((
+                    RowFace {
+                        person: entity,
+                        base: 0.0,
+                    },
+                    Node {
+                        flex_grow: 1.0,
+                        flex_basis: px(0),
+                        min_width: px(0),
+                        flex_direction: FlexDirection::Column,
+                        border: UiRect::all(px(1)),
+                        border_radius: BorderRadius::all(px(6)),
+                        overflow: Overflow::clip(),
+                        ..default()
+                    },
+                    BackgroundColor(ui::theme::title_bg().with_alpha(0.55)),
+                    BorderColor::all(ui::theme::text_dim().with_alpha(0.14)),
+                    ChildOf(rank),
+                ))
+                .id();
+            // The face, on the trade's own ground, ruled off from the
+            // mount beneath in the same livery.
+            let frame = commands
+                .spawn((
+                    Node {
+                        width: percent(100),
+                        aspect_ratio: Some(super::portrait::PLATE_ASPECT),
+                        flex_shrink: 0.0,
+                        border: UiRect::bottom(px(1)),
+                        overflow: Overflow::clip(),
+                        ..default()
+                    },
+                    BackgroundColor(livery.with_alpha(0.1)),
+                    BorderColor::all(livery.with_alpha(0.55)),
+                    ChildOf(card),
+                ))
+                .id();
+            super::portrait::set_the_face(
+                &mut commands,
+                frame,
+                &portraits,
+                entity,
+                livery.with_alpha(0.9),
+            );
+            // The mount: name over calling, the calling in its own colour.
+            let words = commands
+                .spawn((
+                    Node {
+                        width: percent(100),
+                        flex_direction: FlexDirection::Column,
+                        padding: UiRect::axes(px(8), px(6)),
+                        ..default()
+                    },
+                    ChildOf(card),
+                ))
+                .id();
+            commands.spawn((
+                RowLabel(entity),
+                ui::label(person.full_name()),
+                TextLayout::linebreak(LineBreak::NoWrap),
+                ChildOf(words),
+            ));
+            let standing = commands
+                .spawn((
+                    ui::dim(vocation.map_or_else(
+                        || {
+                            format!(
+                                "{} of {}",
+                                super::person_phrase(genome.sex, genome.age),
+                                village.as_deref().unwrap_or("the wilds")
+                            )
+                        },
+                        |trade| trade.describe().to_string(),
+                    )),
+                    TextLayout::linebreak(LineBreak::NoWrap),
+                    ChildOf(words),
+                ))
+                .id();
+            if vocation.is_some() {
+                commands
+                    .entity(standing)
+                    .insert(TextColor(livery.with_alpha(0.9)));
+            }
+            // The whole plaque opens their page; the eye above it flies
+            // to them. The overlay comes before the eye so the eye stays
+            // on top for the pointer.
+            commands.spawn((
                 PersonRow(entity),
                 ui::UiButton,
                 Node {
-                    flex_grow: 1.0,
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    column_gap: px(10),
-                    border_radius: BorderRadius::all(px(0)),
+                    position_type: PositionType::Absolute,
+                    left: px(0),
+                    right: px(0),
+                    top: px(0),
+                    bottom: px(0),
+                    border_radius: BorderRadius::all(px(6)),
                     ..default()
                 },
                 BackgroundColor(ui::theme::panel_bg().with_alpha(0.0)),
                 Interaction::default(),
-                ChildOf(row),
-            ))
-            .id();
-        // The thumbnail: this person's own colours as a little bust -
-        // hair over face over shoulders.
-        let bust = commands
-            .spawn((
-                Node {
-                    width: px(20),
-                    height: px(28),
-                    flex_shrink: 0.0,
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
-                ChildOf(name_button),
-            ))
-            .id();
-        let swatch = |commands: &mut Commands,
-                      tone: crate::creature::genome::Tone,
-                      w: f32,
-                      h: f32,
-                      round: BorderRadius| {
-            commands
+                ChildOf(card),
+            ));
+            let follow_button = commands
                 .spawn((
+                    FollowButton(entity),
+                    ui::UiButton,
                     Node {
-                        width: px(w),
-                        height: px(h),
-                        border_radius: round,
+                        position_type: PositionType::Absolute,
+                        top: px(6),
+                        right: px(6),
+                        width: px(22),
+                        height: px(22),
+                        border: UiRect::all(px(1)),
+                        border_radius: BorderRadius::all(px(999)),
                         ..default()
                     },
-                    BackgroundColor(crate::palette::color_at(tone.palette_index())),
+                    BackgroundColor(ui::theme::title_bg().with_alpha(0.85)),
+                    BorderColor::all(ui::theme::accent().with_alpha(0.4)),
+                    Interaction::default(),
+                    ChildOf(card),
                 ))
-                .id()
-        };
-        let hair = swatch(
-            &mut commands,
-            genome.hair,
-            14.0,
-            6.0,
-            BorderRadius::top(px(3)),
-        );
-        let face = swatch(
-            &mut commands,
-            genome.skin,
-            12.0,
-            9.0,
-            BorderRadius::bottom(px(2)),
-        );
-        let torso = swatch(
-            &mut commands,
-            genome.cloth,
-            18.0,
-            11.0,
-            BorderRadius::top(px(4)),
-        );
-        for part in [hair, face, torso] {
-            commands.entity(part).insert(ChildOf(bust));
+                .id();
+            for (l, t, w, h, r, bright) in [
+                (4.5, 7.5, 12.0, 6.0, 6.0, false),
+                (8.5, 8.5, 4.0, 4.0, 4.0, true),
+            ] {
+                commands.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: px(l),
+                        top: px(t),
+                        width: px(w),
+                        height: px(h),
+                        border_radius: BorderRadius::all(px(r)),
+                        ..default()
+                    },
+                    BackgroundColor(if bright {
+                        crate::palette::shade(&crate::palette::BONE, 0.95)
+                    } else {
+                        ui::theme::accent().with_alpha(0.85)
+                    }),
+                    ChildOf(follow_button),
+                ));
+            }
         }
-        // Name over standing, the mockup's two lines.
-        let words = commands
-            .spawn((
-                Node {
-                    flex_direction: FlexDirection::Column,
-                    ..default()
-                },
-                ChildOf(name_button),
-            ))
-            .id();
-        commands.spawn((
-            RowLabel(entity),
-            ui::label(person.full_name()),
-            ChildOf(words),
-        ));
-        commands.spawn((
-            ui::dim(format!(
-                "{} of {}",
-                super::person_phrase(genome.sex, genome.age),
-                village.as_deref().unwrap_or("the wilds")
-            )),
-            ChildOf(words),
-        ));
-        // The eye flies the camera to them; the row opens their page.
-        let follow_button = commands
-            .spawn((
-                FollowButton(entity),
-                ui::UiButton,
-                Node {
-                    width: px(22),
-                    height: px(22),
-                    flex_shrink: 0.0,
-                    border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(px(999)),
-                    ..default()
-                },
-                BackgroundColor(ui::theme::title_bg()),
-                BorderColor::all(ui::theme::accent().with_alpha(0.4)),
-                Interaction::default(),
-                ChildOf(row),
-            ))
-            .id();
-        for (l, t, w, h, r, bright) in [
-            (4.5, 7.5, 12.0, 6.0, 6.0, false),
-            (8.5, 8.5, 4.0, 4.0, 4.0, true),
-        ] {
+        // A lone card on the last rank keeps to its half of the row.
+        if pair.len() == 1 {
             commands.spawn((
                 Node {
-                    position_type: PositionType::Absolute,
-                    left: px(l),
-                    top: px(t),
-                    width: px(w),
-                    height: px(h),
-                    border_radius: BorderRadius::all(px(r)),
+                    flex_grow: 1.0,
+                    flex_basis: px(0),
+                    min_width: px(0),
                     ..default()
                 },
-                BackgroundColor(if bright {
-                    crate::palette::shade(&crate::palette::BONE, 0.95)
-                } else {
-                    ui::theme::accent().with_alpha(0.85)
-                }),
-                ChildOf(follow_button),
+                ChildOf(rank),
             ));
         }
     }

@@ -42,6 +42,19 @@ pub const AVATAR_UNLOCK: f32 = 6.0;
 /// The land-wide providence, for a village whose faith has real weight.
 pub const FLOURISH_UNLOCK: f32 = 10.0;
 
+/// How a miracle is earned.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Unlock {
+    /// The god's from the first day.
+    Founding,
+    /// Taught when the congregation's faith first holds this much.
+    Belief(f32),
+    /// Awarded by the legends: Mend or Quake, whichever crystallises.
+    Legend,
+    /// The dark school: taught when the god's dread has grown this far.
+    Dread(f32),
+}
+
 /// How far Bounty's blessing reaches from the cast point.
 const BOUNTY_RADIUS: f32 = 9.0;
 
@@ -76,6 +89,9 @@ impl Plugin for MiraclesPlugin {
                     cast,
                     style_hotbar,
                     update_belief_meter,
+                    // The standing wonders: one subject, paired to spare
+                    // the tuple.
+                    (beacons_call, wards_hold, evangels_preach, stones_land),
                     fade_bolts,
                     tick_glory,
                 )
@@ -297,17 +313,41 @@ pub enum Miracle {
     /// whole point - it is the only way a god ever hears what is said
     /// about them by people who think they are alone.
     Avatar,
+    /// A soaking called onto a point: crops drink deep, fires die.
+    Rain,
+    /// A pillar of light the idle walk to - the crowd-mover.
+    Beacon,
+    /// A circle no predator will cross while it stands.
+    Ward,
+    /// Every ripe field in the village yields at once.
+    HarvestWind,
+    /// The dark ripple: fear crosses every heart near the touch.
+    PlagueOfDoubt,
+    /// A boulder out of a clear sky - and it stays, as stone.
+    StoneFromSky,
+    /// A dream visited on one soul: they wake certain, and they preach.
+    Visitation,
+    /// The map opens wide around the touch - colony ground included.
+    FoundingSight,
 }
 
 impl Miracle {
     /// Every miracle there is, for the unlock ladder to walk.
-    pub const ALL: [Miracle; 6] = [
+    pub const ALL: [Miracle; 14] = [
         Miracle::Bounty,
         Miracle::Smite,
         Miracle::Avatar,
+        Miracle::Rain,
         Miracle::Flourish,
+        Miracle::Beacon,
+        Miracle::Ward,
+        Miracle::HarvestWind,
+        Miracle::FoundingSight,
+        Miracle::Visitation,
         Miracle::Mend,
         Miracle::Quake,
+        Miracle::PlagueOfDoubt,
+        Miracle::StoneFromSky,
     ];
 
     pub fn name(self) -> &'static str {
@@ -318,6 +358,14 @@ impl Miracle {
             Miracle::Mend => "Mend",
             Miracle::Quake => "Quake",
             Miracle::Avatar => "Avatar",
+            Miracle::Rain => "Rain",
+            Miracle::Beacon => "Beacon",
+            Miracle::Ward => "Ward",
+            Miracle::HarvestWind => "Harvest Wind",
+            Miracle::PlagueOfDoubt => "Plague of Doubt",
+            Miracle::StoneFromSky => "Stone from Sky",
+            Miracle::Visitation => "Visitation",
+            Miracle::FoundingSight => "Founding Sight",
         }
     }
 
@@ -328,11 +376,13 @@ impl Miracle {
     pub fn cooldown_days(self) -> f32 {
         match self {
             Miracle::Bounty => 0.5,
-            Miracle::Smite => 1.0,
-            Miracle::Avatar => 1.0,
-            Miracle::Mend => 1.0,
+            Miracle::Smite | Miracle::Avatar | Miracle::Mend | Miracle::Rain => 1.0,
             Miracle::Flourish => 1.5,
-            Miracle::Quake => 2.0,
+            Miracle::Quake | Miracle::Beacon | Miracle::Ward => 2.0,
+            Miracle::HarvestWind | Miracle::StoneFromSky => 3.0,
+            Miracle::PlagueOfDoubt => 4.0,
+            // The week-long trumpets. Brett: "some might even have a week."
+            Miracle::Visitation | Miracle::FoundingSight => 7.0,
         }
     }
 
@@ -341,16 +391,31 @@ impl Miracle {
         (self.cooldown_days() * crate::calendar::DAY_SECONDS) as f64
     }
 
-    /// The congregation faith that unlocks this miracle — belief as the
-    /// LADDER, never the fuel. `None` marks the two the legends award
-    /// (Mend, Quake) and the one the god starts with (Bounty).
-    pub fn unlock_at(self) -> Option<f32> {
+    /// What unlocks this miracle. Belief is the LADDER, never the fuel;
+    /// the legends award their own; the darkest asks are paid in dread.
+    pub fn unlock(self) -> Unlock {
         match self {
-            Miracle::Bounty => None,
-            Miracle::Smite => Some(SMITE_UNLOCK),
-            Miracle::Avatar => Some(AVATAR_UNLOCK),
-            Miracle::Flourish => Some(FLOURISH_UNLOCK),
-            Miracle::Mend | Miracle::Quake => None,
+            Miracle::Bounty => Unlock::Founding,
+            Miracle::Smite => Unlock::Belief(SMITE_UNLOCK),
+            Miracle::Avatar => Unlock::Belief(AVATAR_UNLOCK),
+            Miracle::Rain => Unlock::Belief(8.0),
+            Miracle::Flourish => Unlock::Belief(FLOURISH_UNLOCK),
+            Miracle::Beacon => Unlock::Belief(12.0),
+            Miracle::Ward => Unlock::Belief(14.0),
+            Miracle::HarvestWind => Unlock::Belief(16.0),
+            Miracle::FoundingSight => Unlock::Belief(18.0),
+            Miracle::Visitation => Unlock::Belief(20.0),
+            Miracle::Mend | Miracle::Quake => Unlock::Legend,
+            Miracle::PlagueOfDoubt => Unlock::Dread(10.0),
+            Miracle::StoneFromSky => Unlock::Dread(16.0),
+        }
+    }
+
+    /// The belief rung alone, for displays that speak in numbers.
+    pub fn unlock_at(self) -> Option<f32> {
+        match self.unlock() {
+            Unlock::Belief(rung) => Some(rung),
+            _ => None,
         }
     }
 
@@ -363,6 +428,14 @@ impl Miracle {
             Miracle::Mend => "knits the hurt whole around the touch",
             Miracle::Quake => "throws the ground and everyone on it",
             Miracle::Avatar => "wear somebody's body and walk about in it",
+            Miracle::Rain => "a soaking over the point - crops surge, fires die",
+            Miracle::Beacon => "a pillar of light the village gathers to",
+            Miracle::Ward => "a circle predators will not cross for a day",
+            Miracle::HarvestWind => "every ripe field yields at once",
+            Miracle::PlagueOfDoubt => "fear ripples outward from the touch",
+            Miracle::StoneFromSky => "a boulder falls - and stays, as stone",
+            Miracle::Visitation => "appear in a dream; they wake certain, and preach",
+            Miracle::FoundingSight => "the map opens wide around the touch",
         }
     }
 }
@@ -760,6 +833,117 @@ fn draw_miracle_icon(commands: &mut Commands, slot: Entity, miracle: Miracle) {
                 art(commands, block(l, t, w, 4.0, 0.0), ui::theme::text_dim());
             }
         }
+        // Falling drops over a bowed row.
+        Miracle::Rain => {
+            let blue = crate::palette::shade(&crate::palette::CLOTH_BLUE, 0.75);
+            for (l, t) in [
+                (12.0, 8.0),
+                (20.0, 12.0),
+                (28.0, 8.0),
+                (16.0, 18.0),
+                (24.0, 20.0),
+            ] {
+                art(commands, block(l, t, 3.0, 7.0, 2.0), blue);
+            }
+            art(
+                commands,
+                block(10.0, 30.0, 22.0, 4.0, 2.0),
+                crate::palette::shade(&crate::palette::GRASS, 0.7),
+            );
+        }
+        // The pillar, standing in its own glow.
+        Miracle::Beacon => {
+            art(
+                commands,
+                block(19.0, 6.0, 4.0, 28.0, 2.0),
+                ui::theme::accent(),
+            );
+            art(
+                commands,
+                block(14.0, 30.0, 14.0, 4.0, 2.0),
+                ui::theme::accent().with_alpha(0.5),
+            );
+        }
+        // The ring of stones.
+        Miracle::Ward => {
+            for (l, t) in [
+                (18.0, 7.0),
+                (27.0, 12.0),
+                (29.0, 21.0),
+                (22.0, 28.0),
+                (12.0, 28.0),
+                (7.0, 20.0),
+                (9.0, 11.0),
+            ] {
+                art(
+                    commands,
+                    block(l, t, 5.0, 5.0, 2.0),
+                    crate::palette::shade(&crate::palette::STONE, 0.75),
+                );
+            }
+        }
+        // Stalks leaning into the wind.
+        Miracle::HarvestWind => {
+            let gold = crate::palette::shade(&crate::palette::CLOTH_GOLD, 0.85);
+            for (l, h) in [(11.0, 16.0), (17.0, 20.0), (23.0, 18.0), (29.0, 14.0)] {
+                art(commands, block(l, 34.0 - h, 3.0, h, 2.0), gold);
+            }
+        }
+        // A dark drop, spreading rings.
+        Miracle::PlagueOfDoubt => {
+            let ash = crate::palette::shade(&crate::palette::CLOTH_SABLE, 0.6);
+            art(commands, block(18.0, 16.0, 6.0, 6.0, 4.0), ash);
+            art(
+                commands,
+                block(13.0, 11.0, 16.0, 2.0, 2.0),
+                ash.with_alpha(0.5),
+            );
+            art(
+                commands,
+                block(13.0, 27.0, 16.0, 2.0, 2.0),
+                ash.with_alpha(0.5),
+            );
+        }
+        // The stone, and the streak it fell by.
+        Miracle::StoneFromSky => {
+            art(
+                commands,
+                block(24.0, 6.0, 4.0, 12.0, 2.0),
+                ui::theme::accent().with_alpha(0.6),
+            );
+            art(
+                commands,
+                block(12.0, 20.0, 14.0, 12.0, 4.0),
+                crate::palette::shade(&crate::palette::STONE, 0.55),
+            );
+        }
+        // The closed eye, dreaming.
+        Miracle::Visitation => {
+            let pink = crate::palette::shade(&crate::palette::CLOTH_PINK, 0.85);
+            art(commands, block(11.0, 17.0, 20.0, 4.0, 3.0), pink);
+            for l in [13.0, 19.0, 25.0] {
+                art(
+                    commands,
+                    block(l, 22.0, 2.0, 5.0, 1.0),
+                    pink.with_alpha(0.6),
+                );
+            }
+        }
+        // The horizon line, opened.
+        Miracle::FoundingSight => {
+            let bone = crate::palette::shade(&crate::palette::BONE, 0.9);
+            art(commands, block(8.0, 20.0, 26.0, 3.0, 2.0), bone);
+            art(
+                commands,
+                block(14.0, 12.0, 14.0, 3.0, 2.0),
+                bone.with_alpha(0.6),
+            );
+            art(
+                commands,
+                block(18.0, 27.0, 6.0, 6.0, 4.0),
+                ui::theme::accent(),
+            );
+        }
     }
 }
 
@@ -818,10 +1002,13 @@ fn unlock_miracles(
         if grimoire.knows(miracle) {
             continue;
         }
-        let earned = match miracle.unlock_at() {
-            Some(rung) => grimoire.high_water >= rung,
+        let earned = match miracle.unlock() {
+            Unlock::Founding => true,
+            Unlock::Belief(rung) => grimoire.high_water >= rung,
             // The legend-taught pair arrives when the stories say so.
-            None => legend.unlocked == Some(miracle),
+            Unlock::Legend => legend.unlocked == Some(miracle),
+            // The dark school watches the dread the stories carry.
+            Unlock::Dread(depth) => legend.dread >= depth,
         };
         if earned {
             learned.push(miracle);
@@ -950,8 +1137,17 @@ fn cast(
     // ceiling, and each pair is one subject.
     input: (Res<ButtonInput<MouseButton>>, Res<PointerContext>),
     hand: Res<DivineHand>,
-    site: Option<Res<SettlementSite>>,
-    name: Option<Res<crate::villager::DivineName>>,
+    ctx: (
+        Option<Res<SettlementSite>>,
+        Option<Res<crate::villager::DivineName>>,
+        Option<ResMut<crate::villager::explore::KnownWorld>>,
+    ),
+    mut world_q: (
+        Query<(&Transform, &mut crate::villager::work::Field)>,
+        Query<(&Transform, &mut crate::villager::home::Bonfire)>,
+        Query<&mut crate::villager::work::Stockpile>,
+        ResMut<crate::villager::SimRng>,
+    ),
     mut selected: ResMut<SelectedMiracle>,
     mut cooldowns: ResMut<Cooldowns>,
     mut fired: MessageReader<FireMiracle>,
@@ -970,12 +1166,16 @@ fn cast(
     >,
     mut souls: Query<
         (
+            Entity,
+            &Transform,
             &mut crate::villager::Morale,
             &mut crate::villager::belief::Faith,
+            Option<&mut crate::villager::regard::Regard>,
         ),
         With<crate::villager::Villager>,
     >,
 ) {
+    let (site, name, mut known) = ctx;
     let god = name.as_ref().map_or("the god", |n| n.0.as_str());
     let mut castings: Vec<(Miracle, Vec3)> = Vec::new();
     // Two doors, one performer: the slot keys arrive as messages, the
@@ -1004,8 +1204,11 @@ fn cast(
             miracle,
             at,
             god,
+            clock.elapsed,
             &mut commands,
             &site,
+            known.as_deref_mut(),
+            &mut world_q,
             &mut visuals.0,
             &mut visuals.1,
             &mut bushes,
@@ -1035,8 +1238,16 @@ fn perform(
     miracle: Miracle,
     at: Vec3,
     god: &str,
+    now: f64,
     commands: &mut Commands,
     site: &Option<Res<SettlementSite>>,
+    known: Option<&mut crate::villager::explore::KnownWorld>,
+    world_q: &mut (
+        Query<(&Transform, &mut crate::villager::work::Field)>,
+        Query<(&Transform, &mut crate::villager::home::Bonfire)>,
+        Query<&mut crate::villager::work::Stockpile>,
+        ResMut<crate::villager::SimRng>,
+    ),
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     bushes: &mut Query<(&GlobalTransform, &mut FoodSource)>,
@@ -1052,8 +1263,11 @@ fn perform(
     >,
     souls: &mut Query<
         (
+            Entity,
+            &Transform,
             &mut crate::villager::Morale,
             &mut crate::villager::belief::Faith,
+            Option<&mut crate::villager::regard::Regard>,
         ),
         With<crate::villager::Villager>,
     >,
@@ -1175,6 +1389,227 @@ fn perform(
             cast_earned(miracle, at, god, notices, witnessed, victims, souls);
             true
         }
+
+        Miracle::Rain => {
+            let (fields, bonfires, ..) = world_q;
+            let mut watered = 0;
+            for (field_at, mut field) in fields.iter_mut() {
+                if field_at.translation.distance(at) <= RAIN_RADIUS {
+                    field.growth = (field.growth + 0.35).min(1.0);
+                    watered += 1;
+                }
+            }
+            // Rain is the one thing that puts a fire out from the sky.
+            for (fire_at, mut fire) in bonfires.iter_mut() {
+                if fire_at.translation.distance(at) <= RAIN_RADIUS {
+                    fire.fuel = 0.0;
+                }
+            }
+            spawn_glory(
+                commands,
+                meshes,
+                materials,
+                at,
+                crate::palette::shade(&crate::palette::CLOTH_BLUE, 0.8),
+                false,
+            );
+            info!("{god} called rain, {watered} fields drank");
+            notices.write(crate::ui::Notice::fanfare(format!("{god} called the rain")));
+            witnessed.write(DivineEvent {
+                kind: DivineEventKind::Rained,
+                position: at,
+                subject: None,
+                intensity: 0.7,
+            });
+            true
+        }
+
+        Miracle::Beacon => {
+            raise_beacon(commands, meshes, materials, at, now);
+            info!("{god} raised a beacon");
+            notices.write(crate::ui::Notice::fanfare(format!(
+                "{god} set a pillar of light upon the land"
+            )));
+            witnessed.write(DivineEvent {
+                kind: DivineEventKind::Beckoned,
+                position: at,
+                subject: None,
+                intensity: 0.9,
+            });
+            true
+        }
+
+        Miracle::Ward => {
+            raise_ward(commands, meshes, materials, at, now);
+            info!("{god} drew a ward");
+            notices.write(crate::ui::Notice::fanfare(format!(
+                "{god} drew a circle no fang will cross"
+            )));
+            true
+        }
+
+        Miracle::HarvestWind => {
+            let (fields, _, stores, _) = world_q;
+            let mut reaped = 0;
+            let mut yielded = 0.0f32;
+            for (field_at, mut field) in fields.iter_mut() {
+                if field.growth < 0.5 {
+                    continue;
+                }
+                yielded += 8.0 * field.growth;
+                field.growth = 0.08;
+                reaped += 1;
+                if reaped <= 8 {
+                    spawn_glory(
+                        commands,
+                        meshes,
+                        materials,
+                        field_at.translation,
+                        crate::palette::shade(&crate::palette::CLOTH_GOLD, 0.85),
+                        false,
+                    );
+                }
+            }
+            if reaped == 0 {
+                notices.write(crate::ui::Notice::new(
+                    "No field stands ripe enough for the wind".to_string(),
+                ));
+                return false;
+            }
+            if let Some(mut store) = stores.iter_mut().next() {
+                store
+                    .larder
+                    .add(crate::villager::work::FoodKind::Grain, yielded);
+            }
+            info!("{god} sent the harvest wind: {reaped} fields came in at once");
+            notices.write(crate::ui::Notice::fanfare(format!(
+                "{god} sent the harvest wind"
+            )));
+            witnessed.write(DivineEvent {
+                kind: DivineEventKind::Flourished,
+                position: at,
+                subject: None,
+                intensity: 0.9,
+            });
+            true
+        }
+
+        Miracle::PlagueOfDoubt => {
+            let mut shadowed: Vec<Entity> = Vec::new();
+            for (soul, soul_at, mut morale, mut faith, _) in souls.iter_mut() {
+                if soul_at.translation.distance(at) > DOUBT_RADIUS {
+                    continue;
+                }
+                faith.trust = (faith.trust - 0.18).max(0.0);
+                morale.spirits = (morale.spirits - 0.15).max(0.0);
+                shadowed.push(soul);
+            }
+            if shadowed.is_empty() {
+                notices.write(crate::ui::Notice::new(
+                    "Nobody stands there for the shadow to cross".to_string(),
+                ));
+                return false;
+            }
+            // Fear ripples the regard graph: everyone touched steps a
+            // little back from everyone else who was — nobody can say
+            // why, and that is the plague.
+            for &soul in &shadowed {
+                if let Ok((_, _, _, _, Some(mut regard))) = souls.get_mut(soul) {
+                    for &other in shadowed.iter().take(6) {
+                        if other != soul {
+                            regard.warm_over(other, -0.06, Some("the shadow that crossed us"));
+                        }
+                    }
+                }
+            }
+            spawn_glory(
+                commands,
+                meshes,
+                materials,
+                at,
+                crate::palette::shade(&crate::palette::CLOTH_SABLE, 0.5),
+                false,
+            );
+            info!("{god} sowed doubt through {} hearts", shadowed.len());
+            notices.write(crate::ui::Notice::new(format!(
+                "{god} sent a shadow across the hearts of the village"
+            )));
+            witnessed.write(DivineEvent {
+                kind: DivineEventKind::DoubtSown,
+                position: at,
+                subject: None,
+                intensity: 1.0,
+            });
+            true
+        }
+
+        Miracle::StoneFromSky => {
+            let (_, _, _, rng) = world_q;
+            drop_the_stone(commands, meshes, materials, at, now, &mut rng.0);
+            info!("{god} pulled a stone out of the sky");
+            notices.write(crate::ui::Notice::fanfare(format!(
+                "{god} calls a stone out of the empty sky"
+            )));
+            true
+        }
+
+        Miracle::Visitation => {
+            let dreamer = souls
+                .iter()
+                .map(|(soul, soul_at, ..)| (soul, soul_at.translation.distance(at)))
+                .filter(|(_, d)| *d < 4.0)
+                .min_by(|a, b| a.1.total_cmp(&b.1))
+                .map(|(soul, _)| soul);
+            let Some(dreamer) = dreamer else {
+                notices.write(crate::ui::Notice::new(
+                    "The dream needs a soul under the hand".to_string(),
+                ));
+                return false;
+            };
+            if let Ok((_, _, mut morale, mut faith, _)) = souls.get_mut(dreamer) {
+                faith.trust = 1.0;
+                morale.spirits = (morale.spirits + 0.3).min(1.0);
+            }
+            commands.entity(dreamer).insert(Evangel {
+                until: now + 3.0 * crate::calendar::DAY_SECONDS as f64,
+                last_sermon: 0.0,
+            });
+            spawn_glory(
+                commands,
+                meshes,
+                materials,
+                at,
+                crate::palette::shade(&crate::palette::CLOTH_PINK, 0.9),
+                true,
+            );
+            info!("{god} visited a dream");
+            notices.write(crate::ui::Notice::fanfare(
+                "A soul wakes certain of you, and cannot stop saying so".to_string(),
+            ));
+            // No DivineEvent: a dream has no witnesses. The preaching IS
+            // the miracle's public face.
+            true
+        }
+
+        Miracle::FoundingSight => {
+            let Some(known) = known else {
+                return false;
+            };
+            known.learn(at, 170.0);
+            spawn_glory(
+                commands,
+                meshes,
+                materials,
+                at,
+                crate::palette::shade(&crate::palette::BONE, 0.95),
+                true,
+            );
+            info!("{god} opened the land to the village's eyes");
+            notices.write(crate::ui::Notice::fanfare(
+                "The land lies open before the village".to_string(),
+            ));
+            true
+        }
     }
 }
 
@@ -1196,8 +1631,11 @@ fn cast_earned(
     >,
     souls: &mut Query<
         (
+            Entity,
+            &Transform,
             &mut crate::villager::Morale,
             &mut crate::villager::belief::Faith,
+            Option<&mut crate::villager::regard::Regard>,
         ),
         With<crate::villager::Villager>,
     >,
@@ -1216,7 +1654,7 @@ fn cast_earned(
                 vitality.violent = false;
                 motion.flail = 0.0;
                 first.get_or_insert(entity);
-                if let Ok((mut morale, mut faith)) = souls.get_mut(entity) {
+                if let Ok((_, _, mut morale, mut faith, _)) = souls.get_mut(entity) {
                     morale.spirits = (morale.spirits + 0.35).min(1.0);
                     faith.trust = (faith.trust + 0.25).min(1.0);
                 }
@@ -1253,6 +1691,294 @@ fn cast_earned(
             });
         }
         _ => {}
+    }
+}
+
+/// How far Rain reaches from the cast point.
+const RAIN_RADIUS: f32 = 26.0;
+
+/// How far the shadow of doubt reaches.
+const DOUBT_RADIUS: f32 = 30.0;
+
+/// A pillar of light the idle walk to.
+#[derive(Component)]
+pub struct Beacon {
+    until: f64,
+}
+
+/// A circle no predator crosses while it stands.
+#[derive(Component)]
+pub struct Ward {
+    pub radius: f32,
+    until: f64,
+}
+
+/// A stone still falling; when it lands, the ground answers.
+#[derive(Component)]
+pub(crate) struct FallingStone;
+
+/// A soul who woke certain: for a few days their talk carries the god in
+/// it, and everyone near them feels the heat of it.
+#[derive(Component)]
+pub struct Evangel {
+    until: f64,
+    last_sermon: f64,
+}
+
+/// Raises the beacon: a pillar of light standing on the ground.
+fn raise_beacon(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    at: Vec3,
+    now: f64,
+) {
+    let glow = ui::theme::accent();
+    commands.spawn((
+        Name::new("A beacon"),
+        Beacon { until: now + 45.0 },
+        Mesh3d(meshes.add(Cuboid::new(1.3, 30.0, 1.3))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: glow.with_alpha(0.75),
+            emissive: LinearRgba::from(glow) * 8.0,
+            alpha_mode: AlphaMode::Blend,
+            unlit: true,
+            ..default()
+        })),
+        Transform::from_translation(at + Vec3::Y * 15.0),
+        bevy::light::NotShadowCaster,
+    ));
+}
+
+/// Raises the ward: a ring of pale stones around the point.
+fn raise_ward(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    at: Vec3,
+    now: f64,
+) {
+    let ward = commands
+        .spawn((
+            Name::new("A ward"),
+            Ward {
+                radius: 34.0,
+                until: now + crate::calendar::DAY_SECONDS as f64,
+            },
+            Transform::from_translation(at),
+            Visibility::default(),
+        ))
+        .id();
+    let stone = materials.add(StandardMaterial {
+        base_color: crate::palette::shade(&crate::palette::BONE, 0.9),
+        emissive: LinearRgba::from(ui::theme::accent()) * 0.8,
+        ..default()
+    });
+    let block = meshes.add(Cuboid::new(0.8, 1.6, 0.8));
+    for i in 0..8 {
+        let angle = i as f32 / 8.0 * std::f32::consts::TAU;
+        commands.spawn((
+            Mesh3d(block.clone()),
+            MeshMaterial3d(stone.clone()),
+            Transform::from_translation(Vec3::new(angle.cos() * 34.0, 0.8, angle.sin() * 34.0)),
+            ChildOf(ward),
+        ));
+    }
+}
+
+/// Pulls the stone out of the sky: spawned high, falling, and REAL - it
+/// lands as an ordinary boulder and stays, minable stone with a story.
+fn drop_the_stone(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    at: Vec3,
+    now: f64,
+    rng: &mut crate::rng::Rng,
+) {
+    let _ = now;
+    let stone = crate::scatter::spawn_boulder(
+        commands,
+        meshes,
+        materials.add(StandardMaterial {
+            base_color: crate::palette::shade(&crate::palette::STONE, 0.5),
+            perceptual_roughness: 0.95,
+            ..default()
+        }),
+        at + Vec3::Y * 60.0,
+        rng,
+        crate::scatter::RockRoll {
+            mass: 160.0,
+            radius: 1.4,
+            girth: 1.3,
+        },
+        None,
+    );
+    commands.entity(stone).insert((
+        FallingStone,
+        crate::creature::Airborne {
+            velocity: Vec3::new(0.0, -6.0, 0.0),
+        },
+    ));
+}
+
+/// The beacon calls: the idle within its light walk to it, and the pillar
+/// stands down when its time is spent.
+#[allow(clippy::type_complexity)]
+pub(super) fn beacons_call(
+    mut commands: Commands,
+    clock: Res<crate::calendar::WorldClock>,
+    time: Res<Time>,
+    mut since: Local<f32>,
+    beacons: Query<(Entity, &Transform, &Beacon)>,
+    mut drawn: Query<
+        (
+            &Transform,
+            &crate::villager::Activity,
+            &mut crate::creature::MoveTarget,
+        ),
+        (
+            With<crate::villager::Villager>,
+            Without<Corpse>,
+            Without<crate::creature::Held>,
+            Without<Beacon>,
+        ),
+    >,
+) {
+    for (pillar, _, beacon) in &beacons {
+        if clock.elapsed >= beacon.until {
+            commands.entity(pillar).despawn();
+        }
+    }
+    *since += time.delta_secs();
+    if *since < 1.5 {
+        return;
+    }
+    *since = 0.0;
+    for (_, pillar_at, _) in &beacons {
+        let foot = pillar_at.translation - Vec3::Y * 15.0;
+        for (at, activity, mut target) in &mut drawn {
+            if !matches!(
+                activity,
+                crate::villager::Activity::Idle | crate::villager::Activity::Wandering
+            ) {
+                continue;
+            }
+            let away = at.translation.distance(foot);
+            if away < 130.0 && away > 6.0 {
+                target.0 = Some(foot);
+            }
+        }
+    }
+}
+
+/// The ward wards: any predator inside the circle is pressed back out,
+/// and the stones stand down after their day.
+#[allow(clippy::type_complexity)]
+pub(super) fn wards_hold(
+    mut commands: Commands,
+    clock: Res<crate::calendar::WorldClock>,
+    wards: Query<(Entity, &Transform, &Ward)>,
+    mut prowlers: Query<
+        (
+            &Transform,
+            &crate::creature::genome::CreatureGenome,
+            &mut crate::creature::MoveTarget,
+        ),
+        (
+            With<Creature>,
+            Without<Corpse>,
+            Without<crate::creature::Held>,
+        ),
+    >,
+) {
+    for (ring, _, ward) in &wards {
+        if clock.elapsed >= ward.until {
+            commands.entity(ring).despawn();
+        }
+    }
+    for (_, centre, ward) in &wards {
+        for (at, genome, mut target) in &mut prowlers {
+            if genome.species != crate::creature::genome::Species::Wolf {
+                continue;
+            }
+            let from_ring = at.translation.distance(centre.translation);
+            if from_ring < ward.radius + 6.0 {
+                let out = (at.translation - centre.translation).normalize_or(Vec3::X);
+                target.0 = Some(centre.translation + out * (ward.radius * 2.2));
+            }
+        }
+    }
+}
+
+/// The stone lands: the ground answers, whatever stood under it suffers,
+/// and the sky's rock becomes ordinary minable stone with a story.
+#[allow(clippy::type_complexity)]
+pub(super) fn stones_land(
+    mut commands: Commands,
+    mut told: MessageWriter<DivineEvent>,
+    landed: Query<(Entity, &Transform), (With<FallingStone>, Without<crate::creature::Airborne>)>,
+    mut victims: Query<
+        (&Transform, &mut Vitality, &mut CreatureMotion),
+        (
+            With<Creature>,
+            Without<Corpse>,
+            Without<crate::creature::Held>,
+        ),
+    >,
+) {
+    for (stone, at) in &landed {
+        commands.entity(stone).remove::<FallingStone>();
+        for (victim_at, mut vitality, mut motion) in &mut victims {
+            if victim_at.translation.distance(at.translation) > 5.0 {
+                continue;
+            }
+            vitality.harm += 1.3;
+            vitality.violent = true;
+            motion.flail = 1.0;
+        }
+        told.write(DivineEvent {
+            kind: DivineEventKind::Fell,
+            position: at.translation,
+            subject: None,
+            intensity: 1.0,
+        });
+    }
+}
+
+/// The evangelist preaches: whoever woke certain spends their days saying
+/// so, and faith rises in everyone standing near enough to hear.
+#[allow(clippy::type_complexity)]
+pub(super) fn evangels_preach(
+    mut commands: Commands,
+    clock: Res<crate::calendar::WorldClock>,
+    mut certain: Query<
+        (Entity, &Transform, &mut Evangel),
+        (With<crate::villager::Villager>, Without<Corpse>),
+    >,
+    mut flock: Query<
+        (Entity, &Transform, &mut crate::villager::belief::Faith),
+        (
+            With<crate::villager::Villager>,
+            Without<Corpse>,
+            Without<Evangel>,
+        ),
+    >,
+) {
+    for (soul, at, mut evangel) in &mut certain {
+        if clock.elapsed >= evangel.until {
+            commands.entity(soul).remove::<Evangel>();
+            continue;
+        }
+        if clock.elapsed - evangel.last_sermon < 30.0 {
+            continue;
+        }
+        evangel.last_sermon = clock.elapsed;
+        for (_, hearer_at, mut faith) in &mut flock {
+            if hearer_at.translation.distance(at.translation) < 12.0 {
+                faith.trust = (faith.trust + 0.03).min(1.0);
+            }
+        }
     }
 }
 
@@ -1357,10 +2083,14 @@ fn carry_miracles(
                 .iter()
                 .find(|(interaction, _)| **interaction != Interaction::None)
                 .map(|(_, slot)| slot.0);
-            if let Some(to) = landing
-                && to != drag.from
-            {
-                hotbar.0.swap(drag.from, to);
+            match landing {
+                Some(to) if to != drag.from => hotbar.0.swap(drag.from, to),
+                Some(_) => {}
+                // Let go over nothing: the slot empties, WoW-style — the
+                // book holds more miracles than the bar holds slots, and
+                // this is how room is made. The miracle stays learned;
+                // set it back from the deity page whenever.
+                None => hotbar.0[drag.from] = None,
             }
             commands.entity(drag.ghost).despawn();
         }
@@ -1604,6 +2334,35 @@ mod tests {
         // great kindness.
         assert!(SMITE_UNLOCK < FLOURISH_UNLOCK);
         assert!(Miracle::Smite.cooldown_days() < Miracle::Flourish.cooldown_days());
+    }
+
+    #[test]
+    fn every_miracle_names_its_price() {
+        // The whole book, one row each: a rest measured in days, and a
+        // school that teaches it. The dark pair costs dread, the deep
+        // wonders cost a real congregation, and nothing is free twice.
+        for miracle in Miracle::ALL {
+            assert!(
+                miracle.cooldown_days() >= 0.5,
+                "{miracle:?} rests less than half a day"
+            );
+        }
+        // The week-long trumpets are exactly the two promised.
+        let weekly: Vec<_> = Miracle::ALL
+            .into_iter()
+            .filter(|m| m.cooldown_days() >= 7.0)
+            .collect();
+        assert_eq!(weekly, vec![Miracle::FoundingSight, Miracle::Visitation]);
+        // The dark school is dread's alone.
+        assert!(matches!(Miracle::PlagueOfDoubt.unlock(), Unlock::Dread(_)));
+        assert!(matches!(Miracle::StoneFromSky.unlock(), Unlock::Dread(_)));
+        // And the deeper dread teaches the heavier stone.
+        if let (Unlock::Dread(plague), Unlock::Dread(stone)) = (
+            Miracle::PlagueOfDoubt.unlock(),
+            Miracle::StoneFromSky.unlock(),
+        ) {
+            assert!(plague < stone);
+        }
     }
 
     #[test]

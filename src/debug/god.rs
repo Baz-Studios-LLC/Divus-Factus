@@ -285,7 +285,38 @@ fn age_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
 
 /// The bottom band's height, and the left column matched to a quarter.
 const CREED_BAND: f32 = 112.0;
-const LEFT_COLUMN: f32 = 273.0;
+
+/// Pressing an unlocked card on the deity page sets that miracle onto the
+/// bar's first empty slot — the way back for anything dragged off it. The
+/// book holds fourteen; the bar holds ten; this is the loadout's far side.
+pub(crate) fn place_from_the_book(
+    grimoire: Res<crate::miracles::Grimoire>,
+    mut hotbar: ResMut<crate::miracles::Hotbar>,
+    mut notices: MessageWriter<ui::Notice>,
+    cards: Query<(&Interaction, &MiracleCard), Changed<Interaction>>,
+) {
+    for (interaction, card) in &cards {
+        if *interaction != Interaction::Pressed || !grimoire.knows(card.0) {
+            continue;
+        }
+        if hotbar.slot_of(card.0).is_some() {
+            continue;
+        }
+        let before: usize = hotbar.0.iter().filter(|m| m.is_some()).count();
+        hotbar.take_in(card.0);
+        let after: usize = hotbar.0.iter().filter(|m| m.is_some()).count();
+        if after > before {
+            notices.write(ui::Notice::new(format!(
+                "{} takes its place on the bar",
+                card.0.name()
+            )));
+        } else {
+            notices.write(ui::Notice::new(
+                "The bar is full - drag a miracle off it to make room".to_string(),
+            ));
+        }
+    }
+}
 
 pub(crate) fn spawn_god_panel(
     mut commands: Commands,
@@ -440,7 +471,8 @@ pub(crate) fn spawn_god_panel(
                 flex_grow: 1.0,
                 min_height: px(0),
                 flex_direction: FlexDirection::Row,
-                column_gap: px(10),
+                // The page grid's own gutter, or the seams drift a pixel.
+                column_gap: px(super::village::RHYTHM),
                 align_items: AlignItems::Stretch,
                 ..default()
             },
@@ -448,19 +480,18 @@ pub(crate) fn spawn_god_panel(
         ))
         .id();
 
-    // LEFT: the room, the wondering, the presence.
+    // LEFT: the room, the wondering, the presence — tract one of the
+    // page grid, the same vertical every chapter rules by.
     let left = commands
-        .spawn((
-            Node {
-                width: px(LEFT_COLUMN),
-                flex_shrink: 0.0,
-                flex_direction: FlexDirection::Column,
-                row_gap: px(8),
-                ..default()
-            },
-            ChildOf(main),
-        ))
+        .spawn((ordo::col(1, super::village::RHYTHM), ChildOf(main)))
         .id();
+    commands
+        .entity(left)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.row_gap = px(8);
+            node.min_height = px(0);
+        });
     let plate = commands
         .spawn((
             Node {
@@ -479,8 +510,13 @@ pub(crate) fn spawn_god_panel(
     commands.spawn((
         bevy::ui::widget::ImageNode::new(target.clone()),
         Node {
-            width: px(261),
-            height: px(320),
+            // The room fills its tract and stands tall in it: the stage
+            // was a fixed postcard with dead space beneath. The target is
+            // portrait (440x672), so the aspect keeps the pillars true.
+            width: percent(100),
+            aspect_ratio: Some(522.0 / 640.0),
+            max_height: px(560),
+            align_self: AlignSelf::Center,
             ..default()
         },
         ChildOf(plate),
@@ -560,11 +596,16 @@ pub(crate) fn spawn_god_panel(
     ));
     commands.spawn((ui::dim("Your influence in the world."), ChildOf(presence)));
 
-    // RIGHT: the name, the numbers, the powers, the feelings, the curve.
+    // RIGHT: the name, the numbers, the powers, the feelings, the curve
+    // — tracts two and three.
     let right = commands
         .spawn((
+            // The span law inline: two tracts' growth, one gutter absorbed
+            // in the basis. (ordo::col is itself a Node, and a bundle may
+            // not carry two.)
             Node {
-                flex_grow: 1.0,
+                flex_grow: 2.0,
+                flex_basis: px(super::village::RHYTHM),
                 min_width: px(0),
                 flex_direction: FlexDirection::Column,
                 row_gap: px(10),
@@ -775,17 +816,15 @@ pub(crate) fn spawn_god_panel(
             ChildOf(right),
         ))
         .id();
-    for miracle in [
-        Miracle::Flourish,
-        Miracle::Smite,
-        Miracle::Bounty,
-        Miracle::Avatar,
-        Miracle::Mend,
-        Miracle::Quake,
-    ] {
+    for miracle in Miracle::ALL {
         let card = commands
             .spawn((
                 MiracleCard(miracle),
+                Interaction::default(),
+                ui::HoverHint::new(
+                    miracle.name(),
+                    "press to set it on the bar, once it is yours",
+                ),
                 Node {
                     flex_grow: 1.0,
                     flex_basis: px(0),
@@ -832,6 +871,24 @@ pub(crate) fn spawn_god_panel(
             Miracle::Mend => mend_glyph(&mut commands, badge, gold),
             Miracle::Quake => quake_glyph(&mut commands, badge, gold),
             Miracle::Avatar => avatar_glyph(&mut commands, badge, gold),
+            // The wonders wear a plain seal here until each earns its own
+            // engraving; their true faces live on the hotbar's slots.
+            _ => {
+                commands.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: px(15),
+                        top: px(15),
+                        width: px(12),
+                        height: px(12),
+                        border: UiRect::all(px(2)),
+                        border_radius: BorderRadius::all(px(3)),
+                        ..default()
+                    },
+                    BorderColor::all(gold),
+                    ChildOf(badge),
+                ));
+            }
         }
         for field in [0u8, 1, 2] {
             commands.spawn((
@@ -1164,10 +1221,17 @@ pub(crate) fn update_god_panel(
             0 => {
                 if lit {
                     format!("every {} days", label.miracle.cooldown_days())
-                } else if let Some(rung) = label.miracle.unlock_at() {
-                    format!("at {rung:.0} belief")
                 } else {
-                    "by legend".to_string()
+                    match label.miracle.unlock() {
+                        crate::miracles::Unlock::Founding => "from the founding".to_string(),
+                        crate::miracles::Unlock::Belief(rung) => {
+                            format!("at {rung:.0} belief")
+                        }
+                        crate::miracles::Unlock::Legend => "by legend".to_string(),
+                        crate::miracles::Unlock::Dread(depth) => {
+                            format!("by dread, {depth:.0} deep")
+                        }
+                    }
                 }
             }
             1 => if lit { "Active" } else { "Locked" }.to_string(),

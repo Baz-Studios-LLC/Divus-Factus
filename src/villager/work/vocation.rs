@@ -252,6 +252,7 @@ pub(crate) fn morning_muster(
         Query<(&ConstructionSite, &Blueprint)>,
         Query<&Stockpile>,
         Query<&Field>,
+        Query<&crate::villager::civic::CivicPriority>,
     ),
     homeless: Query<
         (),
@@ -307,7 +308,7 @@ pub(crate) fn morning_muster(
     }
     *reckoned = clock.elapsed;
 
-    let (buildings, sites, stores, fields) = town;
+    let (buildings, sites, stores, fields, decree) = town;
     let (known, trees, chunks, terrain, site) = ground;
     let mouths = workers.iter().count();
     if mouths == 0 {
@@ -495,6 +496,14 @@ pub(crate) fn morning_muster(
         ),
         (Vocation::Guard, guards),
     ];
+    // The mayor's decree leans the muster: the standing priority raises
+    // its trades' wants and touches nothing else, so a chain in a hurry
+    // concentrates hands without ever starving the other work.
+    if let Some(priority) = decree.iter().next() {
+        for (vocation, want) in wanted.iter_mut() {
+            *want *= crate::villager::civic::lean_scale(priority.lean, *vocation);
+        }
+    }
     // A roofless village needs a hammer whether or not ground is broken:
     // somebody has to be standing ready when it is.
     if homeless.iter().count() > 2 {

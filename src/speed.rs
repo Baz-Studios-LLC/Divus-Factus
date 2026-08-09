@@ -50,7 +50,7 @@ impl Default for SimSpeed {
 
 /// A button on the strip: a speed, or None for the pause toggle.
 #[derive(Component)]
-struct SpeedButton(Option<f32>);
+pub(crate) struct SpeedButton(pub(crate) Option<f32>);
 
 fn spawn_speed_strip(mut commands: Commands) {
     // The corner margin lives as padding on an invisible apron, so the

@@ -446,8 +446,36 @@ pub(crate) fn spawn_chronicle_page(mut commands: Commands, codex: Res<super::vil
     shelf_tab("FAITH", Some(Ledger::Faith));
     shelf_tab("THE WORLD", Some(Ledger::World));
 
-    // The body: the filter rail and the book itself.
-    let (rail, main) = ui::split_row(&mut commands, page, 240.0, ui::theme::PAD);
+    // The body: the filter rail on tract one, the book on two and three.
+    let band = commands
+        .spawn((ordo::grid_row(super::village::RHYTHM), ChildOf(page)))
+        .id();
+    commands
+        .entity(band)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.flex_grow = 1.0;
+            node.min_height = px(0);
+        });
+    let rail = commands
+        .spawn((ordo::col(1, super::village::RHYTHM), ChildOf(band)))
+        .id();
+    commands
+        .entity(rail)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.min_height = px(0);
+            node.row_gap = px(6);
+        });
+    let main = commands
+        .spawn((ordo::col(2, super::village::RHYTHM), ChildOf(band)))
+        .id();
+    commands
+        .entity(main)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.min_height = px(0);
+        });
     commands.spawn((
         ChronicleRail,
         Node {

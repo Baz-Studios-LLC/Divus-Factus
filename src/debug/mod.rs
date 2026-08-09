@@ -28,6 +28,7 @@ pub(crate) mod layers;
 mod manifest;
 pub(crate) mod ordo_trial;
 mod people;
+pub(crate) mod portrait;
 pub(crate) mod timings;
 pub(crate) mod village;
 mod world;
@@ -50,6 +51,8 @@ impl Plugin for DebugPlugin {
             .init_resource::<DebugState>()
             .init_resource::<SelectedPerson>()
             .init_resource::<RosterSort>()
+            .init_resource::<people::RosterFilter>()
+            .init_resource::<portrait::Portraits>()
             .init_resource::<ChronicleView>()
             .init_resource::<ChronicleStars>()
             .init_resource::<Manifestation>()
@@ -62,6 +65,7 @@ impl Plugin for DebugPlugin {
                     spawn_chronicle_page.after(spawn_village_panel),
                     spawn_village_panel,
                     spawn_god_panel.after(spawn_village_panel),
+                    portrait::spawn_portrait_studio,
                 ),
             )
             .init_resource::<village::Rebinding>()
@@ -82,6 +86,9 @@ impl Plugin for DebugPlugin {
                     update_hud,
                     update_world_panel,
                     update_people_panel,
+                    // The hall's masthead: one subject, paired to spare
+                    // the tuple.
+                    (people::people_pulse, people::filter_by_chip),
                     handle_chronicle_filters,
                     update_chronicle,
                     handle_people_rows,
@@ -96,6 +103,18 @@ impl Plugin for DebugPlugin {
             .add_systems(
                 Update,
                 (paint_world_map, handle_map_zoom, update_world_markers).chain(),
+            )
+            // The portrait studio: booking before seating before stamping,
+            // and the gallery hung last, all in one frame's walk.
+            .add_systems(
+                Update,
+                (
+                    portrait::want_portraits,
+                    portrait::run_the_studio,
+                    portrait::stamp_sitter_layers,
+                    portrait::hang_the_portraits,
+                )
+                    .chain(),
             )
             .add_systems(
                 Update,
@@ -117,8 +136,11 @@ impl Plugin for DebugPlugin {
                         update_ledger_details,
                         village::update_prayer_board,
                         village::answer_the_board,
+                        place_from_the_book,
                     ),
-                    handle_codex_tabs,
+                    // Paired: the chain tuple is at Bevy's ceiling, and
+                    // these two are one subject - the book's chrome.
+                    (handle_codex_tabs, village::footer_date),
                     people::meet_someone,
                     village::settings_panel,
                     village::keybind_panel,
@@ -318,6 +340,38 @@ fn state_phrase(activity: Option<&Activity>, reaction: Option<&Reaction>) -> &'s
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Every codex page, spawned once against one world.
+    ///
+    /// A bundle with a duplicate component panics when it is SPAWNED, not
+    /// when it compiles — the deity page shipped a (ordo::col + Node) pair
+    /// and the whole game panicked at boot. This raises the entire book in
+    /// a test world so that class of crash fails here instead of on
+    /// Brett's screen.
+    #[test]
+    fn the_whole_book_spawns() {
+        use bevy::ecs::system::RunSystemOnce;
+        let mut app = bevy::app::App::new();
+        app.init_resource::<Assets<Image>>();
+        app.init_resource::<Assets<Mesh>>();
+        app.init_resource::<Assets<StandardMaterial>>();
+        app.init_resource::<crate::villager::WorldChronicle>();
+
+        let world = app.world_mut();
+        world.run_system_once(village::spawn_village_panel).unwrap();
+        world.run_system_once(people::spawn_people_panel).unwrap();
+        world.run_system_once(spawn_god_panel).unwrap();
+        world.run_system_once(world::spawn_world_panel).unwrap();
+        world
+            .run_system_once(history::spawn_chronicle_page)
+            .unwrap();
+        world
+            .run_system_once(portrait::spawn_portrait_studio)
+            .unwrap();
+        // The commands applied without a duplicate-bundle panic, and the
+        // codex stands.
+        assert!(world.get_resource::<village::Codex>().is_some());
+    }
 
     #[test]
     fn nudge_reports_movement_and_clamps() {

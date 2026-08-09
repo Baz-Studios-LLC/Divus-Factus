@@ -1336,6 +1336,13 @@ pub(super) fn grow_legend(mut legend: ResMut<Legend>, mut events: MessageReader<
             // own acts: they happen to every village, whoever its god is.
             DivineEventKind::Delivered | DivineEventKind::Flourished => legend.providence += 0.3,
             DivineEventKind::Perished => legend.dread += 0.3,
+            // The wonders feed the legends like their kin: called rain and
+            // the beckoning light are providence, the falling stone and the
+            // sown shadow are dread of the oldest kind.
+            DivineEventKind::Rained => legend.providence += 0.5,
+            DivineEventKind::Beckoned => legend.providence += 0.6,
+            DivineEventKind::Fell => legend.dread += 1.2,
+            DivineEventKind::DoubtSown => legend.dread += 0.8,
             _ => {}
         }
     }

@@ -20,12 +20,18 @@ pub(crate) struct WorldPanel;
 /// The map image and the painter's progress.
 #[derive(Resource)]
 pub(crate) struct WorldMap {
-    pub image: Handle<Image>,
+    /// One painted sheet per zoom step, all warmed while the book is
+    /// open, so the +/- buttons swap pictures instead of repainting.
+    /// Brett: "all three zoom levels too since they all load."
+    pub sheets: [Handle<Image>; 3],
     pub centre: Vec2,
-    pub radius: f32,
-    /// Rows painted so far; the painter rests at the map's full height.
-    pub painted: u32,
+    /// Rows painted so far, per sheet; the painter rests at full height.
+    pub painted: [u32; 3],
 }
+
+/// The face the map pane shows: swapped between the sheets on zoom.
+#[derive(Component)]
+pub(crate) struct MapFace;
 
 /// The zoom radii the +/- buttons walk.
 const ZOOM_STEPS: [f32; 3] = [260.0, 440.0, 760.0];
@@ -174,55 +180,53 @@ pub(crate) fn spawn_world_panel(
         .entity(page)
         .insert((Name::new("World Page"), WorldPanel));
 
-    // The unpainted parchment: near-black until the cartographer works.
-    let blank = vec![0u8; (MAP_W * MAP_H * 4) as usize];
-    let image = images.add(Image::new(
-        bevy::render::render_resource::Extent3d {
-            width: MAP_W,
-            height: MAP_H,
-            depth_or_array_layers: 1,
-        },
-        bevy::render::render_resource::TextureDimension::D2,
-        blank,
-        bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-        bevy::asset::RenderAssetUsages::MAIN_WORLD | bevy::asset::RenderAssetUsages::RENDER_WORLD,
-    ));
+    // The unpainted parchments: near-black until the cartographer works.
+    let mut sheet = || {
+        images.add(Image::new(
+            bevy::render::render_resource::Extent3d {
+                width: MAP_W,
+                height: MAP_H,
+                depth_or_array_layers: 1,
+            },
+            bevy::render::render_resource::TextureDimension::D2,
+            vec![0u8; (MAP_W * MAP_H * 4) as usize],
+            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+            bevy::asset::RenderAssetUsages::MAIN_WORLD
+                | bevy::asset::RenderAssetUsages::RENDER_WORLD,
+        ))
+    };
+    let sheets = [sheet(), sheet(), sheet()];
+    let image = sheets[MapZoom::default().0].clone();
     commands.insert_resource(WorldMap {
-        image: image.clone(),
+        sheets,
         centre: Vec2::ZERO,
-        radius: ZOOM_STEPS[1],
-        painted: 0,
+        painted: [0; 3],
     });
     commands.init_resource::<MapZoom>();
 
     // ---- The main row: the rail and the map. ------------------------------
     let main = commands
-        .spawn((
-            Node {
-                width: percent(100),
-                flex_grow: 1.0,
-                min_height: px(0),
-                flex_direction: FlexDirection::Row,
-                column_gap: px(10),
-                align_items: AlignItems::Stretch,
-                ..default()
-            },
-            ChildOf(page),
-        ))
+        .spawn((ordo::grid_row(super::village::RHYTHM), ChildOf(page)))
         .id();
+    commands
+        .entity(main)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.flex_grow = 1.0;
+            node.min_height = px(0);
+            node.align_items = AlignItems::Stretch;
+        });
 
     let rail = commands
-        .spawn((
-            Node {
-                width: px(300),
-                flex_shrink: 0.0,
-                flex_direction: FlexDirection::Column,
-                row_gap: px(8),
-                ..default()
-            },
-            ChildOf(main),
-        ))
+        .spawn((ordo::col(1, super::village::RHYTHM), ChildOf(main)))
         .id();
+    commands
+        .entity(rail)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.row_gap = px(8);
+            node.min_height = px(0);
+        });
 
     // CURRENT TIME: the date writ large, the season track, the progress.
     let time_card = ui::card_well(&mut commands, rail, "CURRENT TIME");
@@ -362,6 +366,16 @@ pub(crate) fn spawn_world_panel(
 
     // THE MAP: the land itself, with its legend and its zoom.
     let map_card = ui::card_well(&mut commands, main, "WORLD MAP");
+    // Onto tracts two and three WITHOUT replacing the well's own Node:
+    // inserting ordo::col would overwrite the card's styling wholesale.
+    commands
+        .entity(map_card)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.flex_grow = 2.0;
+            node.flex_basis = px(super::village::RHYTHM);
+            node.min_width = px(0);
+        });
     let map_row = commands
         .spawn((
             Node {
@@ -392,6 +406,7 @@ pub(crate) fn spawn_world_panel(
         ))
         .id();
     commands.spawn((
+        MapFace,
         bevy::ui::widget::ImageNode::new(image),
         Node {
             position_type: PositionType::Absolute,
@@ -709,38 +724,55 @@ pub(crate) fn spawn_world_panel(
 /// is open, sampling the same terrain function the world is built from.
 pub(crate) fn paint_world_map(
     codex: Res<super::village::Codex>,
-    panels: Query<&Visibility, With<WorldPanel>>,
+    panels: Query<&Visibility, With<super::village::VillagePanel>>,
     terrain: Option<Res<crate::terrain::Terrain>>,
     site: Option<Res<crate::villager::SettlementSite>>,
     known: Option<Res<crate::villager::explore::KnownWorld>>,
+    zoom: Res<MapZoom>,
+    mut seen: Local<u64>,
     mut map: ResMut<WorldMap>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    if codex.page != super::village::CodexPage::World
-        || !panels.iter().any(|v| *v != Visibility::Hidden)
-    {
+    // Painted whenever the BOOK is open, not only on the world's own
+    // page: the map is rows-per-frame slow by design, so warming it from
+    // the moment the codex opens means the page - and all three zoom
+    // sheets - are already painted when the chapter is chosen. Brett:
+    // "can we load it automatically when the codex loads?... all three
+    // zoom levels too since they all load."
+    let _ = codex.page;
+    if !panels.iter().any(|v| *v != Visibility::Hidden) {
         return;
     }
     let Some(terrain) = terrain else {
         return;
     };
+    // Fresh knowledge restarts the cartography: the fog on a painted
+    // sheet is only as old as the last time the explorers surprised it.
+    let charted = known.as_ref().map_or(0, |k| k.pockets.len()) as u64
+        ^ (known.as_ref().map_or(0.0, |k| k.radius) as u64) << 32;
+    if *seen != charted {
+        *seen = charted;
+        map.painted = [0; 3];
+    }
     // The map centres on the banner the first time it can.
-    if map.painted == 0
+    if map.painted == [0; 3]
         && let Some(site) = site.as_ref()
     {
         map.centre = Vec2::new(site.centre.x, site.centre.z);
     }
-    if map.painted >= MAP_H {
+    // The current zoom paints first; the other sheets warm behind it.
+    let order = [zoom.0, 0, 1, 2];
+    let Some(sheet) = order.into_iter().find(|step| map.painted[*step] < MAP_H) else {
         return;
-    }
-    let Some(mut image) = images.get_mut(&map.image) else {
+    };
+    let Some(mut image) = images.get_mut(&map.sheets[sheet].clone()) else {
         return;
     };
     let Some(data) = image.data.as_mut() else {
         return;
     };
 
-    let radius = map.radius;
+    let radius = ZOOM_STEPS[sheet];
     let radius_z = radius * MAP_H as f32 / MAP_W as f32;
     let centre = map.centre;
     let known_centre = known.as_ref().map(|k| Vec2::new(k.centre.x, k.centre.z));
@@ -752,8 +784,8 @@ pub(crate) fn paint_world_map(
             .collect()
     });
 
-    let rows_to_paint = ROWS_PER_FRAME.min(MAP_H - map.painted);
-    for row in map.painted..map.painted + rows_to_paint {
+    let rows_to_paint = ROWS_PER_FRAME.min(MAP_H - map.painted[sheet]);
+    for row in map.painted[sheet]..map.painted[sheet] + rows_to_paint {
         for col in 0..MAP_W {
             let u = col as f32 / (MAP_W - 1) as f32;
             let v = row as f32 / (MAP_H - 1) as f32;
@@ -821,14 +853,15 @@ pub(crate) fn paint_world_map(
             data[offset + 3] = 255;
         }
     }
-    map.painted += rows_to_paint;
+    map.painted[sheet] += rows_to_paint;
 }
 
 /// The zoom buttons redraw the map at the next radius in or out.
 pub(crate) fn handle_map_zoom(
     buttons: Query<(&Interaction, &MapZoomButton), Changed<Interaction>>,
     mut zoom: ResMut<MapZoom>,
-    mut map: ResMut<WorldMap>,
+    map: Res<WorldMap>,
+    mut faces: Query<&mut bevy::ui::widget::ImageNode, With<MapFace>>,
 ) {
     for (interaction, button) in &buttons {
         if *interaction != Interaction::Pressed {
@@ -841,8 +874,10 @@ pub(crate) fn handle_map_zoom(
         };
         if fresh != zoom.0 {
             zoom.0 = fresh;
-            map.radius = ZOOM_STEPS[fresh];
-            map.painted = 0;
+            // The sheet is already painted (or painting): swap the face.
+            for mut face in &mut faces {
+                face.image = map.sheets[fresh].clone();
+            }
         }
     }
 }
@@ -858,6 +893,7 @@ pub(crate) fn update_world_markers(
     mut last_rebuild: Local<f32>,
     mut fingerprint: Local<u64>,
     map: Res<WorldMap>,
+    zoom: Res<MapZoom>,
     site: Option<Res<crate::villager::SettlementSite>>,
     settlements: Query<&crate::villager::Settlement>,
     villagers: Query<
@@ -889,7 +925,7 @@ pub(crate) fn update_world_markers(
     let fresh = {
         use std::hash::{Hash, Hasher};
         let mut hasher = std::hash::DefaultHasher::new();
-        (map.radius as i32).hash(&mut hasher);
+        (ZOOM_STEPS[zoom.0] as i32).hash(&mut hasher);
         (map.centre.x as i32, map.centre.y as i32).hash(&mut hasher);
         villagers.iter().count().hash(&mut hasher);
         for cairn in &cairns {
@@ -907,9 +943,10 @@ pub(crate) fn update_world_markers(
     *fingerprint = fresh;
     commands.entity(well).despawn_related::<Children>();
 
-    let radius_z = map.radius * MAP_H as f32 / MAP_W as f32;
+    let radius = ZOOM_STEPS[zoom.0];
+    let radius_z = radius * MAP_H as f32 / MAP_W as f32;
     let place = |world: Vec2| -> Option<(f32, f32)> {
-        let u = (world.x - map.centre.x) / (2.0 * map.radius) + 0.5;
+        let u = (world.x - map.centre.x) / (2.0 * radius) + 0.5;
         let v = (world.y - map.centre.y) / (2.0 * radius_z) + 0.5;
         ((0.02..0.98).contains(&u) && (0.02..0.98).contains(&v)).then_some((u * 100.0, v * 100.0))
     };
@@ -1001,7 +1038,7 @@ pub(crate) fn update_world_panel(
     mut commands: Commands,
     codex: Res<super::village::Codex>,
     // Grouped: sixteen params is the compiler's ceiling, not this page's.
-    (clock, sky, weather, terrain, site, known, map, history): (
+    (clock, sky, weather, terrain, site, known, map, history, zoom): (
         Res<crate::calendar::WorldClock>,
         Option<Res<crate::calendar::Sky>>,
         Option<Res<crate::weather::Weather>>,
@@ -1010,6 +1047,7 @@ pub(crate) fn update_world_panel(
         Option<Res<crate::villager::explore::KnownWorld>>,
         Option<Res<WorldMap>>,
         Res<crate::villager::WorldChronicle>,
+        Res<MapZoom>,
     ),
     (panels, cairns, wildlife, events_wells): (
         Query<&Visibility, With<WorldPanel>>,
@@ -1121,7 +1159,8 @@ pub(crate) fn update_world_panel(
 
     // The summary: what kind of country, and how much of it is yours.
     let known_radius = known.as_ref().map_or(0.0, |k| k.radius);
-    let map_radius = map.as_ref().map_or(440.0, |m| m.radius);
+    let map_radius = ZOOM_STEPS[zoom.0];
+    let _ = &map;
     for (row, mut text) in &mut texts.p3() {
         let fresh = match row.0 {
             0 => match (&terrain, &site) {
