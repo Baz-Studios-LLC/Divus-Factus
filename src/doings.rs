@@ -105,6 +105,7 @@ fn doing_word(activity: &Activity, talk: Option<&Conversing>) -> &'static str {
         Activity::Sleeping => "asleep",
         Activity::Working => "working",
         Activity::Praying => "praying",
+        Activity::Marvelling => "on their knees at what they saw",
         Activity::Sheltering => "sheltering",
         Activity::TendingFire => "tending the fire",
         // Most of a conversation is the walk to it: two people who have

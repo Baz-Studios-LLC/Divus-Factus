@@ -767,7 +767,7 @@ pub(super) fn salvage_timber(
 /// personal-stake speedup. Either roof counts: a carpenter with no bed of
 /// their own is as invested in the longhouse going up as in a house.
 fn plan_kind_is_home(
-    build_sites: &Query<(&mut ConstructionSite, &Blueprint)>,
+    build_sites: &Query<(&mut ConstructionSite, &mut Blueprint)>,
     site: Entity,
 ) -> bool {
     build_sites
@@ -839,7 +839,7 @@ pub(super) fn do_work(
         Query<&mut crate::scatter::SacredFlora>,
     ),
     civic: (
-        Query<(&mut ConstructionSite, &Blueprint)>,
+        Query<(&mut ConstructionSite, &mut Blueprint)>,
         Query<&super::Settlement>,
         MessageWriter<crate::ui::Notice>,
         MessageWriter<crate::witness::DivineEvent>,
@@ -1092,27 +1092,64 @@ pub(super) fn do_work(
                 commands.entity(entity).remove::<Job>();
                 continue;
             };
-            let Ok((site_now, site_plan)) = build_sites.get(house) else {
+            // Read into plain values and let the borrow go: the material
+            // switch below needs the plan back mutably.
+            let Some((stuff, site_kind, site_progress)) = build_sites
+                .get(house)
+                .ok()
+                .map(|(site_now, site_plan)| (site_plan.stuff, site_plan.kind, site_now.progress))
+            else {
                 // Finished under someone else's hammer.
                 *activity = Activity::Idle;
                 commands.entity(entity).remove::<Job>();
                 continue;
             };
-            let stuff = site_plan.stuff;
-            let site_progress = site_now.progress;
 
             if carrying.get(entity).is_err() {
-                // Empty-handed: fetch whatever this house is BUILT from.
-                let short = match stuff {
-                    BuildStuff::Timber => store.timber < 1.0,
-                    BuildStuff::Stone => store.stone < 1.0,
-                    BuildStuff::MudBrick => store.clay < 1.0,
+                // Empty-handed: fetch whatever this house is BUILT from -
+                // or whatever the town HAS, if that has run out.
+                //
+                // What a plot is made of is chosen the morning its ground
+                // is broken, out of what stood in the store and what grew
+                // nearby. Held to for ever, that choice is a trap: a
+                // longhouse begun in mud brick during a clay week stands
+                // at nought of twelve for ever once the clay is gone,
+                // however deep the timber pile gets. Brett's town had
+                // fourteen hundred timber and a frame that had never
+                // received one stick of it, and one soul slept rough
+                // behind it for days.
+                //
+                // A builder out of brick finishes the house in wood, the
+                // way a builder would.
+                let held = |stuff: BuildStuff| match stuff {
+                    BuildStuff::Timber => store.timber,
+                    BuildStuff::Stone => store.stone,
+                    BuildStuff::MudBrick => store.clay,
                 };
-                if short {
+                let stuff = if held(stuff) >= 1.0 {
+                    stuff
+                } else if let Some(instead) =
+                    [BuildStuff::Timber, BuildStuff::Stone, BuildStuff::MudBrick]
+                        .into_iter()
+                        .filter(|other| held(*other) >= 4.0)
+                        .max_by(|a, b| held(*a).total_cmp(&held(*b)))
+                {
+                    if let Ok((_, mut site_plan)) = build_sites.get_mut(house) {
+                        site_plan.stuff = instead;
+                    }
+                    info!(
+                        "{} ran out of {} for the {} and went on in {}",
+                        person.name,
+                        stuff.word(),
+                        site_kind.name().to_lowercase(),
+                        instead.word(),
+                    );
+                    instead
+                } else {
                     *activity = Activity::Idle;
                     commands.entity(entity).remove::<Job>();
                     continue;
-                }
+                };
                 if transform.translation.distance(woodpile) > 2.6 {
                     target.0 = Some(woodpile);
                     job.patience -= dt;
@@ -1131,7 +1168,7 @@ pub(super) fn do_work(
                 // build read as a man pacing between the stores and a
                 // half-raised frame for no visible reason. He takes what
                 // the site still wants, up to a load.
-                let wanting = (site_plan.kind.timber_cost() - site_progress).max(0.0);
+                let wanting = (site_kind.timber_cost() - site_progress).max(0.0);
                 let load = match stuff {
                     BuildStuff::Timber => store.timber,
                     BuildStuff::Stone => store.stone,
@@ -1207,7 +1244,7 @@ pub(super) fn do_work(
             construction.last_hand = clock.elapsed;
             // Stages land at thirds of the build, whatever the kind's cost.
             let cost = plan.kind.timber_cost();
-            let target_stage = stage_for(construction.progress, cost, steps_for(plan));
+            let target_stage = stage_for(construction.progress, cost, steps_for(&plan));
             while construction.stage < target_stage {
                 construction.stage += 1;
                 raise_stage(
@@ -1216,7 +1253,7 @@ pub(super) fn do_work(
                     &mut materials,
                     house,
                     construction.stage,
-                    plan,
+                    &plan,
                 );
             }
             if construction.progress >= cost {
@@ -1437,7 +1474,7 @@ pub(super) fn do_work(
                     &mut meshes,
                     &mut materials,
                     site_entity,
-                    plan,
+                    &plan,
                 );
                 info!(
                     "the foundation of {} is laid",

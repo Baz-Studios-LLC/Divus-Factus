@@ -944,6 +944,13 @@ fn express_reactions(
         if reaction.remaining <= 0.0 {
             commands.entity(entity).remove::<Reaction>();
             motion.look_at = None;
+            // Back to their own day - unless the sight put them on their
+            // knees to ask for something, which is the prayer system's
+            // business and not this one's. The pose follows the activity
+            // on its own, one frame later.
+            if matches!(*activity, Activity::Marvelling) {
+                *activity = Activity::Idle;
+            }
             continue;
         }
 
@@ -955,9 +962,19 @@ fn express_reactions(
         let distance = away.length();
 
         match reaction.kind {
+            // Not "stop and stare" any more: down on their knees, facing
+            // it. Worship, not a request - nothing is being asked for and
+            // no prayer opens. Brett: "in truth they should fall to their
+            // knees in worship. It doesnt mean they pray, they just do
+            // the animation."
             ReactionKind::Watch => {
                 target.0 = None;
                 route.waypoints.clear();
+                // Still, so the walk cycle does not play under a kneel.
+                // The kneel itself belongs to `belief::take_a_knee`,
+                // which owns that pose for the whole game and reads it off
+                // `Activity::Marvelling` below.
+                motion.speed = 0.0;
             }
             ReactionKind::Recoil => {
                 if distance < 14.0 && distance > 0.01 {
@@ -971,11 +988,19 @@ fn express_reactions(
             }
         }
 
-        // Watching does not interrupt a prayer - the kneeler lifts their
-        // eyes and keeps kneeling. Fear and awe still do: a recoiling or
-        // approaching pray-er has, honestly, stopped praying.
-        if !(matches!(*activity, Activity::Praying) && reaction.kind == ReactionKind::Watch) {
-            *activity = Activity::Idle;
+        // The witness OWNS the body while the reaction lasts.
+        //
+        // This wrote `Idle` every frame instead, which handed the villager
+        // straight back to the activity chooser - which gave them
+        // somewhere to walk, which this overwrote, at frame rate. Brett
+        // watched a crowd witness a miracle and shake to pieces: "they
+        // start shaking like crazy. it looks like the door bug." It was
+        // the door bug, in a different room: two writers, no owner.
+        //
+        // A prayer already underway is the one thing not interrupted - a
+        // kneeler who sees the god lifts their eyes and keeps kneeling.
+        if !matches!(*activity, Activity::Praying) {
+            *activity = Activity::Marvelling;
         }
     }
 }
@@ -1237,5 +1262,82 @@ mod tests {
             let t = Temperament::random(&mut rng);
             assert!(!t.describe().is_empty());
         }
+    }
+
+    /// A witness of the god's own hand goes to their knees, and the
+    /// witness system OWNS them while it lasts.
+    ///
+    /// It used to write `Idle` every frame, which handed the villager
+    /// straight back to the activity chooser; that gave them somewhere to
+    /// walk, this cleared it, and the two fought at frame rate. Brett:
+    /// "they start shaking like crazy. it looks like the door bug." The
+    /// activity is the ownership, so this is the thing to pin.
+    #[test]
+    fn a_witness_kneels_and_nothing_else_owns_them() {
+        use bevy::ecs::system::RunSystemOnce;
+
+        let mut app = App::new();
+        app.init_resource::<Time>();
+        app.init_resource::<crate::debug::timings::Timings>();
+        let seen = Vec3::new(4.0, 0.0, 0.0);
+        let soul = app
+            .world_mut()
+            .spawn((
+                crate::villager::Villager,
+                Transform::default(),
+                Reaction {
+                    kind: ReactionKind::Watch,
+                    focus: seen,
+                    remaining: 5.0,
+                },
+                // Mid-errand, with somewhere to be: the walk must stop.
+                MoveTarget(Some(Vec3::new(30.0, 0.0, 30.0))),
+                Route::default(),
+                CreatureMotion::new(0.0),
+                Activity::Wandering,
+            ))
+            .id();
+
+        app.world_mut().run_system_once(express_reactions).unwrap();
+        assert_eq!(
+            *app.world().get::<Activity>(soul).unwrap(),
+            Activity::Marvelling,
+            "the witness owns the body while the sight lasts",
+        );
+        assert_eq!(
+            app.world().get::<MoveTarget>(soul).unwrap().0,
+            None,
+            "whatever they were walking to, they are not walking to it now",
+        );
+        assert_eq!(
+            app.world().get::<CreatureMotion>(soul).unwrap().look_at,
+            Some(seen),
+            "they are looking at what they saw",
+        );
+
+        // And the pose follows the activity, from its one owner.
+        app.world_mut()
+            .run_system_once(crate::villager::belief::take_a_knee)
+            .unwrap();
+        assert!(
+            app.world().get::<CreatureMotion>(soul).unwrap().kneeling,
+            "worship is a kneel, not a stare",
+        );
+
+        // When it passes they get up and go back to their own day.
+        app.world_mut().get_mut::<Reaction>(soul).unwrap().remaining = 0.0;
+        app.world_mut().run_system_once(express_reactions).unwrap();
+        assert_eq!(
+            *app.world().get::<Activity>(soul).unwrap(),
+            Activity::Idle,
+            "the sight lets go of them",
+        );
+        app.world_mut()
+            .run_system_once(crate::villager::belief::take_a_knee)
+            .unwrap();
+        assert!(
+            !app.world().get::<CreatureMotion>(soul).unwrap().kneeling,
+            "and they stand back up",
+        );
     }
 }

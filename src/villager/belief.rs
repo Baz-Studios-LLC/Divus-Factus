@@ -320,7 +320,7 @@ impl Belief {
 /// Prayer is something you can see now: whoever is praying goes down on
 /// their knees, and stands back up when the prayer leaves them. One writer
 /// for the posture, so there are no cleanup edges to miss.
-pub(super) fn take_a_knee(
+pub(crate) fn take_a_knee(
     mut folk: Query<
         (
             &Activity,
@@ -337,7 +337,13 @@ pub(super) fn take_a_knee(
     for (activity, mut motion, held, airborne) in &mut folk {
         // The god's grip outranks the prayer: a body plucked mid-devotion
         // unfolds to dangle and kick, and kneels again when set down.
-        let kneeling = !held && !airborne && (staged || matches!(activity, Activity::Praying));
+        // One writer for the pose, keyed off what the person is DOING:
+        // asking on their knees, or on their knees at the sight of the
+        // god's own hand. A second system writing `kneeling` of its own
+        // accord is how the last two shakes in this game happened.
+        let kneeling = !held
+            && !airborne
+            && (staged || matches!(activity, Activity::Praying | Activity::Marvelling));
         if motion.kneeling != kneeling {
             motion.kneeling = kneeling;
         }

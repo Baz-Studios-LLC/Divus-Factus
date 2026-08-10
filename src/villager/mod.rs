@@ -809,6 +809,18 @@ pub enum Activity {
     Bearing,
     /// On their knees, asking.
     Praying,
+    /// On their knees at the sight of the god's own hand - and asking for
+    /// nothing. Worship is not a request: they saw what happened and
+    /// their legs went. Brett: "they should fall to their knees in
+    /// worship. It doesnt mean they pray, they just do the animation."
+    ///
+    /// It is its OWN activity because the witness has to own the body
+    /// while it lasts. Reacting used to write `Idle` every frame, the
+    /// activity chooser handed the freed villager somewhere to walk, and
+    /// the two fought at whatever rate the frame ran - the same shake the
+    /// doorways had, for the same reason. Brett: "they start shaking like
+    /// crazy. it looks like the door bug."
+    Marvelling,
     /// Walking home for the night, or already inside.
     Sleeping,
 }
@@ -3085,6 +3097,7 @@ fn choose_activity(
                 | Activity::TendingFire
                 | Activity::Hauling
                 | Activity::Praying
+                | Activity::Marvelling
                 | Activity::Sleeping
                 | Activity::Mourning
                 | Activity::Bearing
@@ -3276,12 +3289,14 @@ fn pursue_activity(
                 }
             }
 
-            // The work, home and rites systems steer these themselves.
+            // The work, home, rites and witness systems steer these
+            // themselves.
             Activity::Working
             | Activity::VisitingStore
             | Activity::TendingFire
             | Activity::Hauling
             | Activity::Praying
+            | Activity::Marvelling
             | Activity::Sleeping
             | Activity::Mourning
             | Activity::Bearing

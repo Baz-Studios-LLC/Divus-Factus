@@ -269,6 +269,7 @@ pub fn clips_follow_the_day(
             crate::villager::Activity::Sheltering => "sheltering",
             crate::villager::Activity::Bearing => "bearing",
             crate::villager::Activity::Praying => "praying",
+            crate::villager::Activity::Marvelling => "praying",
             crate::villager::Activity::Sleeping => "sleeping",
         };
         match (clip_called(wanted), playing) {
