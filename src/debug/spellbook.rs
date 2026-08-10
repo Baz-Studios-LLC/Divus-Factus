@@ -130,31 +130,36 @@ pub(crate) fn spawn_spellbook_page(mut commands: Commands, codex: Res<super::vil
                 node.flex_shrink = 0.0;
             });
         for &miracle in third {
+            // The tract column stays BARE, exactly like the filler that
+            // squares off a short row - a border or padding on the column
+            // itself joins the flex arithmetic and staggers part-rows off
+            // the tracts. The card is a full-width child instead.
+            let seat = commands
+                .spawn((ordo::col(1, super::village::RHYTHM), ChildOf(grid_line)))
+                .id();
             let card = commands
                 .spawn((
                     MiracleCard(miracle),
-                    ordo::col(1, super::village::RHYTHM),
                     Interaction::default(),
                     ui::HoverHint::new(
                         miracle.name(),
                         "press for the first empty slot - or drag it onto the bar",
                     ),
+                    Node {
+                        width: percent(100),
+                        flex_direction: FlexDirection::Row,
+                        column_gap: px(12),
+                        padding: UiRect::all(px(12)),
+                        border: UiRect::all(px(1)),
+                        border_radius: BorderRadius::all(px(6)),
+                        overflow: Overflow::clip(),
+                        ..default()
+                    },
                     BackgroundColor(Color::BLACK.with_alpha(0.3)),
                     BorderColor::all(ui::theme::panel_border().with_alpha(0.2)),
-                    ChildOf(grid_line),
+                    ChildOf(seat),
                 ))
                 .id();
-            commands
-                .entity(card)
-                .entry::<Node>()
-                .and_modify(|mut node| {
-                    node.flex_direction = FlexDirection::Row;
-                    node.column_gap = px(12);
-                    node.padding = UiRect::all(px(12));
-                    node.border = UiRect::all(px(1));
-                    node.border_radius = BorderRadius::all(px(6));
-                    node.overflow = Overflow::clip();
-                });
             // The face: the same engraving the bar's slots wear, on its
             // own permanent plate.
             let plate = commands

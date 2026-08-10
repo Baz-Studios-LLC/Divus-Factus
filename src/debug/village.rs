@@ -1804,26 +1804,32 @@ pub(crate) fn update_prayer_board(
                 node.flex_shrink = 0.0;
             });
         for (who, person, prayer, vocation) in third {
+            // The tract column stays BARE, matching a short row's filler
+            // exactly - border and padding on the column itself join the
+            // flex arithmetic and stagger part-rows off the tracts. The
+            // card is a full-width child instead.
+            let seat = commands
+                .spawn((ordo::col(1, RHYTHM), ChildOf(grid_line)))
+                .id();
             let card = commands
                 .spawn((
                     PrayerRow(*who),
-                    ordo::col(1, RHYTHM),
                     Interaction::default(),
                     ui::HoverHint::new(&person.name, "press to fly to them"),
+                    Node {
+                        width: percent(100),
+                        flex_direction: FlexDirection::Column,
+                        row_gap: px(6),
+                        padding: UiRect::all(px(10)),
+                        border: UiRect::all(px(2)),
+                        border_radius: BorderRadius::all(px(8)),
+                        ..default()
+                    },
                     BackgroundColor(Color::BLACK.with_alpha(0.32)),
                     BorderColor::all(pink.with_alpha(0.55)),
-                    ChildOf(grid_line),
+                    ChildOf(seat),
                 ))
                 .id();
-            commands
-                .entity(card)
-                .entry::<Node>()
-                .and_modify(|mut node| {
-                    node.row_gap = px(6);
-                    node.padding = UiRect::all(px(10));
-                    node.border = UiRect::all(px(2));
-                    node.border_radius = BorderRadius::all(px(8));
-                });
 
             // The head: the TRUE portrait in a frame of their trade's own
             // colour, the name beside it, hope in the corner - ruled off
