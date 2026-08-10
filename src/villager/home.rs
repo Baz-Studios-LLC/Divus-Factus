@@ -44,6 +44,15 @@ pub const FIRE_CIRCLE_SHELTER: usize = 8;
 /// finally wired to mean it.
 pub const HALL_HEADROOM: usize = 8;
 
+/// The town's size, measured the only honest way: beds. Past this many,
+/// no dwelling breaks ground - the banner will hold no more roofs, the
+/// overflow sleeps rough, and the fullness door in `colony::muster`
+/// opens on its own. Brett: "limiting the size of the town by how many
+/// beds there are to 100. After that people need to get frustrated by
+/// overpopulation and form a new town." The double bed counts its two
+/// already - capacity is counted in souls a roof sleeps, not bedsteads.
+pub const TOWN_BED_CEILING: usize = 100;
+
 pub fn shelter_capacity(houses: usize, longhouses: usize, halls: usize) -> usize {
     FIRE_CIRCLE_SHELTER
         + houses * HOUSE_CAPACITY

@@ -318,6 +318,8 @@ pub struct RoofNeeds {
     pub longhouse_rising: bool,
     /// Grown souls with no roof at all tonight.
     pub roofless: usize,
+    /// Standing town halls, for their headroom in the bed count.
+    pub halls: usize,
 }
 
 /// Which roof to break ground on next, if either.
@@ -331,7 +333,21 @@ pub struct RoofNeeds {
 /// The fire circle is deliberately not counted as shelter here. It is the
 /// shortfall made visible, not capacity to plan around.
 pub fn next_roof(needs: &RoofNeeds) -> Option<BuildingKind> {
-    use crate::villager::home::{HOUSE_CAPACITY, LONGHOUSE_CAPACITY};
+    use crate::villager::home::{HOUSE_CAPACITY, LONGHOUSE_CAPACITY, TOWN_BED_CEILING};
+
+    // The town has a size, and beds are the measure of it. Counting the
+    // roofs already rising, no dwelling breaks ground past the ceiling:
+    // the overflow stays roofless on purpose, their frustration is the
+    // fullness door's fuel, and the road prayer follows. A full town is
+    // not a failed town - it is a town about to be two towns.
+    let beds_when_done = crate::villager::home::shelter_capacity(
+        needs.houses + needs.houses_rising,
+        needs.longhouses + usize::from(needs.longhouse_rising),
+        needs.halls,
+    );
+    if beds_when_done >= TOWN_BED_CEILING {
+        return None;
+    }
 
     let family_slack = (needs.houses * HOUSE_CAPACITY) as i32 - needs.family_souls as i32;
     let single_slack = (needs.longhouses * LONGHOUSE_CAPACITY) as i32 - needs.single_souls as i32;
@@ -2787,10 +2803,32 @@ pub(crate) fn plan_houses(
                 .filter(|(b, _, member)| b.kind == BuildingKind::House && member.0 == settlement)
                 .count(),
             longhouse_rising: rising(BuildingKind::Longhouse),
+            halls: standing(BuildingKind::TownHall),
         })
     } {
         roof
     } else if roofless_adults > 0 {
+        // Nobody builds and people sleep rough: the ceiling, named. A
+        // silent planner here reads as a stall; the truth is the town is
+        // finished growing and the road is the answer.
+        let dwelling_count = |kind: BuildingKind| {
+            civics
+                .iter()
+                .filter(|(b, member)| b.kind == kind && member.0 == settlement)
+                .count()
+        };
+        let beds_now = crate::villager::home::shelter_capacity(
+            dwelling_count(BuildingKind::House),
+            standing_longhouses,
+            dwelling_count(BuildingKind::TownHall),
+        );
+        if beds_now >= crate::villager::home::TOWN_BED_CEILING {
+            info!(
+                "housing watch: the town is full - {} beds is all the banner will hold, and {} sleep rough looking to the road",
+                beds_now, roofless_adults
+            );
+            return;
+        }
         // A roof is already rising for them - say so, with arithmetic,
         // so a stalled build is a visible fact instead of a silent
         // population ceiling.
@@ -3501,7 +3539,44 @@ mod tests {
             // lets these cases test the slack arithmetic rather than the
             // shelter-first rule that outranks it.
             roofless: 0,
+            halls: 0,
         }
+    }
+
+    /// The town's size is measured in beds, and it stops at the ceiling.
+    /// Past a hundred souls' worth of roofs - the double bed counting its
+    /// two - the planner refuses every dwelling, roofless or not, because
+    /// the overflow's frustration is what opens the fullness door and
+    /// sends the road prayer to its knees. Brett's design, 2026-08-10.
+    #[test]
+    fn the_town_stops_at_a_hundred_beds() {
+        use crate::villager::home::{TOWN_BED_CEILING, shelter_capacity};
+        let mut full = snug(80, 16);
+        full.roofless = 9;
+        full.family_souls += 9;
+        assert!(
+            shelter_capacity(full.houses, full.longhouses, 0) >= TOWN_BED_CEILING,
+            "the fixture must stand at the ceiling"
+        );
+        assert!(
+            next_roof(&full).is_none(),
+            "a full town must refuse every new roof"
+        );
+        // The same want with room left: the roof rises.
+        let mut room = full.clone();
+        room.houses = 10;
+        assert!(
+            next_roof(&room).is_some(),
+            "below the ceiling the same want builds"
+        );
+        // Roofs already rising count toward the ceiling too.
+        let mut rising = full.clone();
+        rising.houses -= 3;
+        rising.houses_rising = 3;
+        assert!(
+            next_roof(&rising).is_none(),
+            "the ceiling counts the roofs already going up"
+        );
     }
 
     #[test]
@@ -3519,6 +3594,7 @@ mod tests {
             houses_rising: 0,
             longhouse_rising: false,
             roofless: 12,
+            halls: 0,
         };
         assert_eq!(next_roof(&founding), Some(BuildingKind::Longhouse));
 
