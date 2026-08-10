@@ -345,6 +345,10 @@ pub(crate) fn spawn_people_panel(
                 flex_wrap: FlexWrap::Wrap,
                 column_gap: px(6),
                 row_gap: px(6),
+                // Air above and below the pills: they sat pressed between
+                // the plates and the roster. Brett: "padding above and
+                // below these pills is needed."
+                padding: UiRect::axes(px(0), px(7)),
                 ..default()
             },
             ChildOf(masthead),
