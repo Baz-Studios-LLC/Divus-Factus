@@ -152,7 +152,9 @@ pub(crate) fn spawn_portrait_studio(mut commands: Commands, mut images: ResMut<A
         PortraitCamera,
         Camera3d::default(),
         Camera {
-            order: -21,
+            // One slot below the deity alcove's -21: distinct orders keep
+            // the camera sort unambiguous.
+            order: -22,
             is_active: false,
             clear_color: bevy::camera::ClearColorConfig::Custom(Color::NONE),
             ..default()

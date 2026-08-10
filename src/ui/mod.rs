@@ -39,6 +39,7 @@ impl Plugin for UiPlugin {
                 (
                     spawn_toast_shelf,
                     spawn_prayer_shelf,
+                    spawn_frost_glass,
                     load_fonts,
                     spawn_date_card,
                 ),
@@ -55,8 +56,9 @@ impl Plugin for UiPlugin {
                     keep_the_prayer_shelf.run_if(in_state(crate::GameState::Playing)),
                     set_askings_aside.run_if(in_state(crate::GameState::Playing)),
                     // The frosted glass and the standing-down shelves: one
-                    // subject - the book owning the screen.
-                    (frost_the_world, hud_stands_down),
+                    // subject - the book owning the screen. The glass
+                    // follows the god's own stance after the frost decides.
+                    (frost_the_world, frost_glass_follows, hud_stands_down).chain(),
                     age_toasts,
                     style_buttons,
                     drag_windows,
@@ -2409,35 +2411,138 @@ mod tests {
 /// text. Brett: "can we apply a heavy blur to the game world when the menu
 /// is open?" Done with the renderer's own depth of field, focus pulled to
 /// the god's nose and the aperture thrown wide.
+/// The pane of frosted glass the book lies on: a fullscreen picture of
+/// the small live painting the frost camera makes.
+#[derive(Component)]
+pub(crate) struct FrostPane;
+
+/// The little camera that paints the world onto the glass while the book
+/// is open.
+#[derive(Component)]
+pub(crate) struct FrostCamera;
+
+/// Marks the god camera while its own eyes are closed for reading.
+#[derive(Component)]
+pub(crate) struct Frosted;
+
+/// The glass's grain: the world is painted this small and stretched over
+/// the whole window, so the frost is enormous and costs almost nothing.
+const FROST_FACE: (u32, u32) = (480, 270);
+
+/// Raises the frost rig once: the glass texture, the sleeping camera that
+/// paints it, and the fullscreen pane that shows it under the book.
+pub(crate) fn spawn_frost_glass(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+    let glass = images.add(bevy::image::Image::new_target_texture(
+        FROST_FACE.0,
+        FROST_FACE.1,
+        bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+        None,
+    ));
+    commands.spawn((
+        Name::new("Frost Camera"),
+        FrostCamera,
+        Camera3d::default(),
+        Camera {
+            order: -5,
+            is_active: false,
+            ..default()
+        },
+        bevy::camera::RenderTarget::Image(glass.clone().into()),
+        // At 270 rows this small blur is a huge one on the stretched
+        // glass, for a few dozen taps per tiny pixel.
+        bevy::post_process::dof::DepthOfField {
+            mode: bevy::post_process::dof::DepthOfFieldMode::Gaussian,
+            focal_distance: 0.05,
+            sensor_height: 0.01866,
+            aperture_f_stops: 0.008,
+            max_circle_of_confusion_diameter: 120.0,
+            max_depth: f32::INFINITY,
+        },
+        Transform::default(),
+        bevy::camera::visibility::RenderLayers::from_layers(&[0, crate::globe::GLOBE_LAYER]),
+    ));
+    commands.spawn((
+        FrostPane,
+        Name::new("Frost Pane"),
+        bevy::ui::widget::ImageNode::new(glass).with_mode(bevy::ui::widget::NodeImageMode::Stretch),
+        Node {
+            position_type: PositionType::Absolute,
+            left: px(0),
+            top: px(0),
+            width: percent(100),
+            height: percent(100),
+            display: Display::None,
+            ..default()
+        },
+        GlobalZIndex(-2),
+    ));
+}
+
+/// While the book is open the world goes behind frosted glass — and not
+/// by squinting: the god camera's own eyes close (its layers strip, so
+/// the window pass carries only the book), the frost camera paints the
+/// live world onto a palm-sized glass, and the pane stretches that glass
+/// across the window. Painted small, blurred wide, stretched huge: the
+/// world is colour and motion and nothing legible, at a fraction of the
+/// old full-resolution blur's price. Brett: "I want it super blurry" —
+/// "maybe we need to use another method?" This is that method.
 pub(crate) fn frost_the_world(
     mut commands: Commands,
     books: Query<&Visibility, With<crate::debug::village::VillagePanel>>,
-    cameras: Query<
-        (Entity, Has<bevy::post_process::dof::DepthOfField>),
-        With<crate::camera::GodCamera>,
-    >,
+    gods: Query<(Entity, Has<Frosted>), With<crate::camera::GodCamera>>,
+    mut frost: Query<&mut Camera, With<FrostCamera>>,
+    mut panes: Query<&mut Node, With<FrostPane>>,
 ) {
     let reading = books.iter().any(|v| *v != Visibility::Hidden);
-    for (camera, frosted) in &cameras {
+    for (camera, frosted) in &gods {
         if reading && !frosted {
             commands
                 .entity(camera)
-                .insert(bevy::post_process::dof::DepthOfField {
-                    mode: bevy::post_process::dof::DepthOfFieldMode::Gaussian,
-                    focal_distance: 0.05,
-                    sensor_height: 0.01866,
-                    // Thrown as wide as the lens goes: under the book the
-                    // world is pure colour and motion, nothing legible.
-                    // Brett: "crank it up a ton."
-                    aperture_f_stops: 0.008,
-                    max_circle_of_confusion_diameter: 400.0,
-                    max_depth: f32::INFINITY,
-                });
+                .insert((Frosted, bevy::camera::visibility::RenderLayers::none()));
+            for mut lens in &mut frost {
+                lens.is_active = true;
+            }
+            for mut pane in &mut panes {
+                pane.display = Display::Flex;
+            }
         } else if !reading && frosted {
-            commands
-                .entity(camera)
-                .remove::<bevy::post_process::dof::DepthOfField>();
+            commands.entity(camera).remove::<Frosted>().insert(
+                bevy::camera::visibility::RenderLayers::from_layers(&[
+                    0,
+                    crate::globe::GLOBE_LAYER,
+                ]),
+            );
+            for mut lens in &mut frost {
+                lens.is_active = false;
+            }
+            for mut pane in &mut panes {
+                pane.display = Display::None;
+            }
         }
+    }
+}
+
+/// The frost camera stands exactly where the god stands, wearing the same
+/// lens, so the glass shows the very view the reader stepped away from.
+pub(crate) fn frost_glass_follows(
+    gods: Query<
+        (&GlobalTransform, &Projection),
+        (With<crate::camera::GodCamera>, Without<FrostCamera>),
+    >,
+    mut frost: Query<
+        (&mut Transform, &mut Projection, &Camera),
+        (With<FrostCamera>, Without<crate::camera::GodCamera>),
+    >,
+) {
+    let Ok((eye, lens)) = gods.single() else {
+        return;
+    };
+    for (mut at, mut glass_lens, camera) in &mut frost {
+        if !camera.is_active {
+            continue;
+        }
+        *at = eye.compute_transform();
+        *glass_lens = lens.clone();
     }
 }
 
