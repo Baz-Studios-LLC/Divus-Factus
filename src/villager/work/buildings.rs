@@ -3346,6 +3346,7 @@ pub(crate) fn sermons(
             trust,
             memory.whom.clone(),
             told,
+            memory.of,
         ))
     });
     if let Some(line) = composed

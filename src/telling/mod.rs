@@ -103,6 +103,9 @@ pub struct Retelling {
     pub whom: Option<Whom>,
     /// How many times they have told this before. A worn story is flatter.
     pub told: u32,
+    /// What the act happened to - person, beast or thing - so a line about
+    /// somebody flying is never told about a berry bush.
+    pub of: crate::witness::SubjectClass,
 }
 
 /// One villager's inward moment, as the tags of it: who is thinking, what
@@ -141,6 +144,7 @@ impl Retelling {
         trust: f32,
         whom: Option<Whom>,
         told: u32,
+        of: crate::witness::SubjectClass,
     ) -> Retelling {
         Retelling {
             kind,
@@ -149,6 +153,7 @@ impl Retelling {
             faith: FaithBand::of(trust),
             whom,
             told,
+            of,
         }
     }
 
@@ -187,7 +192,13 @@ impl Tongue {
             Hand::Heard => "heard",
             Hand::Distant => "distant",
         };
-        let mut tags = vec!["tell", kind.as_str(), hand, faith_tag(of.faith)];
+        let mut tags = vec![
+            "tell",
+            kind.as_str(),
+            hand,
+            faith_tag(of.faith),
+            of.of.tag(),
+        ];
         let trade = of.voice.map(trade_tag);
         tags.extend(trade);
         if of.told > 2 {

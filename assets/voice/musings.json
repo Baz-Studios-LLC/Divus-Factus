@@ -1468,5 +1468,332 @@
    "devotion",
    "devout"
   ]
+ },
+ {
+  "t": "I don't know how to do this. I'm doing it anyway. that has to count",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "wavering"
+  ]
+ },
+ {
+  "t": "if you're there, you already know I'm not sure. I came anyway",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "wavering"
+  ]
+ },
+ {
+  "t": "half of me feels foolish kneeling here. the other half {won't get up|keeps me here}",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "wavering"
+  ]
+ },
+ {
+  "t": "I'll believe harder when I'm braver. for now this is what I have",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "wavering"
+  ]
+ },
+ {
+  "t": "give me one small thing. not for proof. just so I sleep",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "wavering"
+  ]
+ },
+ {
+  "t": "everyone else seems so certain. lend me a little of whatever they've got",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion",
+   "wavering"
+  ]
+ },
+ {
+  "t": "no asking today. just {thanks|a word of thanks}. things are good",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion"
+  ]
+ },
+ {
+  "t": "keep them all safe tonight. that's the whole prayer",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion"
+  ]
+ },
+ {
+  "t": "I don't need anything. I just didn't want to walk past without a word",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion"
+  ]
+ },
+ {
+  "t": "the same as yesterday: watch the little ones, mind the fields, and I'll do the rest",
+  "tags": [
+   "muse",
+   "prayer",
+   "devotion"
+  ]
+ },
+ {
+  "t": "the stores are thin and the children eat first. you see how it is down here",
+  "tags": [
+   "muse",
+   "prayer",
+   "hungry"
+  ]
+ },
+ {
+  "t": "I'm not asking for a feast. bread would do. bread and a quiet week",
+  "tags": [
+   "muse",
+   "prayer",
+   "hungry"
+  ]
+ },
+ {
+  "t": "my stomach woke me before the sun did. if there's food to spare anywhere, steer it here",
+  "tags": [
+   "muse",
+   "prayer",
+   "hungry"
+  ]
+ },
+ {
+  "t": "I fed my share to {the little one|somebody who needed it} and I'd do it again. but I'm hungry",
+  "tags": [
+   "muse",
+   "prayer",
+   "hungry"
+  ]
+ },
+ {
+  "t": "you put the fish in the water. any chance of putting some in the net",
+  "tags": [
+   "muse",
+   "prayer",
+   "hungry"
+  ]
+ },
+ {
+  "t": "hunger makes it hard to believe in anything but supper. help me out of that corner",
+  "tags": [
+   "muse",
+   "prayer",
+   "hungry"
+  ]
+ },
+ {
+  "t": "a roof, a door, a fire. whoever had a hand in it - I know, I know. thank you",
+  "tags": [
+   "muse",
+   "prayer",
+   "housed"
+  ]
+ },
+ {
+  "t": "first night under my own roof I just listened to the rain NOT landing on me. thank you for that",
+  "tags": [
+   "muse",
+   "prayer",
+   "housed"
+  ]
+ },
+ {
+  "t": "keep this house standing and I'll keep it worth standing. deal",
+  "tags": [
+   "muse",
+   "prayer",
+   "housed"
+  ]
+ },
+ {
+  "t": "I asked for walls once. I have walls now. I remember what I owe",
+  "tags": [
+   "muse",
+   "prayer",
+   "housed"
+  ]
+ },
+ {
+  "t": "some days it all looks like luck. some days it looks like a hand. today I honestly can't tell",
+  "tags": [
+   "muse",
+   "wavering"
+  ]
+ },
+ {
+  "t": "{Grandmother|my mother} would have called that a sign. I'm not her. but I noticed it",
+  "tags": [
+   "muse",
+   "wavering"
+  ]
+ },
+ {
+  "t": "I keep almost praying and then finding a chore instead",
+  "tags": [
+   "muse",
+   "wavering"
+  ]
+ },
+ {
+  "t": "if it's real, it knows where to find me. I'm not hard to find",
+  "tags": [
+   "muse",
+   "wavering"
+  ]
+ },
+ {
+  "t": "I believe it on the good days. wish the good days came more often",
+  "tags": [
+   "muse",
+   "wavering"
+  ]
+ },
+ {
+  "t": "swept the whole floor today. it's a small thing. it's my small thing",
+  "tags": [
+   "muse",
+   "housed"
+  ]
+ },
+ {
+  "t": "I hang my coat on the same peg every night and every night it pleases me",
+  "tags": [
+   "muse",
+   "housed"
+  ]
+ },
+ {
+  "t": "the fire draws well in this house. whoever set the stones knew their work",
+  "tags": [
+   "muse",
+   "housed"
+  ]
+ },
+ {
+  "t": "I should have somebody over. a house isn't finished until somebody's laughed in it",
+  "tags": [
+   "muse",
+   "housed"
+  ]
+ },
+ {
+  "t": "rain tonight, by the smell of it. let it come. I have a roof",
+  "tags": [
+   "muse",
+   "housed"
+  ]
+ },
+ {
+  "t": "I keep finding little jobs to do around the place. I think I invent half of them",
+  "tags": [
+   "muse",
+   "housed"
+  ]
+ },
+ {
+  "t": "the fish know my shadow by now, I swear. have to try the far bank",
+  "tags": [
+   "muse",
+   "trade:fisher"
+  ]
+ },
+ {
+  "t": "a good net's worth more than a good day. mend tonight, eat tomorrow",
+  "tags": [
+   "muse",
+   "trade:fisher"
+  ]
+ },
+ {
+  "t": "the river was loud today. loud water, busy fish. we'll see",
+  "tags": [
+   "muse",
+   "trade:fisher"
+  ]
+ },
+ {
+  "t": "the best bushes are always one hill further than you want to walk",
+  "tags": [
+   "muse",
+   "trade:gatherer"
+  ]
+ },
+ {
+  "t": "you learn the ground berry by berry. I could walk my rounds blind by now",
+  "tags": [
+   "muse",
+   "trade:gatherer"
+  ]
+ },
+ {
+  "t": "left the green ones for next week. future me can thank present me then",
+  "tags": [
+   "muse",
+   "trade:gatherer"
+  ]
+ },
+ {
+  "t": "planted three for every one I took today. the woods keep their own books",
+  "tags": [
+   "muse",
+   "trade:forester"
+  ]
+ },
+ {
+  "t": "a straight tree is years of luck and one good spot. can't rush either",
+  "tags": [
+   "muse",
+   "trade:forester"
+  ]
+ },
+ {
+  "t": "I know every stand from here to the ridge by name. my names, but still",
+  "tags": [
+   "muse",
+   "trade:forester"
+  ]
+ },
+ {
+  "t": "the tracks went cold at the creek again. clever thing. tomorrow, then",
+  "tags": [
+   "muse",
+   "trade:hunter"
+  ]
+ },
+ {
+  "t": "a still morning is worth more to me than a sharp spear. you take what the day gives",
+  "tags": [
+   "muse",
+   "trade:hunter"
+  ]
+ },
+ {
+  "t": "came home light again. even a good hunter mostly comes home light. that's the trade",
+  "tags": [
+   "muse",
+   "trade:hunter"
+  ]
  }
 ]

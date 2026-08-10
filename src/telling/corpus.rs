@@ -320,6 +320,37 @@ impl Corpus {
 mod tests {
     use super::*;
 
+    /// The register wall between subjects, pinned against the real corpus.
+    /// The bug this guards: a berry bush moved by the hand once came out
+    /// of witnesses' mouths as "I saw somebody lifted clean into the air"
+    /// - Brett: "they say they saw food fly up in the air when I never
+    /// did that." A thing's telling must never borrow a person's words.
+    #[test]
+    fn a_things_story_is_never_told_about_a_person() {
+        let mut voice = Corpus::load();
+        let mut rng = crate::rng::Rng::new(7);
+        for hand in ["saw", "heard", "distant"] {
+            for kind in ["event:lifted", "event:thrown", "event:setdown"] {
+                for _ in 0..20 {
+                    let Some(line) = voice.pick(
+                        1,
+                        &["tell", kind, hand, "devout", "of:thing"],
+                        &[],
+                        &mut rng,
+                    ) else {
+                        continue;
+                    };
+                    for word in ["somebody", "people", " man ", "someone", "{whom}"] {
+                        assert!(
+                            !line.contains(word),
+                            "a thing's {kind} telling spoke of a person: {line}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     fn corpus(lines: &[(&str, &[&str], bool)]) -> Corpus {
         Corpus {
             lines: lines

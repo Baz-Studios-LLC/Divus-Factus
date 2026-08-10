@@ -1,451 +1,493 @@
 [
-  {
-    "t": "I heard the same thing. everyone's talking about it",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "you're the third person to tell me that today",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "huh. and you saw this yourself?",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "that gives me chills, honestly",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "well. the world's gotten strange, that's all I'll say",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "I don't know what to make of that. I really don't",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "if that's true, it changes things. that's all I'm saying",
-    "tags": [
-      "reply",
-      "wavering"
-    ]
-  },
-  {
-    "t": "that's the god's work. plain as anything",
-    "tags": [
-      "reply",
-      "devout"
-    ]
-  },
-  {
-    "t": "I believe you. after what I've seen here, I believe anything",
-    "tags": [
-      "reply",
-      "devout"
-    ]
-  },
-  {
-    "t": "people see what they want to see. no offense",
-    "tags": [
-      "reply",
-      "doubting"
-    ]
-  },
-  {
-    "t": "or it's weather, and we're all scaring ourselves over weather",
-    "tags": [
-      "reply",
-      "doubting"
-    ]
-  },
-  {
-    "t": "come on. you really believe that?",
-    "tags": [
-      "reply",
-      "doubting"
-    ]
-  },
-  {
-    "t": "let's talk about something happier, can we?",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "yeah, I heard that too",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "I don't like the sound of that",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "that's not the kind of story you forget",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "I wish people would stop whispering and just say what's true",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "if you saw it, then I believe you",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "I need a minute with that",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "that makes sense. I don't like it, but it makes sense",
-    "tags": [
-      "reply",
-      "wavering"
-    ]
-  },
-  {
-    "t": "maybe it was the god. maybe it was just a bad day",
-    "tags": [
-      "reply",
-      "wavering"
-    ]
-  },
-  {
-    "t": "I'm trying to believe that means something good",
-    "tags": [
-      "reply",
-      "wavering"
-    ]
-  },
-  {
-    "t": "then the god is closer than people think",
-    "tags": [
-      "reply",
-      "devout"
-    ]
-  },
-  {
-    "t": "I knew we were being watched over",
-    "tags": [
-      "reply",
-      "devout"
-    ]
-  },
-  {
-    "t": "we should be thankful, even if we're scared",
-    "tags": [
-      "reply",
-      "devout"
-    ]
-  },
-  {
-    "t": "or people are scared and making the story bigger",
-    "tags": [
-      "reply",
-      "doubting"
-    ]
-  },
-  {
-    "t": "I believe that something happened. that's as far as I'll go",
-    "tags": [
-      "reply",
-      "doubting"
-    ]
-  },
-  {
-    "t": "everyone's very sure about this and nobody was actually there",
-    "tags": [
-      "reply",
-      "doubting"
-    ]
-  },
-  {
-    "t": "if it keeps happening, somebody should write it down",
-    "tags": [
-      "reply",
-      "trade:priest"
-    ]
-  },
-  {
-    "t": "that's why we need someone watching the edge",
-    "tags": [
-      "reply",
-      "trade:guard"
-    ]
-  },
-  {
-    "t": "they don't want a bandage, they want me to tell them it's over. I can't do that one",
-    "tags": [
-      "reply",
-      "trade:healer"
-    ]
-  },
-  {
-    "t": "if this affects the stores, I need to know now",
-    "tags": [
-      "reply",
-      "trade:cook"
-    ]
-  },
-  {
-    "t": "roads will be harder if everyone is scared",
-    "tags": [
-      "reply",
-      "trade:explorer"
-    ]
-  },
-  {
-    "t": "you're certain? you actually saw it",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "and nobody else was with you?",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "where were you standing when it happened?",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "how close were you?",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "you must have been terrified",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "I'd have run, I don't mind admitting it",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "and you're alright? you're not hurt?",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "sit down, you're shaking",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "that's the strangest thing I've heard all season",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "things like that don't happen here",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "they didn't used to, anyway",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "I've heard something like it before, further off",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "my mother used to tell it the same way",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "so it's true, then. people were saying",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "that's the second account I've had of it",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "then it's not just talk",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "I wish I'd seen it myself",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "I'm glad I didn't see it, honestly",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "what do you want me to do about it?",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "who else have you told?",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "you should tell someone who'll write it down",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "keep that to yourself for now, maybe",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "no, say it. people should know",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "I don't doubt you. I doubt my own ears",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "give me a moment with that",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "well. that changes things",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "that explains a great deal, actually",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "it explains nothing, but I believe you",
-    "tags": [
-      "reply"
-    ]
-  },
-  {
-    "t": "then we've been looked at. properly looked at",
-    "tags": [
-      "reply",
-      "devout"
-    ]
-  },
-  {
-    "t": "that's not chance. you know that as well as I do",
-    "tags": [
-      "reply",
-      "devout"
-    ]
-  },
-  {
-    "t": "we should be saying thank you, not standing here",
-    "tags": [
-      "reply",
-      "devout"
-    ]
-  },
-  {
-    "t": "I don't know what to do with that",
-    "tags": [
-      "reply",
-      "wavering"
-    ]
-  },
-  {
-    "t": "I'll not say you're wrong. I'll not say you're right",
-    "tags": [
-      "reply",
-      "wavering"
-    ]
-  },
-  {
-    "t": "give me time. it's a lot",
-    "tags": [
-      "reply",
-      "wavering"
-    ]
-  },
-  {
-    "t": "there'll be an ordinary reason. there usually is",
-    "tags": [
-      "reply",
-      "doubting"
-    ]
-  },
-  {
-    "t": "you were tired. we're all tired",
-    "tags": [
-      "reply",
-      "doubting"
-    ]
-  },
-  {
-    "t": "I'd want to stand where you stood before I said that",
-    "tags": [
-      "reply",
-      "doubting"
-    ]
-  }
+ {
+  "t": "I heard the same thing. everyone's talking about it",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "you're the third person to tell me that today",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "huh. and you saw this yourself?",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "that gives me chills, honestly",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "well. the world's gotten strange, that's all I'll say",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "I don't know what to make of that. I really don't",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "if that's true, it changes things. that's all I'm saying",
+  "tags": [
+   "reply",
+   "wavering"
+  ]
+ },
+ {
+  "t": "that's the god's work. plain as anything",
+  "tags": [
+   "reply",
+   "devout"
+  ]
+ },
+ {
+  "t": "I believe you. after what I've seen here, I believe anything",
+  "tags": [
+   "reply",
+   "devout"
+  ]
+ },
+ {
+  "t": "people see what they want to see. no offense",
+  "tags": [
+   "reply",
+   "doubting"
+  ]
+ },
+ {
+  "t": "or it's weather, and we're all scaring ourselves over weather",
+  "tags": [
+   "reply",
+   "doubting"
+  ]
+ },
+ {
+  "t": "come on. you really believe that?",
+  "tags": [
+   "reply",
+   "doubting"
+  ]
+ },
+ {
+  "t": "let's talk about something happier, can we?",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "yeah, I heard that too",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "I don't like the sound of that",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "that's not the kind of story you forget",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "I wish people would stop whispering and just say what's true",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "if you saw it, then I believe you",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "I need a minute with that",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "that makes sense. I don't like it, but it makes sense",
+  "tags": [
+   "reply",
+   "wavering"
+  ]
+ },
+ {
+  "t": "maybe it was the god. maybe it was just a bad day",
+  "tags": [
+   "reply",
+   "wavering"
+  ]
+ },
+ {
+  "t": "I'm trying to believe that means something good",
+  "tags": [
+   "reply",
+   "wavering"
+  ]
+ },
+ {
+  "t": "then the god is closer than people think",
+  "tags": [
+   "reply",
+   "devout"
+  ]
+ },
+ {
+  "t": "I knew we were being watched over",
+  "tags": [
+   "reply",
+   "devout"
+  ]
+ },
+ {
+  "t": "we should be thankful, even if we're scared",
+  "tags": [
+   "reply",
+   "devout"
+  ]
+ },
+ {
+  "t": "or people are scared and making the story bigger",
+  "tags": [
+   "reply",
+   "doubting"
+  ]
+ },
+ {
+  "t": "I believe that something happened. that's as far as I'll go",
+  "tags": [
+   "reply",
+   "doubting"
+  ]
+ },
+ {
+  "t": "everyone's very sure about this and nobody was actually there",
+  "tags": [
+   "reply",
+   "doubting"
+  ]
+ },
+ {
+  "t": "if it keeps happening, somebody should write it down",
+  "tags": [
+   "reply",
+   "trade:priest"
+  ]
+ },
+ {
+  "t": "that's why we need someone watching the edge",
+  "tags": [
+   "reply",
+   "trade:guard"
+  ]
+ },
+ {
+  "t": "they don't want a bandage, they want me to tell them it's over. I can't do that one",
+  "tags": [
+   "reply",
+   "trade:healer"
+  ]
+ },
+ {
+  "t": "if this affects the stores, I need to know now",
+  "tags": [
+   "reply",
+   "trade:cook"
+  ]
+ },
+ {
+  "t": "roads will be harder if everyone is scared",
+  "tags": [
+   "reply",
+   "trade:explorer"
+  ]
+ },
+ {
+  "t": "you're certain? you actually saw it",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "and nobody else was with you?",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "where were you standing when it happened?",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "how close were you?",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "you must have been terrified",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "I'd have run, I don't mind admitting it",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "and you're alright? you're not hurt?",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "sit down, you're shaking",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "that's the strangest thing I've heard all season",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "things like that don't happen here",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "they didn't used to, anyway",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "I've heard something like it before, further off",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "my mother used to tell it the same way",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "so it's true, then. people were saying",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "that's the second account I've had of it",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "then it's not just talk",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "I wish I'd seen it myself",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "I'm glad I didn't see it, honestly",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "what do you want me to do about it?",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "who else have you told?",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "you should tell someone who'll write it down",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "keep that to yourself for now, maybe",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "no, say it. people should know",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "I don't doubt you. I doubt my own ears",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "give me a moment with that",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "well. that changes things",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "that explains a great deal, actually",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "it explains nothing, but I believe you",
+  "tags": [
+   "reply"
+  ]
+ },
+ {
+  "t": "then we've been looked at. properly looked at",
+  "tags": [
+   "reply",
+   "devout"
+  ]
+ },
+ {
+  "t": "that's not chance. you know that as well as I do",
+  "tags": [
+   "reply",
+   "devout"
+  ]
+ },
+ {
+  "t": "we should be saying thank you, not standing here",
+  "tags": [
+   "reply",
+   "devout"
+  ]
+ },
+ {
+  "t": "I don't know what to do with that",
+  "tags": [
+   "reply",
+   "wavering"
+  ]
+ },
+ {
+  "t": "I'll not say you're wrong. I'll not say you're right",
+  "tags": [
+   "reply",
+   "wavering"
+  ]
+ },
+ {
+  "t": "give me time. it's a lot",
+  "tags": [
+   "reply",
+   "wavering"
+  ]
+ },
+ {
+  "t": "there'll be an ordinary reason. there usually is",
+  "tags": [
+   "reply",
+   "doubting"
+  ]
+ },
+ {
+  "t": "you were tired. we're all tired",
+  "tags": [
+   "reply",
+   "doubting"
+  ]
+ },
+ {
+  "t": "I'd want to stand where you stood before I said that",
+  "tags": [
+   "reply",
+   "doubting"
+  ]
+ },
+ {
+  "t": "I want it to be true and I'm afraid of it being true. both at once",
+  "tags": [
+   "reply",
+   "wavering"
+  ]
+ },
+ {
+  "t": "see, you say that, and part of me nods along and part of me backs away",
+  "tags": [
+   "reply",
+   "wavering"
+  ]
+ },
+ {
+  "t": "ask me in the morning and I'd laugh. ask me after dark and, well. it's after dark",
+  "tags": [
+   "reply",
+   "wavering"
+  ]
+ },
+ {
+  "t": "my {mother|grandmother} would've believed you straight off. I'm slower. keep talking",
+  "tags": [
+   "reply",
+   "wavering"
+  ]
+ },
+ {
+  "t": "maybe. maybe. I've been saying maybe so long it's starting to sound like yes",
+  "tags": [
+   "reply",
+   "wavering"
+  ]
+ },
+ {
+  "t": "I'm not saying you're wrong. I'm saying I need to sit with it a while",
+  "tags": [
+   "reply",
+   "wavering"
+  ]
+ }
 ]

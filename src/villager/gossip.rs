@@ -676,6 +676,7 @@ pub(crate) fn hold_conversations(
                     trust,
                     memory.whom.clone(),
                     told_before,
+                    memory.of,
                 ))
             });
             // Drawn every telling whether or not it is the one used, so that

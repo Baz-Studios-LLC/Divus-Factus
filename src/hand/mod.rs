@@ -1169,17 +1169,26 @@ fn handle_grab_and_release(
             });
         }
 
+        // LIFTED is a creature's story. A soul hoisted into the sky is
+        // testimony the moment it leaves the ground - but a stone or a
+        // berry bush picked up to be moved is nothing until it lands as
+        // something: the release decides (a hurl is THROWN, a placement
+        // is SET DOWN), and a tree already spoke as UPROOTED above. The
+        // old unconditional write here had villagers swearing they saw
+        // somebody lifted clean into the air every time the god tidied
+        // a bush - Brett: "they say they saw food fly up in the air
+        // when I never did that."
         if let Ok(mut motion) = motions.get_mut(entity) {
             motion.flail = 1.0;
             motion.speed = 0.0;
-        }
 
-        witnessed.write(DivineEvent {
-            kind: DivineEventKind::Lifted,
-            position,
-            subject: Some(entity),
-            intensity: 0.5,
-        });
+            witnessed.write(DivineEvent {
+                kind: DivineEventKind::Lifted,
+                position,
+                subject: Some(entity),
+                intensity: 0.5,
+            });
+        }
 
         // Into the hand's own render pass, so the fist and its cargo can
         // occlude one another. See `relayer`.

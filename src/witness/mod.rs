@@ -505,6 +505,30 @@ impl Whom {
     }
 }
 
+/// What kind of thing an act happened TO. The tellings need this
+/// because "I saw somebody lifted clean into the air" is testimony
+/// when the subject was a person and a lie when it was a berry bush -
+/// the corpus lines wear `of:person`/`of:beast`/`of:thing` tags and
+/// this is the fact those tags check. Old saves predate the question;
+/// their memories were nearly all about people, and load as such.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum SubjectClass {
+    #[default]
+    Person,
+    Beast,
+    Thing,
+}
+
+impl SubjectClass {
+    pub fn tag(self) -> &'static str {
+        match self {
+            SubjectClass::Person => "of:person",
+            SubjectClass::Beast => "of:beast",
+            SubjectClass::Thing => "of:thing",
+        }
+    }
+}
+
 /// One thing a villager saw the god do: what it was, and to whom.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(from = "MemoryOnDisk")]
@@ -524,6 +548,9 @@ pub struct Memory {
     /// anything loaded off a disk, it is.
     #[serde(default)]
     pub day: u32,
+    /// What the act happened to - a person, a beast, or a mere thing.
+    #[serde(default)]
+    pub of: SubjectClass,
 }
 
 /// Old saves predate doubt: their memories load as believed.
@@ -545,6 +572,8 @@ enum MemoryOnDisk {
         divine: bool,
         #[serde(default)]
         day: u32,
+        #[serde(default)]
+        of: SubjectClass,
     },
     Bare(DivineEventKind),
 }
@@ -557,17 +586,20 @@ impl From<MemoryOnDisk> for Memory {
                 whom,
                 divine,
                 day,
+                of,
             } => Memory {
                 kind,
                 whom,
                 divine,
                 day,
+                of,
             },
             MemoryOnDisk::Bare(kind) => Memory {
                 kind,
                 whom: None,
                 divine: true,
                 day: 0,
+                of: SubjectClass::default(),
             },
         }
     }
@@ -595,7 +627,14 @@ impl Witnessed {
     /// How many memories a villager keeps.
     pub const CAPACITY: usize = 8;
 
-    fn record(&mut self, kind: DivineEventKind, whom: Option<Whom>, divine: bool, day: u32) {
+    fn record(
+        &mut self,
+        kind: DivineEventKind,
+        whom: Option<Whom>,
+        divine: bool,
+        day: u32,
+        of: SubjectClass,
+    ) {
         self.recent.insert(
             0,
             Memory {
@@ -603,6 +642,7 @@ impl Witnessed {
                 whom,
                 divine,
                 day,
+                of,
             },
         );
         self.recent.truncate(Self::CAPACITY);
@@ -793,7 +833,16 @@ fn perceive_events(
                 rng.0
                     .chance((event.kind.unmistakably_divine() * conviction).min(0.97))
             });
-            witnessed.record(event.kind, whom, divine, today);
+            // What the act happened TO. A subject with a name is a person,
+            // one with a body but no name is a beast, and everything else -
+            // a sack, a stone, the ground itself - is a thing. Subjectless
+            // acts are acts on the world, and the world is a thing too.
+            let of = match event.subject.and_then(|subject| threads.get(subject).ok()) {
+                Some((Some(_), ..)) => SubjectClass::Person,
+                Some((_, _, _, Some(_))) => SubjectClass::Beast,
+                _ => SubjectClass::Thing,
+            };
+            witnessed.record(event.kind, whom, divine, today, of);
 
             // The one it happened to is already flailing and running from
             // the thing itself. Turning them to WATCH it would stop them
@@ -1011,7 +1060,13 @@ mod tests {
     #[test]
     fn a_fear_fades() {
         let mut bitten = Witnessed::default();
-        bitten.record(DivineEventKind::Mauled, None, false, 10);
+        bitten.record(
+            DivineEventKind::Mauled,
+            None,
+            false,
+            10,
+            SubjectClass::Person,
+        );
         assert_eq!(bitten.peril(10), 1.0, "the day it happened");
         assert!(bitten.peril(17) > 0.0, "a week on, still frightened");
         assert!(bitten.peril(17) < 1.0, "but less so");
@@ -1027,7 +1082,7 @@ mod tests {
             DivineEventKind::Quaked,
             DivineEventKind::Perished,
         ] {
-            seen.record(kind, None, true, 5);
+            seen.record(kind, None, true, 5, SubjectClass::Person);
         }
         assert_eq!(
             seen.peril(5),
@@ -1043,7 +1098,13 @@ mod tests {
         // a spear on the treeline.
         let bitten = {
             let mut held = Witnessed::default();
-            held.record(DivineEventKind::Mauled, None, false, 3);
+            held.record(
+                DivineEventKind::Mauled,
+                None,
+                false,
+                3,
+                SubjectClass::Person,
+            );
             held
         };
         let told = {
@@ -1053,6 +1114,7 @@ mod tests {
                 whom: None,
                 divine: false,
                 day: 3,
+                of: SubjectClass::default(),
             });
             held
         };
@@ -1074,7 +1136,7 @@ mod tests {
         let mut w = Witnessed::default();
         assert!(w.is_innocent());
         for _ in 0..50 {
-            w.record(DivineEventKind::Lifted, None, true, 1);
+            w.record(DivineEventKind::Lifted, None, true, 1, SubjectClass::Person);
         }
         assert_eq!(w.recent.len(), Witnessed::CAPACITY);
         assert_eq!(w.total, 50);
@@ -1084,7 +1146,7 @@ mod tests {
     #[test]
     fn the_newest_memory_comes_first() {
         let mut w = Witnessed::default();
-        w.record(DivineEventKind::Lifted, None, true, 1);
+        w.record(DivineEventKind::Lifted, None, true, 1, SubjectClass::Person);
         w.record(
             DivineEventKind::Thrown,
             Some(Whom {
@@ -1094,6 +1156,7 @@ mod tests {
             }),
             true,
             1,
+            SubjectClass::Person,
         );
         assert_eq!(w.recent[0].kind, DivineEventKind::Thrown);
         assert_eq!(
@@ -1142,6 +1205,7 @@ mod tests {
             }),
             false,
             3,
+            SubjectClass::Person,
         );
         let round: Witnessed =
             serde_json::from_str(&serde_json::to_string(&fresh).unwrap()).unwrap();
