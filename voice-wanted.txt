@@ -1,15 +1,3 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-   39  (worn pool) housed muse
-   32  (worn pool) event:delivered reply wavering
-   22  (worn pool) chat:end event:delivered told wavering
-   15  (worn pool) muse wavering
-   15  (worn pool) chat:followup event:delivered told wavering
-    5  (worn pool) event:delivered heard tell wavering
-    4  (worn pool) event:provided reply wavering
-    4  (worn pool) devout event:delivered reply
-    3  (worn pool) event:provided heard tell wavering
-    2  (worn pool) event:provided saw tell wavering
-    2  (worn pool) devotion muse night prayer wavering
-    2  (worn pool) devout event:provided reply
-    2  (worn pool) chat:end devout event:delivered told
+    1  (worn pool) event:delivered heard tell wavering
