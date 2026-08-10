@@ -183,7 +183,7 @@ fn door_leg(
 /// door, then the inside of it, then their true goal — and because every
 /// target-setter runs each frame, this runs after them and quietly rewrites
 /// the leg without any of them knowing.
-pub(super) fn use_doors(
+pub(crate) fn use_doors(
     clock: Res<crate::calendar::WorldClock>,
     mut commands: Commands,
     shells: Query<(&Transform, &super::work::Shell), Without<Villager>>,

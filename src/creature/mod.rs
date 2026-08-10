@@ -59,7 +59,15 @@ impl Plugin for CreaturePlugin {
                     clip::play_clips,
                 )
                     .chain()
-                    .in_set(CreatureSet),
+                    .in_set(CreatureSet)
+                    // After the door router, always. Movement targets are
+                    // written by the activity systems and REWRITTEN by
+                    // use_doors when a wall stands between walker and goal;
+                    // when locomotion ran between those two writers, the
+                    // walker stepped toward the table one frame and the
+                    // doorstep the next, whipsawing at the threshold -
+                    // Brett: "people still shake violently near doors."
+                    .after(crate::villager::home::use_doors),
             );
     }
 }

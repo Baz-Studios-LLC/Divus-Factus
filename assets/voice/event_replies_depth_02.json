@@ -47,7 +47,7 @@
   { "t": "That makes me want a prayer and a stronger fence.", "tags": ["reply", "event:mauled", "wavering"] },
   { "t": "Wolves bite people when we let them close. Build the fence.", "tags": ["reply", "event:mauled", "doubting"] },
   { "t": "There is no message in teeth. There is only a hungry wolf.", "tags": ["reply", "event:mauled", "doubting"] },
-  { "t": "Praying later will not help as much as carrying a spear now.", "tags": ["reply", "event:mauled", "doubting"] },
+  { "t": "Prayer later will not help as much as holding a spear now.", "tags": ["reply", "event:mauled", "doubting"] },
 
   { "t": "The god made the broken thing whole. That is mercy.", "tags": ["reply", "event:mended", "devout"] },
   { "t": "No tool did that work. Give the god the credit.", "tags": ["reply", "event:mended", "devout"] },
@@ -59,7 +59,7 @@
   { "t": "Repairs look impossible when nobody sees the worker.", "tags": ["reply", "event:mended", "doubting"] },
   { "t": "I want to see the break before I believe it vanished.", "tags": ["reply", "event:mended", "doubting"] },
 
-  { "t": "The god received them. We should care for the people left behind.", "tags": ["reply", "event:perished", "devout"] },
+  { "t": "The god received them. We should support the people left behind.", "tags": ["reply", "event:perished", "devout"] },
   { "t": "Their life mattered to the god. It should matter to us.", "tags": ["reply", "event:perished", "devout"] },
   { "t": "We will pray for the dead and bring food to the family.", "tags": ["reply", "event:perished", "devout"] },
   { "t": "I hope someone was there at the end. I hope the god was.", "tags": ["reply", "event:perished", "wavering"] },
@@ -77,7 +77,7 @@
   { "t": "The timing is difficult to dismiss. I am still trying.", "tags": ["reply", "event:provided", "wavering"] },
   { "t": "Food has owners, even when nobody saw them arrive.", "tags": ["reply", "event:provided", "doubting"] },
   { "t": "Count the baskets twice before calling supper a miracle.", "tags": ["reply", "event:provided", "doubting"] },
-  { "t": "Someone carried that food. We should find them and say thanks.", "tags": ["reply", "event:provided", "doubting"] },
+  { "t": "Someone brought that food. We should find them and say thanks.", "tags": ["reply", "event:provided", "doubting"] },
 
   { "t": "The god shook the ground beneath us. That was a warning.", "tags": ["reply", "event:quaked", "devout"] },
   { "t": "Even the earth moves when the god commands it.", "tags": ["reply", "event:quaked", "devout"] },
@@ -97,7 +97,7 @@
   { "t": "I believe they came down safely. I am unsure about the rest.", "tags": ["reply", "event:setdown", "wavering"] },
   { "t": "People land on their feet sometimes. That is not divine proof.", "tags": ["reply", "event:setdown", "doubting"] },
   { "t": "The gentle part sounds added afterward. Stories like tidy endings.", "tags": ["reply", "event:setdown", "doubting"] },
-  { "t": "Show me where it happened. I want more than a careful retelling.", "tags": ["reply", "event:setdown", "doubting"] },
+  { "t": "Show me where it happened. I want more than an exact retelling.", "tags": ["reply", "event:setdown", "doubting"] },
 
   { "t": "The god struck them. We should ask what brought that judgment.", "tags": ["reply", "event:smote", "devout"] },
   { "t": "Lightning from a clear sky is no ordinary death.", "tags": ["reply", "event:smote", "devout"] },

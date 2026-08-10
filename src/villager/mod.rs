@@ -175,6 +175,16 @@ impl Plugin for VillagerPlugin {
             // tuple is at Bevy's twenty-system ceiling, and the rising
             // needs no ordering against any of it.
             .add_systems(Update, work::rise_out_of_the_earth)
+            // The doors: leaves hung the moment a shell stands, swung for
+            // whoever comes and goes. Unordered on purpose - a door that
+            // opens a frame late is a door.
+            .add_systems(
+                Update,
+                (
+                    work::buildings::hang_the_doors,
+                    work::buildings::swing_the_doors,
+                ),
+            )
             // Likewise unordered: the trades dress whoever took up a
             // calling this frame, whenever in the frame that happened.
             .add_systems(

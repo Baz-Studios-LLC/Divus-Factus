@@ -60,25 +60,43 @@ hesitating, or yelling.
 `sermo::tidy()` now capitalizes every sentence start and supplies terminal
 punctuation. Preserve that behavior and its tests.
 
-### The clean soak ran: the fresh order sheet is in voice-wanted.txt
+### Coverage pass 02 is authored and ready for review
 
-Two accelerated soaks (16+ and 10+ in-game days, divine events included via
-the throw harness) ran on the new corpus with topic-aware replies live. The
-repo's `voice-wanted.txt` now carries fresh counts. Top wants, in order:
+ChatGPT authored 614 records across eight focused files, bringing the corpus
+from 1,416 to 2,030 records:
 
 ```text
-19  event:provided saw tell        (the wonder provides constantly - the
-                                    most-told story in the game is thin)
-16  housed married muse            (two founding couples made this pool hot)
-15  housed muse
-10  reply wavering
- 9  chat:followup told wavering
- 3  devout event:provided reply    (the NEW topic-aware reply pools -
- 3  event:provided reply wavering   exactly the depth the engine change
-                                    was made for; author these per-event,
-                                    per-band)
- 3  event:impact of:person saw tell
+assets/voice/event_replies_depth_02.json
+assets/voice/event_tellings_depth_02.json
+assets/voice/work_chat_depth_02a.json
+assets/voice/work_chat_depth_02b.json
+assets/voice/conversation_stance_depth_02.json
+assets/voice/trade_thoughts_depth_02.json
+assets/voice/home_thoughts_depth_02.json
+assets/voice/prayers_stance_depth_02.json
 ```
+
+This consumes the previous `voice-wanted.txt` order sheet rather than leaving
+its counts as pending work. Resulting coverage includes:
+
+```text
+every current event x faith-band reply pool     at least 3 topical replies
+every current work/topic chat pool              at least 4 lines
+every trade musing pool                          12-14 records
+event:provided firsthand tellings                19 records
+person-impact firsthand tellings                  8 records
+housed + married musings                         28 records
+housed musings                                   75 records
+wavering musings                                 66 records
+wavering told followups                          39 records
+```
+
+Every new utterance passed the authoring audit: JSON shape, locked tags,
+register shape, subject class, slot legality, duplicate text, anachronism
+check, capitalization, punctuation, and the 18-word expanded limit. Both
+required Rust gates pass. Claude should human-read and integrate this batch,
+archive or clear the consumed `voice-wanted.txt`, then run the next soak to
+produce a genuinely fresh order sheet.
 
 New world facts that want words (tags exist; emitters live):
 - Two founding pairs arrive ALREADY WED at maximum devotion - married
@@ -146,8 +164,9 @@ simulation emits truthful context
 ## Current Priorities
 
 1. Correct the life cycle before doing another serious balance pass.
-2. Use the fresh Sermo order sheet for focused corpus batches, then add stance
-   tags only when their emitters and locked vocabulary are implemented.
+2. Human-read and integrate Sermo coverage pass 02, then soak again before
+   authoring more; add stance tags only with implemented emitters and locked
+   vocabulary.
 3. Let sermons become short crowd scenes instead of one line plus hidden math.
 4. Deepen the prayer board's requests and receipts.
 5. Give children some inheritance from their parents.

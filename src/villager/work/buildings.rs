@@ -920,6 +920,128 @@ pub struct Shell {
     pub doors: Vec<Doorway>,
 }
 
+/// A door's swinging leaf: a plank child of its building, hinged at one
+/// jamb. `open` runs 0 closed to 1 swung; the swing system eases it
+/// toward whoever is or is not nearby.
+#[derive(Component)]
+pub struct DoorLeaf {
+    /// The leaf's yaw when shut, in the building's own space.
+    pub closed_yaw: f32,
+    /// How far and which way it swings when open, radians about the hinge.
+    pub swing: f32,
+    /// Where it stands, 0 shut to 1 open.
+    pub open: f32,
+}
+
+/// Hangs a swinging leaf on a doorway. The hinge stands at one jamb, the
+/// plank reaches across the opening, and it swings INWARD - out of the
+/// path of whoever is arriving, the way cottage doors do.
+pub fn hang_the_door(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    building: Entity,
+    door: &Doorway,
+) {
+    let out = door.out.normalize_or(Vec2::X);
+    // The wall runs perpendicular to the way out.
+    let along = Vec2::new(-out.y, out.x);
+    let half_span = 0.62;
+    let hinge = door.at + along * half_span;
+    // Shut, the plank reaches from the hinge back across the opening.
+    let reach = -along;
+    let closed_yaw = (-reach.y).atan2(reach.x);
+    // Open swings the plank toward indoors: whichever turn carries its
+    // reach toward -out. The cross product's sign says which way that is.
+    let inward = -out;
+    let cross = reach.x * inward.y - reach.y * inward.x;
+    let swing = 1.75 * if cross >= 0.0 { 1.0 } else { -1.0 };
+
+    let leaf = meshes.add(Cuboid::new(half_span * 2.0 - 0.06, 2.02, 0.08));
+    let coat = materials.add(StandardMaterial {
+        base_color: crate::palette::shade(&crate::palette::WOOD, 0.32),
+        perceptual_roughness: 1.0,
+        ..default()
+    });
+    commands.entity(building).with_children(|children| {
+        children
+            .spawn((
+                DoorLeaf {
+                    closed_yaw,
+                    swing,
+                    open: 0.0,
+                },
+                Transform::from_xyz(hinge.x, 1.06, hinge.y)
+                    .with_rotation(Quat::from_rotation_y(closed_yaw)),
+                Visibility::Inherited,
+            ))
+            .with_children(|leaf_parts| {
+                leaf_parts.spawn((
+                    Mesh3d(leaf),
+                    MeshMaterial3d(coat),
+                    // Offset half the span so the plank extends from the
+                    // hinge instead of turning about its own middle.
+                    Transform::from_xyz(half_span - 0.03, 0.0, 0.0),
+                    bevy::light::NotShadowCaster,
+                ));
+            });
+    });
+}
+
+/// Hangs leaves on every doorway the moment a shell stands - one system
+/// covering the carried designs and the built-in fallbacks alike, so no
+/// door in the world goes leafless whichever way its building was made.
+pub(crate) fn hang_the_doors(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    fresh: Query<(Entity, &Shell), Added<Shell>>,
+) {
+    for (building, shell) in &fresh {
+        for door in &shell.doors {
+            hang_the_door(&mut commands, &mut meshes, &mut materials, building, door);
+        }
+    }
+}
+
+/// Swings every leaf for its traffic: open while anyone is close, shut
+/// only once everyone has gone - with a wider letting-go than a noticing,
+/// so a doorway conversation does not strobe the door.
+pub(crate) fn swing_the_doors(
+    time: Res<Time>,
+    folk: Query<
+        &GlobalTransform,
+        (
+            With<crate::villager::Villager>,
+            Without<crate::creature::Corpse>,
+        ),
+    >,
+    mut leaves: Query<(&GlobalTransform, &mut DoorLeaf, &mut Transform)>,
+) {
+    for (stood, mut leaf, mut local) in &mut leaves {
+        let at = stood.translation();
+        let mut nearest = f32::MAX;
+        for soul in &folk {
+            nearest = nearest.min(soul.translation().distance_squared(at));
+        }
+        let wants_open = if leaf.open > 0.5 {
+            nearest < 3.4 * 3.4
+        } else {
+            nearest < 2.4 * 2.4
+        };
+        let (target, rate) = if wants_open { (1.0, 3.4) } else { (0.0, 1.6) };
+        let drift = target - leaf.open;
+        if drift.abs() < 0.001 {
+            continue;
+        }
+        let step = (time.delta_secs() * rate).min(drift.abs());
+        leaf.open += drift.signum() * step;
+        // Ease at both ends: a door thrown open still lands softly.
+        let eased = leaf.open * leaf.open * (3.0 - 2.0 * leaf.open);
+        local.rotation = Quat::from_rotation_y(leaf.closed_yaw + leaf.swing * eased);
+    }
+}
+
 /// One bed inside a home, numbered so each occupant owns theirs. The count
 /// is the capacity constant made physical: a house sleeps HOUSE_CAPACITY,
 /// a longhouse LONGHOUSE_CAPACITY, and the furniture cannot drift from the
