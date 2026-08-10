@@ -379,6 +379,19 @@ mod tests {
         assert!(world.get_resource::<village::Codex>().is_some());
     }
 
+    /// The inspector's queries stay disjoint. B0001 panics when the
+    /// SYSTEM INITIALIZES, not when it compiles - the tooltip gate once
+    /// shipped a book query that forgot `Without<InspectorDetail>` and
+    /// the game died at boot on Brett's screen. Initializing the system
+    /// here makes that class fail in the suite instead. Missing
+    /// resources are fine - init runs, and init is where B0001 lives.
+    #[test]
+    fn the_inspector_wires_disjoint_queries() {
+        use bevy::ecs::system::RunSystemOnce;
+        let mut app = bevy::app::App::new();
+        let _ = app.world_mut().run_system_once(inspector::update_inspector);
+    }
+
     #[test]
     fn nudge_reports_movement_and_clamps() {
         let mut value = 0.5;

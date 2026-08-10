@@ -146,12 +146,15 @@ pub(crate) fn update_inspector(
         )>,
         // The book, whose opening smothers the card. In the bundle
         // because the sixteen-parameter ceiling is not close, it is HERE.
+        // Disjoint from EVERY Visibility this system writes - panel,
+        // person block AND the detail line - or B0001 panics at boot.
         Query<
             &Visibility,
             (
                 With<crate::debug::village::VillagePanel>,
                 Without<InspectorPanel>,
                 Without<InspectorPersonBlock>,
+                Without<InspectorDetail>,
             ),
         >,
     ),
