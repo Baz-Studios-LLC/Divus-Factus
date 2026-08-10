@@ -1,85 +1,57 @@
-## The bar is yours
+## The Codex
 
-**The miracle bar is rebuilt: ten slots, arranged by your own hand.** Drag
-a miracle to any slot and it stays there — through saves, through seasons —
-and its number key **fires it on the spot**, wherever the hand points. No
-arming, no second click; press 2 and the lightning falls where you're
-looking. Clicking a slot still arms it for a placed cast, buttons give
-under the finger, and the slot flashes with the act.
+**The whole interface is now one book.** Press Tab and the world steps
+behind frosted glass while THE CODEX fills the screen — an illuminated
+ledger with a chapter for everything: Towns, People, Deity, Miracles,
+Prayers, Chronicle, World and Settings, all down one rail on the left.
+The world keeps turning while you read, and the pace buttons ride the
+book's footer.
 
-- **No more mana.** Miracles run on **cooldowns** — half a day for Bounty,
-  a day for wrath, two for the quake — and the resting slot drains a dark
-  tide until its power answers again.
-- **Belief is the ladder now, not the fuel.** The congregation's faith
-  UNLOCKS each power as it grows — wrath first, the land-wide grace last —
-  and once a miracle is learned it is never taken back. The old mana bar
-  now climbs toward the next unlock and names it.
-- Wearing a body costs nothing while you stay: the Avatar pays a day's
-  cooldown at the door and the ride is yours as long as you please.
+- **Every soul has a face.** Portraits are painted from life — the actual
+  villager, their actual clothes — and hang on the roster, the dossier
+  and the prayer cards.
+- **THE PEOPLE** is a proper hall of records: the full roster with trade
+  chips across the top — press MINER and only the miners remain, press
+  ALL and everyone returns — and a dossier beside it with their wants,
+  what they've seen, and what they've been up to lately.
+- **THE WORLD** carries a real map now, drawn from the land itself and
+  veiled by what your people actually know: the walked ground lit, the
+  cairns marked, the rest held in fog. The map keeps your banner at its
+  centre, wherever you planted it.
 
-## The village spreads
+## The spellbook
 
-**Towns bud.** A thriving town grown past its beds sends out founders; a
-soul nursing real grudges walks out in bitterness and takes whoever loves
-them along — whole households, spouses together, children with their
-parents, never a family split by a banner.
+**THE MIRACLES reads like a spellbook now** — every power on the shelf,
+icon and name, three to a row. Hover for the story: what it does, what it
+costs, what earns it. Press a learned miracle and it takes the first empty
+slot on your bar; drag it if you want it somewhere particular.
 
-- **The god is asked first.** The would-be leader kneels and prays for the
-  road. Set a gift beside them and the venture goes blessed; smite the
-  ground at their feet and it is forbidden; stay silent and they go anyway,
-  unheard.
-- **The road feeds itself.** Explorers and colonists pack ration satchels
-  at the sacks, eat from them on the move, forage the heath when they run
-  dry — and turn for home while the walk back is still shorter than the
-  hunger. Nobody starves marching away from a full larder again.
+- **The bar buttons sweep like clocks.** A resting miracle shows its
+  cooldown as a radial shade that unwinds with the wait — you can read
+  the whole bar's readiness at a glance.
+- THE DEITY keeps its own page next door, for the god's standing — and
+  for what belief will grow into next.
 
-## The prayers reach you
+## The village carries on
 
-- **THE ASKINGS**: every open prayer pinned to the left of the screen as a
-  card, quest-tracker style — the ask, their own words in pink, and how
-  long hope holds. **Press to dive** to the asker at answering height (no
-  camera lock — grab the land and it's yours again); right-press to set a
-  card aside.
-- **Small prayers keep the board alive.** On quiet days — the uncertain
-  first mornings, a storm, a roof finished — someone kneels and says a hope
-  out loud: "if you're there, keep the town safe tonight." Any unmistakably
-  divine act they witness answers it. Ignored, it fades without a mark
-  against you — hope doesn't sour, it just drifts off on the wind.
-- Prayers never borrow the wrong words again, and one gift now means one
-  answer — no more notification storms from a single loaf.
+- **Towns hold elections** and set their own agenda under the mayor they
+  choose.
+- **Wonders rise** where a town's devotion earns them.
+- The pink marks of faith gained and lost float bolder and bigger over
+  heads, so you can read a sermon's worth from across the square.
+- Founders send word, prayers pin their cards, and the chronicle keeps
+  the receipts.
 
-## The great days announce themselves
+## Under the hood
 
-**Center-stage proclamations for the moments that earn a trumpet** — a
-child born, the town hall raised, a colony founded, your legend rising.
-Each card swells in with confetti in its own color, gold for works, green
-for life, pink for faith, each with its own fanfare — and pressing it
-takes you to the moment.
+- The planet's veil now repaints only the ground that changed — walking
+  new ground no longer costs the whole world a repaint.
+- The frame is instrumented end to end; several stutters found and fixed,
+  more hunts underway.
 
-## The trades wear their work
+## Known issue
 
-**Villagers dress for their callings**: the fisher in sea-blue, the hunter
-hooded in leather, the priest robed in purple, the guard in dark stone
-with a red sash — twelve liveries, readable across the square. Changing
-trades happens inside a puff of the new cloth's own color.
-
-## The god's view
-
-- **The clouds part before your gaze**: a clear corridor follows the line
-  from your hand through the camera, so pulling out through the deck never
-  blinds you — and the weather still lies over the rest of the world.
-- **The map never stops learning.** Long games used to hit a hidden limit
-  and leave black holes of fog over ground your people worked daily; the
-  known world now tidies itself and ground once walked never goes dark.
-- Clicking **Title** mid-game no longer crashes to desktop.
-
-## Mended besides
-
-- The codex's soul page lines its labels and values up on a true baseline.
-- Chat bubbles wear the same border weight as thoughts — same pen, all
-  three inks.
-- Rocks the world seeded in shallow water no longer "splash" at every game
-  start; only things that genuinely arrive in water make the sound.
-- The throw's whoosh is retired while a better sound is found.
-- Every session now writes `logs/latest.log`, so a bug you see is a bug
-  that can be read.
+**Shadows can occasionally sit out a session** — missing past a certain
+distance, or very rarely blinking. It's an engine-level fault we've
+cornered with instruments and are fixing at the source; a restart usually
+rerolls it back to normal. If you catch it, a screenshot helps the hunt.
