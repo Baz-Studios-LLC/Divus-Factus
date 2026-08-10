@@ -28,6 +28,10 @@ use crate::witness::{DivineEvent, DivineEventKind};
 /// Hunger past this, with nothing to eat anywhere, sends a person to their knees.
 pub(super) const DESPERATE_HUNGER: f32 = 0.65;
 
+/// How many food prayers may stand open from one town before the rest of
+/// the hungry hold their asking. Enough for a scene, short of a flashmob.
+const CHORUS_OF_ASKING: usize = 3;
+
 /// How long a prayer stays open before it curdles into doubt.
 ///
 /// Long enough to read the pink notice, open nothing, and fly there — the
@@ -322,6 +326,7 @@ pub(super) fn kneel(
     stores: Query<&super::work::Stockpile>,
     grounds: Query<&super::SettlementGround>,
     gifts: Query<&Transform, (With<DivinelyPlaced>, With<FoodSource>, Without<Held>)>,
+    asking: Query<(&Prayer, &MemberOf)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut notices: MessageWriter<crate::ui::Notice>,
@@ -372,7 +377,27 @@ pub(super) fn kneel(
         // someone starving beside it. Six villagers died in VisitingStore at
         // hunger 1.00 with the larder reading full, and not one prayer rose.
         let dying_regardless = needs.hunger >= 0.92;
-        if needs.hunger < DESPERATE_HUNGER || (store_has_food && !dying_regardless) {
+        // Hunger synchronizes across a town - same mealtimes, same thin
+        // night - and one shared threshold turned that into a whole
+        // village kneeling at a single dawn. Brett, watching it: "Everyone
+        // is praying like crazy people!" Each soul carries its own point
+        // of desperation instead, spread a few meals wide, so the askings
+        // arrive as a trickle a town can watch and answer.
+        let pride = (entity.to_bits() % 8) as f32 * 0.025;
+        if needs.hunger < DESPERATE_HUNGER + pride || (store_has_food && !dying_regardless) {
+            continue;
+        }
+        // And one voice can ask for a whole town: while a few food
+        // prayers already stand from this town, the next hungry soul
+        // holds their asking - no less hungry, just not everyone on
+        // their knees at once. The dying wait for nobody.
+        let chorus = asking
+            .iter()
+            .filter(|(prayer, member)| {
+                matches!(prayer.kind, PrayerKind::Food) && Some(member.0) == home
+            })
+            .count();
+        if chorus >= CHORUS_OF_ASKING && !dying_regardless {
             continue;
         }
         if matches!(*activity, Activity::Eating(_) | Activity::Sleeping) {
