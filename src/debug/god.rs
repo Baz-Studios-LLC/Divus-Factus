@@ -732,7 +732,7 @@ pub(crate) fn spawn_god_panel(
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
                     column_gap: px(12),
-                    padding: UiRect::axes(px(14), px(10)),
+                    padding: UiRect::all(px(super::village::RHYTHM)),
                     border: UiRect::all(px(1)),
                     border_radius: BorderRadius::all(px(0)),
                     overflow: Overflow::clip(),

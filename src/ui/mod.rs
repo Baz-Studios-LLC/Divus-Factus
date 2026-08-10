@@ -725,7 +725,9 @@ fn keep_the_prayer_shelf(
                     // border. Brett: "prayer cards need some padding to
                     // make them look more polished."
                     row_gap: px(6),
-                    padding: UiRect::axes(px(14), px(11)),
+                    // One number, both axes: the padding is the page
+                    // grid's own rhythm.
+                    padding: UiRect::all(px(crate::debug::village::RHYTHM)),
                     border: UiRect::all(px(2)),
                     border_radius: BorderRadius::all(px(8)),
                     ..default()
@@ -1733,7 +1735,9 @@ pub fn card_well(commands: &mut Commands, parent: Entity, title: &str) -> Entity
                 min_width: px(0),
                 flex_direction: FlexDirection::Column,
                 row_gap: px(6),
-                padding: UiRect::all(px(10)),
+                // Every well in the book breathes on the page grid's own
+                // rhythm, the same in both directions.
+                padding: UiRect::all(px(crate::debug::village::RHYTHM)),
                 border: UiRect::all(px(1)),
                 border_radius: BorderRadius::all(px(0)),
                 overflow: Overflow::clip(),

@@ -497,7 +497,7 @@ pub(crate) fn spawn_chronicle_page(mut commands: Commands, codex: Res<super::vil
                 width: percent(100),
                 flex_shrink: 0.0,
                 justify_content: JustifyContent::Center,
-                padding: UiRect::axes(px(10), px(8)),
+                padding: UiRect::all(px(super::village::RHYTHM)),
                 border: UiRect::all(px(1)),
                 border_radius: BorderRadius::all(px(0)),
                 margin: UiRect::top(px(6)),

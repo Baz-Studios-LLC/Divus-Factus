@@ -776,7 +776,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
                 column_gap: px(10),
-                padding: UiRect::axes(px(12), px(10)),
+                padding: UiRect::all(px(RHYTHM)),
                 border: UiRect::all(px(1)),
                 border_radius: BorderRadius::all(px(0)),
                 ..default()
@@ -1826,7 +1826,7 @@ pub(crate) fn update_prayer_board(
                         width: percent(100),
                         flex_direction: FlexDirection::Column,
                         row_gap: px(8),
-                        padding: UiRect::axes(px(14), px(12)),
+                        padding: UiRect::all(px(RHYTHM)),
                         border: UiRect::all(px(2)),
                         border_radius: BorderRadius::all(px(8)),
                         ..default()

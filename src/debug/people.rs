@@ -717,7 +717,7 @@ pub(crate) fn spawn_people_panel(
                 flex_wrap: FlexWrap::Wrap,
                 align_content: AlignContent::SpaceEvenly,
                 row_gap: px(5),
-                padding: UiRect::axes(px(12), px(10)),
+                padding: UiRect::all(px(super::village::RHYTHM)),
                 border_radius: BorderRadius::all(px(0)),
                 ..default()
             },
@@ -813,7 +813,7 @@ pub(crate) fn spawn_people_panel(
                     min_height: px(0),
                     flex_direction: FlexDirection::Column,
                     row_gap: px(8),
-                    padding: UiRect::all(px(13)),
+                    padding: UiRect::all(px(super::village::RHYTHM)),
                     border: UiRect::all(px(1)),
                     border_radius: BorderRadius::all(px(0)),
                     overflow: Overflow::clip(),
@@ -883,7 +883,7 @@ pub(crate) fn spawn_people_panel(
             width: percent(100),
             flex_direction: FlexDirection::Column,
             row_gap: px(6),
-            padding: UiRect::all(px(11)),
+            padding: UiRect::all(px(super::village::RHYTHM)),
             border_radius: BorderRadius::all(px(0)),
             ..default()
         },
@@ -897,7 +897,7 @@ pub(crate) fn spawn_people_panel(
             width: percent(100),
             flex_direction: FlexDirection::Column,
             row_gap: px(7),
-            padding: UiRect::all(px(11)),
+            padding: UiRect::all(px(super::village::RHYTHM)),
             border_radius: BorderRadius::all(px(0)),
             ..default()
         },
@@ -914,7 +914,7 @@ pub(crate) fn spawn_people_panel(
             max_height: px(330),
             flex_direction: FlexDirection::Column,
             overflow: Overflow::scroll_y(),
-            padding: UiRect::all(px(11)),
+            padding: UiRect::all(px(super::village::RHYTHM)),
             row_gap: px(2),
             border_radius: BorderRadius::all(px(0)),
             ..default()
@@ -933,7 +933,7 @@ pub(crate) fn spawn_people_panel(
             max_height: px(330),
             flex_direction: FlexDirection::Column,
             overflow: Overflow::scroll_y(),
-            padding: UiRect::all(px(11)),
+            padding: UiRect::all(px(super::village::RHYTHM)),
             row_gap: px(2),
             border_radius: BorderRadius::all(px(0)),
             ..default()
