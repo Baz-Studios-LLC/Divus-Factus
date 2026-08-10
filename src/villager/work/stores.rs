@@ -955,25 +955,57 @@ pub(crate) fn eat_from_store(
 /// there as well."
 pub(crate) fn pile_points_follow(
     mut site: Option<ResMut<SettlementSite>>,
-    piles: Query<(&StorePile, &Transform, &crate::villager::MemberOf), Changed<Transform>>,
+    piles: Query<(&StorePile, &Transform, &crate::villager::MemberOf)>,
     mut grounds: Query<&mut crate::villager::SettlementGround>,
+    shells: Query<(&Transform, &super::buildings::Shell)>,
 ) {
     for (kind, at, owner) in &piles {
         let Ok(mut ground) = grounds.get_mut(owner.0) else {
             continue;
         };
+        // The DELIVERY point, not the pile's own spot. When the sacks
+        // move indoors the pile stands behind walls, and a walker sent to
+        // the sacks themselves paths to a point no route can reach - the
+        // route is denied, the walk is abandoned, and the walker stands
+        // at the wall until the starvation watch names them. Brett, live:
+        // "People still starve in sight of a stocked larder." Third time
+        // this class of bug has drawn blood (the square's centre under
+        // the hall's terraces; the longhouse door that opened indoors),
+        // so the rule is now absolute: everyone is sent to the DOORSTEP,
+        // found through the shell the same way every route out is found.
+        let table = doorstep_of(at.translation, &shells);
         match kind.0 {
-            PileKind::Timber => ground.woodpile = at.translation,
-            PileKind::Food => ground.foodpile = at.translation,
+            PileKind::Timber => ground.woodpile = table,
+            PileKind::Food => ground.foodpile = table,
             _ => continue,
         }
         if kind.0 == PileKind::Timber
             && let Some(site) = site.as_mut()
             && site.settlement == owner.0
         {
-            site.woodpile = at.translation;
+            site.woodpile = table;
         }
     }
+}
+
+/// Where deliveries and meals actually happen for a pile standing at
+/// `at`: the pile's own spot when it stands under the sky, and the
+/// sheltering building's outdoor door-stand when it stands behind walls.
+fn doorstep_of(at: Vec3, shells: &Query<(&Transform, &super::buildings::Shell)>) -> Vec3 {
+    for (housing, shell) in shells {
+        // Into the building's own space; a margin so a pile against the
+        // inner wall still counts as indoors.
+        let local = housing.rotation.inverse() * (at - housing.translation);
+        if local.x.abs() > shell.half_w + 0.5 || local.z.abs() > shell.half_d + 0.5 {
+            continue;
+        }
+        let Some(door) = shell.doors.first() else {
+            continue;
+        };
+        let (_, outside) = shell.door_stand(door);
+        return housing.translation + housing.rotation * Vec3::new(outside.x, 0.0, outside.y);
+    }
+    at
 }
 
 /// A line in the log once a minute, so an unattended run leaves an account of

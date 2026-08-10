@@ -1,57 +1,16 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-  416  (worn pool) event:thrown of:person saw tell
-  156  (worn pool) housed muse
-   96  (worn pool) muse
-   83  (worn pool) reply
-   71  (worn pool) muse trade:hunter
-   69  (worn pool) muse trade:fisher
-   67  (worn pool) muse trade:gatherer
-   67  (worn pool) muse trade:forester
-   64  (worn pool) housed married muse
-   57  (worn pool) married muse
-   50  (worn pool) muse wavering
-   40  (worn pool) muse trade:priest
-   39  (worn pool) chat:followup told
-   36  (worn pool) devout muse
-   32  (worn pool) devout reply
-   21  chat:end devout event:thrown told trade:fisher
-   18  devout housed married muse trade:hunter
-   16  (worn pool) muse trade:miner
-   15  (worn pool) devotion muse prayer
-   12  (worn pool) chat:followup devout told
-    9  (worn pool) muse trade:builder
-    8  (worn pool) devout muse prayer
-    8  chat:end devout event:thrown told trade:hunter
-    8  (worn pool) devotion devout muse prayer
-    8  chat:end devout event:thrown told trade:miner
-    8  chat:end devout event:thrown told trade:forester
-    8  (worn pool) devotion muse night prayer
-    7  (worn pool) chat:end told
-    7  (worn pool) chat:end devout
-    6  chat:followup devout event:thrown told trade:hunter
-    6  chat:followup devout event:thrown told trade:fisher
-    5  devout housed married muse trade:fisher
-    4  (worn pool) chat:followup event:thrown
-    4  (worn pool) chat:followup trade:fisher
-    3  (worn pool) devotion muse prayer roof
-    3  (worn pool) chat:end trade:fisher
-    3  (worn pool) chat:end trade:hunter
-    3  (worn pool) chat:end trade:miner
-    3  (worn pool) chat:end trade:forester
-    3  (worn pool) chat:end trade:gatherer
-    3  (worn pool) chat:followup trade:miner
-    3  devout housed married muse trade:miner
-    3  (worn pool) reply trade:priest
-    3  chat:followup devout event:thrown told trade:miner
-    3  (worn pool) chat:followup trade:hunter
-    2  (worn pool) chat:followup trade:gatherer
-    2  (worn pool) chat:followup trade:priest
-    2  (worn pool) chat:followup trade:forester
-    2  devout housed married muse trade:forester
-    2  chat:followup devout event:thrown told trade:gatherer
-    1  chat:followup devout event:thrown told trade:priest
-    1  (worn pool) devotion muse prayer storm
-    1  (worn pool) chat:end trade:priest
-    1  devout housed married muse trade:gatherer
-    1  chat:followup devout event:thrown told trade:forester
+   19  (worn pool) event:provided saw tell
+   16  (worn pool) housed married muse
+   15  (worn pool) housed muse
+   10  (worn pool) reply wavering
+    9  (worn pool) chat:followup told wavering
+    7  (worn pool) muse wavering
+    4  (worn pool) devout reply
+    3  (worn pool) devout event:provided reply
+    3  (worn pool) event:provided reply wavering
+    3  (worn pool) devout event:provided saw tell
+    3  (worn pool) chat:followup devout told
+    3  (worn pool) event:impact of:person saw tell
+    2  (worn pool) event:delivered saw tell wavering
+    1  (worn pool) event:delivered heard tell wavering
