@@ -320,6 +320,109 @@ impl Corpus {
 mod tests {
     use super::*;
 
+    /// Every tag in the corpus must be one the game actually speaks. A
+    /// line wearing a tag the moments never carry can NEVER fire - it
+    /// just rots silently in the file - and the likeliest way to write
+    /// one is a second author (Brett drafts lines with ChatGPT) inventing
+    /// or misspelling a tag. New tags are welcome; they are added HERE in
+    /// the same change that teaches the game to carry them.
+    #[test]
+    fn every_tag_is_one_the_game_speaks() {
+        const SPOKEN: &[&str] = &[
+            // registers
+            "muse",
+            "tell",
+            "reply",
+            "yell",
+            "prayer",
+            // conversation beats
+            "chat:open",
+            "chat:followup",
+            "chat:reply",
+            "chat:end",
+            "told",
+            // the hand axis and wear
+            "saw",
+            "heard",
+            "distant",
+            "retold",
+            // faith bands
+            "devout",
+            "wavering",
+            "doubting",
+            // moments and states
+            "devotion",
+            "grudge",
+            "housed",
+            "hungry",
+            "hurt",
+            "married",
+            "night",
+            "road",
+            "roof",
+            "roofless",
+            "storm",
+            "wolf",
+            "worn out",
+            // what the act happened to
+            "of:person",
+            "of:beast",
+            "of:thing",
+            // events
+            "event:delivered",
+            "event:flourished",
+            "event:impact",
+            "event:lifted",
+            "event:mauled",
+            "event:mended",
+            "event:perished",
+            "event:provided",
+            "event:quaked",
+            "event:setdown",
+            "event:smote",
+            "event:thrown",
+            "event:uprooted",
+            // trades, in both voices
+            "trade:builder",
+            "trade:cook",
+            "trade:explorer",
+            "trade:farmer",
+            "trade:fisher",
+            "trade:forester",
+            "trade:gatherer",
+            "trade:guard",
+            "trade:healer",
+            "trade:hunter",
+            "trade:miner",
+            "trade:priest",
+            "topic:builder",
+            "topic:cook",
+            "topic:explorer",
+            "topic:farmer",
+            "topic:fisher",
+            "topic:food",
+            "topic:forester",
+            "topic:gatherer",
+            "topic:guard",
+            "topic:healer",
+            "topic:hunter",
+            "topic:miner",
+            "topic:priest",
+            "topic:roof",
+            "topic:weather",
+        ];
+        let voice = Corpus::load();
+        for line in voice.lines() {
+            for tag in &line.tags {
+                assert!(
+                    SPOKEN.contains(&tag.as_str()),
+                    "the corpus wears a tag the game never speaks: {tag:?} on {:?}",
+                    line.t
+                );
+            }
+        }
+    }
+
     /// The register wall between subjects, pinned against the real corpus.
     /// The bug this guards: a berry bush moved by the hand once came out
     /// of witnesses' mouths as "I saw somebody lifted clean into the air"
