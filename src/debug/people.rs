@@ -401,7 +401,7 @@ pub(crate) fn spawn_people_panel(
             flex_direction: FlexDirection::Column,
             row_gap: px(8),
             overflow: Overflow::scroll_y(),
-            padding: UiRect::all(px(6)),
+            padding: UiRect::all(px(9)),
             border_radius: BorderRadius::all(px(0)),
             ..default()
         },
@@ -708,8 +708,8 @@ pub(crate) fn spawn_people_panel(
                 flex_direction: FlexDirection::Row,
                 flex_wrap: FlexWrap::Wrap,
                 align_content: AlignContent::SpaceEvenly,
-                row_gap: px(3),
-                padding: UiRect::axes(px(10), px(6)),
+                row_gap: px(5),
+                padding: UiRect::axes(px(12), px(10)),
                 border_radius: BorderRadius::all(px(0)),
                 ..default()
             },
@@ -742,7 +742,7 @@ pub(crate) fn spawn_people_panel(
                     // `ui::stat_row` already lives by; this grid keeps it.
                     align_items: AlignItems::Baseline,
                     column_gap: px(8),
-                    padding: UiRect::axes(px(4), px(3)),
+                    padding: UiRect::axes(px(6), px(5)),
                     ..default()
                 },
                 ChildOf(grid),
@@ -800,8 +800,8 @@ pub(crate) fn spawn_people_panel(
                     flex_basis: px(0),
                     min_height: px(0),
                     flex_direction: FlexDirection::Column,
-                    row_gap: px(6),
-                    padding: UiRect::all(px(10)),
+                    row_gap: px(8),
+                    padding: UiRect::all(px(13)),
                     border: UiRect::all(px(1)),
                     border_radius: BorderRadius::all(px(0)),
                     overflow: Overflow::clip(),
@@ -846,7 +846,7 @@ pub(crate) fn spawn_people_panel(
         Node {
             width: percent(100),
             flex_direction: FlexDirection::Column,
-            row_gap: px(3),
+            row_gap: px(5),
             ..default()
         },
         ChildOf(lately_card),
@@ -860,7 +860,7 @@ pub(crate) fn spawn_people_panel(
             width: percent(100),
             flex_direction: FlexDirection::Column,
             row_gap: px(6),
-            padding: UiRect::all(px(8)),
+            padding: UiRect::all(px(11)),
             border_radius: BorderRadius::all(px(0)),
             ..default()
         },
@@ -874,7 +874,7 @@ pub(crate) fn spawn_people_panel(
             width: percent(100),
             flex_direction: FlexDirection::Column,
             row_gap: px(7),
-            padding: UiRect::all(px(8)),
+            padding: UiRect::all(px(11)),
             border_radius: BorderRadius::all(px(0)),
             ..default()
         },
@@ -891,7 +891,7 @@ pub(crate) fn spawn_people_panel(
             max_height: px(330),
             flex_direction: FlexDirection::Column,
             overflow: Overflow::scroll_y(),
-            padding: UiRect::all(px(8)),
+            padding: UiRect::all(px(11)),
             row_gap: px(2),
             border_radius: BorderRadius::all(px(0)),
             ..default()
@@ -910,7 +910,7 @@ pub(crate) fn spawn_people_panel(
             max_height: px(330),
             flex_direction: FlexDirection::Column,
             overflow: Overflow::scroll_y(),
-            padding: UiRect::all(px(8)),
+            padding: UiRect::all(px(11)),
             row_gap: px(2),
             border_radius: BorderRadius::all(px(0)),
             ..default()
