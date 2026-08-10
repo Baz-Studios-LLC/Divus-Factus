@@ -44,6 +44,20 @@ pub(crate) use people::*;
 pub(crate) use village::*;
 pub(crate) use world::*;
 
+/// The debug book's frame in three beats, where one total order used to
+/// stand. Hands first, then the carpentry, then the paint: systems inside
+/// a beat run in parallel and never queue behind a stranger, and a new
+/// system joins with one `.in_set(...)` call — no chain tuple to outgrow.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) enum DebugSet {
+    /// Clicks and keys mutate state: filters, selections, page turns.
+    Input,
+    /// Panels rebuild their content from that state.
+    Rebuild,
+    /// Colours, visibility and text are touched up on what stands.
+    Dress,
+}
+
 pub struct DebugPlugin;
 
 impl Plugin for DebugPlugin {
@@ -75,6 +89,12 @@ impl Plugin for DebugPlugin {
                 PreUpdate,
                 village::catch_rebind.after(bevy::input::InputSystems),
             )
+            .configure_sets(
+                Update,
+                (DebugSet::Input, DebugSet::Rebuild, DebugSet::Dress).chain(),
+            )
+            // INPUT: every hand on the instruments. Parallel except where
+            // two hands reach for the same state - those edges are named.
             .add_systems(
                 Update,
                 (
@@ -82,25 +102,40 @@ impl Plugin for DebugPlugin {
                     toggle_dev_overlay,
                     toggle_roofs,
                     toggle_the_sea,
-                    update_dev_overlay,
-                    report_frames.run_if(|| std::env::var("DIVUS_FACTUS_FRAMES").is_ok()),
                     handle_toolbar,
-                    update_hud,
-                    update_world_panel,
-                    update_people_panel,
-                    // The hall's masthead: one subject, paired to spare
-                    // the tuple.
-                    (people::people_pulse, people::filter_by_chip),
+                    screenshot_on_request,
+                    people::filter_by_chip,
                     handle_chronicle_filters,
-                    update_chronicle,
                     handle_people_rows,
                     handle_roster_sort,
-                    // Playing only: the hover card naming what is beneath the
-                    // hand belongs to play, not to the title's translucent veil.
-                    update_inspector.run_if(in_state(crate::GameState::Playing)),
-                    screenshot_on_request,
                 )
-                    .chain(),
+                    .in_set(DebugSet::Input),
+            )
+            .add_systems(
+                Update,
+                (
+                    handle_codex_tabs,
+                    village::answer_the_board,
+                    spellbook::place_from_the_book,
+                    village::settings_panel,
+                    village::keybind_panel,
+                    village::sound_panel,
+                    village::swap_mouse_buttons.after(village::keybind_panel),
+                    // The vacant seat fills only once the page turn is in
+                    // and a row click has had its say - the three writers
+                    // of SelectedPerson keep one order: rows, meet, then
+                    // the capture preselect below.
+                    people::meet_someone
+                        .after(handle_codex_tabs)
+                        .after(handle_people_rows),
+                    // The capture harness picks its page and subject after
+                    // every other hand has spoken - the preselect must win.
+                    capture_preselect
+                        .after(handle_codex_tabs)
+                        .after(handle_people_rows)
+                        .after(people::meet_someone),
+                )
+                    .in_set(DebugSet::Input),
             )
             .add_systems(
                 Update,
@@ -134,43 +169,75 @@ impl Plugin for DebugPlugin {
                 )
                     .chain(),
             )
+            // REBUILD: every page keeps its own content up, in parallel.
             .add_systems(
                 Update,
                 (
+                    update_hud,
+                    update_world_panel,
+                    update_people_panel,
+                    update_chronicle,
                     update_faith_roster,
-                    // Grouped: the chain tuple is at Bevy's ceiling, and
-                    // these three are one subject - codex pages keeping up.
-                    (
-                        update_ledger_details,
-                        village::update_prayer_board,
-                        village::answer_the_board,
-                        spellbook::place_from_the_book,
-                    ),
-                    // Paired: the chain tuple is at Bevy's ceiling, and
-                    // these two are one subject - the book's chrome.
-                    (handle_codex_tabs, village::footer_date),
-                    people::meet_someone,
-                    village::settings_panel,
-                    village::keybind_panel,
-                    village::sound_panel,
-                    village::swap_mouse_buttons,
-                    apply_codex_page,
-                    dress_ledger_banner,
-                    update_dossier,
-                    // Paired: the chain tuple is at Bevy's ceiling, and
-                    // these two are one subject - the god's own pages.
-                    (update_god_panel, spellbook::update_spellbook),
                     update_faith_chart,
-                    capture_preselect,
-                    style_roster_rows,
+                    update_ledger_details,
+                    village::update_prayer_board,
                     update_village_panel,
-                    update_paperdoll,
-                    stamp_doll_layers,
-                    spin_doll,
-                    update_person_detail,
+                    // Playing only: the hover card naming what is beneath the
+                    // hand belongs to play, not to the title's translucent veil.
+                    update_inspector.run_if(in_state(crate::GameState::Playing)),
                 )
-                    .chain(),
+                    .in_set(DebugSet::Rebuild),
+            )
+            .add_systems(
+                Update,
+                (
+                    update_dossier,
+                    update_god_panel,
+                    update_person_detail,
+                    // The doll must stand before its layers are stamped and
+                    // its turntable spun - one subject, kept in step.
+                    (update_paperdoll, stamp_doll_layers, spin_doll).chain(),
+                )
+                    .in_set(DebugSet::Rebuild),
+            )
+            // DRESS: paint on what stands. The page flip goes first so
+            // every dresser that gates on its page's visibility sees the
+            // book already turned; behind it they all run in parallel.
+            .add_systems(
+                Update,
+                (
+                    update_dev_overlay,
+                    (
+                        apply_codex_page,
+                        (
+                            dress_ledger_banner,
+                            spellbook::update_spellbook,
+                            style_roster_rows,
+                            people::people_pulse,
+                            village::footer_date,
+                        ),
+                    )
+                        .chain(),
+                )
+                    .in_set(DebugSet::Dress),
+            )
+            .add_systems(
+                Update,
+                report_frames.run_if(|| std::env::var("DIVUS_FACTUS_FRAMES").is_ok()),
             );
+
+        // The parallel court's own inspector: DIVUS_FACTUS_AMBIGUITY=1
+        // makes the scheduler list every unordered pair that shares
+        // mutable state, so a new system's missing edge is a warning in
+        // the log instead of a nondeterministic frame in the wild.
+        if std::env::var("DIVUS_FACTUS_AMBIGUITY").is_ok() {
+            app.edit_schedule(Update, |schedule| {
+                schedule.set_build_settings(bevy::ecs::schedule::ScheduleBuildSettings {
+                    ambiguity_detection: bevy::ecs::schedule::LogLevel::Warn,
+                    ..default()
+                });
+            });
+        }
 
         if let Some(path) = crate::capture_path() {
             app.insert_resource(AutoCapture {

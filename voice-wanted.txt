@@ -1,3 +1,7 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-    1  (worn pool) devotion muse prayer wavering
+    5  (worn pool) housed muse
+    4  (worn pool) muse wavering
+    2  (worn pool) muse trade:hunter
+    2  (worn pool) devotion muse prayer wavering
+    1  (worn pool) muse trade:gatherer
