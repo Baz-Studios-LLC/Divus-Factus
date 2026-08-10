@@ -546,7 +546,7 @@ pub(crate) fn hold_conversations(
         Option<&crate::witness::Temperament>,
         Option<&traits::Traits>,
     )>,
-    tongue: Option<ResMut<crate::telling::Tongue>>,
+    tongue: Option<ResMut<crate::sermo::Tongue>>,
     watch: Res<crate::debug::timings::Timings>,
 ) {
     let _t = watch.watch("villager: hold_conversations");
@@ -658,18 +658,15 @@ pub(crate) fn hold_conversations(
                 let (hand, told_before) = minds
                     .get(entity)
                     .map(|(_, witnessed, ..)| {
-                        (
-                            crate::telling::Retelling::hand_of(witnessed),
-                            witnessed.told,
-                        )
+                        (crate::sermo::Retelling::hand_of(witnessed), witnessed.told)
                     })
-                    .unwrap_or((crate::telling::Hand::Heard, 0));
+                    .unwrap_or((crate::sermo::Hand::Heard, 0));
                 let trust = minds
                     .get(entity)
                     .ok()
                     .and_then(|(_, _, _, faith, _, _, _)| faith.map(|f| f.trust))
                     .unwrap_or(0.3);
-                tongue.line(&crate::telling::Retelling::new(
+                tongue.line(&crate::sermo::Retelling::new(
                     kind,
                     hand,
                     voice,
@@ -705,10 +702,10 @@ pub(crate) fn hold_conversations(
                     .ok()
                     .and_then(|(_, _, _, faith, _, _, _)| faith.map(|f| f.trust))
                     .unwrap_or(0.3);
-                tongue.muse(crate::telling::Musing {
+                tongue.muse(crate::sermo::Musing {
                     who: talk.partner,
                     voice,
-                    faith: crate::telling::FaithBand::of(trust),
+                    faith: crate::sermo::FaithBand::of(trust),
                     body: Vec::new(),
                     heard: Some(told_plain.clone()),
                     aloud: true,
@@ -892,7 +889,7 @@ pub(crate) fn hold_conversations(
                         entity,
                         "chat:reply",
                         &topic.tag(),
-                        crate::telling::FaithBand::of(trust),
+                        crate::sermo::FaithBand::of(trust),
                         voice,
                         None,
                     )
@@ -961,7 +958,7 @@ pub(crate) fn hold_conversations(
                         role,
                         &topic.tag(),
                         told,
-                        crate::telling::FaithBand::of(trust),
+                        crate::sermo::FaithBand::of(trust),
                         voice,
                         whom.as_deref(),
                     )

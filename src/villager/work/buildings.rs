@@ -3280,7 +3280,7 @@ pub(crate) fn sermons(
     mut stores: Query<&mut Stockpile>,
     shrines: Query<(&GlobalTransform, &Building)>,
     attention: Option<Res<crate::attention::Attention>>,
-    mut tongue: Option<ResMut<crate::telling::Tongue>>,
+    mut tongue: Option<ResMut<crate::sermo::Tongue>>,
     mut congregation: Query<
         (
             Entity,
@@ -3322,7 +3322,7 @@ pub(crate) fn sermons(
                 preacher,
                 at.translation,
                 witnessed.recent[0].clone(),
-                crate::telling::Retelling::hand_of(witnessed),
+                crate::sermo::Retelling::hand_of(witnessed),
                 faith.trust,
                 witnessed.told,
             )
@@ -3339,7 +3339,7 @@ pub(crate) fn sermons(
     // bubble waits on the god's regard.
     let regard = crate::attention::regard(attention.as_deref(), at);
     let composed = tongue.as_mut().and_then(|tongue| {
-        tongue.line(&crate::telling::Retelling::new(
+        tongue.line(&crate::sermo::Retelling::new(
             sermon,
             hand,
             Some(Vocation::Priest),

@@ -32,13 +32,13 @@ mod render;
 mod rng;
 mod save;
 mod scatter;
+mod sermo;
 mod sfx;
 mod sigil;
 mod sky;
 mod speed;
 mod starfield;
 mod survey;
-mod telling;
 mod terrain;
 mod title;
 mod trails;
@@ -165,7 +165,7 @@ fn main() {
     // The voice bench: the corpus with no world around it, for judging
     // the writing without hunting two villagers across a valley first.
     if std::env::args().any(|arg| arg == "--voice") {
-        telling::bench::run();
+        sermo::bench::run();
         return;
     }
     // The planet with nothing living on it, for getting the sphere right
@@ -247,7 +247,7 @@ fn main() {
             markers::MarkersPlugin,
             // Before the tongue: attention decides which words are SHOWN.
             attention::AttentionPlugin,
-            telling::TellingPlugin,
+            sermo::SermoPlugin,
         ))
         .add_plugins((
             keymap::KeymapPlugin,

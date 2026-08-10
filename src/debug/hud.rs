@@ -342,7 +342,7 @@ pub(crate) fn update_hud(
     corpses: Query<(), (With<crate::creature::Corpse>, With<Person>)>,
     reactions: Query<(), (With<Reaction>, With<Person>)>,
     stores: Query<&crate::villager::work::Stockpile>,
-    voice: Option<Res<crate::telling::Tongue>>,
+    voice: Option<Res<crate::sermo::Tongue>>,
     mut panels: Query<&mut Visibility, With<HudPanel>>,
     mut values: Query<(&HudValue, &mut Text)>,
 ) {

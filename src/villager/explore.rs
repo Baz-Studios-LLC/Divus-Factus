@@ -296,7 +296,7 @@ pub(super) fn expeditions(
     mut rng: ResMut<super::SimRng>,
     mut notices: MessageWriter<crate::ui::Notice>,
     mut say: (
-        Option<ResMut<crate::telling::Tongue>>,
+        Option<ResMut<crate::sermo::Tongue>>,
         Option<Res<crate::attention::Attention>>,
     ),
     mut stores: Query<&mut crate::villager::work::Stockpile>,
@@ -502,10 +502,10 @@ pub(super) fn expeditions(
             // `returned`, so the want-list demands homecoming lines until
             // the corpus holds them.
             if let Some(tongue) = say.0.as_mut() {
-                tongue.muse(crate::telling::Musing {
+                tongue.muse(crate::sermo::Musing {
                     who: entity,
                     voice: Some(crate::villager::work::Vocation::Explorer),
-                    faith: crate::telling::FaithBand::Wavering,
+                    faith: crate::sermo::FaithBand::Wavering,
                     body: vec!["returned"],
                     heard: None,
                     aloud: true,

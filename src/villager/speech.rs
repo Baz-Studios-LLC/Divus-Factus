@@ -65,7 +65,7 @@ pub(super) fn muse_the_watched(
     mut since_last: Local<f32>,
     mut last_mused: Local<std::collections::HashMap<Entity, f32>>,
     mut clock: Local<f32>,
-    tongue: Option<ResMut<crate::telling::Tongue>>,
+    tongue: Option<ResMut<crate::sermo::Tongue>>,
     mut rng: ResMut<SimRng>,
     villagers: Query<
         (
@@ -143,10 +143,10 @@ pub(super) fn muse_the_watched(
 
     last_mused.insert(entity, *clock);
     debug!("{} is asked for words", person.name);
-    tongue.muse(crate::telling::Musing {
+    tongue.muse(crate::sermo::Musing {
         who: entity,
         voice: vocation.copied(),
-        faith: crate::telling::FaithBand::of(faith.map_or(0.3, |f| f.trust)),
+        faith: crate::sermo::FaithBand::of(faith.map_or(0.3, |f| f.trust)),
         body,
         heard: None,
         aloud: false,
@@ -161,7 +161,7 @@ pub(super) fn muse_the_watched(
 /// belongs to conversations and to true cries, which arrive marked aloud.
 #[allow(clippy::type_complexity)]
 pub(super) fn show_musings(
-    tongue: Option<ResMut<crate::telling::Tongue>>,
+    tongue: Option<ResMut<crate::sermo::Tongue>>,
     attention: Option<Res<crate::attention::Attention>>,
     name: Option<Res<super::DivineName>>,
     mut say: MessageWriter<crate::ui::Say>,

@@ -67,7 +67,7 @@ pub(super) fn mark_the_dead(
     mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,
     mut telling: (
-        Option<ResMut<crate::telling::Tongue>>,
+        Option<ResMut<crate::sermo::Tongue>>,
         Option<Res<crate::attention::Attention>>,
     ),
     fallen: Query<
@@ -129,10 +129,10 @@ pub(super) fn mark_the_dead(
                 // pick can never hand a mourner a cheerful idle thought, and
                 // the want-list demands mourning lines until they exist.
                 if let Some(tongue) = telling.0.as_mut() {
-                    tongue.muse(crate::telling::Musing {
+                    tongue.muse(crate::sermo::Musing {
                         who: mourner,
                         voice: None,
-                        faith: crate::telling::FaithBand::Wavering,
+                        faith: crate::sermo::FaithBand::Wavering,
                         body: vec!["grieving"],
                         heard: None,
                         aloud: false,

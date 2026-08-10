@@ -478,7 +478,7 @@ pub(super) fn wolves_stalk(
     site: Option<Res<crate::villager::SettlementSite>>,
     towers: Query<(&GlobalTransform, &crate::villager::work::Building)>,
     mut telling: (
-        Option<ResMut<crate::telling::Tongue>>,
+        Option<ResMut<crate::sermo::Tongue>>,
         Option<Res<crate::attention::Attention>>,
     ),
     mut rng: ResMut<crate::villager::SimRng>,
@@ -579,7 +579,7 @@ pub(super) fn wolves_stalk(
                     .entity(*quarry)
                     .insert(Fleeing(clock.elapsed + FLIGHT));
                 if let Some(tongue) = telling.0.as_mut() {
-                    tongue.cry(*quarry, "wolf", crate::telling::FaithBand::Wavering, None);
+                    tongue.cry(*quarry, "wolf", crate::sermo::FaithBand::Wavering, None);
                 }
                 alarms.write(crate::witness::DivineEvent {
                     kind: crate::witness::DivineEventKind::Mauled,
@@ -594,10 +594,10 @@ pub(super) fn wolves_stalk(
             {
                 // Picked for the one being torn at; whether anyone SEES the
                 // words is the showing's business, not the scream's.
-                tongue.muse(crate::telling::Musing {
+                tongue.muse(crate::sermo::Musing {
                     who: *quarry,
                     voice: None,
-                    faith: crate::telling::FaithBand::Wavering,
+                    faith: crate::sermo::FaithBand::Wavering,
                     body: vec!["hurt"],
                     heard: None,
                     aloud: true,

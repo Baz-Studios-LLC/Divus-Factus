@@ -1,4 +1,12 @@
-//! The village's voice: a tagged corpus of authored lines.
+//! SERMO - the village's voice. A tagged corpus of authored lines,
+//! and the engine that picks from it.
+//!
+//! Named by Brett (2026-08-10), Latin for speech and conversation, in
+//! the house that already holds Divus Factus, Ordo and Opificium. It
+//! stays in this tree on purpose: the engine below is small, but the
+//! soul of it - the corpus in the game's own voice, and lines keyed to
+//! the game's own facts (memories, faith, trades, regard) - IS the
+//! game, and does not transplant.
 //!
 //! Every word a villager says or thinks is picked from a hand-written,
 //! hand-tagged corpus (`assets/voice/`), chosen by the tags of the moment
@@ -421,9 +429,9 @@ fn flush_the_want_list(time: Res<Time>, mut since_last: Local<f32>, tongue: Opti
     }
 }
 
-pub struct TellingPlugin;
+pub struct SermoPlugin;
 
-impl Plugin for TellingPlugin {
+impl Plugin for SermoPlugin {
     fn build(&self, app: &mut App) {
         // The corpus reads in a blink and answers on the spot: no worker
         // thread, no weights, no model folder. DIVUS_FACTUS_TELLER=0

@@ -310,7 +310,7 @@ pub(super) fn muster_colonists(
     mut rng: ResMut<SimRng>,
     mut wanted: ResMut<super::explore::GroundWanted>,
     mut notices: MessageWriter<crate::ui::Notice>,
-    mut tongue: Option<ResMut<crate::telling::Tongue>>,
+    mut tongue: Option<ResMut<crate::sermo::Tongue>>,
     mut visuals: (ResMut<Assets<Mesh>>, ResMut<Assets<StandardMaterial>>),
     mut chronicles: Query<&mut Chronicle>,
     towns: Query<(
@@ -463,9 +463,9 @@ pub(super) fn muster_colonists(
         let name = culture.language.name(&mut rng.0);
         let banner_ramp = *rng.0.pick(palette::CLOTH_RAMPS);
         let sigil = (rng.0.next_u32() as usize) % crate::sigil::SIGILS.len();
-        let words = tongue.as_mut().and_then(|tongue| {
-            tongue.pray(leader, &["road"], crate::telling::FaithBand::Sure, None)
-        });
+        let words = tongue
+            .as_mut()
+            .and_then(|tongue| tongue.pray(leader, &["road"], crate::sermo::FaithBand::Sure, None));
         commands.entity(leader).insert((
             Prayer {
                 remaining: ROAD_PATIENCE,

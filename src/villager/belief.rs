@@ -325,7 +325,7 @@ pub(super) fn kneel(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut notices: MessageWriter<crate::ui::Notice>,
-    mut tongue: Option<ResMut<crate::telling::Tongue>>,
+    mut tongue: Option<ResMut<crate::sermo::Tongue>>,
     mut hungry: Query<
         (
             Entity,
@@ -399,7 +399,7 @@ pub(super) fn kneel(
         // already staring at the right villager on the right frame. Brett
         // saw the notices and never once the pink bubble.
         let words = tongue.as_mut().and_then(|tongue| {
-            tongue.pray(entity, &["hungry"], crate::telling::FaithBand::Sure, None)
+            tongue.pray(entity, &["hungry"], crate::sermo::FaithBand::Sure, None)
         });
         commands.entity(entity).insert(Prayer {
             remaining: PRAYER_PATIENCE,
@@ -436,7 +436,7 @@ pub(super) fn kneel_in_hatred(
     clock: Res<crate::calendar::WorldClock>,
     name: Option<Res<DivineName>>,
     mut rng: ResMut<super::SimRng>,
-    mut tongue: Option<ResMut<crate::telling::Tongue>>,
+    mut tongue: Option<ResMut<crate::sermo::Tongue>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut notices: MessageWriter<crate::ui::Notice>,
@@ -495,7 +495,7 @@ pub(super) fn kneel_in_hatred(
             tongue.pray(
                 entity,
                 &["grudge"],
-                crate::telling::FaithBand::of(faith.trust),
+                crate::sermo::FaithBand::of(faith.trust),
                 Some(&enemy_name),
             )
         });
@@ -704,7 +704,7 @@ pub(super) fn kneel_in_devotion(
     weather: Option<Res<crate::weather::Weather>>,
     name: Option<Res<DivineName>>,
     mut rng: ResMut<super::SimRng>,
-    mut tongue: Option<ResMut<crate::telling::Tongue>>,
+    mut tongue: Option<ResMut<crate::sermo::Tongue>>,
     mut visuals: (ResMut<Assets<Mesh>>, ResMut<Assets<StandardMaterial>>),
     mut notices: MessageWriter<crate::ui::Notice>,
     towns: Query<(Entity, &super::Settlement)>,
@@ -804,11 +804,11 @@ pub(super) fn kneel_in_devotion(
             body.push("night");
         }
         let band = if faith.trust > 0.6 {
-            crate::telling::FaithBand::Sure
+            crate::sermo::FaithBand::Sure
         } else if faith.trust > 0.3 {
-            crate::telling::FaithBand::Wavering
+            crate::sermo::FaithBand::Wavering
         } else {
-            crate::telling::FaithBand::Doubting
+            crate::sermo::FaithBand::Doubting
         };
         let words = tongue
             .as_mut()

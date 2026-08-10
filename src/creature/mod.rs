@@ -666,7 +666,7 @@ fn drowning(
     terrain: Option<Res<Terrain>>,
     mut say_timer: Local<f32>,
     mut telling: (
-        Option<ResMut<crate::telling::Tongue>>,
+        Option<ResMut<crate::sermo::Tongue>>,
         Option<Res<crate::attention::Attention>>,
     ),
     mut rng: Local<Option<crate::rng::Rng>>,
@@ -731,10 +731,10 @@ fn drowning(
             // A drowning cry, picked on the spot; the showing decides who
             // hears it.
             if let Some(tongue) = telling.0.as_mut() {
-                tongue.muse(crate::telling::Musing {
+                tongue.muse(crate::sermo::Musing {
                     who: entity,
                     voice: None,
-                    faith: crate::telling::FaithBand::Wavering,
+                    faith: crate::sermo::FaithBand::Wavering,
                     body: vec!["drowning"],
                     heard: None,
                     aloud: true,

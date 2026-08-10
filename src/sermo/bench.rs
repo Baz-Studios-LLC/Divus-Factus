@@ -17,7 +17,7 @@
 //! moment. Read the lines here; watch the timing there.
 
 use crate::rng::Rng;
-use crate::telling::corpus::Corpus;
+use crate::sermo::corpus::Corpus;
 use std::io::{BufRead, Write};
 
 /// Runs the bench until the operator is done, then leaves.
