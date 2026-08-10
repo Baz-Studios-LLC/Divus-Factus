@@ -218,6 +218,7 @@ impl Plugin for VillagerPlugin {
                     stretch_settlement,
                     explore::walk_the_world,
                     explore::expeditions,
+                    explore::the_road_feeds_who_walks_it,
                     explore::escort_duty,
                     explore::raise_cairns,
                 )

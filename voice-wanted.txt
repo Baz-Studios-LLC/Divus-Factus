@@ -1,30 +1,32 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-  232  (worn pool) housed married muse
-  211  (worn pool) housed muse
-  134  (worn pool) muse wavering
-   96  (worn pool) event:delivered reply wavering
-   73  (worn pool) event:smote saw tell
+  240  (worn pool) housed married muse
+  213  (worn pool) housed muse
+  135  (worn pool) muse wavering
+   98  (worn pool) event:delivered reply wavering
+   80  (worn pool) event:smote saw tell
    66  (worn pool) chat:end event:delivered told wavering
-   63  (worn pool) chat:followup told wavering
+   64  (worn pool) chat:followup told wavering
    50  (worn pool) chat:followup event:delivered told wavering
-   39  (worn pool) event:flourished saw tell wavering
-   38  (worn pool) muse trade:explorer
+   40  (worn pool) event:flourished saw tell wavering
+   39  (worn pool) muse trade:explorer
    35  (worn pool) reply wavering
-   26  (worn pool) event:smote saw tell wavering
-   26  (worn pool) event:smote reply wavering
-   25  (worn pool) muse trade:fisher
+   28  (worn pool) muse trade:fisher
+   28  (worn pool) event:smote saw tell wavering
+   28  (worn pool) event:smote reply wavering
    20  (worn pool) married muse
    18  (worn pool) event:delivered heard tell wavering
    18  (worn pool) event:flourished reply wavering
+   14  (worn pool) devout event:smote saw tell
    14  (worn pool) chat:end wavering
-   13  (worn pool) devout event:smote saw tell
    12  (worn pool) event:flourished saw tell
-    8  (worn pool) devout hungry muse prayer
-    7  (worn pool) chat:end event:delivered told
+   12  (worn pool) muse
+   11  (worn pool) devout hungry muse prayer
+   10  (worn pool) chat:end event:delivered told
+   10  (worn pool) chat:followup devout told
+    8  chat:end event:smote told trade:fisher wavering
+    8  (worn pool) event:delivered saw tell wavering
     7  (worn pool) devout event:smote reply
-    7  (worn pool) event:delivered saw tell wavering
-    7  (worn pool) chat:followup devout told
     7  (worn pool) chat:end told
     6  (worn pool) chat:end event:flourished told
     6  (worn pool) chat:end devout event:delivered told
@@ -32,21 +34,20 @@
     6  (worn pool) chat:end event:smote told
     6  (worn pool) devout event:delivered reply
     6  (worn pool) chat:end event:flourished told wavering
-    5  chat:end event:smote told trade:fisher wavering
     5  (worn pool) devout event:flourished saw tell
     4  (worn pool) event:provided reply wavering
+    4  (worn pool) event:delivered heard tell
     4  (worn pool) chat:end trade:explorer
     4  (worn pool) chat:end devout event:smote told
+    4  chat:end event:smote told trade:explorer wavering
     4  (worn pool) event:flourished retold saw tell
     3  (worn pool) devout event:provided saw tell
     3  (worn pool) devotion muse night prayer wavering
     3  (worn pool) chat:end trade:fisher
     3  (worn pool) devout muse
+    3  (worn pool) chat:end devout event:flourished told
     3  (worn pool) event:delivered reply
-    2  (worn pool) event:delivered heard tell
     2  chat:end event:flourished told trade:fisher wavering
-    2  (worn pool) chat:end devout event:flourished told
-    2  chat:end event:smote told trade:explorer wavering
     2  (worn pool) event:smote heard tell wavering
     1  (worn pool) chat:end trade:hunter
     1  (worn pool) reply trade:explorer

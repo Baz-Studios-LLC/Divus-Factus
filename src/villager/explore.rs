@@ -134,6 +134,108 @@ impl KnownWorld {
 #[derive(Component)]
 pub struct Cairn;
 
+/// How far from the banner counts as being away, where the stores-only
+/// law lifts. Past the town's own ground and most of the way to the
+/// working reach: a gatherer in the near fields walks home to eat, and
+/// somebody three hundred strides out does not.
+const AWAY_FROM_HOME: f32 = 110.0;
+
+/// Anybody far from home eats what the land gives them.
+///
+/// The stores-only law - Brett: "They should not eat from bushes, they
+/// should eat from the stores" - ends at the cairns, and until now only
+/// expeditions and colony parties knew that. An ordinary forester who
+/// ranged three hundred strides after the last good timber was held to
+/// the town's table and died walking back to it: "Sperfiko starved on
+/// the road, 275 strides from a larder that held food."
+///
+/// Brett: "they should be able to eat from bushes and if they hunt
+/// animals while they are away." So: the satchel first, then a beast
+/// already down, then the heath. A kill is a meal for whoever is
+/// standing over it hungry - the hunter's harvest can have what is left.
+#[allow(clippy::type_complexity)]
+pub(super) fn the_road_feeds_who_walks_it(
+    time: Res<Time>,
+    mut commands: Commands,
+    grounds: Query<&crate::villager::SettlementGround>,
+    members: Query<&crate::villager::MemberOf>,
+    mut walkers: Query<
+        (
+            Entity,
+            &Transform,
+            &mut Needs,
+            &mut MoveTarget,
+            Option<&mut work::Rations>,
+        ),
+        (
+            With<Villager>,
+            Without<Corpse>,
+            Without<crate::creature::Held>,
+            Without<Airborne>,
+            Without<Expedition>,
+            Without<crate::villager::colony::Colonist>,
+        ),
+    >,
+    mut bushes: Query<(Entity, &GlobalTransform, &mut crate::scatter::FoodSource)>,
+    fallen: Query<
+        (Entity, &Transform),
+        (
+            With<Corpse>,
+            With<crate::creature::Creature>,
+            Without<Villager>,
+        ),
+    >,
+    watch: Res<crate::debug::timings::Timings>,
+) {
+    let _t = watch.watch("villager: the_road_feeds_who_walks_it");
+    let dt = time.delta_secs();
+    for (who, at, mut needs, mut target, mut rations) in &mut walkers {
+        if needs.hunger < 0.55 {
+            continue;
+        }
+        // THEIR town's banner, not whichever one the query hands back
+        // first: a colonist's road is measured from the town they left.
+        let home = members
+            .get(who)
+            .ok()
+            .and_then(|member| grounds.get(member.0).ok())
+            .map(|ground| ground.centre);
+        if home.is_none_or(|centre| at.translation.distance(centre) < AWAY_FROM_HOME) {
+            continue;
+        }
+        // A beast already down, close enough to be worth the walk.
+        let carcass = fallen
+            .iter()
+            .map(|(beast, seat)| (beast, seat.translation))
+            .filter(|(_, spot)| spot.distance(at.translation) < 30.0)
+            .min_by(|a, b| {
+                a.1.distance(at.translation)
+                    .total_cmp(&b.1.distance(at.translation))
+            });
+        if let Some((beast, spot)) = carcass {
+            if spot.distance(at.translation) > 2.6 {
+                target.0 = Some(spot);
+            } else {
+                needs.hunger = (needs.hunger - 0.7).max(0.0);
+                if let Some(rations) = rations.as_deref_mut() {
+                    rations.0 = (rations.0 + 1.0).min(3.0);
+                }
+                commands.entity(beast).despawn();
+            }
+            continue;
+        }
+        if let Some(meal) = forage_tick(
+            at.translation,
+            dt,
+            &mut needs,
+            rations.as_deref_mut(),
+            &mut bushes,
+        ) {
+            target.0 = Some(meal);
+        }
+    }
+}
+
 /// An expedition in progress.
 #[derive(Component)]
 pub struct Expedition {

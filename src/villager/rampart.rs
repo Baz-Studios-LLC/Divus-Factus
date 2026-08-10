@@ -100,7 +100,10 @@ pub struct RampartPart;
 /// Where a gate stands. Guards keep this, and the leaves hang here.
 #[derive(Component)]
 pub struct Gate {
-    /// Which way is out, level with the ground.
+    /// Which way is out, level with the ground. Read by the guard's post
+    /// and the leaves, both of which want to know which side is the world
+    /// and which side is home.
+    #[allow(dead_code)]
     pub out: Vec3,
 }
 

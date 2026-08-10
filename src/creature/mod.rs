@@ -27,6 +27,15 @@ const GRAVITY: f32 = 19.6;
 /// Routes computed per frame across the whole world.
 const ROUTES_PER_FRAME: usize = 4;
 
+/// How far one leg of a long walk reaches before the walker stops and
+/// looks again.
+///
+/// Short enough that the search always has budget to find it, long
+/// enough that a walk home from the far woods is a handful of legs and
+/// not a hundred. A walker who cannot be routed the whole way is walked
+/// as far as can be seen - which is what anybody does crossing country.
+const A_LEG_OF_THE_WAY: f32 = 90.0;
+
 /// How near a doorway a routed walk gives way to a straight one. Long
 /// enough to reach the far end of a longhouse, since a sleeper crossing
 /// their own hall to the door is the walk this exists for, and short
@@ -385,8 +394,13 @@ pub(crate) fn plan_routes(
             continue;
         }
 
-        // Already routed there.
-        if route.goal.is_some_and(|g| g.distance_squared(goal) < 0.25) {
+        // Already routed there - unless the route has run out underneath
+        // them and the goal is still a long way off, which is what a
+        // legged walk (below) leaves behind on purpose.
+        if route.goal.is_some_and(|g| g.distance_squared(goal) < 0.25)
+            && !(route.waypoints.is_empty()
+                && transform.translation.distance(goal) > A_LEG_OF_THE_WAY * 0.5)
+        {
             continue;
         }
         // Or refused it a moment ago. The world has not changed since, and a
@@ -434,10 +448,46 @@ pub(crate) fn plan_routes(
                 route.denied = None;
             }
             None => {
-                // A refusal is how villagers starve beside a full larder:
-                // the walk is refused, `locomotion` drops the errand, and
-                // `still_refused` keeps the search from ever being run
-                // again. Under the wall probe it says so out loud, with
+                // Refused - but a walk home is not a thing anyone may be
+                // told they cannot make.
+                //
+                // The search is bounded at three thousand cells, and a
+                // walk of three hundred strides through broken country
+                // can spend that and come back with nothing. What
+                // happened then was fatal: `locomotion` reads
+                // `unreachable`, drops the errand, and `still_refused`
+                // makes sure the question is never asked again - so the
+                // walker STANDS THERE. Brett's ledger: "Sperfiko starved
+                // on the road, 275 strides from a larder that held
+                // food." Twice in one day, and the larder held ten
+                // thousand.
+                //
+                // So a refused walk is legged instead. Route as far
+                // along the line as the search can manage in one go, and
+                // ask again from there - which is how anybody crosses
+                // country they cannot see the end of.
+                let toward = (goal - transform.translation).normalize_or_zero();
+                let far = transform.translation.distance(goal);
+                if far > A_LEG_OF_THE_WAY * 1.2 {
+                    let leg = transform.translation + toward * A_LEG_OF_THE_WAY;
+                    if let Some(waypoints) = crate::navigation::find_path(
+                        &terrain,
+                        &walls,
+                        transform.translation,
+                        leg,
+                        crate::navigation::DEFAULT_BUDGET,
+                    ) {
+                        // The GOAL stays the far one, so nothing else
+                        // thinks the errand has changed; the waypoints
+                        // only reach as far as this leg, and the test
+                        // above brings them back here for the next one.
+                        route.waypoints = waypoints;
+                        route.unreachable = false;
+                        route.denied = None;
+                        continue;
+                    }
+                }
+                // Under the wall probe the refusal says so out loud, with
                 // the two facts that decide it - whether the ground at
                 // either end is walkable at all, and how far apart they
                 // are.
