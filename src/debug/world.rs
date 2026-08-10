@@ -831,11 +831,20 @@ pub(crate) fn paint_world_map(
         *seen = charted;
         map.painted = [0; 3];
     }
-    // The map centres on the banner the first time it can.
-    if map.painted == [0; 3]
-        && let Some(site) = site.as_ref()
-    {
-        map.centre = Vec2::new(site.centre.x, site.centre.z);
+    // The map centres on the banner - and FOLLOWS it there if the flag
+    // is planted after the sheets were first painted. Centring only
+    // while the sheets were untouched lost a race at the founding: the
+    // knowledge moved to the banner at once, but the SettlementSite
+    // arrives a frame later by command, so a repaint begun in that
+    // frame kept the world's origin at the centre and the whole known
+    // country off the sheet - a fogged empty ocean until an explorer
+    // finally stepped past the cairns.
+    if let Some(site) = site.as_ref() {
+        let banner = Vec2::new(site.centre.x, site.centre.z);
+        if map.centre != banner {
+            map.centre = banner;
+            map.painted = [0; 3];
+        }
     }
     // The current zoom paints first; the other sheets warm behind it.
     let face_h = map.face_h;
