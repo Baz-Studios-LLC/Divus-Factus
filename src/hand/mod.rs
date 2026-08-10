@@ -1167,6 +1167,10 @@ fn handle_grab_and_release(
                 subject: None,
                 intensity: 0.7,
             });
+            // The roots come up with the ground still in them: soil rains
+            // off the ball and settles back into the hole. Brett: "when a
+            // tree is picked up it should drop particles like dirt falling."
+            crate::matter::spill_of(&mut commands, &mut grove_kit.0, &mut matters.4, flat);
         }
 
         // LIFTED is a creature's story. A soul hoisted into the sky is

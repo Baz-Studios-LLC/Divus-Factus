@@ -177,7 +177,10 @@ impl Plugin for VillagerPlugin {
             .add_systems(Update, work::rise_out_of_the_earth)
             // Likewise unordered: the trades dress whoever took up a
             // calling this frame, whenever in the frame that happened.
-            .add_systems(Update, attire::dress_for_work)
+            .add_systems(
+                Update,
+                (attire::dress_for_work, attire::twirl_to_redress).chain(),
+            )
             // Civic life: the ballot and the decree, neither ordered
             // against anything - a mayor chosen a frame late is chosen.
             .add_systems(Update, (civic::hold_elections, civic::set_the_agenda))

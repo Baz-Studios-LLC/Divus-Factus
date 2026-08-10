@@ -413,6 +413,7 @@ pub(super) fn receive_offerings(
             here,
             home,
             &colors,
+            18,
         );
         commands.entity(offering).despawn();
         // Named by what it WAS, not what spilled over: pays[] still holds the

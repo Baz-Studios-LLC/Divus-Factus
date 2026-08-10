@@ -77,6 +77,7 @@ pub fn burst_of(
     at: Vec3,
     home: Vec3,
     colors: &[Color],
+    count: usize,
 ) {
     let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
     let coats: Vec<Handle<StandardMaterial>> = colors
@@ -92,7 +93,7 @@ pub fn burst_of(
         .collect();
     // Golden-angle spread, no two flecks alike - the same trick the glory
     // motes use, so bursts read as one family of magic.
-    for i in 0..18 {
+    for i in 0..count {
         let angle = i as f32 * 2.399963;
         let (sin, cos) = angle.sin_cos();
         let pace = 3.0 + (i % 3) as f32 * 1.4;
@@ -109,6 +110,62 @@ pub fn burst_of(
             MeshMaterial3d(coats[i % coats.len()].clone()),
             Transform::from_translation(at + Vec3::new(cos * 0.4, 0.8, sin * 0.4))
                 .with_scale(Vec3::splat(born)),
+            bevy::light::NotShadowCaster,
+        ));
+    }
+}
+
+/// The spill: earth shaken loose, falling home to the ground.
+///
+/// A tree torn up by the roots does not sparkle - it RAINS. Clumps of
+/// soil break off the root ball, tumble outward, and gather back into
+/// the ground they came from: the same Spark machinery as every other
+/// small magic, so the world keeps one family of motion. About one
+/// clump in fourteen is a pale stone shaken out with the dirt -
+/// Brett: "probably 95% brown and 5% gray?"
+pub fn spill_of(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    at: Vec3,
+) {
+    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+    let coats: [Handle<StandardMaterial>; 3] = [
+        crate::palette::shade(&crate::palette::EARTH, 0.35),
+        crate::palette::shade(&crate::palette::EARTH, 0.55),
+        crate::palette::shade(&crate::palette::STONE, 0.55),
+    ]
+    .map(|color| {
+        materials.add(StandardMaterial {
+            base_color: color,
+            perceptual_roughness: 1.0,
+            ..default()
+        })
+    });
+    for i in 0..14 {
+        let angle = i as f32 * 2.399963;
+        let (sin, cos) = angle.sin_cos();
+        // Low and lazy: dirt falls off, it is not flung.
+        let pace = 0.6 + (i % 3) as f32 * 0.5;
+        let born = 0.10 + (i % 4) as f32 * 0.05;
+        // The one pale stone in the root ball.
+        let coat = if i == 5 { &coats[2] } else { &coats[i % 2] };
+        commands.spawn((
+            Spark {
+                velocity: Vec3::new(cos * pace, 0.4 + (i % 3) as f32 * 0.5, sin * pace),
+                age: 0.0,
+                life: 0.45 + (i % 5) as f32 * 0.08,
+                born,
+                // Home is the ground the tree stood in, scattered a little,
+                // so the clumps FALL and settle instead of vanishing upward.
+                home: at + Vec3::new(cos * (0.5 + pace * 0.3), 0.05, sin * (0.5 + pace * 0.3)),
+            },
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(coat.clone()),
+            Transform::from_translation(
+                at + Vec3::new(cos * 0.3, 0.7 + (i % 3) as f32 * 0.3, sin * 0.3),
+            )
+            .with_scale(Vec3::splat(born)),
             bevy::light::NotShadowCaster,
         ));
     }
@@ -545,6 +602,7 @@ fn the_water_claims(
                 crate::palette::shade(&crate::palette::CLOTH_BLUE, 0.55),
                 crate::palette::shade(&crate::palette::BONE, 0.95),
             ],
+            18,
         );
     }
 }

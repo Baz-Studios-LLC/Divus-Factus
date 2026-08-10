@@ -145,54 +145,115 @@ fn wearing(genome: &CreatureGenome, wear: &Livery) -> bool {
 /// purpose: a body already dressed for its work is left alone, so loading
 /// a save does not rebuild every adult in the world.
 ///
-/// The swap itself hides inside a burst of the NEW cloth's essence — the
-/// same pop everything transforming makes, so a change of clothes reads
-/// as one more small magic instead of a mesh blinking. Brett: "to hide
-/// the change we could do a little animation if their clothes change."
+/// The swap hides inside the TWIRL: the moment a calling changes, the
+/// villager spins on the spot - fast enough to blur who they were - and
+/// comes out of the turn already dressed for the new work, with a small
+/// breath of the new cloth's essence at the chest. Brett: "make the
+/// character spin around fast to change the outfit", and the old full
+/// burst was "a little much" - it is a quarter of what it was, timed to
+/// the reveal instead of the decision.
+///
+/// This system only NOTICES; the spin below does the changing. Idempotent
+/// on purpose: a body already dressed for its work is left alone, so
+/// loading a save does not send every adult in the world pirouetting.
 pub(super) fn dress_for_work(
     mut commands: Commands,
+    dressed: Query<
+        (Entity, &Vocation, &CreatureGenome),
+        (
+            Or<(Added<Vocation>, Changed<Vocation>)>,
+            Without<Corpse>,
+            Without<Twirl>,
+        ),
+    >,
+) {
+    for (root, vocation, genome) in &dressed {
+        if wearing(genome, &livery(*vocation)) {
+            continue;
+        }
+        commands.entity(root).insert(Twirl {
+            spun: 0.0,
+            redressed: false,
+        });
+    }
+}
+
+/// A body mid-pirouette: how far it has turned, and whether the new
+/// clothes are on yet.
+#[derive(Component)]
+pub(super) struct Twirl {
+    spun: f32,
+    redressed: bool,
+}
+
+/// How fast the change of clothes spins, in radians per second, and how
+/// far it goes. Two and a half turns: enough blur to sell the swap, brief
+/// enough that a whole square changing trades at the morning muster reads
+/// as a flourish and not a ballet.
+const TWIRL_PACE: f32 = 34.0;
+const TWIRL_TURNS: f32 = 2.5;
+
+/// Spins the twirling, dresses them at the blurriest beat, and lets the
+/// turn run down. The redress happens mid-spin - the body is rebuilt in
+/// the new livery between one frame's blur and the next, which is the
+/// whole trick: nobody ever sees the mesh change, they see a spin end
+/// with different clothes.
+pub(super) fn twirl_to_redress(
+    mut commands: Commands,
+    time: Res<Time>,
     assets: Option<Res<CreatureAssets>>,
     mut visuals: (ResMut<Assets<Mesh>>, ResMut<Assets<StandardMaterial>>),
-    mut dressed: Query<
+    mut spinning: Query<
         (
             Entity,
-            &Transform,
+            &mut Transform,
+            &mut Twirl,
             &Vocation,
             &mut CreatureGenome,
             &mut CreatureRig,
         ),
-        (Or<(Added<Vocation>, Changed<Vocation>)>, Without<Corpse>),
+        (Without<Corpse>, Without<crate::creature::Held>),
     >,
 ) {
     let Some(assets) = assets else {
         return;
     };
-    for (root, at, vocation, mut genome, mut rig) in &mut dressed {
-        let wear = livery(*vocation);
-        if wearing(&genome, &wear) {
-            continue;
+    let full = TWIRL_TURNS * std::f32::consts::TAU;
+    for (root, mut at, mut twirl, vocation, mut genome, mut rig) in &mut spinning {
+        let step = TWIRL_PACE * time.delta_secs();
+        twirl.spun += step;
+        at.rotate_y(step);
+
+        if !twirl.redressed && twirl.spun >= full * 0.5 {
+            twirl.redressed = true;
+            let wear = livery(*vocation);
+            genome.cloth = wear.cloth;
+            genome.accent = wear.accent;
+            genome.headwear = wear.headwear;
+            genome.garment = wear.garment;
+            genome.belt = wear.belt;
+
+            let chest = at.translation + Vec3::Y * 1.1;
+            crate::matter::burst_of(
+                &mut commands,
+                &mut visuals.0,
+                &mut visuals.1,
+                chest,
+                chest,
+                &[
+                    palette::color_at(wear.cloth.palette_index()),
+                    palette::color_at(wear.accent.palette_index()),
+                ],
+                5,
+            );
+
+            commands.entity(rig.body).despawn();
+            *rig = build_body(&mut commands, &assets, root, &genome);
         }
-        genome.cloth = wear.cloth;
-        genome.accent = wear.accent;
-        genome.headwear = wear.headwear;
-        genome.garment = wear.garment;
-        genome.belt = wear.belt;
 
-        let chest = at.translation + Vec3::Y * 1.1;
-        crate::matter::burst_of(
-            &mut commands,
-            &mut visuals.0,
-            &mut visuals.1,
-            chest,
-            chest,
-            &[
-                palette::color_at(wear.cloth.palette_index()),
-                palette::color_at(wear.accent.palette_index()),
-            ],
-        );
-
-        commands.entity(rig.body).despawn();
-        *rig = build_body(&mut commands, &assets, root, &genome);
+        if twirl.spun >= full {
+            commands.entity(root).remove::<Twirl>();
+        }
     }
 }
 
@@ -267,7 +328,24 @@ mod tests {
         app.world_mut().entity_mut(root).insert(rig);
         app.world_mut().entity_mut(root).insert(Vocation::Priest);
 
+        // The change is a choreography now: noticing starts the twirl,
+        // and the clothes go on at the blurriest beat of the spin.
+        app.init_resource::<Time>();
         app.world_mut().run_system_once(dress_for_work).unwrap();
+        assert!(
+            app.world().get::<Twirl>(root).is_some(),
+            "a new calling starts the twirl"
+        );
+        assert_eq!(
+            app.world().get::<CreatureRig>(root).unwrap().body,
+            bare_body,
+            "nothing changes until the spin blurs"
+        );
+        // Spin past the midpoint: the redress lands mid-blur.
+        app.world_mut()
+            .resource_mut::<Time>()
+            .advance_by(std::time::Duration::from_millis(300));
+        app.world_mut().run_system_once(twirl_to_redress).unwrap();
         let genome = app.world().get::<CreatureGenome>(root).unwrap();
         assert_eq!(genome.headwear, Headwear::Hood, "a priest is hooded");
         assert_eq!(
@@ -278,13 +356,27 @@ mod tests {
         let dressed_body = app.world().get::<CreatureRig>(root).unwrap().body;
         assert_ne!(bare_body, dressed_body, "the body is rebuilt in the livery");
 
-        // Again: nothing to do, nothing rebuilt.
+        // The turn runs down and the twirl leaves.
+        app.world_mut()
+            .resource_mut::<Time>()
+            .advance_by(std::time::Duration::from_millis(300));
+        app.world_mut().run_system_once(twirl_to_redress).unwrap();
+        assert!(
+            app.world().get::<Twirl>(root).is_none(),
+            "the twirl ends when the turns are spent"
+        );
+
+        // Again: nothing to do, no new twirl, nothing rebuilt.
         app.world_mut().entity_mut(root).insert(Vocation::Priest);
         app.world_mut().run_system_once(dress_for_work).unwrap();
+        assert!(
+            app.world().get::<Twirl>(root).is_none(),
+            "an already-dressed body is left alone"
+        );
         assert_eq!(
             app.world().get::<CreatureRig>(root).unwrap().body,
             dressed_body,
-            "an already-dressed body is left alone"
+            "an already-dressed body is not rebuilt"
         );
     }
 }
