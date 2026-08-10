@@ -40,8 +40,87 @@ impl Plugin for NavigationPlugin {
             .add_systems(
                 Update,
                 (survey_the_walls, chart_the_ground).before(crate::creature::plan_routes),
-            );
+            )
+            .add_systems(Update, watch_the_walls.after(crate::creature::plan_routes));
     }
+}
+
+/// `DIVUS_FACTUS_WALL_PROBE=1`: counts walks that go through a wall.
+///
+/// Brett: "a lot of people still walk through the walls." The search has
+/// known about buildings for a while and the door router bends the last
+/// stride, so the question is not WHETHER it happens but which of the two
+/// is letting it - and a rate is the only honest answer. Every stride is
+/// tested against every footprint, split three ways: a building they were
+/// only passing (a search failure), their own building with the router
+/// steering (a bend that lost the race), and their own building with no
+/// router at all (a bend that never happened).
+fn watch_the_walls(
+    walls: Res<Walls>,
+    time: Res<Time>,
+    mut on: Local<Option<bool>>,
+    mut said: Local<f32>,
+    mut tally: Local<(u32, u32, u32, u32)>,
+    mut last: Local<std::collections::HashMap<Entity, Vec2>>,
+    walkers: Query<
+        (Entity, &Transform, Has<crate::villager::home::Doorbound>),
+        (
+            With<crate::villager::Villager>,
+            Without<crate::creature::Corpse>,
+        ),
+    >,
+) {
+    if !*on.get_or_insert_with(|| std::env::var("DIVUS_FACTUS_WALL_PROBE").is_ok()) {
+        return;
+    }
+    for (who, at, doorbound) in &walkers {
+        let here = Vec2::new(at.translation.x, at.translation.z);
+        let Some(there) = last.insert(who, here) else {
+            continue;
+        };
+        if there.distance(here) < 0.01 {
+            continue;
+        }
+        tally.0 += 1;
+        // Two different questions, and only the second is the one the
+        // player asks. A stride that crosses a building the walker is
+        // neither leaving nor entering is a search failure. A stride
+        // that crosses the wall of their OWN destination is excused by
+        // the search on purpose - no path on a two-and-a-half metre grid
+        // can thread a one metre door - and is meant to be bent through
+        // the doorway by `home::use_doors`. When that bending fails, what
+        // you SEE is a person walking through their own wall, which is
+        // what Brett is reporting.
+        let excused = walls.excused(there, here);
+        for (slot, building) in walls.buildings.iter().enumerate().take(MOST_BUILDINGS) {
+            if !building.crosses(there, here) {
+                continue;
+            }
+            if !excused[slot] {
+                tally.1 += 1;
+            } else if doorbound {
+                // The router HAS them and they are still in the wall: the
+                // bend is aimed wrong, or the walk beat it to the wall.
+                tally.2 += 1;
+            } else {
+                // The router never took them at all.
+                tally.3 += 1;
+            }
+            break;
+        }
+    }
+    *said += time.delta_secs();
+    if *said < 10.0 {
+        return;
+    }
+    *said = 0.0;
+    let (strides, through, bound, adrift) = *tally;
+    *tally = (0, 0, 0, 0);
+    info!(
+        "wall probe: of {strides} strides, {through} cut through a building they were only \
+         passing; {bound} went through their own wall with the door router steering, \
+         {adrift} with no router at all",
+    );
 }
 
 // ------------------------------------------------------- what can be reached
@@ -328,11 +407,17 @@ pub struct Footprint {
 }
 
 impl Footprint {
-    pub fn contains(&self, p: Vec2) -> bool {
+    /// Whether a point is inside this footprint once it is grown by
+    /// `margin`. The footprint is drawn a shoulder's width INSIDE the
+    /// wall so a route never grazes the building, which means a point in
+    /// the wall's own thickness is "outside" it - fine for deciding
+    /// where a walk may go, wrong for deciding which building a walk
+    /// belongs to.
+    pub fn within(&self, p: Vec2, margin: f32) -> bool {
         let (sin, cos) = (-self.yaw).sin_cos();
         let local = p - self.at;
         let turned = Vec2::new(local.x * cos - local.y * sin, local.x * sin + local.y * cos);
-        turned.x.abs() < self.half.x && turned.y.abs() < self.half.y
+        turned.x.abs() < self.half.x + margin && turned.y.abs() < self.half.y + margin
     }
 
     /// Whether a straight walk from `a` to `b` passes through this footprint at
@@ -422,10 +507,24 @@ impl Walls {
     /// anyone could reach. The door itself is steered by `home::use_doors`, which
     /// is the right tool at that scale; this only has to stop people walking
     /// through the walls on their way past.
+    /// The excuse is judged GENEROUSLY - a stride's margin outside the
+    /// footprint - while the barring below stays strict. The asymmetry is
+    /// the whole point: a footprint is drawn a shoulder's width inside
+    /// the wall, so a goal standing in the wall's own thickness, or a
+    /// pace outside the door, belonged to no building at all. Every step
+    /// into it was barred and the walk was refused outright.
+    ///
+    /// That is how eight hundred walks to a full larder were refused in
+    /// four minutes: the village's sacks stand against the longhouse, the
+    /// hungry stood twenty strides off with nowhere their feet were
+    /// allowed to go, and `locomotion` drops an errand it cannot route.
+    /// They starved in sight of the food, for the third time in this
+    /// project, and the first two fixes were both about the terrain.
     fn excused(&self, start: Vec2, goal: Vec2) -> [bool; MOST_BUILDINGS] {
         let mut excused = [false; MOST_BUILDINGS];
         for (slot, building) in self.buildings.iter().enumerate().take(MOST_BUILDINGS) {
-            excused[slot] = building.contains(start) || building.contains(goal);
+            excused[slot] = building.within(start, EITHER_END_MARGIN)
+                || building.within(goal, EITHER_END_MARGIN);
         }
         excused
     }
@@ -438,6 +537,13 @@ impl Walls {
         })
     }
 }
+
+/// How far outside a footprint still counts as belonging to that building
+/// when deciding whether a walk may enter it. Wide enough to cover the
+/// shoulder's width the footprint is shrunk by, the wall's own thickness,
+/// and a pace of doorstep beyond it - so a sack, a bed or a doorstep
+/// standing anywhere in a building's fabric is somewhere a walk can end.
+const EITHER_END_MARGIN: f32 = 1.2;
 
 /// How many buildings one search can hold excuses for. A village outgrowing
 /// this does not break — the excess simply cannot be entered on that journey,
@@ -1067,7 +1173,7 @@ mod tests {
                     for i in 0..=400 {
                         let along = a + (b - a) * (i as f32 / 400.0);
                         assert!(
-                            !footprint.contains(along),
+                            !footprint.within(along, 0.0),
                             "crosses() said no but ({along}) is inside a hall \
                              turned {turn} at step {step}"
                         );
@@ -1095,7 +1201,7 @@ mod tests {
         // The test only means something if the straight line really does go
         // through the building.
         assert!(
-            hall.contains(Vec2::new(middle.x, middle.z)),
+            hall.within(Vec2::new(middle.x, middle.z), 0.0),
             "the hall is not on the line, so this proves nothing"
         );
         let walls = Walls {
@@ -1104,7 +1210,7 @@ mod tests {
         let path = find_path(&t, &walls, start, goal, DEFAULT_BUDGET).expect("a way round");
         for leg in &path {
             assert!(
-                !hall.contains(Vec2::new(leg.x, leg.z)),
+                !hall.within(Vec2::new(leg.x, leg.z), 0.0),
                 "the route goes through the hall at {leg:?}"
             );
         }
@@ -1114,7 +1220,7 @@ mod tests {
             for i in 0..=20 {
                 let p = cursor.lerp(*leg, i as f32 / 20.0);
                 assert!(
-                    !hall.contains(Vec2::new(p.x, p.z)),
+                    !hall.within(Vec2::new(p.x, p.z), 0.0),
                     "a leg of the route cuts the corner off the hall"
                 );
             }
@@ -1159,9 +1265,12 @@ mod tests {
             half: Vec2::new(6.0, 2.0),
             yaw: std::f32::consts::FRAC_PI_4,
         };
-        assert!(hall.contains(Vec2::new(3.0, 3.0)), "along its own length");
         assert!(
-            !hall.contains(Vec2::new(-3.5, 3.5)),
+            hall.within(Vec2::new(3.0, 3.0), 0.0),
+            "along its own length"
+        );
+        assert!(
+            !hall.within(Vec2::new(-3.5, 3.5), 0.0),
             "across it: this is inside the box that contains the hall, and \
              outside the hall"
         );

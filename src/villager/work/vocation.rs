@@ -304,6 +304,18 @@ pub(crate) fn morning_muster(
         Query<&Transform, Without<crate::scatter::FellableTree>>,
         Option<Res<Terrain>>,
         Option<Res<SettlementSite>>,
+        // What the land offers a food trade: the berries in a gatherer's
+        // walk, the game in a hunter's. Counted the same way the famine
+        // watch counts them, so the dealer and the coroner agree.
+        Query<(&GlobalTransform, &crate::scatter::FoodSource)>,
+        Query<
+            (&Transform, &CreatureGenome),
+            (
+                With<crate::creature::Creature>,
+                Without<Corpse>,
+                Without<crate::creature::Held>,
+            ),
+        >,
     ),
     mut workers: Query<
         (
@@ -329,7 +341,7 @@ pub(crate) fn morning_muster(
     *reckoned = clock.elapsed;
 
     let (buildings, sites, stores, fields, decree) = town;
-    let (known, trees, chunks, terrain, site) = ground;
+    let (known, trees, chunks, terrain, site, bushes, game) = ground;
     let mouths = workers.iter().count();
     if mouths == 0 {
         return;
@@ -454,18 +466,70 @@ pub(crate) fn morning_muster(
         .filter(|f| f.farmer == Entity::PLACEHOLDER)
         .count() as f32;
 
+    // Which food trades the land can actually pay. The dealer used to
+    // weight them blind - and at a founding deep in the woods, with the
+    // closest berries seven hundred strides out, it kept handing out
+    // gathering baskets while two spear-hands stood beside prey nineteen
+    // strides from the square. Ten founders fell to six before the
+    // ledger said why. A trade the land cannot pay gets no hands, and
+    // its share flows to the trades that can.
+    let centre = site.as_ref().map(|s| s.centre);
+    let berries_near = centre.is_none_or(|c| {
+        bushes
+            .iter()
+            .any(|(at, bush)| bush.amount > 0.3 && at.translation().distance(c) < WORK_REACH)
+    });
+    let game_near = centre.is_none_or(|c| {
+        game.iter().any(|(at, genome)| {
+            matches!(
+                genome.species,
+                crate::creature::genome::Species::Deer | crate::creature::genome::Species::Boar
+            ) && at.translation.distance(c) < WORK_REACH * 1.6
+        })
+    });
+    let mut gather_share = if berries_near { 0.45 } else { 0.0 };
+    let mut fish_share = if shore_near { 0.30 } else { 0.0 };
+    let mut hunt_share = if game_near { 0.25 } else { 0.0 };
+    let offered = gather_share + fish_share + hunt_share;
+    if offered > 0.0 {
+        gather_share /= offered;
+        fish_share /= offered;
+        hunt_share /= offered;
+    }
+    // Whether the land feeds them at all without being farmed. A village
+    // can hunt a wood empty in a few days - the herd went from forty
+    // head to two - so this is a fact that CHANGES, and the muster's
+    // fingerprint below carries it so the village takes stock the day
+    // the last deer is gone.
+    let wild_food = berries_near || shore_near || game_near;
+    let plots = fields.iter().count() as f32;
+
     // What the village wants, counted in hands. A want of zero is a trade
     // nobody takes up - which is the whole point: a farmer is somebody who
     // has a field, not somebody who once rolled a plough.
     let food_hands = mouths as f32 * (0.2 + 0.4 * hungry);
     let mut wanted: Vec<(Vocation, f32)> = vec![
-        (Vocation::Gatherer, food_hands * 0.45),
+        (Vocation::Gatherer, food_hands * gather_share),
+        (Vocation::Fisher, food_hands * fish_share),
+        (Vocation::Hunter, food_hands * hunt_share),
+        // A plot wants a pair of hands whether or not somebody has
+        // already claimed it. Counting only the UNCLAIMED plots meant
+        // the want fell to nothing the moment a farmer took a furrow,
+        // the next muster struck them off it, and the field went back to
+        // weeds - farming in five-minute shifts.
+        //
+        // And where the land offers nothing wild - no berries in a
+        // walk, no shore, no game left - the want is for the FIRST
+        // furrow, before any field exists. Without that a village in the
+        // deep woods had no path to food at all: the basket and the
+        // spear were dealt against a land that could not pay them, and
+        // nobody could ever be dealt the plough, because the plough was
+        // wanted only where a field already stood. Ten souls starved to
+        // six in a forest, holding tools for work that was not there.
         (
-            Vocation::Fisher,
-            if shore_near { food_hands * 0.3 } else { 0.0 },
+            Vocation::Farmer,
+            plots.min(4.0).max(if wild_food { 0.0 } else { 2.0 }),
         ),
-        (Vocation::Hunter, food_hands * 0.25),
-        (Vocation::Farmer, unworked_fields),
         // Wood: for the fire, for every build, and for the pile that has
         // to exist before a carpenter has anything to carry.
         (
@@ -547,6 +611,13 @@ pub(crate) fn morning_muster(
         betrothed.min(3) as f32,
         wood_known as u8 as f32,
         shore_near as u8 as f32,
+        // What the land can still pay. The day the last deer within a
+        // hunter's walk is gone, the village must take stock again -
+        // otherwise the muster keeps dealing spears at an empty wood
+        // until the morning.
+        berries_near as u8 as f32,
+        game_near as u8 as f32,
+        plots,
         guards,
         hurt.iter().filter(|(v, ..)| v.harm > 0.15).count().min(3) as f32,
         has(BuildingKind::Tavern) as u8 as f32,
@@ -569,16 +640,26 @@ pub(crate) fn morning_muster(
 
     // The work that always exists, for hands the wants do not reach. Every
     // one of these has something to do on the first morning of the world.
+    // A basket is no work where nothing fruits and a spear is no work
+    // where nothing grazes: spare hands used to be dealt both anyway,
+    // and spent their days walking to a heath that had been picked bare
+    // a week ago. The plough is the other way about - it is standing
+    // work only where the wild will NOT feed them, since a village
+    // beside a full berry patch should pick before it ploughs.
     let standing: Vec<Vocation> = [
         Vocation::Gatherer,
         Vocation::Forester,
         Vocation::Hunter,
         Vocation::Miner,
         Vocation::Fisher,
+        Vocation::Farmer,
     ]
     .into_iter()
     .filter(|v| *v != Vocation::Fisher || shore_near)
     .filter(|v| *v != Vocation::Forester || wood_known)
+    .filter(|v| *v != Vocation::Gatherer || berries_near)
+    .filter(|v| *v != Vocation::Hunter || game_near)
+    .filter(|v| *v != Vocation::Farmer || !wild_food)
     .collect();
 
     // Dealt in a fixed order so a re-run of the same world musters the
@@ -621,7 +702,15 @@ pub(crate) fn morning_muster(
                         let bump = |v: Vocation| if v == held { 0.2 } else { 0.0 };
                         (a_craft + bump(*a)).total_cmp(&(b_craft + bump(*b)))
                     })
-                    .or(Some(Vocation::Gatherer))
+                    // The last resort of a land that offers nothing: turn
+                    // the ground over. A basket was the old answer, and
+                    // in a wood with no berries it was an answer that
+                    // fed nobody.
+                    .or(Some(if wild_food {
+                        Vocation::Gatherer
+                    } else {
+                        Vocation::Farmer
+                    }))
             });
         let Some(best) = best else { continue };
         if let Some(entry) = wanted.iter_mut().find(|(v, _)| *v == best) {

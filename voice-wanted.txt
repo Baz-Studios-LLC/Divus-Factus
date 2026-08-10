@@ -1,17 +1,55 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-   31  (worn pool) devout hungry muse prayer
-   27  (worn pool) event:thrown of:person saw tell
-   22  (worn pool) housed married muse
-   14  (worn pool) hungry muse prayer
-    8  (worn pool) event:thrown of:person saw tell wavering
-    8  (worn pool) devout event:thrown of:person saw tell
-    5  (worn pool) devout muse prayer
-    3  (worn pool) devotion muse night prayer wavering
-    3  (worn pool) devout event:thrown reply
-    3  (worn pool) event:thrown reply wavering
-    2  (worn pool) hungry muse trade:forester
-    1  (worn pool) married muse worn out
-    1  (worn pool) doubting event:thrown of:person saw tell
-    1  (worn pool) devotion devout muse prayer
-    1  (worn pool) devotion devout muse night prayer
+  155  (worn pool) housed muse
+  140  (worn pool) housed married muse
+   92  (worn pool) muse wavering
+   39  (worn pool) chat:followup devout told
+   36  (worn pool) event:smote saw tell
+   34  (worn pool) muse trade:miner
+   32  (worn pool) muse
+   30  (worn pool) muse trade:hunter
+   29  (worn pool) muse trade:gatherer
+   28  (worn pool) event:flourished saw tell
+   28  (worn pool) married muse
+   23  chat:end devout event:smote told trade:gatherer
+   23  (worn pool) muse trade:forester
+   21  (worn pool) event:delivered saw tell
+   21  (worn pool) muse trade:priest
+   20  (worn pool) chat:end wavering
+   19  (worn pool) devout reply
+   18  (worn pool) chat:followup told
+   16  (worn pool) devout event:smote reply
+   15  (worn pool) devout muse
+   14  (worn pool) chat:end devout
+   14  (worn pool) devout event:smote saw tell
+   14  (worn pool) chat:end told
+   13  (worn pool) event:smote saw tell wavering
+   13  chat:end devout event:flourished told trade:gatherer
+   12  (worn pool) devout event:delivered reply
+   11  (worn pool) devout event:flourished reply
+   10  (worn pool) event:delivered saw tell wavering
+    9  (worn pool) devout event:flourished saw tell
+    8  (worn pool) devout event:provided reply
+    8  (worn pool) devout event:delivered saw tell
+    7  (worn pool) devotion devout muse prayer
+    7  chat:end devout event:smote told trade:forester
+    6  (worn pool) event:delivered reply wavering
+    6  (worn pool) chat:end trade:gatherer
+    6  (worn pool) chat:end trade:miner
+    6  (worn pool) event:smote reply wavering
+    6  (worn pool) devout event:provided saw tell
+    6  (worn pool) devotion devout muse night prayer
+    4  chat:end devout event:flourished told trade:forester
+    4  (worn pool) event:delivered reply
+    4  chat:end devout event:delivered told trade:gatherer
+    3  chat:end event:smote told trade:miner wavering
+    3  (worn pool) chat:end trade:forester
+    2  (worn pool) event:flourished reply wavering
+    2  (worn pool) chat:followup trade:gatherer
+    2  (worn pool) chat:end trade:builder
+    2  (worn pool) event:smote heard tell wavering
+    2  (worn pool) event:delivered heard tell wavering
+    2  chat:end event:delivered told trade:miner wavering
+    1  (worn pool) chat:followup event:smote
+    1  (worn pool) reply trade:priest
+    1  (worn pool) chat:followup event:delivered

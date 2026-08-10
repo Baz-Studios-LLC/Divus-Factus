@@ -409,11 +409,25 @@ fn plant_the_flag(
 /// search's own answer.
 fn plant_it_unattended(
     vantage: Option<Res<OpeningVantage>>,
+    terrain: Option<Res<crate::terrain::Terrain>>,
     mut chosen: ResMut<ChosenGround>,
     mut next: ResMut<NextState<GameState>>,
 ) {
     info!("the world is made, and nobody is in it: the flag is in your hand");
-    if std::env::var("DIVUS_FACTUS_AUTOPLANT").is_err() {
+    let Ok(dial) = std::env::var("DIVUS_FACTUS_AUTOPLANT") else {
+        return;
+    };
+    // `x,z` plants the flag at exact coordinates - the harness for
+    // founding-site bugs, because a player's chosen ground is part of
+    // the reproduction. Brett's woods famine lived at -2364,-1799 and
+    // the survey's favourite spot could never have found it.
+    if let Some((x, z)) = dial
+        .split_once(',')
+        .and_then(|(x, z)| Some((x.trim().parse::<f32>().ok()?, z.trim().parse::<f32>().ok()?)))
+    {
+        let y = terrain.map_or(0.0, |t| t.height_at(x, z));
+        info!("the flag was planted unattended, where the dial pointed");
+        found_here(Vec3::new(x, y, z), &mut chosen, &mut next);
         return;
     }
     let Some(vantage) = vantage else {

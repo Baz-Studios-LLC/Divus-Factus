@@ -74,6 +74,11 @@ pub(super) fn mark_the_dead(
         (Entity, &Transform, &Person, Option<&Parentage>),
         (Added<Corpse>, With<Villager>),
     >,
+    // Death closes the asking: a corpse that kept its prayer held a
+    // place in the town's chorus and a card's worth of count on the
+    // board - the ledger read seven asking over six living souls.
+    children: Query<&Children>,
+    motes: Query<Entity, With<crate::villager::belief::PrayerMote>>,
     mut mourners: Query<
         (
             Entity,
@@ -99,6 +104,7 @@ pub(super) fn mark_the_dead(
         commands.entity(dead).insert(Passing {
             since: clock.elapsed,
         });
+        super::belief::end_prayer(&mut commands, dead, &children, &motes);
 
         let mut gathered = 0;
         for (mourner, mourner_at, spouse, parentage, mut activity, mut morale, chronicle) in

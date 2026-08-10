@@ -626,6 +626,19 @@ pub(crate) fn update_store_piles(
     }
 }
 
+/// A personal place at the table. Every diner used to aim at the sack
+/// point itself, so a mealtime crowd stood inside one another, and the
+/// separation push fought the walk in a visible shudder - two villagers
+/// vibrating in each other's chests at the storehouse door. Same soul,
+/// same seat, every meal; the ring stays inside the four-stride reach of
+/// the sacks, so a seat still counts as being at the table.
+fn table_seat(who: Entity, table: Vec3) -> Vec3 {
+    let bits = who.to_bits();
+    let angle = (bits % 12) as f32 / 12.0 * std::f32::consts::TAU;
+    let ring = 1.3 + ((bits >> 4) % 3) as f32 * 0.5;
+    table + Vec3::new(angle.cos() * ring, 0.0, angle.sin() * ring)
+}
+
 /// The hungry eat from the store when the bushes cannot feed them.
 ///
 /// This is what the stockpile is *for*: the difference between a bad berry
@@ -839,6 +852,7 @@ pub(crate) fn eat_from_store(
             &mut MoveTarget,
             Option<&crate::villager::traits::Traits>,
             Option<&LastMeal>,
+            Option<&Vocation>,
         ),
         (
             With<Villager>,
@@ -850,7 +864,7 @@ pub(crate) fn eat_from_store(
 ) {
     let cooked = clock.elapsed < kitchen.until;
 
-    for (who, transform, mut needs, mut morale, mut activity, mut target, manner, last) in
+    for (who, transform, mut needs, mut morale, mut activity, mut target, manner, last, vocation) in
         &mut hungry
     {
         // Everyone eats from their OWN town's larder and walks to their own
@@ -876,16 +890,35 @@ pub(crate) fn eat_from_store(
                     // desperate: whoever is starving keeps coming to the
                     // sacks anyway, because the square is where the hungry
                     // kneel and where the god looks first.
-                    if needs.hunger < crate::villager::belief::DESPERATE_HUNGER {
+                    //
+                    // EXCEPT the food trades. A hunter standing vigil at
+                    // the empty sacks is how a town starves with prey
+                    // twenty strides off: the moment the larder hit zero,
+                    // every soul past desperate froze at this point -
+                    // hunters, gatherers and fishers among them - and the
+                    // village's food income went to exactly nothing.
+                    // Brett, watching the pile-up: "they are all just
+                    // standing by the door." Whoever can DO something
+                    // about the hunger goes and does it.
+                    let provider = matches!(
+                        vocation,
+                        Some(
+                            Vocation::Fisher
+                                | Vocation::Gatherer
+                                | Vocation::Hunter
+                                | Vocation::Farmer
+                        )
+                    );
+                    if provider || needs.hunger < crate::villager::belief::DESPERATE_HUNGER {
                         *activity = Activity::Idle;
                         target.0 = None;
                     } else if transform.translation.distance(table) > 4.0 {
-                        target.0 = Some(table);
+                        target.0 = Some(table_seat(who, table));
                     }
                     continue;
                 }
                 if transform.translation.distance(table) > 4.0 {
-                    target.0 = Some(table);
+                    target.0 = Some(table_seat(who, table));
                     continue;
                 }
                 // The meal comes out of the larder by kind — bread first
@@ -1109,13 +1142,18 @@ mod tests {
             Activity::VisitingStore,
             "an empty larder must not turn away the starving",
         );
-        assert_eq!(
-            app.world()
-                .get::<crate::creature::MoveTarget>(soul)
-                .unwrap()
-                .0,
-            Some(sacks),
-            "the vigil is kept at the sacks, not wherever hunger struck",
+        // At the sacks means a personal seat WITHIN the table's reach,
+        // not the sack point itself: aiming every diner at one exact
+        // spot stood the whole mealtime crowd inside one another.
+        let stood = app
+            .world()
+            .get::<crate::creature::MoveTarget>(soul)
+            .unwrap()
+            .0
+            .expect("the vigil walks to the sacks");
+        assert!(
+            stood.distance(sacks) < 4.0,
+            "the vigil is kept within the table's reach, not wherever hunger struck",
         );
 
         // The merely peckish go back to their day and wait for the trades.
@@ -1125,6 +1163,40 @@ mod tests {
             *app.world().get::<Activity>(soul).unwrap(),
             Activity::Idle,
             "hunger the gatherers will fix should not besiege an empty larder",
+        );
+    }
+
+    /// The vigil never captures a food trade. The day the larder hit
+    /// zero, every soul past desperate froze at the sacks - the hunters
+    /// among them - and the village's food income went to exactly
+    /// nothing: prey nineteen strides out, ten founders down to six.
+    /// Whoever can DO something about the hunger is sent to do it.
+    #[test]
+    fn the_hungry_hunter_hunts_instead_of_holding_vigil() {
+        let sacks = Vec3::new(3.0, 0.0, 0.0);
+        let (mut app, town) = town_with(sacks);
+        let hunter = app
+            .world_mut()
+            .spawn((
+                crate::villager::Villager,
+                Transform::from_xyz(63.0, 0.0, 0.0),
+                Needs {
+                    hunger: 0.95,
+                    ..default()
+                },
+                crate::villager::Morale::default(),
+                Activity::VisitingStore,
+                crate::creature::MoveTarget::default(),
+                crate::villager::MemberOf(town),
+                Vocation::Hunter,
+            ))
+            .id();
+
+        app.world_mut().run_system_once(eat_from_store).unwrap();
+        assert_eq!(
+            *app.world().get::<Activity>(hunter).unwrap(),
+            Activity::Idle,
+            "a starving hunter's answer to the empty sacks is a deer, not a vigil",
         );
     }
 

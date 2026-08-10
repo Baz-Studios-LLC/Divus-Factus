@@ -681,15 +681,60 @@ fn keep_the_prayer_shelf(
     });
     let asking = praying.iter().count();
 
+    // Askings for the same thing stand together on one card, fronted by
+    // the most urgent asker - a starving town is one asking with many
+    // voices, not a wall of cards. Brett, at nine food cards: "we should
+    // probably clump multiple people praying for the same thing into one
+    // prayer card to prevent getting swamped." Dark and road prayers
+    // never clump: each names a particular neighbour or a particular
+    // flag, and folding those together would hide who wants what.
+    use crate::villager::belief::PrayerKind;
+    #[derive(PartialEq)]
+    enum Clump {
+        Food,
+        Thanks,
+        Question,
+        Alone(Entity),
+    }
+    let clump_of = |who: Entity, kind: &PrayerKind| match kind {
+        PrayerKind::Food => Clump::Food,
+        PrayerKind::Devotion { grateful: true } => Clump::Thanks,
+        PrayerKind::Devotion { grateful: false } => Clump::Question,
+        _ => Clump::Alone(who),
+    };
+    // (front card, voices behind it) in urgency order: the first asking
+    // of each kind keeps the card, the rest are counted onto it.
+    let mut clumped: Vec<(
+        (
+            Entity,
+            &crate::villager::Person,
+            &crate::villager::belief::Prayer,
+            Option<&crate::villager::work::Vocation>,
+        ),
+        usize,
+    )> = Vec::new();
+    let mut keys: Vec<Clump> = Vec::new();
+    for row in &open {
+        let key = clump_of(row.0, &row.2.kind);
+        match keys.iter().position(|k| *k == key) {
+            Some(i) => clumped[i].1 += 1,
+            None => {
+                keys.push(key);
+                clumped.push((*row, 0));
+            }
+        }
+    }
+
     let fresh = {
         use std::hash::{Hash, Hasher};
         let mut hasher = std::hash::DefaultHasher::new();
-        for (who, _, prayer, _) in open.iter().take(SHELF_CARDS) {
+        for ((who, _, prayer, _), voices) in clumped.iter().take(SHELF_CARDS) {
             who.to_bits().hash(&mut hasher);
+            voices.hash(&mut hasher);
             crate::debug::village::hope_band(prayer.remaining).hash(&mut hasher);
         }
         asking.hash(&mut hasher);
-        open.len().hash(&mut hasher);
+        clumped.len().hash(&mut hasher);
         hasher.finish()
     };
     if fresh == *fingerprint {
@@ -712,7 +757,7 @@ fn keep_the_prayer_shelf(
         });
 
     let pink = crate::palette::shade(&crate::palette::CLOTH_PINK, 1.0);
-    for (who, person, prayer, vocation) in open.iter().take(SHELF_CARDS) {
+    for ((who, person, prayer, vocation), voices) in clumped.iter().take(SHELF_CARDS) {
         let card = commands
             .spawn((
                 crate::debug::village::PrayerRow(*who),
@@ -785,8 +830,13 @@ fn keep_the_prayer_shelf(
             *who,
             livery.with_alpha(0.9),
         );
+        let line = if *voices > 0 {
+            prayer.kind.ask_line_many(&person.name, *voices)
+        } else {
+            prayer.kind.ask_line(&person.name)
+        };
         commands.spawn((
-            body(prayer.kind.ask_line(&person.name)),
+            body(line),
             Node {
                 flex_grow: 1.0,
                 min_width: px(0),
@@ -807,10 +857,16 @@ fn keep_the_prayer_shelf(
             ChildOf(card),
         ));
     }
-    let carded = open.len().min(SHELF_CARDS);
-    if asking > carded {
+    // Whoever the shown cards do not speak for - the clumps past the
+    // shelf's edge, and the askings set aside.
+    let covered: usize = clumped
+        .iter()
+        .take(SHELF_CARDS)
+        .map(|(_, voices)| 1 + voices)
+        .sum();
+    if asking > covered {
         commands.spawn((
-            dim(format!("and {} more asking", asking - carded)),
+            dim(format!("and {} more asking", asking - covered)),
             ChildOf(shelf),
         ));
     }

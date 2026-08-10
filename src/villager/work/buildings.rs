@@ -920,6 +920,10 @@ pub struct Shell {
     pub doors: Vec<Doorway>,
 }
 
+/// Half the width of a doorway's opening: the hinge stands this far
+/// along the wall from the door mark.
+const DOOR_HALF_SPAN: f32 = 0.62;
+
 /// A door's swinging leaf: a plank child of its building, hinged at one
 /// jamb. `open` runs 0 closed to 1 swung; the swing system eases it
 /// toward whoever is or is not nearby.
@@ -931,23 +935,44 @@ pub struct DoorLeaf {
     pub swing: f32,
     /// Where it stands, 0 shut to 1 open.
     pub open: f32,
+    /// The DOORWAY's own place in the building's space - not the hinge.
+    /// Traffic is measured here so the two leaves of a double door always
+    /// agree: measured at their own hinges instead, a villager standing
+    /// at one jamb was inside one leaf's noticing and outside the
+    /// other's, and half a double door swung while the other half stayed
+    /// shut. Brett: "open doors are also closed at the same time."
+    pub aperture: Vec3,
 }
 
 /// Hangs a swinging leaf on a doorway. The hinge stands at one jamb, the
 /// plank reaches across the opening, and it swings INWARD - out of the
 /// path of whoever is arriving, the way cottage doors do.
+///
+/// `jamb` picks WHICH jamb carries the hinge: +1 or -1 along the wall.
+/// A lone door does not care; the two leaves of a double doorway hinge
+/// at their outer jambs and so swing apart, the way the longhouse's
+/// front doors should. Brett: "the double doors on the long house
+/// should open opposite."
+/// `adopt` is the maker's OWN door panel, where the drawing has one: the
+/// pieces already standing in that opening, with their places in the
+/// building's space. They are re-hung on the hinge and no plank is made
+/// - a carried design that drew its doors had them drawn shut forever
+/// while a second plank of ours swung beside them.
 pub fn hang_the_door(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     building: Entity,
     door: &Doorway,
+    jamb: f32,
+    span: f32,
+    aperture: Vec2,
+    adopt: &[(Entity, Transform)],
 ) {
     let out = door.out.normalize_or(Vec2::X);
     // The wall runs perpendicular to the way out.
-    let along = Vec2::new(-out.y, out.x);
-    let half_span = 0.62;
-    let hinge = door.at + along * half_span;
+    let along = Vec2::new(-out.y, out.x) * jamb.signum();
+    let hinge = door.at + along * DOOR_HALF_SPAN;
     // Shut, the plank reaches from the hinge back across the opening.
     let reach = -along;
     let closed_yaw = (-reach.y).atan2(reach.x);
@@ -957,49 +982,191 @@ pub fn hang_the_door(
     let cross = reach.x * inward.y - reach.y * inward.x;
     let swing = 1.75 * if cross >= 0.0 { 1.0 } else { -1.0 };
 
-    let leaf = meshes.add(Cuboid::new(half_span * 2.0 - 0.06, 2.02, 0.08));
-    let coat = materials.add(StandardMaterial {
-        base_color: crate::palette::shade(&crate::palette::WOOD, 0.32),
-        perceptual_roughness: 1.0,
-        ..default()
-    });
-    commands.entity(building).with_children(|children| {
-        children
-            .spawn((
-                DoorLeaf {
-                    closed_yaw,
-                    swing,
-                    open: 0.0,
-                },
-                Transform::from_xyz(hinge.x, 1.06, hinge.y)
-                    .with_rotation(Quat::from_rotation_y(closed_yaw)),
-                Visibility::Inherited,
-            ))
-            .with_children(|leaf_parts| {
-                leaf_parts.spawn((
-                    Mesh3d(leaf),
-                    MeshMaterial3d(coat),
-                    // Offset half the span so the plank extends from the
-                    // hinge instead of turning about its own middle.
-                    Transform::from_xyz(half_span - 0.03, 0.0, 0.0),
-                    bevy::light::NotShadowCaster,
-                ));
-            });
-    });
+    let seat = Transform::from_xyz(hinge.x, 1.06, hinge.y)
+        .with_rotation(Quat::from_rotation_y(closed_yaw));
+    let leaf = commands
+        .spawn((
+            DoorLeaf {
+                closed_yaw,
+                swing,
+                open: 0.0,
+                aperture: Vec3::new(aperture.x, 1.06, aperture.y),
+            },
+            seat,
+            Visibility::Inherited,
+            ChildOf(building),
+        ))
+        .id();
+
+    if adopt.is_empty() {
+        let plank = meshes.add(Cuboid::new(span - 0.06, 2.02, 0.08));
+        let coat = materials.add(StandardMaterial {
+            base_color: crate::palette::shade(&crate::palette::WOOD, 0.32),
+            perceptual_roughness: 1.0,
+            ..default()
+        });
+        commands.entity(leaf).with_children(|leaf_parts| {
+            leaf_parts.spawn((
+                Mesh3d(plank),
+                MeshMaterial3d(coat),
+                // Offset half the span so the plank extends from the
+                // hinge instead of turning about its own middle.
+                Transform::from_xyz(span / 2.0 - 0.03, 0.0, 0.0),
+                bevy::light::NotShadowCaster,
+            ));
+        });
+        return;
+    }
+
+    // The maker's panel, re-seated on the hinge: the same piece, in the
+    // same place, now turning. The hinge carries no scale, so its
+    // inverse is one turn and one shift.
+    let unturn = seat.rotation.inverse();
+    for (piece, stood) in adopt {
+        commands.entity(*piece).insert((
+            Transform {
+                translation: unturn * (stood.translation - seat.translation),
+                rotation: unturn * stood.rotation,
+                scale: stood.scale,
+            },
+            ChildOf(leaf),
+        ));
+    }
+}
+
+/// The pieces the maker DREW in this doorway, if any: the door panel
+/// itself and whatever small furniture rides on it - the handle, the
+/// hinge plate. Judged by shape rather than by name, because a drawing
+/// carries no names: a panel is broad along the wall, thin across it,
+/// most of a person tall, and standing in the opening.
+///
+/// The jamb posts either side fail it on breadth (a hand's width along
+/// the wall against a panel's half-metre), the lintel and ridge on
+/// height, and the doorstep on both height and standing outside.
+fn the_makers_own_panel(door: &Doorway, parts: &[(Entity, Transform)]) -> Vec<(Entity, Transform)> {
+    let out = door.out.normalize_or(Vec2::X);
+    let along = Vec2::new(-out.y, out.x);
+    // A turned box's reach along a given direction in the building's
+    // own space - the same arithmetic the shell is measured with.
+    let reach_along = |stood: &Transform, way: Vec3| {
+        let half = stood.scale * 0.5;
+        (stood.rotation * Vec3::new(half.x, 0.0, 0.0))
+            .dot(way)
+            .abs()
+            + (stood.rotation * Vec3::new(0.0, half.y, 0.0))
+                .dot(way)
+                .abs()
+            + (stood.rotation * Vec3::new(0.0, 0.0, half.z))
+                .dot(way)
+                .abs()
+    };
+    let wall_way = Vec3::new(along.x, 0.0, along.y);
+    let out_way = Vec3::new(out.x, 0.0, out.y);
+
+    let Some((_, panel)) = parts
+        .iter()
+        .filter(|(_, stood)| {
+            let here = Vec2::new(stood.translation.x, stood.translation.z) - door.at;
+            here.dot(along).abs() < DOOR_HALF_SPAN + 0.15
+                && here.dot(out).abs() < 0.5
+                && (0.7..1.8).contains(&stood.translation.y)
+                && reach_along(stood, wall_way) >= 0.35
+                && reach_along(stood, out_way) <= 0.2
+        })
+        .min_by(|a, b| {
+            let d = |stood: &Transform| {
+                (Vec2::new(stood.translation.x, stood.translation.z) - door.at).length()
+            };
+            d(&a.1).total_cmp(&d(&b.1))
+        })
+    else {
+        return Vec::new();
+    };
+
+    // The panel and the small furniture screwed to it - a handle, a
+    // hinge plate - so those swing with the door they belong to. Small
+    // is load-bearing here: a door's frame stands where the leaf's
+    // corner is and would otherwise be adopted by it, and Brett watched
+    // a longhouse lintel swing away with one door. Nothing the size of
+    // a beam rides on a door.
+    let room = Vec3::new(
+        reach_along(&panel, Vec3::X) + 0.12,
+        reach_along(&panel, Vec3::Y) + 0.12,
+        reach_along(&panel, Vec3::Z) + 0.12,
+    );
+    let fitting = |stood: &Transform| {
+        reach_along(stood, Vec3::X).max(reach_along(stood, Vec3::Y)) <= 0.25
+            && reach_along(stood, Vec3::Z) <= 0.25
+    };
+    parts
+        .iter()
+        .filter(|(_, stood)| {
+            let offset = (stood.translation - panel.translation).abs();
+            let inside = offset.x <= room.x && offset.y <= room.y && offset.z <= room.z;
+            inside && (stood.translation == panel.translation || fitting(stood))
+        })
+        .copied()
+        .collect()
 }
 
 /// Hangs leaves on every doorway the moment a shell stands - one system
 /// covering the carried designs and the built-in fallbacks alike, so no
 /// door in the world goes leafless whichever way its building was made.
+///
+/// Doorways marked close together in the same wall are a DOUBLE door:
+/// each leaf hinges at the jamb away from its twin, so the pair swings
+/// apart from the middle instead of both leaves turning the same way.
 pub(crate) fn hang_the_doors(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     fresh: Query<(Entity, &Shell), Added<Shell>>,
+    kin: Query<&Children>,
+    pieces: Query<&Transform>,
 ) {
     for (building, shell) in &fresh {
-        for door in &shell.doors {
-            hang_the_door(&mut commands, &mut meshes, &mut materials, building, door);
+        let parts: Vec<(Entity, Transform)> = kin
+            .get(building)
+            .into_iter()
+            .flatten()
+            .filter_map(|piece| pieces.get(*piece).ok().map(|stood| (*piece, *stood)))
+            .collect();
+        for (i, door) in shell.doors.iter().enumerate() {
+            let twin = shell.doors.iter().enumerate().find(|(j, other)| {
+                *j != i && other.at.distance(door.at) < 1.7 && other.out.dot(door.out) > 0.7
+            });
+            let jamb = twin.map_or(1.0, |(_, twin)| {
+                let along = Vec2::new(-door.out.y, door.out.x);
+                if along.dot(door.at - twin.at) >= 0.0 {
+                    1.0
+                } else {
+                    -1.0
+                }
+            });
+            // A twin leaf reaches only to the middle of the shared
+            // opening, where it meets its partner edge to edge; a lone
+            // leaf spans its whole doorway.
+            let span = twin.map_or(DOOR_HALF_SPAN * 2.0, |(_, twin)| {
+                (door.at.distance(twin.at) + DOOR_HALF_SPAN * 2.0) / 2.0
+            });
+            // Twins share ONE aperture - the middle of the pair - so the
+            // two leaves of a double door always read the same traffic
+            // and move together. Measured at each leaf's own mark they
+            // stood a metre apart, and somebody could be inside one
+            // leaf's noticing and outside the other's.
+            let aperture = twin.map_or(door.at, |(_, twin)| (door.at + twin.at) * 0.5);
+            let adopt = the_makers_own_panel(door, &parts);
+            hang_the_door(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                building,
+                door,
+                jamb,
+                span,
+                aperture,
+                &adopt,
+            );
         }
     }
 }
@@ -1016,10 +1183,16 @@ pub(crate) fn swing_the_doors(
             Without<crate::creature::Corpse>,
         ),
     >,
-    mut leaves: Query<(&GlobalTransform, &mut DoorLeaf, &mut Transform)>,
+    sites: Query<&GlobalTransform>,
+    mut leaves: Query<(&ChildOf, &mut DoorLeaf, &mut Transform)>,
 ) {
-    for (stood, mut leaf, mut local) in &mut leaves {
-        let at = stood.translation();
+    for (hung_on, mut leaf, mut local) in &mut leaves {
+        // Measured at the DOORWAY, so a double door's two leaves always
+        // read the same traffic and move together.
+        let Ok(site) = sites.get(hung_on.parent()) else {
+            continue;
+        };
+        let at = site.transform_point(leaf.aperture);
         let mut nearest = f32::MAX;
         for soul in &folk {
             nearest = nearest.min(soul.translation().distance_squared(at));
@@ -3971,6 +4144,52 @@ mod tests {
             ..crowded_longhouse
         };
         assert_eq!(next_roof(&crowded_houses), Some(BuildingKind::House));
+    }
+
+    /// The maker's own door swings, and NOTHING else does.
+    ///
+    /// Built from the carried longhouse's real front wall: two panels
+    /// with their handles, the jamb posts either side, and the lintel
+    /// over the top - every piece yawed a quarter turn, the way the
+    /// bench writes them. The lintel is the one that bit: it stands a
+    /// metre above the panel's middle, well inside the leaf's own
+    /// bounding box, and it swung out with the door until the riders
+    /// had to be small enough to be furniture. Brett: "the top frame is
+    /// moving with one of the doors. That shouldnt happen."
+    #[test]
+    fn only_the_door_swings_with_the_door() {
+        let turned = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
+        let piece = |x: f32, y: f32, z: f32, size: Vec3| {
+            Transform::from_xyz(x, y, z)
+                .with_rotation(turned)
+                .with_scale(size)
+        };
+        let mut world = World::new();
+        let mut named = |stood: Transform| (world.spawn(stood).id(), stood);
+        let panel = named(piece(2.58, 1.38, 0.5, Vec3::new(1.0, 2.0, 0.12)));
+        let handle = named(piece(2.65, 1.38, 0.12, Vec3::splat(0.12)));
+        let far_panel = named(piece(2.58, 1.38, -0.5, Vec3::new(1.0, 2.0, 0.12)));
+        let jamb = named(piece(2.52, 1.38, 1.06, Vec3::new(0.12, 2.0, 0.38)));
+        let lintel = named(piece(2.52, 2.44, 0.0, Vec3::new(2.25, 0.12, 0.38)));
+        let parts = [panel, handle, far_panel, jamb, lintel];
+
+        let door = Doorway {
+            at: Vec2::new(2.52, 0.5),
+            out: Vec2::X,
+        };
+        let hung: Vec<Entity> = the_makers_own_panel(&door, &parts)
+            .iter()
+            .map(|(piece, _)| *piece)
+            .collect();
+
+        assert!(hung.contains(&panel.0), "the maker's own panel must swing");
+        assert!(hung.contains(&handle.0), "its handle swings with it");
+        assert!(!hung.contains(&lintel.0), "the frame over the door stands");
+        assert!(!hung.contains(&jamb.0), "so does the post beside it");
+        assert!(
+            !hung.contains(&far_panel.0),
+            "the other leaf of a double door is its own door",
+        );
     }
 
     #[test]

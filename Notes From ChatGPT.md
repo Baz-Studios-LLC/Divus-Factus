@@ -4,32 +4,23 @@ Living handoff between ChatGPT and Claude. Keep only current decisions, active
 work, and useful next steps. Delete completed or contradicted advice instead of
 turning this file into a project history.
 
-## Current Sermo State
+## The lane
 
-Claude reports that coverage pass 02 is integrated, human-read, and live. The
-corpus contains 2,030 records and all twelve Sermo gates pass. Field capture
-already showed event-specific faith stances in a group birth conversation and
-a wavering devotion prayer appearing on the prayer board.
+Brett, 2026-08-10: **"ChatGPT only works on the chat system"** — and
+**"ChatGPT will offer suggestions for you to consider on the game as well."**
 
-The post-batch soak is running. Do not begin batch 03 until it produces a fresh
-`voice-wanted.txt`. The previous order sheet was consumed by pass 02.
+So: the WORK is the corpus. ChatGPT authors and audits lines in
+`assets/voice/*.json`, and nothing else is implemented from that side.
+Claude owns engine behaviour, emitters, vocabulary, tests, and every other
+system in the game.
 
-When the new sheet lands:
-
-1. Order corpus work by observed counts, highest first.
-2. Prefer several precise combinations over another broad generic pool.
-3. Run every expanded alternation through the full authoring audit.
-4. Human-read the batch before integration, then soak again.
-
-Claude is adding Rust gates for near-duplicate text, impossible tag bundles,
-and thin pools. Until those land, ChatGPT should continue reporting its own
-duplicate, tag, subject, slot, length, punctuation, and anachronism audit.
-
-## Collaboration Boundary
-
-ChatGPT's standing implementation lane is `assets/voice/*.json`. Claude owns
-Rust engine behavior, emitters, vocabulary, and tests. A new tag is an engine
-feature request, never an invented corpus tag.
+Suggestions about the rest of the game are welcome and read — they go on
+Claude's list to weigh, not into code. The sermon-scene, stance-slice,
+prayer-receipt and inheritance proposals from the last pass have all been
+captured there; they are trimmed out of this file only to keep the handoff
+short, not because they were unwanted. Keep them coming, and keep them
+brief: what the player would see, and why it matters, beats a
+specification.
 
 `SERMO-AUTHORING.md` is the contract. In particular:
 
@@ -44,125 +35,94 @@ Brett likes grammatically correct sentences. Fragments can still be natural in
 replies, hesitation, panic, or shouting, but lowercase presentation should not
 become the house style.
 
-## Fresh Simulation Facts
+A new tag is a request to Claude, never an invented corpus tag.
 
-These scenes are now visible and may generate useful corpus demand when current
-tags can truthfully describe them:
+## Current Sermo State
 
-- Doors have moving leaves and react to nearby villagers. Waiting at a door,
-  holding it, and reaching a full house at night are real threshold scenes.
+Coverage pass 02 is integrated, human-read, and live. The corpus contains
+2,030 records and all twelve Sermo gates pass. Field capture showed
+event-specific faith stances in a group birth conversation and a wavering
+devotion prayer on the prayer board.
+
+**Batch 03 is open.** The order sheet below is a finished soak's own count of
+moments that went without words or wore their pool thin. It is copied here
+because every play session rewrites `voice-wanted.txt` at exit, and a short
+evening session can overwrite a long soak's data. Trust this table over the
+file if the two disagree.
+
+```text
+count  tags of the moment (all "worn pool")
+  31   devout hungry muse prayer
+  27   event:thrown of:person saw tell
+  22   housed married muse
+  14   hungry muse prayer
+   8   event:thrown of:person saw tell wavering
+   8   devout event:thrown of:person saw tell
+   5   devout muse prayer
+   3   devotion muse night prayer wavering
+   3   devout event:thrown reply
+   3   event:thrown reply wavering
+   2   hungry muse trade:forester
+   1   married muse worn out
+   1   doubting event:thrown of:person saw tell
+   1   devotion devout muse prayer
+   1   devotion devout muse night prayer
+```
+
+The shape of the demand: hungry prayers in both faith bands dominate, thrown-
+person tellings wear thin fast in every band, and the founding couples make
+housed-married musing a high-traffic pool from the first morning.
+
+For batch 03:
+
+1. Order the work by these counts, highest first.
+2. Prefer several precise combinations over another broad generic pool.
+3. Run every expanded alternation through the full authoring audit.
+4. Human-read the batch before integration, then soak again.
+
+Claude is adding Rust gates for near-duplicate text, impossible tag bundles,
+and thin pools. Until those land, keep reporting your own duplicate, tag,
+subject, slot, length, punctuation, and anachronism audit.
+
+## Fresh simulation facts
+
+Scenes that are now visible, and may generate honest corpus demand where the
+locked tags can already describe them:
+
+- Doors have moving leaves and react to nearby villagers. A carried design's
+  own drawn door is the panel that swings. Waiting at a door and reaching a
+  full house at night are real threshold scenes.
 - Sleepers lie still and stir at individual times. Night thoughts may honestly
   mention turning over, the cold side of a bed, or a spouse breathing nearby.
-- Meals form a small daily crowd at the storehouse doorstep, making food and
-  work small talk especially visible and repeat-prone.
 - Founding couples arrive married and highly devout, so marriage and devotion
-  pools receive traffic immediately.
+  pools take traffic from the first morning.
 - Towns stop adding beds at the town ceiling. Roofless villagers, road prayers,
-  and full-town pressure become increasingly important in older settlements.
+  and full-town pressure matter more in older settlements.
+- Hunger prayers now arrive as a trickle rather than a chorus: each soul
+  carries its own point of desperation, and while a few food prayers stand
+  open the next hungry soul holds theirs. The board clumps same-kind askings
+  onto one card. So a food prayer is READ more carefully than before — it is
+  worth more distinct lines, not more of the same beat.
 
-Do not force these facts into lines merely because they are new. Let the soak
-show which emitted combinations are actually thin.
+A correction to the last pass: **the mealtime crowd at a storehouse doorstep
+is a bug, not a scene.** Villagers were standing at a door because a walk to
+the sacks could not finish. It is being fixed. Do not write lines about
+queueing at a door for food.
 
-## Suggested Engine Work
+Do not force any of these facts into lines merely because they are new. Let
+the soak show which emitted combinations are actually thin.
 
-### 1. Make sermons short crowd conversations
+## Notes for ChatGPT (from Claude)
 
-This is the strongest next legibility improvement. A sermon currently retells
-a real memory and changes listeners, but most of the congregation's response
-is hidden. Turn selected sermons into two-to-four-beat scenes:
+Field report from today's runs, so the next batch is aimed at what the game
+actually says:
 
-```text
-priest opens with a real event
-one congregant agrees, doubts, fears, or asks a practical question
-priest answers or interprets
-optional second congregant closes or redirects the subject
-```
-
-Possible future roles, introduced only with emitters and vocabulary:
-
-```text
-sermon:open
-sermon:response
-sermon:question
-sermon:objection
-sermon:interpret
-sermon:close
-```
-
-Keep the mechanical sermon effect on its existing owner and apply it once.
-Extra beats should reveal interpretation, not multiply faith effects. Limit the
-speakers so a crowd does not become a wall of bubbles.
-
-### 2. Add the first small stance slice
-
-The same event should not make everyone angry or everyone sad. Existing
-`Traits`, `Temperament`, `Regard`, faith, hunger, rest, morale, injury, and
-housing can weight different reactions.
-
-Start with only two or three stances that have clear simulation definitions
-and high-traffic scenes. For each stance:
-
-1. Define the exact facts and thresholds that emit it.
-2. Add and lock the vocabulary in the same code change.
-3. Trace or test that it reaches a real Sermo request.
-4. Record its thin combinations for ChatGPT to author.
-
-Prefer a weighted reaction over a deterministic label. Low morale and hunger
-might increase anger, fear, resignation, or despair differently according to
-temperament and traits.
-
-### 3. Preserve complete prayer receipts
-
-The prayer board is a major player-facing system. Closed prayers should retain
-enough structured truth for later gossip, doctrine, and player history:
-
-```text
-asker
-prayer kind
-target or subject
-reason
-opened and closed dates
-answering world or divine event
-outcome
-```
-
-This enables readable patterns such as repeated food prayers being answered
-while shelter prayers are ignored. Dark or selfish prayers should have social
-consequences when answered, not only private faith and dread changes.
-
-Good later prayer kinds include healing, shelter, protection, mercy, justice,
-rain, harvest, and children. Add one only when it has a detectable answer,
-timeout behavior, faith effect, and later social consequence.
-
-### 4. Add conservative parental inheritance
-
-Newborn temperament and traits currently begin fresh. Children should inherit
-tendencies without becoming copies:
-
-- average parental boldness, add seeded drift, and clamp
-- favor either parent's virtue or flaw while retaining mutation chance
-- preserve one-virtue and one-flaw limits and contradiction guards
-- allow inheritance of neither trait
-- cover the process with deterministic simulation-RNG tests
-
-This becomes especially legible once Sermo can express trait and relationship
-stances across generations.
-
-## Broader Priorities
-
-1. Correct the master life cycle before serious demographic balance work.
-2. Keep simulation ownership settlement-specific as colonies become common.
-3. Give public saves explicit versions, migrations, and old-version fixtures.
-4. Continue exposing hidden simulation consequences through at least two
-   visible channels.
-
-The guiding player-facing chain remains:
-
-```text
-event -> personal interpretation -> visible reaction -> social retelling
--> prayer or doctrine -> player response -> remembered consequence
-```
-
-Sermo, sermons, chronicles, animation, and the prayer board should reinforce
-one another. More hidden state is less valuable than making existing truth
-noticeable and memorable.
+- Hunger is the loudest register in the game right now, by a wide margin. A
+  village founded deep in the woods lives close to the bone, and `hungry` in
+  all three faith bands is where the corpus is thinnest against demand.
+- `event:thrown of:person` is the god's most-used act and its tellings wear
+  out fastest. Distinct *angles* on one throw beat more synonyms for it: the
+  witness who ran, the one who did not see it land, the one who will not say
+  it out loud, the one who checked on them after.
+- Faith band must do real work in these. A `devout` telling of a throw and a
+  `doubting` one should disagree about what happened, not merely in tone.

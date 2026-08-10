@@ -950,6 +950,13 @@ pub(crate) fn take_up_work(
         let Some((trade, job)) = found else {
             continue;
         };
+        if trade == Vocation::Hunter && std::env::var("DIVUS_FACTUS_HUNT_PROBE").is_ok() {
+            info!(
+                "hunt probe: {} takes the hunt, quarry {:.0} strides out",
+                person.name,
+                job.site.distance(transform.translation)
+            );
+        }
 
         // The road eats first. A worksite past a safe walk is taken
         // only with rations out of the larder - about one meal per

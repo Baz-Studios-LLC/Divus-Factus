@@ -156,6 +156,32 @@ impl PrayerKind {
             }
         }
     }
+
+    /// The same asking with a crowd behind it: the board clumps prayers
+    /// for the same thing onto one card, fronted by the most urgent
+    /// asker. Brett: "clump multiple people praying for the same thing
+    /// into one prayer card to prevent getting swamped with cards."
+    /// Dark and road prayers never clump - each names a particular
+    /// neighbour or a particular flag - so those arms fall back to the
+    /// single voice.
+    pub fn ask_line_many(&self, asker: &str, others: usize) -> String {
+        let company = if others == 1 {
+            "one other".to_string()
+        } else {
+            format!("{others} others")
+        };
+        match self {
+            PrayerKind::Food => format!("{asker} and {company} ask for food"),
+            PrayerKind::Devotion { grateful } => {
+                if *grateful {
+                    format!("{asker} and {company} give thanks")
+                } else {
+                    format!("{asker} and {company} ask if you are there")
+                }
+            }
+            _ => self.ask_line(asker),
+        }
+    }
 }
 
 /// An open prayer: what they are asking for, and how long hope lasts.
@@ -326,7 +352,9 @@ pub(super) fn kneel(
     stores: Query<&super::work::Stockpile>,
     grounds: Query<&super::SettlementGround>,
     gifts: Query<&Transform, (With<DivinelyPlaced>, With<FoodSource>, Without<Held>)>,
-    asking: Query<(&Prayer, &MemberOf)>,
+    // The dead do not hold places in the chorus: a corpse still wearing
+    // its unanswered prayer must not mute the living behind it.
+    asking: Query<(&Prayer, &MemberOf), Without<Corpse>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut notices: MessageWriter<crate::ui::Notice>,
@@ -382,23 +410,34 @@ pub(super) fn kneel(
         // village kneeling at a single dawn. Brett, watching it: "Everyone
         // is praying like crazy people!" Each soul carries its own point
         // of desperation instead, spread a few meals wide, so the askings
-        // arrive as a trickle a town can watch and answer.
-        let pride = (entity.to_bits() % 8) as f32 * 0.025;
+        // arrive as a trickle a town can watch and answer. Not on the
+        // road: out there the prayer is the rescue flare, and it goes up
+        // at desperate, unstaggered.
+        let pride = if on_the_road {
+            0.0
+        } else {
+            (entity.to_bits() % 8) as f32 * 0.025
+        };
         if needs.hunger < DESPERATE_HUNGER + pride || (store_has_food && !dying_regardless) {
             continue;
         }
         // And one voice can ask for a whole town: while a few food
         // prayers already stand from this town, the next hungry soul
         // holds their asking - no less hungry, just not everyone on
-        // their knees at once. The dying wait for nobody.
-        let chorus = asking
-            .iter()
-            .filter(|(prayer, member)| {
-                matches!(prayer.kind, PrayerKind::Food) && Some(member.0) == home
-            })
-            .count();
-        if chorus >= CHORUS_OF_ASKING && !dying_regardless {
-            continue;
+        // their knees at once. The dying wait for nobody, and neither
+        // does anyone on the road - a walker past the working ground is
+        // not part of the town's chorus, and their asking is the only
+        // sign of them the god gets.
+        if !on_the_road && !dying_regardless {
+            let chorus = asking
+                .iter()
+                .filter(|(prayer, member)| {
+                    matches!(prayer.kind, PrayerKind::Food) && Some(member.0) == home
+                })
+                .count();
+            if chorus >= CHORUS_OF_ASKING {
+                continue;
+            }
         }
         if matches!(*activity, Activity::Eating(_) | Activity::Sleeping) {
             continue;

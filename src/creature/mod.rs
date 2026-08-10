@@ -27,6 +27,12 @@ const GRAVITY: f32 = 19.6;
 /// Routes computed per frame across the whole world.
 const ROUTES_PER_FRAME: usize = 4;
 
+/// How near a doorway a routed walk gives way to a straight one. Long
+/// enough to reach the far end of a longhouse, since a sleeper crossing
+/// their own hall to the door is the walk this exists for, and short
+/// enough that the straight line stays within one building's own ground.
+const THREAD_THE_DOOR: f32 = 16.0;
+
 pub struct CreaturePlugin;
 
 impl Plugin for CreaturePlugin {
@@ -314,7 +320,12 @@ pub(crate) fn plan_routes(
     walls: Res<crate::navigation::Walls>,
     chart: Res<crate::navigation::Reachable>,
     mut creatures: Query<
-        (&Transform, &MoveTarget, &mut Route),
+        (
+            &Transform,
+            &MoveTarget,
+            &mut Route,
+            Has<crate::villager::home::Doorbound>,
+        ),
         (
             With<Creature>,
             Without<Held>,
@@ -342,13 +353,37 @@ pub(crate) fn plan_routes(
     // still in the street.
     let mut budget = ROUTES_PER_FRAME.max(creatures.iter().count() / 8);
 
-    for (transform, target, mut route) in &mut creatures {
+    for (transform, target, mut route, doorbound) in &mut creatures {
         let Some(goal) = target.0 else {
             if route.goal.is_some() {
                 route.clear();
             }
             continue;
         };
+
+        // A walk the door router has hold of, close enough that the
+        // doorway IS the journey, steers straight at it.
+        //
+        // The search cannot help here and quietly hurts: no path on a
+        // two-and-a-half metre grid can thread a one metre door, so a
+        // building somebody is entering or leaving is EXCUSED from the
+        // walls - and a route to the door is then free to cut out
+        // through the side wall on its way there. Measured, that was
+        // every single wall-crossing in the village: a hundred and
+        // twenty-one strides through their own walls in ten seconds,
+        // every one of them with the router steering. Brett: "a lot of
+        // people still walk through the walls."
+        //
+        // Straight is the honest line at this range. The router's near
+        // leg stands inside a single room and its far leg straight out
+        // through the opening, so the walk it describes never wanted a
+        // path in the first place.
+        if doorbound && transform.translation.distance(goal) < THREAD_THE_DOOR {
+            route.waypoints.clear();
+            route.goal = None;
+            route.unreachable = false;
+            continue;
+        }
 
         // Already routed there.
         if route.goal.is_some_and(|g| g.distance_squared(goal) < 0.25) {
@@ -399,6 +434,33 @@ pub(crate) fn plan_routes(
                 route.denied = None;
             }
             None => {
+                // A refusal is how villagers starve beside a full larder:
+                // the walk is refused, `locomotion` drops the errand, and
+                // `still_refused` keeps the search from ever being run
+                // again. Under the wall probe it says so out loud, with
+                // the two facts that decide it - whether the ground at
+                // either end is walkable at all, and how far apart they
+                // are.
+                if std::env::var("DIVUS_FACTUS_WALL_PROBE").is_ok() {
+                    info!(
+                        "route refused: {:.0},{:.0} -> {:.0},{:.0} ({:.0} apart, standing on {}, aiming at {})",
+                        transform.translation.x,
+                        transform.translation.z,
+                        goal.x,
+                        goal.z,
+                        transform.translation.distance(goal),
+                        if terrain.is_walkable(transform.translation.x, transform.translation.z) {
+                            "walkable ground"
+                        } else {
+                            "UNWALKABLE ground"
+                        },
+                        if terrain.is_walkable(goal.x, goal.z) {
+                            "walkable ground"
+                        } else {
+                            "UNWALKABLE ground"
+                        },
+                    );
+                }
                 route.waypoints.clear();
                 route.unreachable = true;
                 route.denied = Some((goal, now));

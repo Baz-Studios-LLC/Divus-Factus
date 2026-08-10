@@ -2421,8 +2421,16 @@ fn starvation_watch(
     time: Res<Time>,
     mut since: Local<f32>,
     site: Option<Res<SettlementSite>>,
+    towns: Query<(&SettlementGround, &work::Stockpile)>,
     watchers: Query<
-        (&Person, &Needs, &Activity, &Transform),
+        (
+            &Person,
+            &Needs,
+            &Activity,
+            &Transform,
+            Option<&MemberOf>,
+            Option<&crate::creature::MoveTarget>,
+        ),
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
     watch: Res<crate::debug::timings::Timings>,
@@ -2433,16 +2441,35 @@ fn starvation_watch(
         return;
     }
     *since = 0.0;
-    for (person, needs, activity, at) in &watchers {
+    for (person, needs, activity, at, member, target) in &watchers {
         if needs.hunger < 0.95 {
             continue;
         }
         let from_home = site
             .as_ref()
             .map_or(f32::NAN, |s| s.centre.distance(at.translation));
+        // The banner is not the meal. Twice now a village has starved
+        // beside a full larder because the SACKS were somewhere the
+        // walk could not finish, so the watch reads out the table too:
+        // how far it stands, what it holds, and whether the walk is
+        // even aimed at it.
+        let table = member
+            .map(|m| m.0)
+            .or_else(|| site.as_ref().map(|s| s.settlement))
+            .and_then(|town| towns.get(town).ok());
+        let (to_table, larder, aimed) = table.map_or((f32::NAN, f32::NAN, f32::NAN), |(g, s)| {
+            (
+                g.foodpile.distance(at.translation),
+                s.food(),
+                target
+                    .and_then(|t| t.0)
+                    .map_or(f32::NAN, |goal| goal.distance(g.foodpile)),
+            )
+        });
         info!(
-            "starvation watch: {} is {:?} at hunger {:.2}, {:.0} strides from the banner",
-            person.name, activity, needs.hunger, from_home
+            "starvation watch: {} is {:?} at hunger {:.2}, {:.0} strides from the banner, \
+             {:.1} from the sacks (larder {larder:.0}, walking to a point {aimed:.1} off them)",
+            person.name, activity, needs.hunger, from_home, to_table
         );
     }
 }
@@ -2996,6 +3023,7 @@ fn choose_activity(
             &Transform,
             &MoveTarget,
             Option<&MemberOf>,
+            Option<&work::Vocation>,
         ),
         (
             With<Villager>,
@@ -3011,7 +3039,7 @@ fn choose_activity(
     watch: Res<crate::debug::timings::Timings>,
 ) {
     let _t = watch.watch("villager: choose_activity");
-    for (mut activity, needs, transform, target, member) in &mut villagers {
+    for (mut activity, needs, transform, target, member, vocation) in &mut villagers {
         // Their OWN town's larder. Reading the focused settlement here
         // would gate a colonist's meals — and now their prayers — on how
         // full the pantry is in whichever town the player is looking at.
@@ -3103,7 +3131,22 @@ fn choose_activity(
             // still draws the desperate to the square, because the square
             // is where the starving kneel, and a prayer is what is left
             // when the sacks are empty.
-            if larder >= 1.0 || needs.hunger >= belief::DESPERATE_HUNGER {
+            //
+            // Unless they work a food trade: the desperate hunter's
+            // answer to the empty sacks is a deer, not a vigil. This gate
+            // mirrors the one in `eat_from_store` exactly — if only one
+            // side sent providers to the square, the two systems would
+            // trade the same soul back and forth every frame.
+            let provider = matches!(
+                vocation,
+                Some(
+                    work::Vocation::Fisher
+                        | work::Vocation::Gatherer
+                        | work::Vocation::Hunter
+                        | work::Vocation::Farmer
+                )
+            );
+            if larder >= 1.0 || (needs.hunger >= belief::DESPERATE_HUNGER && !provider) {
                 *activity = Activity::VisitingStore;
                 continue;
             }

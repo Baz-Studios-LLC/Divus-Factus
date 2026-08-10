@@ -67,6 +67,14 @@ const DOWN_TOOLS_HUNGER: f32 = HUNGRY_THRESHOLD + 0.1;
 /// What one hunt's kill is worth in stored food.
 const CARCASS_FOOD: f32 = 3.0;
 
+/// How close a hunter must be to strike. Longer than the bench-worker's
+/// arm on purpose: prey drifts a few steps at a time while it grazes,
+/// and a hunter held to the ordinary two-and-a-bit strides spent whole
+/// mornings arriving at where a deer had just been - patience ran out,
+/// the deer was shunned, and a village with prey nineteen strides from
+/// the square brought home no meat at all.
+const SPEAR_REACH: f32 = 4.2;
+
 /// Carriers walk their wood to the pile and put it down.
 pub(super) fn haul_wood(
     mut commands: Commands,
@@ -854,11 +862,20 @@ pub(super) fn do_work(
         ResMut<crate::scatter::DirtyGroves>,
     ),
     assets: (ResMut<Assets<Mesh>>, ResMut<Assets<StandardMaterial>>),
+    // CreatureMotion is OPTIONAL, and the whole hunt hangs on it: death
+    // strips a body of its motion, so a required `&mut CreatureMotion`
+    // quietly dropped every carcass out of this query the instant the
+    // kill landed. The hunter then "lost the quarry", went idle, was
+    // dealt the same carcass again, lost it again - three and a half
+    // thousand times in four minutes - and the harvest arm below, which
+    // exists precisely to turn a corpse into meat, could never run. A
+    // village in the deep woods with prey twenty strides from the square
+    // brought home nothing and starved to six.
     mut prey_query: Query<
         (
             &Transform,
             &mut Vitality,
-            &mut CreatureMotion,
+            Option<&mut CreatureMotion>,
             Has<Corpse>,
             &CreatureGenome,
         ),
@@ -866,6 +883,11 @@ pub(super) fn do_work(
     >,
 ) {
     let dt = time.delta_secs();
+    // DIVUS_FACTUS_HUNT_PROBE=1 narrates every hunt: the deal, the chase,
+    // the shun, the strike. The woods famine was a village that starved
+    // with prey twenty strides out, and the census alone could not say
+    // which link of the hunt was broken.
+    let hunt_probe = std::env::var("DIVUS_FACTUS_HUNT_PROBE").is_ok();
     // Mouths per town, so one settlement's thin larder does not push
     // another settlement's trades into working after dark.
     let mut alive_by_town: std::collections::HashMap<Entity, usize> =
@@ -1008,7 +1030,7 @@ pub(super) fn do_work(
                     job.progress += dt;
                     if job.progress >= 1.1 {
                         job.progress = 0.0;
-                        for (wolf_t, mut vitality, mut wolf_motion, is_corpse, genome) in
+                        for (wolf_t, mut vitality, wolf_motion, is_corpse, genome) in
                             prey_query.iter_mut()
                         {
                             if is_corpse
@@ -1020,7 +1042,9 @@ pub(super) fn do_work(
                             vitality.harm += 0.7;
                             vitality.violent = true;
                             vitality.undoing = crate::creature::Undoing::Blow;
-                            wolf_motion.flail = 1.0;
+                            if let Some(mut wolf_motion) = wolf_motion {
+                                wolf_motion.flail = 1.0;
+                            }
                             if vitality.harm >= 1.0 {
                                 info!("{} slew a wolf", person.name);
                                 if let Some(chronicle) = chronicle.as_mut() {
@@ -1434,6 +1458,32 @@ pub(super) fn do_work(
                     job.site = prey_transform.translation;
                 }
                 None => {
+                    if hunt_probe {
+                        // The full anatomy of the miss, deferred so it costs
+                        // no query parameters: which part of the prey query
+                        // the quarry stopped satisfying, or whether it still
+                        // exists at all.
+                        let name = person.name.clone();
+                        match job.focus {
+                            Some(prey) => commands.queue(move |world: &mut World| {
+                                match world.get_entity(prey) {
+                                    Err(_) => {
+                                        info!("hunt probe: {name}'s quarry no longer exists")
+                                    }
+                                    Ok(quarry) => info!(
+                                        "hunt probe: {name}'s quarry stands but mismatches: creature={} villager={} vitality={} motion={} genome={} corpse={}",
+                                        quarry.contains::<Creature>(),
+                                        quarry.contains::<crate::villager::Villager>(),
+                                        quarry.contains::<Vitality>(),
+                                        quarry.contains::<CreatureMotion>(),
+                                        quarry.contains::<CreatureGenome>(),
+                                        quarry.contains::<Corpse>(),
+                                    ),
+                                }
+                            }),
+                            None => info!("hunt probe: {name} carries a hunt with no quarry"),
+                        }
+                    }
                     *activity = Activity::Idle;
                     commands.entity(entity).remove::<Job>();
                     continue;
@@ -1455,10 +1505,21 @@ pub(super) fn do_work(
         }
 
         let distance = transform.translation.distance(job.site);
-        if distance > WORK_RANGE {
+        let reach = if *vocation == Vocation::Hunter {
+            SPEAR_REACH
+        } else {
+            WORK_RANGE
+        };
+        if distance > reach {
             target.0 = Some(job.site);
             job.patience -= dt;
             if job.patience <= 0.0 {
+                if hunt_probe && *vocation == Vocation::Hunter {
+                    info!(
+                        "hunt probe: {} shunned the chase {:.1} strides short",
+                        person.name, distance
+                    );
+                }
                 *activity = Activity::Idle;
                 target.0 = None;
                 commands.entity(entity).remove::<Job>().insert(Shunned {
@@ -1483,14 +1544,18 @@ pub(super) fn do_work(
         // the cycle - and a better-rewarded one below: most trades yield
         // more per cycle as the craft grows.
         let skill = skills.as_ref().map_or(0.0, |s| s.of(*vocation));
-        let cycle =
-            if context.3.iter().any(|b| b.kind == BuildingKind::Blacksmith) && store.iron > 0.0 {
+        let cycle = if context.3.iter().any(|b| b.kind == BuildingKind::Blacksmith) && store.iron > 0.0 {
                 WORK_SECONDS * 0.75
             } else {
                 WORK_SECONDS
             } * manner.map_or(1.0, |m| m.work_pace())
                 * weather.as_ref().map_or(1.0, |w| w.toil())
-                * (1.0 - skill * 0.2);
+                * (1.0 - skill * 0.2)
+                // A hunt is jabs, not a shift at a bench. Six seconds of
+                // standing beside a grazing deer never comes - it drifts,
+                // the clock resets, and the kill is forever three strides
+                // away. A spear thrust is quick or it is nothing.
+                * if *vocation == Vocation::Hunter { 0.35 } else { 1.0 };
         job.progress += dt;
         if job.progress < cycle {
             continue;
@@ -1870,7 +1935,7 @@ pub(super) fn do_work(
                 let Some(prey) = job.focus else {
                     continue;
                 };
-                let Ok((_, mut vitality, mut prey_motion, is_corpse, genome)) =
+                let Ok((_, mut vitality, prey_motion, is_corpse, genome)) =
                     prey_query.get_mut(prey)
                 else {
                     continue;
@@ -1900,8 +1965,16 @@ pub(super) fn do_work(
                 vitality.harm += 0.55;
                 vitality.violent = true;
                 vitality.undoing = crate::creature::Undoing::Blow;
-                prey_motion.flail = 1.0;
+                if let Some(mut prey_motion) = prey_motion {
+                    prey_motion.flail = 1.0;
+                }
                 motion.flail = motion.flail.max(0.4);
+                if hunt_probe {
+                    info!(
+                        "hunt probe: {} struck, the quarry's harm stands at {:.2}",
+                        person.name, vitality.harm
+                    );
+                }
             }
         }
 
@@ -2151,5 +2224,40 @@ mod tests {
             assert!(!vocation.describe().is_empty());
             assert!(vocation.taking_up().starts_with("took up"));
         }
+    }
+
+    /// A kill must still be visible to the hunter who made it.
+    ///
+    /// Death strips a body of its `CreatureMotion`, so `do_work`'s prey
+    /// query may never REQUIRE that component: it did, every carcass
+    /// fell out of the query the instant it died, the harvest arm could
+    /// not run, and a village in the deep woods starved from ten souls
+    /// to six with venison lying in the grass. The query shape is the
+    /// contract; this test guards it without booting the whole game.
+    #[test]
+    fn a_carcass_still_answers_the_hunters_query() {
+        let mut world = World::new();
+        let quarry = world
+            .spawn((
+                Creature,
+                Transform::default(),
+                Vitality::default(),
+                CreatureGenome::random(Species::Deer, &mut Rng::new(4)),
+                Corpse,
+            ))
+            .id();
+        let mut query = world.query_filtered::<(
+            &Transform,
+            &mut Vitality,
+            Option<&mut CreatureMotion>,
+            Has<Corpse>,
+            &CreatureGenome,
+        ), (With<Creature>, Without<Villager>)>();
+        let (_, _, motion, is_corpse, genome) = query
+            .get_mut(&mut world, quarry)
+            .expect("a carcass with no motion must still answer the hunter's query");
+        assert!(is_corpse, "the harvest arm keys off this flag");
+        assert!(motion.is_none(), "death took the motion, as it should");
+        assert_eq!(genome.species, Species::Deer);
     }
 }
