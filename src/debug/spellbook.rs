@@ -2,13 +2,14 @@
 //!
 //! Brett: "The miracles page should show all of the abilities that you
 //! can get and have a copy of the toolbar where you can slot them. Like a
-//! spell book from WoW." Every power the god may ever learn hangs here as
-//! a card — face, name, what it does, what it costs in days, and what
-//! earns it — and the header carries the belief ladder and a LIVE MIRROR
-//! of the ten-slot bar. The mirror is made of the same `MiracleSlot`s the
-//! HUD's apron wears, so the dresser, the styler, the cooldown sweep and
-//! the drag all serve it without knowing there are two bars. Cards go to
-//! the bar by press (first empty slot) or by drag, WoW-style.
+//! spell book from WoW" — and, like WoW's book, the shelf is ICON AND
+//! NAME alone, three to a row, with everything else in Ordo's floating
+//! tooltip that rides the mouse. "We are going to need a lot more room
+//! for more miracles." The header carries the belief ladder and a LIVE
+//! MIRROR of the ten-slot bar, made of the same `MiracleSlot`s the HUD's
+//! apron wears, so the dresser, the styler, the cooldown sweep and the
+//! drag all serve it without knowing there are two bars. Entries go to
+//! the bar by press (first empty slot) or by drag.
 //!
 //! THE DEITY page next door is for the god's own standing — and will one
 //! day carry the progression tree, when belief-as-XP finds its shape.
@@ -20,15 +21,11 @@ use crate::miracles::{Miracle, MiracleCard};
 #[derive(Component)]
 pub(crate) struct SpellbookPanel;
 
-/// One live text on a spellbook card.
+/// An entry's name, dressed by its lock state.
 #[derive(Component)]
-pub(crate) struct MiracleText {
-    miracle: Miracle,
-    /// 0 cost, 1 state, 2 reason.
-    field: u8,
-}
+pub(crate) struct MiracleName(Miracle);
 
-/// Pressing a learned card sets its miracle in the first empty slot —
+/// Pressing a learned entry sets its miracle in the first empty slot —
 /// the quick way; the drag is the precise one.
 pub(crate) fn place_from_the_book(
     grimoire: Res<crate::miracles::Grimoire>,
@@ -68,7 +65,7 @@ pub(crate) fn spawn_spellbook_page(mut commands: Commands, codex: Res<super::vil
     let leaf = ordo::page(&mut commands, page, super::village::RHYTHM);
 
     // The header: the ladder that earns the powers, and the bar that
-    // carries them — always in reach while the shelf below scrolls.
+    // carries them — always in reach while the shelf below grows.
     let head = commands
         .spawn((
             Node {
@@ -112,12 +109,13 @@ pub(crate) fn spawn_spellbook_page(mut commands: Commands, codex: Res<super::vil
         .id();
     crate::miracles::raise_bar_slots(&mut commands, bar);
     commands.spawn((
-        ui::dim("press a card for the first empty slot - or drag it onto the bar"),
+        ui::dim("press a miracle for the first empty slot - or drag it onto the bar"),
         ChildOf(head),
     ));
 
-    // The shelf: every miracle there is, three to a row on the page
-    // grid, learned or still to earn.
+    // The shelf: every miracle there is, icon and name alone, three to a
+    // row on the page grid. The rest of each entry's story lives in the
+    // tooltip that rides the mouse.
     let all = Miracle::ALL;
     for third in all.chunks(3) {
         let grid_line = commands
@@ -131,25 +129,21 @@ pub(crate) fn spawn_spellbook_page(mut commands: Commands, codex: Res<super::vil
             });
         for &miracle in third {
             // The tract column stays BARE, exactly like the filler that
-            // squares off a short row - a border or padding on the column
-            // itself joins the flex arithmetic and staggers part-rows off
-            // the tracts. The card is a full-width child instead.
+            // squares off a short row; the entry is a full-width child.
             let seat = commands
                 .spawn((ordo::col(1, super::village::RHYTHM), ChildOf(grid_line)))
                 .id();
-            let card = commands
+            let entry = commands
                 .spawn((
                     MiracleCard(miracle),
                     Interaction::default(),
-                    ui::HoverHint::new(
-                        miracle.name(),
-                        "press for the first empty slot - or drag it onto the bar",
-                    ),
+                    ordo::Tooltip::new(miracle.name(), ""),
                     Node {
                         width: percent(100),
                         flex_direction: FlexDirection::Row,
-                        column_gap: px(12),
-                        padding: UiRect::all(px(12)),
+                        align_items: AlignItems::Center,
+                        column_gap: px(10),
+                        padding: UiRect::all(px(6)),
                         border: UiRect::all(px(1)),
                         border_radius: BorderRadius::all(px(6)),
                         overflow: Overflow::clip(),
@@ -160,8 +154,6 @@ pub(crate) fn spawn_spellbook_page(mut commands: Commands, codex: Res<super::vil
                     ChildOf(seat),
                 ))
                 .id();
-            // The face: the same engraving the bar's slots wear, on its
-            // own permanent plate.
             let plate = commands
                 .spawn((
                     Node {
@@ -175,44 +167,22 @@ pub(crate) fn spawn_spellbook_page(mut commands: Commands, codex: Res<super::vil
                     },
                     BackgroundColor(ui::theme::panel_bg().with_alpha(0.6)),
                     BorderColor::all(ui::theme::panel_border()),
-                    ChildOf(card),
+                    ChildOf(entry),
                 ))
                 .id();
             crate::miracles::paint_miracle_face(&mut commands, plate, miracle);
-            let words = commands
-                .spawn((
-                    Node {
-                        flex_grow: 1.0,
-                        min_width: px(0),
-                        flex_direction: FlexDirection::Column,
-                        row_gap: px(2),
-                        ..default()
-                    },
-                    ChildOf(card),
-                ))
-                .id();
             commands.spawn((
+                MiracleName(miracle),
                 Text::new(miracle.name().to_uppercase()),
                 ui::DisplayFace,
                 TextFont {
                     font_size: FontSize::Px(14.0),
                     ..default()
                 },
-                TextColor(ui::theme::accent()),
-                ChildOf(words),
+                TextColor(ui::theme::text_dim()),
+                TextLayout::linebreak(LineBreak::NoWrap),
+                ChildOf(entry),
             ));
-            commands.spawn((ui::dim(miracle.blurb()), ChildOf(words)));
-            for field in [0u8, 1, 2] {
-                commands.spawn((
-                    MiracleText { miracle, field },
-                    ui::dim(""),
-                    Node {
-                        max_width: percent(100),
-                        ..default()
-                    },
-                    ChildOf(words),
-                ));
-            }
         }
         // A short last row keeps its columns' width.
         for _ in third.len()..3 {
@@ -221,23 +191,56 @@ pub(crate) fn spawn_spellbook_page(mut commands: Commands, codex: Res<super::vil
     }
 }
 
+/// One line saying what a miracle asks and where it stands, for the
+/// tooltip's body.
+fn story_of(miracle: Miracle, lit: bool) -> String {
+    if lit {
+        return format!(
+            "{}. Ready every {} days.",
+            miracle.blurb(),
+            miracle.cooldown_days()
+        );
+    }
+    let earns = match miracle.unlock() {
+        crate::miracles::Unlock::Founding => "yours from the founding".to_string(),
+        crate::miracles::Unlock::Belief(rung) => {
+            format!("earned at {rung:.0} belief")
+        }
+        crate::miracles::Unlock::Legend => {
+            if miracle == Miracle::Mend {
+                "a legend of providence unlocks it".to_string()
+            } else {
+                "a legend of dread unlocks it".to_string()
+            }
+        }
+        crate::miracles::Unlock::Dread(depth) => {
+            format!("earned by dread, {depth:.0} deep")
+        }
+    };
+    format!("{}. Locked - {}.", miracle.blurb(), earns)
+}
+
 /// Keeps the shelf honest while the page shows: which powers are held,
-/// what each costs, and what still earns the rest.
+/// and each entry's tooltip telling its story.
 pub(crate) fn update_spellbook(
     codex: Res<super::village::Codex>,
     panels: Query<&Visibility, With<SpellbookPanel>>,
     grimoire: Res<crate::miracles::Grimoire>,
-    mut cards: Query<(&MiracleCard, &mut BackgroundColor, &mut BorderColor)>,
-    mut texts: Query<(&MiracleText, &mut Text)>,
+    mut entries: Query<(
+        &MiracleCard,
+        &mut BackgroundColor,
+        &mut BorderColor,
+        &mut ordo::Tooltip,
+    )>,
+    mut names: Query<(&MiracleName, &mut TextColor)>,
 ) {
     if codex.page != super::village::CodexPage::Miracles
         || !panels.iter().any(|v| *v != Visibility::Hidden)
     {
         return;
     }
-    let unlocked = |miracle: Miracle| grimoire.knows(miracle);
-    for (card, mut fill, mut border) in &mut cards {
-        let lit = unlocked(card.0);
+    for (card, mut fill, mut border, mut tip) in &mut entries {
+        let lit = grimoire.knows(card.0);
         fill.0 = if lit {
             ui::theme::title_bg()
         } else {
@@ -248,41 +251,20 @@ pub(crate) fn update_spellbook(
         } else {
             ui::theme::panel_border().with_alpha(0.2)
         });
+        let fresh = story_of(card.0, lit);
+        if tip.line != fresh {
+            tip.line = fresh;
+        }
     }
-    for (label, mut text) in &mut texts {
-        let lit = unlocked(label.miracle);
-        let fresh = match label.field {
-            0 => {
-                if lit {
-                    format!("every {} days", label.miracle.cooldown_days())
-                } else {
-                    match label.miracle.unlock() {
-                        crate::miracles::Unlock::Founding => "from the founding".to_string(),
-                        crate::miracles::Unlock::Belief(rung) => {
-                            format!("at {rung:.0} belief")
-                        }
-                        crate::miracles::Unlock::Legend => "by legend".to_string(),
-                        crate::miracles::Unlock::Dread(depth) => {
-                            format!("by dread, {depth:.0} deep")
-                        }
-                    }
-                }
-            }
-            1 => if lit { "Active" } else { "Locked" }.to_string(),
-            _ => {
-                if lit {
-                    String::new()
-                } else if label.miracle == Miracle::Mend {
-                    "a legend of providence unlocks it".to_string()
-                } else if label.miracle == Miracle::Quake {
-                    "a legend of dread unlocks it".to_string()
-                } else {
-                    String::new()
-                }
-            }
+    for (name, mut ink) in &mut names {
+        let lit = grimoire.knows(name.0);
+        let fresh = if lit {
+            ui::theme::accent()
+        } else {
+            ui::theme::text_dim()
         };
-        if text.0 != fresh {
-            *text = Text::new(fresh);
+        if ink.0 != fresh {
+            ink.0 = fresh;
         }
     }
 }
