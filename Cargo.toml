@@ -40,3 +40,14 @@ opt-level = 3
 
 [profile.dev]
 opt-level = 1
+# Line tables, not the full symbol tree. On macOS the dev profile writes
+# its debug info UNPACKED - one .o file per codegen unit, kept forever
+# beside the binary - and this folder had reached two hundred and
+# thirty-five gigabytes on ninety-seven thousand of them. Brett: "the
+# Divus Factus folder is over 300gb...why is that?" The game itself is
+# forty megabytes.
+#
+# Line tables still name the file and line in every panic and backtrace,
+# which is the only debug information this project has ever actually
+# used, and they cost a fraction of the space.
+debug = "line-tables-only"

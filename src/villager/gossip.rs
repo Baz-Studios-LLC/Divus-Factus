@@ -258,7 +258,19 @@ pub enum Chat {
     Weather,
     /// Not small talk at all: a grievance one of them has with the
     /// other, said out loud.
-    Quarrel(Grievance),
+    ///
+    /// The aggrieved party is carried WITH the charge, because a quarrel
+    /// has two sides and they are not interchangeable. Without it both
+    /// speakers wore the same tags, and the corpus could put "you ate
+    /// while I went hungry" in the mouth of the one who ate - the same
+    /// class of lie as a villager describing a berry bush as somebody
+    /// flying. ChatGPT caught it before a line of it was written.
+    Quarrel {
+        over: Grievance,
+        /// The one with the empty stomach, no roof, or the older score
+        /// to settle.
+        aggrieved: Entity,
+    },
 }
 
 /// What the quarrel is ABOUT - and it is always something true.
@@ -304,31 +316,35 @@ pub enum Grievance {
 /// with nothing between them has nothing to quarrel about, and gets
 /// small talk like everybody else.
 fn grievance_between(
-    mine: (Option<&Needs>, bool),
-    theirs: (Option<&Needs>, bool),
+    mine: (Entity, Option<&Needs>, bool),
+    theirs: (Entity, Option<&Needs>, bool),
     regard: Option<f32>,
-) -> Option<Grievance> {
-    let (my_needs, my_roof) = mine;
-    let (their_needs, their_roof) = theirs;
+) -> Option<(Grievance, Entity)> {
+    let (me, my_needs, my_roof) = mine;
+    let (them, their_needs, their_roof) = theirs;
     let starving = |needs: Option<&Needs>| needs.is_some_and(|n| n.hunger > 0.62);
     let fed = |needs: Option<&Needs>| needs.is_some_and(|n| n.hunger < 0.3);
 
-    // Hunger beside plenty. It takes BOTH: two hungry people commiserate
-    // - that is the food small talk - and it is the difference between
-    // them that stings.
-    if (starving(my_needs) && fed(their_needs)) || (starving(their_needs) && fed(my_needs)) {
-        return Some(Grievance::Hunger);
+    // Hunger beside plenty, and WHOSE hunger. It takes both: two hungry
+    // people commiserate - that is the food small talk - and it is the
+    // difference between them that stings.
+    if starving(my_needs) && fed(their_needs) {
+        return Some((Grievance::Hunger, me));
     }
-    // A roof one of them has.
+    if starving(their_needs) && fed(my_needs) {
+        return Some((Grievance::Hunger, them));
+    }
+    // A roof one of them has, and the one who has not is the aggrieved.
     if my_roof != their_roof {
-        return Some(Grievance::Roof);
+        return Some((Grievance::Roof, if my_roof { them } else { me }));
     }
     // And what they were already carrying. The regard graph is the
     // village's own memory of who has wronged whom, so an old grudge
     // needs no fresh cause - which is exactly why old grudges are the
-    // easiest quarrels to restart.
+    // easiest quarrels to restart. The one holding the grudge is the one
+    // with something to say.
     if regard.is_some_and(|feeling| feeling <= -0.35) {
-        return Some(Grievance::Grudge);
+        return Some((Grievance::Grudge, me));
     }
     None
 }
@@ -366,16 +382,29 @@ impl Chat {
             Chat::Food => "topic:food".to_string(),
             Chat::Roof => "topic:roof".to_string(),
             Chat::Weather => "topic:weather".to_string(),
-            Chat::Quarrel(over) => over.tag().to_string(),
+            Chat::Quarrel { over, .. } => over.tag().to_string(),
         }
     }
 
-    /// Every tag this subject brings to the corpus. Small talk brings
-    /// one; a quarrel brings its register AND its charge, so a line
-    /// written for the charge is never said pleasantly.
-    pub fn tags(self) -> Vec<String> {
+    /// Every tag this subject brings to the corpus, FOR THIS SPEAKER.
+    ///
+    /// Small talk brings one tag and both sides share it. A quarrel
+    /// brings three: the register, the charge, and which side of it this
+    /// mouth is on - because "you ate while I went hungry" and "I cannot
+    /// help what is in the store" are answers to the same charge from
+    /// opposite ends of it, and nothing else in the moment can tell the
+    /// corpus which one it is holding.
+    pub fn tags_for(self, speaker: Entity) -> Vec<String> {
         match self {
-            Chat::Quarrel(over) => vec!["quarrel".to_string(), over.tag().to_string()],
+            Chat::Quarrel { over, aggrieved } => vec![
+                "quarrel".to_string(),
+                over.tag().to_string(),
+                if speaker == aggrieved {
+                    "aggrieved".to_string()
+                } else {
+                    "advantaged".to_string()
+                },
+            ],
             other => vec![other.tag()],
         }
     }
@@ -581,15 +610,15 @@ pub(crate) fn meet_to_talk(
                 // whole difference between a quarrel and random
                 // hostility.
                 let grievance = grievance_between(
-                    (my_needs, my_roof),
-                    (their_needs, their_roof),
+                    (teller, my_needs, my_roof),
+                    (listener, their_needs, their_roof),
                     regards
                         .get(teller)
                         .ok()
                         .map(|regard| regard.toward(listener)),
                 );
                 match (grievance, shared_trade, both_hungry, both_roofless, foul) {
-                    (Some(over), ..) => Chat::Quarrel(over),
+                    (Some((over, aggrieved)), ..) => Chat::Quarrel { over, aggrieved },
                     (_, Some(trade), ..) => Chat::Work(trade),
                     (_, _, true, ..) => Chat::Food,
                     (_, _, _, true, _) => Chat::Roof,
@@ -603,7 +632,7 @@ pub(crate) fn meet_to_talk(
         // Logged, because a chat about the work writes no chronicle and
         // shows no bubble unless the god happens to be watching - which
         // leaves a soak no way at all to tell talking from silence.
-        if let Chat::Quarrel(over) = subject {
+        if let Chat::Quarrel { over, .. } = subject {
             info!("two of them fell out over {}", over.describe());
         } else if memory.is_none() {
             info!("two of them fell to talking about {}", subject.tag());
@@ -700,8 +729,32 @@ pub(crate) fn hold_conversations(
             // which is where half the village's grudges will honestly come
             // from. Only conversations that actually happened count.
             if talk.spoke_at.is_some() {
-                let soured = rng.0.chance(0.12);
-                let by = if soured { -0.07 } else { 0.05 };
+                // A quarrel does not land on the heart the way a chat
+                // does. This rolled the friendly odds whatever had been
+                // said, so an argument about an empty stomach warmed
+                // both of them seven times in eight - ChatGPT caught it
+                // reading the first slice: "a quarrel can therefore make
+                // both people warmer regardless of what was said."
+                //
+                // It sours instead, and harder for the one who brought
+                // the charge: being answered badly about a real
+                // grievance is worse than being accused of one. Apology,
+                // mediation and withdrawal will want their own weights
+                // later; a flat souring is the honest floor until the
+                // outcome is a thing the engine decides rather than a
+                // thing the corpus happens to say.
+                let quarrelled = matches!(talk.topic, Some(Chat::Quarrel { .. }));
+                let wronged = matches!(
+                    talk.topic,
+                    Some(Chat::Quarrel { aggrieved, .. }) if aggrieved == entity
+                );
+                let soured = quarrelled || rng.0.chance(0.12);
+                let by = match (quarrelled, wronged, soured) {
+                    (true, true, _) => -0.16,
+                    (true, false, _) => -0.09,
+                    (false, _, true) => -0.07,
+                    (false, _, false) => 0.05,
+                };
                 let partner_name = minds
                     .get(talk.partner)
                     .map(|(p, ..)| p.name.clone())
@@ -1021,7 +1074,11 @@ pub(crate) fn hold_conversations(
                     tongue.turn_about(
                         entity,
                         "chat:reply",
-                        &topic.tags().iter().map(String::as_str).collect::<Vec<_>>(),
+                        &topic
+                            .tags_for(entity)
+                            .iter()
+                            .map(String::as_str)
+                            .collect::<Vec<_>>(),
                         false,
                         crate::sermo::FaithBand::of(trust),
                         voice,
@@ -1090,7 +1147,11 @@ pub(crate) fn hold_conversations(
                     tongue.turn_about(
                         entity,
                         role,
-                        &topic.tags().iter().map(String::as_str).collect::<Vec<_>>(),
+                        &topic
+                            .tags_for(entity)
+                            .iter()
+                            .map(String::as_str)
+                            .collect::<Vec<_>>(),
                         told,
                         crate::sermo::FaithBand::of(trust),
                         voice,
@@ -1380,5 +1441,77 @@ mod tests {
             app.world().entity(bride).get::<Spouse>().is_some(),
             "a season of waiting and still no wedding: the village cannot renew itself",
         );
+    }
+
+    /// A quarrel knows which of them is the wronged one, and says so to
+    /// the corpus.
+    ///
+    /// Without this both sides wore the same tags and a line meant for
+    /// the hungry one - "you ate while I went hungry" - could come out
+    /// of the mouth of the one who ate. ChatGPT caught it reviewing the
+    /// first slice, before a word of the quarrel corpus was written.
+    #[test]
+    fn a_quarrel_knows_which_of_them_is_wronged() {
+        let mut world = World::new();
+        let hungry = world.spawn_empty().id();
+        let fed = world.spawn_empty().id();
+        let starving = Needs {
+            hunger: 0.8,
+            ..default()
+        };
+        let full = Needs {
+            hunger: 0.1,
+            ..default()
+        };
+
+        // Whichever way round the pair is asked, the empty stomach is
+        // the aggrieved one.
+        let (over, wronged) = grievance_between(
+            (hungry, Some(&starving), true),
+            (fed, Some(&full), true),
+            None,
+        )
+        .expect("hunger beside plenty is a grievance");
+        assert_eq!(over, Grievance::Hunger);
+        assert_eq!(wronged, hungry);
+        let (_, wronged) = grievance_between(
+            (fed, Some(&full), true),
+            (hungry, Some(&starving), true),
+            None,
+        )
+        .expect("and the same asked the other way about");
+        assert_eq!(wronged, hungry);
+
+        // Two hungry people commiserate; that is small talk, not a row.
+        assert!(
+            grievance_between(
+                (hungry, Some(&starving), true),
+                (fed, Some(&starving), true),
+                None,
+            )
+            .is_none(),
+            "shared hunger is sympathy, not a grievance",
+        );
+
+        // The roofless one is the wronged one.
+        let (over, wronged) =
+            grievance_between((hungry, Some(&full), true), (fed, Some(&full), false), None)
+                .expect("a roof one has and the other has not");
+        assert_eq!(over, Grievance::Roof);
+        assert_eq!(wronged, fed, "the one sleeping out is the aggrieved");
+
+        // And the tags say which mouth is which.
+        let row = Chat::Quarrel {
+            over: Grievance::Hunger,
+            aggrieved: hungry,
+        };
+        let theirs = row.tags_for(hungry);
+        let mine = row.tags_for(fed);
+        assert!(theirs.iter().any(|tag| tag == "aggrieved"));
+        assert!(mine.iter().any(|tag| tag == "advantaged"));
+        for tags in [&theirs, &mine] {
+            assert!(tags.iter().any(|tag| tag == "quarrel"));
+            assert!(tags.iter().any(|tag| tag == "over:hunger"));
+        }
     }
 }

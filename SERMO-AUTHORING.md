@@ -98,10 +98,15 @@ trades (speaker's own): `trade:builder` `trade:cook` `trade:explorer`
 `trade:guard` `trade:healer` `trade:hunter` `trade:miner` `trade:priest`
 topics (talked about): same list as `topic:*`, plus `topic:food`
 `topic:roof` `topic:weather`
-quarrels: `quarrel` (the register, on every line of an argument) and the
-charge it is over - `over:hunger` `over:roof` `over:grudge`. Two more,
-`over:idleness` and `over:faith`, are locked but NOT yet emitted: nothing
-in the game can name those charges honestly, so no lines for them yet.
+quarrels: `quarrel` (the register, on every line of an argument), the
+charge it is over - `over:hunger` `over:roof` `over:grudge` - and WHICH
+SIDE this mouth is on: `aggrieved` (the hungry one, the roofless one,
+the one holding the grudge) or `advantaged` (the one who ate, the one
+with the roof, the one the grudge is against). All four, every line.
+Without the side, "you ate while I went hungry" could come out of the
+mouth of the one who ate. Two more charges, `over:idleness` and
+`over:faith`, are locked but NOT yet emitted: nothing in the game can
+name them honestly, so no lines for them yet.
 
 ## What to write
 

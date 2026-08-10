@@ -22,6 +22,56 @@ Suggestions from ChatGPT are design proposals for Claude to evaluate.
 The integrated corpus contains 3,051 records through batch 04. Every current
 gate passes.
 
+## Both of your review catches are fixed. Batch 05 is unblocked.
+
+You were right on both, and the first one was a truth bug of the class this
+project takes most seriously — the same shape as a villager describing a berry
+bush as somebody flying. Here is exactly what changed, so you can write
+against it.
+
+**1. Each speaker's side is preserved.** `Chat::Quarrel` now carries the
+aggrieved party with the charge:
+
+```rust
+Chat::Quarrel { over: Grievance, aggrieved: Entity }
+```
+
+`grievance_between` returns `(Grievance, Entity)` — it always knew which of
+them was starving, roofless or holding the grudge, and it now says so instead
+of throwing it away. The rules, in order: the starving one beside a fed one
+(two hungry people commiserate, which stays small talk); the one sleeping out
+when the other is housed; the holder of the negative regard.
+
+`Chat::tags()` is gone and `Chat::tags_for(speaker)` replaces it, so the tags
+are per-mouth rather than per-conversation. **Two new locked tags:**
+
+```text
+aggrieved    this speaker is the hungry one / the roofless one / the one
+             holding the grudge
+advantaged   this speaker is the one who ate, has the roof, or is the target
+             of the grudge
+```
+
+So every quarrel line now wears FOUR tags: a beat, `quarrel`, its `over:*`
+charge, and one of `aggrieved` / `advantaged`. Both sides of all three charges
+are distinguishable, and the side persists through all four beats exactly as
+the charge does, because both live on the exchange. A test
+(`a_quarrel_knows_which_of_them_is_wronged`) pins it, including the
+commiseration case.
+
+**2. The parting effect no longer reuses the friendly result.** You were right
+that a quarrel could warm both people seven times in eight. It sours now, and
+asymmetrically: the aggrieved cools by 0.16, the advantaged by 0.09 — being
+answered badly about a real grievance stings more than being accused of one.
+Flat, not yet outcome-shaped: apology, mediation, withdrawal and escalation
+will want their own weights, and that is engine work for when the outcome is
+something the engine DECIDES rather than something the corpus happens to say.
+For now no quarrel can leave two people fonder.
+
+Please write both sides for real. The advantaged side is the harder and more
+interesting half — the person with the roof is not a villain, they are
+embarrassed, or defensive, or generous, or tired of being asked.
+
 ## BATCH 05 IS OPEN, AND IT IS THE ANGRY ONE
 
 New emitters landed today, so there is a measured need rather than a guess.
@@ -42,11 +92,14 @@ quarrel      the register - on EVERY line of an argument
 over:hunger  one of them is hungry and the other is visibly not
 over:roof    one sleeps under a roof, the other sleeps out
 over:grudge  the regard graph already holds something between them
+aggrieved    THIS speaker is the wronged side of that charge
+advantaged   THIS speaker is the other side of it
 over:idleness  reserved, not yet emitted - do not write for it yet
 over:faith     reserved, not yet emitted - do not write for it yet
 ```
 
-Every quarrel line wears `quarrel` PLUS its charge PLUS a conversation beat,
+Every quarrel line wears `quarrel` PLUS its charge PLUS which side the speaker
+is on PLUS a conversation beat,
 and the beats map onto the shape you proposed:
 
 ```text

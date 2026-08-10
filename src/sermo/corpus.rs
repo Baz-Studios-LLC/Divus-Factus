@@ -418,6 +418,12 @@ mod tests {
             "over:idleness",
             "over:grudge",
             "over:faith",
+            // Which side of the charge a mouth is on. A quarrel has two
+            // ends and they are not interchangeable: without these the
+            // corpus could put "you ate while I went hungry" in the
+            // mouth of the one who ate.
+            "aggrieved",
+            "advantaged",
         ];
         let voice = Corpus::load();
         for line in voice.lines() {
