@@ -115,6 +115,57 @@ pub fn burst_of(
     }
 }
 
+/// The puff: a breath of cloth, close against the body.
+///
+/// The change-of-clothes gesture. The offering burst throws its essence
+/// metres and gathers it back grandly - right for a gift becoming stores,
+/// far too much for a coat. These flecks are small, barely clear the
+/// silhouette, and settle back INTO the body, like cloth falling into
+/// place. Brett, twice: the swap's particles were "a little much", then
+/// "still way too big and move way too far away from the body".
+pub fn puff_of(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    at: Vec3,
+    colors: &[Color],
+) {
+    let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+    let coats: Vec<Handle<StandardMaterial>> = colors
+        .iter()
+        .map(|color| {
+            materials.add(StandardMaterial {
+                base_color: *color,
+                emissive: LinearRgba::from(*color) * 0.6,
+                perceptual_roughness: 1.0,
+                ..default()
+            })
+        })
+        .collect();
+    for i in 0..5 {
+        let angle = i as f32 * 2.399963;
+        let (sin, cos) = angle.sin_cos();
+        let pace = 0.5 + (i % 3) as f32 * 0.25;
+        let born = 0.07 + (i % 3) as f32 * 0.04;
+        commands.spawn((
+            Spark {
+                velocity: Vec3::new(cos * pace, 0.7 + (i % 4) as f32 * 0.25, sin * pace),
+                age: 0.0,
+                life: 0.35 + (i % 5) as f32 * 0.06,
+                born,
+                home: at,
+            },
+            Mesh3d(cube.clone()),
+            MeshMaterial3d(coats[i % coats.len()].clone()),
+            Transform::from_translation(
+                at + Vec3::new(cos * 0.25, (i % 3) as f32 * 0.25 - 0.2, sin * 0.25),
+            )
+            .with_scale(Vec3::splat(born)),
+            bevy::light::NotShadowCaster,
+        ));
+    }
+}
+
 /// The spill: earth shaken loose, falling home to the ground.
 ///
 /// A tree torn up by the roots does not sparkle - it RAINS. Clumps of

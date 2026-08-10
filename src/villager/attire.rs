@@ -234,17 +234,15 @@ pub(super) fn twirl_to_redress(
             genome.belt = wear.belt;
 
             let chest = at.translation + Vec3::Y * 1.1;
-            crate::matter::burst_of(
+            crate::matter::puff_of(
                 &mut commands,
                 &mut visuals.0,
                 &mut visuals.1,
-                chest,
                 chest,
                 &[
                     palette::color_at(wear.cloth.palette_index()),
                     palette::color_at(wear.accent.palette_index()),
                 ],
-                5,
             );
 
             commands.entity(rig.body).despawn();
