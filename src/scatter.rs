@@ -1364,15 +1364,33 @@ pub fn chunk_scatter_seed(world_seed: u32, coord: IVec2) -> u64 {
 
 /// Leans foliage back and forth. Two sine waves at different rates so the motion
 /// does not read as a loop.
+/// Ground further than this from the eye holds its lean. Nobody can tell
+/// a frozen bush from a swaying one at three hundred paces - but the
+/// transform tree can: every bush written per frame is a dirty transform
+/// the propagation and the renderer pay for again, and the far ones were
+/// most of the whole world's per-frame dirt.
+const SWAY_REACH: f32 = 300.0;
+
 fn sway_foliage(
     time: Res<Time>,
-    mut foliage: Query<(&Foliage, &mut Transform)>,
+    cameras: Query<&GlobalTransform, With<crate::camera::GodCamera>>,
+    mut foliage: Query<(&Foliage, &mut Transform, &GlobalTransform)>,
     watch: Res<crate::debug::timings::Timings>,
 ) {
     let _t = watch.watch("scatter: sway_foliage");
     let t = time.elapsed_secs();
+    let Ok(eye) = cameras.single() else {
+        return;
+    };
+    let eye = eye.translation();
 
-    for (foliage, mut transform) in &mut foliage {
+    for (foliage, mut transform, stood) in &mut foliage {
+        // The read comes before the write on purpose: skipping the write
+        // is the whole saving. Last frame's global position is plenty for
+        // a reach this coarse.
+        if stood.translation().distance_squared(eye) > SWAY_REACH * SWAY_REACH {
+            continue;
+        }
         let a = (t * 0.9 + foliage.phase).sin();
         let b = (t * 1.7 + foliage.phase * 1.3).sin();
         let lean = (a * 0.7 + b * 0.3) * foliage.amplitude;

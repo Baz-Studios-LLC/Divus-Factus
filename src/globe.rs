@@ -279,12 +279,70 @@ pub(crate) struct PlanetTree {
     /// Frames since the world began, for the forgetting below.
     beat: u64,
     /// Which painting of the veil the world currently wants. Bumped when the
-    /// fog of war toggles or the known world grows; patches wearing an older
-    /// painting are rebuilt a few per frame, so the veil SWEEPS rather than
-    /// hitches.
+    /// fog of war TOGGLES - a change with no locality - so every patch
+    /// repaints, a few per frame, and the veil SWEEPS rather than hitches.
+    /// The known world merely GROWING no longer bumps it: growth stales
+    /// only the patches it touches, by zeroing their own `painted`.
     paint_beat: u64,
-    /// A cheap fingerprint of (fog mode, known world) to notice the change.
-    veil_print: (bool, u32, usize),
+    /// The veil as the planet last painted it, kept to tell WHAT changed.
+    veil_seen: Option<VeilSeen>,
+}
+
+/// The veil's shape at one painting: the home circle and the pockets, in
+/// the terrain's own `(x, z)`. Two of these answer the only question the
+/// planet has - which GROUND would these paint differently?
+#[derive(PartialEq)]
+struct VeilSeen {
+    centre: Vec2,
+    radius: f32,
+    pockets: Vec<(Vec2, f32)>,
+}
+
+impl VeilSeen {
+    fn of(known: &crate::villager::explore::KnownWorld) -> Self {
+        VeilSeen {
+            centre: Vec2::new(known.centre.x, known.centre.z),
+            radius: known.radius,
+            pockets: known
+                .pockets
+                .iter()
+                .map(|pocket| (Vec2::new(pocket.at.x, pocket.at.z), pocket.radius))
+                .collect(),
+        }
+    }
+
+    /// The discs of ground where these two veils could disagree: every
+    /// pocket present in exactly one of them, and both home circles when
+    /// the home moved or grew. Everywhere else, both paint alike.
+    fn changed_discs(&self, fresh: &Self) -> Vec<(Vec2, f32)> {
+        let mut discs = Vec::new();
+        if self.centre != fresh.centre || self.radius != fresh.radius {
+            discs.push((self.centre, self.radius));
+            discs.push((fresh.centre, fresh.radius));
+        }
+        // Set difference both ways: `tidy` merges and reorders pockets,
+        // so positions are compared, never indices.
+        let key = |(at, radius): &(Vec2, f32)| {
+            (
+                (at.x * 8.0) as i64,
+                (at.y * 8.0) as i64,
+                (radius * 8.0) as i64,
+            )
+        };
+        let old: std::collections::HashSet<_> = self.pockets.iter().map(key).collect();
+        let new: std::collections::HashSet<_> = fresh.pockets.iter().map(key).collect();
+        discs.extend(self.pockets.iter().filter(|p| !new.contains(&key(p))));
+        discs.extend(fresh.pockets.iter().filter(|p| !old.contains(&key(p))));
+        discs
+    }
+}
+
+/// The direction a terrain `(x, z)` bends to - the inverse of
+/// [`ground_coordinates`], minus sign and all.
+fn chart_direction(at: Vec2) -> Vec3 {
+    let lon = at.x / PLANET_RADIUS;
+    let lat = -at.y / PLANET_RADIUS;
+    Vec3::new(lon.sin() * lat.cos(), lat.sin(), lon.cos() * lat.cos())
 }
 
 impl PlanetTree {
@@ -1413,17 +1471,42 @@ fn tend_the_tree(
         }
     }
 
-    // Notice the veil changing — the F key, or the known world growing —
-    // and mark every standing patch's painting stale by bumping the beat.
+    // Notice the veil changing. A TOGGLE - the F key, leaving the title -
+    // changes every patch at once, so it bumps the beat and the planet
+    // repaints whole. The known world GROWING is a different animal: one
+    // walker learning one meadow used to repaint the entire planet a few
+    // patches a frame - seconds of full-price terrain sampling for a
+    // thirty-pace circle - so growth now stales only the patches whose
+    // ground the change actually touches.
     let shroud = veil_of(&veil.0, &veil.1, state.get());
-    let print = (
-        shroud.is_some(),
-        shroud.map_or(0, |k| k.radius as u32),
-        shroud.map_or(0, |k| k.pockets.len()),
-    );
-    if tree.veil_print != print {
-        tree.veil_print = print;
-        tree.paint_beat += 1;
+    let fresh = shroud.map(VeilSeen::of);
+    if fresh != tree.veil_seen {
+        let discs = match (&tree.veil_seen, &fresh) {
+            (Some(seen), Some(now)) => Some(seen.changed_discs(now)),
+            // On or off is everywhere at once.
+            _ => None,
+        };
+        match discs {
+            Some(discs) => {
+                let toward: Vec<(Vec3, f32)> = discs
+                    .iter()
+                    .map(|(at, radius)| (chart_direction(*at), (radius + 48.0) / PLANET_RADIUS))
+                    .collect();
+                for (key, patch) in tree.built.iter_mut() {
+                    let reach = key.cell_arc() * PATCH_CELLS as f32 * 0.8;
+                    let dir = key.centre_dir();
+                    let touched = toward.iter().any(|(disc, arc)| {
+                        let limit = (reach + arc).min(std::f32::consts::PI);
+                        dir.dot(*disc) > limit.cos()
+                    });
+                    if touched {
+                        patch.painted = 0;
+                    }
+                }
+            }
+            None => tree.paint_beat += 1,
+        }
+        tree.veil_seen = fresh;
     }
 
     // Grow the missing and repaint the stale, nearest first, a few per
@@ -1577,6 +1660,57 @@ fn dress_for_space(mut clear: ResMut<ClearColor>, cameras: Query<&CameraRig, Wit
 
 #[cfg(test)]
 mod tests {
+
+    /// A learned pocket must stale the patch it lands on and leave the far
+    /// side of the planet alone - the growth that used to repaint the world.
+    #[test]
+    fn growth_changes_only_the_ground_it_touched() {
+        use super::VeilSeen;
+        let before = VeilSeen {
+            centre: Vec2::new(1000.0, 200.0),
+            radius: 170.0,
+            pockets: vec![(Vec2::new(1400.0, 250.0), 30.0)],
+        };
+        let mut after = VeilSeen {
+            pockets: vec![
+                // The old pocket, reordered - tidy does that - plus a new one.
+                (Vec2::new(1650.0, -90.0), 32.0),
+                (Vec2::new(1400.0, 250.0), 30.0),
+            ],
+            ..VeilSeen {
+                centre: before.centre,
+                radius: before.radius,
+                pockets: Vec::new(),
+            }
+        };
+        let discs = before.changed_discs(&after);
+        assert_eq!(discs, vec![(Vec2::new(1650.0, -90.0), 32.0)]);
+
+        // The home circle growing names both paintings of it.
+        after.radius = 240.0;
+        let discs = before.changed_discs(&after);
+        assert!(discs.contains(&(before.centre, 170.0)));
+        assert!(discs.contains(&(before.centre, 240.0)));
+    }
+
+    /// The staleness test lives on the sphere: a chart position must bend
+    /// to the same direction `ground_coordinates` unbends.
+    #[test]
+    fn the_chart_direction_inverts_the_ground() {
+        for at in [
+            Vec2::new(0.0, 0.0),
+            Vec2::new(1070.0, 139.0),
+            Vec2::new(-4200.0, 2600.0),
+            Vec2::new(9000.0, -5000.0),
+        ] {
+            let dir = super::chart_direction(at);
+            let (x, z) = super::ground_coordinates(dir);
+            assert!(
+                (x - at.x).abs() < 0.5 && (z - at.y).abs() < 0.5,
+                "{at:?} came back as ({x}, {z})"
+            );
+        }
+    }
 
     /// The fog shader undoes the bend to ask what ground a pixel stands on, and
     /// it has to come back to the ground the simulation is actually using.
