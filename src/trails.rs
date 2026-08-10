@@ -205,11 +205,32 @@ fn paint(
     for at in gone {
         trails.cells.remove(&at);
     }
+    // `DIVUS_FACTUS_TRAIL_PROBE=1`: says whether the ground is being
+    // worn, and whether the wear is reaching any chunk to be painted on.
+    // Brett: "I still dont see paths." The wearing and the painting are
+    // two halves that can fail apart, and only a count tells them apart.
+    if std::env::var("DIVUS_FACTUS_TRAIL_PROBE").is_ok() {
+        let worn = trails.cells.len();
+        let deepest = trails
+            .cells
+            .values()
+            .map(|cell| cell.wear)
+            .fold(0.0_f32, f32::max);
+        info!(
+            "trail probe: {worn} cells worn, deepest {deepest:.1} of {VISIBLE} to show, \
+             {} stale, {} chunks to repaint, {} chunks standing",
+            stale.len(),
+            dirty.len(),
+            chunks.iter().count(),
+        );
+    }
     if dirty.is_empty() {
         return;
     }
 
     let dirt = crate::palette::shade(&crate::palette::EARTH, 0.42).to_linear();
+    let mut tinted_now = 0u32;
+    let mut deepest_blend = 0.0_f32;
     for (chunk, mesh_handle) in &chunks {
         if !dirty.contains(&chunk.coord) {
             continue;
@@ -217,10 +238,6 @@ fn paint(
         let Some(mut mesh) = meshes.get_mut(&mesh_handle.0) else {
             continue;
         };
-        let origin = Vec2::new(
-            chunk.coord.x as f32 * CHUNK_SIZE,
-            chunk.coord.y as f32 * CHUNK_SIZE,
-        );
         let Some(positions) = mesh
             .attribute(Mesh::ATTRIBUTE_POSITION)
             .and_then(|a| a.as_float3())
@@ -234,7 +251,23 @@ fn paint(
             continue;
         };
         for (position, color) in positions.iter().zip(colors.iter_mut()) {
-            let (x, z) = (origin.x + position[0], origin.y + position[2]);
+            // THE BEND, for the fourth time in this project. A chunk's
+            // vertices are seated on the SPHERE in world space - its
+            // entity carries Transform::IDENTITY precisely because the
+            // mesh already knows where it is - so a vertex is not a
+            // chunk-local offset and adding the chunk's origin to it
+            // produced a point thousands of units from any ground anyone
+            // had ever walked. Every lookup missed, every wear read
+            // nought, and the paint had nothing to paint: the trails
+            // went out the day the world became round, which is exactly
+            // where Brett placed it.
+            //
+            // Unbent, a vertex answers in the flat frame the wear map is
+            // written in. Same lesson as `wood_known`, the job sites and
+            // `survey_the_walls`: if a thing is being compared to the
+            // simulation, it must be in the simulation's own coordinates.
+            let flat = crate::globe::unbend(Vec3::new(position[0], position[1], position[2]));
+            let (x, z) = (flat.x, flat.z);
             let wear = trails.wear_near(x, z);
             // The alpha channel is a private ledger: 1.0 means untouched
             // ground, anything less means we painted it. Opaque terrain
@@ -249,6 +282,10 @@ fn paint(
             // darkens into a true road within a working morning, and even
             // a hard road never fully loses the ground tone underneath.
             let blend = ((wear - 1.2) / 5.0).clamp(0.0, 1.0) * 0.8;
+            if blend > 0.0 {
+                tinted_now += 1;
+                deepest_blend = deepest_blend.max(blend);
+            }
             let base = ground_color_at(&terrain, x, z);
             *color = [
                 base[0] + (dirt.red - base[0]) * blend,
@@ -257,5 +294,10 @@ fn paint(
                 if blend > 0.0 { 0.999 } else { 1.0 },
             ];
         }
+    }
+    if std::env::var("DIVUS_FACTUS_TRAIL_PROBE").is_ok() {
+        info!(
+            "trail probe: {tinted_now} vertices wear dirt, deepest blend {deepest_blend:.2} of 0.80",
+        );
     }
 }
