@@ -375,6 +375,7 @@ impl Plugin for VillagerPlugin {
                         work::smelt,
                         work::dye_cloth,
                         work::famine_watch,
+                        work::the_sacks_hold_what_they_hold,
                         work::settle_field_claims,
                     )
                         .chain(),

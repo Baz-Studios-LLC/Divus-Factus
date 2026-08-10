@@ -1074,6 +1074,13 @@ fn apply(world: &mut World, save: SaveGame) {
         };
         world.flush();
         let kind = b.blueprint.kind;
+        // Read before the commands borrow the world: a loaded plot gets a
+        // fresh grace, since the clock it was last touched by belonged to
+        // another session and a saved town should not open with its
+        // builds already written off as abandoned.
+        let loaded_at = world
+            .get_resource::<crate::calendar::WorldClock>()
+            .map_or(0.0, |clock| clock.elapsed);
         {
             let mut commands = world.commands();
             if b.done {
@@ -1102,6 +1109,7 @@ fn apply(world: &mut World, save: SaveGame) {
                         stage: b.stage,
                         stone_laid: b.stone_laid,
                         timber_footing: b.timber_footing,
+                        last_hand: loaded_at,
                     },
                 ));
             }

@@ -39,64 +39,29 @@ A new tag is a request to Claude, never an invented corpus tag.
 
 ## Current Sermo State
 
-Coverage pass 02 is integrated, human-read, and live. The corpus contains
-2,030 records and all twelve Sermo gates pass. Field capture showed
-event-specific faith stances in a group birth conversation and a wavering
-devotion prayer on the prayer board.
-
-**Batch 03 is open.** The order sheet below is a finished soak's own count of
-moments that went without words or wore their pool thin. It is copied here
-because every play session rewrites `voice-wanted.txt` at exit, and a short
-evening session can overwrite a long soak's data. Trust this table over the
-file if the two disagree.
+**Batch 03 is integrated, human-read, and green.** It added 460 records in four
+files and brought the corpus from 2,030 to 2,490 records:
 
 ```text
-count  tags of the moment (all "worn pool")
- 533   housed muse
- 420   housed married muse
- 339   muse
- 325   muse wavering
- 201   event:delivered saw tell
- 179   chat:followup told wavering
- 175   chat:end
- 169   muse trade:miner
- 167   muse trade:hunter
- 163   reply wavering
- 161   muse trade:gatherer
- 130   married muse
- 116   event:smote saw tell
- 101   reply
-  92   event:flourished saw tell
-  81   muse trade:priest
-  76   doubting muse
-  74   devout muse
-  66   chat:followup devout told
-  65   devout reply
+115  assets/voice/daily_thoughts_depth_03.json
+132  assets/voice/event_depth_03.json
+125  assets/voice/conversation_depth_03.json
+ 88  assets/voice/trade_hunger_depth_03.json
 ```
 
-The full sheet runs to 113 rows; `voice-wanted.txt` at the repo root has the
-tail if you want it.
+The batch follows the completed soak: home and married-home thoughts,
+ordinary and wavering thoughts, delivered/smote/flourished accounts, worn
+conversation endings and story followups, and miner/hunter/gatherer/priest
+thoughts. It also includes a smaller faith-banded hunger section and
+person-throw accounts based on Claude's field report. Throw witnesses react
+from distinct angles, and faith bands disagree about cause rather than merely
+changing tone.
 
-The shape of the demand has changed since the last pass, and the change is
-worth reading. Indoor life is now the loudest thing in the game: `housed muse`
-and `housed married muse` together are nearly a thousand worn picks, because
-villagers sleep in real beds in real houses and the founding couples are
-married from the first morning. A married person thinking at home is the
-single most-needed pool in the corpus.
-
-After that: plain `muse` and `muse wavering` (the everyday thought, which
-wears out simply because it is asked for constantly), birth tellings, the
-`chat:followup` / `chat:end` beats of small talk, and per-trade musing for
-the miner, hunter and gatherer. Hunger has dropped off the top of the sheet
-entirely — the famine that generated the last order sheet was a bug, and it
-is fixed.
-
-For batch 03:
-
-1. Order the work by these counts, highest first.
-2. Prefer several precise combinations over another broad generic pool.
-3. Run every expanded alternation through the full authoring audit.
-4. Human-read the batch before integration, then soak again.
+The standalone full-corpus audit reported zero errors across shape, register,
+subject, slot, exact duplicate, word limit, capitalization, punctuation,
+digits, and the engine's anachronism filter. Claude confirmed the complete
+suite passes: 426 tests, including all twelve Sermo gates. Wait for the next
+clean soak before opening batch 04.
 
 Claude is adding Rust gates for near-duplicate text, impossible tag bundles,
 and thin pools. Until those land, keep reporting your own duplicate, tag,
@@ -124,23 +89,87 @@ locked tags can already describe them:
 
 A correction to the last pass: **the mealtime crowd at a storehouse doorstep
 is a bug, not a scene.** Villagers were standing at a door because a walk to
-the sacks could not finish. It is being fixed. Do not write lines about
+the sacks could not finish. It is fixed now — the walk was being refused
+outright, so they starved in sight of the food. Do not write lines about
 queueing at a door for food.
 
 Do not force any of these facts into lines merely because they are new. Let
 the soak show which emitted combinations are actually thin.
 
-## Notes for ChatGPT (from Claude)
+## Suggestion: Commandments Through Prophets
 
-Field report from today's runs, so the next batch is aimed at what the game
-actually says:
+Brett is designing a way to appoint a prophet and would like divine decrees or
+commandments to pass through that person. This is stronger than issuing rules
+from a menu because the prophet becomes a visible, fallible conduit between
+the player and society.
 
-- Hunger is the loudest register in the game right now, by a wide margin. A
-  village founded deep in the woods lives close to the bone, and `hungry` in
-  all three faith bands is where the corpus is thinnest against demand.
-- `event:thrown of:person` is the god's most-used act and its tellings wear
-  out fastest. Distinct *angles* on one throw beat more synonyms for it: the
-  witness who ran, the one who did not see it land, the one who will not say
-  it out loud, the one who checked on them after.
-- Faith band must do real work in these. A `devout` telling of a throw and a
-  `doubting` one should disagree about what happened, not merely in tone.
+Preserve four distinct layers:
+
+```text
+what the player intended
+what the prophet proclaimed
+how priests interpret it
+what ordinary villagers believe it means
+```
+
+The player might send an exact command, a symbolic vision, an answered prayer,
+or possess the prophet through Avatar and proclaim it directly. A sincere
+prophet may still misunderstand a vision; an ambitious, frightened, or cruel
+one may bend ambiguous words. Avatar can guarantee the spoken wording while
+creating later accusations of fraud, madness, or heresy.
+
+Commandments should create social pressure, not mind control. Faith, regard
+for the prophet, personality, need, and fear determine obedience. Priests
+repeat and interpret decrees in sermons; villagers discuss violations, report
+them through prayer or gossip, plead for mercy, and disagree about punishment.
+Visible divine enforcement makes a decree firm doctrine. Ignoring repeated
+violations makes it ceremonial. Contradicting a commandment through miracles
+forces believers to explain the contradiction.
+
+Succession matters: when a prophet dies, old commandments remain while the
+right to interpret or replace them becomes disputed. Different settlements
+may preserve different versions. A Codex view should show the original decree,
+the public wording, current interpretations, reach, notable obedience and
+violations, enforcement history, and whether it is active, disputed, neglected,
+or repealed.
+
+The player-facing value is a society visibly deciding what its god meant.
+Examples such as "Feed the hungry," "Honor the dead," "Wolves are sacred," or
+"Those struck by the god are guilty" should produce behavior, sermons,
+conflicts, prayers, and remembered consequences rather than a passive modifier.
+
+## Notes for ChatGPT (from Claude, 2026-08-10 evening)
+
+Reading the batch: the throw accounts are the best work in it. "I saw them
+go up. I have no explanation" and a devout teller crediting the god for the
+same event is precisely the disagreement the faith bands are for — the bands
+now change what a witness BELIEVES HAPPENED, not just how they sound about
+it. Keep writing them that way.
+
+**What has changed in the world since your batch, which will move the next
+order sheet:**
+
+- **The famine is over, and it was a bug.** Hunger topped the last sheet
+  because hunters could not finish a hunt at all. Expect hunger tags to keep
+  falling. Do not write more famine lines on the strength of the old sheet.
+- **A larder now has a ceiling**, set by the town's storehouse, granary and
+  smokehouse, and food past it spoils. Villages that used to sit on ten
+  thousand food will sit on a few hundred. Plenty is no longer permanent, and
+  a full larder now takes hands OFF the food trades — so a gatherer's or
+  hunter's thought at a full store is a real moment: their work is done for
+  now and somebody has sent them to the woods or the rock instead.
+- **A town that has everyone housed and stores put by builds a town hall**,
+  and one soul sleeping rough beside a stalled build no longer freezes the
+  whole town's ambition. Civic life — elections, mayors, decrees — becomes
+  reachable in ordinary runs for the first time.
+
+**One request, and it is the biggest gap in the corpus.** `housed muse` and
+`housed married muse` are far and away the thinnest pools against demand —
+nearly a thousand worn picks between them in one soak. That is a person
+indoors, at home, thinking; and if they are married, thinking with somebody
+else in the room. The tags are `housed`, `married`, `night`, `roof`,
+`worn out`. This is the ordinary domestic register and the game has almost
+nothing in it. It does not want drama — it wants the small true business of
+being at home with someone: the floor, the fire, the door that sticks, the
+other person's breathing, what tomorrow needs doing. That pool is where the
+next batch should spend most of its words.

@@ -101,6 +101,100 @@ impl Larder {
     }
 }
 
+/// What a town can keep food in, before its roofs are counted: sacks
+/// stacked in the open beside the banner, and no more than that.
+const SACKS_IN_THE_OPEN: f32 = 90.0;
+
+/// What each roof adds to it. A granary is the big one - it is what a
+/// granary IS - and a smokehouse earns its place by making meat keep.
+const STOREHOUSE_KEEPS: f32 = 120.0;
+const GRANARY_KEEPS: f32 = 300.0;
+const SMOKEHOUSE_KEEPS: f32 = 100.0;
+
+/// Meals a head the sacks will always hold, however small the town's
+/// roofs are. The ceiling must never be the thing that starves a
+/// village - see the standing law that a village thrives by default -
+/// so a growing town's floor rises with its mouths whether or not
+/// anyone has got round to a granary.
+const MEALS_A_HEAD: f32 = 8.0;
+
+/// How much food this town can keep from spoiling.
+///
+/// There was no such number for a long time and the stockpile was a pair
+/// of unbounded floats: a village of twenty-two sat on ten thousand food
+/// and went on gathering, because nothing ever told a gatherer to stop.
+/// Brett: "that food is ridiculous, lol maybe we should curb that too."
+///
+/// It also gives the storehouse and the granary an actual job. They were
+/// civic ambition that held nothing; now a town that wants a deeper
+/// larder has to build one.
+pub fn larder_ceiling(mouths: usize, storehouse: bool, granary: bool, smokehouse: bool) -> f32 {
+    let roofed = SACKS_IN_THE_OPEN
+        + if storehouse { STOREHOUSE_KEEPS } else { 0.0 }
+        + if granary { GRANARY_KEEPS } else { 0.0 }
+        + if smokehouse { SMOKEHOUSE_KEEPS } else { 0.0 };
+    roofed.max(mouths as f32 * MEALS_A_HEAD)
+}
+
+/// Food past what the town can keep goes bad, kind by kind.
+///
+/// Trimmed here rather than refused at every place food enters, because
+/// food enters from a dozen places - a haul, a kill, a bake, a miracle -
+/// and one honest ceiling beats a dozen doorkeepers who might disagree.
+pub(crate) fn the_sacks_hold_what_they_hold(
+    time: Res<Time>,
+    mut since: Local<f32>,
+    mut notices: MessageWriter<crate::ui::Notice>,
+    buildings: Query<(&Building, &crate::villager::MemberOf)>,
+    folk: Query<&crate::villager::MemberOf, (With<Villager>, Without<Corpse>)>,
+    mut towns: Query<(Entity, &crate::villager::Settlement, &mut Stockpile)>,
+) {
+    *since += time.delta_secs();
+    if *since < 10.0 {
+        return;
+    }
+    *since = 0.0;
+    for (town, settlement, mut store) in &mut towns {
+        let has = |kind: BuildingKind| {
+            buildings
+                .iter()
+                .any(|(b, member)| b.kind == kind && member.0 == town)
+        };
+        let mouths = folk.iter().filter(|member| member.0 == town).count();
+        let ceiling = larder_ceiling(
+            mouths,
+            has(BuildingKind::Storehouse),
+            has(BuildingKind::Granary),
+            has(BuildingKind::Smokehouse),
+        );
+        let held = store.food();
+        if held <= ceiling {
+            continue;
+        }
+        // Everything spoils together, in proportion, so a larder does not
+        // quietly turn into nothing but bread.
+        let keep = ceiling / held;
+        store.larder.berries *= keep;
+        store.larder.fish *= keep;
+        store.larder.meat *= keep;
+        store.larder.grain *= keep;
+        store.larder.bread *= keep;
+        let lost = held - ceiling;
+        // Only worth saying when it is worth hearing: a town living at
+        // its ceiling would otherwise nag every ten seconds.
+        if lost > ceiling * 0.08 {
+            info!(
+                "{} let {lost:.0} food spoil: the town can keep {ceiling:.0} and had {held:.0}",
+                settlement.name
+            );
+            notices.write(crate::ui::Notice::new(format!(
+                "Food spoiled in {} for want of somewhere to keep it",
+                settlement.name
+            )));
+        }
+    }
+}
+
 /// The last kind of food a villager ate: sameness dulls, variety cheers.
 #[derive(Component)]
 pub struct LastMeal(pub FoodKind);
@@ -1108,6 +1202,35 @@ mod tests {
             ))
             .id();
         (app, town)
+    }
+
+    /// The ceiling curbs plenty and can never cause a famine.
+    ///
+    /// Brett, looking at ten thousand food for twenty-two people: "that
+    /// food is ridiculous, lol maybe we should curb that too." It is a
+    /// curb on hoarding, not a ration: whatever the town has built, the
+    /// sacks always hold several days' meals a head, because a village
+    /// starving on account of its own storage rules would be the exact
+    /// bug this project keeps promising never to write again.
+    #[test]
+    fn the_larder_ceiling_curbs_plenty_without_causing_famine() {
+        let bare = larder_ceiling(10, false, false, false);
+        assert!(bare >= 10.0 * 4.0, "a hamlet keeps days of meals: {bare}");
+        // Building for it earns a deeper larder.
+        let stored = larder_ceiling(10, true, false, false);
+        let full = larder_ceiling(10, true, true, true);
+        assert!(stored > bare, "a storehouse keeps more than open sacks");
+        assert!(full > stored, "a granary and smokehouse keep more again");
+        // And a big town is never rationed by the ceiling: mouths raise
+        // the floor whether or not anyone has built anything.
+        let crowd = larder_ceiling(90, false, false, false);
+        assert!(
+            crowd >= 90.0 * 4.0,
+            "ninety souls must be able to keep days of food: {crowd}",
+        );
+        // But plenty is still finite - the number Brett was looking at is
+        // out of reach for any town of that size.
+        assert!(full < 1000.0, "hoarding stays curbed: {full}");
     }
 
     /// An empty larder turns away the peckish, never the starving.

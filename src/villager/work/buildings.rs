@@ -292,7 +292,12 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
             // between them is what puts a watch on the treeline.
             Shrine => needs.believers as f32 * 0.12 + needs.betrothed as f32 * 0.5,
             Watchtower => needs.peril * 0.4,
-            TownHall => (needs.population as f32 - 16.0) / 8.0,
+            // Measured from below its own minimum, so the number that
+            // says when a town has earned a hall is the number that
+            // gives it one. From sixteen, an eighteen-soul town scored a
+            // quarter against a floor of nearly a half, and the ladder
+            // quietly meant twenty while the ledger said eighteen.
+            TownHall => (needs.population as f32 - 14.0) / 8.0,
             House | Longhouse => 0.0,
         };
         if score > best.map_or(0.0, |(b, _)| b) {
@@ -765,7 +770,23 @@ pub struct ConstructionSite {
     /// fire comes to the world, the homes that will fear it most.
     #[serde(default)]
     pub timber_footing: bool,
+    /// When a hand last laid anything into this plot, on the world clock.
+    ///
+    /// A build that nobody has touched in a long while is a build the
+    /// village has quietly given up on, and the planner must be able to
+    /// tell that from one that is simply slow. Brett's town of twenty-two
+    /// had a longhouse at nought of twelve timber with fourteen hundred
+    /// timber in the store, and because one soul was roofless behind it
+    /// the whole civic ladder went unread for days: no town hall, no
+    /// tavern, nothing.
+    #[serde(default)]
+    pub last_hand: f64,
 }
+
+/// How long a plot may go untouched before the town stops waiting on it
+/// and gets on with the rest of its ambitions. Long enough that a slow
+/// build with one carpenter on it is never mistaken for an abandoned one.
+const A_BUILD_GONE_QUIET: f64 = 240.0;
 
 impl ConstructionSite {
     /// Stone this build's foundation expects before walls may rise.
@@ -3018,6 +3039,38 @@ pub(crate) fn plan_houses(
     // that wants masonry.
     let rock_near = find_ground_in(&terrain, site.centre, &mut rng.0, 200, minable).is_some();
 
+    // What the town would build if it were free to want something. Held
+    // as a closure because two branches ask it now: the ordinary one,
+    // where everybody is housed, and the one where somebody is not but
+    // the roof meant for them has not been touched in a long while.
+    let civic_ladder = || {
+        let needs = CivicNeeds {
+            population,
+            stone: store_now.stone,
+            timber_stored: store_now.timber,
+            stone_stored: store_now.stone,
+            food_stored: store_now.food(),
+            avg_spirits: spirits_sum / population.max(1) as f32,
+            homeless: roofless_adults,
+            hurt,
+            believers,
+            fishers,
+            farmers,
+            foresters,
+            fields: fields.iter().count(),
+            peril,
+            betrothed,
+            pending_builds: pending
+                .iter()
+                .filter(|(_, _, member)| member.0 == settlement)
+                .count(),
+            shore_near,
+            miners,
+            rock_near,
+        };
+        next_civic(&needs, has_kind)
+    };
+
     // A person needs a house, so a house gets built: ground breaks because
     // roofless people exist, not because a formula says the town is due.
     // Only when everyone sleeps under a roof does the village have the
@@ -3127,49 +3180,45 @@ pub(crate) fn plan_houses(
         // A roof is already rising for them - say so, with arithmetic,
         // so a stalled build is a visible fact instead of a silent
         // population ceiling.
-        if let Some((plan, cs, _)) = pending.iter().find(|(b, _, member)| {
-            member.0 == settlement
-                && matches!(b.kind, BuildingKind::House | BuildingKind::Longhouse)
-        }) {
-            info!(
-                "housing watch: {} roofless ({} want family rooms, {} want longhouse beds); {} stands at {:.0} of {:.0} timber, {:.0} of {:.0} footing stone",
-                roofless_adults,
-                family_souls,
-                single_souls,
-                plan.kind.name().to_lowercase(),
-                cs.progress,
-                plan.kind.timber_cost(),
-                cs.stone_laid,
-                cs.footing_stone(plan.kind),
-            );
+        //
+        // And a roof standing half-raised must not hold the whole town's
+        // ambition hostage. Brett, at twenty-two souls: "my current run
+        // is at 22 people and no town hall has been built." One person
+        // was roofless while a longhouse stood at nought of twelve
+        // timber with fourteen hundred in the store, and this branch
+        // returned every time it ran - so the civic ladder had not been
+        // reached in days. Shelter still comes first while shelter is
+        // actually being made; a build that has not moved is a different
+        // problem, and the town gets on with the rest of its life.
+        let stalled = pending
+            .iter()
+            .find(|(b, _, member)| {
+                member.0 == settlement
+                    && matches!(b.kind, BuildingKind::House | BuildingKind::Longhouse)
+            })
+            .inspect(|(plan, cs, _)| {
+                info!(
+                    "housing watch: {} roofless ({} want family rooms, {} want longhouse beds); {} stands at {:.0} of {:.0} timber, {:.0} of {:.0} footing stone",
+                    roofless_adults,
+                    family_souls,
+                    single_souls,
+                    plan.kind.name().to_lowercase(),
+                    cs.progress,
+                    plan.kind.timber_cost(),
+                    cs.stone_laid,
+                    cs.footing_stone(plan.kind),
+                );
+            })
+            .is_some_and(|(_, cs, _)| clock.elapsed - cs.last_hand > A_BUILD_GONE_QUIET);
+        if !stalled {
+            return;
         }
-        return;
+        match civic_ladder() {
+            Some(kind) => kind,
+            None => return,
+        }
     } else {
-        let needs = CivicNeeds {
-            population,
-            stone: store_now.stone,
-            timber_stored: store_now.timber,
-            stone_stored: store_now.stone,
-            food_stored: store_now.food(),
-            avg_spirits: spirits_sum / population.max(1) as f32,
-            homeless: roofless_adults,
-            hurt,
-            believers,
-            fishers,
-            farmers,
-            foresters,
-            fields: fields.iter().count(),
-            peril,
-            betrothed,
-            pending_builds: pending
-                .iter()
-                .filter(|(_, _, member)| member.0 == settlement)
-                .count(),
-            shore_near,
-            miners,
-            rock_near,
-        };
-        match next_civic(&needs, has_kind) {
+        match civic_ladder() {
             Some(kind) => kind,
             None => return,
         }
@@ -3561,6 +3610,9 @@ pub(crate) fn plan_houses(
                 crate::globe::RigidlySeated,
                 ConstructionSite {
                     timber_footing,
+                    // Ground broken counts as a hand laid on it: a plot
+                    // is not abandoned the second it is measured out.
+                    last_hand: clock.elapsed,
                     ..default()
                 },
                 crate::villager::MemberOf(site.settlement),

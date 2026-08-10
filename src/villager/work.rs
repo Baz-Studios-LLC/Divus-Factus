@@ -1204,6 +1204,7 @@ pub(super) fn do_work(
                 continue;
             };
             construction.progress += 1.0;
+            construction.last_hand = clock.elapsed;
             // Stages land at thirds of the build, whatever the kind's cost.
             let cost = plan.kind.timber_cost();
             let target_stage = stage_for(construction.progress, cost, steps_for(plan));
@@ -1392,6 +1393,7 @@ pub(super) fn do_work(
             commands.entity(entity).remove::<CarryingStone>();
             shed_wood(&mut commands, entity, &children, &loads);
             construction.stone_laid += 1.0;
+            construction.last_hand = clock.elapsed;
             // The block lands where it was laid: courses appear around the
             // perimeter, corners first - but only for buildings raised by
             // the village's own hand. A carried-in drawing builds NOTHING
@@ -2189,6 +2191,60 @@ mod tests {
             ..coastal
         };
         assert_ne!(next_civic(&inland, none), Some(BuildingKind::Dock));
+    }
+
+    /// A town of twenty-two with its works already up builds the hall.
+    ///
+    /// Brett's own run, to the number: "my current run is at 22 people and
+    /// no town hall has been built." Ten civic buildings standing, fourteen
+    /// stone in the pile, and the ladder had never once been asked - one
+    /// soul was sleeping rough behind a longhouse that had not been touched
+    /// in days, and the planner returned at that branch every time it ran.
+    /// The ladder itself was always willing, which is what this pins.
+    #[test]
+    fn a_town_of_twenty_two_wants_its_hall() {
+        let built = [
+            BuildingKind::Well,
+            BuildingKind::Dock,
+            BuildingKind::Storehouse,
+            BuildingKind::Sawmill,
+            BuildingKind::Granary,
+            BuildingKind::Blacksmith,
+            BuildingKind::Mill,
+            BuildingKind::Bakery,
+            BuildingKind::Herbalist,
+            BuildingKind::Shrine,
+        ];
+        let grown = CivicNeeds {
+            population: 22,
+            stone: 14.0,
+            stone_stored: 14.0,
+            timber_stored: 1469.0,
+            food_stored: 300.0,
+            avg_spirits: 0.8,
+            ..Default::default()
+        };
+        assert_eq!(
+            next_civic(&grown, |k| built.contains(&k)),
+            Some(BuildingKind::TownHall),
+        );
+
+        // Eighteen is the stated price of a hall, so eighteen buys one.
+        let just_enough = CivicNeeds {
+            population: 18,
+            ..grown
+        };
+        assert_eq!(
+            next_civic(&just_enough, |k| built.contains(&k)),
+            Some(BuildingKind::TownHall),
+        );
+
+        // Seventeen does not.
+        let hamlet = CivicNeeds {
+            population: 17,
+            ..grown
+        };
+        assert_eq!(next_civic(&hamlet, |k| built.contains(&k)), None);
     }
 
     #[test]

@@ -357,6 +357,21 @@ pub(crate) fn morning_muster(
     // pantry for eight and a rounding error for twenty-four.
     let floor = (mouths as f32 * 1.2).max(12.0);
     let hungry = ((floor - food) / floor).clamp(0.0, 1.0);
+    // And its ceiling is what the town's roofs can keep. Brett, at ten
+    // thousand food: "when the food reserves get too high people should
+    // stop wanting to be hunters, farmers and fishers and gatherers."
+    // They wind down from three quarters full rather than stopping dead,
+    // so a village eases off the bushes instead of downing baskets on one
+    // berry - and the hands freed go to the stone and timber the town is
+    // actually short of.
+    let ceiling = crate::villager::work::stores::larder_ceiling(
+        mouths,
+        has(BuildingKind::Storehouse),
+        has(BuildingKind::Granary),
+        has(BuildingKind::Smokehouse),
+    );
+    let put_by = (((food / ceiling.max(1.0)) - 0.75) / 0.25).clamp(0.0, 1.0);
+    let still_wanted = 1.0 - put_by;
 
     // Whether any fellable tree stands on ground the village knows. When
     // none does, more foresters are useless - someone has to go find woods.
@@ -507,7 +522,7 @@ pub(crate) fn morning_muster(
     // What the village wants, counted in hands. A want of zero is a trade
     // nobody takes up - which is the whole point: a farmer is somebody who
     // has a field, not somebody who once rolled a plough.
-    let food_hands = mouths as f32 * (0.2 + 0.4 * hungry);
+    let food_hands = mouths as f32 * (0.2 + 0.4 * hungry) * still_wanted;
     let mut wanted: Vec<(Vocation, f32)> = vec![
         (Vocation::Gatherer, food_hands * gather_share),
         (Vocation::Fisher, food_hands * fish_share),
@@ -528,7 +543,7 @@ pub(crate) fn morning_muster(
         // six in a forest, holding tools for work that was not there.
         (
             Vocation::Farmer,
-            plots.min(4.0).max(if wild_food { 0.0 } else { 2.0 }),
+            plots.min(4.0).max(if wild_food { 0.0 } else { 2.0 }) * still_wanted,
         ),
         // Wood: for the fire, for every build, and for the pile that has
         // to exist before a carpenter has anything to carry.
@@ -618,6 +633,10 @@ pub(crate) fn morning_muster(
         berries_near as u8 as f32,
         game_near as u8 as f32,
         plots,
+        // A larder crossing its ceiling changes every food trade's want,
+        // so the muster has to notice the day it happens - and the day a
+        // new granary raises the ceiling back over it.
+        (put_by * 8.0) as u64 as f32,
         guards,
         hurt.iter().filter(|(v, ..)| v.harm > 0.15).count().min(3) as f32,
         has(BuildingKind::Tavern) as u8 as f32,
@@ -660,6 +679,16 @@ pub(crate) fn morning_muster(
     .filter(|v| *v != Vocation::Gatherer || berries_near)
     .filter(|v| *v != Vocation::Hunter || game_near)
     .filter(|v| *v != Vocation::Farmer || !wild_food)
+    // And none of the food trades at all once the sacks are full: a
+    // spare pair of hands at a full larder belongs in the woods or at
+    // the rock, which is what the town is actually short of.
+    .filter(|v| {
+        still_wanted > 0.0
+            || !matches!(
+                v,
+                Vocation::Gatherer | Vocation::Hunter | Vocation::Fisher | Vocation::Farmer
+            )
+    })
     .collect();
 
     // Dealt in a fixed order so a re-run of the same world musters the
@@ -706,7 +735,9 @@ pub(crate) fn morning_muster(
                     // the ground over. A basket was the old answer, and
                     // in a wood with no berries it was an answer that
                     // fed nobody.
-                    .or(Some(if wild_food {
+                    .or(Some(if still_wanted <= 0.0 {
+                        Vocation::Forester
+                    } else if wild_food {
                         Vocation::Gatherer
                     } else {
                         Vocation::Farmer
