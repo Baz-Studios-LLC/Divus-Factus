@@ -721,8 +721,11 @@ fn keep_the_prayer_shelf(
                 Node {
                     width: percent(100),
                     flex_direction: FlexDirection::Column,
-                    row_gap: px(2),
-                    padding: UiRect::axes(px(9), px(6)),
+                    // Room to breathe: the words used to press against the
+                    // border. Brett: "prayer cards need some padding to
+                    // make them look more polished."
+                    row_gap: px(6),
+                    padding: UiRect::axes(px(14), px(11)),
                     border: UiRect::all(px(2)),
                     border_radius: BorderRadius::all(px(8)),
                     ..default()
