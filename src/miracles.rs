@@ -71,6 +71,7 @@ pub struct MiraclesPlugin;
 
 impl Plugin for MiraclesPlugin {
     fn build(&self, app: &mut App) {
+        app.add_plugins(bevy::ui_render::prelude::UiMaterialPlugin::<CooldownSweep>::default());
         app.init_resource::<SelectedMiracle>()
             .init_resource::<Hotbar>()
             .init_resource::<Grimoire>()
@@ -570,9 +571,31 @@ pub struct MiracleCard(pub Miracle);
 #[derive(Component)]
 struct SlotArt;
 
-/// The dark sweep rising over a slot while its miracle rests.
+/// The dark sweep over a resting slot: a radial wipe, WoW's own grammar,
+/// drawn by a tiny UI material whose wedge closes as the days pass.
 #[derive(Component)]
 struct CooldownShade(usize);
+
+/// The sweep's cloth: how much rest remains (the wedge), and its shade.
+#[derive(
+    bevy::asset::Asset,
+    bevy::reflect::TypePath,
+    bevy::render::render_resource::AsBindGroup,
+    Debug,
+    Clone,
+)]
+pub struct CooldownSweep {
+    #[uniform(0)]
+    pub remaining: f32,
+    #[uniform(0)]
+    pub shade: LinearRgba,
+}
+
+impl bevy::ui_render::prelude::UiMaterial for CooldownSweep {
+    fn fragment_shader() -> bevy::shader::ShaderRef {
+        "shaders/cooldown_sweep.wgsl".into()
+    }
+}
 
 /// The remaining-time word under the sweep.
 #[derive(Component)]
@@ -596,7 +619,7 @@ struct BeliefReadout;
 #[derive(Component)]
 struct BeliefFill;
 
-fn spawn_hotbar(mut commands: Commands) {
+fn spawn_hotbar(mut commands: Commands, mut sweeps: ResMut<Assets<CooldownSweep>>) {
     // The strip sits flush with the screen's foot; the column carries the
     // visual margin as PADDING instead, so the whole apron around the bar -
     // sides, top, and the gap beneath - still reads as interface and the
@@ -667,7 +690,15 @@ fn spawn_hotbar(mut commands: Commands) {
             ChildOf(meter),
         ))
         .id();
-    commands.spawn((BeliefReadout, ui::dim("BELIEF 0"), ChildOf(label_row)));
+    let readout = commands
+        .spawn((BeliefReadout, ui::dim("BELIEF 0"), ChildOf(label_row)))
+        .id();
+    commands
+        .entity(readout)
+        .insert(TextColor(crate::palette::shade(
+            &crate::palette::BONE,
+            0.97,
+        )));
     let bar = commands
         .spawn((
             Name::new("Miracle Hotbar"),
@@ -690,13 +721,17 @@ fn spawn_hotbar(mut commands: Commands) {
     // Ten slots, bare. What sits in each is the Hotbar resource's business,
     // and `dress_the_bar` draws it — the frames here are furniture. Brett:
     // "I want the bar to be 10 buttons wide."
-    raise_bar_slots(&mut commands, bar);
+    raise_bar_slots(&mut commands, &mut sweeps, bar);
 }
 
 /// Raises the bar's ten slots under `bar`: frames, key caps, cooldown
 /// sweeps. The HUD's apron and the spellbook's mirror both call this, so
 /// the two bars can never drift apart in anatomy.
-pub(crate) fn raise_bar_slots(commands: &mut Commands, bar: Entity) {
+pub(crate) fn raise_bar_slots(
+    commands: &mut Commands,
+    sweeps: &mut Assets<CooldownSweep>,
+    bar: Entity,
+) {
     for index in 0..10 {
         let slot = commands
             .spawn((
@@ -733,18 +768,22 @@ pub(crate) fn raise_bar_slots(commands: &mut Commands, bar: Entity) {
             .id();
         commands.entity(number).insert(ChildOf(slot));
 
-        // The rest sweep: a dark tide that drains as the days pass.
+        // The rest sweep: a radial shade whose wedge closes clockwise
+        // as the days pass, the way every action bar since WoW says it.
         commands.spawn((
             CooldownShade(index),
+            bevy::ui_render::prelude::MaterialNode(sweeps.add(CooldownSweep {
+                remaining: 0.0,
+                shade: LinearRgba::new(0.0, 0.0, 0.0, 0.62),
+            })),
             Node {
                 position_type: PositionType::Absolute,
                 left: px(0),
                 right: px(0),
+                top: px(0),
                 bottom: px(0),
-                height: percent(0),
                 ..default()
             },
-            BackgroundColor(Color::BLACK.with_alpha(0.62)),
             ChildOf(slot),
         ));
         // And the word for how long: "2d", "14h".
@@ -810,7 +849,15 @@ pub(crate) fn raise_belief_meter(commands: &mut Commands, parent: Entity) {
             ChildOf(meter),
         ))
         .id();
-    commands.spawn((BeliefReadout, ui::dim("BELIEF 0"), ChildOf(label_row)));
+    let readout = commands
+        .spawn((BeliefReadout, ui::dim("BELIEF 0"), ChildOf(label_row)))
+        .id();
+    commands
+        .entity(readout)
+        .insert(TextColor(crate::palette::shade(
+            &crate::palette::BONE,
+            0.97,
+        )));
 }
 
 /// Draws a miracle's face into a slot: the node-built icon, tagged as art
@@ -972,17 +1019,23 @@ fn miracle_face(commands: &mut Commands, slot: Entity, miracle: Miracle, tag_as_
         }
         // A dark drop, spreading rings.
         Miracle::PlagueOfDoubt => {
-            let ash = crate::palette::shade(&crate::palette::CLOTH_SABLE, 0.6);
-            art(commands, block(18.0, 16.0, 6.0, 6.0, 4.0), ash);
+            // Fear rippling from a pale heart, in the dread school's own
+            // red - the old sable-on-dark mark was a shadow on shadow.
+            let dread = crate::palette::shade(&crate::palette::CLOTH_RED, 0.6);
             art(
                 commands,
-                block(13.0, 11.0, 16.0, 2.0, 2.0),
-                ash.with_alpha(0.5),
+                block(18.0, 16.0, 6.0, 6.0, 4.0),
+                crate::palette::shade(&crate::palette::BONE, 0.82),
             );
             art(
                 commands,
-                block(13.0, 27.0, 16.0, 2.0, 2.0),
-                ash.with_alpha(0.5),
+                block(13.0, 11.0, 16.0, 2.5, 2.0),
+                dread.with_alpha(0.95),
+            );
+            art(
+                commands,
+                block(13.0, 27.0, 16.0, 2.5, 2.0),
+                dread.with_alpha(0.95),
             );
         }
         // The stone, and the streak it fell by.
@@ -2248,16 +2301,14 @@ fn update_belief_meter(
         .filter(|(_, rung)| *rung > grimoire.high_water)
         .min_by(|a, b| a.1.total_cmp(&b.1));
 
+    // The number alone, in plain ink: the fill still climbs toward the
+    // next rung, and the spellbook names what waits there. Brett: "it
+    // doesn't need to say the next unlock on it."
     for mut text in &mut readout {
-        text.0 = match next_rung {
-            Some((miracle, rung)) => format!(
-                "BELIEF {:.0} - {} AT {:.0}",
-                belief.total,
-                miracle.name().to_uppercase(),
-                rung
-            ),
-            None => format!("BELIEF {:.0}", belief.total),
-        };
+        let fresh = format!("BELIEF {:.0}", belief.total);
+        if text.0 != fresh {
+            text.0 = fresh;
+        }
     }
     let fraction = match next_rung {
         Some((_, rung)) if rung > 0.0 => (belief.total / rung).clamp(0.0, 1.0),
@@ -2344,7 +2395,14 @@ fn cooldown_faces(
     clock: Res<crate::calendar::WorldClock>,
     hotbar: Res<Hotbar>,
     cooldowns: Res<Cooldowns>,
-    mut shades: Query<(&CooldownShade, &mut Node), Without<CooldownLabel>>,
+    mut sweeps: ResMut<Assets<CooldownSweep>>,
+    shades: Query<
+        (
+            &CooldownShade,
+            &bevy::ui_render::prelude::MaterialNode<CooldownSweep>,
+        ),
+        Without<CooldownLabel>,
+    >,
     mut labels: Query<(&CooldownLabel, &mut Text)>,
 ) {
     let fraction = |index: usize| -> (f32, f64) {
@@ -2360,9 +2418,17 @@ fn cooldown_faces(
             }
         })
     };
-    for (shade, mut node) in &mut shades {
+    for (shade, cloth) in &shades {
         let (tide, _) = fraction(shade.0);
-        node.height = percent(tide * 100.0);
+        // Touch the asset only when the wedge moves: get_mut marks it
+        // for re-upload, and an untouched sweep costs nothing.
+        if sweeps
+            .get(&cloth.0)
+            .is_some_and(|sweep| sweep.remaining != tide)
+            && let Some(mut sweep) = sweeps.get_mut(&cloth.0)
+        {
+            sweep.remaining = tide;
+        }
     }
     for (label, mut text) in &mut labels {
         let (_, left) = fraction(label.0);

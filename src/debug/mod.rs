@@ -363,6 +363,7 @@ mod tests {
         use bevy::ecs::system::RunSystemOnce;
         let mut app = bevy::app::App::new();
         app.init_resource::<Assets<Image>>();
+        app.init_resource::<Assets<crate::miracles::CooldownSweep>>();
         app.init_resource::<Assets<Mesh>>();
         app.init_resource::<Assets<StandardMaterial>>();
         app.init_resource::<crate::villager::WorldChronicle>();

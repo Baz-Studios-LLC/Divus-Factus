@@ -56,7 +56,11 @@ pub(crate) fn place_from_the_book(
     }
 }
 
-pub(crate) fn spawn_spellbook_page(mut commands: Commands, codex: Res<super::village::Codex>) {
+pub(crate) fn spawn_spellbook_page(
+    mut commands: Commands,
+    codex: Res<super::village::Codex>,
+    mut sweeps: ResMut<Assets<crate::miracles::CooldownSweep>>,
+) {
     let page = codex.miracles_page;
     commands
         .entity(page)
@@ -107,7 +111,7 @@ pub(crate) fn spawn_spellbook_page(mut commands: Commands, codex: Res<super::vil
             ChildOf(head),
         ))
         .id();
-    crate::miracles::raise_bar_slots(&mut commands, bar);
+    crate::miracles::raise_bar_slots(&mut commands, &mut sweeps, bar);
     commands.spawn((
         ui::dim("press a miracle for the first empty slot - or drag it onto the bar"),
         ChildOf(head),
