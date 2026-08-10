@@ -1807,8 +1807,10 @@ pub(crate) fn update_prayer_board(
                 });
 
             // The head: the TRUE portrait in a frame of their trade's own
-            // colour, the name beside it, hope in the corner. The studio's
-            // stand-in bust holds the frame until their sitting comes up.
+            // colour, the name beside it, hope in the corner - ruled off
+            // beneath, so the header reads apart from the asking. The
+            // studio's stand-in bust holds the frame until their sitting
+            // comes up.
             let head = commands
                 .spawn((
                     Node {
@@ -1816,8 +1818,11 @@ pub(crate) fn update_prayer_board(
                         flex_direction: FlexDirection::Row,
                         align_items: AlignItems::Center,
                         column_gap: px(8),
+                        padding: UiRect::bottom(px(7)),
+                        border: UiRect::bottom(px(1)),
                         ..default()
                     },
+                    BorderColor::all(pink.with_alpha(0.3)),
                     ChildOf(card),
                 ))
                 .id();

@@ -742,6 +742,9 @@ fn keep_the_prayer_shelf(
             .map(|trade| crate::villager::attire::livery(*trade).cloth)
             .map(|tone| crate::palette::color_at(tone.palette_index()))
             .unwrap_or(pink);
+        // Ruled off beneath the face and the name, so the header reads
+        // apart from the words. Brett: "can we get a divider line under
+        // the portrait and name on the card?"
         let head = commands
             .spawn((
                 Node {
@@ -749,8 +752,11 @@ fn keep_the_prayer_shelf(
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
                     column_gap: px(8),
+                    padding: UiRect::bottom(px(8)),
+                    border: UiRect::bottom(px(1)),
                     ..default()
                 },
+                BorderColor::all(pink.with_alpha(0.3)),
                 ChildOf(card),
             ))
             .id();
