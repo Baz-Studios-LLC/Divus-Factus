@@ -2448,6 +2448,14 @@ pub(crate) fn spawn_frost_glass(mut commands: Commands, mut images: ResMut<Asset
             ..default()
         },
         bevy::camera::RenderTarget::Image(glass.clone().into()),
+        // The glass wears the god camera's own look - HDR, the same
+        // tonemapper, the depth prepass the water reads - or its noon
+        // comes out as someone else's dusk. The grading is mirrored live
+        // in frost_glass_follows, since F8/F9 can retune it mid-game.
+        bevy::camera::Hdr,
+        bevy::core_pipeline::tonemapping::Tonemapping::TonyMcMapface,
+        bevy::core_pipeline::prepass::DepthPrepass,
+        bevy::render::view::ColorGrading::default(),
         // At 270 rows this small blur is a huge one on the stretched
         // glass, for a few dozen taps per tiny pixel.
         bevy::post_process::dof::DepthOfField {
@@ -2493,12 +2501,19 @@ pub(crate) fn frost_the_world(
     mut frost: Query<&mut Camera, With<FrostCamera>>,
     mut panes: Query<&mut Node, With<FrostPane>>,
 ) {
-    let reading = books.iter().any(|v| *v != Visibility::Hidden);
+    // DIVUS_FACTUS_FROST forces the glass on from boot, so the frost can
+    // be photographed and judged without a hand to open the book.
+    //
+    // The god camera keeps rendering the world UNDER the pane while the
+    // book is open. Its layers must never be stripped: the streamer and
+    // every other camera-keyed governor follow what the window's camera
+    // sees, and blinding it unloaded the world out from under the frost
+    // camera too — the glass showed nothing but clouds over the void.
+    let reading = books.iter().any(|v| *v != Visibility::Hidden)
+        || std::env::var("DIVUS_FACTUS_FROST").is_ok();
     for (camera, frosted) in &gods {
         if reading && !frosted {
-            commands
-                .entity(camera)
-                .insert((Frosted, bevy::camera::visibility::RenderLayers::none()));
+            commands.entity(camera).insert(Frosted);
             for mut lens in &mut frost {
                 lens.is_active = true;
             }
@@ -2506,12 +2521,7 @@ pub(crate) fn frost_the_world(
                 pane.display = Display::Flex;
             }
         } else if !reading && frosted {
-            commands.entity(camera).remove::<Frosted>().insert(
-                bevy::camera::visibility::RenderLayers::from_layers(&[
-                    0,
-                    crate::globe::GLOBE_LAYER,
-                ]),
-            );
+            commands.entity(camera).remove::<Frosted>();
             for mut lens in &mut frost {
                 lens.is_active = false;
             }
@@ -2522,27 +2532,48 @@ pub(crate) fn frost_the_world(
     }
 }
 
-/// The frost camera stands exactly where the god stands, wearing the same
-/// lens, so the glass shows the very view the reader stepped away from.
+/// The frost camera RIDES the god camera: adopted as its child with an
+/// identity transform, so propagation itself guarantees the two share an
+/// eye every frame. A hand-rolled position sync froze mid-flight once —
+/// the glass stared at the sea floor from under the world while the god
+/// flew on — and a child cannot be left behind. The lens is still copied
+/// by hand: projections do not inherit.
 pub(crate) fn frost_glass_follows(
+    mut commands: Commands,
     gods: Query<
-        (&GlobalTransform, &Projection),
+        (
+            Entity,
+            &Projection,
+            Option<&bevy::render::view::ColorGrading>,
+        ),
         (With<crate::camera::GodCamera>, Without<FrostCamera>),
     >,
     mut frost: Query<
-        (&mut Transform, &mut Projection, &Camera),
+        (
+            Entity,
+            &mut Projection,
+            Option<&mut bevy::render::view::ColorGrading>,
+            Has<ChildOf>,
+        ),
         (With<FrostCamera>, Without<crate::camera::GodCamera>),
     >,
 ) {
-    let Ok((eye, lens)) = gods.single() else {
+    let Ok((god, lens, grading)) = gods.single() else {
         return;
     };
-    for (mut at, mut glass_lens, camera) in &mut frost {
-        if !camera.is_active {
-            continue;
+    for (glass, mut glass_lens, glass_grading, adopted) in &mut frost {
+        if !adopted {
+            commands
+                .entity(glass)
+                .insert((ChildOf(god), Transform::IDENTITY));
         }
-        *at = eye.compute_transform();
         *glass_lens = lens.clone();
+        // The god's grading carries the look's exposure and saturation;
+        // the glass wears the same or reads darker than the world it
+        // reflects.
+        if let (Some(grading), Some(mut glass_grading)) = (grading, glass_grading) {
+            *glass_grading = grading.clone();
+        }
     }
 }
 
