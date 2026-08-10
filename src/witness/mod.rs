@@ -86,7 +86,9 @@ fn mortal_events(
     mut deaths: MessageReader<crate::creature::CreatureDied>,
     mut events: MessageWriter<DivineEvent>,
     villagers: Query<(), With<Villager>>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("witness: mortal_events");
     for death in deaths.read() {
         if villagers.get(death.entity).is_err() {
             continue;
@@ -708,7 +710,9 @@ fn perceive_events(
     )>,
     manners: Query<&crate::villager::traits::Traits>,
     mut rng: Option<ResMut<crate::villager::SimRng>>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("witness: perceive_events");
     // Gathers what one entity's threads are, for the kinship question.
     let threads_of = |entity: Entity| -> crate::villager::kin::Threads<'_> {
         let Ok((person, spouse, parents, genome)) = threads.get(entity) else {
@@ -830,7 +834,9 @@ fn perceive_deaths(
             Without<crate::creature::Corpse>,
         ),
     >,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("witness: perceive_deaths");
     for death in deaths.read() {
         // Violent deaths carry further, the way a scream carries further than a sigh.
         let carry = if death.violent { 44.0 } else { 26.0 };
@@ -877,7 +883,9 @@ fn express_reactions(
         ),
         Without<Airborne>,
     >,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("witness: express_reactions");
     let dt = time.delta_secs();
 
     for (entity, mut reaction, transform, mut target, mut route, mut motion, mut activity) in

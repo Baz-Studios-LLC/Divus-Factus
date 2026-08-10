@@ -209,6 +209,70 @@ impl Plugin for VillagerPlugin {
                 )
                     .chain(),
             )
+            // The stopwatch brackets: each big chain banks its span under
+            // DIVUS_FACTUS_TIMINGS=1, so the unwatched column can say which
+            // chain to open instead of shrugging. Every bracket carries BOTH
+            // edges - pinned to the seam between two chains - or the
+            // scheduler runs it at the frame's rim and the span swallows
+            // the whole schedule instead of its own chain.
+            .add_systems(
+                Update,
+                (
+                    crate::debug::timings::open_span("villager: rhythms").before(home::assign_beds),
+                    crate::debug::timings::close_span("villager: rhythms")
+                        .after(explore::raise_cairns),
+                    // The halves, hunting a burst no watch has named: if one
+                    // half fattens alone the beast is a member of it, and if
+                    // both fatten together the beast is a stranger both wait
+                    // on. Retire these once it is caught.
+                    crate::debug::timings::close_span("villager: rhythms, rites half")
+                        .after(rites::burials)
+                        .before(seek_company),
+                    crate::debug::timings::open_span("villager: rhythms, rites half")
+                        .before(home::assign_beds),
+                    crate::debug::timings::open_span("villager: rhythms, roads half")
+                        .after(rites::burials)
+                        .before(seek_company),
+                    crate::debug::timings::close_span("villager: rhythms, roads half")
+                        .after(explore::raise_cairns),
+                    crate::debug::timings::open_span("villager: the body")
+                        .before(accumulate_hunger),
+                    crate::debug::timings::close_span("villager: the body")
+                        .after(choose_activity)
+                        .before(work::assign_vocations),
+                    crate::debug::timings::close_span("villager: the body, ages half")
+                        .after(births)
+                        .before(bereave),
+                    crate::debug::timings::open_span("villager: the body, ages half")
+                        .before(accumulate_hunger),
+                    crate::debug::timings::open_span("villager: the body, talk half")
+                        .after(births)
+                        .before(bereave),
+                    crate::debug::timings::close_span("villager: the body, talk half")
+                        .after(choose_activity)
+                        .before(work::assign_vocations),
+                    crate::debug::timings::open_span("witness: the set")
+                        .before(crate::witness::WitnessSet),
+                    crate::debug::timings::close_span("witness: the set")
+                        .after(crate::witness::WitnessSet),
+                    crate::debug::timings::open_span("villager: the work")
+                        .after(choose_activity)
+                        .before(work::assign_vocations),
+                    crate::debug::timings::close_span("villager: the work")
+                        .after(work::log_stores)
+                        .before(belief::endow_faith),
+                    crate::debug::timings::open_span("villager: the belief")
+                        .after(work::log_stores)
+                        .before(belief::endow_faith),
+                    crate::debug::timings::close_span("villager: the belief")
+                        .after(work::settle_field_claims)
+                        .before(home::assign_homes),
+                    crate::debug::timings::open_span("villager: the homes")
+                        .after(work::settle_field_claims)
+                        .before(home::assign_homes),
+                    crate::debug::timings::close_span("villager: the homes").after(record_history),
+                ),
+            )
             .add_systems(
                 Update,
                 (
@@ -2233,7 +2297,9 @@ fn accumulate_hunger(
         &mut crate::creature::Vitality,
         Option<&Activity>,
     )>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("villager: accumulate_hunger");
     let dt = time.delta_secs();
     let rate = dt / SECONDS_TO_STARVE;
 
@@ -2275,7 +2341,9 @@ fn starvation_watch(
         (&Person, &Needs, &Activity, &Transform),
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("villager: starvation_watch");
     *since += time.delta_secs();
     if *since < 8.0 {
         return;
@@ -2333,7 +2401,9 @@ fn grow_up(
         ),
         Without<crate::creature::Corpse>,
     >,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("villager: grow_up");
     let Some(rng) = rng.as_mut() else {
         return;
     };
@@ -2394,7 +2464,9 @@ fn grow_old(
         ),
         Without<crate::creature::Corpse>,
     >,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("villager: grow_old");
     for (entity, mut genome, mut prime, person, chronicle) in &mut aging {
         prime.remaining -= time.delta_secs();
         if prime.remaining > 0.0 {
@@ -2616,7 +2688,9 @@ fn births(
         ),
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("villager: births");
     *since_last += time.delta_secs();
     if *since_last < BIRTH_INTERVAL {
         return;
@@ -2850,7 +2924,9 @@ fn choose_activity(
         (Entity, &Transform, &FoodSource),
         (With<crate::hand::DivinelyPlaced>, Without<Villager>),
     >,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("villager: choose_activity");
     for (mut activity, needs, transform, target, member) in &mut villagers {
         // Their OWN town's larder. Reading the focused settlement here
         // would gate a colonist's meals — and now their prayers — on how
@@ -3211,6 +3287,7 @@ mod tests {
     #[test]
     fn news_changes_hands_at_a_meeting() {
         let mut app = App::new();
+        app.init_resource::<crate::debug::timings::Timings>();
         app.insert_resource(Time::<()>::default());
         app.init_resource::<crate::calendar::WorldClock>();
         app.insert_resource(SimRng(Rng::new(8)));
@@ -3278,6 +3355,7 @@ mod tests {
         // left to itself comes back frozen. What is gated is the BUBBLE. What
         // must not be gated is any of this.
         let mut app = App::new();
+        app.init_resource::<crate::debug::timings::Timings>();
         app.insert_resource(Time::<()>::default());
         app.init_resource::<crate::calendar::WorldClock>();
         app.insert_resource(SimRng(Rng::new(8)));
@@ -3343,6 +3421,7 @@ mod tests {
     #[test]
     fn children_grow_into_adults_with_rebuilt_bodies() {
         let mut app = App::new();
+        app.init_resource::<crate::debug::timings::Timings>();
         app.add_plugins(bevy::time::TimePlugin);
         app.init_resource::<Assets<Mesh>>();
         app.init_resource::<Assets<StandardMaterial>>();
@@ -3539,6 +3618,7 @@ mod tests {
     /// they have seen.
     fn a_witness(divine: bool) -> App {
         let mut app = App::new();
+        app.init_resource::<crate::debug::timings::Timings>();
         app.insert_resource(crate::calendar::WorldClock::default());
         app.insert_resource(crate::WorldSeed(9));
         app.insert_resource(SettlementCulture {

@@ -42,7 +42,9 @@ pub(crate) fn form_bonds(
     mut hearts: Query<&mut super::regard::Regard>,
     spirits: Query<&Morale>,
     mut stirred: Query<&mut super::Stirrings>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("villager: form_bonds");
     *since_last += time.delta_secs();
     if *since_last < BOND_INTERVAL {
         return;
@@ -350,7 +352,9 @@ pub(crate) fn meet_to_talk(
         Has<super::home::Home>,
     )>,
     weather: Option<Res<crate::weather::Weather>>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("villager: meet_to_talk");
     *since_last += time.delta_secs();
     if *since_last < GOSSIP_INTERVAL {
         return;
@@ -543,7 +547,9 @@ pub(crate) fn hold_conversations(
         Option<&traits::Traits>,
     )>,
     tongue: Option<ResMut<crate::telling::Tongue>>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("villager: hold_conversations");
     let mut tongue = tongue;
     // Positions snapshot so both halves of a pair can steer at each other.
     let spots: Vec<(Entity, Vec3)> = pairs
@@ -1074,6 +1080,7 @@ mod tests {
     #[test]
     fn a_bride_takes_her_husbands_house_and_keeps_her_own_on_record() {
         let mut app = App::new();
+        app.init_resource::<crate::debug::timings::Timings>();
         let mut time = Time::<()>::default();
         time.advance_by(std::time::Duration::from_secs_f32(BOND_INTERVAL + 1.0));
         app.insert_resource(time);
@@ -1217,6 +1224,7 @@ mod tests {
         // at the fire. Grown people live years; a season is patience,
         // not a technicality.
         let mut app = App::new();
+        app.init_resource::<crate::debug::timings::Timings>();
         let mut time = Time::<()>::default();
         time.advance_by(std::time::Duration::from_secs_f32(BOND_INTERVAL + 1.0));
         app.insert_resource(time);

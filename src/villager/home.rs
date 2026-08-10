@@ -246,7 +246,9 @@ pub(super) fn assign_beds(
     held: Query<(Entity, &Home, &BedSlot), With<Villager>>,
     kinds: Query<Has<Longhouse>, Or<(With<Hut>, With<Longhouse>)>>,
     beds: Query<(&ChildOf, &Bed)>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("villager: assign_beds");
     // A finished house is claimed by its whole household in ONE frame, and
     // command-inserted slots are not visible until the next — so the deals
     // made THIS run must be remembered here, or everyone sees an empty
@@ -347,7 +349,9 @@ pub(super) fn hold_abed(
     mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,
     mut sleepers: Query<(Entity, &Abed, &mut Transform, &mut CreatureMotion), With<Villager>>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("villager: hold_abed");
     let night = clock.is_night();
     for (entity, abed, mut transform, mut motion) in &mut sleepers {
         if night {

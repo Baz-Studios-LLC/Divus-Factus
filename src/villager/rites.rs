@@ -91,7 +91,9 @@ pub(super) fn mark_the_dead(
             Without<Airborne>,
         ),
     >,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("villager: mark_the_dead");
     let day = clock.day();
     for (dead, at, person, dead_parentage) in &fallen {
         commands.entity(dead).insert(Passing {
@@ -162,7 +164,9 @@ pub(super) fn mourn(
             Without<Airborne>,
         ),
     >,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("villager: mourn");
     for (mourner, at, grieving, mut activity, mut target, mut motion) in &mut mourners {
         if *activity != Activity::Mourning {
             commands.entity(mourner).remove::<Grieving>();
@@ -234,7 +238,9 @@ pub(super) fn burials(
             Without<Airborne>,
         ),
     >,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("villager: burials");
     let Some(terrain) = terrain else {
         return;
     };
@@ -443,6 +449,7 @@ mod tests {
     #[test]
     fn a_death_gathers_mourners() {
         let mut app = App::new();
+        app.init_resource::<crate::debug::timings::Timings>();
         app.init_resource::<crate::calendar::WorldClock>();
         app.add_message::<crate::ui::Say>();
 

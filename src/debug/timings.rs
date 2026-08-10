@@ -37,6 +37,8 @@ pub struct Timings {
     /// When a slow frame was last reported, so a sustained bad patch says so
     /// once every couple of seconds rather than a dozen times a second.
     last_cried: Mutex<Option<Instant>>,
+    /// Spans opened by name and not yet closed. See [`open_span`].
+    spans: Mutex<HashMap<&'static str, Instant>>,
 }
 
 impl Default for Timings {
@@ -49,6 +51,7 @@ impl Default for Timings {
             whole: Mutex::new((0.0, 0.0, 0)),
             this_frame: Mutex::new(HashMap::new()),
             last_cried: Mutex::new(None),
+            spans: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -190,6 +193,53 @@ impl Drop for Watch<'_> {
     }
 }
 
+/// Opens a named span at this point in the schedule; the [`close_span`]
+/// of the same name banks the wall-clock between the two into the report,
+/// as if the span were one watched system. The pair bracket ground a
+/// `watch` inside one system cannot cover: a whole chain of systems, or
+/// the engine's own tail of the frame. A span is wall time between two
+/// scheduling points - systems from elsewhere may run inside it.
+pub fn open_span(name: &'static str) -> impl Fn(Res<Timings>) {
+    move |timings: Res<Timings>| {
+        if !timings.on {
+            return;
+        }
+        if let Ok(mut spans) = timings.spans.lock() {
+            spans.insert(name, Instant::now());
+        }
+    }
+}
+
+/// The other end of [`open_span`].
+pub fn close_span(name: &'static str) -> impl Fn(Res<Timings>) {
+    move |timings: Res<Timings>| {
+        if !timings.on {
+            return;
+        }
+        let Some(from) = timings
+            .spans
+            .lock()
+            .ok()
+            .and_then(|mut spans| spans.remove(name))
+        else {
+            return;
+        };
+        let took = from.elapsed().as_secs_f64();
+        if let Ok(mut spent) = timings.spent.lock() {
+            let entry = spent.entry(name).or_insert((0.0, 0));
+            entry.0 += took;
+            entry.1 += 1;
+        }
+        // Spans stay OUT of the per-frame tally on purpose. A span is a
+        // wall-clock window that may hold other systems' work, so counting
+        // it beside the watches double-books the frame: the slow-frame
+        // line once read "0.0ms unwatched" while a hundred unwatched
+        // milliseconds hid inside overlapping spans. The 2s report tells
+        // spans from `spent`; the burst line tells only true watches, and
+        // its unwatched column stays honest.
+    }
+}
+
 /// Says where the frames went, every couple of seconds.
 pub fn report_timings(timings: Res<Timings>) {
     if !timings.on {
@@ -244,7 +294,11 @@ pub fn report_timings(timings: Res<Timings>) {
         );
     }
 
-    for (name, total, hits) in rows.iter().take(10) {
+    // Two dozen rows, not ten: the chain-bracket spans ride at the top of
+    // any bad window, and a cap of ten once hid the guilty system's own
+    // watch beneath eight brackets - a hundred milliseconds sat at row
+    // eleven while the hunt blamed ghosts.
+    for (name, total, hits) in rows.iter().take(24) {
         info!(
             "  {:>7.2}ms/frame  {name}  ({hits} calls)",
             total * 1000.0 / frames as f64,
@@ -262,6 +316,27 @@ impl Plugin for TimingsPlugin {
         // reported, or the split reads a frame's worth of nothing.
         app.init_resource::<Timings>()
             .add_systems(First, open_the_frame)
+            // The engine's own tail, in two spans: the interface being
+            // laid out, then transforms and visibility being propagated
+            // and everything after. If the unwatched column is fat and
+            // these are too, the cost is Bevy's built-ins, not an
+            // unwatched system of ours - and the split says which kind.
+            .add_systems(
+                PostUpdate,
+                (
+                    open_span("bevy: interface layout").before(bevy::ui::UiSystems::Layout),
+                    close_span("bevy: interface layout")
+                        .after(bevy::ui::UiSystems::Layout)
+                        .before(bevy::transform::TransformSystems::Propagate),
+                    open_span("bevy: the frame's tail")
+                        .after(bevy::ui::UiSystems::Layout)
+                        .before(bevy::transform::TransformSystems::Propagate),
+                ),
+            )
+            .add_systems(
+                Last,
+                close_span("bevy: the frame's tail").before(close_the_frame),
+            )
             .add_systems(Last, (close_the_frame, report_timings).chain());
     }
 }

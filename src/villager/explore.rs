@@ -242,7 +242,9 @@ pub(super) fn walk_the_world(
             Without<crate::creature::Corpse>,
         ),
     >,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("villager: walk_the_world");
     // Feet are slow. Once a second is finer than anyone can walk out of.
     *since_last += time.delta_secs();
     if *since_last < 1.0 {
@@ -285,6 +287,7 @@ pub(super) fn expeditions(
         Query<&super::MemberOf>,
         Query<&super::SettlementGround>,
         Option<Res<GroundWanted>>,
+        Res<crate::debug::timings::Timings>,
     ),
     // Bundled with a spare slot's worth of company: this system sits at
     // Bevy's parameter ceiling.
@@ -322,10 +325,11 @@ pub(super) fn expeditions(
         ),
     >,
 ) {
+    let (members, grounds, wanted, watch) = homes;
+    let _t = watch.watch("villager: expeditions");
     let (Some(terrain), Some(site)) = (terrain, site) else {
         return;
     };
-    let (members, grounds, wanted) = homes;
     let wanted = wanted.is_some_and(|order| order.0);
     let dt = time.delta_secs();
 

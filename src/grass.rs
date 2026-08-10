@@ -84,7 +84,9 @@ fn drive_wind(
     time: Res<Time>,
     weather: Option<Res<crate::weather::Weather>>,
     mut materials: ResMut<Assets<GrassMaterial>>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("grass: drive_wind");
     let wind = weather.map_or(0.3, |w| w.wind);
     for (_, material) in materials.iter_mut() {
         material.extension.params.clock.x = time.elapsed_secs();
@@ -285,7 +287,9 @@ fn stream_grass(
     world_seed: Res<crate::WorldSeed>,
     mut chunks: ResMut<GrassChunks>,
     cameras: Query<&crate::camera::CameraRig>,
+    watch: Res<crate::debug::timings::Timings>,
 ) {
+    let _t = watch.watch("grass: stream_grass");
     let (Some(terrain), Some(assets), Ok(rig)) = (terrain, assets, cameras.single()) else {
         return;
     };
