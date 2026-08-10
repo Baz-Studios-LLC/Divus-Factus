@@ -595,7 +595,14 @@ const MOON_SIZE: f32 = 520.0;
 fn apply_sky_to_lights(
     sky: Res<Sky>,
     mut ambient: ResMut<GlobalAmbientLight>,
-    mut suns: Query<(&mut DirectionalLight, &mut Transform), (With<SunLight>, Without<FillLight>)>,
+    mut suns: Query<
+        (
+            &mut DirectionalLight,
+            &mut Transform,
+            Option<&bevy::camera::visibility::ViewVisibility>,
+        ),
+        (With<SunLight>, Without<FillLight>),
+    >,
     mut fills: Query<(&mut DirectionalLight, &mut Transform), (With<FillLight>, Without<SunLight>)>,
     mut moons: Query<
         (&mut DirectionalLight, &mut Transform),
@@ -611,19 +618,26 @@ fn apply_sky_to_lights(
     // file all say it should: what the lights are ACTUALLY told, frame by
     // frame. `DIVUS_FACTUS_SKY_PROBE=1`.
     if std::env::var("DIVUS_FACTUS_SKY_PROBE").is_ok() {
+        let shadow_state = suns
+            .iter()
+            .map(|(light, _, seen)| (light.shadow_maps_enabled, seen.map(|v| v.get())))
+            .collect::<Vec<_>>();
         info!(
-            "sky probe: daylight {:.3} sun_dir_y {:.3} ambient {:.0} sun {:.0} fill {:.0} moon {:.0}",
+            "sky probe: daylight {:.3} sun_dir_y {:.3} ambient {:.0} sun {:.0} fill {:.0} moon {:.0} sun_shadows {:?} layer_shadows {} rig_dist {:?}",
             sky.daylight,
             sky.sun_direction.y,
             sky.ambient_brightness,
             sky.sun_illuminance,
             sky.fill_illuminance,
             sky.moon_illuminance,
+            shadow_state,
+            layers.shown(crate::debug::layers::Layer::Shadows),
+            eyes.iter().next().map(|rig| rig.distance),
         );
     }
 
     let centre = crate::globe::planet_centre();
-    for (mut light, mut transform) in &mut suns {
+    for (mut light, mut transform, _) in &mut suns {
         light.color = sky.sun_color;
         light.illuminance = sky.sun_illuminance.max(1.0);
         // No shadows in the dark: with the sun's light at nothing, any

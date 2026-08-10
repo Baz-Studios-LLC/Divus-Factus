@@ -314,26 +314,18 @@ impl Plugin for TimingsPlugin {
     fn build(&self, app: &mut App) {
         // Chained on purpose: the frame has to be closed before it is
         // reported, or the split reads a frame's worth of nothing.
+        // NOTHING of the stopwatch's may live in the engine's schedules
+        // beyond the frame clock that always has. The tail was measured
+        // once with probes threaded between Bevy's PostUpdate sets, and
+        // once more with a single edge-free system merely REGISTERED
+        // there - and either way the registration re-sorted the
+        // neighbourhood where visibility and shadow-caster lists are
+        // built, and settled a bistable race: the world's shadows came
+        // up flickering, or stuck off, depending on the sort. Spans
+        // bracket OUR systems in OUR schedules; the engine's tail is
+        // main-world minus Update's spans, derived, not probed.
         app.init_resource::<Timings>()
             .add_systems(First, open_the_frame)
-            // The engine's tail is measured from the END of Update to the
-            // frame's close - one span, anchored only in OUR schedules.
-            //
-            // It was measured in two, once, with probes threaded BETWEEN
-            // Bevy's own PostUpdate sets (`after(UiSystems::Layout)`,
-            // `before(TransformSystems::Propagate)`) - and those edges
-            // re-sorted the neighbourhood where Bevy computes visibility
-            // and shadow-caster lists. The whole world's shadows toggled
-            // on alternate frames, arming or not per RUN, bisected to the
-            // instrumentation commit and to these probes by ten-run pair
-            // capture rates (0/10 without them, ~half armed with). The
-            // stopwatch must never place edges inside the engine's own
-            // ordering: measure around Bevy, not through it.
-            .add_systems(PostUpdate, open_span("bevy: the frame's tail"))
-            .add_systems(
-                Last,
-                close_span("bevy: the frame's tail").before(close_the_frame),
-            )
             .add_systems(Last, (close_the_frame, report_timings).chain());
     }
 }
