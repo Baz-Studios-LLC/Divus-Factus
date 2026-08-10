@@ -489,5 +489,139 @@
    "reply",
    "wavering"
   ]
+ },
+ {
+  "t": "I'm sorry. I know you {knew|liked} them.",
+  "tags": [
+   "reply",
+   "event:perished"
+  ]
+ },
+ {
+  "t": "That's hard news. Sit down a moment if you need to.",
+  "tags": [
+   "reply",
+   "event:perished"
+  ]
+ },
+ {
+  "t": "Every time it happens I think of my own. You can't help it.",
+  "tags": [
+   "reply",
+   "event:perished"
+  ]
+ },
+ {
+  "t": "That's the best thing I've heard all {week|season}. Both well?",
+  "tags": [
+   "reply",
+   "event:delivered"
+  ]
+ },
+ {
+  "t": "A baby. Well. The place could use the noise.",
+  "tags": [
+   "reply",
+   "event:delivered"
+  ]
+ },
+ {
+  "t": "Good. We needed something to go right around here.",
+  "tags": [
+   "reply",
+   "event:delivered"
+  ]
+ },
+ {
+  "t": "Lightning doesn't just pick a spot. Not like that.",
+  "tags": [
+   "reply",
+   "event:smote",
+   "devout"
+  ]
+ },
+ {
+  "t": "I'll be honest, that frightens me more than it convinces me.",
+  "tags": [
+   "reply",
+   "event:smote",
+   "wavering"
+  ]
+ },
+ {
+  "t": "Storms hit things. That's what storms do. Still. Odd, that.",
+  "tags": [
+   "reply",
+   "event:smote",
+   "doubting"
+  ]
+ },
+ {
+  "t": "See? We are watched. I've been saying it all along.",
+  "tags": [
+   "reply",
+   "event:provided",
+   "devout"
+  ]
+ },
+ {
+  "t": "Food's food. I'll say thank you and not ask too hard to what.",
+  "tags": [
+   "reply",
+   "event:provided",
+   "wavering"
+  ]
+ },
+ {
+  "t": "Somebody put it there. Somebody always put it there. But who?",
+  "tags": [
+   "reply",
+   "event:provided",
+   "doubting"
+  ]
+ },
+ {
+  "t": "Is the {well|longhouse} still standing? That's the first thing to check.",
+  "tags": [
+   "reply",
+   "event:quaked"
+  ]
+ },
+ {
+  "t": "I felt it through my feet. I don't want to feel that again.",
+  "tags": [
+   "reply",
+   "event:quaked"
+  ]
+ },
+ {
+  "t": "How bad? Do they need the healer or the priest?",
+  "tags": [
+   "reply",
+   "event:mauled"
+  ]
+ },
+ {
+  "t": "That's the second time this season. We need watch fires at night.",
+  "tags": [
+   "reply",
+   "event:mauled"
+  ]
+ },
+ {
+  "t": "Up? Just... up? I'd have sat down on the spot.",
+  "tags": [
+   "reply",
+   "event:lifted",
+   "of:person"
+  ]
+ },
+ {
+  "t": "And they walked away from that? Then something meant them to.",
+  "tags": [
+   "reply",
+   "event:thrown",
+   "of:person"
+  ]
  }
 ]

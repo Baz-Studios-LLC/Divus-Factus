@@ -509,6 +509,7 @@ pub(super) fn expeditions(
                     body: vec!["returned"],
                     heard: None,
                     aloud: true,
+                    about: None,
                 });
             }
             if let Some(mut chronicle) = chronicle {

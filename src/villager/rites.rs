@@ -136,6 +136,7 @@ pub(super) fn mark_the_dead(
                         body: vec!["grieving"],
                         heard: None,
                         aloud: false,
+                        about: None,
                     });
                 }
             }

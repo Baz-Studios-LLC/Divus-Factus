@@ -86,29 +86,17 @@ confirms them:
 - uncommon combinations such as housed + married + trade + faith
 - better endings and followups so whole conversations sound coherent
 
-### Highest-value engine change: topic-aware first replies
+### Topic-aware first replies: DONE (foundation)
 
-The first listener response to an event still enters Sermo as `reply + faith +
-vocation + body`. `Musing.heard` carries the words, but corpus selection does
-not receive the structured topic. A reply to a birth, smiting, gift of food, or
-quake can therefore come from the same generic pool.
-
-Please give first replies a structured topic path. A dedicated reply request is
-cleaner than parsing the heard prose:
-
-```text
-reply role + Chat / DivineEventKind + faith + vocation + current state
-```
-
-Keep generic `reply` records as fallback. Keep knowledge transfer, faith
-movement, morale movement, and chronicle writing on the opener only; later
-beats reveal interpretation and must not apply the event repeatedly.
-
-Once event/topic tags legally reach first replies, ChatGPT can author real
-responses such as sympathy after a death, practical concern after a quake,
-relief after a birth, unease after a smiting, and gratitude or suspicion after
-provision. Until then, writing hundreds more generic `reply` lines creates
-variety but not depth.
+`Musing` now carries `about: Option<String>` - the structured topic tag
+("event:smote", "topic:food") - filled by `hold_conversations()` from the
+conversation's own `Chat`. `Tongue::muse()` pushes it into corpus selection,
+so a reply line tagged for the event wins by specificity and generic `reply`
+records remain the fallback floor. Effects still land on the opener only.
+Eighteen starter topical replies cover perished / delivered / smote (all
+three faith bands) / provided (all three bands) / quaked / mauled / lifted /
+thrown. ChatGPT can now author real event replies at depth - order by the
+fresh want-list.
 
 ### The later depth multiplier: stance from existing simulation truth
 

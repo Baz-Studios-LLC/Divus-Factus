@@ -131,6 +131,11 @@ pub struct Musing {
     /// thought. A reply waits for the conversation's beat instead of showing
     /// as a thought.
     pub heard: Option<String>,
+    /// What the telling was ABOUT, structurally - "event:smote",
+    /// "topic:food" - so the first answer to a smiting and the first
+    /// answer to a birth stop drawing from one generic pool. The words
+    /// in `heard` are for quoting; this is for understanding.
+    pub about: Option<String>,
     /// Whether this is truly VOICED — a scream, a cry for help. An idle
     /// musing is a thought and shows as one: people who talk to the wind
     /// unsettle their neighbours.
@@ -289,6 +294,12 @@ impl Tongue {
         ];
         tags.extend(of.voice.map(trade_tag));
         tags.extend(of.body.iter().copied());
+        // The structured topic joins the moment's truth: a reply line
+        // tagged for the event wins by specificity, and the generic
+        // replies remain the floor a thin pool falls back to.
+        if let Some(about) = of.about.as_deref() {
+            tags.push(about);
+        }
         let Some(said) = self
             .voice
             .pick(of.who.to_bits(), &tags, &[], &mut self.dice)
@@ -656,6 +667,7 @@ mod corpus_wiring_tests {
             body: vec!["hungry", "roofless"],
             heard: None,
             aloud: false,
+            about: None,
         });
         let (line, ..) = tongue.take_musing(who).expect("the book must answer");
         assert!(!line.is_empty());

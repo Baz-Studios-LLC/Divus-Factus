@@ -1,22 +1,3 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-   13  (worn pool) event:delivered saw tell
-    9  (worn pool) housed muse
-    8  (worn pool) event:delivered heard tell
-    7  (worn pool) reply wavering
-    5  (worn pool) muse wavering
-    5  (worn pool) chat:open topic:forester
-    4  (worn pool) muse trade:fisher
-    4  (worn pool) muse trade:gatherer
-    4  (worn pool) muse trade:forester
-    3  (worn pool) devotion muse prayer wavering
-    3  (worn pool) housed married muse
-    2  (worn pool) chat:open trade:forester
-    2  (worn pool) devotion muse prayer
-    2  (worn pool) muse trade:hunter
-    2  (worn pool) hungry muse prayer
-    1  (worn pool) married muse
-    1  (worn pool) muse trade:priest
-    1  (worn pool) devout muse prayer
-    1  (worn pool) muse prayer wavering
-    1  housed married muse trade:forester wavering
+    1  (worn pool) event:provided reply wavering

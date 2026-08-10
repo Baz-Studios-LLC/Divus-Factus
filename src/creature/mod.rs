@@ -738,6 +738,7 @@ fn drowning(
                     body: vec!["drowning"],
                     heard: None,
                     aloud: true,
+                    about: None,
                 });
             }
         }

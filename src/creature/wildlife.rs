@@ -601,6 +601,7 @@ pub(super) fn wolves_stalk(
                     body: vec!["hurt"],
                     heard: None,
                     aloud: true,
+                    about: None,
                 });
             }
         }

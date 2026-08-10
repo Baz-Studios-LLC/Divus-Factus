@@ -708,6 +708,7 @@ pub(crate) fn hold_conversations(
                     faith: crate::sermo::FaithBand::of(trust),
                     body: Vec::new(),
                     heard: Some(told_plain.clone()),
+                    about: talk.topic.as_ref().map(|topic| topic.tag()),
                     aloud: true,
                 });
             }

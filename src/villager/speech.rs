@@ -150,6 +150,7 @@ pub(super) fn muse_the_watched(
         body,
         heard: None,
         aloud: false,
+        about: None,
     });
 }
 
