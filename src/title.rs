@@ -85,9 +85,9 @@ struct QuitButton;
 
 /// The door to the maker's bench.
 #[derive(Component)]
-struct AtelierButton;
+struct OpificiumButton;
 
-/// Where the Atelier stands, if it stands anywhere.
+/// Where Opificium stands, if it stands anywhere.
 ///
 /// Beside the game first, which is where a packaged build puts it: one bundle
 /// holding both, so the bench a player opens is always the one that matches the
@@ -100,33 +100,42 @@ struct AtelierButton;
 ///
 /// `None` means it is not installed, and the button does not appear at all. A
 /// door that opens onto nothing is worse than no door.
-fn atelier_beside_us() -> Option<std::path::PathBuf> {
+fn opificium_beside_us() -> Option<std::path::PathBuf> {
     // What it is called where it SHIPS, and what cargo calls it in a tree. The
     // shipped name changed because a launcher that runs the first `.exe` in the
     // folder ran the bench when a player pressed PLAY - so the bench now sorts
     // after the game and cannot be mistaken for it either.
     let shipped = if cfg!(windows) {
-        "TheAtelier.exe"
+        "Opificium.exe"
     } else {
-        "TheAtelier"
+        "Opificium"
     };
     let built = if cfg!(windows) {
-        "divus-factus-atelier.exe"
+        "divus-factus-opificium.exe"
     } else {
-        "divus-factus-atelier"
+        "divus-factus-opificium"
+    };
+    // The names the bench shipped under before it was Opificium. A launcher
+    // that merges an update over an old install can leave the old bench on
+    // disk beside the new game; a working door to the old bench beats a
+    // missing button until the next clean install sweeps it.
+    let legacy = if cfg!(windows) {
+        ["TheAtelier.exe", "divus-factus-atelier.exe"]
+    } else {
+        ["TheAtelier", "divus-factus-atelier"]
     };
     let us = std::env::current_exe().ok()?;
     let here = us.parent()?;
-    for named in [shipped, built] {
+    for named in [shipped, built, legacy[0], legacy[1]] {
         let beside = here.join(named);
         if beside.is_file() {
             return Some(beside);
         }
     }
     // A source tree: the game runs from `target/release`, the bench builds into
-    // `atelier/target/release`.
+    // `opificium/target/release`.
     let workspace = here.parent()?.parent()?;
-    let in_tree = workspace.join("atelier/target/release").join(built);
+    let in_tree = workspace.join("opificium/target/release").join(built);
     in_tree.is_file().then_some(in_tree)
 }
 
@@ -624,9 +633,9 @@ fn spawn_title(
         .insert((SettingsButton, TitleMenu));
     // Only when there is a bench to open. A button that does nothing teaches a
     // player that buttons here might do nothing.
-    if atelier_beside_us().is_some() {
-        let bench = button_of_size(&mut commands, menu, "Atelier", 340.0, 21.0, 16.0);
-        commands.entity(bench).insert((AtelierButton, TitleMenu));
+    if opificium_beside_us().is_some() {
+        let bench = button_of_size(&mut commands, menu, "Opificium", 340.0, 21.0, 16.0);
+        commands.entity(bench).insert((OpificiumButton, TitleMenu));
     }
     let quit = button_of_size(&mut commands, menu, "Quit", 340.0, 21.0, 16.0);
     commands.entity(quit).insert((QuitButton, TitleMenu));
@@ -1743,7 +1752,7 @@ fn handle_choice(
     mut saves_panels: Query<&mut Visibility, With<crate::save::SavesPanel>>,
     settings: Query<&Interaction, (Changed<Interaction>, With<SettingsButton>)>,
     quit: Query<&Interaction, (Changed<Interaction>, With<QuitButton>)>,
-    bench: Query<&Interaction, (Changed<Interaction>, With<AtelierButton>)>,
+    bench: Query<&Interaction, (Changed<Interaction>, With<OpificiumButton>)>,
     open_settings: Query<Entity, With<SettingsScreen>>,
     chunks: Option<Res<crate::terrain::LoadedChunks>>,
     site: Option<Res<crate::villager::SettlementSite>>,
@@ -1762,7 +1771,7 @@ fn handle_choice(
             );
         }
     }
-    // The Atelier takes over: the bench opens and the game stands down.
+    // Opificium takes over: the bench opens and the game stands down.
     //
     // Two programs at once would be two programs fighting over one machine's
     // graphics for no reason - nobody draws a building and plays at the same
@@ -1772,7 +1781,7 @@ fn handle_choice(
         if *interaction != Interaction::Pressed {
             continue;
         }
-        let Some(path) = atelier_beside_us() else {
+        let Some(path) = opificium_beside_us() else {
             continue;
         };
         // From its own folder, so it finds its palette and its fonts the way it

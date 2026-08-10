@@ -21,7 +21,7 @@
 //!
 //! Not this program's. The bodies come out of the game's own builder, baked to
 //! `data/bodies/*.json` by `cargo test bake_the_bodies` over in the game, with
-//! the joints named the way a clip names them. The Atelier and the game share no
+//! the joints named the way a clip names them. Opificium and the game share no
 //! code, so a villager drawn here by hand would be a SECOND villager, and wrong
 //! the first time a proportion moved.
 
@@ -313,7 +313,7 @@ fn carry_in_the_bodies(mut bodies: ResMut<Bodies>, mut wearing: ResMut<Wearing>)
         roads.push(std::path::PathBuf::from(manifest).join("data/bodies"));
     }
     roads.push("data/bodies".into());
-    roads.push("atelier/data/bodies".into());
+    roads.push("opificium/data/bodies".into());
     roads.push(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data/bodies"));
     let Some((home, entries)) = roads
         .into_iter()

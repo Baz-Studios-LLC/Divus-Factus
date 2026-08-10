@@ -363,12 +363,12 @@ pub fn shade_blend(a: &Ramp, b: &Ramp, blend: f32, t: f32) -> Color {
 
 #[cfg(test)]
 mod tests {
-    /// Writes the palette out for the Atelier, which paints with the game's
+    /// Writes the palette out for Opificium, which paints with the game's
     /// own ramps but shares none of its code. Run by hand when the palette
-    /// changes: `cargo test export_palette_for_atelier -- --ignored`
+    /// changes: `cargo test export_palette_for_opificium -- --ignored`
     #[test]
     #[ignore = "a hand-run export, not a check"]
-    fn export_palette_for_atelier() {
+    fn export_palette_for_opificium() {
         let named: &[(&str, &super::Ramp)] = &[
             ("stone", &super::STONE),
             ("earth", &super::EARTH),
@@ -409,8 +409,8 @@ mod tests {
             })
             .collect();
         let json = format!("{{\n  \"ramps\": [\n{}\n  ]\n}}\n", ramps.join(",\n"));
-        std::fs::create_dir_all("atelier/data").expect("atelier/data");
-        std::fs::write("atelier/data/palette.json", json).expect("write palette.json");
+        std::fs::create_dir_all("opificium/data").expect("opificium/data");
+        std::fs::write("opificium/data/palette.json", json).expect("write palette.json");
     }
 
     use super::*;

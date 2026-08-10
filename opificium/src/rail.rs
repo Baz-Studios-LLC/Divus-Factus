@@ -192,7 +192,7 @@ pub fn raise_rail(mut commands: Commands, fonts: Res<Fonts>, palette: Res<Palett
         .id();
 
     commands.spawn((
-        Text::new("THE ATELIER"),
+        Text::new("THE OPIFICIUM"),
         TextFont {
             font: fonts.display.clone().into(),
             font_size: FontSize::Px(20.0),

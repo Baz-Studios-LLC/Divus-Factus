@@ -1,6 +1,6 @@
 //! Authored clips, laid over the animator's own motion.
 //!
-//! A clip is a handful of moments drawn on the Atelier's rig bench, each holding
+//! A clip is a handful of moments drawn on Opificium's rig bench, each holding
 //! a rotation for the joints that moved in it. The game reads them out of
 //! `assets/clips/*.baz` and plays one on a villager whose activity it is named
 //! for: `praying.baz` plays on anyone praying, `chatting.baz` on anyone stopped

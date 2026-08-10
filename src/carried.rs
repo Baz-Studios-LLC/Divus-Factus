@@ -49,7 +49,7 @@ pub fn roads(under: &str) -> Vec<PathBuf> {
 }
 
 /// Where a maker's OWN work goes: the drawings and clips they bake out of the
-/// Atelier, under the same roof as their saves.
+/// Opificium, under the same roof as their saves.
 ///
 /// It is not the bundle. A bundle is replaced whole on the next update and is
 /// not writable besides, so anything a player makes has to live where their

@@ -1,16 +1,16 @@
 # The file contract
 
-The Atelier and Divus Factus share no code. Everything that passes between
+Opificium and Divus Factus share no code. Everything that passes between
 them is a file described here, and this page is the single word on what
-those files mean. The game exports its truth for the Atelier (`data/`);
+those files mean. The game exports its truth for Opificium (`data/`);
 the maker exports work for the game (`out/`), and the god carries it into
 the world by hand.
 
-## Game → Atelier
+## Game → Opificium
 
 ### `data/palette.json`
 
-Written by the game: `cargo test export_palette_for_atelier -- --ignored`.
+Written by the game: `cargo test export_palette_for_opificium -- --ignored`.
 Re-run whenever the game's palette changes.
 
 ```json
@@ -29,7 +29,7 @@ Parts: `body, head, leg-l, shin-l, leg-r, shin-r, arm-l, forearm-l, arm-r,
 forearm-r` (hinges are children of their upper joints; rotations are about
 local X: positive carries the free end forward).
 
-## Atelier → game
+## Opificium → game
 
 ### Blueprints: `out/buildings/<name>.json`
 
@@ -72,7 +72,7 @@ game already understands, so the carrying-in is mechanical:
 }
 ```
 
-- `part`: `wall-<len>` (0.25 thick, 2.4 high — the Atelier's truth; the game conforms),
+- `part`: `wall-<len>` (0.25 thick, 2.4 high — Opificium's truth; the game conforms),
   `ridge-<len>` (the cap over a ridge line, half a metre across at the
   bench's pitch), `gable-<len>` (a wedge - a real triangular prism, peak at the
   bench's 45 degree pitch, so it stands half as tall as it is wide),

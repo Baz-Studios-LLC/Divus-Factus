@@ -1,9 +1,9 @@
 //! The game's look, carried in as data.
 //!
 //! The palette arrives from the game via `data/palette.json` — written by
-//! the game's own `export_palette_for_atelier` test — so nothing here can
+//! the game's own `export_palette_for_opificium` test — so nothing here can
 //! drift from what the game actually draws. If the file is missing the
-//! Atelier still opens, in bone and gold, and says so.
+//! Opificium still opens, in bone and gold, and says so.
 
 use bevy::prelude::*;
 use serde::Deserialize;
@@ -50,7 +50,7 @@ impl Palette {
     }
 }
 
-/// The Atelier wears the codex's colours.
+/// Opificium wears the codex's colours.
 pub mod theme {
     use super::Palette;
     use bevy::prelude::*;
@@ -180,7 +180,7 @@ fn load_palette() -> Palette {
         roads.push(std::path::PathBuf::from(manifest).join("data/palette.json"));
     }
     roads.push("data/palette.json".into());
-    roads.push("atelier/data/palette.json".into());
+    roads.push("opificium/data/palette.json".into());
 
     for road in roads {
         if let Ok(text) = std::fs::read_to_string(&road)
@@ -202,7 +202,7 @@ fn load_palette() -> Palette {
     }
     warn!(
         "no data/palette.json - run the game's export first: \
-         cargo test export_palette_for_atelier -- --ignored"
+         cargo test export_palette_for_opificium -- --ignored"
     );
     Palette {
         ramps: vec![

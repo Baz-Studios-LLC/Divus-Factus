@@ -53,8 +53,8 @@ jobs:
       # The bench is its own crate with its own lockfile, so the workspace build
       # above does not touch it. It ships inside the game's bundle and the title
       # screen opens it.
-      - name: Build the Atelier (release)
-        run: cargo build --release --manifest-path atelier/Cargo.toml
+      - name: Build Opificium (release)
+        run: cargo build --release --manifest-path opificium/Cargo.toml
 
       - name: Compute version (tag without leading v)
         id: ver
@@ -81,8 +81,8 @@ jobs:
           # after it: a launcher that takes the first .exe in the folder took
           # `divus-factus-atelier.exe` and opened the editor when a player
           # pressed PLAY.
-          Copy-Item atelier\target\release\divus-factus-atelier.exe stage\TheAtelier.exe
-          Copy-Item -Recurse atelier\data stage\data
+          Copy-Item opificium\target\release\divus-factus-opificium.exe stage\Opificium.exe
+          Copy-Item -Recurse opificium\data stage\data
           Compress-Archive -Path stage\* -DestinationPath dist\DivusFactus-windows-x86_64.zip -Force
 
       - name: Attach to release

@@ -1,10 +1,10 @@
-//! THE ATELIER — the maker's own bench.
+//! THE OPIFICIUM — the maker's own bench.
 //!
 //! A standalone companion to Divus Factus: buildings and animations are
 //! authored here by hand and exported as JSON for the game to take in. The
 //! two programs share no code — the game exports its palette as data
-//! (`data/palette.json`) so the Atelier paints with true colours, and the
-//! Atelier exports blueprints and clips the game translates at its leisure.
+//! (`data/palette.json`) so Opificium paints with true colours, and the
+//! Opificium exports blueprints and clips the game translates at its leisure.
 
 use bevy::prelude::*;
 
@@ -30,7 +30,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                title: "Divus Factus — The Atelier".to_string(),
+                title: "Divus Factus — Opificium".to_string(),
                 resolution: bevy::window::WindowResolution::new(1440, 900),
                 ..default()
             }),
@@ -42,7 +42,7 @@ fn main() {
         .add_plugins(rig::RigPlugin)
         // Which bench the maker opens at. A maker working on the rig for an
         // hour should not walk across the builder to reach it every time.
-        .insert_resource(match std::env::var("ATELIER_BENCH").as_deref() {
+        .insert_resource(match std::env::var("OPIFICIUM_BENCH").as_deref() {
             Ok("rig") => Bench::Rig,
             _ => Bench::Builder,
         })

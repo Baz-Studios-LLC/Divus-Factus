@@ -43,7 +43,7 @@ pub const PITCH_STEP: f32 = 2.5;
 /// of these three numbers worth compiling that fails it.
 const _: () = assert!(PITCH_LEAST <= ROOF_PITCH_DEGREES && ROOF_PITCH_DEGREES <= PITCH_MOST);
 
-/// The Atelier's own measurements - the source of truth now; the game
+/// Opificium's own measurements - the source of truth now; the game
 /// conforms to these when its buildings are replaced. A quarter-metre
 /// wall on a quarter-metre grid means centrelines always land on snaps.
 const WALL_THICK: f32 = 0.25;
@@ -3021,7 +3021,7 @@ pub(crate) fn carried_home(under: &str) -> std::path::PathBuf {
 /// Asks what the work is, and where it should go, before carrying it in.
 ///
 /// The bake used to be a `cargo test`, which meant a building could only be
-/// carried in from a source tree - so the Atelier in the launcher build was a
+/// carried in from a source tree - so Opificium in the launcher build was a
 /// sketchpad whose work had nowhere to go. Brett: "At what point does it install
 /// its own files?" It goes into the game's own folder now, in one press, and the
 /// game reads that folder alongside the drawings that shipped with it.
@@ -7785,7 +7785,7 @@ fn is_a_work(path: &std::path::Path) -> bool {
 /// that is read-only where it is installed properly, and that breaks the
 /// signature where it is not.
 ///
-/// A maker working in the tree still writes to `atelier/out/buildings`, which is
+/// A maker working in the tree still writes to `opificium/out/buildings`, which is
 /// where their buildings already are and where git can see them.
 pub(crate) fn bench_home() -> std::path::PathBuf {
     if let Ok(tree) = std::env::var("CARGO_MANIFEST_DIR") {
@@ -7795,13 +7795,13 @@ pub(crate) fn bench_home() -> std::path::PathBuf {
     // for this game's things.
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
     let base = if cfg!(target_os = "macos") {
-        format!("{home}/Library/Application Support/Divus Factus/atelier")
+        format!("{home}/Library/Application Support/Divus Factus/opificium")
     } else if cfg!(target_os = "windows") {
         std::env::var("APPDATA")
-            .map(|roaming| format!("{roaming}/Divus Factus/atelier"))
-            .unwrap_or_else(|_| "atelier".into())
+            .map(|roaming| format!("{roaming}/Divus Factus/opificium"))
+            .unwrap_or_else(|_| "opificium".into())
     } else {
-        format!("{home}/.local/share/divus-factus/atelier")
+        format!("{home}/.local/share/divus-factus/opificium")
     };
     std::path::PathBuf::from(base)
 }

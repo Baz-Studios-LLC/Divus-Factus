@@ -823,7 +823,7 @@ pub fn name_the_joints(
 
 /// Writes the bodies the bench poses on, out of the game's own builder.
 ///
-/// The Atelier and the game share no code, so the bench could only ever have a
+/// Opificium and the game share no code, so the bench could only ever have a
 /// SECOND villager in it - hand-copied, and wrong the first time a proportion
 /// moved. It reads these files instead: the real bodies, built by the real
 /// builder from real genomes, with the joints named the way a clip names them.
@@ -894,7 +894,8 @@ mod bake {
                 wanted.push((age, sex));
             }
         }
-        let out = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("atelier/data/bodies");
+        let out =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("opificium/data/bodies");
         std::fs::create_dir_all(&out).expect("the bodies folder");
 
         let mut found = 0;

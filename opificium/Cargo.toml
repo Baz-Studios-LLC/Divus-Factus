@@ -1,5 +1,5 @@
 [package]
-name = "divus-factus-atelier"
+name = "divus-factus-opificium"
 version = "0.3.4"
 edition = "2024"
 description = "The maker's own bench: buildings and animations for Divus Factus, authored by hand and exported as files."

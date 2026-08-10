@@ -1,4 +1,4 @@
-//! Buildings carried in from the Atelier.
+//! Buildings carried in from Opificium.
 //!
 //! The bench and the game share no code: the bench resolves its own
 //! catalogue and palette and hands over plain boxes with colours, plus
@@ -203,7 +203,7 @@ fn carried() -> &'static Vec<Baked> {
 /// `tavern-corner.baz` becomes the tavern the moment it is carried in, with
 /// nothing to register and no code to change. A kind nobody has drawn falls back
 /// to the village's own hand, exactly as everything did before there was an
-/// Atelier; a kind somebody HAS drawn never falls back again.
+/// Opificium; a kind somebody HAS drawn never falls back again.
 fn called(kind: super::BuildingKind) -> &'static str {
     use super::BuildingKind as K;
     match kind {
@@ -362,7 +362,7 @@ fn hip(keep_x: f32, keep_z: f32) -> Mesh {
 /// GABLE's prism, two slopes meeting at a peak; this is the far commoner cut,
 /// and without it a beam meeting a roof had to stop square and stand off it.
 ///
-/// The vertices are the Atelier's, corner for corner. The two programs share no
+/// The vertices are Opificium's, corner for corner. The two programs share no
 /// code and never will, so the only thing keeping a shape the same shape in both
 /// is that somebody wrote it out twice and said so - see `FORMATS.md`.
 /// A unit box with its top or bottom face cut back at each end.
@@ -651,7 +651,7 @@ pub fn raise_baked(
             }
             // A hip roof carries its own proportions in its form - "hip:0.5x0.6"
             // - because a truncated pyramid is a different mesh at every deck
-            // size and a name alone cannot say which. See atelier/FORMATS.md.
+            // size and a name alone cannot say which. See opificium/FORMATS.md.
             hipped if hipped.starts_with("hip:") => {
                 let mut parts = hipped.trim_start_matches("hip:").split('x');
                 let keep_x = parts.next().and_then(|n| n.parse().ok()).unwrap_or(0.5);
