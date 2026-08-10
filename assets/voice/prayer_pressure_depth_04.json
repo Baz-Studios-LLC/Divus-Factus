@@ -1,82 +1,722 @@
 [
-  { "t": "You can close this wound. Please do it before the fever starts.", "tags": ["muse", "prayer", "hurt", "devout"] },
-  { "t": "Give the healer steady hands and give me enough sense to obey.", "tags": ["muse", "prayer", "hurt", "devout"] },
-  { "t": "I know you see this pain. Help me endure what remains.", "tags": ["muse", "prayer", "hurt", "devout"] },
-  { "t": "Mend what is torn and let me return to useful work.", "tags": ["muse", "prayer", "hurt", "devout"] },
-  { "t": "If you can help this heal, I would be grateful.", "tags": ["muse", "prayer", "hurt", "wavering"] },
-  { "t": "The healer has done their part. Perhaps you could help with the rest.", "tags": ["muse", "prayer", "hurt", "wavering"] },
-  { "t": "I do not know whether pain reaches you. Mine is loud enough.", "tags": ["muse", "prayer", "hurt", "wavering"] },
-  { "t": "I trust the bandage more than prayer, but I am using both.", "tags": ["muse", "prayer", "hurt", "doubting"] },
-  { "t": "If you want belief, healing this would make a strong argument.", "tags": ["muse", "prayer", "hurt", "doubting"] },
-  { "t": "The healer says rest. I suppose asking you cannot hurt more.", "tags": ["muse", "prayer", "hurt", "doubting"] },
-  { "t": "Lead the builders to us. We need walls before the cold worsens.", "tags": ["muse", "prayer", "roofless", "devout"] },
-  { "t": "You have given others shelter. Please remember us now.", "tags": ["muse", "prayer", "roofless", "devout"] },
-  { "t": "Keep us warm tonight while hands prepare a proper roof.", "tags": ["muse", "prayer", "roofless", "devout"] },
-  { "t": "I will help build it. Please help us reach that morning.", "tags": ["muse", "prayer", "roofless", "devout"] },
-  { "t": "If you hear people without roofs, we are still here.", "tags": ["muse", "prayer", "roofless", "wavering"] },
-  { "t": "A dry night would feel enough like an answer.", "tags": ["muse", "prayer", "roofless", "wavering"] },
-  { "t": "I am asking for shelter, not certainty. Please send one of them.", "tags": ["muse", "prayer", "roofless", "wavering"] },
-  { "t": "Builders make roofs. If you exist, help them finish ours.", "tags": ["muse", "prayer", "roofless", "doubting"] },
-  { "t": "I have asked every person who might help. You are the last attempt.", "tags": ["muse", "prayer", "roofless", "doubting"] },
-  { "t": "A roof would persuade me more than another sermon about patience.", "tags": ["muse", "prayer", "roofless", "doubting"] },
-  { "t": "Hold the roofs down and keep the walls standing.", "tags": ["muse", "prayer", "storm", "devout"] },
-  { "t": "Turn the worst wind aside before it reaches the houses.", "tags": ["muse", "prayer", "storm", "devout"] },
-  { "t": "Guard everyone outside and guide them home through the rain.", "tags": ["muse", "prayer", "storm", "devout"] },
-  { "t": "You rule the sky. Show mercy to the people beneath it.", "tags": ["muse", "prayer", "storm", "devout"] },
-  { "t": "If storms listen to anybody, let this one listen to you.", "tags": ["muse", "prayer", "storm", "wavering"] },
-  { "t": "The wind is rising. I hope you are nearer than it sounds.", "tags": ["muse", "prayer", "storm", "wavering"] },
-  { "t": "Help the roofs hold, and I will decide what that means later.", "tags": ["muse", "prayer", "storm", "wavering"] },
-  { "t": "Weather does not bargain, but perhaps you do. Spare the houses.", "tags": ["muse", "prayer", "storm", "doubting"] },
-  { "t": "I expect the builders deserve more thanks. Help them anyway.", "tags": ["muse", "prayer", "storm", "doubting"] },
-  { "t": "If you made this storm, stopping it would be a decent start.", "tags": ["muse", "prayer", "storm", "doubting"] },
-  { "t": "Guide my steps and let the road end somewhere safe.", "tags": ["muse", "prayer", "road", "devout"] },
-  { "t": "Watch the people traveling beyond our fires tonight.", "tags": ["muse", "prayer", "road", "devout"] },
-  { "t": "Keep wolves away and bring every traveler home again.", "tags": ["muse", "prayer", "road", "devout"] },
-  { "t": "Make the way plain when the path divides.", "tags": ["muse", "prayer", "road", "devout"] },
-  { "t": "I do not know where this road leads. Perhaps you do.", "tags": ["muse", "prayer", "road", "wavering"] },
-  { "t": "If you travel with anyone, walk beside us for a while.", "tags": ["muse", "prayer", "road", "wavering"] },
-  { "t": "Help me choose the path I will regret least.", "tags": ["muse", "prayer", "road", "wavering"] },
-  { "t": "I trust my feet, but another pair of eyes would help.", "tags": ["muse", "prayer", "road", "doubting"] },
-  { "t": "If you know the shorter road, now is the time to mention it.", "tags": ["muse", "prayer", "road", "doubting"] },
-  { "t": "I am lost enough to ask anyone, including you.", "tags": ["muse", "prayer", "road", "doubting"] },
-  { "t": "Keep the wolves beyond the paths where our children walk.", "tags": ["muse", "prayer", "wolf", "devout"] },
-  { "t": "Strengthen the guards and turn the pack toward empty ground.", "tags": ["muse", "prayer", "wolf", "devout"] },
-  { "t": "Do not let another family hear wolves outside their door.", "tags": ["muse", "prayer", "wolf", "devout"] },
-  { "t": "You know every creature. Keep these ones away from us.", "tags": ["muse", "prayer", "wolf", "devout"] },
-  { "t": "Maybe wolves fear you. I know they do not fear me.", "tags": ["muse", "prayer", "wolf", "wavering"] },
-  { "t": "I heard them near the trees. Please let that be the closest they come.", "tags": ["muse", "prayer", "wolf", "wavering"] },
-  { "t": "Help the guards find the pack before the pack finds anyone alone.", "tags": ["muse", "prayer", "wolf", "wavering"] },
-  { "t": "Wolves understand spears better than prayers. Send people with spears.", "tags": ["muse", "prayer", "wolf", "doubting"] },
-  { "t": "If you protect this village, the howling is your chance to prove it.", "tags": ["muse", "prayer", "wolf", "doubting"] },
-  { "t": "I would prefer a strong fence, but I will ask you too.", "tags": ["muse", "prayer", "wolf", "doubting"] },
-  { "t": "Keep watch while the village sleeps and the fires burn low.", "tags": ["muse", "prayer", "night", "devout"] },
-  { "t": "Stand beside the guards where their torches cannot reach.", "tags": ["muse", "prayer", "night", "devout"] },
-  { "t": "Let every sleeper wake safely when morning comes.", "tags": ["muse", "prayer", "night", "devout"] },
-  { "t": "Quiet the fears that grow larger after dark.", "tags": ["muse", "prayer", "night", "devout"] },
-  { "t": "Night makes every doubt louder. Stay near if you can.", "tags": ["muse", "prayer", "night", "wavering"] },
-  { "t": "I cannot see beyond the fire. I hope you can.", "tags": ["muse", "prayer", "night", "wavering"] },
-  { "t": "Help me sleep without turning every sound into danger.", "tags": ["muse", "prayer", "night", "wavering"] },
-  { "t": "The guard is real and awake. I am asking you as extra help.", "tags": ["muse", "prayer", "night", "doubting"] },
-  { "t": "If darkness belongs to you too, keep it quiet tonight.", "tags": ["muse", "prayer", "night", "doubting"] },
-  { "t": "I cannot sleep, so I may as well test whether you listen.", "tags": ["muse", "prayer", "night", "doubting"] },
-  { "t": "Punish them for what they did and let everyone see it.", "tags": ["muse", "prayer", "grudge", "devout"] },
-  { "t": "You saw their insult. Show them that you did not approve.", "tags": ["muse", "prayer", "grudge", "devout"] },
-  { "t": "Judge between us, and do not mistake my patience for forgiveness.", "tags": ["muse", "prayer", "grudge", "devout"] },
-  { "t": "I have left punishment to you. Please make it memorable.", "tags": ["muse", "prayer", "grudge", "devout"] },
-  { "t": "I want revenge and keep calling it justice. You know the difference.", "tags": ["muse", "prayer", "grudge", "wavering"] },
-  { "t": "Part of me wants you to hurt them. The rest hopes you refuse.", "tags": ["muse", "prayer", "grudge", "wavering"] },
-  { "t": "I am too angry to ask for anything decent tonight.", "tags": ["muse", "prayer", "grudge", "wavering"] },
-  { "t": "I doubt you listen, which makes this easier to admit. Ruin their day.", "tags": ["muse", "prayer", "grudge", "doubting"] },
-  { "t": "If divine justice exists, it could begin with my unpleasant neighbor.", "tags": ["muse", "prayer", "grudge", "doubting"] },
-  { "t": "I know this is foolish. I still want you to frighten them.", "tags": ["muse", "prayer", "grudge", "doubting"] },
-  { "t": "Teach me to serve without needing everyone to notice.", "tags": ["muse", "prayer", "devotion", "devout"] },
-  { "t": "I have received enough. Show me where I should give.", "tags": ["muse", "prayer", "devotion", "devout"] },
-  { "t": "Keep my faith honest when obedience becomes inconvenient.", "tags": ["muse", "prayer", "devotion", "devout"] },
-  { "t": "Let my actions match the promises I make here.", "tags": ["muse", "prayer", "devotion", "devout"] },
-  { "t": "I keep returning. Perhaps that means more than certainty would.", "tags": ["muse", "prayer", "devotion", "wavering"] },
-  { "t": "I want to trust you without pretending my questions disappeared.", "tags": ["muse", "prayer", "devotion", "wavering"] },
-  { "t": "Give me enough faith for the next decision, not every decision forever.", "tags": ["muse", "prayer", "devotion", "wavering"] },
-  { "t": "I came because habit is cheaper than certainty. Surprise me.", "tags": ["muse", "prayer", "devotion", "doubting"] },
-  { "t": "If devotion matters to you, explain why doubt keeps company with mine.", "tags": ["muse", "prayer", "devotion", "doubting"] },
-  { "t": "I am kneeling. That is more agreement than you had yesterday.", "tags": ["muse", "prayer", "devotion", "doubting"] }
+  {
+    "t": "You can close this wound. Please do it before the fever starts.",
+    "tags": [
+      "muse",
+      "prayer",
+      "hurt",
+      "devout"
+    ]
+  },
+  {
+    "t": "Give the healer steady hands and give me enough sense to obey.",
+    "tags": [
+      "muse",
+      "prayer",
+      "hurt",
+      "devout"
+    ]
+  },
+  {
+    "t": "I know you see this pain. Help me endure what remains.",
+    "tags": [
+      "muse",
+      "prayer",
+      "hurt",
+      "devout"
+    ]
+  },
+  {
+    "t": "Mend what is torn and let me return to useful work.",
+    "tags": [
+      "muse",
+      "prayer",
+      "hurt",
+      "devout"
+    ]
+  },
+  {
+    "t": "If you can help this heal, I would be grateful.",
+    "tags": [
+      "muse",
+      "prayer",
+      "hurt",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The healer has done their part. Perhaps you could help with the rest.",
+    "tags": [
+      "muse",
+      "prayer",
+      "hurt",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I do not know whether pain reaches you. Mine is loud enough.",
+    "tags": [
+      "muse",
+      "prayer",
+      "hurt",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I trust the bandage more than prayer, but I am using both.",
+    "tags": [
+      "muse",
+      "prayer",
+      "hurt",
+      "doubting"
+    ]
+  },
+  {
+    "t": "If you want belief, healing this would make a strong argument.",
+    "tags": [
+      "muse",
+      "prayer",
+      "hurt",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The healer says rest. I suppose asking you cannot hurt more.",
+    "tags": [
+      "muse",
+      "prayer",
+      "hurt",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Lead the builders to us. We need walls before the cold worsens.",
+    "tags": [
+      "muse",
+      "prayer",
+      "roofless",
+      "devout"
+    ]
+  },
+  {
+    "t": "You have given others shelter. Please remember us now.",
+    "tags": [
+      "muse",
+      "prayer",
+      "roofless",
+      "devout"
+    ]
+  },
+  {
+    "t": "Keep us warm tonight while hands prepare a proper roof.",
+    "tags": [
+      "muse",
+      "prayer",
+      "roofless",
+      "devout"
+    ]
+  },
+  {
+    "t": "I will help build it. Please help us reach that morning.",
+    "tags": [
+      "muse",
+      "prayer",
+      "roofless",
+      "devout"
+    ]
+  },
+  {
+    "t": "If you hear people without roofs, we are still here.",
+    "tags": [
+      "muse",
+      "prayer",
+      "roofless",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A dry night would feel enough like an answer.",
+    "tags": [
+      "muse",
+      "prayer",
+      "roofless",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am asking for shelter, not certainty. Please send one of them.",
+    "tags": [
+      "muse",
+      "prayer",
+      "roofless",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Builders make roofs. If you exist, help them finish ours.",
+    "tags": [
+      "muse",
+      "prayer",
+      "roofless",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I have asked every person who might help. You are the last attempt.",
+    "tags": [
+      "muse",
+      "prayer",
+      "roofless",
+      "doubting"
+    ]
+  },
+  {
+    "t": "A roof would persuade me more than another sermon about patience.",
+    "tags": [
+      "muse",
+      "prayer",
+      "roofless",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Hold the roofs down and keep the walls standing.",
+    "tags": [
+      "muse",
+      "prayer",
+      "storm",
+      "devout"
+    ]
+  },
+  {
+    "t": "Turn the worst wind aside before it reaches the houses.",
+    "tags": [
+      "muse",
+      "prayer",
+      "storm",
+      "devout"
+    ]
+  },
+  {
+    "t": "Guard everyone outside and guide them home through the rain.",
+    "tags": [
+      "muse",
+      "prayer",
+      "storm",
+      "devout"
+    ]
+  },
+  {
+    "t": "You rule the sky. Show mercy to the people beneath it.",
+    "tags": [
+      "muse",
+      "prayer",
+      "storm",
+      "devout"
+    ]
+  },
+  {
+    "t": "If storms listen to anybody, let this one listen to you.",
+    "tags": [
+      "muse",
+      "prayer",
+      "storm",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The wind is rising. I hope you are nearer than it sounds.",
+    "tags": [
+      "muse",
+      "prayer",
+      "storm",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Help the roofs hold, and I will decide what that means later.",
+    "tags": [
+      "muse",
+      "prayer",
+      "storm",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Weather does not bargain, but perhaps you do. Spare the houses.",
+    "tags": [
+      "muse",
+      "prayer",
+      "storm",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I expect the builders deserve more thanks. Help them anyway.",
+    "tags": [
+      "muse",
+      "prayer",
+      "storm",
+      "doubting"
+    ]
+  },
+  {
+    "t": "If you made this storm, stopping it would be a decent start.",
+    "tags": [
+      "muse",
+      "prayer",
+      "storm",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Guide my steps and let the road end somewhere safe.",
+    "tags": [
+      "muse",
+      "prayer",
+      "road",
+      "devout"
+    ]
+  },
+  {
+    "t": "Watch the people travelling beyond our fires tonight.",
+    "tags": [
+      "muse",
+      "prayer",
+      "road",
+      "devout"
+    ]
+  },
+  {
+    "t": "Keep wolves away and bring every traveler home again.",
+    "tags": [
+      "muse",
+      "prayer",
+      "road",
+      "devout"
+    ]
+  },
+  {
+    "t": "Make the way plain when the path divides.",
+    "tags": [
+      "muse",
+      "prayer",
+      "road",
+      "devout"
+    ]
+  },
+  {
+    "t": "I do not know where this road leads. Perhaps you do.",
+    "tags": [
+      "muse",
+      "prayer",
+      "road",
+      "wavering"
+    ]
+  },
+  {
+    "t": "If you travel with anyone, walk beside us for a while.",
+    "tags": [
+      "muse",
+      "prayer",
+      "road",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Help me choose the path I will regret least.",
+    "tags": [
+      "muse",
+      "prayer",
+      "road",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I trust my feet, but another pair of eyes would help.",
+    "tags": [
+      "muse",
+      "prayer",
+      "road",
+      "doubting"
+    ]
+  },
+  {
+    "t": "If you know the shorter road, now is the time to mention it.",
+    "tags": [
+      "muse",
+      "prayer",
+      "road",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I am lost enough to ask anyone, including you.",
+    "tags": [
+      "muse",
+      "prayer",
+      "road",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Keep the wolves beyond the paths where our children walk.",
+    "tags": [
+      "muse",
+      "prayer",
+      "wolf",
+      "devout"
+    ]
+  },
+  {
+    "t": "Strengthen the guards and turn the pack toward empty ground.",
+    "tags": [
+      "muse",
+      "prayer",
+      "wolf",
+      "devout"
+    ]
+  },
+  {
+    "t": "Do not let another family hear wolves outside their door.",
+    "tags": [
+      "muse",
+      "prayer",
+      "wolf",
+      "devout"
+    ]
+  },
+  {
+    "t": "You know every creature. Keep these ones away from us.",
+    "tags": [
+      "muse",
+      "prayer",
+      "wolf",
+      "devout"
+    ]
+  },
+  {
+    "t": "Maybe wolves fear you. I know they do not fear me.",
+    "tags": [
+      "muse",
+      "prayer",
+      "wolf",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard them near the trees. Please let that be the closest they come.",
+    "tags": [
+      "muse",
+      "prayer",
+      "wolf",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Help the guards find the pack before the pack finds anyone alone.",
+    "tags": [
+      "muse",
+      "prayer",
+      "wolf",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Wolves understand spears better than prayers. Send people with spears.",
+    "tags": [
+      "muse",
+      "prayer",
+      "wolf",
+      "doubting"
+    ]
+  },
+  {
+    "t": "If you protect this village, the howling is your chance to prove it.",
+    "tags": [
+      "muse",
+      "prayer",
+      "wolf",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I would prefer a strong fence, but I will ask you too.",
+    "tags": [
+      "muse",
+      "prayer",
+      "wolf",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Keep watch while the village sleeps and the fires burn low.",
+    "tags": [
+      "muse",
+      "prayer",
+      "night",
+      "devout"
+    ]
+  },
+  {
+    "t": "Stand beside the guards where their torches cannot reach.",
+    "tags": [
+      "muse",
+      "prayer",
+      "night",
+      "devout"
+    ]
+  },
+  {
+    "t": "Let every sleeper wake safely when morning comes.",
+    "tags": [
+      "muse",
+      "prayer",
+      "night",
+      "devout"
+    ]
+  },
+  {
+    "t": "Quiet the fears that grow larger after dark.",
+    "tags": [
+      "muse",
+      "prayer",
+      "night",
+      "devout"
+    ]
+  },
+  {
+    "t": "Night makes every doubt louder. Stay near if you can.",
+    "tags": [
+      "muse",
+      "prayer",
+      "night",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I cannot see beyond the fire. I hope you can.",
+    "tags": [
+      "muse",
+      "prayer",
+      "night",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Help me sleep without turning every sound into danger.",
+    "tags": [
+      "muse",
+      "prayer",
+      "night",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The guard is real and awake. I am asking you as extra help.",
+    "tags": [
+      "muse",
+      "prayer",
+      "night",
+      "doubting"
+    ]
+  },
+  {
+    "t": "If darkness belongs to you too, keep it quiet tonight.",
+    "tags": [
+      "muse",
+      "prayer",
+      "night",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I cannot sleep, so I may as well test whether you listen.",
+    "tags": [
+      "muse",
+      "prayer",
+      "night",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Punish them for what they did and let everyone see it.",
+    "tags": [
+      "muse",
+      "prayer",
+      "grudge",
+      "devout"
+    ]
+  },
+  {
+    "t": "You saw their insult. Show them that you did not approve.",
+    "tags": [
+      "muse",
+      "prayer",
+      "grudge",
+      "devout"
+    ]
+  },
+  {
+    "t": "Judge between us, and do not mistake my patience for forgiveness.",
+    "tags": [
+      "muse",
+      "prayer",
+      "grudge",
+      "devout"
+    ]
+  },
+  {
+    "t": "I have left punishment to you. Please make it memorable.",
+    "tags": [
+      "muse",
+      "prayer",
+      "grudge",
+      "devout"
+    ]
+  },
+  {
+    "t": "I want revenge and keep calling it justice. You know the difference.",
+    "tags": [
+      "muse",
+      "prayer",
+      "grudge",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Part of me wants you to hurt them. The rest hopes you refuse.",
+    "tags": [
+      "muse",
+      "prayer",
+      "grudge",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am too angry to ask for anything decent tonight.",
+    "tags": [
+      "muse",
+      "prayer",
+      "grudge",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I doubt you listen, which makes this easier to admit. Ruin their day.",
+    "tags": [
+      "muse",
+      "prayer",
+      "grudge",
+      "doubting"
+    ]
+  },
+  {
+    "t": "If divine justice exists, it could begin with my unpleasant neighbour.",
+    "tags": [
+      "muse",
+      "prayer",
+      "grudge",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I know this is foolish. I still want you to frighten them.",
+    "tags": [
+      "muse",
+      "prayer",
+      "grudge",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Teach me to serve without needing everyone to notice.",
+    "tags": [
+      "muse",
+      "prayer",
+      "devotion",
+      "devout"
+    ]
+  },
+  {
+    "t": "I have received enough. Show me where I should give.",
+    "tags": [
+      "muse",
+      "prayer",
+      "devotion",
+      "devout"
+    ]
+  },
+  {
+    "t": "Keep my faith honest when obedience becomes inconvenient.",
+    "tags": [
+      "muse",
+      "prayer",
+      "devotion",
+      "devout"
+    ]
+  },
+  {
+    "t": "Let my actions match the promises I make here.",
+    "tags": [
+      "muse",
+      "prayer",
+      "devotion",
+      "devout"
+    ]
+  },
+  {
+    "t": "I keep returning. Perhaps that means more than certainty would.",
+    "tags": [
+      "muse",
+      "prayer",
+      "devotion",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I want to trust you without pretending my questions disappeared.",
+    "tags": [
+      "muse",
+      "prayer",
+      "devotion",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Give me enough faith for the next decision, not every decision forever.",
+    "tags": [
+      "muse",
+      "prayer",
+      "devotion",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I came because habit is cheaper than certainty. Surprise me.",
+    "tags": [
+      "muse",
+      "prayer",
+      "devotion",
+      "doubting"
+    ]
+  },
+  {
+    "t": "If devotion matters to you, explain why doubt keeps company with mine.",
+    "tags": [
+      "muse",
+      "prayer",
+      "devotion",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I am kneeling. That is more agreement than you had yesterday.",
+    "tags": [
+      "muse",
+      "prayer",
+      "devotion",
+      "doubting"
+    ]
+  }
 ]

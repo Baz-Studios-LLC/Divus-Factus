@@ -27,6 +27,13 @@ What always fails review: capital-P Poetry, sermons, modern idiom
 lines longer than ~2 short sentences, and any line that could not be said
 by a tired person leaning on a fence.
 
+**The village speaks British English**, because the game's own labels do —
+the chronicle reads "nursed a neighbour back to health". So: neighbour,
+colour, honour, favour, labour, rumour, behaviour, travelled, realise,
+recognise, apologise, grey, plough. The test
+`the_village_speaks_one_english` fails the build on the American spellings,
+whole words only.
+
 ## The record shape
 
 ```json

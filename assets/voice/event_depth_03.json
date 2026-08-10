@@ -1,134 +1,1205 @@
 [
-  { "t": "I heard the first cry and knew the god had stayed with us.", "tags": ["tell", "event:delivered", "saw", "devout"] },
-  { "t": "The room went quiet, then the child cried. I thanked the god at once.", "tags": ["tell", "event:delivered", "saw", "devout"] },
-  { "t": "I watched the mother hold on until the god brought the child through.", "tags": ["tell", "event:delivered", "saw", "devout"] },
-  { "t": "Both were breathing when it ended. The god was merciful in that room.", "tags": ["tell", "event:delivered", "saw", "devout"] },
-  { "t": "The child came safely after a hard labor. I saw an answered prayer.", "tags": ["tell", "event:delivered", "saw", "devout"] },
-  { "t": "I stood near the door and prayed until I heard the child.", "tags": ["tell", "event:delivered", "saw", "devout"] },
-  { "t": "The healer worked, the mother endured, and the god brought them through.", "tags": ["tell", "event:delivered", "saw", "devout"] },
-  { "t": "I saw the child open their eyes. That was the god's kindness.", "tags": ["tell", "event:delivered", "saw", "devout"] },
-  { "t": "The birth turned dangerous, but the god did not abandon them.", "tags": ["tell", "event:delivered", "saw", "devout"] },
-  { "t": "I watched a new life enter this village under the god's protection.", "tags": ["tell", "event:delivered", "saw", "devout"] },
-  { "t": "The mother asked for the god, and the child arrived safely soon after.", "tags": ["tell", "event:delivered", "saw", "devout"] },
-  { "t": "Nobody in that room stood alone. The god was with every one of us.", "tags": ["tell", "event:delivered", "saw", "devout"] },
-  { "t": "I heard the child cry and wanted to call it a blessing.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "Both survived. I thanked the healer first and the god quietly afterward.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The labor was hard, then suddenly it was over. Maybe somebody listened.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I prayed near the door, though I cannot say what helped.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The child was quiet at first. When they cried, everyone breathed again.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I saw skilled hands and good fortune. There may have been more.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The mother held on longer than I thought anyone could.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "A safe birth makes me wonder whether my doubts are too easy.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The room felt different when the child arrived. I cannot explain that.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I expected the worst and watched both of them survive.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "Perhaps the god helped. I know the people beside her certainly did.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I left that room more grateful than certain.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I watched the healer work until the child was safely born.", "tags": ["tell", "event:delivered", "saw", "doubting"] },
-  { "t": "The mother did the hardest work in that room. Remember that part.", "tags": ["tell", "event:delivered", "saw", "doubting"] },
-  { "t": "I heard prayers, but I saw people save that birth.", "tags": ["tell", "event:delivered", "saw", "doubting"] },
-  { "t": "The child cried because their lungs worked. That was enough for me.", "tags": ["tell", "event:delivered", "saw", "doubting"] },
-  { "t": "It was a difficult birth with a good ending, not a mystery.", "tags": ["tell", "event:delivered", "saw", "doubting"] },
-  { "t": "Everyone credits the god after forgetting who cleaned the blood.", "tags": ["tell", "event:delivered", "saw", "doubting"] },
-  { "t": "I stood in the room. Nothing happened without human hands.", "tags": ["tell", "event:delivered", "saw", "doubting"] },
-  { "t": "The healer knew what to do, and the mother was strong.", "tags": ["tell", "event:delivered", "saw", "doubting"] },
-  { "t": "A safe birth is wonderful without being divine.", "tags": ["tell", "event:delivered", "saw", "doubting"] },
-  { "t": "I watched skilled work succeed. Calling it a miracle hides the lesson.", "tags": ["tell", "event:delivered", "saw", "doubting"] },
-  { "t": "The child came late and healthy. Births do that sometimes.", "tags": ["tell", "event:delivered", "saw", "doubting"] },
-  { "t": "I am glad they survived. Gratitude does not require a god.", "tags": ["tell", "event:delivered", "saw", "doubting"] },
-  { "t": "They say the birth was difficult, but the god guarded both lives.", "tags": ["tell", "event:delivered", "heard", "devout"] },
-  { "t": "Word came that the child cried strongly. The god was kind.", "tags": ["tell", "event:delivered", "heard", "devout"] },
-  { "t": "I heard the mother's prayer was answered before dawn.", "tags": ["tell", "event:delivered", "heard", "devout"] },
-  { "t": "They say both are safe. Maybe prayer helped; good hands certainly did.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "I heard the child came safely after a long night.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "The story sounds like luck until people mention how close it came.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "The healer delivered the child safely. People have added the god since.", "tags": ["tell", "event:delivered", "heard", "doubting"] },
-  { "t": "I heard mother and child are well. That is the whole useful story.", "tags": ["tell", "event:delivered", "heard", "doubting"] },
-  { "t": "People call it divine because they were frightened first.", "tags": ["tell", "event:delivered", "heard", "doubting"] },
-  { "t": "I saw the bolt choose one person beneath an empty sky.", "tags": ["tell", "event:smote", "saw", "devout", "of:person"] },
-  { "t": "The god struck them before anyone could move. I will remember that warning.", "tags": ["tell", "event:smote", "saw", "devout", "of:person"] },
-  { "t": "I watched judgment fall without thunder or rain.", "tags": ["tell", "event:smote", "saw", "devout", "of:person"] },
-  { "t": "One moment they stood there, and the next the god had answered.", "tags": ["tell", "event:smote", "saw", "devout", "of:person"] },
-  { "t": "The clear sky made the god's intent impossible to miss.", "tags": ["tell", "event:smote", "saw", "devout", "of:person"] },
-  { "t": "I saw the god's power land on a person. Nobody nearby spoke afterward.", "tags": ["tell", "event:smote", "saw", "devout", "of:person"] },
-  { "t": "Lightning struck them from a clear sky. I still do not know why.", "tags": ["tell", "event:smote", "saw", "wavering", "of:person"] },
-  { "t": "I saw the bolt land, and belief became harder to avoid.", "tags": ["tell", "event:smote", "saw", "wavering", "of:person"] },
-  { "t": "Maybe it was judgment. That possibility bothers me more than chance.", "tags": ["tell", "event:smote", "saw", "wavering", "of:person"] },
-  { "t": "The person fell before I heard anything. I cannot call that ordinary.", "tags": ["tell", "event:smote", "saw", "wavering", "of:person"] },
-  { "t": "I watched it happen and still cannot decide whether the god meant it.", "tags": ["tell", "event:smote", "saw", "wavering", "of:person"] },
-  { "t": "There were no clouds. That leaves me with questions I dislike.", "tags": ["tell", "event:smote", "saw", "wavering", "of:person"] },
-  { "t": "I saw lightning strike a person. Strange weather is still weather.", "tags": ["tell", "event:smote", "saw", "doubting", "of:person"] },
-  { "t": "The sky was clear, but clear skies do not prove intent.", "tags": ["tell", "event:smote", "saw", "doubting", "of:person"] },
-  { "t": "A person died, and everyone immediately invented a reason.", "tags": ["tell", "event:smote", "saw", "doubting", "of:person"] },
-  { "t": "I witnessed a terrible accident. I did not witness judgment.", "tags": ["tell", "event:smote", "saw", "doubting", "of:person"] },
-  { "t": "The bolt was real. The meaning came from frightened people afterward.", "tags": ["tell", "event:smote", "saw", "doubting", "of:person"] },
-  { "t": "I saw the person fall. Nobody can honestly say why it happened.", "tags": ["tell", "event:smote", "saw", "doubting", "of:person"] },
-  { "t": "I watched new growth cover the bare ground after the god acted.", "tags": ["tell", "event:flourished", "saw", "devout"] },
-  { "t": "The plants thickened before us. The god had answered our need.", "tags": ["tell", "event:flourished", "saw", "devout"] },
-  { "t": "I saw the field fill out in moments. That was providence.", "tags": ["tell", "event:flourished", "saw", "devout"] },
-  { "t": "The god made poor ground generous while we watched.", "tags": ["tell", "event:flourished", "saw", "devout"] },
-  { "t": "Fresh shoots rose where there had been almost nothing.", "tags": ["tell", "event:flourished", "saw", "devout"] },
-  { "t": "I watched the god give the village another harvest.", "tags": ["tell", "event:flourished", "saw", "devout"] },
-  { "t": "The field changed while I stood there. Maybe we were helped.", "tags": ["tell", "event:flourished", "saw", "wavering"] },
-  { "t": "I saw new growth appear too quickly for any season I know.", "tags": ["tell", "event:flourished", "saw", "wavering"] },
-  { "t": "The plants rose together. I have no ordinary answer for that.", "tags": ["tell", "event:flourished", "saw", "wavering"] },
-  { "t": "I wanted food, and the ground changed. I am still considering that.", "tags": ["tell", "event:flourished", "saw", "wavering"] },
-  { "t": "It looked like a blessing. I am not ready to swear it was.", "tags": ["tell", "event:flourished", "saw", "wavering"] },
-  { "t": "The growth was real. Whether it was an answer remains harder.", "tags": ["tell", "event:flourished", "saw", "wavering"] },
-  { "t": "I saw the field improve quickly. We may have missed earlier growth.", "tags": ["tell", "event:flourished", "saw", "doubting"] },
-  { "t": "Plants grow unevenly. People notice only when the change suits a story.", "tags": ["tell", "event:flourished", "saw", "doubting"] },
-  { "t": "The ground was better than we thought. That happens without a god.", "tags": ["tell", "event:flourished", "saw", "doubting"] },
-  { "t": "I watched the plants, not the sky. The plants had enough water.", "tags": ["tell", "event:flourished", "saw", "doubting"] },
-  { "t": "A good patch became a better patch. Fear made it seem sudden.", "tags": ["tell", "event:flourished", "saw", "doubting"] },
-  { "t": "The field changed, but calling every change divine teaches us nothing.", "tags": ["tell", "event:flourished", "saw", "doubting"] },
-  { "t": "The god threw {whom} so hard that nobody dared approach at first.", "tags": ["tell", "event:thrown", "saw", "devout", "of:person"] },
-  { "t": "I watched {whom} leave the ground under the god's hand.", "tags": ["tell", "event:thrown", "saw", "devout", "of:person"] },
-  { "t": "{whom} crossed half the square without taking a step. The god did that.", "tags": ["tell", "event:thrown", "saw", "devout", "of:person"] },
-  { "t": "I ran toward {whom} only after the god released them.", "tags": ["tell", "event:thrown", "saw", "devout", "of:person"] },
-  { "t": "The god lifted {whom} from their feet and cast them aside.", "tags": ["tell", "event:thrown", "saw", "devout", "of:person"] },
-  { "t": "I saw {whom} fly. No human hand was near them.", "tags": ["tell", "event:thrown", "saw", "devout", "of:person"] },
-  { "t": "{whom} landed hard, and I thanked the god they still moved.", "tags": ["tell", "event:thrown", "saw", "devout", "of:person"] },
-  { "t": "Nobody touched {whom}. The god's warning was plain enough.", "tags": ["tell", "event:thrown", "saw", "devout", "of:person"] },
-  { "t": "I saw {whom} rise, but I looked away before they landed.", "tags": ["tell", "event:thrown", "saw", "wavering", "of:person"] },
-  { "t": "{whom} flew past me. I still cannot say what moved them.", "tags": ["tell", "event:thrown", "saw", "wavering", "of:person"] },
-  { "t": "I ran when {whom} left the ground. Courage returned afterward.", "tags": ["tell", "event:thrown", "saw", "wavering", "of:person"] },
-  { "t": "Nobody was near {whom}. I wish that made the answer simpler.", "tags": ["tell", "event:thrown", "saw", "wavering", "of:person"] },
-  { "t": "I checked on {whom} after they landed. They could barely speak.", "tags": ["tell", "event:thrown", "saw", "wavering", "of:person"] },
-  { "t": "{whom} went up suddenly. I did not see where they came down.", "tags": ["tell", "event:thrown", "saw", "wavering", "of:person"] },
-  { "t": "I saw the throw clearly. Its meaning is what I cannot settle.", "tags": ["tell", "event:thrown", "saw", "wavering", "of:person"] },
-  { "t": "Something sent {whom} across the ground. I am not naming it yet.", "tags": ["tell", "event:thrown", "saw", "wavering", "of:person"] },
-  { "t": "{whom} stumbled before they flew. People leave that part out.", "tags": ["tell", "event:thrown", "saw", "doubting", "of:person"] },
-  { "t": "I saw {whom} fall hard. I did not measure the distance.", "tags": ["tell", "event:thrown", "saw", "doubting", "of:person"] },
-  { "t": "Everyone ran from {whom}, which made the throw look worse.", "tags": ["tell", "event:thrown", "saw", "doubting", "of:person"] },
-  { "t": "{whom} was hurt, but frightened witnesses have stretched the story.", "tags": ["tell", "event:thrown", "saw", "doubting", "of:person"] },
-  { "t": "I checked where {whom} landed. The marks were real; the explanation was not.", "tags": ["tell", "event:thrown", "saw", "doubting", "of:person"] },
-  { "t": "Nobody touched {whom}, but that does not prove a god did.", "tags": ["tell", "event:thrown", "saw", "doubting", "of:person"] },
-  { "t": "I saw {whom} leave the ground. I also saw confusion everywhere.", "tags": ["tell", "event:thrown", "saw", "doubting", "of:person"] },
-  { "t": "{whom} landed nearby. The tale already sends them twice as far.", "tags": ["tell", "event:thrown", "saw", "doubting", "of:person"] },
-  { "t": "The god protected that birth. I am glad you told me.", "tags": ["reply", "event:delivered", "devout"] },
-  { "t": "A safe child deserves thanks at the shrine.", "tags": ["reply", "event:delivered", "devout"] },
-  { "t": "That sounds like mercy arriving through capable hands.", "tags": ["reply", "event:delivered", "devout"] },
-  { "t": "Maybe the god helped. Either way, I am relieved.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I can believe the birth was fortunate without knowing why.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "That is the kind of story that makes doubt less comfortable.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Credit the mother and healer before anybody invisible.", "tags": ["reply", "event:delivered", "doubting"] },
-  { "t": "A good birth is good news. It is not evidence.", "tags": ["reply", "event:delivered", "doubting"] },
-  { "t": "I am pleased they survived. Leave the explanation there.", "tags": ["reply", "event:delivered", "doubting"] },
-  { "t": "The god made that field answer our hunger.", "tags": ["reply", "event:flourished", "devout"] },
-  { "t": "We asked for abundance, and abundance came.", "tags": ["reply", "event:flourished", "devout"] },
-  { "t": "Gather all of it. Gifts should not be wasted.", "tags": ["reply", "event:flourished", "devout"] },
-  { "t": "Maybe it was help. We should use it before debating it.", "tags": ["reply", "event:flourished", "wavering"] },
-  { "t": "That growth is difficult to explain and easy to welcome.", "tags": ["reply", "event:flourished", "wavering"] },
-  { "t": "I am not certain it was divine, but I noticed.", "tags": ["reply", "event:flourished", "wavering"] },
-  { "t": "Healthy soil needs no blessing to do its work.", "tags": ["reply", "event:flourished", "doubting"] },
-  { "t": "People always discover providence after counting a good yield.", "tags": ["reply", "event:flourished", "doubting"] },
-  { "t": "Harvest first. Invent meanings after the stores are full.", "tags": ["reply", "event:flourished", "doubting"] },
-  { "t": "The god judged them openly. We should pay attention.", "tags": ["reply", "event:smote", "devout"] },
-  { "t": "That clear sky makes the warning plain.", "tags": ["reply", "event:smote", "devout"] },
-  { "t": "Power like that should make everyone examine their conduct.", "tags": ["reply", "event:smote", "devout"] },
-  { "t": "I believe the strike happened. I fear believing it was deserved.", "tags": ["reply", "event:smote", "wavering"] },
-  { "t": "That sounds deliberate, though I wish it did not.", "tags": ["reply", "event:smote", "wavering"] },
-  { "t": "If the god chose them, I need to understand the reason.", "tags": ["reply", "event:smote", "wavering"] },
-  { "t": "A strange bolt does not become justice because people fear it.", "tags": ["reply", "event:smote", "doubting"] },
-  { "t": "Nobody knows what the dead person deserved. Stop pretending.", "tags": ["reply", "event:smote", "doubting"] },
-  { "t": "You saw lightning. The judgment was added afterward.", "tags": ["reply", "event:smote", "doubting"] }
+  {
+    "t": "I heard the first cry and knew the god had stayed with us.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "The room went quiet, then the child cried. I thanked the god at once.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "I watched the mother hold on until the god brought the child through.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "Both were breathing when it ended. The god was merciful in that room.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "The child came safely after a hard labour. I saw an answered prayer.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "I stood near the door and prayed until I heard the child.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "The healer worked, the mother endured, and the god brought them through.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "I saw the child open their eyes. That was the god's kindness.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "The birth turned dangerous, but the god did not abandon them.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "I watched a new life enter this village under the god's protection.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "The mother asked for the god, and the child arrived safely soon after.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "Nobody in that room stood alone. The god was with every one of us.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard the child cry and wanted to call it a blessing.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Both survived. I thanked the healer first and the god quietly afterward.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The labour was hard, then suddenly it was over. Maybe somebody listened.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I prayed near the door, though I cannot say what helped.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The child was quiet at first. When they cried, everyone breathed again.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I saw skilled hands and good fortune. There may have been more.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The mother held on longer than I thought anyone could.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A safe birth makes me wonder whether my doubts are too easy.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The room felt different when the child arrived. I cannot explain that.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I expected the worst and watched both of them survive.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps the god helped. I know the people beside her certainly did.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I left that room more grateful than certain.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I watched the healer work until the child was safely born.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The mother did the hardest work in that room. Remember that part.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I heard prayers, but I saw people save that birth.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The child cried because their lungs worked. That was enough for me.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "It was a difficult birth with a good ending, not a mystery.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Everyone credits the god after forgetting who cleaned the blood.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I stood in the room. Nothing happened without human hands.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The healer knew what to do, and the mother was strong.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "A safe birth is wonderful without being divine.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I watched skilled work succeed. Calling it a miracle hides the lesson.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The child came late and healthy. Births do that sometimes.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I am glad they survived. Gratitude does not require a god.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "They say the birth was difficult, but the god guarded both lives.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "Word came that the child cried strongly. The god was kind.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard the mother's prayer was answered before dawn.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "They say both are safe. Maybe prayer helped; good hands certainly did.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard the child came safely after a long night.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The story sounds like luck until people mention how close it came.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The healer delivered the child safely. People have added the god since.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I heard mother and child are well. That is the whole useful story.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "People call it divine because they were frightened first.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I saw the bolt choose one person beneath an empty sky.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The god struck them before anyone could move. I will remember that warning.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I watched judgment fall without thunder or rain.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "One moment they stood there, and the next the god had answered.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The clear sky made the god's intent impossible to miss.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw the god's power land on a person. Nobody nearby spoke afterward.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Lightning struck them from a clear sky. I still do not know why.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw the bolt land, and belief became harder to avoid.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Maybe it was judgment. That possibility bothers me more than chance.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The person fell before I heard anything. I cannot call that ordinary.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I watched it happen and still cannot decide whether the god meant it.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "There were no clouds. That leaves me with questions I dislike.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw lightning strike a person. Strange weather is still weather.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The sky was clear, but clear skies do not prove intent.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "A person died, and everyone immediately invented a reason.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I witnessed a terrible accident. I did not witness judgment.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The bolt was real. The meaning came from frightened people afterward.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw the person fall. Nobody can honestly say why it happened.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I watched new growth cover the bare ground after the god acted.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "The plants thickened before us. The god had answered our need.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "I saw the field fill out in moments. That was providence.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god made poor ground generous while we watched.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "Fresh shoots rose where there had been almost nothing.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "I watched the god give the village another harvest.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "The field changed while I stood there. Maybe we were helped.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I saw new growth appear too quickly for any season I know.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The plants rose together. I have no ordinary answer for that.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I wanted food, and the ground changed. I am still considering that.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "It looked like a blessing. I am not ready to swear it was.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The growth was real. Whether it was an answer remains harder.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I saw the field improve quickly. We may have missed earlier growth.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Plants grow unevenly. People notice only when the change suits a story.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The ground was better than we thought. That happens without a god.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I watched the plants, not the sky. The plants had enough water.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "A good patch became a better patch. Fear made it seem sudden.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The field changed, but calling every change divine teaches us nothing.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The god threw {whom} so hard that nobody dared approach at first.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I watched {whom} leave the ground under the god's hand.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "{whom} crossed half the square without taking a step. The god did that.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I ran toward {whom} only after the god released them.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The god lifted {whom} from their feet and cast them aside.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw {whom} fly. No human hand was near them.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "{whom} landed hard, and I thanked the god they still moved.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Nobody touched {whom}. The god's warning was plain enough.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw {whom} rise, but I looked away before they landed.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "{whom} flew past me. I still cannot say what moved them.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I ran when {whom} left the ground. Courage returned afterward.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Nobody was near {whom}. I wish that made the answer simpler.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I checked on {whom} after they landed. They could barely speak.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "{whom} went up suddenly. I did not see where they came down.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw the throw clearly. Its meaning is what I cannot settle.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Something sent {whom} across the ground. I am not naming it yet.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "{whom} stumbled before they flew. People leave that part out.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw {whom} fall hard. I did not measure the distance.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Everyone ran from {whom}, which made the throw look worse.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "{whom} was hurt, but frightened witnesses have stretched the story.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I checked where {whom} landed. The marks were real; the explanation was not.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Nobody touched {whom}, but that does not prove a god did.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw {whom} leave the ground. I also saw confusion everywhere.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "{whom} landed nearby. The tale already sends them twice as far.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The god protected that birth. I am glad you told me.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "devout"
+    ]
+  },
+  {
+    "t": "A safe child deserves thanks at the shrine.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "devout"
+    ]
+  },
+  {
+    "t": "That sounds like mercy arriving through capable hands.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "devout"
+    ]
+  },
+  {
+    "t": "Maybe the god helped. Either way, I am relieved.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I can believe the birth was fortunate without knowing why.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That is the kind of story that makes doubt less comfortable.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Credit the mother and healer before anybody invisible.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "doubting"
+    ]
+  },
+  {
+    "t": "A good birth is good news. It is not evidence.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I am pleased they survived. Leave the explanation there.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The god made that field answer our hunger.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "devout"
+    ]
+  },
+  {
+    "t": "We asked for abundance, and abundance came.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "devout"
+    ]
+  },
+  {
+    "t": "Gather all of it. Gifts should not be wasted.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "devout"
+    ]
+  },
+  {
+    "t": "Maybe it was help. We should use it before debating it.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That growth is difficult to explain and easy to welcome.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am not certain it was divine, but I noticed.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Healthy soil needs no blessing to do its work.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "doubting"
+    ]
+  },
+  {
+    "t": "People always discover providence after counting a good yield.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Harvest first. Invent meanings after the stores are full.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The god judged them openly. We should pay attention.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "devout"
+    ]
+  },
+  {
+    "t": "That clear sky makes the warning plain.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "devout"
+    ]
+  },
+  {
+    "t": "Power like that should make everyone examine their conduct.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "devout"
+    ]
+  },
+  {
+    "t": "I believe the strike happened. I fear believing it was deserved.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That sounds deliberate, though I wish it did not.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "wavering"
+    ]
+  },
+  {
+    "t": "If the god chose them, I need to understand the reason.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A strange bolt does not become justice because people fear it.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Nobody knows what the dead person deserved. Stop pretending.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "doubting"
+    ]
+  },
+  {
+    "t": "You saw lightning. The judgment was added afterward.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "doubting"
+    ]
+  }
 ]

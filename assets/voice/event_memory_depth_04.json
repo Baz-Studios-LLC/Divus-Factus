@@ -1,102 +1,956 @@
 [
-  { "t": "They say food appeared when the stores were nearly bare. The god heard us.", "tags": ["tell", "event:provided", "heard", "devout"] },
-  { "t": "I heard supplies appeared without anyone bringing them. That sounds like help.", "tags": ["tell", "event:provided", "heard", "wavering"] },
-  { "t": "Someone found food and forgot who placed it. That is hardly proof.", "tags": ["tell", "event:provided", "heard", "doubting"] },
-  { "t": "Word reached us that food appeared in another settlement's empty stores.", "tags": ["tell", "event:provided", "distant"] },
-  { "t": "The account says the god filled every basket before dawn.", "tags": ["tell", "event:provided", "distant", "devout"] },
-  { "t": "Farther on, they claim food came from nowhere. I hope some part is true.", "tags": ["tell", "event:provided", "distant", "wavering"] },
-  { "t": "The story crossed two settlements and gained a feast along the way.", "tags": ["tell", "event:provided", "distant", "doubting"] },
-  { "t": "I have told it often: the stores were empty, then the god provided.", "tags": ["tell", "event:provided", "saw", "retold", "devout"] },
-  { "t": "They say a wound closed beneath the god's attention.", "tags": ["tell", "event:mended", "heard", "devout"] },
-  { "t": "I heard someone recovered suddenly. Maybe the god helped the healing along.", "tags": ["tell", "event:mended", "heard", "wavering"] },
-  { "t": "A healer treated the wound, and later people credited the god.", "tags": ["tell", "event:mended", "heard", "doubting"] },
-  { "t": "A distant account says a dying person stood up healed.", "tags": ["tell", "event:mended", "distant"] },
-  { "t": "They speak beyond the hills of flesh restored by divine mercy.", "tags": ["tell", "event:mended", "distant", "devout"] },
-  { "t": "The healing story sounds larger each time it travels.", "tags": ["tell", "event:mended", "distant", "wavering"] },
-  { "t": "By the time the account reached us, a scratch had become mortal.", "tags": ["tell", "event:mended", "distant", "doubting"] },
-  { "t": "I still tell how the wound closed while we watched.", "tags": ["tell", "event:mended", "saw", "retold"] },
-  { "t": "They say the ground shook when the god's anger passed beneath it.", "tags": ["tell", "event:quaked", "heard", "devout"] },
-  { "t": "I heard dishes fell and walls shifted. Maybe the god moved below them.", "tags": ["tell", "event:quaked", "heard", "wavering"] },
-  { "t": "Ground moves sometimes. Fear supplied the divine explanation afterward.", "tags": ["tell", "event:quaked", "heard", "doubting"] },
-  { "t": "People beyond the ridge report a shaking strong enough to wake every house.", "tags": ["tell", "event:quaked", "distant"] },
-  { "t": "The distant account says the god made the whole valley kneel.", "tags": ["tell", "event:quaked", "distant", "devout"] },
-  { "t": "The shaking may have been divine. The broken walls were certainly real.", "tags": ["tell", "event:quaked", "distant", "wavering"] },
-  { "t": "Each village adds another fallen building to the earthquake account.", "tags": ["tell", "event:quaked", "distant", "doubting"] },
-  { "t": "I have repeated the shaking so often I remember people's faces best.", "tags": ["tell", "event:quaked", "saw", "retold"] },
-  { "t": "They say the god drove the wolf away after it mauled someone.", "tags": ["tell", "event:mauled", "heard", "devout", "of:person"] },
-  { "t": "I heard someone survived a wolf attack. Perhaps prayer helped.", "tags": ["tell", "event:mauled", "heard", "wavering", "of:person"] },
-  { "t": "A wolf attacked someone, and frightened neighbors made it divine.", "tags": ["tell", "event:mauled", "heard", "doubting", "of:person"] },
-  { "t": "News came from another settlement that wolves took a person near the trees.", "tags": ["tell", "event:mauled", "distant", "of:person"] },
-  { "t": "They say the god spared someone from a whole pack beyond the ridge.", "tags": ["tell", "event:mauled", "distant", "devout", "of:person"] },
-  { "t": "The far account cannot decide whether the person lived.", "tags": ["tell", "event:mauled", "distant", "wavering", "of:person"] },
-  { "t": "One wolf became five before the story reached our fire.", "tags": ["tell", "event:mauled", "distant", "doubting", "of:person"] },
-  { "t": "I keep telling where the wolf came from so others watch that path.", "tags": ["tell", "event:mauled", "saw", "retold", "of:person"] },
-  { "t": "They say the god called someone away before their family was ready.", "tags": ["tell", "event:perished", "heard", "devout", "of:person"] },
-  { "t": "I heard someone died suddenly. I do not know whether there was meaning.", "tags": ["tell", "event:perished", "heard", "wavering", "of:person"] },
-  { "t": "A person died, and grief made every ordinary detail sound divine.", "tags": ["tell", "event:perished", "heard", "doubting", "of:person"] },
-  { "t": "Word came from far away that a person died without warning.", "tags": ["tell", "event:perished", "distant", "of:person"] },
-  { "t": "The distant account says the god took someone in full view of the village.", "tags": ["tell", "event:perished", "distant", "devout", "of:person"] },
-  { "t": "I heard a death became a warning after several tellings.", "tags": ["tell", "event:perished", "distant", "wavering", "of:person"] },
-  { "t": "Nobody who tells the story knew the person who died.", "tags": ["tell", "event:perished", "distant", "doubting", "of:person"] },
-  { "t": "I have told the death often, but I refuse to improve it.", "tags": ["tell", "event:perished", "heard", "retold", "of:person"] },
-  { "t": "They say the god raised someone until their feet cleared the roof.", "tags": ["tell", "event:lifted", "heard", "devout", "of:person"] },
-  { "t": "I heard a person rose without support. That leaves little room for easy answers.", "tags": ["tell", "event:lifted", "heard", "wavering", "of:person"] },
-  { "t": "Someone fell, and the account now begins with them floating.", "tags": ["tell", "event:lifted", "heard", "doubting", "of:person"] },
-  { "t": "A story from the next valley has a person rising above the houses.", "tags": ["tell", "event:lifted", "distant", "of:person"] },
-  { "t": "They say the god lifted someone high enough for every doubter to see.", "tags": ["tell", "event:lifted", "distant", "devout", "of:person"] },
-  { "t": "Perhaps someone truly rose. The height changes with every speaker.", "tags": ["tell", "event:lifted", "distant", "wavering", "of:person"] },
-  { "t": "The far account lifts the person higher each time it is told.", "tags": ["tell", "event:lifted", "distant", "doubting", "of:person"] },
-  { "t": "I still remember the empty space beneath their feet.", "tags": ["tell", "event:lifted", "saw", "retold", "of:person"] },
-  { "t": "They say the god lowered someone gently after displaying divine power.", "tags": ["tell", "event:setdown", "heard", "devout", "of:person"] },
-  { "t": "I heard a floating person reached the ground unharmed. Maybe mercy ended it.", "tags": ["tell", "event:setdown", "heard", "wavering", "of:person"] },
-  { "t": "Someone landed safely, and people invented a divine descent.", "tags": ["tell", "event:setdown", "heard", "doubting", "of:person"] },
-  { "t": "The traveling account says a person descended without bending a blade of grass.", "tags": ["tell", "event:setdown", "distant", "of:person"] },
-  { "t": "They say the god returned someone to earth as gently as sleep.", "tags": ["tell", "event:setdown", "distant", "devout", "of:person"] },
-  { "t": "The safe landing sounds possible. The rest sounds polished by travel.", "tags": ["tell", "event:setdown", "distant", "wavering", "of:person"] },
-  { "t": "Nobody remembers who first claimed the person floated before landing.", "tags": ["tell", "event:setdown", "distant", "doubting", "of:person"] },
-  { "t": "I tell the landing because everyone asks what happened after the rising.", "tags": ["tell", "event:setdown", "saw", "retold", "of:person"] },
-  { "t": "They say the god slammed someone down hard enough to split the earth.", "tags": ["tell", "event:impact", "heard", "devout", "of:person"] },
-  { "t": "I heard a person struck the ground without falling first. I cannot settle that.", "tags": ["tell", "event:impact", "heard", "wavering", "of:person"] },
-  { "t": "A person fell hard. The divine force appeared in later accounts.", "tags": ["tell", "event:impact", "heard", "doubting", "of:person"] },
-  { "t": "A distant story says someone hit the ground and shook every nearby wall.", "tags": ["tell", "event:impact", "distant", "of:person"] },
-  { "t": "They say the god cast a person down as a public warning.", "tags": ["tell", "event:impact", "distant", "devout", "of:person"] },
-  { "t": "Something terrible happened when the person landed. The cause remains disputed.", "tags": ["tell", "event:impact", "distant", "wavering", "of:person"] },
-  { "t": "The impact grows louder whenever the story crosses another settlement.", "tags": ["tell", "event:impact", "distant", "doubting", "of:person"] },
-  { "t": "I have repeated the landing, but the sound is what stays with me.", "tags": ["tell", "event:impact", "saw", "retold", "of:person"] },
-  { "t": "They say the god tore a whole tree from the soil.", "tags": ["tell", "event:uprooted", "heard", "devout", "of:thing"] },
-  { "t": "I heard a tree rose roots first. Weather seems too easy an answer.", "tags": ["tell", "event:uprooted", "heard", "wavering", "of:thing"] },
-  { "t": "A rotten tree fell, and the story turned the fall upward.", "tags": ["tell", "event:uprooted", "heard", "doubting", "of:thing"] },
-  { "t": "Beyond the ridge, people claim an entire grove left the ground.", "tags": ["tell", "event:uprooted", "distant", "of:thing"] },
-  { "t": "The distant account says the god pulled trees out like weeds.", "tags": ["tell", "event:uprooted", "distant", "devout", "of:thing"] },
-  { "t": "One tree may have moved. A traveling story has made it a forest.", "tags": ["tell", "event:uprooted", "distant", "wavering", "of:thing"] },
-  { "t": "No witness who reached us agrees how many trees moved.", "tags": ["tell", "event:uprooted", "distant", "doubting", "of:thing"] },
-  { "t": "I tell where the roots broke because that part proves what I saw.", "tags": ["tell", "event:uprooted", "saw", "retold", "of:thing"] },
-  { "t": "They say the god struck a person beneath a cloudless sky.", "tags": ["tell", "event:smote", "heard", "devout", "of:person"] },
-  { "t": "I heard the bolt came without thunder. That sounds deliberate, though I hesitate.", "tags": ["tell", "event:smote", "heard", "wavering", "of:person"] },
-  { "t": "Lightning killed someone. Clear weather does not prove judgment.", "tags": ["tell", "event:smote", "heard", "doubting", "of:person"] },
-  { "t": "A far settlement tells of a person struck under a bright sky.", "tags": ["tell", "event:smote", "distant", "of:person"] },
-  { "t": "They say the god named a sinner with lightning before the whole town.", "tags": ["tell", "event:smote", "distant", "devout", "of:person"] },
-  { "t": "The strange lightning may be true. The person's supposed guilt may not be.", "tags": ["tell", "event:smote", "distant", "wavering", "of:person"] },
-  { "t": "The farther the account travels, the clearer the dead person's crime becomes.", "tags": ["tell", "event:smote", "distant", "doubting", "of:person"] },
-  { "t": "I repeat only the strike. I never claim to know the reason.", "tags": ["tell", "event:smote", "saw", "retold", "wavering", "of:person"] },
-  { "t": "They say the god made bare ground produce a season's growth in moments.", "tags": ["tell", "event:flourished", "heard", "devout"] },
-  { "t": "I heard the field changed before anyone could explain it.", "tags": ["tell", "event:flourished", "heard", "wavering"] },
-  { "t": "A good field became a miracle after enough people discussed it.", "tags": ["tell", "event:flourished", "heard", "doubting"] },
-  { "t": "News from beyond the hills says empty land turned green overnight.", "tags": ["tell", "event:flourished", "distant"] },
-  { "t": "The distant account credits the god with feeding an entire settlement at once.", "tags": ["tell", "event:flourished", "distant", "devout"] },
-  { "t": "Somewhere far away, a field changed suddenly. I would like to see it.", "tags": ["tell", "event:flourished", "distant", "wavering"] },
-  { "t": "The crop doubles each time the account moves down the road.", "tags": ["tell", "event:flourished", "distant", "doubting"] },
-  { "t": "I keep telling how quickly the shoots appeared, though nobody believes the timing.", "tags": ["tell", "event:flourished", "saw", "retold"] },
-  { "t": "They say the god threw someone beyond the village path.", "tags": ["tell", "event:thrown", "heard", "devout", "of:person"] },
-  { "t": "I heard a person flew without being touched. I cannot dismiss that easily.", "tags": ["tell", "event:thrown", "heard", "wavering", "of:person"] },
-  { "t": "Someone was knocked down, and every teller adds another body length.", "tags": ["tell", "event:thrown", "heard", "doubting", "of:person"] },
-  { "t": "The far account has someone flying from one settlement to the next.", "tags": ["tell", "event:thrown", "distant", "of:person"] },
-  { "t": "They say the god flung a person so all nearby settlements would hear.", "tags": ["tell", "event:thrown", "distant", "devout", "of:person"] },
-  { "t": "A person may truly have flown. The distance is now anybody's guess.", "tags": ["tell", "event:thrown", "distant", "wavering", "of:person"] },
-  { "t": "The story throws them farther because nobody checks where they landed.", "tags": ["tell", "event:thrown", "distant", "doubting", "of:person"] },
-  { "t": "I have told the throw many times. I still leave out the screaming.", "tags": ["tell", "event:thrown", "saw", "retold", "wavering", "of:person"] },
-  { "t": "They say a safe child was born after prayers from the whole house.", "tags": ["tell", "event:delivered", "heard", "devout"] },
-  { "t": "I heard both survived a difficult birth. That leaves room for hope.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "A healer delivered a healthy child. The prayer story arrived later.", "tags": ["tell", "event:delivered", "heard", "doubting"] },
-  { "t": "A traveling account tells of a child born safely after a terrible night.", "tags": ["tell", "event:delivered", "distant"] }
+  {
+    "t": "They say food appeared when the stores were nearly bare. The god heard us.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard supplies appeared without anyone bringing them. That sounds like help.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Someone found food and forgot who placed it. That is hardly proof.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Word reached us that food appeared in another settlement's empty stores.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "The account says the god filled every basket before dawn.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "Farther on, they claim food came from nowhere. I hope some part is true.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The story crossed two settlements and gained a feast along the way.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I have told it often: the stores were empty, then the god provided.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "retold",
+      "devout"
+    ]
+  },
+  {
+    "t": "They say a wound closed beneath the god's attention.",
+    "tags": [
+      "tell",
+      "event:mended",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard someone recovered suddenly. Maybe the god helped the healing along.",
+    "tags": [
+      "tell",
+      "event:mended",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A healer treated the wound, and later people credited the god.",
+    "tags": [
+      "tell",
+      "event:mended",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "A distant account says a dying person stood up healed.",
+    "tags": [
+      "tell",
+      "event:mended",
+      "distant"
+    ]
+  },
+  {
+    "t": "They speak beyond the hills of flesh restored by divine mercy.",
+    "tags": [
+      "tell",
+      "event:mended",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "The healing story sounds larger each time it travels.",
+    "tags": [
+      "tell",
+      "event:mended",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "By the time the account reached us, a scratch had become mortal.",
+    "tags": [
+      "tell",
+      "event:mended",
+      "distant",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I still tell how the wound closed while we watched.",
+    "tags": [
+      "tell",
+      "event:mended",
+      "saw",
+      "retold"
+    ]
+  },
+  {
+    "t": "They say the ground shook when the god's anger passed beneath it.",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard dishes fell and walls shifted. Maybe the god moved below them.",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Ground moves sometimes. Fear supplied the divine explanation afterward.",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "People beyond the ridge report a shaking strong enough to wake every house.",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "distant"
+    ]
+  },
+  {
+    "t": "The distant account says the god made the whole valley kneel.",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "The shaking may have been divine. The broken walls were certainly real.",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Each village adds another fallen building to the earthquake account.",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "distant",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I have repeated the shaking so often I remember people's faces best.",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "saw",
+      "retold"
+    ]
+  },
+  {
+    "t": "They say the god drove the wolf away after it mauled someone.",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard someone survived a wolf attack. Perhaps prayer helped.",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "A wolf attacked someone, and frightened neighbours made it divine.",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "News came from another settlement that wolves took a person near the trees.",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god spared someone from a whole pack beyond the ridge.",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "distant",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The far account cannot decide whether the person lived.",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "distant",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "One wolf became five before the story reached our fire.",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "distant",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I keep telling where the wolf came from so others watch that path.",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "saw",
+      "retold",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god called someone away before their family was ready.",
+    "tags": [
+      "tell",
+      "event:perished",
+      "heard",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard someone died suddenly. I do not know whether there was meaning.",
+    "tags": [
+      "tell",
+      "event:perished",
+      "heard",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "A person died, and grief made every ordinary detail sound divine.",
+    "tags": [
+      "tell",
+      "event:perished",
+      "heard",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Word came from far away that a person died without warning.",
+    "tags": [
+      "tell",
+      "event:perished",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The distant account says the god took someone in full view of the village.",
+    "tags": [
+      "tell",
+      "event:perished",
+      "distant",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard a death became a warning after several tellings.",
+    "tags": [
+      "tell",
+      "event:perished",
+      "distant",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Nobody who tells the story knew the person who died.",
+    "tags": [
+      "tell",
+      "event:perished",
+      "distant",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I have told the death often, but I refuse to improve it.",
+    "tags": [
+      "tell",
+      "event:perished",
+      "heard",
+      "retold",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god raised someone until their feet cleared the roof.",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "heard",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard a person rose without support. That leaves little room for easy answers.",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "heard",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Someone fell, and the account now begins with them floating.",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "heard",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "A story from the next valley has a person rising above the houses.",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god lifted someone high enough for every doubter to see.",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "distant",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Perhaps someone truly rose. The height changes with every speaker.",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "distant",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The far account lifts the person higher each time it is told.",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "distant",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I still remember the empty space beneath their feet.",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "saw",
+      "retold",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god lowered someone gently after displaying divine power.",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "heard",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard a floating person reached the ground unharmed. Maybe mercy ended it.",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "heard",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Someone landed safely, and people invented a divine descent.",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "heard",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The travelling account says a person descended without bending a blade of grass.",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god returned someone to earth as gently as sleep.",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "distant",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The safe landing sounds possible. The rest sounds polished by travel.",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "distant",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Nobody remembers who first claimed the person floated before landing.",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "distant",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I tell the landing because everyone asks what happened after the rising.",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "saw",
+      "retold",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god slammed someone down hard enough to split the earth.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "heard",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard a person struck the ground without falling first. I cannot settle that.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "heard",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "A person fell hard. The divine force appeared in later accounts.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "heard",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "A distant story says someone hit the ground and shook every nearby wall.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god cast a person down as a public warning.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "distant",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Something terrible happened when the person landed. The cause remains disputed.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "distant",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The impact grows louder whenever the story crosses another settlement.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "distant",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I have repeated the landing, but the sound is what stays with me.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "saw",
+      "retold",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god tore a whole tree from the soil.",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "heard",
+      "devout",
+      "of:thing"
+    ]
+  },
+  {
+    "t": "I heard a tree rose roots first. Weather seems too easy an answer.",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "heard",
+      "wavering",
+      "of:thing"
+    ]
+  },
+  {
+    "t": "A rotten tree fell, and the story turned the fall upward.",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "heard",
+      "doubting",
+      "of:thing"
+    ]
+  },
+  {
+    "t": "Beyond the ridge, people claim an entire grove left the ground.",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "distant",
+      "of:thing"
+    ]
+  },
+  {
+    "t": "The distant account says the god pulled trees out like weeds.",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "distant",
+      "devout",
+      "of:thing"
+    ]
+  },
+  {
+    "t": "One tree may have moved. A travelling story has made it a forest.",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "distant",
+      "wavering",
+      "of:thing"
+    ]
+  },
+  {
+    "t": "No witness who reached us agrees how many trees moved.",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "distant",
+      "doubting",
+      "of:thing"
+    ]
+  },
+  {
+    "t": "I tell where the roots broke because that part proves what I saw.",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "saw",
+      "retold",
+      "of:thing"
+    ]
+  },
+  {
+    "t": "They say the god struck a person beneath a cloudless sky.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "heard",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard the bolt came without thunder. That sounds deliberate, though I hesitate.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "heard",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Lightning killed someone. Clear weather does not prove judgment.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "heard",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "A far settlement tells of a person struck under a bright sky.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god named a sinner with lightning before the whole town.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "distant",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The strange lightning may be true. The person's supposed guilt may not be.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "distant",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The farther the account travels, the clearer the dead person's crime becomes.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "distant",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I repeat only the strike. I never claim to know the reason.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "retold",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god made bare ground produce a season's growth in moments.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard the field changed before anyone could explain it.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A good field became a miracle after enough people discussed it.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "News from beyond the hills says empty land turned green overnight.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "distant"
+    ]
+  },
+  {
+    "t": "The distant account credits the god with feeding an entire settlement at once.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "Somewhere far away, a field changed suddenly. I would like to see it.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The crop doubles each time the account moves down the road.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "distant",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I keep telling how quickly the shoots appeared, though nobody believes the timing.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "retold"
+    ]
+  },
+  {
+    "t": "They say the god threw someone beyond the village path.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "heard",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard a person flew without being touched. I cannot dismiss that easily.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "heard",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Someone was knocked down, and every teller adds another body length.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "heard",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The far account has someone flying from one settlement to the next.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god flung a person so all nearby settlements would hear.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "distant",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "A person may truly have flown. The distance is now anybody's guess.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "distant",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The story throws them farther because nobody checks where they landed.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "distant",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I have told the throw many times. I still leave out the screaming.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "retold",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say a safe child was born after prayers from the whole house.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard both survived a difficult birth. That leaves room for hope.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A healer delivered a healthy child. The prayer story arrived later.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "A travelling account tells of a child born safely after a terrible night.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "distant"
+    ]
+  }
 ]

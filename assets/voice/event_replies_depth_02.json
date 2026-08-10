@@ -1,131 +1,938 @@
 [
-  { "t": "The god watched over that birth. I am certain of it.", "tags": ["reply", "event:delivered", "devout"] },
-  { "t": "A safe child is a blessing. We should give thanks.", "tags": ["reply", "event:delivered", "devout"] },
-  { "t": "The god kept both of them here. That matters.", "tags": ["reply", "event:delivered", "devout"] },
-  { "t": "Maybe the god helped. I am mostly glad they are safe.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "A birth like that makes belief easier for a day.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I do not know who deserves thanks. I will thank everyone.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Good hands delivered that child. Do not forget the people in the room.", "tags": ["reply", "event:delivered", "doubting"] },
-  { "t": "Births go well sometimes. That does not make them miracles.", "tags": ["reply", "event:delivered", "doubting"] },
-  { "t": "I am glad they lived. I will leave the god out of it.", "tags": ["reply", "event:delivered", "doubting"] },
-
-  { "t": "The god made the ground generous. We should not waste what grew.", "tags": ["reply", "event:flourished", "devout"] },
-  { "t": "That harvest has the god's hand all over it.", "tags": ["reply", "event:flourished", "devout"] },
-  { "t": "The land answered because the god willed it. Give thanks.", "tags": ["reply", "event:flourished", "devout"] },
-  { "t": "It could be a blessing. It could be a very good season.", "tags": ["reply", "event:flourished", "wavering"] },
-  { "t": "I want to call that providence. I am not quite there.", "tags": ["reply", "event:flourished", "wavering"] },
-  { "t": "Whatever caused it, we should fill the stores while we can.", "tags": ["reply", "event:flourished", "wavering"] },
-  { "t": "Good soil and good weather can surprise people. That is enough explanation.", "tags": ["reply", "event:flourished", "doubting"] },
-  { "t": "The fields had a strong year. Fields do that.", "tags": ["reply", "event:flourished", "doubting"] },
-  { "t": "Call it a miracle after the next harvest does the same.", "tags": ["reply", "event:flourished", "doubting"] },
-
-  { "t": "The god threw them down. There is no softer way to say it.", "tags": ["reply", "event:impact", "devout"] },
-  { "t": "That landing was judgment. I would mind where I stand.", "tags": ["reply", "event:impact", "devout"] },
-  { "t": "The god spared them the worst of that fall.", "tags": ["reply", "event:impact", "devout"] },
-  { "t": "Something put them on the ground. I cannot say what.", "tags": ["reply", "event:impact", "wavering"] },
-  { "t": "I believe the fall. The reason for it is harder.", "tags": ["reply", "event:impact", "wavering"] },
-  { "t": "That sounds like power. Whether it was divine power, I do not know.", "tags": ["reply", "event:impact", "wavering"] },
-  { "t": "A bad fall becomes a miracle once enough people repeat it.", "tags": ["reply", "event:impact", "doubting"] },
-  { "t": "They hit the ground hard. That part needs no god.", "tags": ["reply", "event:impact", "doubting"] },
-  { "t": "Show me where they landed before you tell me what caused it.", "tags": ["reply", "event:impact", "doubting"] },
-
-  { "t": "The god lifted them for everyone to see. That was no accident.", "tags": ["reply", "event:lifted", "devout"] },
-  { "t": "Being raised like that marks a person. We should pay attention.", "tags": ["reply", "event:lifted", "devout"] },
-  { "t": "The god took hold of them and set doubt aside.", "tags": ["reply", "event:lifted", "devout"] },
-  { "t": "I believe they rose. I still do not know why.", "tags": ["reply", "event:lifted", "wavering"] },
-  { "t": "That is hard to explain without the god. Hard is not impossible.", "tags": ["reply", "event:lifted", "wavering"] },
-  { "t": "If you truly saw their feet leave the ground, I need time.", "tags": ["reply", "event:lifted", "wavering"] },
-  { "t": "People jump, stumble, and remember badly. I need more than one account.", "tags": ["reply", "event:lifted", "doubting"] },
-  { "t": "Nobody floats. That tells me the story grew somewhere.", "tags": ["reply", "event:lifted", "doubting"] },
-  { "t": "I would need to see that with my own eyes.", "tags": ["reply", "event:lifted", "doubting"] },
-
-  { "t": "The god saw the wolf and saw who suffered. Help will come.", "tags": ["reply", "event:mauled", "devout"] },
-  { "t": "We should pray for them and sharpen every spear.", "tags": ["reply", "event:mauled", "devout"] },
-  { "t": "The god spared their life. We must tend the wounds.", "tags": ["reply", "event:mauled", "devout"] },
-  { "t": "Maybe someone watched over them. The wounds are real either way.", "tags": ["reply", "event:mauled", "wavering"] },
-  { "t": "I do not know why the god allowed it. I am glad they survived.", "tags": ["reply", "event:mauled", "wavering"] },
-  { "t": "That makes me want a prayer and a stronger fence.", "tags": ["reply", "event:mauled", "wavering"] },
-  { "t": "Wolves bite people when we let them close. Build the fence.", "tags": ["reply", "event:mauled", "doubting"] },
-  { "t": "There is no message in teeth. There is only a hungry wolf.", "tags": ["reply", "event:mauled", "doubting"] },
-  { "t": "Prayer later will not help as much as holding a spear now.", "tags": ["reply", "event:mauled", "doubting"] },
-
-  { "t": "The god made the broken thing whole. That is mercy.", "tags": ["reply", "event:mended", "devout"] },
-  { "t": "No tool did that work. Give the god the credit.", "tags": ["reply", "event:mended", "devout"] },
-  { "t": "The god restored what we could not. We should remember it.", "tags": ["reply", "event:mended", "devout"] },
-  { "t": "It was broken, and now it is not. I cannot explain the middle.", "tags": ["reply", "event:mended", "wavering"] },
-  { "t": "That sounds like a miracle. I am surprised to hear myself say it.", "tags": ["reply", "event:mended", "wavering"] },
-  { "t": "Maybe the god repaired it. Someone should still inspect the work.", "tags": ["reply", "event:mended", "wavering"] },
-  { "t": "Someone fixed it and failed to mention it. That happens.", "tags": ["reply", "event:mended", "doubting"] },
-  { "t": "Repairs look impossible when nobody sees the worker.", "tags": ["reply", "event:mended", "doubting"] },
-  { "t": "I want to see the break before I believe it vanished.", "tags": ["reply", "event:mended", "doubting"] },
-
-  { "t": "The god received them. We should support the people left behind.", "tags": ["reply", "event:perished", "devout"] },
-  { "t": "Their life mattered to the god. It should matter to us.", "tags": ["reply", "event:perished", "devout"] },
-  { "t": "We will pray for the dead and bring food to the family.", "tags": ["reply", "event:perished", "devout"] },
-  { "t": "I hope someone was there at the end. I hope the god was.", "tags": ["reply", "event:perished", "wavering"] },
-  { "t": "Death makes me want to believe and doubt at the same time.", "tags": ["reply", "event:perished", "wavering"] },
-  { "t": "I do not know where they went. I know who will miss them.", "tags": ["reply", "event:perished", "wavering"] },
-  { "t": "They died. We should speak about their life, not invent an answer.", "tags": ["reply", "event:perished", "doubting"] },
-  { "t": "Death is hard enough without pretending we know what follows.", "tags": ["reply", "event:perished", "doubting"] },
-  { "t": "Help the family in front of us. Leave the next world alone.", "tags": ["reply", "event:perished", "doubting"] },
-
-  { "t": "The god fed us when the stores failed. We owe thanks.", "tags": ["reply", "event:provided", "devout"] },
-  { "t": "Food appearing when we needed it is providence made plain.", "tags": ["reply", "event:provided", "devout"] },
-  { "t": "The god heard an empty stomach and answered it.", "tags": ["reply", "event:provided", "devout"] },
-  { "t": "Maybe the food was given. Maybe somebody left it. We should still share it.", "tags": ["reply", "event:provided", "wavering"] },
-  { "t": "I want that to be an answer. Hunger makes belief tempting.", "tags": ["reply", "event:provided", "wavering"] },
-  { "t": "The timing is difficult to dismiss. I am still trying.", "tags": ["reply", "event:provided", "wavering"] },
-  { "t": "Food has owners, even when nobody saw them arrive.", "tags": ["reply", "event:provided", "doubting"] },
-  { "t": "Count the baskets twice before calling supper a miracle.", "tags": ["reply", "event:provided", "doubting"] },
-  { "t": "Someone brought that food. We should find them and say thanks.", "tags": ["reply", "event:provided", "doubting"] },
-
-  { "t": "The god shook the ground beneath us. That was a warning.", "tags": ["reply", "event:quaked", "devout"] },
-  { "t": "Even the earth moves when the god commands it.", "tags": ["reply", "event:quaked", "devout"] },
-  { "t": "We should check every wall and then give thanks for surviving.", "tags": ["reply", "event:quaked", "devout"] },
-  { "t": "The earth moved, certainly. Whether the god moved it is another question.", "tags": ["reply", "event:quaked", "wavering"] },
-  { "t": "That shaking felt deliberate. I do not like what that suggests.", "tags": ["reply", "event:quaked", "wavering"] },
-  { "t": "I nearly prayed while it happened. I am still deciding what that means.", "tags": ["reply", "event:quaked", "wavering"] },
-  { "t": "Ground shifts. It does not need hands to move.", "tags": ["reply", "event:quaked", "doubting"] },
-  { "t": "Check the foundations before everyone starts preaching about the shaking.", "tags": ["reply", "event:quaked", "doubting"] },
-  { "t": "Fear makes patterns quickly. An earthquake is frightening enough by itself.", "tags": ["reply", "event:quaked", "doubting"] },
-
-  { "t": "The god put them down gently. Mercy followed power.", "tags": ["reply", "event:setdown", "devout"] },
-  { "t": "They were returned safely because the god chose it.", "tags": ["reply", "event:setdown", "devout"] },
-  { "t": "Give thanks that the god set them down instead of dropping them.", "tags": ["reply", "event:setdown", "devout"] },
-  { "t": "A gentle landing does make the story harder to dismiss.", "tags": ["reply", "event:setdown", "wavering"] },
-  { "t": "Something lowered them. I cannot decide whether that comforts me.", "tags": ["reply", "event:setdown", "wavering"] },
-  { "t": "I believe they came down safely. I am unsure about the rest.", "tags": ["reply", "event:setdown", "wavering"] },
-  { "t": "People land on their feet sometimes. That is not divine proof.", "tags": ["reply", "event:setdown", "doubting"] },
-  { "t": "The gentle part sounds added afterward. Stories like tidy endings.", "tags": ["reply", "event:setdown", "doubting"] },
-  { "t": "Show me where it happened. I want more than an exact retelling.", "tags": ["reply", "event:setdown", "doubting"] },
-
-  { "t": "The god struck them. We should ask what brought that judgment.", "tags": ["reply", "event:smote", "devout"] },
-  { "t": "Lightning from a clear sky is no ordinary death.", "tags": ["reply", "event:smote", "devout"] },
-  { "t": "The god answered with wrath. Nobody should celebrate that lightly.", "tags": ["reply", "event:smote", "devout"] },
-  { "t": "That sounds like the god, and I wish it did not.", "tags": ["reply", "event:smote", "wavering"] },
-  { "t": "If it was judgment, I want to know what was judged.", "tags": ["reply", "event:smote", "wavering"] },
-  { "t": "A clear sky makes chance harder to believe. Not impossible, just harder.", "tags": ["reply", "event:smote", "wavering"] },
-  { "t": "Lightning is lightning. Clear skies do not make it a sentence.", "tags": ["reply", "event:smote", "doubting"] },
-  { "t": "People call every strange death judgment after the person cannot answer back.", "tags": ["reply", "event:smote", "doubting"] },
-  { "t": "I believe they were struck. I do not believe anyone chose it.", "tags": ["reply", "event:smote", "doubting"] },
-
-  { "t": "The god cast them aside. That kind of power deserves caution.", "tags": ["reply", "event:thrown", "devout"] },
-  { "t": "Nobody flies that far without the god's hand behind it.", "tags": ["reply", "event:thrown", "devout"] },
-  { "t": "The god threw them and still let them live. Remember both parts.", "tags": ["reply", "event:thrown", "devout"] },
-  { "t": "I believe something threw them. Naming it is where I hesitate.", "tags": ["reply", "event:thrown", "wavering"] },
-  { "t": "That story frightens me more if the god truly did it.", "tags": ["reply", "event:thrown", "wavering"] },
-  { "t": "People do not move like that. I admit the obvious explanation is difficult.", "tags": ["reply", "event:thrown", "wavering"] },
-  { "t": "A tumble looks like a flight when the witness is frightened.", "tags": ["reply", "event:thrown", "doubting"] },
-  { "t": "I need distance, marks, and another witness before I believe that throw.", "tags": ["reply", "event:thrown", "doubting"] },
-  { "t": "The story traveled farther than the person did. I would wager on that.", "tags": ["reply", "event:thrown", "doubting"] },
-
-  { "t": "The god pulled that tree from the earth. Nothing else could.", "tags": ["reply", "event:uprooted", "devout"] },
-  { "t": "Roots and all means the god wanted our attention.", "tags": ["reply", "event:uprooted", "devout"] },
-  { "t": "The god cleared the ground with one act. We should ask why.", "tags": ["reply", "event:uprooted", "devout"] },
-  { "t": "A whole tree coming up is difficult to explain. I will grant you that.", "tags": ["reply", "event:uprooted", "wavering"] },
-  { "t": "Maybe the god moved it. Maybe the roots were already gone.", "tags": ["reply", "event:uprooted", "wavering"] },
-  { "t": "I would like to see the hole before I decide what happened.", "tags": ["reply", "event:uprooted", "wavering"] },
-  { "t": "Rot takes roots before anyone sees it. Then one hard pull finishes the work.", "tags": ["reply", "event:uprooted", "doubting"] },
-  { "t": "Trees fall strangely on bad ground. That is not a sermon.", "tags": ["reply", "event:uprooted", "doubting"] },
-  { "t": "Show me sound roots and no tools. Then I will listen.", "tags": ["reply", "event:uprooted", "doubting"] }
+  {
+    "t": "The god watched over that birth. I am certain of it.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "devout"
+    ]
+  },
+  {
+    "t": "A safe child is a blessing. We should give thanks.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god kept both of them here. That matters.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "devout"
+    ]
+  },
+  {
+    "t": "Maybe the god helped. I am mostly glad they are safe.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A birth like that makes belief easier for a day.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I do not know who deserves thanks. I will thank everyone.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Good hands delivered that child. Do not forget the people in the room.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Births go well sometimes. That does not make them miracles.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I am glad they lived. I will leave the god out of it.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The god made the ground generous. We should not waste what grew.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "devout"
+    ]
+  },
+  {
+    "t": "That harvest has the god's hand all over it.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "devout"
+    ]
+  },
+  {
+    "t": "The land answered because the god willed it. Give thanks.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "devout"
+    ]
+  },
+  {
+    "t": "It could be a blessing. It could be a very good season.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I want to call that providence. I am not quite there.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Whatever caused it, we should fill the stores while we can.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Good soil and good weather can surprise people. That is enough explanation.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The fields had a strong year. Fields do that.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Call it a miracle after the next harvest does the same.",
+    "tags": [
+      "reply",
+      "event:flourished",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The god threw them down. There is no softer way to say it.",
+    "tags": [
+      "reply",
+      "event:impact",
+      "devout"
+    ]
+  },
+  {
+    "t": "That landing was judgment. I would mind where I stand.",
+    "tags": [
+      "reply",
+      "event:impact",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god spared them the worst of that fall.",
+    "tags": [
+      "reply",
+      "event:impact",
+      "devout"
+    ]
+  },
+  {
+    "t": "Something put them on the ground. I cannot say what.",
+    "tags": [
+      "reply",
+      "event:impact",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I believe the fall. The reason for it is harder.",
+    "tags": [
+      "reply",
+      "event:impact",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That sounds like power. Whether it was divine power, I do not know.",
+    "tags": [
+      "reply",
+      "event:impact",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A bad fall becomes a miracle once enough people repeat it.",
+    "tags": [
+      "reply",
+      "event:impact",
+      "doubting"
+    ]
+  },
+  {
+    "t": "They hit the ground hard. That part needs no god.",
+    "tags": [
+      "reply",
+      "event:impact",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Show me where they landed before you tell me what caused it.",
+    "tags": [
+      "reply",
+      "event:impact",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The god lifted them for everyone to see. That was no accident.",
+    "tags": [
+      "reply",
+      "event:lifted",
+      "devout"
+    ]
+  },
+  {
+    "t": "Being raised like that marks a person. We should pay attention.",
+    "tags": [
+      "reply",
+      "event:lifted",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god took hold of them and set doubt aside.",
+    "tags": [
+      "reply",
+      "event:lifted",
+      "devout"
+    ]
+  },
+  {
+    "t": "I believe they rose. I still do not know why.",
+    "tags": [
+      "reply",
+      "event:lifted",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That is hard to explain without the god. Hard is not impossible.",
+    "tags": [
+      "reply",
+      "event:lifted",
+      "wavering"
+    ]
+  },
+  {
+    "t": "If you truly saw their feet leave the ground, I need time.",
+    "tags": [
+      "reply",
+      "event:lifted",
+      "wavering"
+    ]
+  },
+  {
+    "t": "People jump, stumble, and remember badly. I need more than one account.",
+    "tags": [
+      "reply",
+      "event:lifted",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Nobody floats. That tells me the story grew somewhere.",
+    "tags": [
+      "reply",
+      "event:lifted",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I would need to see that with my own eyes.",
+    "tags": [
+      "reply",
+      "event:lifted",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The god saw the wolf and saw who suffered. Help will come.",
+    "tags": [
+      "reply",
+      "event:mauled",
+      "devout"
+    ]
+  },
+  {
+    "t": "We should pray for them and sharpen every spear.",
+    "tags": [
+      "reply",
+      "event:mauled",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god spared their life. We must tend the wounds.",
+    "tags": [
+      "reply",
+      "event:mauled",
+      "devout"
+    ]
+  },
+  {
+    "t": "Maybe someone watched over them. The wounds are real either way.",
+    "tags": [
+      "reply",
+      "event:mauled",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I do not know why the god allowed it. I am glad they survived.",
+    "tags": [
+      "reply",
+      "event:mauled",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That makes me want a prayer and a stronger fence.",
+    "tags": [
+      "reply",
+      "event:mauled",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Wolves bite people when we let them close. Build the fence.",
+    "tags": [
+      "reply",
+      "event:mauled",
+      "doubting"
+    ]
+  },
+  {
+    "t": "There is no message in teeth. There is only a hungry wolf.",
+    "tags": [
+      "reply",
+      "event:mauled",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Prayer later will not help as much as holding a spear now.",
+    "tags": [
+      "reply",
+      "event:mauled",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The god made the broken thing whole. That is mercy.",
+    "tags": [
+      "reply",
+      "event:mended",
+      "devout"
+    ]
+  },
+  {
+    "t": "No tool did that work. Give the god the credit.",
+    "tags": [
+      "reply",
+      "event:mended",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god restored what we could not. We should remember it.",
+    "tags": [
+      "reply",
+      "event:mended",
+      "devout"
+    ]
+  },
+  {
+    "t": "It was broken, and now it is not. I cannot explain the middle.",
+    "tags": [
+      "reply",
+      "event:mended",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That sounds like a miracle. I am surprised to hear myself say it.",
+    "tags": [
+      "reply",
+      "event:mended",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe the god repaired it. Someone should still inspect the work.",
+    "tags": [
+      "reply",
+      "event:mended",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Someone fixed it and failed to mention it. That happens.",
+    "tags": [
+      "reply",
+      "event:mended",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Repairs look impossible when nobody sees the worker.",
+    "tags": [
+      "reply",
+      "event:mended",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I want to see the break before I believe it vanished.",
+    "tags": [
+      "reply",
+      "event:mended",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The god received them. We should support the people left behind.",
+    "tags": [
+      "reply",
+      "event:perished",
+      "devout"
+    ]
+  },
+  {
+    "t": "Their life mattered to the god. It should matter to us.",
+    "tags": [
+      "reply",
+      "event:perished",
+      "devout"
+    ]
+  },
+  {
+    "t": "We will pray for the dead and bring food to the family.",
+    "tags": [
+      "reply",
+      "event:perished",
+      "devout"
+    ]
+  },
+  {
+    "t": "I hope someone was there at the end. I hope the god was.",
+    "tags": [
+      "reply",
+      "event:perished",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Death makes me want to believe and doubt at the same time.",
+    "tags": [
+      "reply",
+      "event:perished",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I do not know where they went. I know who will miss them.",
+    "tags": [
+      "reply",
+      "event:perished",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They died. We should speak about their life, not invent an answer.",
+    "tags": [
+      "reply",
+      "event:perished",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Death is hard enough without pretending we know what follows.",
+    "tags": [
+      "reply",
+      "event:perished",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Help the family in front of us. Leave the next world alone.",
+    "tags": [
+      "reply",
+      "event:perished",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The god fed us when the stores failed. We owe thanks.",
+    "tags": [
+      "reply",
+      "event:provided",
+      "devout"
+    ]
+  },
+  {
+    "t": "Food appearing when we needed it is providence made plain.",
+    "tags": [
+      "reply",
+      "event:provided",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god heard an empty stomach and answered it.",
+    "tags": [
+      "reply",
+      "event:provided",
+      "devout"
+    ]
+  },
+  {
+    "t": "Maybe the food was given. Maybe somebody left it. We should still share it.",
+    "tags": [
+      "reply",
+      "event:provided",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I want that to be an answer. Hunger makes belief tempting.",
+    "tags": [
+      "reply",
+      "event:provided",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The timing is difficult to dismiss. I am still trying.",
+    "tags": [
+      "reply",
+      "event:provided",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Food has owners, even when nobody saw them arrive.",
+    "tags": [
+      "reply",
+      "event:provided",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Count the baskets twice before calling supper a miracle.",
+    "tags": [
+      "reply",
+      "event:provided",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Someone brought that food. We should find them and say thanks.",
+    "tags": [
+      "reply",
+      "event:provided",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The god shook the ground beneath us. That was a warning.",
+    "tags": [
+      "reply",
+      "event:quaked",
+      "devout"
+    ]
+  },
+  {
+    "t": "Even the earth moves when the god commands it.",
+    "tags": [
+      "reply",
+      "event:quaked",
+      "devout"
+    ]
+  },
+  {
+    "t": "We should check every wall and then give thanks for surviving.",
+    "tags": [
+      "reply",
+      "event:quaked",
+      "devout"
+    ]
+  },
+  {
+    "t": "The earth moved, certainly. Whether the god moved it is another question.",
+    "tags": [
+      "reply",
+      "event:quaked",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That shaking felt deliberate. I do not like what that suggests.",
+    "tags": [
+      "reply",
+      "event:quaked",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I nearly prayed while it happened. I am still deciding what that means.",
+    "tags": [
+      "reply",
+      "event:quaked",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Ground shifts. It does not need hands to move.",
+    "tags": [
+      "reply",
+      "event:quaked",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Check the foundations before everyone starts preaching about the shaking.",
+    "tags": [
+      "reply",
+      "event:quaked",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Fear makes patterns quickly. An earthquake is frightening enough by itself.",
+    "tags": [
+      "reply",
+      "event:quaked",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The god put them down gently. Mercy followed power.",
+    "tags": [
+      "reply",
+      "event:setdown",
+      "devout"
+    ]
+  },
+  {
+    "t": "They were returned safely because the god chose it.",
+    "tags": [
+      "reply",
+      "event:setdown",
+      "devout"
+    ]
+  },
+  {
+    "t": "Give thanks that the god set them down instead of dropping them.",
+    "tags": [
+      "reply",
+      "event:setdown",
+      "devout"
+    ]
+  },
+  {
+    "t": "A gentle landing does make the story harder to dismiss.",
+    "tags": [
+      "reply",
+      "event:setdown",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Something lowered them. I cannot decide whether that comforts me.",
+    "tags": [
+      "reply",
+      "event:setdown",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I believe they came down safely. I am unsure about the rest.",
+    "tags": [
+      "reply",
+      "event:setdown",
+      "wavering"
+    ]
+  },
+  {
+    "t": "People land on their feet sometimes. That is not divine proof.",
+    "tags": [
+      "reply",
+      "event:setdown",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The gentle part sounds added afterward. Stories like tidy endings.",
+    "tags": [
+      "reply",
+      "event:setdown",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Show me where it happened. I want more than an exact retelling.",
+    "tags": [
+      "reply",
+      "event:setdown",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The god struck them. We should ask what brought that judgment.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "devout"
+    ]
+  },
+  {
+    "t": "Lightning from a clear sky is no ordinary death.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god answered with wrath. Nobody should celebrate that lightly.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "devout"
+    ]
+  },
+  {
+    "t": "That sounds like the god, and I wish it did not.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "wavering"
+    ]
+  },
+  {
+    "t": "If it was judgment, I want to know what was judged.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A clear sky makes chance harder to believe. Not impossible, just harder.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Lightning is lightning. Clear skies do not make it a sentence.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "doubting"
+    ]
+  },
+  {
+    "t": "People call every strange death judgment after the person cannot answer back.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I believe they were struck. I do not believe anyone chose it.",
+    "tags": [
+      "reply",
+      "event:smote",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The god cast them aside. That kind of power deserves caution.",
+    "tags": [
+      "reply",
+      "event:thrown",
+      "devout"
+    ]
+  },
+  {
+    "t": "Nobody flies that far without the god's hand behind it.",
+    "tags": [
+      "reply",
+      "event:thrown",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god threw them and still let them live. Remember both parts.",
+    "tags": [
+      "reply",
+      "event:thrown",
+      "devout"
+    ]
+  },
+  {
+    "t": "I believe something threw them. Naming it is where I hesitate.",
+    "tags": [
+      "reply",
+      "event:thrown",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That story frightens me more if the god truly did it.",
+    "tags": [
+      "reply",
+      "event:thrown",
+      "wavering"
+    ]
+  },
+  {
+    "t": "People do not move like that. I admit the obvious explanation is difficult.",
+    "tags": [
+      "reply",
+      "event:thrown",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A tumble looks like a flight when the witness is frightened.",
+    "tags": [
+      "reply",
+      "event:thrown",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I need distance, marks, and another witness before I believe that throw.",
+    "tags": [
+      "reply",
+      "event:thrown",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The story travelled farther than the person did. I would wager on that.",
+    "tags": [
+      "reply",
+      "event:thrown",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The god pulled that tree from the earth. Nothing else could.",
+    "tags": [
+      "reply",
+      "event:uprooted",
+      "devout"
+    ]
+  },
+  {
+    "t": "Roots and all means the god wanted our attention.",
+    "tags": [
+      "reply",
+      "event:uprooted",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god cleared the ground with one act. We should ask why.",
+    "tags": [
+      "reply",
+      "event:uprooted",
+      "devout"
+    ]
+  },
+  {
+    "t": "A whole tree coming up is difficult to explain. I will grant you that.",
+    "tags": [
+      "reply",
+      "event:uprooted",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe the god moved it. Maybe the roots were already gone.",
+    "tags": [
+      "reply",
+      "event:uprooted",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I would like to see the hole before I decide what happened.",
+    "tags": [
+      "reply",
+      "event:uprooted",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Rot takes roots before anyone sees it. Then one hard pull finishes the work.",
+    "tags": [
+      "reply",
+      "event:uprooted",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Trees fall strangely on bad ground. That is not a sermon.",
+    "tags": [
+      "reply",
+      "event:uprooted",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Show me sound roots and no tools. Then I will listen.",
+    "tags": [
+      "reply",
+      "event:uprooted",
+      "doubting"
+    ]
+  }
 ]

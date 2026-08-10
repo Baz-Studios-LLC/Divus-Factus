@@ -1,123 +1,1014 @@
 [
-  { "t": "I heard the child cry, and I thanked the god before anyone spoke.", "tags": ["tell", "event:delivered", "saw", "devout"] },
-  { "t": "Both survived. Maybe skill saved them, and maybe the god helped.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I watched people work for that safe birth. They deserve the credit.", "tags": ["tell", "event:delivered", "saw", "doubting"] },
-  { "t": "They say the god guarded the birth. Mother and child are safe.", "tags": ["tell", "event:delivered", "heard", "devout"] },
-  { "t": "I heard both are well. Perhaps somebody was listening after all.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "The birth went well because capable people were there. That is good enough.", "tags": ["tell", "event:delivered", "heard", "doubting"] },
-  { "t": "Word reached us about a safe birth. I do not know the family.", "tags": ["tell", "event:delivered", "distant"] },
-
-  { "t": "I watched the field thicken before my eyes. The god made it answer.", "tags": ["tell", "event:flourished", "saw", "devout"] },
-  { "t": "The plants came on too quickly for weather alone. I think I saw providence.", "tags": ["tell", "event:flourished", "saw", "wavering"] },
-  { "t": "The field looked fuller, but good growth can surprise anyone.", "tags": ["tell", "event:flourished", "saw", "doubting"] },
-  { "t": "They say the god filled the land with new growth.", "tags": ["tell", "event:flourished", "heard", "devout"] },
-  { "t": "I heard the fields changed in a moment. I am trying to believe it.", "tags": ["tell", "event:flourished", "heard", "wavering"] },
-  { "t": "People saw a good field and built a miracle around it.", "tags": ["tell", "event:flourished", "heard", "doubting"] },
-  { "t": "The story says whole fields grew heavy farther down the valley.", "tags": ["tell", "event:flourished", "distant"] },
-
-  { "t": "I saw someone strike the ground hard. The god put them there.", "tags": ["tell", "event:impact", "saw", "devout", "of:person"] },
-  { "t": "They hit the ground beside me. I cannot explain how they fell.", "tags": ["tell", "event:impact", "saw", "wavering", "of:person"] },
-  { "t": "I saw the landing, not the cause. People are adding that part.", "tags": ["tell", "event:impact", "saw", "doubting", "of:person"] },
-  { "t": "They say the god drove someone into the ground.", "tags": ["tell", "event:impact", "heard", "devout", "of:person"] },
-  { "t": "I heard someone fell hard after something strange. The cause is unclear.", "tags": ["tell", "event:impact", "heard", "wavering", "of:person"] },
-  { "t": "A hard fall became divine judgment before the dust settled.", "tags": ["tell", "event:impact", "heard", "doubting", "of:person"] },
-  { "t": "The story reached me as a person falling from nowhere.", "tags": ["tell", "event:impact", "distant", "of:person"] },
-  { "t": "I felt the impact through my boots. They did not simply trip.", "tags": ["tell", "event:impact", "saw", "of:person"] },
-  { "t": "They came down shoulder first. Everyone nearby heard it.", "tags": ["tell", "event:impact", "saw", "of:person"] },
-  { "t": "I saw dust jump when they landed. Somebody ran for the healer.", "tags": ["tell", "event:impact", "saw", "of:person"] },
-  { "t": "They hit hard enough to leave a mark in the ground.", "tags": ["tell", "event:impact", "saw", "of:person"] },
-  { "t": "I heard the crash before I saw the person on the ground.", "tags": ["tell", "event:impact", "heard", "of:person"] },
-  { "t": "Someone struck the earth hard, from what the nearest witnesses say.", "tags": ["tell", "event:impact", "heard", "of:person"] },
-
-  { "t": "I watched the god lift a person clear of the ground.", "tags": ["tell", "event:lifted", "saw", "devout", "of:person"] },
-  { "t": "Their feet rose above my head. I think the god was there.", "tags": ["tell", "event:lifted", "saw", "wavering", "of:person"] },
-  { "t": "I saw them leave the ground, but I will not invent a reason.", "tags": ["tell", "event:lifted", "saw", "doubting", "of:person"] },
-  { "t": "They say the god raised someone where the whole square could see.", "tags": ["tell", "event:lifted", "heard", "devout", "of:person"] },
-  { "t": "I heard a person floated above the road. I barely believe myself repeating it.", "tags": ["tell", "event:lifted", "heard", "wavering", "of:person"] },
-  { "t": "The story has somebody flying now. It probably began with a stumble.", "tags": ["tell", "event:lifted", "heard", "doubting", "of:person"] },
-  { "t": "Farther on, people claim a person rose without rope or ladder.", "tags": ["tell", "event:lifted", "distant", "of:person"] },
-
-  { "t": "I saw the wolf tear into them, and the god kept them alive.", "tags": ["tell", "event:mauled", "saw", "devout", "of:person"] },
-  { "t": "The wolf had them down. Maybe something heard us shouting.", "tags": ["tell", "event:mauled", "saw", "wavering", "of:person"] },
-  { "t": "I watched a hungry wolf attack. Nothing supernatural was needed.", "tags": ["tell", "event:mauled", "saw", "doubting", "of:person"] },
-  { "t": "They say the god spared someone from a wolf's teeth.", "tags": ["tell", "event:mauled", "heard", "devout", "of:person"] },
-  { "t": "I heard the attack was terrible. I hope somebody watched over them.", "tags": ["tell", "event:mauled", "heard", "wavering", "of:person"] },
-  { "t": "People are blaming signs and omens. The wolf was simply hungry.", "tags": ["tell", "event:mauled", "heard", "doubting", "of:person"] },
-  { "t": "Word from the far road says a wolf badly hurt someone.", "tags": ["tell", "event:mauled", "distant", "of:person"] },
-
-  { "t": "I watched the damage close under the god's hand.", "tags": ["tell", "event:mended", "saw", "devout"] },
-  { "t": "What was broken became whole. I think I saw a miracle.", "tags": ["tell", "event:mended", "saw", "wavering"] },
-  { "t": "I saw the repair afterward, not who performed it.", "tags": ["tell", "event:mended", "saw", "doubting"] },
-  { "t": "They say the god repaired what no worker could fix.", "tags": ["tell", "event:mended", "heard", "devout"] },
-  { "t": "I heard the break vanished without tools. That is difficult to dismiss.", "tags": ["tell", "event:mended", "heard", "wavering"] },
-  { "t": "Someone repaired it quietly, and now everyone wants a miracle.", "tags": ["tell", "event:mended", "heard", "doubting"] },
-  { "t": "The tale from farther out says broken work made itself whole.", "tags": ["tell", "event:mended", "distant"] },
-
-  { "t": "I was there when they died. The god received them.", "tags": ["tell", "event:perished", "saw", "devout", "of:person"] },
-  { "t": "I watched their breathing stop. I hope someone waited beyond it.", "tags": ["tell", "event:perished", "saw", "wavering", "of:person"] },
-  { "t": "I saw a life end. I will not claim knowledge past that.", "tags": ["tell", "event:perished", "saw", "doubting", "of:person"] },
-  { "t": "They say the god called someone away last night.", "tags": ["tell", "event:perished", "heard", "devout", "of:person"] },
-  { "t": "I heard they died quietly. I want to believe they were not alone.", "tags": ["tell", "event:perished", "heard", "wavering", "of:person"] },
-  { "t": "Someone died, and people are already pretending to know why.", "tags": ["tell", "event:perished", "heard", "doubting", "of:person"] },
-  { "t": "News of a death reached us from the other side of town.", "tags": ["tell", "event:perished", "distant", "of:person"] },
-
-  { "t": "I saw the food arrive with nobody bringing it. The god provided.", "tags": ["tell", "event:provided", "saw", "devout"] },
-  { "t": "The baskets appeared beside us. I think a prayer was answered.", "tags": ["tell", "event:provided", "saw", "wavering"] },
-  { "t": "I saw food where none had been. I did not see who brought it.", "tags": ["tell", "event:provided", "saw", "doubting"] },
-  { "t": "They say the god filled empty hands with food.", "tags": ["tell", "event:provided", "heard", "devout"] },
-  { "t": "I heard food appeared near the stores. The timing makes me wonder.", "tags": ["tell", "event:provided", "heard", "wavering"] },
-  { "t": "Somebody misplaced a basket, and now the story calls it providence.", "tags": ["tell", "event:provided", "heard", "doubting"] },
-  { "t": "Farther along, they say food arrived from nowhere.", "tags": ["tell", "event:provided", "distant"] },
-  { "t": "I watched an empty patch fill with provisions. Nobody walked near it.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "Food was suddenly there, plain as the ground under it.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "I counted the sacks before and after. More stood there afterward.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "The meal arrived before anyone could fetch it. I was standing close.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "I saw full baskets where the ground had been bare.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "Nobody brought that food through the square. I watched every path.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "There was nothing, then enough to eat. That is exactly what I saw.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "I touched the food myself. It was real and still nobody claimed it.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "The story around town is that food appeared beside the hungry.", "tags": ["tell", "event:provided", "heard"] },
-  { "t": "Three people told me the same thing: nobody brought those baskets.", "tags": ["tell", "event:provided", "heard"] },
-  { "t": "I keep hearing about food set down without anyone bringing it.", "tags": ["tell", "event:provided", "heard"] },
-  { "t": "The tale has reached the road now. Somewhere, empty stores filled themselves.", "tags": ["tell", "event:provided", "distant"] },
-
-  { "t": "I felt the god move the earth under my feet.", "tags": ["tell", "event:quaked", "saw", "devout"] },
-  { "t": "The ground rolled while I stood there. I nearly called it divine.", "tags": ["tell", "event:quaked", "saw", "wavering"] },
-  { "t": "I felt an earthquake. Fear supplied the god afterward.", "tags": ["tell", "event:quaked", "saw", "doubting"] },
-  { "t": "They say the god shook every wall in the village.", "tags": ["tell", "event:quaked", "heard", "devout"] },
-  { "t": "I heard the ground moved like water. That is hard to hear calmly.", "tags": ["tell", "event:quaked", "heard", "wavering"] },
-  { "t": "There was a quake, and people immediately gave it intentions.", "tags": ["tell", "event:quaked", "heard", "doubting"] },
-  { "t": "The shaking was felt well beyond the village, from what reached me.", "tags": ["tell", "event:quaked", "distant"] },
-
-  { "t": "I watched the god lower a person safely to the ground.", "tags": ["tell", "event:setdown", "saw", "devout", "of:person"] },
-  { "t": "They came down gently in front of me. I cannot explain it.", "tags": ["tell", "event:setdown", "saw", "wavering", "of:person"] },
-  { "t": "I saw them land safely. The rest of the story is guesswork.", "tags": ["tell", "event:setdown", "saw", "doubting", "of:person"] },
-  { "t": "They say the god returned someone gently to the earth.", "tags": ["tell", "event:setdown", "heard", "devout", "of:person"] },
-  { "t": "I heard a person floated down unharmed. I do not know what to believe.", "tags": ["tell", "event:setdown", "heard", "wavering", "of:person"] },
-  { "t": "A safe landing became divine mercy by the third telling.", "tags": ["tell", "event:setdown", "heard", "doubting", "of:person"] },
-  { "t": "The distant version says a person was lowered without rope.", "tags": ["tell", "event:setdown", "distant", "of:person"] },
-
-  { "t": "I saw the god strike a person under a clear sky.", "tags": ["tell", "event:smote", "saw", "devout", "of:person"] },
-  { "t": "The bolt came from nowhere. I fear it may have been judgment.", "tags": ["tell", "event:smote", "saw", "wavering", "of:person"] },
-  { "t": "I saw lightning kill someone. I did not see a judge.", "tags": ["tell", "event:smote", "saw", "doubting", "of:person"] },
-  { "t": "They say the god struck someone before the whole square.", "tags": ["tell", "event:smote", "heard", "devout", "of:person"] },
-  { "t": "I heard the sky was clear when the lightning came. That troubles me.", "tags": ["tell", "event:smote", "heard", "wavering", "of:person"] },
-  { "t": "Lightning killed someone, and fear turned weather into judgment.", "tags": ["tell", "event:smote", "heard", "doubting", "of:person"] },
-  { "t": "The far story says a person was struck beneath a clear sky.", "tags": ["tell", "event:smote", "distant", "of:person"] },
-
-  { "t": "I watched the god throw a person across the ground.", "tags": ["tell", "event:thrown", "saw", "devout", "of:person"] },
-  { "t": "They flew farther than any fall should send them. I think the god acted.", "tags": ["tell", "event:thrown", "saw", "wavering", "of:person"] },
-  { "t": "I saw the person tumble. The story makes the distance larger.", "tags": ["tell", "event:thrown", "saw", "doubting", "of:person"] },
-  { "t": "They say the god flung someone clear across the square.", "tags": ["tell", "event:thrown", "heard", "devout", "of:person"] },
-  { "t": "I heard a person was thrown without anyone touching them.", "tags": ["tell", "event:thrown", "heard", "wavering", "of:person"] },
-  { "t": "Every retelling throws them farther. I doubt the first distance too.", "tags": ["tell", "event:thrown", "heard", "doubting", "of:person"] },
-  { "t": "The version that reached me has a person flying over rooftops.", "tags": ["tell", "event:thrown", "distant", "of:person"] },
-
-  { "t": "I watched the god pull a tree out by every root.", "tags": ["tell", "event:uprooted", "saw", "devout", "of:thing"] },
-  { "t": "The whole tree came free at once. I nearly called it a sign.", "tags": ["tell", "event:uprooted", "saw", "wavering", "of:thing"] },
-  { "t": "I saw a tree fall with rotten roots. People preferred a miracle.", "tags": ["tell", "event:uprooted", "saw", "doubting", "of:thing"] },
-  { "t": "They say the god tore a tree from sound ground.", "tags": ["tell", "event:uprooted", "heard", "devout", "of:thing"] },
-  { "t": "I heard the roots came out clean. That detail makes me wonder.", "tags": ["tell", "event:uprooted", "heard", "wavering", "of:thing"] },
-  { "t": "A fallen tree became an uprooted wonder as the story traveled.", "tags": ["tell", "event:uprooted", "heard", "doubting", "of:thing"] },
-  { "t": "Farther up the road, they claim whole trees leave the ground.", "tags": ["tell", "event:uprooted", "distant", "of:thing"] }
+  {
+    "t": "I heard the child cry, and I thanked the god before anyone spoke.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "Both survived. Maybe skill saved them, and maybe the god helped.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I watched people work for that safe birth. They deserve the credit.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "They say the god guarded the birth. Mother and child are safe.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard both are well. Perhaps somebody was listening after all.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The birth went well because capable people were there. That is good enough.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Word reached us about a safe birth. I do not know the family.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "distant"
+    ]
+  },
+  {
+    "t": "I watched the field thicken before my eyes. The god made it answer.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "The plants came on too quickly for weather alone. I think I saw providence.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The field looked fuller, but good growth can surprise anyone.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "They say the god filled the land with new growth.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard the fields changed in a moment. I am trying to believe it.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "People saw a good field and built a miracle around it.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The story says whole fields grew heavy farther down the valley.",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "distant"
+    ]
+  },
+  {
+    "t": "I saw someone strike the ground hard. The god put them there.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They hit the ground beside me. I cannot explain how they fell.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw the landing, not the cause. People are adding that part.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god drove someone into the ground.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "heard",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard someone fell hard after something strange. The cause is unclear.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "heard",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "A hard fall became divine judgment before the dust settled.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "heard",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The story reached me as a person falling from nowhere.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I felt the impact through my boots. They did not simply trip.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They came down shoulder first. Everyone nearby heard it.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw dust jump when they landed. Somebody ran for the healer.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They hit hard enough to leave a mark in the ground.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard the crash before I saw the person on the ground.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "heard",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Someone struck the earth hard, from what the nearest witnesses say.",
+    "tags": [
+      "tell",
+      "event:impact",
+      "heard",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I watched the god lift a person clear of the ground.",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Their feet rose above my head. I think the god was there.",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw them leave the ground, but I will not invent a reason.",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god raised someone where the whole square could see.",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "heard",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard a person floated above the road. I barely believe myself repeating it.",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "heard",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The story has somebody flying now. It probably began with a stumble.",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "heard",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Farther on, people claim a person rose without rope or ladder.",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw the wolf tear into them, and the god kept them alive.",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The wolf had them down. Maybe something heard us shouting.",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I watched a hungry wolf attack. Nothing supernatural was needed.",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god spared someone from a wolf's teeth.",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard the attack was terrible. I hope somebody watched over them.",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "People are blaming signs and omens. The wolf was simply hungry.",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Word from the far road says a wolf badly hurt someone.",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I watched the damage close under the god's hand.",
+    "tags": [
+      "tell",
+      "event:mended",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "What was broken became whole. I think I saw a miracle.",
+    "tags": [
+      "tell",
+      "event:mended",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I saw the repair afterward, not who performed it.",
+    "tags": [
+      "tell",
+      "event:mended",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "They say the god repaired what no worker could fix.",
+    "tags": [
+      "tell",
+      "event:mended",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard the break vanished without tools. That is difficult to dismiss.",
+    "tags": [
+      "tell",
+      "event:mended",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Someone repaired it quietly, and now everyone wants a miracle.",
+    "tags": [
+      "tell",
+      "event:mended",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The tale from farther out says broken work made itself whole.",
+    "tags": [
+      "tell",
+      "event:mended",
+      "distant"
+    ]
+  },
+  {
+    "t": "I was there when they died. The god received them.",
+    "tags": [
+      "tell",
+      "event:perished",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I watched their breathing stop. I hope someone waited beyond it.",
+    "tags": [
+      "tell",
+      "event:perished",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw a life end. I will not claim knowledge past that.",
+    "tags": [
+      "tell",
+      "event:perished",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god called someone away last night.",
+    "tags": [
+      "tell",
+      "event:perished",
+      "heard",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard they died quietly. I want to believe they were not alone.",
+    "tags": [
+      "tell",
+      "event:perished",
+      "heard",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Someone died, and people are already pretending to know why.",
+    "tags": [
+      "tell",
+      "event:perished",
+      "heard",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "News of a death reached us from the other side of town.",
+    "tags": [
+      "tell",
+      "event:perished",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw the food arrive with nobody bringing it. The god provided.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "The baskets appeared beside us. I think a prayer was answered.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I saw food where none had been. I did not see who brought it.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "They say the god filled empty hands with food.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard food appeared near the stores. The timing makes me wonder.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Somebody misplaced a basket, and now the story calls it providence.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Farther along, they say food arrived from nowhere.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "I watched an empty patch fill with provisions. Nobody walked near it.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "Food was suddenly there, plain as the ground under it.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "I counted the sacks before and after. More stood there afterward.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "The meal arrived before anyone could fetch it. I was standing close.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "I saw full baskets where the ground had been bare.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "Nobody brought that food through the square. I watched every path.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "There was nothing, then enough to eat. That is exactly what I saw.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "I touched the food myself. It was real and still nobody claimed it.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "The story around town is that food appeared beside the hungry.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "Three people told me the same thing: nobody brought those baskets.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "I keep hearing about food set down without anyone bringing it.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "The tale has reached the road now. Somewhere, empty stores filled themselves.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "I felt the god move the earth under my feet.",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "The ground rolled while I stood there. I nearly called it divine.",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I felt an earthquake. Fear supplied the god afterward.",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "They say the god shook every wall in the village.",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard the ground moved like water. That is hard to hear calmly.",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "There was a quake, and people immediately gave it intentions.",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The shaking was felt well beyond the village, from what reached me.",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "distant"
+    ]
+  },
+  {
+    "t": "I watched the god lower a person safely to the ground.",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They came down gently in front of me. I cannot explain it.",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw them land safely. The rest of the story is guesswork.",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god returned someone gently to the earth.",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "heard",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard a person floated down unharmed. I do not know what to believe.",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "heard",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "A safe landing became divine mercy by the third telling.",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "heard",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The distant version says a person was lowered without rope.",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw the god strike a person under a clear sky.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The bolt came from nowhere. I fear it may have been judgment.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw lightning kill someone. I did not see a judge.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god struck someone before the whole square.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "heard",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard the sky was clear when the lightning came. That troubles me.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "heard",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Lightning killed someone, and fear turned weather into judgment.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "heard",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The far story says a person was struck beneath a clear sky.",
+    "tags": [
+      "tell",
+      "event:smote",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I watched the god throw a person across the ground.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They flew farther than any fall should send them. I think the god acted.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw the person tumble. The story makes the distance larger.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "They say the god flung someone clear across the square.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "heard",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard a person was thrown without anyone touching them.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "heard",
+      "wavering",
+      "of:person"
+    ]
+  },
+  {
+    "t": "Every retelling throws them farther. I doubt the first distance too.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "heard",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "The version that reached me has a person flying over rooftops.",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I watched the god pull a tree out by every root.",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "saw",
+      "devout",
+      "of:thing"
+    ]
+  },
+  {
+    "t": "The whole tree came free at once. I nearly called it a sign.",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "saw",
+      "wavering",
+      "of:thing"
+    ]
+  },
+  {
+    "t": "I saw a tree fall with rotten roots. People preferred a miracle.",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "saw",
+      "doubting",
+      "of:thing"
+    ]
+  },
+  {
+    "t": "They say the god tore a tree from sound ground.",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "heard",
+      "devout",
+      "of:thing"
+    ]
+  },
+  {
+    "t": "I heard the roots came out clean. That detail makes me wonder.",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "heard",
+      "wavering",
+      "of:thing"
+    ]
+  },
+  {
+    "t": "A fallen tree became an uprooted wonder as the story travelled.",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "heard",
+      "doubting",
+      "of:thing"
+    ]
+  },
+  {
+    "t": "Farther up the road, they claim whole trees leave the ground.",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "distant",
+      "of:thing"
+    ]
+  }
 ]

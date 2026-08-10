@@ -1,56 +1,387 @@
 [
-  { "t": "I know which floorboard complains when I step on it. I should fix that.", "tags": ["muse", "housed"] },
-  { "t": "The room still smells like fresh timber when the door has been shut all day.", "tags": ["muse", "housed"] },
-  { "t": "I need another peg by {the door|my bed}. One peg is never enough.", "tags": ["muse", "housed"] },
-  { "t": "I left mud across my own floor again. At least it is my mud and my floor.", "tags": ["muse", "housed"] },
-  { "t": "The fire draws better since I moved that stone. Small changes matter in a house.", "tags": ["muse", "housed"] },
-  { "t": "I should air the {blankets|bedding} tomorrow. They have started smelling like smoke.", "tags": ["muse", "housed"] },
-  { "t": "There is a draft under the door, but I know where to stuff the cloth now.", "tags": ["muse", "housed"] },
-  { "t": "I keep a cup by {the bed|my chair}. It makes the place feel settled.", "tags": ["muse", "housed"] },
-  { "t": "The roof creaks in the wind, and every time I count the beams again.", "tags": ["muse", "housed"] },
-  { "t": "I could use a shelf near {the hearth|the door}. Everything ends up on the floor.", "tags": ["muse", "housed"] },
-  { "t": "I swept yesterday, and somehow there are leaves inside again.", "tags": ["muse", "housed"] },
-  { "t": "A shut door at night is worth more than I knew.", "tags": ["muse", "housed"] },
-  { "t": "We disagree about where everything belongs. Somehow it all stays where they put it.", "tags": ["muse", "housed", "married"] },
-  { "t": "They steal the blanket every night and deny it every morning.", "tags": ["muse", "housed", "married"] },
-  { "t": "I should get home early tonight. We have barely spoken all {week|day}.", "tags": ["muse", "housed", "married"] },
-  { "t": "The house feels different when they are not in it. Too quiet by half.", "tags": ["muse", "housed", "married"] },
-  { "t": "We need a bigger pot. Marriage has somehow doubled the washing up.", "tags": ["muse", "housed", "married"] },
-  { "t": "They fixed the latch without saying anything. I noticed.", "tags": ["muse", "housed", "married"] },
-  { "t": "We keep planning a quiet supper. Something always needs doing first.", "tags": ["muse", "housed", "married"] },
-  { "t": "I still look for them in a crowd before I realize I am doing it.", "tags": ["muse", "married"] },
-  { "t": "I should apologize before night. I was tired, but I was still wrong.", "tags": ["muse", "married"] },
-  { "t": "They worry too much when I work late. I suppose that is better than not worrying.", "tags": ["muse", "married"] },
-  { "t": "I promised we would eat together tonight. I mean to keep it.", "tags": ["muse", "married"] },
-  { "t": "The best part of coming home is having somebody notice.", "tags": ["muse", "married"] },
-  { "t": "I need to mend the net before that tear becomes the whole net.", "tags": ["muse", "trade:fisher"] },
-  { "t": "The fish were biting close to shore. That saved me a long wet walk.", "tags": ["muse", "trade:fisher"] },
-  { "t": "I lost a good {hook|weight} today. I am more annoyed than it was worth.", "tags": ["muse", "trade:fisher"] },
-  { "t": "The water looked empty all morning, then the net came up heavy.", "tags": ["muse", "trade:fisher"] },
-  { "t": "Cold fingers make poor knots. I need better gloves.", "tags": ["muse", "trade:fisher"] },
-  { "t": "I know there are fish under me. Knowing does not fill the basket.", "tags": ["muse", "trade:fisher"] },
-  { "t": "I found {berries|another patch} where I was certain we had picked everything clean.", "tags": ["muse", "trade:gatherer"] },
-  { "t": "The basket is heavier on the way home. That is the satisfying part.", "tags": ["muse", "trade:gatherer"] },
-  { "t": "I keep seeing good patches after my basket is already full.", "tags": ["muse", "trade:gatherer"] },
-  { "t": "Half this work is remembering what will be ripe next week.", "tags": ["muse", "trade:gatherer"] },
-  { "t": "I ate one berry to check it. Then I checked another.", "tags": ["muse", "trade:gatherer"] },
-  { "t": "The birds always find the good bushes before I do.", "tags": ["muse", "trade:gatherer"] },
-  { "t": "That tree leaned the wrong way all morning and fell exactly where I expected.", "tags": ["muse", "trade:forester"] },
-  { "t": "I need to wrap this axe handle before it {opens|blisters} my palm again.", "tags": ["muse", "trade:forester"] },
-  { "t": "The close trees are gone. Every log now starts with a long walk.", "tags": ["muse", "trade:forester"] },
-  { "t": "I planted saplings today. Somebody else will be glad I did.", "tags": ["muse", "trade:forester"] },
-  { "t": "Fresh chips stick to everything. I will be finding them in bed.", "tags": ["muse", "trade:forester"] },
-  { "t": "A dull axe turns one job into three. I know better than this.", "tags": ["muse", "trade:forester"] },
-  { "t": "The tracks doubled back at the creek. I nearly missed it.", "tags": ["muse", "trade:hunter"] },
-  { "t": "I waited so long today that my feet went numb before anything moved.", "tags": ["muse", "trade:hunter"] },
-  { "t": "The {spearhead|binding} is loose again. I should fix it before I trust it.", "tags": ["muse", "trade:hunter"] },
-  { "t": "I saw plenty of signs and no meat. Signs do not make stew.", "tags": ["muse", "trade:hunter"] },
-  { "t": "A clean trail is easy. It is the broken trail that teaches you anything.", "tags": ["muse", "trade:hunter"] },
-  { "t": "I came back empty, but I know where to start tomorrow.", "tags": ["muse", "trade:hunter"] },
-  { "t": "People want certainty from a priest. I mostly have questions and a clean robe.", "tags": ["muse", "trade:priest"] },
-  { "t": "I should visit the family with the new baby. They will need food more than advice.", "tags": ["muse", "trade:priest"] },
-  { "t": "The shrine needs sweeping again. Dust does not care where it settles.", "tags": ["muse", "trade:priest"] },
-  { "t": "I heard three prayers today and had an answer for none of them.", "tags": ["muse", "trade:priest"] },
-  { "t": "A short sermon would do everyone good, especially me.", "tags": ["muse", "trade:priest"] },
-  { "t": "I need to listen longer before I tell people what their trouble means.", "tags": ["muse", "trade:priest"] }
+  {
+    "t": "I know which floorboard complains when I step on it. I should fix that.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "The room still smells like fresh timber when the door has been shut all day.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I need another peg by {the door|my bed}. One peg is never enough.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I left mud across my own floor again. At least it is my mud and my floor.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "The fire draws better since I moved that stone. Small changes matter in a house.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I should air the {blankets|bedding} tomorrow. They have started smelling like smoke.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "There is a draft under the door, but I know where to stuff the cloth now.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I keep a cup by {the bed|my chair}. It makes the place feel settled.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "The roof creaks in the wind, and every time I count the beams again.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I could use a shelf near {the hearth|the door}. Everything ends up on the floor.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I swept yesterday, and somehow there are leaves inside again.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "A shut door at night is worth more than I knew.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "We disagree about where everything belongs. Somehow it all stays where they put it.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "They steal the blanket every night and deny it every morning.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "I should get home early tonight. We have barely spoken all {week|day}.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "The house feels different when they are not in it. Too quiet by half.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "We need a bigger pot. Marriage has somehow doubled the washing up.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "They fixed the latch without saying anything. I noticed.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "We keep planning a quiet supper. Something always needs doing first.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "I still look for them in a crowd before I realise I am doing it.",
+    "tags": [
+      "muse",
+      "married"
+    ]
+  },
+  {
+    "t": "I should apologise before night. I was tired, but I was still wrong.",
+    "tags": [
+      "muse",
+      "married"
+    ]
+  },
+  {
+    "t": "They worry too much when I work late. I suppose that is better than not worrying.",
+    "tags": [
+      "muse",
+      "married"
+    ]
+  },
+  {
+    "t": "I promised we would eat together tonight. I mean to keep it.",
+    "tags": [
+      "muse",
+      "married"
+    ]
+  },
+  {
+    "t": "The best part of coming home is having somebody notice.",
+    "tags": [
+      "muse",
+      "married"
+    ]
+  },
+  {
+    "t": "I need to mend the net before that tear becomes the whole net.",
+    "tags": [
+      "muse",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "The fish were biting close to shore. That saved me a long wet walk.",
+    "tags": [
+      "muse",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "I lost a good {hook|weight} today. I am more annoyed than it was worth.",
+    "tags": [
+      "muse",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "The water looked empty all morning, then the net came up heavy.",
+    "tags": [
+      "muse",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "Cold fingers make poor knots. I need better gloves.",
+    "tags": [
+      "muse",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "I know there are fish under me. Knowing does not fill the basket.",
+    "tags": [
+      "muse",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "I found {berries|another patch} where I was certain we had picked everything clean.",
+    "tags": [
+      "muse",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "The basket is heavier on the way home. That is the satisfying part.",
+    "tags": [
+      "muse",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "I keep seeing good patches after my basket is already full.",
+    "tags": [
+      "muse",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "Half this work is remembering what will be ripe next week.",
+    "tags": [
+      "muse",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "I ate one berry to check it. Then I checked another.",
+    "tags": [
+      "muse",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "The birds always find the good bushes before I do.",
+    "tags": [
+      "muse",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "That tree leaned the wrong way all morning and fell exactly where I expected.",
+    "tags": [
+      "muse",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "I need to wrap this axe handle before it {opens|blisters} my palm again.",
+    "tags": [
+      "muse",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "The close trees are gone. Every log now starts with a long walk.",
+    "tags": [
+      "muse",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "I planted saplings today. Somebody else will be glad I did.",
+    "tags": [
+      "muse",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "Fresh chips stick to everything. I will be finding them in bed.",
+    "tags": [
+      "muse",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "A dull axe turns one job into three. I know better than this.",
+    "tags": [
+      "muse",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "The tracks doubled back at the creek. I nearly missed it.",
+    "tags": [
+      "muse",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "I waited so long today that my feet went numb before anything moved.",
+    "tags": [
+      "muse",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "The {spearhead|binding} is loose again. I should fix it before I trust it.",
+    "tags": [
+      "muse",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "I saw plenty of signs and no meat. Signs do not make stew.",
+    "tags": [
+      "muse",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "A clean trail is easy. It is the broken trail that teaches you anything.",
+    "tags": [
+      "muse",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "I came back empty, but I know where to start tomorrow.",
+    "tags": [
+      "muse",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "People want certainty from a priest. I mostly have questions and a clean robe.",
+    "tags": [
+      "muse",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "I should visit the family with the new baby. They will need food more than advice.",
+    "tags": [
+      "muse",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "The shrine needs sweeping again. Dust does not care where it settles.",
+    "tags": [
+      "muse",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "I heard three prayers today and had an answer for none of them.",
+    "tags": [
+      "muse",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "A short sermon would do everyone good, especially me.",
+    "tags": [
+      "muse",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "I need to listen longer before I tell people what their trouble means.",
+    "tags": [
+      "muse",
+      "trade:priest"
+    ]
+  }
 ]

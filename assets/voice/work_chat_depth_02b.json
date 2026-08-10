@@ -1,78 +1,492 @@
 [
-  { "t": "That cut is clean, but the swelling worries me.", "tags": ["chat:open", "topic:healer"] },
-  { "t": "We are running low on clean cloth again.", "tags": ["chat:open", "topic:healer"] },
-  { "t": "People keep working on bad ankles and making them worse.", "tags": ["chat:open", "topic:healer"] },
-  { "t": "Wash the cut and check it again tonight.", "tags": ["chat:reply", "topic:healer"] },
-  { "t": "Boil the oldest cloth. It will serve until we weave more.", "tags": ["chat:reply", "topic:healer"] },
-  { "t": "Tell them rest is treatment, not laziness.", "tags": ["chat:reply", "topic:healer"] },
-  { "t": "I will look at the swelling after the next dressing.", "tags": ["chat:followup", "topic:healer"] },
-  { "t": "Keep the clean strips separate from everything else this time.", "tags": ["chat:followup", "topic:healer"] },
-  { "t": "Send them to me before supper if the pain worsens.", "tags": ["chat:end", "topic:healer"] },
-  { "t": "We have done what we can today. Let the body work now.", "tags": ["chat:end", "topic:healer"] },
-
-  { "t": "The deer tracks cross the creek and disappear on stone.", "tags": ["chat:open", "topic:hunter"] },
-  { "t": "I heard movement near the ridge before dawn.", "tags": ["chat:open", "topic:hunter"] },
-  { "t": "Something has been following the same game trail as us.", "tags": ["chat:open", "topic:hunter"] },
-  { "t": "Wait beyond the stones. The tracks return on the soft ground.", "tags": ["chat:reply", "topic:hunter"] },
-  { "t": "Sound travels badly on that ridge. It may have been farther away.", "tags": ["chat:reply", "topic:hunter"] },
-  { "t": "Check for wolf prints beside the deer trail.", "tags": ["chat:reply", "topic:hunter"] },
-  { "t": "I will take the creek side while you circle above.", "tags": ["chat:followup", "topic:hunter"] },
-  { "t": "We should leave before dawn and move without talking.", "tags": ["chat:followup", "topic:hunter"] },
-  { "t": "Bring the longer spear tomorrow. The brush is too thick for a bow.", "tags": ["chat:end", "topic:hunter"] },
-  { "t": "If the trail stays cold, we turn back before dark.", "tags": ["chat:end", "topic:hunter"] },
-
-  { "t": "The lower face is good stone, but it breaks in narrow pieces.", "tags": ["chat:open", "topic:miner"] },
-  { "t": "I found a dark vein behind the loose rock.", "tags": ["chat:open", "topic:miner"] },
-  { "t": "The supports creaked when we struck the north wall.", "tags": ["chat:open", "topic:miner"] },
-  { "t": "Use the narrow pieces for foundations. They will pack tightly.", "tags": ["chat:reply", "topic:miner"] },
-  { "t": "Mark the dark vein and bring a better lamp.", "tags": ["chat:reply", "topic:miner"] },
-  { "t": "Stop working that wall until the supports are checked.", "tags": ["chat:reply", "topic:miner"] },
-  { "t": "I will brace the weak side before anyone swings again.", "tags": ["chat:followup", "topic:miner"] },
-  { "t": "We should sort the stone before hauling another load.", "tags": ["chat:followup", "topic:miner"] },
-  { "t": "Meet me at the face after the lamps are filled.", "tags": ["chat:end", "topic:miner"] },
-  { "t": "Leave the loose section alone tonight. It will still be there tomorrow.", "tags": ["chat:end", "topic:miner"] },
-
-  { "t": "More people came to the shrine this morning than last week.", "tags": ["chat:open", "topic:priest"] },
-  { "t": "Half the prayers today were about food, and the stores are not empty.", "tags": ["chat:open", "topic:priest"] },
-  { "t": "People keep asking what the last miracle meant.", "tags": ["chat:open", "topic:priest"] },
-  { "t": "Fear brings people in faster than gratitude does.", "tags": ["chat:reply", "topic:priest"] },
-  { "t": "They may be praying for neighbors who have less.", "tags": ["chat:reply", "topic:priest"] },
-  { "t": "Tell them what happened first. Meaning can wait until afterward.", "tags": ["chat:reply", "topic:priest"] },
-  { "t": "I will speak about the event without pretending certainty.", "tags": ["chat:followup", "topic:priest"] },
-  { "t": "We should visit the people who stopped coming, not only count arrivals.", "tags": ["chat:followup", "topic:priest"] },
-  { "t": "Let us talk after the evening prayers when the shrine is quiet.", "tags": ["chat:end", "topic:priest"] },
-  { "t": "I need time before I turn that story into a lesson.", "tags": ["chat:end", "topic:priest"] },
-
-  { "t": "The grain sacks look lower than they did yesterday.", "tags": ["chat:open", "topic:food"] },
-  { "t": "We have plenty of roots and almost nothing else.", "tags": ["chat:open", "topic:food"] },
-  { "t": "Someone took a second bowl before the children ate.", "tags": ["chat:open", "topic:food"] },
-  { "t": "The cook used more grain this morning. That may explain it.", "tags": ["chat:reply", "topic:food"] },
-  { "t": "Roots will feed us if people stop complaining about them.", "tags": ["chat:reply", "topic:food"] },
-  { "t": "Serve the children first and count the bowls at the door.", "tags": ["chat:reply", "topic:food"] },
-  { "t": "I will ask what came in before we start blaming anyone.", "tags": ["chat:followup", "topic:food"] },
-  { "t": "We should dry whatever keeps and eat the rest quickly.", "tags": ["chat:followup", "topic:food"] },
-  { "t": "Let us count the stores properly after supper.", "tags": ["chat:end", "topic:food"] },
-  { "t": "There is enough for today. Tomorrow needs its own answer.", "tags": ["chat:end", "topic:food"] },
-
-  { "t": "The new house still leaks where the roof meets the wall.", "tags": ["chat:open", "topic:roof"] },
-  { "t": "Three households are waiting for the next load of timber.", "tags": ["chat:open", "topic:roof"] },
-  { "t": "The old thatch will not survive another hard storm.", "tags": ["chat:open", "topic:roof"] },
-  { "t": "Pack moss into the joint until the builder can return.", "tags": ["chat:reply", "topic:roof"] },
-  { "t": "The families with children should get the first finished walls.", "tags": ["chat:reply", "topic:roof"] },
-  { "t": "Strip the worst thatch and replace it before the rain starts.", "tags": ["chat:reply", "topic:roof"] },
-  { "t": "I will bring a ladder and look at the leak tonight.", "tags": ["chat:followup", "topic:roof"] },
-  { "t": "We need to finish one house before breaking ground on another.", "tags": ["chat:followup", "topic:roof"] },
-  { "t": "Tell them we have not forgotten. Timber takes time.", "tags": ["chat:end", "topic:roof"] },
-  { "t": "We will know what the roof needs after the next rain.", "tags": ["chat:end", "topic:roof"] },
-
-  { "t": "The wind changed while I was crossing the square.", "tags": ["chat:open", "topic:weather"] },
-  { "t": "Those clouds are moving faster than I like.", "tags": ["chat:open", "topic:weather"] },
-  { "t": "The morning felt warm, but the shade still has a bite.", "tags": ["chat:open", "topic:weather"] },
-  { "t": "Bring loose things inside before the wind strengthens.", "tags": ["chat:reply", "topic:weather"] },
-  { "t": "The clouds may pass north. They did yesterday.", "tags": ["chat:reply", "topic:weather"] },
-  { "t": "Keep your coat nearby. The warmth will not last after sunset.", "tags": ["chat:reply", "topic:weather"] },
-  { "t": "I will check the roofs before the first rain reaches us.", "tags": ["chat:followup", "topic:weather"] },
-  { "t": "The fields need water, even if the rest of us prefer dry feet.", "tags": ["chat:followup", "topic:weather"] },
-  { "t": "We will see what the sky decided by evening.", "tags": ["chat:end", "topic:weather"] },
-  { "t": "I am going inside before the weather proves either of us wrong.", "tags": ["chat:end", "topic:weather"] }
+  {
+    "t": "That cut is clean, but the swelling worries me.",
+    "tags": [
+      "chat:open",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "We are running low on clean cloth again.",
+    "tags": [
+      "chat:open",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "People keep working on bad ankles and making them worse.",
+    "tags": [
+      "chat:open",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "Wash the cut and check it again tonight.",
+    "tags": [
+      "chat:reply",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "Boil the oldest cloth. It will serve until we weave more.",
+    "tags": [
+      "chat:reply",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "Tell them rest is treatment, not laziness.",
+    "tags": [
+      "chat:reply",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "I will look at the swelling after the next dressing.",
+    "tags": [
+      "chat:followup",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "Keep the clean strips separate from everything else this time.",
+    "tags": [
+      "chat:followup",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "Send them to me before supper if the pain worsens.",
+    "tags": [
+      "chat:end",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "We have done what we can today. Let the body work now.",
+    "tags": [
+      "chat:end",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "The deer tracks cross the creek and disappear on stone.",
+    "tags": [
+      "chat:open",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "I heard movement near the ridge before dawn.",
+    "tags": [
+      "chat:open",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "Something has been following the same game trail as us.",
+    "tags": [
+      "chat:open",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "Wait beyond the stones. The tracks return on the soft ground.",
+    "tags": [
+      "chat:reply",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "Sound travels badly on that ridge. It may have been farther away.",
+    "tags": [
+      "chat:reply",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "Check for wolf prints beside the deer trail.",
+    "tags": [
+      "chat:reply",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "I will take the creek side while you circle above.",
+    "tags": [
+      "chat:followup",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "We should leave before dawn and move without talking.",
+    "tags": [
+      "chat:followup",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "Bring the longer spear tomorrow. The brush is too thick for a bow.",
+    "tags": [
+      "chat:end",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "If the trail stays cold, we turn back before dark.",
+    "tags": [
+      "chat:end",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "The lower face is good stone, but it breaks in narrow pieces.",
+    "tags": [
+      "chat:open",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "I found a dark vein behind the loose rock.",
+    "tags": [
+      "chat:open",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "The supports creaked when we struck the north wall.",
+    "tags": [
+      "chat:open",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "Use the narrow pieces for foundations. They will pack tightly.",
+    "tags": [
+      "chat:reply",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "Mark the dark vein and bring a better lamp.",
+    "tags": [
+      "chat:reply",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "Stop working that wall until the supports are checked.",
+    "tags": [
+      "chat:reply",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "I will brace the weak side before anyone swings again.",
+    "tags": [
+      "chat:followup",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "We should sort the stone before hauling another load.",
+    "tags": [
+      "chat:followup",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "Meet me at the face after the lamps are filled.",
+    "tags": [
+      "chat:end",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "Leave the loose section alone tonight. It will still be there tomorrow.",
+    "tags": [
+      "chat:end",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "More people came to the shrine this morning than last week.",
+    "tags": [
+      "chat:open",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "Half the prayers today were about food, and the stores are not empty.",
+    "tags": [
+      "chat:open",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "People keep asking what the last miracle meant.",
+    "tags": [
+      "chat:open",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "Fear brings people in faster than gratitude does.",
+    "tags": [
+      "chat:reply",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "They may be praying for neighbours who have less.",
+    "tags": [
+      "chat:reply",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "Tell them what happened first. Meaning can wait until afterward.",
+    "tags": [
+      "chat:reply",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "I will speak about the event without pretending certainty.",
+    "tags": [
+      "chat:followup",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "We should visit the people who stopped coming, not only count arrivals.",
+    "tags": [
+      "chat:followup",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "Let us talk after the evening prayers when the shrine is quiet.",
+    "tags": [
+      "chat:end",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "I need time before I turn that story into a lesson.",
+    "tags": [
+      "chat:end",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "The grain sacks look lower than they did yesterday.",
+    "tags": [
+      "chat:open",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "We have plenty of roots and almost nothing else.",
+    "tags": [
+      "chat:open",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "Someone took a second bowl before the children ate.",
+    "tags": [
+      "chat:open",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "The cook used more grain this morning. That may explain it.",
+    "tags": [
+      "chat:reply",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "Roots will feed us if people stop complaining about them.",
+    "tags": [
+      "chat:reply",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "Serve the children first and count the bowls at the door.",
+    "tags": [
+      "chat:reply",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "I will ask what came in before we start blaming anyone.",
+    "tags": [
+      "chat:followup",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "We should dry whatever keeps and eat the rest quickly.",
+    "tags": [
+      "chat:followup",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "Let us count the stores properly after supper.",
+    "tags": [
+      "chat:end",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "There is enough for today. Tomorrow needs its own answer.",
+    "tags": [
+      "chat:end",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "The new house still leaks where the roof meets the wall.",
+    "tags": [
+      "chat:open",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "Three households are waiting for the next load of timber.",
+    "tags": [
+      "chat:open",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "The old thatch will not survive another hard storm.",
+    "tags": [
+      "chat:open",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "Pack moss into the joint until the builder can return.",
+    "tags": [
+      "chat:reply",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "The families with children should get the first finished walls.",
+    "tags": [
+      "chat:reply",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "Strip the worst thatch and replace it before the rain starts.",
+    "tags": [
+      "chat:reply",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "I will bring a ladder and look at the leak tonight.",
+    "tags": [
+      "chat:followup",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "We need to finish one house before breaking ground on another.",
+    "tags": [
+      "chat:followup",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "Tell them we have not forgotten. Timber takes time.",
+    "tags": [
+      "chat:end",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "We will know what the roof needs after the next rain.",
+    "tags": [
+      "chat:end",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "The wind changed while I was crossing the square.",
+    "tags": [
+      "chat:open",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "Those clouds are moving faster than I like.",
+    "tags": [
+      "chat:open",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "The morning felt warm, but the shade still has a bite.",
+    "tags": [
+      "chat:open",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "Bring loose things inside before the wind strengthens.",
+    "tags": [
+      "chat:reply",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "The clouds may pass north. They did yesterday.",
+    "tags": [
+      "chat:reply",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "Keep your coat nearby. The warmth will not last after sunset.",
+    "tags": [
+      "chat:reply",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "I will check the roofs before the first rain reaches us.",
+    "tags": [
+      "chat:followup",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "The fields need water, even if the rest of us prefer dry feet.",
+    "tags": [
+      "chat:followup",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "We will see what the sky decided by evening.",
+    "tags": [
+      "chat:end",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "I am going inside before the weather proves either of us wrong.",
+    "tags": [
+      "chat:end",
+      "topic:weather"
+    ]
+  }
 ]

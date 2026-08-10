@@ -1335,7 +1335,7 @@ pub(super) fn faith_of_witnesses(
                 DivineEventKind::Flourished => {
                     faith.shift(0.05 * conviction);
                     if let Some(mut chronicle) = chronicle {
-                        chronicle.record(clock.day(), "read the god's favor in the harvest");
+                        chronicle.record(clock.day(), "read the god's favour in the harvest");
                     }
                 }
                 _ => {}

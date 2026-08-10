@@ -1,1563 +1,1563 @@
 [
- {
-  "t": "I saw it myself. {whom} went straight up into the air like a sack of feathers",
-  "tags": [
-   "tell",
-   "event:lifted",
-   "saw",
-   "of:person"
-  ]
- },
- {
-  "t": "people get picked up off the ground now. that's a thing that happens here",
-  "tags": [
-   "tell",
-   "event:lifted",
-   "heard",
-   "of:person"
-  ]
- },
- {
-  "t": "I watched {whom} get flung like a stone from a sling. I'm not sleeping tonight",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "saw",
-   "of:person"
-  ]
- },
- {
-  "t": "they say {whom} got thrown halfway across the valley. I half believe it",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "heard",
-   "of:person"
-  ]
- },
- {
-  "t": "thrown, they said. people don't just fall UP, so something did the throwing",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "heard",
-   "devout",
-   "of:person"
-  ]
- },
- {
-  "t": "somebody flew, somebody fell, and the story grows every time it's told",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "distant",
-   "doubting",
-   "of:person"
-  ]
- },
- {
-  "t": "it set {whom} down gentle as you'd put down an egg. I saw the whole thing",
-  "tags": [
-   "tell",
-   "event:setdown",
-   "saw",
-   "of:person"
-  ]
- },
- {
-  "t": "the ground shook and there was a crash you could feel in your teeth. I was right there",
-  "tags": [
-   "tell",
-   "event:impact",
-   "saw"
-  ]
- },
- {
-  "t": "did you feel that crash earlier? whatever it was, I'm glad I wasn't under it",
-  "tags": [
-   "tell",
-   "event:impact",
-   "heard"
-  ]
- },
- {
-  "t": "food just appeared. out of nowhere, right where we needed it. I saw it land",
-  "tags": [
-   "tell",
-   "event:provided",
-   "saw"
-  ]
- },
- {
-  "t": "they're saying the food in the square just showed up on its own",
-  "tags": [
-   "tell",
-   "event:provided",
-   "heard"
-  ]
- },
- {
-  "t": "we were fed when we had nothing. I know a gift when I eat one",
-  "tags": [
-   "tell",
-   "event:provided",
-   "saw",
-   "devout"
-  ]
- },
- {
-  "t": "free food, sure. and I say someone just miscounted the baskets",
-  "tags": [
-   "tell",
-   "event:provided",
-   "heard",
-   "doubting"
-  ]
- },
- {
-  "t": "the sky came down on {whom} and there's nothing left but scorched grass. I saw it",
-  "tags": [
-   "tell",
-   "event:smote",
-   "saw"
-  ]
- },
- {
-  "t": "I can't stop seeing it. one flash and {whom} was just gone",
-  "tags": [
-   "tell",
-   "event:smote",
-   "saw",
-   "retold"
-  ]
- },
- {
-  "t": "they say {whom} was struck down out of a clear sky. clear sky, no storm",
-  "tags": [
-   "tell",
-   "event:smote",
-   "heard"
-  ]
- },
- {
-  "t": "struck down for something, mark me. the sky doesn't miss",
-  "tags": [
-   "tell",
-   "event:smote",
-   "heard",
-   "devout"
-  ]
- },
- {
-  "t": "lightning kills somebody every few years. it's sad, it's not a message",
-  "tags": [
-   "tell",
-   "event:smote",
-   "heard",
-   "doubting"
-  ]
- },
- {
-  "t": "a whole tree ripped up by the roots, right in front of me. roots and all",
-  "tags": [
-   "tell",
-   "event:uprooted",
-   "saw"
-  ]
- },
- {
-  "t": "you seen that tree by the ridge? something tore it out like a weed",
-  "tags": [
-   "tell",
-   "event:uprooted",
-   "heard"
-  ]
- },
- {
-  "t": "the wall mended itself. I watched the crack close up like it was never there",
-  "tags": [
-   "tell",
-   "event:mended",
-   "saw"
-  ]
- },
- {
-  "t": "broken one day, whole the next, and no one lifted a tool. explain that",
-  "tags": [
-   "tell",
-   "event:mended",
-   "heard"
-  ]
- },
- {
-  "t": "the ground rolled under my feet like water. I thought that was the end of us",
-  "tags": [
-   "tell",
-   "event:quaked",
-   "saw"
-  ]
- },
- {
-  "t": "you felt the shaking too, right? the whole village felt it",
-  "tags": [
-   "tell",
-   "event:quaked",
-   "heard"
-  ]
- },
- {
-  "t": "the earth doesn't shake itself. someone shook it",
-  "tags": [
-   "tell",
-   "event:quaked",
-   "heard",
-   "devout"
-  ]
- },
- {
-  "t": "{whom} is gone. I was there. I don't want to talk about the details",
-  "tags": [
-   "tell",
-   "event:perished",
-   "saw"
-  ]
- },
- {
-  "t": "did you hear about {whom}? terrible thing. terrible",
-  "tags": [
-   "tell",
-   "event:perished",
-   "heard"
-  ]
- },
- {
-  "t": "we lost {whom}. the fire feels smaller tonight",
-  "tags": [
-   "tell",
-   "event:perished",
-   "heard",
-   "retold"
-  ]
- },
- {
-  "t": "a baby came through the whole thing healthy and yelling. that's the best news all season",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "heard"
-  ]
- },
- {
-  "t": "the bushes went heavy with fruit overnight. I picked till my basket broke",
-  "tags": [
-   "tell",
-   "event:flourished",
-   "saw"
-  ]
- },
- {
-  "t": "everything's blooming at once out east. go see it before the birds get it",
-  "tags": [
-   "tell",
-   "event:flourished",
-   "heard"
-  ]
- },
- {
-  "t": "the land doesn't bloom like that on its own. that's a thank-you or an ask",
-  "tags": [
-   "tell",
-   "event:flourished",
-   "heard",
-   "devout"
-  ]
- },
- {
-  "t": "good soil, good rain, good luck. no mystery in a berry",
-  "tags": [
-   "tell",
-   "event:flourished",
-   "heard",
-   "doubting"
-  ]
- },
- {
-  "t": "a wolf came at me out past the trees. I got away, but only just",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "saw"
-  ]
- },
- {
-  "t": "I've got teeth marks in my leg. I'm not going back out there alone",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "saw"
-  ]
- },
- {
-  "t": "it had me down. I don't want to talk about how close that was",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "saw",
-   "retold"
-  ]
- },
- {
-  "t": "we need somebody watching the treeline. I'm saying that as the one who got bit",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "saw"
-  ]
- },
- {
-  "t": "I keep hearing it behind me and there's nothing there",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "saw",
-   "retold"
-  ]
- },
- {
-  "t": "a wolf went for {whom} right in front of me and I couldn't do a thing",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "saw"
-  ]
- },
- {
-  "t": "I watched {whom} get dragged before we got it off them",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "saw"
-  ]
- },
- {
-  "t": "you heard about {whom}? a wolf, out past the trees",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "heard"
-  ]
- },
- {
-  "t": "they're saying the wolves aren't scared of us any more",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "heard"
-  ]
- },
- {
-  "t": "somebody came home torn up yesterday. nobody's saying much about it",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "heard"
-  ]
- },
- {
-  "t": "I'm not walking that road on my own now, and neither should you",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "heard"
-  ]
- },
- {
-  "t": "the woods are owed something, and they came and took it",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "heard",
-   "devout"
-  ]
- },
- {
-  "t": "a wolf is a wolf. it was hungry, that's the whole of it",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "heard",
-   "doubting"
-  ]
- },
- {
-  "t": "post a man on the edge and this stops. that's all it needs",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "heard",
-   "trade:guard"
-  ]
- },
- {
-  "t": "I saw it happen. {whom} just lifted right off the ground",
-  "tags": [
-   "tell",
-   "event:lifted",
-   "saw",
-   "of:person"
-  ]
- },
- {
-  "t": "they're saying {whom} got picked up like it was nothing",
-  "tags": [
-   "tell",
-   "event:lifted",
-   "heard",
-   "of:person"
-  ]
- },
- {
-  "t": "I saw {whom} go flying. I don't know how else to say it",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "saw",
-   "of:person"
-  ]
- },
- {
-  "t": "people say {whom} got thrown hard enough to leave a mark",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "heard",
-   "of:person"
-  ]
- },
- {
-  "t": "I watched {whom} get put back down. gentle, but still not normal",
-  "tags": [
-   "tell",
-   "event:setdown",
-   "saw",
-   "of:person"
-  ]
- },
- {
-  "t": "they say {whom} was set down like somebody had hold of them",
-  "tags": [
-   "tell",
-   "event:setdown",
-   "heard",
-   "of:person"
-  ]
- },
- {
-  "t": "I heard the crash before I saw anything. scared me half to death",
-  "tags": [
-   "tell",
-   "event:impact",
-   "saw"
-  ]
- },
- {
-  "t": "everyone heard that hit. don't let anybody tell you they didn't",
-  "tags": [
-   "tell",
-   "event:impact",
-   "heard"
-  ]
- },
- {
-  "t": "food showed up right when we needed it. I was standing there",
-  "tags": [
-   "tell",
-   "event:provided",
-   "saw"
-  ]
- },
- {
-  "t": "they say food turned up from nowhere. nobody's complaining",
-  "tags": [
-   "tell",
-   "event:provided",
-   "heard"
-  ]
- },
- {
-  "t": "call it luck if you want. hungry people got fed",
-  "tags": [
-   "tell",
-   "event:provided",
-   "heard",
-   "wavering"
-  ]
- },
- {
-  "t": "I saw {whom} struck down. I wish I hadn't",
-  "tags": [
-   "tell",
-   "event:smote",
-   "saw"
-  ]
- },
- {
-  "t": "one moment {whom} was there, then the sky hit",
-  "tags": [
-   "tell",
-   "event:smote",
-   "saw",
-   "retold"
-  ]
- },
- {
-  "t": "they're saying {whom} was smote. I hope they're wrong",
-  "tags": [
-   "tell",
-   "event:smote",
-   "heard"
-  ]
- },
- {
-  "t": "I don't like smiting. even when people say it was deserved",
-  "tags": [
-   "tell",
-   "event:smote",
-   "heard",
-   "wavering"
-  ]
- },
- {
-  "t": "I saw that tree come up roots and all. nobody touched it",
-  "tags": [
-   "tell",
-   "event:uprooted",
-   "saw"
-  ]
- },
- {
-  "t": "a whole tree got pulled up. that's what they're saying",
-  "tags": [
-   "tell",
-   "event:uprooted",
-   "heard"
-  ]
- },
- {
-  "t": "I watched the damage fix itself. tools don't work like that",
-  "tags": [
-   "tell",
-   "event:mended",
-   "saw"
-  ]
- },
- {
-  "t": "they say the broken part is whole again. no builder did it",
-  "tags": [
-   "tell",
-   "event:mended",
-   "heard"
-  ]
- },
- {
-  "t": "the ground moved under me. I nearly went flat on my face",
-  "tags": [
-   "tell",
-   "event:quaked",
-   "saw"
-  ]
- },
- {
-  "t": "the shaking reached everybody. even the calm ones looked scared",
-  "tags": [
-   "tell",
-   "event:quaked",
-   "heard"
-  ]
- },
- {
-  "t": "{whom} is dead. I heard it from somebody who was there",
-  "tags": [
-   "tell",
-   "event:perished",
-   "heard"
-  ]
- },
- {
-  "t": "I saw what happened to {whom}. I don't want that in my head",
-  "tags": [
-   "tell",
-   "event:perished",
-   "saw"
-  ]
- },
- {
-  "t": "the baby made it. sometimes that's enough good news for one day",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "heard"
-  ]
- },
- {
-  "t": "mother and baby are alive. that's what matters",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "heard"
-  ]
- },
- {
-  "t": "I saw the bushes heavy with fruit. more than yesterday, easy",
-  "tags": [
-   "tell",
-   "event:flourished",
-   "saw"
-  ]
- },
- {
-  "t": "people are saying the berries came in all at once",
-  "tags": [
-   "tell",
-   "event:flourished",
-   "heard"
-  ]
- },
- {
-  "t": "I saw the wolf hit {whom}. it was fast and ugly",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "saw"
-  ]
- },
- {
-  "t": "{whom} got mauled. that's not a rumor, that's real",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "heard"
-  ]
- },
- {
-  "t": "someone needs to do something about the wolves before it happens again",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "heard"
-  ]
- },
- {
-  "t": "somebody in the next valley got carried off the ground, or so it reaches me",
-  "tags": [
-   "tell",
-   "event:lifted",
-   "distant",
-   "of:person"
-  ]
- },
- {
-  "t": "the story going round is a man went up. I've had it off three people and no two agree",
-  "tags": [
-   "tell",
-   "event:lifted",
-   "distant",
-   "of:person"
-  ]
- },
- {
-  "t": "they say a man was thrown further than a man goes. I wasn't there and neither was anyone I asked",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "distant",
-   "of:person"
-  ]
- },
- {
-  "t": "there's a story about someone being set down safe out of the air. nice, if it's true",
-  "tags": [
-   "tell",
-   "event:setdown",
-   "distant",
-   "of:person"
-  ]
- },
- {
-  "t": "something came down hard somewhere east. that's as much as anyone can tell me",
-  "tags": [
-   "tell",
-   "event:impact",
-   "distant"
-  ]
- },
- {
-  "t": "I hear there was food nobody carried in. I'd like to meet whoever saw it",
-  "tags": [
-   "tell",
-   "event:provided",
-   "distant"
-  ]
- },
- {
-  "t": "word is somebody was struck out of a clear sky. it's been passed along a lot of mouths",
-  "tags": [
-   "tell",
-   "event:smote",
-   "distant"
-  ]
- },
- {
-  "t": "the story's grown every time I've heard it. by now it's a whole field burnt",
-  "tags": [
-   "tell",
-   "event:smote",
-   "distant"
-  ]
- },
- {
-  "t": "they're telling it that a tree came out of the ground on its own. I only have it third-hand",
-  "tags": [
-   "tell",
-   "event:uprooted",
-   "distant"
-  ]
- },
- {
-  "t": "somebody's wound closed up overnight, they say. nobody can tell me whose",
-  "tags": [
-   "tell",
-   "event:mended",
-   "distant"
-  ]
- },
- {
-  "t": "the ground shook somewhere out that way. I felt nothing here, but they swear to it",
-  "tags": [
-   "tell",
-   "event:quaked",
-   "distant"
-  ]
- },
- {
-  "t": "I heard we lost someone. I don't even know the name yet, which tells you how it reached me",
-  "tags": [
-   "tell",
-   "event:perished",
-   "distant"
-  ]
- },
- {
-  "t": "there was a birth, apparently, and it went well. good news travels slow out here",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "distant"
-  ]
- },
- {
-  "t": "the story is the bushes came in twice as heavy. I'll believe it when I've picked one",
-  "tags": [
-   "tell",
-   "event:flourished",
-   "distant"
-  ]
- },
- {
-  "t": "there's talk of a wolf taking someone. nobody I've asked was there, but everyone's heard it",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "distant"
-  ]
- },
- {
-  "t": "the wolf story keeps getting bigger. that usually means it started with something real",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "distant"
-  ]
- },
- {
-  "t": "I was outside the door the whole time. she's alright, and so is the baby",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "saw"
-  ]
- },
- {
-  "t": "I heard the first cry myself. I'm not ashamed to say I welled up",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "saw"
-  ]
- },
- {
-  "t": "the light came down and that was it. I was close enough to feel it",
-  "tags": [
-   "tell",
-   "event:smote",
-   "saw"
-  ]
- },
- {
-  "t": "I've never heard a noise like it. my ears rang till nightfall",
-  "tags": [
-   "tell",
-   "event:smote",
-   "saw"
-  ]
- },
- {
-  "t": "one moment there was somebody standing there",
-  "tags": [
-   "tell",
-   "event:smote",
-   "saw"
-  ]
- },
- {
-  "t": "they say it came out of a clear sky",
-  "tags": [
-   "tell",
-   "event:smote",
-   "heard"
-  ]
- },
- {
-  "t": "I didn't see it. I saw what was left",
-  "tags": [
-   "tell",
-   "event:smote",
-   "heard"
-  ]
- },
- {
-  "t": "the whole village heard that one",
-  "tags": [
-   "tell",
-   "event:smote",
-   "heard"
-  ]
- },
- {
-  "t": "there's talk of somebody struck dead out past the ridge",
-  "tags": [
-   "tell",
-   "event:smote",
-   "distant"
-  ]
- },
- {
-  "t": "I've had it third-hand, so make of it what you like",
-  "tags": [
-   "tell",
-   "event:smote",
-   "distant"
-  ]
- },
- {
-  "t": "I watched it come into leaf while I stood there. green, all at once",
-  "tags": [
-   "tell",
-   "event:flourished",
-   "saw"
-  ]
- },
- {
-  "t": "it grew, properly grew, in front of me. no season does that",
-  "tags": [
-   "tell",
-   "event:flourished",
-   "saw"
-  ]
- },
- {
-  "t": "they're saying a tree came good overnight",
-  "tags": [
-   "tell",
-   "event:flourished",
-   "heard"
-  ]
- },
- {
-  "t": "somebody swears the fruit came in early and heavy",
-  "tags": [
-   "tell",
-   "event:flourished",
-   "heard"
-  ]
- },
- {
-  "t": "I hear the growing's been strange further along the valley",
-  "tags": [
-   "tell",
-   "event:flourished",
-   "distant"
-  ]
- },
- {
-  "t": "food, just sitting there, where I know there was none",
-  "tags": [
-   "tell",
-   "event:provided",
-   "saw"
-  ]
- },
- {
-  "t": "I found it laid out like somebody meant me to have it",
-  "tags": [
-   "tell",
-   "event:provided",
-   "saw"
-  ]
- },
- {
-  "t": "I'd been praying about it that morning. then there it was",
-  "tags": [
-   "tell",
-   "event:provided",
-   "saw"
-  ]
- },
- {
-  "t": "they say food turned up where nobody put any",
-  "tags": [
-   "tell",
-   "event:provided",
-   "heard"
-  ]
- },
- {
-  "t": "there's talk of the stores filling on their own",
-  "tags": [
-   "tell",
-   "event:provided",
-   "heard"
-  ]
- },
- {
-  "t": "I've heard of food arriving out of nowhere. never seen it",
-  "tags": [
-   "tell",
-   "event:provided",
-   "distant"
-  ]
- },
- {
-  "t": "it was set down right in front of me. gently, like a gift",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "saw"
-  ]
- },
- {
-  "t": "I watched it come down out of nothing and land soft",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "saw"
-  ]
- },
- {
-  "t": "something was brought to us, that's how they're telling it",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "heard"
-  ]
- },
- {
-  "t": "they say things get delivered, out that way",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "distant"
-  ]
- },
- {
-  "t": "{whom} went straight up. feet off the ground, arms going",
-  "tags": [
-   "tell",
-   "event:lifted",
-   "saw",
-   "of:person"
-  ]
- },
- {
-  "t": "I saw somebody lifted clean into the air. nothing holding them",
-  "tags": [
-   "tell",
-   "event:lifted",
-   "saw",
-   "of:person"
-  ]
- },
- {
-  "t": "{whom} was in the sky. I don't know how else to say it",
-  "tags": [
-   "tell",
-   "event:lifted",
-   "saw",
-   "of:person"
-  ]
- },
- {
-  "t": "they're saying {whom} got picked up like a doll",
-  "tags": [
-   "tell",
-   "event:lifted",
-   "heard",
-   "of:person"
-  ]
- },
- {
-  "t": "somebody was carried up off the ground, is what I heard",
-  "tags": [
-   "tell",
-   "event:lifted",
-   "heard",
-   "of:person"
-  ]
- },
- {
-  "t": "there's a story about people being lifted. I've not seen it",
-  "tags": [
-   "tell",
-   "event:lifted",
-   "distant",
-   "of:person"
-  ]
- },
- {
-  "t": "{whom} came down soft as anything. not a scratch",
-  "tags": [
-   "tell",
-   "event:setdown",
-   "saw",
-   "of:person"
-  ]
- },
- {
-  "t": "whatever had hold of {whom} put them down kindly",
-  "tags": [
-   "tell",
-   "event:setdown",
-   "saw",
-   "of:person"
-  ]
- },
- {
-  "t": "they say {whom} was let down gentle, which is something",
-  "tags": [
-   "tell",
-   "event:setdown",
-   "heard",
-   "of:person"
-  ]
- },
- {
-  "t": "I hear people get set down safe sometimes. only sometimes",
-  "tags": [
-   "tell",
-   "event:setdown",
-   "distant",
-   "of:person"
-  ]
- },
- {
-  "t": "{whom} went across the ground like a thrown stone",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "saw",
-   "of:person"
-  ]
- },
- {
-  "t": "I watched somebody get flung. I'll not forget the sound",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "saw",
-   "of:person"
-  ]
- },
- {
-  "t": "it threw {whom}. threw them, like you'd throw a sack",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "saw",
-   "of:person"
-  ]
- },
- {
-  "t": "they say {whom} was hurled halfway across the village",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "heard",
-   "of:person"
-  ]
- },
- {
-  "t": "somebody got thrown, and not gently",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "heard",
-   "of:person"
-  ]
- },
- {
-  "t": "out that way they talk about people being thrown about",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "distant",
-   "of:person"
-  ]
- },
- {
-  "t": "{whom} hit the ground hard. I ran, but there was nothing to do",
-  "tags": [
-   "tell",
-   "event:impact",
-   "saw",
-   "of:person"
-  ]
- },
- {
-  "t": "I heard it before I saw it. that's the part that stays",
-  "tags": [
-   "tell",
-   "event:impact",
-   "saw"
-  ]
- },
- {
-  "t": "they say {whom} came down and the ground won",
-  "tags": [
-   "tell",
-   "event:impact",
-   "heard",
-   "of:person"
-  ]
- },
- {
-  "t": "somebody struck the earth. that's all I know",
-  "tags": [
-   "tell",
-   "event:impact",
-   "heard",
-   "of:person"
-  ]
- },
- {
-  "t": "I've heard of people coming down hard. terrible thing",
-  "tags": [
-   "tell",
-   "event:impact",
-   "distant",
-   "of:person"
-  ]
- },
- {
-  "t": "the break closed while I was looking at it. no tool, no hands",
-  "tags": [
-   "tell",
-   "event:mended",
-   "saw"
-  ]
- },
- {
-  "t": "I've built long enough to know that isn't possible",
-  "tags": [
-   "tell",
-   "event:mended",
-   "saw"
-  ]
- },
- {
-  "t": "they say what was broken is whole and nobody mended it",
-  "tags": [
-   "tell",
-   "event:mended",
-   "heard"
-  ]
- },
- {
-  "t": "I hear things get put right on their own out that way",
-  "tags": [
-   "tell",
-   "event:mended",
-   "distant"
-  ]
- },
- {
-  "t": "the ground moved under me. I went down on one knee",
-  "tags": [
-   "tell",
-   "event:quaked",
-   "saw"
-  ]
- },
- {
-  "t": "I watched the earth lift like a blanket being shaken",
-  "tags": [
-   "tell",
-   "event:quaked",
-   "saw"
-  ]
- },
- {
-  "t": "they say the ground itself shifted",
-  "tags": [
-   "tell",
-   "event:quaked",
-   "heard"
-  ]
- },
- {
-  "t": "the shaking woke everybody, that much I know",
-  "tags": [
-   "tell",
-   "event:quaked",
-   "heard"
-  ]
- },
- {
-  "t": "there's talk of the earth moving further off",
-  "tags": [
-   "tell",
-   "event:quaked",
-   "distant"
-  ]
- },
- {
-  "t": "it came out of the ground whole, roots hanging",
-  "tags": [
-   "tell",
-   "event:uprooted",
-   "saw"
-  ]
- },
- {
-  "t": "a tree does not leave the earth on its own. that one did",
-  "tags": [
-   "tell",
-   "event:uprooted",
-   "saw"
-  ]
- },
- {
-  "t": "they say a tree was pulled up like a weed",
-  "tags": [
-   "tell",
-   "event:uprooted",
-   "heard"
-  ]
- },
- {
-  "t": "I've heard of whole trees coming up. never seen the hole",
-  "tags": [
-   "tell",
-   "event:uprooted",
-   "distant"
-  ]
- },
- {
-  "t": "it had {whom} down. I've never run so fast in my life",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "saw"
-  ]
- },
- {
-  "t": "I got there and there was blood on the grass",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "saw"
-  ]
- },
- {
-  "t": "I heard {whom} screaming and I couldn't get there quick enough",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "saw"
-  ]
- },
- {
-  "t": "they say a wolf took {whom} right at the edge",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "heard"
-  ]
- },
- {
-  "t": "somebody got bitten badly. that's all anyone's saying",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "heard"
-  ]
- },
- {
-  "t": "there's wolves further along, they say. taking people",
-  "tags": [
-   "tell",
-   "event:mauled",
-   "distant"
-  ]
- },
- {
-  "t": "{whom} is gone. I was there and I couldn't help",
-  "tags": [
-   "tell",
-   "event:perished",
-   "saw"
-  ]
- },
- {
-  "t": "I sat with {whom} at the end. it was quiet, at least",
-  "tags": [
-   "tell",
-   "event:perished",
-   "saw"
-  ]
- },
- {
-  "t": "we lost {whom}. word came round this morning",
-  "tags": [
-   "tell",
-   "event:perished",
-   "heard"
-  ]
- },
- {
-  "t": "they say {whom} didn't make it",
-  "tags": [
-   "tell",
-   "event:perished",
-   "heard"
-  ]
- },
- {
-  "t": "I hear somebody died out that way. I didn't know them",
-  "tags": [
-   "tell",
-   "event:perished",
-   "distant"
-  ]
- },
- {
-  "t": "that was a gift. I'll not hear it called anything else",
-  "tags": [
-   "tell",
-   "event:provided",
-   "saw",
-   "devout"
-  ]
- },
- {
-  "t": "we were answered. plainly answered",
-  "tags": [
-   "tell",
-   "event:provided",
-   "heard",
-   "devout"
-  ]
- },
- {
-  "t": "food turns up. people drop things. I'm not building a religion on it",
-  "tags": [
-   "tell",
-   "event:provided",
-   "saw",
-   "doubting"
-  ]
- },
- {
-  "t": "I don't know what that was, but it wasn't nothing",
-  "tags": [
-   "tell",
-   "event:smote",
-   "saw",
-   "wavering"
-  ]
- },
- {
-  "t": "that was a judgement. I felt it in my chest",
-  "tags": [
-   "tell",
-   "event:smote",
-   "saw",
-   "devout"
-  ]
- },
- {
-  "t": "lightning hits things. it's hit trees before",
-  "tags": [
-   "tell",
-   "event:smote",
-   "heard",
-   "doubting"
-  ]
- },
- {
-  "t": "something's watching over this place, and it's not gentle",
-  "tags": [
-   "tell",
-   "event:quaked",
-   "saw",
-   "wavering"
-  ]
- },
- {
-  "t": "I've stopped pretending I understand any of it",
-  "tags": [
-   "tell",
-   "event:mended",
-   "saw",
-   "wavering"
-  ]
- },
- {
-  "t": "a {stone|boulder} went sailing over the {trees|roofs} today. nobody threw it. nobody COULD throw it",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "of:thing",
-   "saw"
-  ]
- },
- {
-  "t": "something heavy came down out past the {well|square} and it didn't roll there on its own",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "of:thing",
-   "heard"
-  ]
- },
- {
-  "t": "the {bush|whole bush} moved. not swayed - MOVED. one spot to another, like a hand tidying a table",
-  "tags": [
-   "tell",
-   "event:lifted",
-   "of:thing",
-   "saw"
-  ]
- },
- {
-  "t": "things around here get picked up and put down {neater|somewhere better} than they started. make of that what you like",
-  "tags": [
-   "tell",
-   "event:setdown",
-   "of:thing",
-   "heard",
-   "doubting"
-  ]
- },
- {
-  "t": "I watched a {rock|stone} float. I've been staring at rocks all day since, waiting",
-  "tags": [
-   "tell",
-   "event:lifted",
-   "of:thing",
-   "saw"
-  ]
- },
- {
-  "t": "a {deer|wolf} went up in the air, legs still running. I laughed and then I stopped laughing",
-  "tags": [
-   "tell",
-   "event:lifted",
-   "of:beast",
-   "saw"
-  ]
- },
- {
-  "t": "they say some animal got hurled clear over the {river|ridge}. the dogs won't settle tonight",
-  "tags": [
-   "tell",
-   "event:thrown",
-   "of:beast",
-   "heard"
-  ]
- },
- {
-  "t": "there's a new little one at {the longhouse|theirs}. came through fine, both of them",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "saw"
-  ]
- },
- {
-  "t": "did you hear? a baby, safe and squalling. loudest thing in the village and nobody minds",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "heard"
-  ]
- },
- {
-  "t": "a child was born and the whole square's been grinning about it since {morning|midday}",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "heard"
-  ]
- },
- {
-  "t": "I was there when the little one came. hands shaking, and then that cry. best sound there is",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "saw"
-  ]
- },
- {
-  "t": "another mouth to feed, they say, like that's a complaint. it's the best news we've had all season",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "heard"
-  ]
- },
- {
-  "t": "word is a baby came safe out in {the new ground|one of the far houses}. good news walks fast",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "distant"
-  ]
- },
- {
-  "t": "they've a child now. I remember when the two of THEM were children. where do the years go",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "heard"
-  ]
- },
- {
-  "t": "a birth, and an easy one, thank {whatever's listening|the stars}. we needed something to go right",
-  "tags": [
-   "tell",
-   "event:delivered",
-   "saw",
-   "wavering"
-  ]
- }
+  {
+    "t": "I saw it myself. {whom} went straight up into the air like a sack of feathers",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "people get picked up off the ground now. that's a thing that happens here",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "heard",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I watched {whom} get flung like a stone from a sling. I'm not sleeping tonight",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "they say {whom} got thrown halfway across the valley. I half believe it",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "heard",
+      "of:person"
+    ]
+  },
+  {
+    "t": "thrown, they said. people don't just fall UP, so something did the throwing",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "heard",
+      "devout",
+      "of:person"
+    ]
+  },
+  {
+    "t": "somebody flew, somebody fell, and the story grows every time it's told",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "distant",
+      "doubting",
+      "of:person"
+    ]
+  },
+  {
+    "t": "it set {whom} down gentle as you'd put down an egg. I saw the whole thing",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "the ground shook and there was a crash you could feel in your teeth. I was right there",
+    "tags": [
+      "tell",
+      "event:impact",
+      "saw"
+    ]
+  },
+  {
+    "t": "did you feel that crash earlier? whatever it was, I'm glad I wasn't under it",
+    "tags": [
+      "tell",
+      "event:impact",
+      "heard"
+    ]
+  },
+  {
+    "t": "food just appeared. out of nowhere, right where we needed it. I saw it land",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "they're saying the food in the square just showed up on its own",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "we were fed when we had nothing. I know a gift when I eat one",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "free food, sure. and I say someone just miscounted the baskets",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "the sky came down on {whom} and there's nothing left but scorched grass. I saw it",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw"
+    ]
+  },
+  {
+    "t": "I can't stop seeing it. one flash and {whom} was just gone",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "retold"
+    ]
+  },
+  {
+    "t": "they say {whom} was struck down out of a clear sky. clear sky, no storm",
+    "tags": [
+      "tell",
+      "event:smote",
+      "heard"
+    ]
+  },
+  {
+    "t": "struck down for something, mark me. the sky doesn't miss",
+    "tags": [
+      "tell",
+      "event:smote",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "lightning kills somebody every few years. it's sad, it's not a message",
+    "tags": [
+      "tell",
+      "event:smote",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "a whole tree ripped up by the roots, right in front of me. roots and all",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "saw"
+    ]
+  },
+  {
+    "t": "you seen that tree by the ridge? something tore it out like a weed",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "heard"
+    ]
+  },
+  {
+    "t": "the wall mended itself. I watched the crack close up like it was never there",
+    "tags": [
+      "tell",
+      "event:mended",
+      "saw"
+    ]
+  },
+  {
+    "t": "broken one day, whole the next, and no one lifted a tool. explain that",
+    "tags": [
+      "tell",
+      "event:mended",
+      "heard"
+    ]
+  },
+  {
+    "t": "the ground rolled under my feet like water. I thought that was the end of us",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "saw"
+    ]
+  },
+  {
+    "t": "you felt the shaking too, right? the whole village felt it",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "heard"
+    ]
+  },
+  {
+    "t": "the earth doesn't shake itself. someone shook it",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "{whom} is gone. I was there. I don't want to talk about the details",
+    "tags": [
+      "tell",
+      "event:perished",
+      "saw"
+    ]
+  },
+  {
+    "t": "did you hear about {whom}? terrible thing. terrible",
+    "tags": [
+      "tell",
+      "event:perished",
+      "heard"
+    ]
+  },
+  {
+    "t": "we lost {whom}. the fire feels smaller tonight",
+    "tags": [
+      "tell",
+      "event:perished",
+      "heard",
+      "retold"
+    ]
+  },
+  {
+    "t": "a baby came through the whole thing healthy and yelling. that's the best news all season",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard"
+    ]
+  },
+  {
+    "t": "the bushes went heavy with fruit overnight. I picked till my basket broke",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw"
+    ]
+  },
+  {
+    "t": "everything's blooming at once out east. go see it before the birds get it",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "heard"
+    ]
+  },
+  {
+    "t": "the land doesn't bloom like that on its own. that's a thank-you or an ask",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "good soil, good rain, good luck. no mystery in a berry",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "a wolf came at me out past the trees. I got away, but only just",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "saw"
+    ]
+  },
+  {
+    "t": "I've got teeth marks in my leg. I'm not going back out there alone",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "saw"
+    ]
+  },
+  {
+    "t": "it had me down. I don't want to talk about how close that was",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "saw",
+      "retold"
+    ]
+  },
+  {
+    "t": "we need somebody watching the treeline. I'm saying that as the one who got bit",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "saw"
+    ]
+  },
+  {
+    "t": "I keep hearing it behind me and there's nothing there",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "saw",
+      "retold"
+    ]
+  },
+  {
+    "t": "a wolf went for {whom} right in front of me and I couldn't do a thing",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "saw"
+    ]
+  },
+  {
+    "t": "I watched {whom} get dragged before we got it off them",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "saw"
+    ]
+  },
+  {
+    "t": "you heard about {whom}? a wolf, out past the trees",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard"
+    ]
+  },
+  {
+    "t": "they're saying the wolves aren't scared of us any more",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard"
+    ]
+  },
+  {
+    "t": "somebody came home torn up yesterday. nobody's saying much about it",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard"
+    ]
+  },
+  {
+    "t": "I'm not walking that road on my own now, and neither should you",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard"
+    ]
+  },
+  {
+    "t": "the woods are owed something, and they came and took it",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "a wolf is a wolf. it was hungry, that's the whole of it",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "post a man on the edge and this stops. that's all it needs",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "I saw it happen. {whom} just lifted right off the ground",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "they're saying {whom} got picked up like it was nothing",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "heard",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw {whom} go flying. I don't know how else to say it",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "people say {whom} got thrown hard enough to leave a mark",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "heard",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I watched {whom} get put back down. gentle, but still not normal",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "they say {whom} was set down like somebody had hold of them",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "heard",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard the crash before I saw anything. scared me half to death",
+    "tags": [
+      "tell",
+      "event:impact",
+      "saw"
+    ]
+  },
+  {
+    "t": "everyone heard that hit. don't let anybody tell you they didn't",
+    "tags": [
+      "tell",
+      "event:impact",
+      "heard"
+    ]
+  },
+  {
+    "t": "food showed up right when we needed it. I was standing there",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "they say food turned up from nowhere. nobody's complaining",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "call it luck if you want. hungry people got fed",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I saw {whom} struck down. I wish I hadn't",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw"
+    ]
+  },
+  {
+    "t": "one moment {whom} was there, then the sky hit",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "retold"
+    ]
+  },
+  {
+    "t": "they're saying {whom} was smote. I hope they're wrong",
+    "tags": [
+      "tell",
+      "event:smote",
+      "heard"
+    ]
+  },
+  {
+    "t": "I don't like smiting. even when people say it was deserved",
+    "tags": [
+      "tell",
+      "event:smote",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I saw that tree come up roots and all. nobody touched it",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "saw"
+    ]
+  },
+  {
+    "t": "a whole tree got pulled up. that's what they're saying",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "heard"
+    ]
+  },
+  {
+    "t": "I watched the damage fix itself. tools don't work like that",
+    "tags": [
+      "tell",
+      "event:mended",
+      "saw"
+    ]
+  },
+  {
+    "t": "they say the broken part is whole again. no builder did it",
+    "tags": [
+      "tell",
+      "event:mended",
+      "heard"
+    ]
+  },
+  {
+    "t": "the ground moved under me. I nearly went flat on my face",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "saw"
+    ]
+  },
+  {
+    "t": "the shaking reached everybody. even the calm ones looked scared",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "heard"
+    ]
+  },
+  {
+    "t": "{whom} is dead. I heard it from somebody who was there",
+    "tags": [
+      "tell",
+      "event:perished",
+      "heard"
+    ]
+  },
+  {
+    "t": "I saw what happened to {whom}. I don't want that in my head",
+    "tags": [
+      "tell",
+      "event:perished",
+      "saw"
+    ]
+  },
+  {
+    "t": "the baby made it. sometimes that's enough good news for one day",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard"
+    ]
+  },
+  {
+    "t": "mother and baby are alive. that's what matters",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard"
+    ]
+  },
+  {
+    "t": "I saw the bushes heavy with fruit. more than yesterday, easy",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw"
+    ]
+  },
+  {
+    "t": "people are saying the berries came in all at once",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "heard"
+    ]
+  },
+  {
+    "t": "I saw the wolf hit {whom}. it was fast and ugly",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "saw"
+    ]
+  },
+  {
+    "t": "{whom} got mauled. that's not a rumour, that's real",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard"
+    ]
+  },
+  {
+    "t": "someone needs to do something about the wolves before it happens again",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard"
+    ]
+  },
+  {
+    "t": "somebody in the next valley got carried off the ground, or so it reaches me",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "the story going round is a man went up. I've had it off three people and no two agree",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "they say a man was thrown further than a man goes. I wasn't there and neither was anyone I asked",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "there's a story about someone being set down safe out of the air. nice, if it's true",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "something came down hard somewhere east. that's as much as anyone can tell me",
+    "tags": [
+      "tell",
+      "event:impact",
+      "distant"
+    ]
+  },
+  {
+    "t": "I hear there was food nobody carried in. I'd like to meet whoever saw it",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "word is somebody was struck out of a clear sky. it's been passed along a lot of mouths",
+    "tags": [
+      "tell",
+      "event:smote",
+      "distant"
+    ]
+  },
+  {
+    "t": "the story's grown every time I've heard it. by now it's a whole field burnt",
+    "tags": [
+      "tell",
+      "event:smote",
+      "distant"
+    ]
+  },
+  {
+    "t": "they're telling it that a tree came out of the ground on its own. I only have it third-hand",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "distant"
+    ]
+  },
+  {
+    "t": "somebody's wound closed up overnight, they say. nobody can tell me whose",
+    "tags": [
+      "tell",
+      "event:mended",
+      "distant"
+    ]
+  },
+  {
+    "t": "the ground shook somewhere out that way. I felt nothing here, but they swear to it",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "distant"
+    ]
+  },
+  {
+    "t": "I heard we lost someone. I don't even know the name yet, which tells you how it reached me",
+    "tags": [
+      "tell",
+      "event:perished",
+      "distant"
+    ]
+  },
+  {
+    "t": "there was a birth, apparently, and it went well. good news travels slow out here",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "distant"
+    ]
+  },
+  {
+    "t": "the story is the bushes came in twice as heavy. I'll believe it when I've picked one",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "distant"
+    ]
+  },
+  {
+    "t": "there's talk of a wolf taking someone. nobody I've asked was there, but everyone's heard it",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "distant"
+    ]
+  },
+  {
+    "t": "the wolf story keeps getting bigger. that usually means it started with something real",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "distant"
+    ]
+  },
+  {
+    "t": "I was outside the door the whole time. she's alright, and so is the baby",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw"
+    ]
+  },
+  {
+    "t": "I heard the first cry myself. I'm not ashamed to say I welled up",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw"
+    ]
+  },
+  {
+    "t": "the light came down and that was it. I was close enough to feel it",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw"
+    ]
+  },
+  {
+    "t": "I've never heard a noise like it. my ears rang till nightfall",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw"
+    ]
+  },
+  {
+    "t": "one moment there was somebody standing there",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw"
+    ]
+  },
+  {
+    "t": "they say it came out of a clear sky",
+    "tags": [
+      "tell",
+      "event:smote",
+      "heard"
+    ]
+  },
+  {
+    "t": "I didn't see it. I saw what was left",
+    "tags": [
+      "tell",
+      "event:smote",
+      "heard"
+    ]
+  },
+  {
+    "t": "the whole village heard that one",
+    "tags": [
+      "tell",
+      "event:smote",
+      "heard"
+    ]
+  },
+  {
+    "t": "there's talk of somebody struck dead out past the ridge",
+    "tags": [
+      "tell",
+      "event:smote",
+      "distant"
+    ]
+  },
+  {
+    "t": "I've had it third-hand, so make of it what you like",
+    "tags": [
+      "tell",
+      "event:smote",
+      "distant"
+    ]
+  },
+  {
+    "t": "I watched it come into leaf while I stood there. green, all at once",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw"
+    ]
+  },
+  {
+    "t": "it grew, properly grew, in front of me. no season does that",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "saw"
+    ]
+  },
+  {
+    "t": "they're saying a tree came good overnight",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "heard"
+    ]
+  },
+  {
+    "t": "somebody swears the fruit came in early and heavy",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "heard"
+    ]
+  },
+  {
+    "t": "I hear the growing's been strange further along the valley",
+    "tags": [
+      "tell",
+      "event:flourished",
+      "distant"
+    ]
+  },
+  {
+    "t": "food, just sitting there, where I know there was none",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "I found it laid out like somebody meant me to have it",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "I'd been praying about it that morning. then there it was",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "they say food turned up where nobody put any",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "there's talk of the stores filling on their own",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "I've heard of food arriving out of nowhere. never seen it",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "it was set down right in front of me. gently, like a gift",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw"
+    ]
+  },
+  {
+    "t": "I watched it come down out of nothing and land soft",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw"
+    ]
+  },
+  {
+    "t": "something was brought to us, that's how they're telling it",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard"
+    ]
+  },
+  {
+    "t": "they say things get delivered, out that way",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "distant"
+    ]
+  },
+  {
+    "t": "{whom} went straight up. feet off the ground, arms going",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I saw somebody lifted clean into the air. nothing holding them",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "{whom} was in the sky. I don't know how else to say it",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "they're saying {whom} got picked up like a doll",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "heard",
+      "of:person"
+    ]
+  },
+  {
+    "t": "somebody was carried up off the ground, is what I heard",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "heard",
+      "of:person"
+    ]
+  },
+  {
+    "t": "there's a story about people being lifted. I've not seen it",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "{whom} came down soft as anything. not a scratch",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "whatever had hold of {whom} put them down kindly",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "they say {whom} was let down gentle, which is something",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "heard",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I hear people get set down safe sometimes. only sometimes",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "{whom} went across the ground like a thrown stone",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I watched somebody get flung. I'll not forget the sound",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "it threw {whom}. threw them, like you'd throw a sack",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "they say {whom} was hurled halfway across the village",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "heard",
+      "of:person"
+    ]
+  },
+  {
+    "t": "somebody got thrown, and not gently",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "heard",
+      "of:person"
+    ]
+  },
+  {
+    "t": "out that way they talk about people being thrown about",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "{whom} hit the ground hard. I ran, but there was nothing to do",
+    "tags": [
+      "tell",
+      "event:impact",
+      "saw",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I heard it before I saw it. that's the part that stays",
+    "tags": [
+      "tell",
+      "event:impact",
+      "saw"
+    ]
+  },
+  {
+    "t": "they say {whom} came down and the ground won",
+    "tags": [
+      "tell",
+      "event:impact",
+      "heard",
+      "of:person"
+    ]
+  },
+  {
+    "t": "somebody struck the earth. that's all I know",
+    "tags": [
+      "tell",
+      "event:impact",
+      "heard",
+      "of:person"
+    ]
+  },
+  {
+    "t": "I've heard of people coming down hard. terrible thing",
+    "tags": [
+      "tell",
+      "event:impact",
+      "distant",
+      "of:person"
+    ]
+  },
+  {
+    "t": "the break closed while I was looking at it. no tool, no hands",
+    "tags": [
+      "tell",
+      "event:mended",
+      "saw"
+    ]
+  },
+  {
+    "t": "I've built long enough to know that isn't possible",
+    "tags": [
+      "tell",
+      "event:mended",
+      "saw"
+    ]
+  },
+  {
+    "t": "they say what was broken is whole and nobody mended it",
+    "tags": [
+      "tell",
+      "event:mended",
+      "heard"
+    ]
+  },
+  {
+    "t": "I hear things get put right on their own out that way",
+    "tags": [
+      "tell",
+      "event:mended",
+      "distant"
+    ]
+  },
+  {
+    "t": "the ground moved under me. I went down on one knee",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "saw"
+    ]
+  },
+  {
+    "t": "I watched the earth lift like a blanket being shaken",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "saw"
+    ]
+  },
+  {
+    "t": "they say the ground itself shifted",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "heard"
+    ]
+  },
+  {
+    "t": "the shaking woke everybody, that much I know",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "heard"
+    ]
+  },
+  {
+    "t": "there's talk of the earth moving further off",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "distant"
+    ]
+  },
+  {
+    "t": "it came out of the ground whole, roots hanging",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "saw"
+    ]
+  },
+  {
+    "t": "a tree does not leave the earth on its own. that one did",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "saw"
+    ]
+  },
+  {
+    "t": "they say a tree was pulled up like a weed",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "heard"
+    ]
+  },
+  {
+    "t": "I've heard of whole trees coming up. never seen the hole",
+    "tags": [
+      "tell",
+      "event:uprooted",
+      "distant"
+    ]
+  },
+  {
+    "t": "it had {whom} down. I've never run so fast in my life",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "saw"
+    ]
+  },
+  {
+    "t": "I got there and there was blood on the grass",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "saw"
+    ]
+  },
+  {
+    "t": "I heard {whom} screaming and I couldn't get there quick enough",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "saw"
+    ]
+  },
+  {
+    "t": "they say a wolf took {whom} right at the edge",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard"
+    ]
+  },
+  {
+    "t": "somebody got bitten badly. that's all anyone's saying",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "heard"
+    ]
+  },
+  {
+    "t": "there's wolves further along, they say. taking people",
+    "tags": [
+      "tell",
+      "event:mauled",
+      "distant"
+    ]
+  },
+  {
+    "t": "{whom} is gone. I was there and I couldn't help",
+    "tags": [
+      "tell",
+      "event:perished",
+      "saw"
+    ]
+  },
+  {
+    "t": "I sat with {whom} at the end. it was quiet, at least",
+    "tags": [
+      "tell",
+      "event:perished",
+      "saw"
+    ]
+  },
+  {
+    "t": "we lost {whom}. word came round this morning",
+    "tags": [
+      "tell",
+      "event:perished",
+      "heard"
+    ]
+  },
+  {
+    "t": "they say {whom} didn't make it",
+    "tags": [
+      "tell",
+      "event:perished",
+      "heard"
+    ]
+  },
+  {
+    "t": "I hear somebody died out that way. I didn't know them",
+    "tags": [
+      "tell",
+      "event:perished",
+      "distant"
+    ]
+  },
+  {
+    "t": "that was a gift. I'll not hear it called anything else",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "we were answered. plainly answered",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "food turns up. people drop things. I'm not building a religion on it",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I don't know what that was, but it wasn't nothing",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "that was a judgement. I felt it in my chest",
+    "tags": [
+      "tell",
+      "event:smote",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "lightning hits things. it's hit trees before",
+    "tags": [
+      "tell",
+      "event:smote",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "something's watching over this place, and it's not gentle",
+    "tags": [
+      "tell",
+      "event:quaked",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I've stopped pretending I understand any of it",
+    "tags": [
+      "tell",
+      "event:mended",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "a {stone|boulder} went sailing over the {trees|roofs} today. nobody threw it. nobody COULD throw it",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "of:thing",
+      "saw"
+    ]
+  },
+  {
+    "t": "something heavy came down out past the {well|square} and it didn't roll there on its own",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "of:thing",
+      "heard"
+    ]
+  },
+  {
+    "t": "the {bush|whole bush} moved. not swayed - MOVED. one spot to another, like a hand tidying a table",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "of:thing",
+      "saw"
+    ]
+  },
+  {
+    "t": "things around here get picked up and put down {neater|somewhere better} than they started. make of that what you like",
+    "tags": [
+      "tell",
+      "event:setdown",
+      "of:thing",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I watched a {rock|stone} float. I've been staring at rocks all day since, waiting",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "of:thing",
+      "saw"
+    ]
+  },
+  {
+    "t": "a {deer|wolf} went up in the air, legs still running. I laughed and then I stopped laughing",
+    "tags": [
+      "tell",
+      "event:lifted",
+      "of:beast",
+      "saw"
+    ]
+  },
+  {
+    "t": "they say some animal got hurled clear over the {river|ridge}. the dogs won't settle tonight",
+    "tags": [
+      "tell",
+      "event:thrown",
+      "of:beast",
+      "heard"
+    ]
+  },
+  {
+    "t": "there's a new little one at {the longhouse|theirs}. came through fine, both of them",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw"
+    ]
+  },
+  {
+    "t": "did you hear? a baby, safe and squalling. loudest thing in the village and nobody minds",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard"
+    ]
+  },
+  {
+    "t": "a child was born and the whole square's been grinning about it since {morning|midday}",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard"
+    ]
+  },
+  {
+    "t": "I was there when the little one came. hands shaking, and then that cry. best sound there is",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw"
+    ]
+  },
+  {
+    "t": "another mouth to feed, they say, like that's a complaint. it's the best news we've had all season",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard"
+    ]
+  },
+  {
+    "t": "word is a baby came safe out in {the new ground|one of the far houses}. good news walks fast",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "distant"
+    ]
+  },
+  {
+    "t": "they've a child now. I remember when the two of THEM were children. where do the years go",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard"
+    ]
+  },
+  {
+    "t": "a birth, and an easy one, thank {whatever's listening|the stars}. we needed something to go right",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  }
 ]

@@ -423,6 +423,61 @@ mod tests {
         }
     }
 
+    /// The village speaks one English, and it is the one on the game's
+    /// own labels: a chronicle that reads "nursed a neighbour back to
+    /// health" beside a bubble that says "neighbor" is a seam the player
+    /// can see. The corpus drifted American across two authored batches -
+    /// realized, honor, favor, traveling, gray - and nothing caught it,
+    /// because every other gate is about truth or shape rather than
+    /// spelling.
+    #[test]
+    fn the_village_speaks_one_english() {
+        // The American half of each pair, and what the game says instead.
+        const DRIFT: &[(&str, &str)] = &[
+            ("neighbor", "neighbour"),
+            ("color", "colour"),
+            ("honor", "honour"),
+            ("favor", "favour"),
+            ("labor", "labour"),
+            ("harbor", "harbour"),
+            ("rumor", "rumour"),
+            ("humor", "humour"),
+            ("behavior", "behaviour"),
+            ("marvelous", "marvellous"),
+            ("traveled", "travelled"),
+            ("traveling", "travelling"),
+            ("realize", "realise"),
+            ("realized", "realised"),
+            ("recognize", "recognise"),
+            ("recognized", "recognised"),
+            ("apologize", "apologise"),
+            ("apologized", "apologised"),
+            ("organize", "organise"),
+            ("practiced", "practised"),
+            ("defense", "defence"),
+            ("offense", "offence"),
+            ("gray", "grey"),
+            ("plow", "plough"),
+        ];
+        let voice = Corpus::load();
+        for line in voice.lines() {
+            let said = line.t.to_lowercase();
+            for (theirs, ours) in DRIFT {
+                // Whole words only: "colorless" is not a word this game
+                // uses, but "harbor" inside "harboring" would be, and a
+                // substring test would also condemn "honorary".
+                let found = said
+                    .split(|c: char| !c.is_alphabetic())
+                    .any(|w| w == *theirs);
+                assert!(
+                    !found,
+                    "the corpus drifts into another English: {theirs:?} should be {ours:?} in {:?}",
+                    line.t
+                );
+            }
+        }
+    }
+
     /// The register wall between subjects, pinned against the real corpus.
     /// The bug this guards: a berry bush moved by the hand once came out
     /// of witnesses' mouths as "I saw somebody lifted clean into the air"

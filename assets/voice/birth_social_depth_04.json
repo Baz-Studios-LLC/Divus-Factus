@@ -1,103 +1,875 @@
 [
-  { "t": "I heard the child breathe before I realized I had been holding my own breath.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The mother looked exhausted, but she smiled when they placed the child beside her.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I waited outside until someone opened the door and said both were safe.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The healer asked for water, cloth, and quiet. Prayer came from everyone else.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I saw how close it came. Luck feels like too small a word.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The child did not cry at once. I prayed before deciding whether I believed.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "When the child finally moved, everyone thanked somebody different.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I watched the healer stay calm while the rest of us failed at it.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The mother asked us to stop whispering and let her work.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I thought we had lost the child. Then I heard a cry.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "Someone prayed beside me. I joined before I could question myself.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The room was all work until the child arrived. Then everybody started thanking the god.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I saw skill, strength, and something I still cannot name.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The birth lasted through the night. Dawn found both of them alive.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I brought clean water and tried not to listen through the door.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The healer said the danger had passed. I nearly thanked the god aloud.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I watched the mother hold the child and forgot every doubt for a moment.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "Nothing looked miraculous until I remembered how frightened we had been.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The child was small, loud, and alive. I needed nothing more just then.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I saw the mother's hands stop shaking when the child cried.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "We did everything we knew. Perhaps the part beyond knowing mattered too.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The room smelled of smoke and blood. Nobody there spoke lightly of miracles.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I stood useless by the wall and promised anything if both survived.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "Both lived. I am still deciding what to do with the promise I made.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The child gripped one finger. That felt important, though I cannot explain why.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I expected a sign and got a tired mother asking for water.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "People called the birth blessed. I called it a relief and meant nearly the same thing.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The healer never mentioned the god. Everyone waiting outside did.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "I prayed for both lives, then spent the whole birth doubting my own prayer.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "The first cry sounded ordinary. I have never been happier to hear something ordinary.", "tags": ["tell", "event:delivered", "saw", "wavering"] },
-  { "t": "That sounds like help, but it also sounds like very good healing.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I am glad they are safe. I can wonder about the reason later.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Did the mother think the god helped, or is that everyone else's account?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "A safe birth can feel divine without proving anything.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I would rather thank too many hands than overlook one.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Maybe the god answered. Maybe the healer did. I can honor both.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Was the child ever in danger, or did it only feel that way?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I want to believe your prayer mattered. I truly do.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Good news makes belief easier, but easy belief still worries me.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "The mother deserves rest before we turn her birth into doctrine.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I cannot call it chance after hearing how close they came.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Perhaps mercy and skill arrived together. Why must we choose?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Did anyone ask the healer what happened?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I prayed for them too. I was afraid to tell anybody.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "The child's survival matters more than settling this argument.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "That account leaves room for the god, though it does not require one.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I believe you saw something good. I am unsure what made it happen.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Maybe answered prayers look exactly like people doing their work well.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I hope the god helped. Hope is the honest word.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Your story makes me grateful and uncertain in equal measure.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Was anyone listening when the mother spoke afterward?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "The god may deserve thanks, but the healer certainly does.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I have heard enough bad birth stories to value this one.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "One safe child cannot settle every doubt, but it can quiet them.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "That sounds wonderful. It also sounds exhausting.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I am not ready to name it a miracle. I am ready to celebrate.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Let us ask what the family needs instead of what the birth proves.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I should visit them before deciding what I believe about it.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "We can debate the god after the mother has slept.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I will bring clean cloth. That is one thing I know how to do.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "The story gives me questions. The family needs useful hands.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I may pray tonight. I will decide when I am alone.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Let the child become a person before we make them an argument.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I need to hear the healer's account before settling mine.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "That is good news, whatever name we give the cause.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I will think about the god after checking on the mother.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Perhaps I owe thanks. I know I owe the family some peace.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "We should stop before we turn uncertainty into gossip.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I am relieved enough for today. Belief can wait until tomorrow.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "The child is safe. I do not need a second conclusion yet.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I should bring supper and keep my questions to myself.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Tell me again after the excitement has left the account.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I believe the relief in your face. The rest needs time.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Maybe we were helped. We were certainly fortunate.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I will not argue about miracles beside a sleeping child.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "There is joy enough here without forcing certainty onto it.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "The family will need food tomorrow. Let us start there.", "tags": ["chat:end", "event:delivered", "told"] },
-  { "t": "I should stop talking about them and go see how they are.", "tags": ["chat:end", "event:delivered", "told"] },
-  { "t": "A new child means more work for everyone. Good work, though.", "tags": ["chat:end", "event:delivered", "told"] },
-  { "t": "Let us give them one quiet evening before visiting.", "tags": ["chat:end", "event:delivered", "told"] },
-  { "t": "I will pass the good news on and leave out the argument.", "tags": ["chat:end", "event:delivered", "told"] },
-  { "t": "The child has arrived. The village can meet them soon enough.", "tags": ["chat:end", "event:delivered", "told"] },
-  { "t": "I need to finish my work before offering anybody help.", "tags": ["chat:end", "event:delivered", "told"] },
-  { "t": "We should remember the healer when thanking people.", "tags": ["chat:end", "event:delivered", "told"] },
-  { "t": "That family has heard enough voices for one day.", "tags": ["chat:end", "event:delivered", "told"] },
-  { "t": "I am glad you told me. I will let the news settle.", "tags": ["chat:end", "event:delivered", "told"] },
-  { "t": "Do you know whether the mother had asked for the god?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Was the healer surprised, or only everyone watching?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I wonder what the mother believes happened in that room.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "The first cry must have changed every thought you had.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Did your prayer feel answered, or were you simply relieved?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I might believe differently if I had stood where you stood.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "People outside the room always sound more certain than people inside it.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Perhaps the god worked through the healer. I could accept that.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Was there a moment when everyone thought the child was lost?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I keep wondering whether blessings always look like ordinary work.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Your uncertainty makes the account easier for me to trust.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I expected you to sound more certain after seeing it.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Maybe nobody in that room needs to agree about why they survived.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "The god may have helped, but the mother still bore the pain.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I understand why that birth changed something in you.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] }
+  {
+    "t": "I heard the child breathe before I realised I had been holding my own breath.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The mother looked exhausted, but she smiled when they placed the child beside her.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I waited outside until someone opened the door and said both were safe.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The healer asked for water, cloth, and quiet. Prayer came from everyone else.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I saw how close it came. Luck feels like too small a word.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The child did not cry at once. I prayed before deciding whether I believed.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "When the child finally moved, everyone thanked somebody different.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I watched the healer stay calm while the rest of us failed at it.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The mother asked us to stop whispering and let her work.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I thought we had lost the child. Then I heard a cry.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Someone prayed beside me. I joined before I could question myself.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The room was all work until the child arrived. Then everybody started thanking the god.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I saw skill, strength, and something I still cannot name.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The birth lasted through the night. Dawn found both of them alive.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I brought clean water and tried not to listen through the door.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The healer said the danger had passed. I nearly thanked the god aloud.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I watched the mother hold the child and forgot every doubt for a moment.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Nothing looked miraculous until I remembered how frightened we had been.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The child was small, loud, and alive. I needed nothing more just then.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I saw the mother's hands stop shaking when the child cried.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "We did everything we knew. Perhaps the part beyond knowing mattered too.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The room smelled of smoke and blood. Nobody there spoke lightly of miracles.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I stood useless by the wall and promised anything if both survived.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Both lived. I am still deciding what to do with the promise I made.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The child gripped one finger. That felt important, though I cannot explain why.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I expected a sign and got a tired mother asking for water.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "People called the birth blessed. I called it a relief and meant nearly the same thing.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The healer never mentioned the god. Everyone waiting outside did.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I prayed for both lives, then spent the whole birth doubting my own prayer.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The first cry sounded ordinary. I have never been happier to hear something ordinary.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That sounds like help, but it also sounds like very good healing.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am glad they are safe. I can wonder about the reason later.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Did the mother think the god helped, or is that everyone else's account?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A safe birth can feel divine without proving anything.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I would rather thank too many hands than overlook one.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe the god answered. Maybe the healer did. I can honour both.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Was the child ever in danger, or did it only feel that way?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I want to believe your prayer mattered. I truly do.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Good news makes belief easier, but easy belief still worries me.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The mother deserves rest before we turn her birth into doctrine.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I cannot call it chance after hearing how close they came.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps mercy and skill arrived together. Why must we choose?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Did anyone ask the healer what happened?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I prayed for them too. I was afraid to tell anybody.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The child's survival matters more than settling this argument.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That account leaves room for the god, though it does not require one.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I believe you saw something good. I am unsure what made it happen.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe answered prayers look exactly like people doing their work well.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I hope the god helped. Hope is the honest word.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Your story makes me grateful and uncertain in equal measure.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Was anyone listening when the mother spoke afterward?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The god may deserve thanks, but the healer certainly does.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I have heard enough bad birth stories to value this one.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "One safe child cannot settle every doubt, but it can quiet them.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That sounds wonderful. It also sounds exhausting.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am not ready to name it a miracle. I am ready to celebrate.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Let us ask what the family needs instead of what the birth proves.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I should visit them before deciding what I believe about it.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "We can debate the god after the mother has slept.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I will bring clean cloth. That is one thing I know how to do.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The story gives me questions. The family needs useful hands.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I may pray tonight. I will decide when I am alone.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Let the child become a person before we make them an argument.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I need to hear the healer's account before settling mine.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That is good news, whatever name we give the cause.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I will think about the god after checking on the mother.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps I owe thanks. I know I owe the family some peace.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "We should stop before we turn uncertainty into gossip.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am relieved enough for today. Belief can wait until tomorrow.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The child is safe. I do not need a second conclusion yet.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I should bring supper and keep my questions to myself.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Tell me again after the excitement has left the account.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I believe the relief in your face. The rest needs time.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe we were helped. We were certainly fortunate.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I will not argue about miracles beside a sleeping child.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "There is joy enough here without forcing certainty onto it.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The family will need food tomorrow. Let us start there.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told"
+    ]
+  },
+  {
+    "t": "I should stop talking about them and go see how they are.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told"
+    ]
+  },
+  {
+    "t": "A new child means more work for everyone. Good work, though.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told"
+    ]
+  },
+  {
+    "t": "Let us give them one quiet evening before visiting.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told"
+    ]
+  },
+  {
+    "t": "I will pass the good news on and leave out the argument.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told"
+    ]
+  },
+  {
+    "t": "The child has arrived. The village can meet them soon enough.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told"
+    ]
+  },
+  {
+    "t": "I need to finish my work before offering anybody help.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told"
+    ]
+  },
+  {
+    "t": "We should remember the healer when thanking people.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told"
+    ]
+  },
+  {
+    "t": "That family has heard enough voices for one day.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told"
+    ]
+  },
+  {
+    "t": "I am glad you told me. I will let the news settle.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told"
+    ]
+  },
+  {
+    "t": "Do you know whether the mother had asked for the god?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Was the healer surprised, or only everyone watching?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I wonder what the mother believes happened in that room.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The first cry must have changed every thought you had.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Did your prayer feel answered, or were you simply relieved?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I might believe differently if I had stood where you stood.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "People outside the room always sound more certain than people inside it.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps the god worked through the healer. I could accept that.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Was there a moment when everyone thought the child was lost?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I keep wondering whether blessings always look like ordinary work.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Your uncertainty makes the account easier for me to trust.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I expected you to sound more certain after seeing it.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe nobody in that room needs to agree about why they survived.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The god may have helped, but the mother still bore the pain.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I understand why that birth changed something in you.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  }
 ]
