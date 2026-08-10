@@ -19,6 +19,9 @@ shots; imitate the shots, not a description of them:
 - "the stores are thin and the children eat first. you see how it is down here"
 - "I saw it myself. {whom} went straight up into the air like a sack of feathers"
 
+Keep every expanded utterance under eighteen words - brevity is the
+voice's spine, and the limit is now part of the audit.
+
 What always fails review: capital-P Poetry, sermons, modern idiom
 ("okay", "awesome"), fantasy-novel diction ("verily", "the gods willing"),
 lines longer than ~2 short sentences, and any line that could not be said
