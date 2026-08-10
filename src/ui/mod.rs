@@ -236,11 +236,31 @@ struct Bubble {
     /// How far above the head the box floats — a thought's circle trail
     /// needs more room than a speech tail.
     lift: f32,
+    /// Who they are talking TO, when this is one turn of a conversation.
+    ///
+    /// A conversation's bubbles hang between the two of them rather than
+    /// over their own heads, and each voice keeps its own side - one
+    /// down the left, one down the right, oldest at the top. Brett: "can
+    /// we make the bubbles look like text massages. They stack on the
+    /// left for one person and on the right for the other." It reads the
+    /// way a thread does, and it fixes something real: four beats over
+    /// two heads, each popping and gone, never read AS a conversation.
+    with: Option<Entity>,
+    /// Which side of the thread this voice keeps: -1 left, +1 right.
+    /// Decided by the pair, not the speaker, so both turns of the same
+    /// exchange agree and neither voice ever changes sides mid-sentence.
+    side: f32,
 }
 
 /// At most this many bubbles at once: sparse is the point. If everyone
 /// talks over each other, nobody is worth watching.
 const BUBBLE_CAP: usize = 7;
+
+/// How far a conversation's turn sits off the thread's middle, in
+/// pixels. Wide enough that the two sides read as two voices and not as
+/// one ragged column, narrow enough that a long line still hangs over
+/// the pair rather than out in the field beside them.
+const THREAD_GAP: f32 = 14.0;
 
 /// Spawns a bubble per Say, skipping speakers who already have one.
 fn speak(
@@ -257,6 +277,7 @@ fn speak(
     // itself. (`float_bubbles` keeps the bent GlobalTransform - screen
     // projection is render-space work.)
     speakers: Query<&Transform, Without<Bubble>>,
+    talking: Query<&crate::villager::gossip::Conversing>,
     live: Query<&Bubble>,
 ) {
     let started = std::time::Instant::now();
@@ -268,7 +289,20 @@ fn speak(
         // rule that used to live here belonged to the retired teller's
         // judging days, and its last effect was silencing written lines
         // that had every right to play.
-        if live.iter().count() >= BUBBLE_CAP || live.iter().any(|b| b.speaker == say.speaker) {
+        if live.iter().count() >= BUBBLE_CAP {
+            continue;
+        }
+        // Whether this is one turn of a conversation, and with whom. A
+        // thought or a prayer is nobody's turn, whoever is standing
+        // nearby: only speech joins a thread.
+        let talking_to = (!say.thought && !say.prayer)
+            .then(|| talking.get(say.speaker).ok().map(|talk| talk.partner))
+            .flatten();
+        // One bubble each, as ever - except in a thread, where each of
+        // them speaks twice and both turns have to stay up or it is not
+        // a thread. Two is the whole of anyone's share.
+        let already = live.iter().filter(|b| b.speaker == say.speaker).count();
+        if already >= if talking_to.is_some() { 2 } else { 1 } {
             continue;
         }
         // The one place every line in the game passes through, whoever wrote
@@ -300,8 +334,22 @@ fn speak(
             .spawn((
                 Bubble {
                     speaker: say.speaker,
-                    until: time.elapsed_secs() + 4.5,
+                    // A turn of a conversation waits for the rest of the
+                    // conversation: four beats at a few seconds each, and
+                    // a thread whose first line has already gone is not a
+                    // thread. A remark to nobody keeps its old life.
+                    until: time.elapsed_secs() + if talking_to.is_some() { 13.0 } else { 4.5 },
                     lift: if say.thought { 26.0 } else { 8.0 },
+                    with: talking_to,
+                    side: talking_to.map_or(0.0, |partner| {
+                        // The pair decides, so both agree: the lower of
+                        // the two entities keeps the left.
+                        if say.speaker.to_bits() < partner.to_bits() {
+                            -1.0
+                        } else {
+                            1.0
+                        }
+                    }),
                 },
                 // The stand-down covers bubbles with the rest of the HUD:
                 // a word said under an open book plays to the frost.
@@ -464,7 +512,20 @@ fn float_bubbles(
             commands.entity(entity).despawn();
             continue;
         };
-        let overhead = speaker.translation() + Vec3::Y * 2.3;
+        // A conversation hangs BETWEEN the two of them, so both voices
+        // share one column and the turns stack into a thread. Over their
+        // own heads they never read as an exchange: two people walking
+        // shoulder to shoulder produced two separate popping boxes, and
+        // the reply had usually outlived the thing it answered.
+        //
+        // If the other one is gone - died, was picked up, walked off -
+        // the words fall back over the speaker's own head, which is
+        // where a remark to nobody belongs.
+        let between = bubble
+            .with
+            .and_then(|partner| speakers.get(partner).ok())
+            .map(|partner| (speaker.translation() + partner.translation()) * 0.5);
+        let overhead = between.unwrap_or(speaker.translation()) + Vec3::Y * 2.3;
         // Ordo's one depth curve, borrowed until the bubbles become
         // placards themselves: far talk shrinks to presence instead of
         // stacking a wall of full-sized text over a busy square.
@@ -477,7 +538,13 @@ fn float_bubbles(
                 let size = computed.size() * computed.inverse_scale_factor();
                 // Lifted enough that the tail's point, not the box, meets
                 // the top of the speaker's head.
-                let mut pos = Vec2::new(at.x - size.x * 0.5, at.y - size.y - bubble.lift);
+                //
+                // A conversation's turn is pushed off centre to its own
+                // side of the thread - one voice down the left, the other
+                // down the right - so who said what is legible before a
+                // word is read, the way it is on a phone.
+                let lean = bubble.side * (size.x * 0.5 + THREAD_GAP) * scale;
+                let mut pos = Vec2::new(at.x - size.x * 0.5 + lean, at.y - size.y - bubble.lift);
                 // Two people talking shoulder to shoulder must not talk
                 // over each other's words: a bubble that would land on an
                 // earlier one climbs until it sits clear above it.

@@ -202,6 +202,58 @@ Keep speakers on topic by storing the grievance on the exchange. Every later
 beat receives that same topic plus the speaker's stance. This can remain fully
 authored and deterministic; it does not require an LLM.
 
+### Grievance Truth and Provenance
+
+Every quarrel must be about something that is real, or something a particular
+person has a credible reason to believe is real. Sermo must never invent a
+missing duty, theft, insult, affair, injury, victim, commandment, or past event
+merely because an argument line needs material.
+
+A grievance should point to structured provenance:
+
+```text
+the claim being made
+who or what it concerns
+the real event, condition, relationship, duty, or object behind it
+how the accuser knows: saw, heard, inferred, assumed, or fabricated
+the clue or source that made the belief plausible
+the accuser's confidence
+whether the accuser knows the claim is false
+when the grievance began and whether it has happened before
+```
+
+Valid foundations include:
+
+- **Observed truth:** somebody saw food taken, work abandoned, a promise
+  broken, an insult spoken, or a person harmed.
+- **Sourced report:** a known witness or gossip account supplied the claim;
+  distance and retelling affect confidence.
+- **Mistaken inference from a real clue:** food is missing and the accused was
+  near the stores; a roof failed after their repair; somebody was seen leaving
+  a house without knowing why.
+- **Different interpretation:** both people agree on the miracle or event but
+  disagree about blame, intent, doctrine, fairness, or what should follow.
+- **Deliberate lie:** the accuser knows the claim is false and has a concrete
+  motive such as jealousy, revenge, fear, status, concealment, or political
+  gain. Lying should require simulation support, not random corpus selection.
+
+The accused responds from their own knowledge. They may admit the act, dispute
+intent, offer missing context, expose the bad source, honestly deny a mistaken
+claim, lie in return, or know they have been caught. Witnesses should react
+differently when they possess evidence that supports or contradicts either
+side.
+
+The practical law is: **every participant should be able to answer “Why do you
+believe that?” from information they actually hold.** A false accusation can
+be dramatically real while remaining factually false. The gap between world
+truth, personal belief, public rumour, and intentional deception is valuable
+simulation state and should survive into gossip and aftermath.
+
+Avoid unsupported absolutes such as “you always neglect your work” unless the
+character remembers a repeated pattern. One missed duty supports “you left the
+work unfinished”; several remembered failures may support “you always leave it
+to us.” Specific accusations make both conflict and rebuttal more convincing.
+
 ### Reaction and Escalation
 
 Use existing simulation facts to weight responses: regard, kinship, traits,
@@ -425,3 +477,51 @@ emitters and must not be written for.
 
 Your milestone advice was right and is being followed: mundane arguments with
 visible aftermath first, and doctrine only once that loop works.
+
+## Before the First Quarrel Corpus: Preserve Each Speaker's Side
+
+The first live slice is promising, but hunger and roof quarrels currently lose
+one truth needed for specific writing. `grievance_between()` correctly knows
+which person is starving and which is fed, or which is roofless and which is
+housed. It then collapses that fact to `Grievance::Hunger` or
+`Grievance::Roof`. Both participants subsequently receive only `quarrel` plus
+the same `over:*` tag.
+
+That means the corpus cannot know whether the current speaker is deprived or
+advantaged. A fed opener could receive "You ate while I went hungry"; a housed
+listener could answer with the roofless person's complaint. Vague lines could
+avoid the error, but they would waste the strongest truth in the scene.
+
+This is not the deferred personality stance system. It is factual role
+orientation. Preserve it before ChatGPT authors the large quarrel corpus.
+Possible solutions:
+
+```text
+store the aggrieved entity on the conversation
+emit a per-speaker side such as aggrieved / advantaged
+or emit topic-specific sides such as hungry-side / fed-side
+```
+
+Use whichever representation fits the engine, but test both participants:
+
+- hunger: starving speaker and fed speaker receive distinguishable contexts
+- roof: roofless speaker and housed speaker receive distinguishable contexts
+- grudge: the holder of the negative regard is distinguishable from its target
+
+The role should persist through all four beats just as the grievance does.
+Then the corpus can write accusations, defences, shame, generosity, contempt,
+apologies, and threats without guessing who has the food or roof.
+
+Also inspect the existing parting effect before calling aftermath complete.
+The current generic conversation exit independently gives each participant an
+88% chance of warmth and a 12% chance of souring. A quarrel can therefore make
+both people warmer regardless of what was said. The first version may leave
+outcome neutral, but it should not silently reuse the friendly-chat result.
+Eventually apology, mediation, withdrawal, and escalation need different
+weighted outcomes, whether inferred from a small outcome class or chosen by
+the engine before selecting the matching final line.
+
+Once speaker side is live, ChatGPT can author the first real batch for the
+three emitted grievances: `over:hunger`, `over:roof`, and `over:grudge` across
+all four existing conversation beats. Do not write `over:idleness` or
+`over:faith` yet.
