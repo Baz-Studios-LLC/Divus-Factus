@@ -1975,6 +1975,8 @@ pub(crate) fn spawn_settlement(
     } else {
         STARTING_POPULATION
     };
+    // Kept as they spawn, so the founding can wed two pairs of them below.
+    let mut first_families: Vec<(Entity, Person)> = Vec::with_capacity(founders);
     for i in 0..founders {
         // Out of the hall's door, one after another, rather than
         // scattered across a field they were never in.
@@ -2007,18 +2009,20 @@ pub(crate) fn spawn_settlement(
             i as f32 * 0.618,
         );
 
+        // Founders are strangers to one another: twelve people, twelve
+        // houses. Paternal descent will thin that down over the
+        // generations on its own — the names that survive are the ones
+        // that had sons, which is how a village ends up with a handful
+        // of old families and a lot of forgotten ones.
+        let person = Person::born(
+            language.name_for(genome_sex, &mut rng),
+            language.surname(&mut rng),
+        );
+        first_families.push((entity, person.clone()));
         commands.entity(entity).insert((
             Villager,
             traits::Traits::roll(&mut rng),
-            // Founders are strangers to one another: twelve people, twelve
-            // houses. Paternal descent will thin that down over the
-            // generations on its own — the names that survive are the ones
-            // that had sons, which is how a village ends up with a handful
-            // of old families and a lot of forgotten ones.
-            Person::born(
-                language.name_for(genome_sex, &mut rng),
-                language.surname(&mut rng),
-            ),
+            person,
             crate::witness::Temperament::random(&mut rng),
             crate::witness::Witnessed::default(),
             speech::RecentlySaid::default(),
@@ -2057,6 +2061,73 @@ pub(crate) fn spawn_settlement(
             commands.entity(entity).insert(Prime {
                 remaining: rng.range(SECONDS_OF_PRIME * 0.3, SECONDS_OF_PRIME),
             });
+        }
+    }
+
+    // Two of the pairs came to the valley already wed. Ten strangers read
+    // as an expedition; two households and six single hands read as a
+    // MIGRATION - and a founding with families in it wants houses at once
+    // and starts having children a season sooner. Brett: "have two couples
+    // that are already married at game start." The founders alternate
+    // woman and man out of the door, so (0,1) and (2,3) are the pairs; the
+    // effects are the wedding rite's own - spouse both ways, her name
+    // follows his house, hearts already warm - minus the ceremony, which
+    // happened somewhere back down the road they came in on.
+    if restoring.is_none() && first_families.len() >= 4 {
+        let day = clock.day();
+        for (wife_at, husband_at) in [(0usize, 1usize), (2, 3)] {
+            let (wife, her) = first_families[wife_at].clone();
+            let (husband, him) = first_families[husband_at].clone();
+            commands.entity(wife).insert(Spouse(husband));
+            commands.entity(husband).insert(Spouse(wife));
+            // She takes his house; her born name keeps the maternal line.
+            let married = Person {
+                name: her.name.clone(),
+                surname: him.surname.clone(),
+                born_surname: her.born_surname.clone(),
+            };
+            commands.entity(wife).insert(married.clone());
+            // Chronicles rebuilt whole: the arrival line each founder
+            // already carries, and the marriage that predates the banner.
+            let mut hers = Chronicle::default();
+            hers.record(
+                day,
+                if wife_at == 0 {
+                    format!("founded {settlement_name} beside the water")
+                } else {
+                    format!("settled {settlement_name} among the first families")
+                },
+            );
+            hers.record(
+                day,
+                format!("came to the valley already wed to {}", him.full_name()),
+            );
+            commands.entity(wife).insert(hers);
+            let mut his = Chronicle::default();
+            his.record(
+                day,
+                format!("settled {settlement_name} among the first families"),
+            );
+            his.record(
+                day,
+                format!("came to the valley already wed to {}", married.full_name()),
+            );
+            commands.entity(husband).insert(his);
+            // Not the rite's day-of spark - the worn-in devotion of a
+            // marriage that predates the road. Near the ceiling, so the
+            // pair reads as LOVE from the first glance at the dossier and
+            // stays devoted against the heart's slow cooling.
+            let mut her_heart = regard::Regard::default();
+            her_heart.warm(husband, 0.95);
+            commands.entity(wife).insert(her_heart);
+            let mut his_heart = regard::Regard::default();
+            his_heart.warm(wife, 0.95);
+            commands.entity(husband).insert(his_heart);
+            info!(
+                "{} and {} came to the valley already wed",
+                married.full_name(),
+                him.full_name()
+            );
         }
     }
 

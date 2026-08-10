@@ -2,7 +2,154 @@
 
 Reviewed against the current code on 2026-08-10. This is a living handoff for
 Claude, not a history of ideas. Delete a section when it is implemented or no
-longer fits the design.
+longer fits the design. Before adding new advice, compare the existing notes
+against the current code and remove completed, duplicated, or contradicted
+items. Completed work may be named once as foundation, but must not remain
+written as pending work.
+
+## Sermo Collaboration Handoff - Immediate Next Work
+
+Brett wants Sermo to become genuinely deep. Since ChatGPT can author corpus
+content quickly, the target should be broad situational coverage: many ordinary
+thoughts, prayers, stories, and conversations selected from precise simulation
+truths. The goal is not volume for its own sake. The goal is that villagers
+rarely repeat themselves and usually say something that reveals why this
+particular person is having this particular moment.
+
+### Integrated foundation
+
+Commit `8bf7c03` integrated the first ChatGPT-authored depth batch:
+
+```text
+assets/voice/births_depth.json
+assets/voice/daily_life_depth.json
+assets/voice/prayers_depth.json
+assets/voice/conversation_depth.json
+```
+
+It contains 158 new records and 181 possible utterances after alternations,
+bringing the corpus to 1,398 records. It covers the current worn pools for:
+
+- firsthand, secondhand, and distant birth stories
+- housed and married thoughts
+- fisher, gatherer, forester, hunter, and priest thoughts
+- devotion, hunger, wavering, and devout prayers
+- generic and wavering first replies
+- all four beats of forester conversation
+
+The batch was audited across every expanded alternation for JSON validity,
+locked vocabulary, exact duplicates, slot legality, capitalization, terminal
+punctuation, and the 18-word limit. Both required gates pass:
+
+```text
+cargo test every_tag_is_one_the_game_speaks
+cargo test a_things_story_is_never_told_about_a_person
+```
+
+That commit also implemented and tested sentence-case presentation in
+`sermo::tidy()`. This foundation is complete; do not treat it as pending work.
+
+### Brett's presentation preference
+
+Brett wants normal sentence capitalization and punctuation. He does not like
+ordinary dialogue beginning with a lowercase letter. Keep the voice plain,
+brief, concrete, and conversational; this is not a request for formal or poetic
+speech. Natural fragments remain appropriate when somebody is replying,
+hesitating, or yelling.
+
+`sermo::tidy()` now capitalizes every sentence start and supplies terminal
+punctuation. Preserve that behavior and its tests.
+
+### Run a clean Sermo soak next
+
+Do not immediately request another blind batch. First run several in-game days
+with the new corpus and watch speech at normal speed as well as accelerated
+simulation speed.
+
+For a useful authoring sample:
+
+1. Clear or archive the old `voice-wanted.txt` before the controlled run so old
+   counts do not masquerade as new misses.
+2. Let a village experience work, meals, marriage, housing changes, prayer,
+   weather, at least one birth, and several divine events.
+3. Watch complete conversations, not only isolated bubbles.
+4. Record any line that is grammatically fine but socially or factually wrong.
+5. Preserve the newly generated `voice-wanted.txt` and hand it to ChatGPT.
+
+The next batch should be ordered by fresh counts. Likely areas, if the run
+confirms them:
+
+- all remaining trades across `muse` and all four chat beats
+- food, roof, and weather conversations across faith bands
+- every event across `saw`, `heard`, `distant`, and compatible faith bands
+- more devotion, hunger, road, and grudge prayers
+- uncommon combinations such as housed + married + trade + faith
+- better endings and followups so whole conversations sound coherent
+
+### Highest-value engine change: topic-aware first replies
+
+The first listener response to an event still enters Sermo as `reply + faith +
+vocation + body`. `Musing.heard` carries the words, but corpus selection does
+not receive the structured topic. A reply to a birth, smiting, gift of food, or
+quake can therefore come from the same generic pool.
+
+Please give first replies a structured topic path. A dedicated reply request is
+cleaner than parsing the heard prose:
+
+```text
+reply role + Chat / DivineEventKind + faith + vocation + current state
+```
+
+Keep generic `reply` records as fallback. Keep knowledge transfer, faith
+movement, morale movement, and chronicle writing on the opener only; later
+beats reveal interpretation and must not apply the event repeatedly.
+
+Once event/topic tags legally reach first replies, ChatGPT can author real
+responses such as sympathy after a death, practical concern after a quake,
+relief after a birth, unease after a smiting, and gratitude or suspicion after
+provision. Until then, writing hundreds more generic `reply` lines creates
+variety but not depth.
+
+### The later depth multiplier: stance from existing simulation truth
+
+After topic-aware replies are stable, expose a small, carefully chosen set of
+stance tags derived from existing data: `Traits`, `Temperament`, `Regard`,
+faith, hunger, rest, morale, injury, and housing. The same pressure should
+weight different reactions rather than force one universal emotion.
+
+Any new stance tag is a code feature first:
+
+1. Define exactly which simulation facts emit it.
+2. Add it to the locked vocabulary in the same code change.
+3. Confirm it reaches a real Sermo request in a test or bench trace.
+4. Then ask ChatGPT to author its corpus coverage.
+
+Do not let ChatGPT invent tags directly in JSON. Its standing lane is
+`assets/voice/*.json`; engine context and vocabulary remain Claude's lane.
+
+### Definition of success
+
+Sermo is deep when a player can watch one exchange and infer several truths:
+
+```text
+what happened
+how directly the speaker knows it
+what the speaker believes
+what practical pressure they are under
+how they feel about the person involved
+whether the listener accepts, doubts, redirects, or ends the subject
+```
+
+The long-term loop should remain:
+
+```text
+simulation emits truthful context
+-> Sermo selects authored words
+-> player and human review expose thin or false coverage
+-> voice-wanted.txt records missing combinations
+-> ChatGPT authors a focused batch
+-> gates, human read, soak, repeat
+```
 
 ## Current Priorities
 
@@ -13,135 +160,6 @@ longer fits the design.
 5. Give children some inheritance from their parents.
 6. Continue removing focused-town assumptions before colonies become common.
 7. Version and fixture-test public save data before release.
-
-## Sermo: Make the First Reply About What Was Said
-
-Sermo is already a strong foundation. It is authored, fast, tag-driven,
-debuggable, and independent of a runtime LLM. `Corpus` already rewards
-specificity and freshness, records thin coverage in `voice-wanted.txt`, and
-loads every JSON file under `assets/voice`. `Conversing` already carries a
-topic and schedules a four-beat exchange without transferring the same rumor
-four times.
-
-The remaining weak point is the listener's first answer to an event story.
-`hold_conversations()` passes the teller's words into `Musing.heard`, but
-`Tongue::muse()` does not derive meaning from those words. It picks with:
-
-```text
-reply + faith + vocation + body
-```
-
-It does not receive `event:smote`, `event:provided`, or the conversation's
-other topic tag. A listener can therefore answer a smiting and a gift of food
-with the same generic line. Later beats use `turn_about()` and are already
-topic-aware, so the first reply is now the odd beat out.
-
-Recommended change:
-
-- Add a dedicated `Tongue::reply(...)` path, or pass an optional structured
-  topic into `Musing`.
-- Pass `Chat` / `DivineEventKind` from `hold_conversations()` rather than trying
-  to parse the raw `heard` string.
-- Select with `chat:reply + topic + faith + vocation`, with generic
-  `chat:reply` as the final fallback.
-- Keep knowledge transfer, faith movement, morale movement, and chronicle
-  writing on the opener only. Later words are interpretation, not new events.
-
-The eventual useful shape for every beat is:
-
-```text
-role + topic + faith + vocation + emotional stance + relationship stance
-```
-
-Examples:
-
-```text
-chat:reply + event:smote + doubting + afraid
-chat:reply + event:provided + devout + grateful
-chat:followup + food + hungry + trade:cook
-chat:end + roof + roofless + gloomy
-```
-
-Do this incrementally. Topic-aware first replies are the important fix;
-emotional and relationship stance can follow once the basic path is covered.
-
-## Sermo: Let Existing Character Data Reach the Words
-
-The game now has more character differentiation than Sermo exposes. `Traits`
-already changes work pace, conviction, morale recovery, talkativeness,
-endurance, and appetite. `Temperament` changes reactions through boldness.
-`Regard`, hunger, rest, morale, injury, faith, vocation, and housing state also
-exist. Most chat selection currently sees only topic, faith, vocation, and
-occasionally `told`.
-
-Do not make traits dictate a sentence. Let them weight an emotional
-interpretation, then expose that interpretation as a tag:
-
-```text
-simulation pressure -> weighted interpretation -> Sermo stance tag
-```
-
-Examples:
-
-```text
-hungry + low spirits + gloomy             -> sad / hopeless weighted upward
-hungry + low spirits + bold               -> angry / demanding weighted upward
-smite witnessed + skeptic                 -> bitter / afraid weighted upward
-food provided + devout                    -> grateful weighted upward
-friend harmed + warm regard               -> worried / angry weighted upward
-enemy helped + sour regard                -> resentful weighted upward
-```
-
-The same facts must still produce different people. Use seeded rolls and
-weights, not rules such as `Gloomy == always sad`. Save a stance only if it
-needs to persist beyond the current exchange; otherwise derive it when a beat
-is selected.
-
-Useful first stance vocabulary:
-
-```text
-angry afraid sad hopeful bitter grateful practical suspicious relieved
-```
-
-Only add a tag when enough lines or a reliable fallback exist for it. The
-`voice-wanted.txt` loop should guide which combinations deserve writing.
-
-## Split and Test the Voice Corpus
-
-`assets/voice/chat.json` is now large enough that authoring mistakes will be
-harder to see by inspection. The loader already supports splitting it without
-an engine change. A practical layout would be:
-
-```text
-assets/voice/chat_general.json
-assets/voice/chat_events.json
-assets/voice/chat_work.json
-assets/voice/chat_needs.json
-assets/voice/sermons.json
-assets/voice/musings.json
-assets/voice/prayers.json
-assets/voice/tellings.json
-assets/voice/yells.json
-```
-
-Split by register and subject, not by every individual tag. Too many tiny files
-will make combinations harder to reason about.
-
-Add a corpus audit that can report:
-
-- unknown or misspelled tags
-- missing slot values such as `{whom}`
-- a generic fallback for every runtime role
-- lines that can never match any emitted tag bundle
-- thin role/topic/stance combinations
-- duplicate or near-duplicate text
-
-The goal is not simply more lines. Every visible line should reveal at least
-one simulation truth: what happened, what the speaker believes, what they need,
-what they fear, or how they regard somebody involved.
-
-Keep the voice ordinary and practical. These are people talking, not prophecy
-machines.
 
 ## Sermons Should Become Short Crowd Scenes
 
