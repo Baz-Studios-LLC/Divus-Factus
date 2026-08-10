@@ -1,10 +1,36 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-   17  (worn pool) chat:end event:delivered told wavering
-   15  (worn pool) chat:followup event:delivered told wavering
+  146  (worn pool) housed married muse
+  112  (worn pool) housed muse
+   68  (worn pool) muse wavering
+   46  (worn pool) event:smote saw tell
+   45  (worn pool) event:delivered reply wavering
+   34  (worn pool) chat:followup event:delivered told wavering
+   32  (worn pool) event:flourished saw tell wavering
+   29  (worn pool) chat:end event:delivered told wavering
+   24  (worn pool) reply wavering
+   21  (worn pool) event:smote reply wavering
+   18  (worn pool) event:flourished reply wavering
+   17  (worn pool) event:smote saw tell wavering
+   16  (worn pool) chat:followup told wavering
    12  (worn pool) event:delivered heard tell wavering
-   10  (worn pool) event:delivered reply wavering
+   12  (worn pool) devout event:smote saw tell
+    8  (worn pool) event:flourished saw tell
+    6  (worn pool) chat:end event:flourished told
+    6  (worn pool) chat:end event:smote told
+    5  (worn pool) chat:end event:smote told wavering
+    5  (worn pool) chat:end wavering
+    5  (worn pool) devout event:flourished saw tell
+    5  (worn pool) chat:end event:flourished told wavering
     4  (worn pool) event:provided reply wavering
+    4  (worn pool) chat:end devout event:delivered told
+    4  (worn pool) chat:end told
+    4  (worn pool) devout event:delivered reply
+    4  (worn pool) event:flourished retold saw tell
     3  (worn pool) devout event:provided saw tell
-    2  (worn pool) devotion muse night prayer wavering
-    1  (worn pool) chat:end event:flourished told wavering
+    3  (worn pool) devotion muse night prayer wavering
+    2  (worn pool) chat:end devout event:smote told
+    1  (worn pool) reply trade:explorer
+    1  (worn pool) chat:end trade:explorer
+    1  (worn pool) devout event:smote reply
+    1  (worn pool) chat:end devout event:flourished told

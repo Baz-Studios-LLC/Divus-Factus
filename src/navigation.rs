@@ -367,15 +367,26 @@ fn survey_the_walls(
             Or<(Changed<Transform>, Added<crate::villager::work::Shell>)>,
         ),
     >,
+    // A town's wall, which is one circle rather than a hundred panels.
+    towns: Query<(
+        &crate::villager::SettlementGround,
+        &crate::villager::rampart::Rampart,
+    )>,
     mut standing: Local<usize>,
     watch: Res<crate::debug::timings::Timings>,
 ) {
     let _t = watch.watch("navigation: survey_the_walls");
-    let count = shells.iter().count();
+    let count = shells.iter().count() + towns.iter().count();
     if changed.is_empty() && count == *standing {
         return;
     }
     *standing = count;
+    walls.ramparts.clear();
+    walls.ramparts.extend(
+        towns
+            .iter()
+            .map(|(ground, wall)| wall.as_barrier(ground.centre)),
+    );
     walls.buildings.clear();
     walls.buildings.extend(shells.iter().map(|(at, shell)| {
         Footprint {
@@ -487,10 +498,98 @@ impl Footprint {
     }
 }
 
-/// Every building the search must walk around.
+/// A town's perimeter, as the search sees it: one circle with gaps in it.
+///
+/// A ring rather than a hundred fence panels, and that is a decision about
+/// COST, not tidiness. `crosses` is asked once per obstacle per edge of the
+/// search, and a search expands thousands of edges: a hundred panels around
+/// one village would be a hundred rotated-rectangle clips where this is one
+/// quadratic and a couple of angles. The art draws posts along the same
+/// circle; the maths never sees them.
+///
+/// Gates are gaps in the circle, measured in radians about the centre. They
+/// must be WIDE - `home::use_doors` exists because no route on a
+/// two-and-a-half metre grid can thread a one metre door, and unlike a
+/// door, a town gate carries the whole economy: every forester, hunter and
+/// gatherer walks out through one twice a day. A gate too narrow for the
+/// search to find is a village that starves inside its own defences.
+#[derive(Clone, Debug)]
+pub struct Rampart {
+    pub at: Vec2,
+    pub radius: f32,
+    /// Where each gate stands, in radians about the centre.
+    pub gates: Vec<f32>,
+    /// Half a gate's opening, in radians. Set from metres by `gate_arc`.
+    pub gate_half: f32,
+}
+
+/// The half-angle a gate of `metres` subtends on a ring of `radius`.
+pub fn gate_arc(radius: f32, metres: f32) -> f32 {
+    (metres * 0.5 / radius.max(1.0)).atan()
+}
+
+/// How wide a town gate stands, in metres.
+///
+/// Four cells of the search grid, and that is the whole reason for the
+/// number: a gap the search cannot see is a gap nobody can walk through.
+/// It reads right as well - a cart's width and then some, which is what a
+/// town gate is for.
+pub const GATE_WIDTH: f32 = 10.0;
+
+impl Rampart {
+    /// Whether this stretch of walk goes through the wall rather than
+    /// through a gate.
+    ///
+    /// The segment is clipped against the circle; each place it crosses is
+    /// turned into an angle, and an angle standing in a gate is a lawful
+    /// way through. Both crossings are tested, because a walk that cuts a
+    /// corner of the town enters and leaves again.
+    pub fn bars(&self, a: Vec2, b: Vec2) -> bool {
+        let run = b - a;
+        let from = a - self.at;
+        // Where the segment meets the circle: |from + t*run| = radius.
+        let (qa, qb, qc) = (
+            run.length_squared(),
+            2.0 * from.dot(run),
+            from.length_squared() - self.radius * self.radius,
+        );
+        if qa < 1e-9 {
+            return false;
+        }
+        let under = qb * qb - 4.0 * qa * qc;
+        if under <= 0.0 {
+            // Never touches the ring: both ends are the same side of it.
+            return false;
+        }
+        let root = under.sqrt();
+        for t in [(-qb - root) / (2.0 * qa), (-qb + root) / (2.0 * qa)] {
+            if !(0.0..=1.0).contains(&t) {
+                continue;
+            }
+            let hit = from + run * t;
+            let angle = hit.y.atan2(hit.x);
+            let through_a_gate = self.gates.iter().any(|gate| {
+                let mut apart = (angle - gate).abs() % std::f32::consts::TAU;
+                if apart > std::f32::consts::PI {
+                    apart = std::f32::consts::TAU - apart;
+                }
+                apart <= self.gate_half
+            });
+            if !through_a_gate {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+/// Every building the search must walk around, and every town wall.
 #[derive(Resource, Default)]
 pub struct Walls {
     pub buildings: Vec<Footprint>,
+    /// Town perimeters. Never excused: a wall you are inside is still a
+    /// wall, and the way out of it is the gate.
+    pub ramparts: Vec<Rampart>,
 }
 
 impl Walls {
@@ -532,6 +631,9 @@ impl Walls {
     /// Whether a straight walk from `a` to `b` passes through any building it
     /// is not excused from. See `Footprint::crosses`.
     fn barred(&self, a: Vec2, b: Vec2, excused: &[bool; MOST_BUILDINGS]) -> bool {
+        if self.ramparts.iter().any(|wall| wall.bars(a, b)) {
+            return true;
+        }
         self.buildings.iter().enumerate().any(|(slot, building)| {
             !excused.get(slot).copied().unwrap_or(false) && building.crosses(a, b)
         })
@@ -1205,6 +1307,7 @@ mod tests {
             "the hall is not on the line, so this proves nothing"
         );
         let walls = Walls {
+            ramparts: Vec::new(),
             buildings: vec![hall],
         };
         let path = find_path(&t, &walls, start, goal, DEFAULT_BUDGET).expect("a way round");
@@ -1243,6 +1346,7 @@ mod tests {
             yaw: 0.0,
         };
         let walls = Walls {
+            ramparts: Vec::new(),
             buildings: vec![home],
         };
         assert!(
@@ -1430,6 +1534,102 @@ mod tests {
         assert!(
             short <= CELL * 3.0 + 0.1,
             "the walk should end beside the buried goal, not {short} strides short",
+        );
+    }
+
+    /// A wall is a wall, and a gate is the way through it.
+    #[test]
+    fn a_rampart_bars_the_wall_and_opens_the_gate() {
+        let wall = Rampart {
+            at: Vec2::ZERO,
+            radius: 60.0,
+            // One gate due east.
+            gates: vec![0.0],
+            gate_half: gate_arc(60.0, 8.0),
+        };
+        let out = |angle: f32, distance: f32| Vec2::new(angle.cos(), angle.sin()) * distance;
+
+        assert!(
+            wall.bars(
+                out(std::f32::consts::PI, 10.0),
+                out(std::f32::consts::PI, 90.0)
+            ),
+            "walking due west goes straight through the wall",
+        );
+        assert!(
+            !wall.bars(out(0.0, 10.0), out(0.0, 90.0)),
+            "walking due east goes out through the gate",
+        );
+        // Wholly inside, and wholly outside, are both nobody's business.
+        assert!(!wall.bars(out(1.0, 5.0), out(2.0, 40.0)), "inside the town");
+        assert!(!wall.bars(out(1.0, 80.0), out(2.0, 90.0)), "outside it");
+        // A walk that crosses the town crosses the ring TWICE, and both
+        // crossings have to be lawful. Straight through from the east:
+        // in at the gate, and out through the far wall.
+        assert!(
+            wall.bars(out(0.0, 90.0), out(std::f32::consts::PI, 90.0)),
+            "in through the gate and out through the far wall is still barred",
+        );
+        // And a chord that clips the town's edge away from any gate.
+        assert!(
+            wall.bars(out(0.0, 90.0), out(2.0, 90.0)),
+            "a chord across the town's edge crosses the wall twice",
+        );
+    }
+
+    /// The whole point of the ring, proved on real ground: a walled town
+    /// can still send its people out to work, and the way out is the gate.
+    ///
+    /// The lesson this is built from cost a village its life this morning:
+    /// no route on a two-and-a-half metre grid can thread a one metre
+    /// door. A town gate carries every forester and hunter twice a day,
+    /// so if the search cannot find it, the village starves inside its
+    /// own defences.
+    #[test]
+    fn a_walled_town_can_still_send_its_people_to_work() {
+        let terrain = Terrain::new(4242);
+        let home = walkable_near(&terrain);
+        let ring = 60.0;
+        let mut walls = Walls::default();
+        walls.ramparts.push(Rampart {
+            at: Vec2::new(home.x, home.z),
+            radius: ring,
+            gates: vec![0.0, std::f32::consts::PI],
+            gate_half: gate_arc(ring, GATE_WIDTH),
+        });
+
+        // Work lies where work lies - all round the compass, well past
+        // the wall. Every errand must find a gate.
+        let mut walked = 0;
+        let mut tried = 0;
+        for step in 0..12 {
+            let angle = step as f32 / 12.0 * std::f32::consts::TAU;
+            let far = home + Vec3::new(angle.cos(), 0.0, angle.sin()) * (ring + 40.0);
+            if !terrain.is_walkable(far.x, far.z) {
+                continue;
+            }
+            tried += 1;
+            let Some(waypoints) = find_path(&terrain, &walls, home, far, DEFAULT_BUDGET) else {
+                continue;
+            };
+            walked += 1;
+            // And it went through a gate, not through the wall: no leg of
+            // the walk may cross the ring anywhere else.
+            let mut here = Vec2::new(home.x, home.z);
+            for point in &waypoints {
+                let next = Vec2::new(point.x, point.z);
+                assert!(
+                    !walls.ramparts[0].bars(here, next),
+                    "a walk out of a walled town went through the wall",
+                );
+                here = next;
+            }
+        }
+        assert!(tried >= 6, "not enough walkable ground to judge: {tried}");
+        assert!(
+            walked * 4 >= tried * 3,
+            "a walled town could only reach {walked} of {tried} errands - \
+             its people would starve inside their own gates",
         );
     }
 }

@@ -13,6 +13,7 @@ pub mod colony;
 pub mod explore;
 pub mod home;
 pub mod names;
+pub mod rampart;
 pub mod rites;
 pub mod speech;
 pub mod traits;
@@ -375,8 +376,16 @@ impl Plugin for VillagerPlugin {
                         work::smelt,
                         work::dye_cloth,
                         work::famine_watch,
-                        work::the_sacks_hold_what_they_hold,
-                        work::settle_field_claims,
+                        // Sharing one seat, and not for tidiness: this
+                        // chain stands at Bevy's tuple ceiling, so a new
+                        // system joins it only by sitting with its kin.
+                        (
+                            work::the_sacks_hold_what_they_hold,
+                            work::settle_field_claims,
+                            rampart::raise_the_fence,
+                            rampart::stand_the_posts,
+                        )
+                            .chain(),
                     )
                         .chain(),
                     (

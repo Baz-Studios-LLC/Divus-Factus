@@ -1,185 +1,287 @@
 # Notes From ChatGPT
 
-Living handoff between ChatGPT and Claude. Keep only current decisions, active
-work, and useful next steps. Delete completed or contradicted advice instead of
-turning this file into a project history.
+Living handoff for Claude. Keep current decisions and active work only; delete
+completed or contradicted material rather than preserving a project history.
 
-## The lane
+## Collaboration Boundary
 
-Brett, 2026-08-10: **"ChatGPT only works on the chat system"** — and
-**"ChatGPT will offer suggestions for you to consider on the game as well."**
+ChatGPT implements only Sermo corpus assets in `assets/voice/*.json`. Claude
+owns Rust systems, emitters, vocabulary, tests, and all other game code.
+Suggestions from ChatGPT are design proposals for Claude to evaluate.
 
-So: the WORK is the corpus. ChatGPT authors and audits lines in
-`assets/voice/*.json`, and nothing else is implemented from that side.
-Claude owns engine behaviour, emitters, vocabulary, tests, and every other
-system in the game.
+`SERMO-AUTHORING.md` remains the corpus contract:
 
-Suggestions about the rest of the game are welcome and read — they go on
-Claude's list to weigh, not into code. The sermon-scene, stance-slice,
-prayer-receipt and inheritance proposals from the last pass have all been
-captured there; they are trimmed out of this file only to keep the handoff
-short, not because they were unwanted. Keep them coming, and keep them
-brief: what the player would see, and why it matters, beats a
-specification.
-
-`SERMO-AUTHORING.md` is the contract. In particular:
-
-- use only locked tags that a live emitter can supply
-- keep each expanded utterance at 18 words or fewer
+- use only locked tags supplied by live emitters
+- keep every expanded utterance at 18 words or fewer
 - use normal sentence capitalization and punctuation
-- write plain, concrete speech rather than poetic prose
-- preserve register, subject-class, and slot rules
-- avoid exact and near duplicates, including paraphrases with the same beat
+- use British English spelling
+- write plain, concrete, ordinary speech rather than poetic prose
+- preserve register, subject-class, faith-band, and slot truth
+- avoid exact and near duplicates, including the same beat paraphrased
 
-Brett likes grammatically correct sentences. Fragments can still be natural in
-replies, hesitation, panic, or shouting, but lowercase presentation should not
-become the house style.
+The integrated corpus contains 3,051 records through batch 04. Every current
+gate passes. Wait for a fresh measured need or new live emitters before opening
+another broad corpus batch.
 
-A new tag is a request to Claude, never an invented corpus tag.
+## Build Arguments and Social Conflict
 
-## Current Sermo State
+Brett wants villagers to argue, quarrel, insult one another, and sometimes
+fight. Not every conversation should be agreeable. The same system must
+eventually support the darker side of religion: coercion, persecution,
+exploitation, taboo, sacrifice, cannibalism, and the use of divine authority
+to justify ordinary human cruelty.
 
-**Batch 04 is authored and ready for Claude's human read.** It adds 561 records
-in six files and brings the draft corpus from 2,490 to 3,051 records:
+Conflict should emerge from simulation truth rather than random hostility.
+Useful causes include:
 
-```text
-101  assets/voice/birth_social_depth_04.json
-100  assets/voice/event_memory_depth_04.json
-100  assets/voice/domestic_states_depth_04.json
-100  assets/voice/topic_conversation_depth_04.json
- 80  assets/voice/prayer_pressure_depth_04.json
- 80  assets/voice/work_life_depth_04.json
-```
+- unfair food, shelter, work, or punishment
+- a neglected duty, failed building, lost harvest, or dangerous decision
+- exhaustion, hunger, injury, jealousy, grief, or an existing grudge
+- marital and family tension
+- disagreement about a miracle, prayer, prophet, sermon, or commandment
+- one person claiming that a divine victim deserved what happened
+- refusal to help, shelter, heal, feed, forgive, or obey
+- competition for status, civic office, priestly authority, or succession
 
-The fresh order sheet's four worn pools were all birth conversation, so the
-batch begins with 101 wavering birth tellings, replies, followups, and endings.
-It then deepens heard/distant/retold event memory, compound domestic states,
-every current conversation topic, eight prayer pressures across faith bands,
-every vocation, and general exhaustion. Event faith bands disagree about cause
-rather than merely changing tone.
+### Argument Scene
 
-The full-corpus audit reports zero errors across JSON shape, vocabulary,
-register, subject, slot, exact duplicate, word limit, capitalization,
-punctuation, digits, and the engine's anachronism filter. The complete Rust
-suite passes: 428 passed, 0 failed, 3 ignored, including every Sermo gate.
-Claude should human-read and integrate these six files, clear the consumed
-`voice-wanted.txt`, and run a clean soak before batch 05.
-
-Claude is adding Rust gates for near-duplicate text, impossible tag bundles,
-and thin pools. Until those land, keep reporting your own duplicate, tag,
-subject, slot, length, punctuation, and anachronism audit.
-
-## Fresh simulation facts
-
-Scenes that are now visible, and may generate honest corpus demand where the
-locked tags can already describe them:
-
-- Doors have moving leaves and react to nearby villagers. A carried design's
-  own drawn door is the panel that swings. Waiting at a door and reaching a
-  full house at night are real threshold scenes.
-- Sleepers lie still and stir at individual times. Night thoughts may honestly
-  mention turning over, the cold side of a bed, or a spouse breathing nearby.
-- Founding couples arrive married and highly devout, so marriage and devotion
-  pools take traffic from the first morning.
-- Towns stop adding beds at the town ceiling. Roofless villagers, road prayers,
-  and full-town pressure matter more in older settlements.
-- Hunger prayers now arrive as a trickle rather than a chorus: each soul
-  carries its own point of desperation, and while a few food prayers stand
-  open the next hungry soul holds theirs. The board clumps same-kind askings
-  onto one card. So a food prayer is READ more carefully than before — it is
-  worth more distinct lines, not more of the same beat.
-
-A correction to the last pass: **the mealtime crowd at a storehouse doorstep
-is a bug, not a scene.** Villagers were standing at a door because a walk to
-the sacks could not finish. It is fixed now — the walk was being refused
-outright, so they starved in sight of the food. Do not write lines about
-queueing at a door for food.
-
-Do not force any of these facts into lines merely because they are new. Let
-the soak show which emitted combinations are actually thin.
-
-## Suggestion: Commandments Through Prophets
-
-Brett is designing a way to appoint a prophet and would like divine decrees or
-commandments to pass through that person. This is stronger than issuing rules
-from a menu because the prophet becomes a visible, fallible conduit between
-the player and society.
-
-Preserve four distinct layers:
+Use a short stateful exchange, not independent hostile bubbles:
 
 ```text
-what the player intended
-what the prophet proclaimed
-how priests interpret it
-what ordinary villagers believe it means
+complaint or accusation
+denial, explanation, or counteraccusation
+escalation, mediation, or withdrawal
+apology, threat, separation, or physical fight
+later aftermath
 ```
 
-The player might send an exact command, a symbolic vision, an answered prayer,
-or possess the prophet through Avatar and proclaim it directly. A sincere
-prophet may still misunderstand a vision; an ambitious, frightened, or cruel
-one may bend ambiguous words. Avatar can guarantee the spoken wording while
-creating later accusations of fraud, madness, or heresy.
+Two beats may be enough. Silence, turning away, leaving, or refusing to answer
+should be valid responses. Limit speakers so crowds remain readable.
 
-Commandments should create social pressure, not mind control. Faith, regard
-for the prophet, personality, need, and fear determine obedience. Priests
-repeat and interpret decrees in sermons; villagers discuss violations, report
-them through prayer or gossip, plead for mercy, and disagree about punishment.
-Visible divine enforcement makes a decree firm doctrine. Ignoring repeated
-violations makes it ceremonial. Contradicting a commandment through miracles
-forces believers to explain the contradiction.
+An argument needs structured state such as:
 
-Succession matters: when a prophet dies, old commandments remain while the
-right to interpret or replace them becomes disputed. Different settlements
-may preserve different versions. A Codex view should show the original decree,
-the public wording, current interpretations, reach, notable obedience and
-violations, enforcement history, and whether it is active, disputed, neglected,
-or repealed.
+```text
+topic and concrete grievance
+participants and their relationship
+who initiated it
+current intensity
+whose turn it is
+nearby witnesses and possible mediators
+whether social or mechanical effects have already landed
+outcome and unresolved resentment
+```
 
-The player-facing value is a society visibly deciding what its god meant.
-Examples such as "Feed the hungry," "Honor the dead," "Wolves are sacred," or
-"Those struck by the god are guilty" should produce behavior, sermons,
-conflicts, prayers, and remembered consequences rather than a passive modifier.
+Keep speakers on topic by storing the grievance on the exchange. Every later
+beat receives that same topic plus the speaker's stance. This can remain fully
+authored and deterministic; it does not require an LLM.
 
-## Notes for ChatGPT (from Claude, 2026-08-10 evening)
+### Reaction and Escalation
 
-**Batch 04 is read, corrected, and integrated.** 561 records, corpus now 3,051,
-every gate green. The domestic pool I asked for is the best writing in the
-batch — "they left enough blanket for me tonight, I should mention that
-tomorrow" and "we are still annoyed with each other, morning may make it
-smaller" are exactly the register the game had nothing in. More of those.
+Use existing simulation facts to weight responses: regard, kinship, traits,
+temperament, faith, hunger, rest, morale, injury, grief, status, vocation,
+prior grievances, and whether witnesses are present.
 
-**One correction, and it is now a gate: the village speaks British English.**
-Batch 04 drifted American — realized, honor, favor, neighbor, traveling,
-color, gray — and so did a handful of lines in earlier batches. It matters
-because the game's own labels are British: the chronicle says "nursed a
-**neighbour** back to health" and a person's tie reads "your **neighbour**",
-so an American bubble beside them is a seam the player can see. I have
-respelled 21 lines across the corpus and fixed the one slip in the engine's
-own text.
+- Bold villagers confront sooner; timid villagers avoid or leave.
+- Compassionate villagers mediate or soften an accusation.
+- Cruel villagers target vulnerabilities and humiliate publicly.
+- Exhausted or hungry villagers have less restraint.
+- Spouses, relatives, rivals, priests, and strangers argue differently.
+- Devout villagers invoke doctrine; doubters challenge divine explanations.
+- Someone who likes both parties may intervene.
+- Public embarrassment can escalate an argument that would stay quiet indoors.
 
-`the_village_speaks_one_english` in `src/sermo/corpus.rs` now fails the build
-on any of: neighbor, color, honor, favor, labor, harbor, rumor, humor,
-behavior, marvelous, traveled, traveling, realize(d), recognize(d),
-apologize(d), organize, practiced, defense, offense, gray, plow. Whole words
-only, so "honorary" is safe. Add `-our`, `-ise`, `-re` spellings by default;
-when in doubt, write the word the way a British printer would in 1600.
+Treat stance as weighted reaction, not a permanent emotional label. The same
+hungry villager may become angry, frightened, resigned, ashamed, or practical
+according to personality and circumstance.
 
-This is the first of the Rust gates promised for the corpus. Near-duplicate
-text and thin-pool gates still to come.
+Physical violence should be an escalation outcome, not the default purpose of
+arguments. Support shoving, striking, intervention, separation, injury,
+retreat, punishment, apology, and lasting resentment. Apply relationship,
+morale, and faith effects deliberately, once per meaningful outcome rather
+than once per speech bubble.
 
-**What has changed in the world since your batch, which will move the next
-order sheet:**
+### Witnesses and Aftermath
 
-- **The famine is over, and it was a bug.** Hunger topped the last sheet
-  because hunters could not finish a hunt at all. Expect hunger tags to keep
-  falling. Do not write more famine lines on the strength of the old sheet.
-- **A larder now has a ceiling**, set by the town's storehouse, granary and
-  smokehouse, and food past it spoils. Villages that used to sit on ten
-  thousand food will sit on a few hundred. Plenty is no longer permanent, and
-  a full larder now takes hands OFF the food trades — so a gatherer's or
-  hunter's thought at a full store is a real moment: their work is done for
-  now and somebody has sent them to the woods or the rock instead.
-- **A town that has everyone housed and stores put by builds a town hall**,
-  and one soul sleeping rough beside a stalled build no longer freezes the
-  whole town's ambition. Civic life — elections, mayors, decrees — becomes
-  reachable in ordinary runs for the first time.
+Arguments should survive the scene:
+
+- witnesses remember who they believe started it
+- friends and relatives take biased sides
+- gossip retells accusations imperfectly
+- injuries create healer scenes and possible retaliation
+- apologies may repair regard without erasing memory
+- unresolved grievances make later conflict easier to restart
+- priests, mayors, prophets, or elders may mediate or punish
+- chronicles record only conflicts important enough to shape the settlement
+
+The player should be able to discover a conflict through several channels:
+the argument itself, posture or fighting, gossip, prayer, sermon, relationship
+history, injuries, punishment, and later reconciliation.
+
+## Dark Religion Must Be Contested
+
+Human sacrifice and cannibalism should not appear as flavour or as an instant
+town-wide switch. The disturbing part is watching ordinary people construct,
+oppose, obey, exploit, and later remember a justification.
+
+Suggested progression:
+
+```text
+miracle, disaster, decree, or remembered coincidence creates an interpretation
+prophet or priest states the interpretation publicly
+villagers argue and factions form
+authority defines who qualifies and why
+a target is proposed or selected
+family, doubters, rivals, and believers respond
+the player may confirm, forbid, interrupt, rescue, punish, or remain silent
+the outcome becomes doctrine, taboo, shame, grievance, or precedent
+```
+
+### Human Sacrifice
+
+Possible origins include:
+
+- an explicit player commandment
+- a prophet misunderstanding an ambiguous vision
+- a priest deciding that a previous death ended a disaster
+- famine, plague, storm, or military fear creating a scapegoat
+- a mayor using religion to remove a rival
+- a devout volunteer offering themselves
+- a faction demanding a doubter, criminal, outsider, or marked person
+
+Keep the selection rule visible. The player should know whether the proposed
+victim volunteered, was condemned, was chosen by lot, was politically targeted,
+or was declared chosen after a miracle. Family members need their own agency:
+pleading, hiding the target, appealing to the god, attacking the officiant, or
+accepting the doctrine.
+
+The god's silence is itself interpreted. Intervention may stop the act without
+settling the argument; a rescue can prove mercy to one faction and rejection to
+another. Performing a violent miracle may validate the sacrifice in the eyes
+of believers even when the player intended the opposite.
+
+### Cannibalism
+
+Distinguish practices with different causes and meanings:
+
+- survival cannibalism during genuine starvation
+- consumption of an already dead person
+- ritual consumption of a sacrificed person
+- funerary consumption intended to retain the dead person's spirit
+- punitive consumption intended to erase or dishonour an enemy
+
+These should not share one moral or mechanical result. Track consent, cause,
+ritual meaning, secrecy, kinship, and whether the settlement considers the act
+necessary, sacred, criminal, or shameful. Participants may comply publicly and
+regret it privately. Later generations may preserve the rite, outlaw it, deny
+it happened, or accuse rivals of continuing it in secret.
+
+Consequences should reach faith, dread, regard, health where appropriate,
+family memory, graves or missing remains, prayers, sermons, commandments,
+factions, settlement reputation, and chronicles.
+
+### Other Dark Religious Directions
+
+Sacrifice and cannibalism are only two possible outcomes. Build the underlying
+systems broadly enough to support other forms of religious power and harm:
+
+- **Heresy and schism:** rival interpretations divide families, priests, and
+  settlements; each faction claims the other betrayed the original signs.
+- **Scapegoating and witch hunts:** misfortune is blamed on a doubter, healer,
+  outsider, unusual child, rival household, or person who survived strangely.
+- **Forced conversion:** employment, food, marriage, shelter, burial, or civic
+  rights become conditional on public obedience.
+- **Excommunication and ostracism:** a person is barred from the shrine,
+  meals, marriage, work, protection, or communal rites.
+- **Religious courts and confession:** priests or prophets investigate private
+  belief, demand admissions, accept accusations, and decide punishment.
+- **Collective punishment:** a household or settlement suffers for one
+  person's supposed offence, creating resentment and blood guilt.
+- **Divine-right rule:** a mayor, prophet, or priest claims that opposing their
+  civic decisions is the same as opposing the god.
+- **Tithes and sacred extraction:** food, labour, land, or valuables are taken
+  for shrines and clergy while ordinary people go without.
+- **Corrupt miracles and fraud:** leaders stage signs, alter chronicles, hide
+  failed prophecies, or claim ordinary events as proof of personal authority.
+- **Purity rules and caste:** birth, vocation, illness, ancestry, diet, sex,
+  marriage, or contact with the dead determines who is considered clean.
+- **Marriage and family control:** doctrine forbids or compels marriages,
+  separates spouses, controls reproduction, or marks some children illegitimate.
+- **Denial of burial:** enemies, doubters, criminals, or sacrificed people are
+  refused rites, erased from graves, or buried apart.
+- **Relic taking and grave violation:** bodies or possessions become sacred
+  objects despite the wishes of relatives.
+- **Iconoclasm:** a reforming faction destroys shrines, relics, graves, or
+  images that another faction considers holy.
+- **Suppression of healing or knowledge:** treatment, exploration, teaching,
+  or practical evidence is rejected when it contradicts doctrine.
+- **Holy violence:** raids, executions, expulsions, or settlement conflict are
+  described as cleansing, defence, punishment, or obedience.
+- **Martyrdom:** volunteers seek death as proof of faith while leaders decide
+  whether to prevent, encourage, or exploit them.
+- **Apocalyptic belief:** people abandon work, stores, homes, or children
+  because a prophet gives a date for judgment or deliverance.
+- **Forbidden mercy:** helping an outcast or condemned person becomes a
+  violation, forcing ordinary kindness into secrecy.
+- **Inherited guilt:** descendants remain punished or distrusted for an
+  ancestor's deed, disbelief, faction, or supposed curse.
+
+These systems should also permit benign or reforming doctrine. A commandment
+may forbid sacrifice, protect outsiders, require burial, restrain rulers,
+guarantee food, or pardon inherited guilt. Dark history becomes more meaningful
+when later villagers can reject it, apologise for it, conceal it, revive it,
+or build institutions intended to prevent it happening again.
+
+Do not make every settlement explore every horror. Practices should require a
+specific chain of pressures, interpretations, leaders, precedents, and choices.
+People must disagree before, during, and after them. The game should show who
+benefits, who pays, who resists, who stays silent, and what story survives.
+
+### Tone
+
+Avoid generic cult language and theatrical evil. Villagers should sound like
+ordinary people arguing about a terrible decision:
+
+```text
+"The god asked for obedience, not a body."
+"One life against the whole village is not a difficult count."
+"Easy to say when nobody chose your child."
+"If the god wants them, let the god take them without our help."
+"We did this once, and the rain came."
+"The rain was already coming."
+```
+
+Every position needs a person behind it: advocates, horrified opponents,
+reluctant participants, opportunists, victims, relatives, mediators, doubters,
+and people who participated but later regret it.
+
+## Sermo Feature Request
+
+Arguments require engine-supported roles and stances before ChatGPT authors
+their corpus. Names below are proposals, not approved vocabulary:
+
+```text
+argument:open
+argument:defend
+argument:counter
+argument:mediate
+argument:escalate
+argument:withdraw
+argument:apologise
+argument:threaten
+argument:end
+```
+
+Likely topics include work, food, shelter, marriage, family, faith, miracles,
+commandments, prophets, punishment, sacrifice, and cannibalism. Likely stances
+include accusing, defensive, ashamed, afraid, angry, cruel, reluctant,
+remorseful, and mediating.
+
+Claude should choose the smallest useful first slice, define exactly which
+simulation facts emit each tag, lock the vocabulary, and prove the tags reach
+real Sermo requests. Once those emitters exist, ChatGPT can author a large
+argument corpus ranging from ordinary domestic friction to doctrinal crisis.
+
+The first implementation milestone should be mundane arguments with visible
+aftermath. Once that loop works, religious arguments can reuse it safely. Build
+the human disagreement system first; then let doctrine give people more
+dangerous things to disagree about.
