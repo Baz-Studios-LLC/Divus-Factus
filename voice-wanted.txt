@@ -1,23 +1,40 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-   94  (worn pool) housed married muse
-   72  (worn pool) housed muse
-   45  (worn pool) muse wavering
-   37  (worn pool) chat:followup told wavering
-   35  (worn pool) reply wavering
+  143  (worn pool) housed married muse
+  117  (worn pool) housed muse
+   72  (worn pool) muse wavering
+   68  (worn pool) chat:followup told wavering
+   57  (worn pool) reply wavering
+   55  (worn pool) event:smote saw tell
    31  (worn pool) event:delivered saw tell wavering
-   24  (worn pool) event:uprooted saw tell
+   29  (worn pool) event:uprooted saw tell
+   28  (worn pool) event:smote reply wavering
+   21  (worn pool) event:smote saw tell wavering
    18  (worn pool) event:delivered reply wavering
+   17  chat:end event:smote told trade:forester wavering
    14  (worn pool) chat:end wavering
+   13  (worn pool) event:uprooted of:thing saw tell wavering
+   12  (worn pool) event:uprooted reply wavering
    12  (worn pool) chat:end event:delivered told
-   11  (worn pool) event:uprooted of:thing saw tell wavering
-   11  (worn pool) event:uprooted reply wavering
    10  (worn pool) chat:end event:delivered told wavering
    10  (worn pool) event:delivered heard tell wavering
+    8  (worn pool) event:provided reply wavering
     7  (worn pool) chat:end told
     6  (worn pool) chat:end trade:forester
+    6  (worn pool) chat:end event:smote told
+    6  (worn pool) chat:end trade:miner
+    6  (worn pool) chat:end event:smote told wavering
+    5  chat:end event:uprooted told trade:forester wavering
+    4  chat:end event:provided told trade:miner wavering
+    4  chat:end event:provided told trade:forester wavering
+    4  (worn pool) devout event:smote saw tell
+    3  chat:end event:smote told trade:miner wavering
     3  (worn pool) event:delivered reply
-    2  (worn pool) devotion muse night prayer wavering
-    1  (worn pool) chat:end trade:miner
-    1  chat:end event:uprooted told trade:forester wavering
+    3  (worn pool) chat:end trade:fisher
+    3  (worn pool) devotion muse night prayer wavering
+    2  chat:end event:smote told trade:fisher wavering
+    2  chat:end event:uprooted told trade:miner wavering
+    1  (worn pool) devout event:provided saw tell
+    1  (worn pool) event:provided saw tell wavering
+    1  (worn pool) chat:end trade:priest
     1  (worn pool) reply trade:priest

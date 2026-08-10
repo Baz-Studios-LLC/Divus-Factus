@@ -518,6 +518,15 @@ pub(crate) fn morning_muster(
     // the last deer is gone.
     let wild_food = berries_near || shore_near || game_near;
     let plots = fields.iter().count() as f32;
+    // Enough is enough in the other sheds too. Curbing the larder alone
+    // just moved the absurdity one door over: with the food trades wound
+    // down, every spare hand went to the woods and the rock instead, and
+    // a soak ended on four and a half thousand stone. What a town can
+    // use is bounded by the number of mouths in it, and a village that
+    // has everything it needs sends its spare hands down the road to
+    // find out what else is out there.
+    let timber_deep = timber >= mouths as f32 * 25.0;
+    let stone_deep = masonry >= mouths as f32 * 20.0;
 
     // What the village wants, counted in hands. A want of zero is a trade
     // nobody takes up - which is the whole point: a farmer is somebody who
@@ -635,8 +644,11 @@ pub(crate) fn morning_muster(
         plots,
         // A larder crossing its ceiling changes every food trade's want,
         // so the muster has to notice the day it happens - and the day a
-        // new granary raises the ceiling back over it.
+        // new granary raises the ceiling back over it. The other sheds
+        // filling up moves hands the same way.
         (put_by * 8.0) as u64 as f32,
+        timber_deep as u8 as f32,
+        stone_deep as u8 as f32,
         guards,
         hurt.iter().filter(|(v, ..)| v.harm > 0.15).count().min(3) as f32,
         has(BuildingKind::Tavern) as u8 as f32,
@@ -675,7 +687,8 @@ pub(crate) fn morning_muster(
     ]
     .into_iter()
     .filter(|v| *v != Vocation::Fisher || shore_near)
-    .filter(|v| *v != Vocation::Forester || wood_known)
+    .filter(|v| *v != Vocation::Forester || (wood_known && !timber_deep))
+    .filter(|v| *v != Vocation::Miner || !stone_deep)
     .filter(|v| *v != Vocation::Gatherer || berries_near)
     .filter(|v| *v != Vocation::Hunter || game_near)
     .filter(|v| *v != Vocation::Farmer || !wild_food)
@@ -731,11 +744,14 @@ pub(crate) fn morning_muster(
                         let bump = |v: Vocation| if v == held { 0.2 } else { 0.0 };
                         (a_craft + bump(*a)).total_cmp(&(b_craft + bump(*b)))
                     })
-                    // The last resort of a land that offers nothing: turn
-                    // the ground over. A basket was the old answer, and
-                    // in a wood with no berries it was an answer that
-                    // fed nobody.
-                    .or(Some(if still_wanted <= 0.0 {
+                    // Nothing standing left to do. A town with full
+                    // sheds and nothing to raise sends its spare hands
+                    // down the road - which is how the next town gets
+                    // found. Otherwise: turn the ground over where the
+                    // wild will not feed them, and pick where it will.
+                    .or(Some(if still_wanted <= 0.0 && timber_deep && stone_deep {
+                        Vocation::Explorer
+                    } else if still_wanted <= 0.0 {
                         Vocation::Forester
                     } else if wild_food {
                         Vocation::Gatherer
