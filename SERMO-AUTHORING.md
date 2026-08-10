@@ -8,9 +8,15 @@ code, only these JSON files, and every batch must pass the gates below).
 
 ## The voice, by example
 
-Lowercase starts. Plain, concrete, everyday talk — never poetic fragments.
-People talk about floors, pegs, nets, stew, drafts under doors. Study the
-shots; imitate the shots, not a description of them:
+Plain, concrete, everyday talk — never poetic fragments. People talk about
+floors, pegs, nets, stew, drafts under doors. Study the shots; imitate the
+shots, not a description of them.
+
+**Read the shots for TONE, not for punctuation.** They were written when
+this corpus ran lowercase, and it does not any more: Brett — "I think plain
+english and proper grammer is the way to go for everything." Sentence case,
+full stops, British spelling. The engine repairs the old lines as it says
+them, so the two live side by side in the files; write new ones properly.
 
 - "swept the whole floor today. it's a small thing. it's my small thing"
 - "my stomach's been {growling|complaining|at me} since I {woke up|got up}"
@@ -92,6 +98,10 @@ trades (speaker's own): `trade:builder` `trade:cook` `trade:explorer`
 `trade:guard` `trade:healer` `trade:hunter` `trade:miner` `trade:priest`
 topics (talked about): same list as `topic:*`, plus `topic:food`
 `topic:roof` `topic:weather`
+quarrels: `quarrel` (the register, on every line of an argument) and the
+charge it is over - `over:hunger` `over:roof` `over:grudge`. Two more,
+`over:idleness` and `over:faith`, are locked but NOT yet emitted: nothing
+in the game can name those charges honestly, so no lines for them yet.
 
 ## What to write
 

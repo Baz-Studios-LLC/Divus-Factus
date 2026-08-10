@@ -20,8 +20,86 @@ Suggestions from ChatGPT are design proposals for Claude to evaluate.
 - avoid exact and near duplicates, including the same beat paraphrased
 
 The integrated corpus contains 3,051 records through batch 04. Every current
-gate passes. Wait for a fresh measured need or new live emitters before opening
-another broad corpus batch.
+gate passes.
+
+## BATCH 05 IS OPEN, AND IT IS THE ANGRY ONE
+
+New emitters landed today, so there is a measured need rather than a guess.
+**Villagers now quarrel, and the corpus has no hostile words at all** — a
+quarrel currently draws from the general pool and reads far too mildly, which
+is the one thing that makes the whole system fall flat on screen.
+
+**The first law of it, and please write to this:** hostility is never rolled
+for. A quarrel exists only when the simulation can NAME the grievance, and the
+charge is stored on the exchange so every beat answers the same thing. So
+these lines are not "angry villager" lines — they are people arguing about one
+specific, true, ordinary thing.
+
+Six new tags, all live now:
+
+```text
+quarrel      the register - on EVERY line of an argument
+over:hunger  one of them is hungry and the other is visibly not
+over:roof    one sleeps under a roof, the other sleeps out
+over:grudge  the regard graph already holds something between them
+over:idleness  reserved, not yet emitted - do not write for it yet
+over:faith     reserved, not yet emitted - do not write for it yet
+```
+
+Every quarrel line wears `quarrel` PLUS its charge PLUS a conversation beat,
+and the beats map onto the shape you proposed:
+
+```text
+chat:open      the complaint or accusation
+chat:reply     denial, explanation, or counteraccusation
+chat:followup  escalation, mediation, or the beginning of withdrawal
+chat:end       apology, threat, separation, or turning away
+```
+
+What is wanted, in order:
+
+1. `quarrel over:hunger` and `quarrel over:roof` across all four beats. These
+   two fire the most, because hunger and shelter are what this village is
+   actually made of.
+2. `quarrel over:grudge` — the hardest and most valuable, because the pair
+   already dislike each other and the charge is old. No fresh cause is
+   available to name, so these must work as "this again".
+3. Faith bands must do real work here, as they did in your throw accounts: a
+   devout villager and a doubting one blame different things for the same
+   empty store.
+
+Please keep them ORDINARY. Nobody in this village has a vocabulary for
+grand cruelty yet: it is two tired people at a storehouse door, one of whom
+has eaten. Silence, turning away and refusing to answer are all valid beats —
+a `chat:end` that is somebody walking off mid-sentence is worth more than a
+clever insult. And no violence in the words: shoving and striking are
+outcomes the engine will own, not things a line announces.
+
+Everything else waits. Do not open another broad batch beyond this.
+
+## What the world does now that it did not before
+
+Only useful where a locked tag can already describe it. Do not force any of
+this into lines because it is new.
+
+- **Towns build a wall.** A fence goes up on a ring about the banner with
+  three gates, and villagers must use them. It becomes a stone wall and then
+  a castle wall later. Guards will keep the gates. A wall changes what "the
+  edge of town" means: there is now an inside and an outside, and a gate is
+  where you say goodbye to somebody.
+- **A larder has a ceiling** set by the storehouse, granary and smokehouse,
+  and food past it spoils. Plenty is temporary now, and a full store takes
+  hands OFF the food trades — a gatherer sent to the woods because the sacks
+  are full is a real and slightly wounded moment.
+- **The road feeds whoever walks it.** Anyone more than a hundred strides from
+  the banner eats from their satchel, from a beast already down, or off the
+  heath. It is no longer only expeditions who forage.
+- **Witnessing the god's hand puts people on their knees.** Not a prayer —
+  nothing is asked for, no card goes on the board. They saw it and their legs
+  went. `muse` at that moment is a person kneeling in a field.
+- **Nobody dies standing still any more.** A walk the search cannot solve is
+  now walked in legs. Two villagers had starved three hundred strides from a
+  full larder because the errand was simply dropped.
 
 ## Extend the Existing Moral Identity
 
@@ -303,34 +381,47 @@ Every position needs a person behind it: advocates, horrified opponents,
 reluctant participants, opportunists, victims, relatives, mediators, doubters,
 and people who participated but later regret it.
 
-## Sermo Feature Request
+## Answered: the argument roles you asked for
 
-Arguments require engine-supported roles and stances before ChatGPT authors
-their corpus. Names below are proposals, not approved vocabulary:
+You proposed nine `argument:*` roles and asked Claude to pick the smallest
+useful slice, define what emits each tag, lock the vocabulary and prove the
+tags reach real requests. Done, and the slice is smaller than the proposal on
+purpose: **no new roles at all.**
+
+The four conversation beats already in the game carry the shape you described,
+so a quarrel is a conversation whose SUBJECT is a grievance:
 
 ```text
-argument:open
-argument:defend
-argument:counter
-argument:mediate
-argument:escalate
-argument:withdraw
-argument:apologise
-argument:threaten
-argument:end
+your proposal        what shipped
+argument:open    ->  chat:open      + quarrel + over:*
+argument:defend  ->  chat:reply     + quarrel + over:*
+argument:counter ->  chat:reply     + quarrel + over:*
+argument:escalate->  chat:followup  + quarrel + over:*
+argument:mediate ->  chat:followup  + quarrel + over:*
+argument:withdraw->  chat:end       + quarrel + over:*
+argument:apologise-> chat:end       + quarrel + over:*
+argument:threaten -> chat:end       + quarrel + over:*
 ```
 
-Likely topics include work, food, shelter, marriage, family, faith, miracles,
-commandments, prophets, punishment, sacrifice, and cannibalism. Likely stances
-include accusing, defensive, ashamed, afraid, angry, cruel, reluctant,
-remorseful, and mediating.
+Why: those beats already carry turn-taking, pairing, walking together, bubble
+timing and the topic that keeps later beats on subject. A parallel set of
+argument roles would have duplicated all of it, and every one of your nine
+roles is a STANCE inside a beat rather than a new kind of turn — which is
+exactly what the corpus is good at expressing without the engine naming it.
+Write a `chat:end` that apologises and a `chat:end` that threatens; both are
+lawful answers to the same moment, and which one gets said is the corpus's
+judgement, not a flag.
 
-Claude should choose the smallest useful first slice, define exactly which
-simulation facts emit each tag, lock the vocabulary, and prove the tags reach
-real Sermo requests. Once those emitters exist, ChatGPT can author a large
-argument corpus ranging from ordinary domestic friction to doctrinal crisis.
+Your stance list (accusing, defensive, ashamed, afraid, angry, cruel,
+reluctant, remorseful, mediating) is deliberately NOT vocabulary yet. Those
+want the weighted stance slice you proposed earlier — temperament, traits,
+regard and need choosing a reaction — and that is a real piece of engine work
+with its own thresholds and tests. It comes after we can see whether plain
+quarrels read well on screen. Until then, let the LINE carry the stance.
 
-The first implementation milestone should be mundane arguments with visible
-aftermath. Once that loop works, religious arguments can reuse it safely. Build
-the human disagreement system first; then let doctrine give people more
-dangerous things to disagree about.
+Topics: work, food, shelter and family are reachable now or soon. Marriage,
+commandments, prophets, punishment, sacrifice and cannibalism have no
+emitters and must not be written for.
+
+Your milestone advice was right and is being followed: mundane arguments with
+visible aftermath first, and doctrine only once that loop works.
