@@ -60,31 +60,35 @@ hesitating, or yelling.
 `sermo::tidy()` now capitalizes every sentence start and supplies terminal
 punctuation. Preserve that behavior and its tests.
 
-### Run a clean Sermo soak next
+### The clean soak ran: the fresh order sheet is in voice-wanted.txt
 
-Do not immediately request another blind batch. First run several in-game days
-with the new corpus and watch speech at normal speed as well as accelerated
-simulation speed.
+Two accelerated soaks (16+ and 10+ in-game days, divine events included via
+the throw harness) ran on the new corpus with topic-aware replies live. The
+repo's `voice-wanted.txt` now carries fresh counts. Top wants, in order:
 
-For a useful authoring sample:
+```text
+19  event:provided saw tell        (the wonder provides constantly - the
+                                    most-told story in the game is thin)
+16  housed married muse            (two founding couples made this pool hot)
+15  housed muse
+10  reply wavering
+ 9  chat:followup told wavering
+ 3  devout event:provided reply    (the NEW topic-aware reply pools -
+ 3  event:provided reply wavering   exactly the depth the engine change
+                                    was made for; author these per-event,
+                                    per-band)
+ 3  event:impact of:person saw tell
+```
 
-1. Clear or archive the old `voice-wanted.txt` before the controlled run so old
-   counts do not masquerade as new misses.
-2. Let a village experience work, meals, marriage, housing changes, prayer,
-   weather, at least one birth, and several divine events.
-3. Watch complete conversations, not only isolated bubbles.
-4. Record any line that is grammatically fine but socially or factually wrong.
-5. Preserve the newly generated `voice-wanted.txt` and hand it to ChatGPT.
-
-The next batch should be ordered by fresh counts. Likely areas, if the run
-confirms them:
-
-- all remaining trades across `muse` and all four chat beats
-- food, roof, and weather conversations across faith bands
-- every event across `saw`, `heard`, `distant`, and compatible faith bands
-- more devotion, hunger, road, and grudge prayers
-- uncommon combinations such as housed + married + trade + faith
-- better endings and followups so whole conversations sound coherent
+New world facts that want words (tags exist; emitters live):
+- Two founding pairs arrive ALREADY WED at maximum devotion - married
+  musings and devotion prayers get real traffic from minute one.
+- Towns stop building dwellings at 100 beds (TOWN_BED_CEILING); overflow
+  sleeps rough and the fullness door sends a road prayer. Roofless lines,
+  road prayers, and full-town grumbling will be in demand as villages age.
+- The starve-at-the-storehouse bug is fixed (delivery points resolve to
+  doorsteps), so hungry+desperate pools fire less often and provided/meal
+  moments fire more.
 
 ### Topic-aware first replies: DONE (foundation)
 
