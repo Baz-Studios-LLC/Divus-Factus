@@ -381,16 +381,21 @@ pub(crate) fn spawn_world_panel(
     }
 
     // THE MAP: the land itself, with its legend and its zoom.
-    let map_card = ui::card_well(&mut commands, main, "WORLD MAP");
-    // Onto tracts two and three WITHOUT replacing the well's own Node:
-    // inserting ordo::col would overwrite the card's styling wholesale.
+    // The map's SEAT spans tracts two and three, bare; the card is a
+    // full child. A card wearing its border and padding on the tract
+    // column itself joins the flex arithmetic and pushes the seam off
+    // the verticals the bottom band keeps.
+    let map_seat = commands
+        .spawn((ordo::col(2, super::village::RHYTHM), ChildOf(main)))
+        .id();
+    let map_card = ui::card_well(&mut commands, map_seat, "WORLD MAP");
     commands
         .entity(map_card)
         .entry::<Node>()
         .and_modify(|mut node| {
-            node.flex_grow = 2.0;
-            node.flex_basis = px(super::village::RHYTHM);
-            node.min_width = px(0);
+            node.width = percent(100);
+            node.flex_grow = 1.0;
+            node.min_height = px(0);
         });
     let map_row = commands
         .spawn((
