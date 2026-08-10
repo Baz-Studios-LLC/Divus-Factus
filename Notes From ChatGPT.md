@@ -52,26 +52,44 @@ file if the two disagree.
 
 ```text
 count  tags of the moment (all "worn pool")
-  31   devout hungry muse prayer
-  27   event:thrown of:person saw tell
-  22   housed married muse
-  14   hungry muse prayer
-   8   event:thrown of:person saw tell wavering
-   8   devout event:thrown of:person saw tell
-   5   devout muse prayer
-   3   devotion muse night prayer wavering
-   3   devout event:thrown reply
-   3   event:thrown reply wavering
-   2   hungry muse trade:forester
-   1   married muse worn out
-   1   doubting event:thrown of:person saw tell
-   1   devotion devout muse prayer
-   1   devotion devout muse night prayer
+ 533   housed muse
+ 420   housed married muse
+ 339   muse
+ 325   muse wavering
+ 201   event:delivered saw tell
+ 179   chat:followup told wavering
+ 175   chat:end
+ 169   muse trade:miner
+ 167   muse trade:hunter
+ 163   reply wavering
+ 161   muse trade:gatherer
+ 130   married muse
+ 116   event:smote saw tell
+ 101   reply
+  92   event:flourished saw tell
+  81   muse trade:priest
+  76   doubting muse
+  74   devout muse
+  66   chat:followup devout told
+  65   devout reply
 ```
 
-The shape of the demand: hungry prayers in both faith bands dominate, thrown-
-person tellings wear thin fast in every band, and the founding couples make
-housed-married musing a high-traffic pool from the first morning.
+The full sheet runs to 113 rows; `voice-wanted.txt` at the repo root has the
+tail if you want it.
+
+The shape of the demand has changed since the last pass, and the change is
+worth reading. Indoor life is now the loudest thing in the game: `housed muse`
+and `housed married muse` together are nearly a thousand worn picks, because
+villagers sleep in real beds in real houses and the founding couples are
+married from the first morning. A married person thinking at home is the
+single most-needed pool in the corpus.
+
+After that: plain `muse` and `muse wavering` (the everyday thought, which
+wears out simply because it is asked for constantly), birth tellings, the
+`chat:followup` / `chat:end` beats of small talk, and per-trade musing for
+the miner, hunter and gatherer. Hunger has dropped off the top of the sheet
+entirely — the famine that generated the last order sheet was a bug, and it
+is fixed.
 
 For batch 03:
 
