@@ -178,8 +178,10 @@ fn season_name(season: u8) -> &'static str {
 const MAP_W: u32 = 512;
 /// The height the sheets are born with, before the pane is measured.
 const MAP_H: u32 = 288;
-/// Rows the cartographer paints per frame.
-const ROWS_PER_FRAME: u32 = 6;
+/// Rows the cartographer paints per frame. Twelve draws a freshly recut
+/// sheet in about half a second - the map blooms in rather than sitting
+/// black on the page's first opening.
+const ROWS_PER_FRAME: u32 = 12;
 
 /// A blank parchment cut to the pane's shape, near-black until the
 /// cartographer works.
@@ -584,23 +586,39 @@ pub(crate) fn spawn_world_panel(
     let s = legend_row(&mut commands, "unknown country");
     swatch_box(&mut commands, s, Color::srgb(0.07, 0.08, 0.10));
 
-    // ---- The bottom row: seasons, trends, events. -------------------------
+    // ---- The bottom row: seasons, trends, events - ON THE TRACTS. ---------
+    // A free-splitting row here drifted off the page grid; the band is a
+    // grid row of bare seats now, each card a full child of its seat.
     let bottom = commands
-        .spawn((
-            Node {
-                width: percent(100),
-                height: px(150),
-                flex_shrink: 0.0,
-                flex_direction: FlexDirection::Row,
-                column_gap: px(10),
-                align_items: AlignItems::Stretch,
-                ..default()
-            },
-            ChildOf(page),
-        ))
+        .spawn((ordo::grid_row(super::village::RHYTHM), ChildOf(page)))
         .id();
+    commands
+        .entity(bottom)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.height = px(150);
+            node.flex_shrink = 0.0;
+        });
+    let mut seat = || {
+        let seat = commands
+            .spawn((ordo::col(1, super::village::RHYTHM), ChildOf(bottom)))
+            .id();
+        seat
+    };
+    let (seasons_seat, trends_seat, events_seat) = (seat(), seat(), seat());
+    let fill = |commands: &mut Commands, card: Entity| {
+        commands
+            .entity(card)
+            .entry::<Node>()
+            .and_modify(|mut node| {
+                node.width = percent(100);
+                node.flex_grow = 1.0;
+                node.min_height = px(0);
+            });
+    };
 
-    let seasons = ui::card_well(&mut commands, bottom, "SEASONS & YEAR");
+    let seasons = ui::card_well(&mut commands, seasons_seat, "SEASONS & YEAR");
+    fill(&mut commands, seasons);
     let seasons_row = commands
         .spawn((
             Node {
@@ -697,7 +715,8 @@ pub(crate) fn spawn_world_panel(
         commands.entity(value).insert(SeasonFact(index));
     }
 
-    let trends = ui::card_well(&mut commands, bottom, "WORLD TRENDS");
+    let trends = ui::card_well(&mut commands, trends_seat, "WORLD TRENDS");
+    fill(&mut commands, trends);
     for (index, label) in [
         (0u8, "temperature"),
         (1, "moisture"),
@@ -708,7 +727,8 @@ pub(crate) fn spawn_world_panel(
         commands.entity(value).insert(TrendValue(index));
     }
 
-    let events = ui::card_well(&mut commands, bottom, "RECENT WORLD EVENTS");
+    let events = ui::card_well(&mut commands, events_seat, "RECENT WORLD EVENTS");
+    fill(&mut commands, events);
     commands.spawn((
         WorldEvents,
         Node {
@@ -765,6 +785,7 @@ pub(crate) fn fit_the_sheets(
     if wanted.abs_diff(map.face_h) <= 4 {
         return;
     }
+    info!("the map is recut: {} -> {} rows", map.face_h, wanted);
     map.face_h = wanted;
     map.painted = [0; 3];
     map.sheets = std::array::from_fn(|_| parchment(&mut images, wanted));
