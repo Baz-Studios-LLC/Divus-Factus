@@ -587,6 +587,10 @@ pub(crate) fn spawn_people_panel(
             DetailPage,
             Node {
                 width: percent(100),
+                // The dossier fills its tract to the floor, so its last
+                // band can close on the roster's own bottom edge.
+                flex_grow: 1.0,
+                min_height: px(0),
                 flex_direction: FlexDirection::Column,
                 row_gap: px(ui::theme::GAP),
                 ..default()
@@ -785,8 +789,12 @@ pub(crate) fn spawn_people_panel(
         .spawn((
             Node {
                 width: percent(100),
-                height: px(210),
-                flex_shrink: 0.0,
+                // Grown, not fixed: the band reaches the page floor, so
+                // HAS SEEN and LATELY close level with the people list.
+                // Brett: "the bottom of the has seen and lately panels
+                // should align with the bottom of the people list."
+                flex_grow: 1.0,
+                min_height: px(120),
                 flex_direction: FlexDirection::Row,
                 column_gap: px(10),
                 align_items: AlignItems::Stretch,
@@ -844,6 +852,17 @@ pub(crate) fn spawn_people_panel(
     commands.spawn((PersonDetailText, ui::body(""), ChildOf(wants_card)));
     let seen_card = card(&mut commands, left_col, "HAS SEEN");
     commands.spawn((DetailSeen, ui::body(""), ChildOf(seen_card)));
+    // Halved by decree, not by content: equal basis keeps WANTS and HAS
+    // SEEN the same height however their lines wrap. Brett: "the wants
+    // and has seen panels should be the same height."
+    for half in [wants_card, seen_card] {
+        commands
+            .entity(half)
+            .entry::<Node>()
+            .and_modify(|mut node| {
+                node.flex_basis = percent(50);
+            });
+    }
     let lately_card = card(&mut commands, cards, "LATELY");
     commands.spawn((
         LatelyWell,
