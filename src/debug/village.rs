@@ -531,49 +531,49 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
     };
     let ledger_tab = chapter(
         &mut commands,
-        "THE TOWNS",
+        "TOWNS",
         CodexPage::Ledger,
         "The Towns",
         "the heart of a living world",
     );
     let people_tab = chapter(
         &mut commands,
-        "THE PEOPLE",
+        "PEOPLE",
         CodexPage::People,
         "The People",
         "the mortals of your world",
     );
     let deity_tab = chapter(
         &mut commands,
-        "THE DEITY",
+        "DEITY",
         CodexPage::Deity,
         "The Deity",
         "you are the unseen; they are the faithful",
     );
     let miracles_tab = chapter(
         &mut commands,
-        "THE MIRACLES",
+        "MIRACLES",
         CodexPage::Miracles,
         "The Miracles",
         "every power you may learn, and the bar that carries them",
     );
     let prayers_tab = chapter(
         &mut commands,
-        "THE PRAYERS",
+        "PRAYERS",
         CodexPage::Prayers,
         "The Prayers",
         "what the faithful ask of you",
     );
     let chronicle_tab = chapter(
         &mut commands,
-        "THE CHRONICLE",
+        "CHRONICLE",
         CodexPage::Chronicle,
         "The Chronicle",
         "the tale of your people, written moment by moment",
     );
     let world_tab = chapter(
         &mut commands,
-        "THE WORLD",
+        "WORLD",
         CodexPage::World,
         "The World",
         "the lands your people walk; the seasons turn",
@@ -1656,8 +1656,14 @@ pub(crate) fn update_ledger_details(
 /// each other.
 fn build_prayers_page(commands: &mut Commands, page: Entity) {
     let leaf = ordo::page(commands, page, RHYTHM);
+    // The helper stands clear of the first row of cards. Brett: "these
+    // prayer cards need better padding, also from the text above."
     commands.spawn((
         ui::dim("press a prayer to fly to whoever is asking"),
+        Node {
+            margin: UiRect::bottom(px(10)),
+            ..default()
+        },
         ChildOf(leaf.header),
     ));
     commands.spawn((
@@ -1819,8 +1825,8 @@ pub(crate) fn update_prayer_board(
                     Node {
                         width: percent(100),
                         flex_direction: FlexDirection::Column,
-                        row_gap: px(6),
-                        padding: UiRect::all(px(10)),
+                        row_gap: px(8),
+                        padding: UiRect::axes(px(14), px(12)),
                         border: UiRect::all(px(2)),
                         border_radius: BorderRadius::all(px(8)),
                         ..default()
