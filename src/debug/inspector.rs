@@ -144,6 +144,16 @@ pub(crate) fn update_inspector(
             Option<&crate::scatter::FoodSource>,
             Option<&crate::scatter::SacredFlora>,
         )>,
+        // The book, whose opening smothers the card. In the bundle
+        // because the sixteen-parameter ceiling is not close, it is HERE.
+        Query<
+            &Visibility,
+            (
+                With<crate::debug::village::VillagePanel>,
+                Without<InspectorPanel>,
+                Without<InspectorPersonBlock>,
+            ),
+        >,
     ),
     households: Query<
         (&Person, &crate::villager::home::Home, &Activity),
@@ -179,6 +189,16 @@ pub(crate) fn update_inspector(
     let Ok(mut visibility) = panels.single_mut() else {
         return;
     };
+
+    // The open book smothers every tooltip: the codex covers the world,
+    // and its own controls explain themselves. Brett: "nothing in the
+    // codex needs a tooltip since it covers them anyway."
+    if rising.4.iter().any(|v| *v != Visibility::Hidden) {
+        if *visibility != Visibility::Hidden {
+            *visibility = Visibility::Hidden;
+        }
+        return;
+    }
 
     // ONE tooltip system: a hinted button under the cursor speaks through
     // the same top-corner card the world does. Interface wins over world
