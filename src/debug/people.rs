@@ -5,6 +5,7 @@ use crate::villager::{
     Activity, Chronicle, MemberOf, Morale, Needs, Parentage, Person, Settlement, Spouse, Villager,
 };
 use crate::witness::{Temperament, Witnessed};
+use bevy::ecs::system::SystemParam;
 
 /// The roster panel: everyone alive, click to follow.
 #[derive(Component)]
@@ -945,32 +946,70 @@ pub(crate) fn spawn_people_panel(
     commands.insert_resource(PaperdollTarget(target));
 }
 
+/// The hall's own memory between frames: when it last rebuilt, whether
+/// the book stood open, and the roster order it settled on.
+#[derive(SystemParam)]
+pub(crate) struct RosterMemory<'s> {
+    last_rebuild: Local<'s, f32>,
+    was_open: Local<'s, bool>,
+    roster: Local<'s, Vec<Entity>>,
+    last_sort: Local<'s, bool>,
+}
+
+/// Everyone the roster can show, and the plates to show them with.
+#[derive(SystemParam)]
+pub(crate) struct HallSight<'w, 's> {
+    portraits: Res<'w, super::portrait::Portraits>,
+    settlements: Query<'w, 's, &'static Settlement>,
+    people: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static Person,
+            &'static crate::creature::genome::CreatureGenome,
+            &'static Activity,
+            Option<&'static crate::villager::work::Vocation>,
+        ),
+        (With<Villager>, Without<crate::creature::Corpse>),
+    >,
+}
+
+/// The hall's standing surfaces: the panel gate, the row shelf, and the
+/// labels rewritten in place.
+#[derive(SystemParam)]
+pub(crate) struct HallBoards<'w, 's> {
+    panels: Query<'w, 's, &'static Visibility, With<PeoplePanel>>,
+    containers: Query<'w, 's, Entity, With<PeopleRows>>,
+    labels: Query<'w, 's, (&'static RowLabel, &'static mut Text)>,
+}
+
 /// Rebuilds the roster while it is open: one clickable row per living person.
 pub(crate) fn update_people_panel(
     mut commands: Commands,
     time: Res<Time>,
-    mut last_rebuild: Local<f32>,
-    mut was_open: Local<bool>,
-    mut roster: Local<Vec<Entity>>,
-    panels: Query<&Visibility, With<PeoplePanel>>,
-    containers: Query<Entity, With<PeopleRows>>,
-    mut labels: Query<(&RowLabel, &mut Text)>,
     sort: Res<RosterSort>,
-    mut last_sort: Local<bool>,
     filter: Res<RosterFilter>,
-    portraits: Res<super::portrait::Portraits>,
-    settlements: Query<&Settlement>,
-    people: Query<
-        (
-            Entity,
-            &Person,
-            &crate::creature::genome::CreatureGenome,
-            &Activity,
-            Option<&crate::villager::work::Vocation>,
-        ),
-        (With<Villager>, Without<crate::creature::Corpse>),
-    >,
+    memory: RosterMemory,
+    sight: HallSight,
+    boards: HallBoards,
 ) {
+    let RosterMemory {
+        mut last_rebuild,
+        mut was_open,
+        mut roster,
+        mut last_sort,
+    } = memory;
+    let HallSight {
+        portraits,
+        settlements,
+        people,
+    } = sight;
+    let HallBoards {
+        panels,
+        containers,
+        mut labels,
+    } = boards;
     let open = panels.iter().any(|v| *v != Visibility::Hidden);
     // A window that just opened fills instantly; only the refresh is paced.
     let just_opened = open && !*was_open;

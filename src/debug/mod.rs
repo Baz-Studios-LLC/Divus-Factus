@@ -467,6 +467,20 @@ mod tests {
         let _ = app.world_mut().run_system_once(inspector::update_inspector);
     }
 
+    /// The other fat systems get the same net: their bundles were carved
+    /// into named SystemParam structs, and a struct field conflicting
+    /// with a sibling is the same boot-time B0001 as an anonymous tuple.
+    #[test]
+    fn the_fat_systems_wire_disjoint_queries() {
+        use bevy::ecs::system::RunSystemOnce;
+        let mut app = bevy::app::App::new();
+        let _ = app.world_mut().run_system_once(people::update_people_panel);
+        let _ = app
+            .world_mut()
+            .run_system_once(people::update_person_detail);
+        let _ = app.world_mut().run_system_once(god::update_god_panel);
+    }
+
     #[test]
     fn nudge_reports_movement_and_clamps() {
         let mut value = 0.5;

@@ -4,6 +4,7 @@ use super::*;
 use crate::creature::genome::Age;
 use crate::hand::DivineHand;
 use crate::witness::{Reaction, Temperament, Witnessed};
+use bevy::ecs::system::SystemParam;
 
 /// The inspector, bottom left: whoever the hand is over, read out as a person.
 #[derive(Component)]
@@ -80,6 +81,185 @@ pub(crate) struct InspectorMemories;
 #[derive(Component)]
 pub(crate) struct InspectorLife;
 
+/// One window on every soul the corner card can speak of: the dossier
+/// tuple, the corpse check, and the names that kin and houses go by.
+#[derive(SystemParam)]
+pub(crate) struct SoulSight<'w, 's> {
+    people: Query<
+        'w,
+        's,
+        (
+            &'static Person,
+            &'static Temperament,
+            &'static Witnessed,
+            Option<&'static Reaction>,
+            Option<&'static Needs>,
+            Option<&'static Activity>,
+            Option<&'static crate::creature::Vitality>,
+            Option<&'static crate::creature::genome::CreatureGenome>,
+            Option<&'static crate::villager::Spouse>,
+            Option<&'static crate::villager::Parentage>,
+            Option<&'static MemberOf>,
+            Option<&'static Chronicle>,
+            Option<&'static crate::villager::work::Vocation>,
+            (
+                Option<&'static Morale>,
+                Option<&'static crate::villager::belief::Faith>,
+                Option<&'static crate::villager::traits::Traits>,
+                Option<&'static crate::villager::speech::RecentlySaid>,
+                Option<&'static crate::villager::regard::Regard>,
+            ),
+        ),
+    >,
+    corpse_check:
+        Query<'w, 's, Option<&'static crate::creature::Vitality>, With<crate::creature::Corpse>>,
+    kin_names: Query<'w, 's, &'static Person>,
+    households: Query<
+        'w,
+        's,
+        (
+            &'static Person,
+            &'static crate::villager::home::Home,
+            &'static Activity,
+        ),
+        Without<crate::creature::Corpse>,
+    >,
+    residents: Query<
+        'w,
+        's,
+        (
+            &'static MemberOf,
+            &'static crate::creature::genome::CreatureGenome,
+        ),
+        (With<Villager>, Without<crate::creature::Corpse>),
+    >,
+    names: Query<'w, 's, &'static Name>,
+}
+
+/// The town around whatever the hand is over: its name, its stores, and
+/// which roofs are whose.
+#[derive(SystemParam)]
+pub(crate) struct TownSight<'w, 's> {
+    settlements: Query<'w, 's, &'static Settlement>,
+    settlement_info: Query<
+        'w,
+        's,
+        (
+            &'static Settlement,
+            &'static crate::villager::work::Stockpile,
+        ),
+    >,
+    huts: Query<
+        'w,
+        's,
+        Has<crate::villager::work::Longhouse>,
+        Or<(
+            With<crate::villager::work::Hut>,
+            With<crate::villager::work::Longhouse>,
+        )>,
+    >,
+}
+
+/// The still-life cards: graves, piles, buildings, and the stores they
+/// front. What the tuple positions used to hide, named.
+#[derive(SystemParam)]
+pub(crate) struct StillCards<'w, 's> {
+    graves: Query<
+        'w,
+        's,
+        (
+            &'static crate::villager::rites::Grave,
+            &'static Person,
+            &'static Chronicle,
+        ),
+        Without<Temperament>,
+    >,
+    piles: Query<'w, 's, &'static crate::villager::work::StorePile>,
+    trends: Option<Res<'w, crate::villager::work::StoreTrends>>,
+    site: Option<Res<'w, crate::villager::SettlementSite>>,
+    buildings: Query<'w, 's, &'static crate::villager::work::Building>,
+}
+
+/// What is not yet or no longer a person under the hand: works rising,
+/// the ground's gifts, hinted buttons - and the book whose opening
+/// smothers the card.
+#[derive(SystemParam)]
+pub(crate) struct RisingSight<'w, 's> {
+    builds: Query<
+        'w,
+        's,
+        (
+            &'static crate::villager::work::ConstructionSite,
+            &'static crate::villager::work::Blueprint,
+        ),
+    >,
+    deposits: Query<'w, 's, &'static crate::matter::Deposit>,
+    hints: Query<'w, 's, (&'static Interaction, &'static ui::HoverHint)>,
+    /// What a held thing is WORTH, for the card.
+    worth: Query<
+        'w,
+        's,
+        (
+            Option<&'static crate::matter::Matter>,
+            Option<&'static crate::matter::Lump>,
+            Option<&'static crate::scatter::FoodSource>,
+            Option<&'static crate::scatter::SacredFlora>,
+        ),
+    >,
+    /// The book, whose opening smothers the card. Disjoint from EVERY
+    /// Visibility this system writes - panel, person block AND the
+    /// detail line - or B0001 panics at boot.
+    book: Query<
+        'w,
+        's,
+        &'static Visibility,
+        (
+            With<crate::debug::village::VillagePanel>,
+            Without<InspectorPanel>,
+            Without<InspectorPersonBlock>,
+            Without<InspectorDetail>,
+        ),
+    >,
+}
+
+/// The card itself - every surface the inspector writes.
+#[derive(SystemParam)]
+pub(crate) struct InspectorInk<'w, 's> {
+    panels: Query<
+        'w,
+        's,
+        &'static mut Visibility,
+        (With<InspectorPanel>, Without<InspectorPersonBlock>),
+    >,
+    person_block: Query<
+        'w,
+        's,
+        (&'static mut Visibility, &'static mut Node),
+        (With<InspectorPersonBlock>, Without<InspectorPanel>),
+    >,
+    texts: ParamSet<
+        'w,
+        's,
+        (
+            Query<'w, 's, &'static mut Text, With<InspectorName>>,
+            Query<'w, 's, &'static mut Text, With<InspectorSubtitle>>,
+            Query<
+                'w,
+                's,
+                (&'static mut Text, &'static mut Visibility),
+                (
+                    With<InspectorDetail>,
+                    Without<InspectorPanel>,
+                    Without<InspectorPersonBlock>,
+                ),
+            >,
+            Query<'w, 's, (&'static InspectorValue, &'static mut Text)>,
+            Query<'w, 's, &'static mut Text, With<InspectorMemories>>,
+            Query<'w, 's, &'static mut Text, With<InspectorLife>>,
+        ),
+    >,
+}
+
 /// Fills the inspector with whoever the hand is over or carrying.
 ///
 /// A living person gets the full dossier: state, hunger, health, heart, what
@@ -90,105 +270,30 @@ pub(crate) struct InspectorLife;
 pub(crate) fn update_inspector(
     hand: Res<DivineHand>,
     follow: Res<crate::camera::FollowTarget>,
-    people: Query<(
-        &Person,
-        &Temperament,
-        &Witnessed,
-        Option<&Reaction>,
-        Option<&Needs>,
-        Option<&Activity>,
-        Option<&crate::creature::Vitality>,
-        Option<&crate::creature::genome::CreatureGenome>,
-        Option<&crate::villager::Spouse>,
-        Option<&crate::villager::Parentage>,
-        Option<&MemberOf>,
-        Option<&Chronicle>,
-        Option<&crate::villager::work::Vocation>,
-        (
-            Option<&Morale>,
-            Option<&crate::villager::belief::Faith>,
-            Option<&crate::villager::traits::Traits>,
-            Option<&crate::villager::speech::RecentlySaid>,
-            Option<&crate::villager::regard::Regard>,
-        ),
-    )>,
-    corpse_check: Query<Option<&crate::creature::Vitality>, With<crate::creature::Corpse>>,
-    cards: (
-        Query<(&crate::villager::rites::Grave, &Person, &Chronicle), Without<Temperament>>,
-        Query<&crate::villager::work::StorePile>,
-        Option<Res<crate::villager::work::StoreTrends>>,
-        Option<Res<crate::villager::SettlementSite>>,
-        Query<&crate::villager::work::Building>,
-    ),
-    kin_names: Query<&Person>,
-    settlements: Query<&Settlement>,
-    huts: Query<
-        Has<crate::villager::work::Longhouse>,
-        Or<(
-            With<crate::villager::work::Hut>,
-            With<crate::villager::work::Longhouse>,
-        )>,
-    >,
-    rising: (
-        Query<(
-            &crate::villager::work::ConstructionSite,
-            &crate::villager::work::Blueprint,
-        )>,
-        Query<&crate::matter::Deposit>,
-        Query<(&Interaction, &ui::HoverHint)>,
-        // What a held thing is WORTH, for the card. Bundled with its
-        // relatives; the sixteen-parameter ceiling is close.
-        Query<(
-            Option<&crate::matter::Matter>,
-            Option<&crate::matter::Lump>,
-            Option<&crate::scatter::FoodSource>,
-            Option<&crate::scatter::SacredFlora>,
-        )>,
-        // The book, whose opening smothers the card. In the bundle
-        // because the sixteen-parameter ceiling is not close, it is HERE.
-        // Disjoint from EVERY Visibility this system writes - panel,
-        // person block AND the detail line - or B0001 panics at boot.
-        Query<
-            &Visibility,
-            (
-                With<crate::debug::village::VillagePanel>,
-                Without<InspectorPanel>,
-                Without<InspectorPersonBlock>,
-                Without<InspectorDetail>,
-            ),
-        >,
-    ),
-    households: Query<
-        (&Person, &crate::villager::home::Home, &Activity),
-        Without<crate::creature::Corpse>,
-    >,
-    settlement_info: Query<(&Settlement, &crate::villager::work::Stockpile)>,
-    residents: Query<
-        (&MemberOf, &crate::creature::genome::CreatureGenome),
-        (With<Villager>, Without<crate::creature::Corpse>),
-    >,
-    names: Query<&Name>,
-    mut panels: Query<&mut Visibility, (With<InspectorPanel>, Without<InspectorPersonBlock>)>,
-    mut person_block: Query<
-        (&mut Visibility, &mut Node),
-        (With<InspectorPersonBlock>, Without<InspectorPanel>),
-    >,
-    mut texts: ParamSet<(
-        Query<&mut Text, With<InspectorName>>,
-        Query<&mut Text, With<InspectorSubtitle>>,
-        Query<
-            (&mut Text, &mut Visibility),
-            (
-                With<InspectorDetail>,
-                Without<InspectorPanel>,
-                Without<InspectorPersonBlock>,
-            ),
-        >,
-        Query<(&InspectorValue, &mut Text)>,
-        Query<&mut Text, With<InspectorMemories>>,
-        Query<&mut Text, With<InspectorLife>>,
-    )>,
+    souls: SoulSight,
+    towns: TownSight,
+    cards: StillCards,
+    rising: RisingSight,
+    ink: InspectorInk,
 ) {
+    let SoulSight {
+        people,
+        corpse_check,
+        kin_names,
+        households,
+        residents,
+        names,
+    } = souls;
+    let TownSight {
+        settlements,
+        settlement_info,
+        huts,
+    } = towns;
+    let InspectorInk {
+        mut panels,
+        mut person_block,
+        mut texts,
+    } = ink;
     let Ok(mut visibility) = panels.single_mut() else {
         return;
     };
@@ -196,7 +301,7 @@ pub(crate) fn update_inspector(
     // The open book smothers every tooltip: the codex covers the world,
     // and its own controls explain themselves. Brett: "nothing in the
     // codex needs a tooltip since it covers them anyway."
-    if rising.4.iter().any(|v| *v != Visibility::Hidden) {
+    if rising.book.iter().any(|v| *v != Visibility::Hidden) {
         if *visibility != Visibility::Hidden {
             *visibility = Visibility::Hidden;
         }
@@ -207,7 +312,7 @@ pub(crate) fn update_inspector(
     // the same top-corner card the world does. Interface wins over world
     // - if you are over a button, the button is what you are asking about.
     if let Some(hint) = rising
-        .2
+        .hints
         .iter()
         .find(|(interaction, _)| !matches!(interaction, Interaction::None))
         .map(|(_, hint)| hint)
@@ -261,14 +366,14 @@ pub(crate) fn update_inspector(
     let corpse = corpse_check.get(entity);
 
     // A pile in the square: the store it fronts, and which way it is going.
-    if let Ok(pile) = cards.1.get(entity) {
+    if let Ok(pile) = cards.piles.get(entity) {
         use crate::villager::work::PileKind;
         for (mut block, mut node) in &mut person_block {
             *block = Visibility::Hidden;
             node.display = Display::None;
         }
         let store = cards
-            .3
+            .site
             .as_ref()
             .and_then(|site| settlement_info.get(site.settlement).ok())
             .map(|(_, store)| store);
@@ -297,7 +402,7 @@ pub(crate) fn update_inspector(
         }
         if let Ok((mut detail, mut detail_visibility)) = texts.p2().single_mut() {
             let rate = cards
-                .2
+                .trends
                 .as_ref()
                 .map_or(0.0, |trends| trends.rate_per_minute(pile.0));
             let fresh = if rate > 0.5 {
@@ -316,7 +421,7 @@ pub(crate) fn update_inspector(
     }
 
     // A storehouse or granary: what shelters under its roof, and the drift.
-    if let Ok(building) = cards.4.get(entity) {
+    if let Ok(building) = cards.buildings.get(entity) {
         use crate::villager::work::{BuildingKind, PileKind};
         let holds: &[(PileKind, &str)] = match building.kind {
             BuildingKind::Storehouse => &[(PileKind::Timber, "logs"), (PileKind::Stone, "stone")],
@@ -329,7 +434,7 @@ pub(crate) fn update_inspector(
                 node.display = Display::None;
             }
             let store = cards
-                .3
+                .site
                 .as_ref()
                 .and_then(|site| settlement_info.get(site.settlement).ok())
                 .map(|(_, store)| store);
@@ -384,7 +489,7 @@ pub(crate) fn update_inspector(
                     .iter()
                     .map(|(kind, word)| {
                         let rate = cards
-                            .2
+                            .trends
                             .as_ref()
                             .map_or(0.0, |trends| trends.rate_per_minute(*kind));
                         if rate > 0.5 {
@@ -407,7 +512,7 @@ pub(crate) fn update_inspector(
     }
 
     // A grave: the life that ended under it, read back from the stone.
-    if let Ok((grave, person, story)) = cards.0.get(entity) {
+    if let Ok((grave, person, story)) = cards.graves.get(entity) {
         for (mut block, mut node) in &mut person_block {
             *block = Visibility::Hidden;
             node.display = Display::None;
@@ -629,7 +734,7 @@ pub(crate) fn update_inspector(
                 residents.join("\n")
             },
         )
-    } else if let Ok((construction, plan)) = rising.0.get(entity) {
+    } else if let Ok((construction, plan)) = rising.builds.get(entity) {
         // The whole bill, plainly: every material this build wants, how
         // much is in it, how much it takes. A tooltip that named only the
         // line the site happened to be stuck on left you guessing what
@@ -709,7 +814,7 @@ pub(crate) fn update_inspector(
             None => "still",
         };
         (name, cause.to_string())
-    } else if let Ok(deposit) = rising.1.get(entity) {
+    } else if let Ok(deposit) = rising.deposits.get(entity) {
         // The god reads the ground itself: what it is, and how much the
         // village could still carry out of it.
         (
@@ -724,8 +829,10 @@ pub(crate) fn update_inspector(
         // A held resource says what it is worth, so the god knows what the
         // fist is carrying before it opens - "the tooltip should say how
         // much of what resource you have in your hand".
-        let worth = held.then(|| rising.3.get(entity).ok()).flatten().and_then(
-            |(matter, lump, food, sacred)| {
+        let worth = held
+            .then(|| rising.worth.get(entity).ok())
+            .flatten()
+            .and_then(|(matter, lump, food, sacred)| {
                 if let Some(lump) = lump {
                     let kind = match lump.kind {
                         crate::matter::DepositKind::Clay => "clay",
@@ -753,8 +860,7 @@ pub(crate) fn update_inspector(
                 } else {
                     None
                 }
-            },
-        );
+            });
         (
             what,
             match worth {
