@@ -115,6 +115,13 @@ pub struct BedSlot(pub u8);
 pub struct Abed {
     pub at: Vec3,
     pub facing: Quat,
+    /// How far they have rolled about their own spine, in radians.
+    /// Zero is flat on the back; roughly ±0.9 is on a side.
+    pub roll: f32,
+    /// The roll the sleeper is easing toward.
+    pub roll_to: f32,
+    /// When they next stir, on the world clock.
+    pub next_stir: f64,
 }
 
 /// When this walk first started being routed through a doorway.
@@ -357,15 +364,36 @@ fn laid_from(genome: &crate::creature::genome::CreatureGenome, facing: Quat, ahe
 pub(super) fn hold_abed(
     mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,
-    mut sleepers: Query<(Entity, &Abed, &mut Transform, &mut CreatureMotion), With<Villager>>,
+    time: Res<Time>,
+    mut rng: ResMut<crate::villager::SimRng>,
+    mut sleepers: Query<(Entity, &mut Abed, &mut Transform, &mut CreatureMotion), With<Villager>>,
     watch: Res<crate::debug::timings::Timings>,
 ) {
     let _t = watch.watch("villager: hold_abed");
     let night = clock.is_night();
-    for (entity, abed, mut transform, mut motion) in &mut sleepers {
+    for (entity, mut abed, mut transform, mut motion) in &mut sleepers {
         if night {
+            // Sleepers lie STILL: the stride is stopped dead, or the walk
+            // cycle keeps swinging the limbs of a body flat on its back.
+            // Brett: "people still walk animate while laying in bed. They
+            // should lay still and randomly roll on their side."
+            motion.speed = 0.0;
+            motion.phase = 0.0;
+            motion.look_at = None;
+
+            // The stir: now and then a sleeper eases onto a side, or back
+            // flat, the slow way a sleeping body actually turns. Never on
+            // a schedule - each roll books the next at its own hour.
+            if clock.elapsed >= abed.next_stir {
+                abed.roll_to = *rng.0.pick(&[-0.9f32, 0.0, 0.0, 0.9]);
+                abed.next_stir = clock.elapsed + rng.0.range(25.0, 110.0) as f64;
+            }
+            let drift = abed.roll_to - abed.roll;
+            let step = (time.delta_secs() * 0.8).min(drift.abs());
+            abed.roll += drift.signum() * step;
+
             transform.translation = abed.at;
-            transform.rotation = abed.facing;
+            transform.rotation = abed.facing * Quat::from_rotation_y(abed.roll);
         } else {
             commands.entity(entity).remove::<Abed>();
             transform.rotation = Quat::IDENTITY;
@@ -1165,6 +1193,9 @@ pub(super) fn night_routine(
                     commands.entity(entity).insert(Abed {
                         at: bed_at + laid_from(genome, facing, PILLOW_AHEAD),
                         facing,
+                        roll: 0.0,
+                        roll_to: 0.0,
+                        next_stir: 0.0,
                     });
                 }
             }
@@ -1240,6 +1271,9 @@ pub(super) fn night_routine(
                     // flames, and the feet stop short of the ring.
                     at: spot + laid_from(genome, facing, genome.height() * 0.35),
                     facing,
+                    roll: 0.0,
+                    roll_to: 0.0,
+                    next_stir: 0.0,
                 });
             }
         }

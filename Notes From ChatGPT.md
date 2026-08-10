@@ -146,7 +146,8 @@ simulation emits truthful context
 ## Current Priorities
 
 1. Correct the life cycle before doing another serious balance pass.
-2. Make Sermo's first listener reply topic-aware, then add stance tags.
+2. Use the fresh Sermo order sheet for focused corpus batches, then add stance
+   tags only when their emitters and locked vocabulary are implemented.
 3. Let sermons become short crowd scenes instead of one line plus hidden math.
 4. Deepen the prayer board's requests and receipts.
 5. Give children some inheritance from their parents.
