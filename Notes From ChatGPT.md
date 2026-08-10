@@ -23,6 +23,55 @@ The integrated corpus contains 3,051 records through batch 04. Every current
 gate passes. Wait for a fresh measured need or new live emitters before opening
 another broad corpus batch.
 
+## Extend the Existing Moral Identity
+
+Do not build a second morality system. The Deity page already derives public
+alignment from the `Legend` balance between providence and dread:
+
+- providing, mending, flourishing, rain, and beckoning light feed providence
+- smiting, quaking, uprooting, death, falling stones, sown doubt, answered dark
+  prayers, and violently refusing a road feed dread
+- providence dominant by 40% reads as Benevolent
+- dread dominant by 40% reads as Terrible
+- neither dominant currently reads as Neutral
+
+This is the right foundation because the god's nature is inferred from acts
+people witnessed and the stories they tell. The Deity page also describes
+stories of gifts or terror, while the manifestation changes its colour, motion,
+agitation, and grandeur according to legend and public trust.
+
+Arguments, commandments, prophets, and dark religion should feed and complicate
+this existing identity. Moral memory should eventually include:
+
+- commandments issued, contradicted, enforced, neglected, or repealed
+- which kinds of prayers receive answers
+- protection or punishment of particular groups
+- mercy after violations
+- favouritism among families, factions, and settlements
+- whether the god stops atrocities committed in its name
+- what prophets teach with apparent divine approval
+- consistency between proclaimed rules and later miracles
+
+Keep providence versus dread as the broad public alignment. Add descriptive
+tendencies inferred from behaviour rather than another good/evil score:
+
+```text
+merciful or punitive
+protective or demanding
+consistent or capricious
+present or distant
+universal or partisan
+```
+
+`Neutral` currently combines different histories: an inactive god, a balanced
+god that both heals and kills, and an unpredictable god. The manifestation's
+conviction partly distinguishes them, but the wording does not. Possible later
+descriptions include Unknown, Contradictory, Unmoved, and Unfathomable.
+
+The Deity page already has a static `PROPHETS: None` card. Use that existing
+surface when prophets become real. The new systems should deepen the god's
+current moral biography, not replace it with a morality slider.
+
 ## Build Arguments and Social Conflict
 
 Brett wants villagers to argue, quarrel, insult one another, and sometimes
