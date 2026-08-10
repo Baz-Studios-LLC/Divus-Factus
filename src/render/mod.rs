@@ -125,6 +125,10 @@ pub struct LookSettings {
     /// authored, and pushing them further under a warm key light drives the whole
     /// landscape toward lime.
     pub saturation: f32,
+    /// The reading frost: the glass camera's blur while the book is open,
+    /// as a circle of confusion in glass pixels (the glass is 270 tall).
+    /// Zero is clear glass.
+    pub frost: f32,
 }
 
 impl Default for LookSettings {
@@ -138,6 +142,7 @@ impl Default for LookSettings {
             focus_bias: 1.0,
             exposure: 0.05,
             saturation: 0.96,
+            frost: 80.0,
         }
     }
 }
@@ -423,7 +428,12 @@ fn apply_look_settings(
         With<GodCamera>,
     >,
     mut existing: Query<&mut DepthOfField, With<GodCamera>>,
+    mut glass: Query<&mut DepthOfField, (With<crate::ui::FrostCamera>, Without<GodCamera>)>,
 ) {
+    // The reading frost rides the same dials as the rest of the look.
+    for mut frost in &mut glass {
+        frost.max_circle_of_confusion_diameter = look.frost;
+    }
     for (entity, rig, mut bloom, mut vignette, mut color_grading) in &mut effects {
         bloom.intensity = look.bloom;
         vignette.intensity = look.vignette;

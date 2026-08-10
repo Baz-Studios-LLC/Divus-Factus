@@ -143,11 +143,9 @@ fn update_date_card(
     mut big: Query<&mut Text, (With<DateBig>, Without<DateSmall>)>,
     mut small: Query<&mut Text, (With<DateSmall>, Without<DateBig>)>,
 ) {
-    *since += time.delta_secs();
-    if *since < 0.5 {
-        return;
-    }
-    *since = 0.0;
+    // Visibility answers the book the FRAME it moves: it used to wait on
+    // the text's half-second clock, and the card trailed the codex by a
+    // visible beat, both ways. Only the date's lettering is paced.
     // The F1 instrument panel owns this corner while it is up, and it
     // carries the date already.
     let book_open = books.iter().any(|v| *v != Visibility::Hidden);
@@ -157,15 +155,23 @@ fn update_date_card(
         // over the rail was two clocks fighting for one corner.
         && !book_open;
     for mut visibility in &mut card {
-        *visibility = if playing {
+        let fresh = if playing {
             Visibility::Visible
         } else {
             Visibility::Hidden
         };
+        if *visibility != fresh {
+            *visibility = fresh;
+        }
     }
     if !playing {
         return;
     }
+    *since += time.delta_secs();
+    if *since < 0.5 {
+        return;
+    }
+    *since = 0.0;
     let Some(clock) = clock else {
         return;
     };
@@ -2431,7 +2437,11 @@ const FROST_FACE: (u32, u32) = (480, 270);
 
 /// Raises the frost rig once: the glass texture, the sleeping camera that
 /// paints it, and the fullscreen pane that shows it under the book.
-pub(crate) fn spawn_frost_glass(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+pub(crate) fn spawn_frost_glass(
+    mut commands: Commands,
+    mut images: ResMut<Assets<Image>>,
+    look: Res<crate::render::LookSettings>,
+) {
     let glass = images.add(bevy::image::Image::new_target_texture(
         FROST_FACE.0,
         FROST_FACE.1,
@@ -2463,7 +2473,7 @@ pub(crate) fn spawn_frost_glass(mut commands: Commands, mut images: ResMut<Asset
             focal_distance: 0.05,
             sensor_height: 0.01866,
             aperture_f_stops: 0.008,
-            max_circle_of_confusion_diameter: 120.0,
+            max_circle_of_confusion_diameter: look.frost,
             max_depth: f32::INFINITY,
         },
         Transform::default(),

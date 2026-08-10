@@ -43,6 +43,7 @@ pub(crate) enum HudValue {
     Focus,
     Exposure,
     Saturation,
+    Frost,
     DepthOfField,
 }
 
@@ -131,6 +132,7 @@ pub(crate) fn spawn_hud(mut commands: Commands, mouse: Res<crate::keymap::MouseS
         (HudValue::Focus, "focus", "F4/F5"),
         (HudValue::Exposure, "exposure", "F8/F9"),
         (HudValue::Saturation, "saturation", "F11/shift-F11"),
+        (HudValue::Frost, "frost", "F6/F7"),
         (HudValue::DepthOfField, "depth of field", "F10"),
     ];
     for (value, label, hint) in look_rows {
@@ -279,6 +281,14 @@ pub(crate) fn handle_tuning_input(
     }
     if keys.just_pressed(KeyCode::F9) {
         changed |= nudge(&mut look.exposure, 0.1, -3.0, 3.0);
+    }
+
+    // The reading frost, thinned or thickened ten glass pixels at a time.
+    if keys.just_pressed(KeyCode::F6) {
+        changed |= nudge(&mut look.frost, -10.0, 0.0, 270.0);
+    }
+    if keys.just_pressed(KeyCode::F7) {
+        changed |= nudge(&mut look.frost, 10.0, 0.0, 270.0);
     }
 
     // Both hands of saturation live on F11 - richer plain, paler shifted.
@@ -458,6 +468,7 @@ pub(crate) fn update_hud(
             HudValue::Focus => format!("{:.2}x", look.focus_bias),
             HudValue::Exposure => format!("{:+.1}", look.exposure),
             HudValue::Saturation => format!("{:.2}", look.saturation),
+            HudValue::Frost => format!("{:.0}px", look.frost),
             HudValue::DepthOfField => if look.depth_of_field_enabled() {
                 "on"
             } else {
