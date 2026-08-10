@@ -552,9 +552,18 @@ pub struct FireMiracle {
     pub at: Vec3,
 }
 
-/// A hotbar slot, by position. What sits in it lives in [`Hotbar`].
+/// A hotbar slot, by position. What sits in it lives in [`Hotbar`]. The
+/// codex's spellbook raises a second set of these as its bar mirror, and
+/// every slot system - the dresser, the styler, the cooldown sweep, the
+/// drag - serves both copies without knowing there are two.
 #[derive(Component)]
 struct MiracleSlot(usize);
+
+/// A spellbook card for one miracle: press to set it in the first empty
+/// slot, or drag it onto the bar, WoW-style. Lives wherever a page lays
+/// it - the codex's spellbook today.
+#[derive(Component)]
+pub struct MiracleCard(pub Miracle);
 
 /// A piece of slot dressing — icon nodes and hint, torn down and redrawn
 /// whenever the bar's arrangement changes.
@@ -681,6 +690,13 @@ fn spawn_hotbar(mut commands: Commands) {
     // Ten slots, bare. What sits in each is the Hotbar resource's business,
     // and `dress_the_bar` draws it — the frames here are furniture. Brett:
     // "I want the bar to be 10 buttons wide."
+    raise_bar_slots(&mut commands, bar);
+}
+
+/// Raises the bar's ten slots under `bar`: frames, key caps, cooldown
+/// sweeps. The HUD's apron and the spellbook's mirror both call this, so
+/// the two bars can never drift apart in anatomy.
+pub(crate) fn raise_bar_slots(commands: &mut Commands, bar: Entity) {
     for index in 0..10 {
         let slot = commands
             .spawn((
@@ -746,11 +762,76 @@ fn spawn_hotbar(mut commands: Commands) {
     }
 }
 
+/// Raises a belief-ladder meter under `parent`: the fill, and the words
+/// naming the next unlock. One update system serves every copy raised.
+pub(crate) fn raise_belief_meter(commands: &mut Commands, parent: Entity) {
+    let meter = commands
+        .spawn((
+            Name::new("Belief Meter"),
+            Node {
+                align_self: AlignSelf::Stretch,
+                height: px(16),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(6)),
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            BackgroundColor(ui::theme::panel_bg()),
+            BorderColor::all(ui::theme::panel_border()),
+            ChildOf(parent),
+        ))
+        .id();
+    commands.spawn((
+        BeliefFill,
+        Node {
+            position_type: PositionType::Absolute,
+            left: px(0),
+            top: px(0),
+            bottom: px(0),
+            width: percent(0),
+            border_radius: BorderRadius::all(px(5)),
+            ..default()
+        },
+        BackgroundColor(ui::theme::accent().with_alpha(0.45)),
+        ChildOf(meter),
+    ));
+    let label_row = commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(0),
+                right: px(0),
+                top: px(0),
+                bottom: px(0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            ChildOf(meter),
+        ))
+        .id();
+    commands.spawn((BeliefReadout, ui::dim("BELIEF 0"), ChildOf(label_row)));
+}
+
 /// Draws a miracle's face into a slot: the node-built icon, tagged as art
 /// so a re-dress can sweep it. The same shapes the slots always wore.
 fn draw_miracle_icon(commands: &mut Commands, slot: Entity, miracle: Miracle) {
+    miracle_face(commands, slot, miracle, true);
+}
+
+/// The same face, untagged: for the spellbook's cards, whose icons are
+/// permanent furniture the bar-dresser's sweep must never take.
+pub(crate) fn paint_miracle_face(commands: &mut Commands, parent: Entity, miracle: Miracle) {
+    miracle_face(commands, parent, miracle, false);
+}
+
+fn miracle_face(commands: &mut Commands, slot: Entity, miracle: Miracle, tag_as_art: bool) {
     let art = |commands: &mut Commands, node: Node, color: Color| {
-        let piece = commands.spawn((SlotArt, node, BackgroundColor(color))).id();
+        let piece = if tag_as_art {
+            commands.spawn((SlotArt, node, BackgroundColor(color))).id()
+        } else {
+            commands.spawn((node, BackgroundColor(color))).id()
+        };
         commands.entity(piece).insert(ChildOf(slot));
     };
     let block = |l: f32, t: f32, w: f32, h: f32, r: f32| Node {
@@ -1034,6 +1115,7 @@ fn choose_miracle(
     hotbar: Res<Hotbar>,
     cooldowns: Res<Cooldowns>,
     dragging: Res<DragState>,
+    books: Query<&Visibility, With<crate::debug::village::VillagePanel>>,
     slots: Query<(&Interaction, &MiracleSlot), Changed<Interaction>>,
     mut selected: ResMut<SelectedMiracle>,
     mut notices: MessageWriter<ui::Notice>,
@@ -1041,6 +1123,13 @@ fn choose_miracle(
     // A drag in progress owns the pointer; a press that began a carry must
     // not also arm what it lifted.
     if dragging.0.is_some() {
+        return;
+    }
+    // The book's bar mirror is for ARRANGING, not casting: a slot pressed
+    // while the codex is open must not leave a miracle armed behind the
+    // pages, waiting to fire on the first click after it closes.
+    if books.iter().any(|v| *v != Visibility::Hidden) {
+        selected.0 = None;
         return;
     }
     for (interaction, slot) in &slots {
@@ -1984,12 +2073,18 @@ pub(super) fn evangels_preach(
 
 /// A miracle mid-carry: where it came from, and the ghost under the cursor.
 struct Drag {
-    from: usize,
+    source: Source,
     miracle: Miracle,
     ghost: Entity,
     /// Where the press began, to tell a click from a carry.
     grip: Vec2,
     live: bool,
+}
+
+/// Where a carry was lifted from: a bar slot, or the spellbook's shelf.
+enum Source {
+    Slot(usize),
+    Book,
 }
 
 /// The carry in progress, if any.
@@ -2000,21 +2095,25 @@ pub struct DragState(Option<Drag>);
 /// and pull, and the miracle comes away under the cursor; let go over
 /// another slot and the two trade places; let go anywhere else and it
 /// settles home. A press that never pulls past a knuckle's width stays a
-/// click, and the arming system keeps it.
+/// click, and the arming system keeps it. The spellbook's cards lift the
+/// same way: drag a learned miracle from the book onto any slot.
 #[allow(clippy::type_complexity)]
 fn carry_miracles(
     mut commands: Commands,
     buttons: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
+    grimoire: Res<Grimoire>,
     mut hotbar: ResMut<Hotbar>,
     mut dragging: ResMut<DragState>,
     mut selected: ResMut<SelectedMiracle>,
     slots: Query<(&Interaction, &MiracleSlot)>,
+    cards: Query<(&Interaction, &MiracleCard)>,
     mut ghosts: Query<&mut Node, With<DragGhost>>,
 ) {
     let cursor = windows.single().ok().and_then(|w| w.cursor_position());
 
-    // A press on a loaded slot takes a grip.
+    // A press on a loaded slot - or a learned card in the book - takes a
+    // grip.
     if buttons.just_pressed(MouseButton::Left)
         && dragging.0.is_none()
         && let Some(at) = cursor
@@ -2027,13 +2126,28 @@ fn carry_miracles(
                 continue;
             };
             dragging.0 = Some(Drag {
-                from: slot.0,
+                source: Source::Slot(slot.0),
                 miracle,
                 ghost: Entity::PLACEHOLDER,
                 grip: at,
                 live: false,
             });
             break;
+        }
+        if dragging.0.is_none() {
+            for (interaction, card) in &cards {
+                if *interaction == Interaction::None || !grimoire.knows(card.0) {
+                    continue;
+                }
+                dragging.0 = Some(Drag {
+                    source: Source::Book,
+                    miracle: card.0,
+                    ghost: Entity::PLACEHOLDER,
+                    grip: at,
+                    live: false,
+                });
+                break;
+            }
         }
     }
 
@@ -2076,21 +2190,32 @@ fn carry_miracles(
         }
     }
 
-    // The release: over a slot, the two trade places; anywhere else, home.
+    // The release: over a slot, the carry lands; anywhere else, a slot's
+    // miracle goes home to the book and a book's carry simply fades.
     if buttons.just_released(MouseButton::Left) {
         if drag.live {
             let landing = slots
                 .iter()
                 .find(|(interaction, _)| **interaction != Interaction::None)
                 .map(|(_, slot)| slot.0);
-            match landing {
-                Some(to) if to != drag.from => hotbar.0.swap(drag.from, to),
-                Some(_) => {}
+            match (&drag.source, landing) {
+                (Source::Slot(from), Some(to)) if to != *from => hotbar.0.swap(*from, to),
+                (Source::Slot(_), Some(_)) => {}
                 // Let go over nothing: the slot empties, WoW-style — the
                 // book holds more miracles than the bar holds slots, and
                 // this is how room is made. The miracle stays learned;
-                // set it back from the deity page whenever.
-                None => hotbar.0[drag.from] = None,
+                // set it back from the spellbook whenever.
+                (Source::Slot(from), None) => hotbar.0[*from] = None,
+                // From the book onto a slot: the miracle takes that seat,
+                // leaving any old seat it held - a move, not a copy.
+                (Source::Book, Some(to)) => {
+                    if let Some(old) = hotbar.slot_of(drag.miracle) {
+                        hotbar.0[old] = None;
+                    }
+                    hotbar.0[to] = Some(drag.miracle);
+                }
+                // A book carry let go over nothing changes nothing.
+                (Source::Book, None) => {}
             }
             commands.entity(drag.ghost).despawn();
         }

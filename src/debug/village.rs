@@ -101,6 +101,7 @@ pub(crate) enum CodexPage {
     People,
     Chronicle,
     Deity,
+    Miracles,
     Prayers,
     World,
     Settings,
@@ -116,12 +117,14 @@ pub(crate) struct Codex {
     pub people_page: Entity,
     pub chronicle_page: Entity,
     pub deity_page: Entity,
+    pub miracles_page: Entity,
     pub prayers_page: Entity,
     pub world_page: Entity,
     pub ledger_tab: Entity,
     pub people_tab: Entity,
     pub chronicle_tab: Entity,
     pub deity_tab: Entity,
+    pub miracles_tab: Entity,
     pub prayers_tab: Entity,
     pub world_tab: Entity,
     pub settings_page: Entity,
@@ -508,6 +511,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
     let people_page = bound_page();
     let chronicle_page = bound_page();
     let deity_page = bound_page();
+    let miracles_page = bound_page();
     let prayers_page = bound_page();
     let world_page = bound_page();
     let settings_page = bound_page();
@@ -541,10 +545,17 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
     );
     let deity_tab = chapter(
         &mut commands,
-        "THE MIRACLES",
+        "THE DEITY",
         CodexPage::Deity,
-        "The Miracles",
+        "The Deity",
         "you are the unseen; they are the faithful",
+    );
+    let miracles_tab = chapter(
+        &mut commands,
+        "THE MIRACLES",
+        CodexPage::Miracles,
+        "The Miracles",
+        "every power you may learn, and the bar that carries them",
     );
     let prayers_tab = chapter(
         &mut commands,
@@ -656,12 +667,14 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         people_page,
         chronicle_page,
         deity_page,
+        miracles_page,
         prayers_page,
         world_page,
         ledger_tab,
         people_tab,
         chronicle_tab,
         deity_tab,
+        miracles_tab,
         prayers_tab,
         world_tab,
         title_text: book.title,
@@ -1210,6 +1223,7 @@ pub(crate) fn apply_codex_page(
         (codex.people_page, codex.page == CodexPage::People),
         (codex.chronicle_page, codex.page == CodexPage::Chronicle),
         (codex.deity_page, codex.page == CodexPage::Deity),
+        (codex.miracles_page, codex.page == CodexPage::Miracles),
         (codex.prayers_page, codex.page == CodexPage::Prayers),
         (codex.world_page, codex.page == CodexPage::World),
     ];
@@ -1240,6 +1254,7 @@ pub(crate) fn apply_codex_page(
         (codex.people_tab, codex.page == CodexPage::People),
         (codex.chronicle_tab, codex.page == CodexPage::Chronicle),
         (codex.deity_tab, codex.page == CodexPage::Deity),
+        (codex.miracles_tab, codex.page == CodexPage::Miracles),
         (codex.prayers_tab, codex.page == CodexPage::Prayers),
         (codex.world_tab, codex.page == CodexPage::World),
     ];
@@ -1269,6 +1284,10 @@ pub(crate) fn apply_codex_page(
             "The tale of your people, written moment by moment.",
         ),
         CodexPage::Deity => ("THE DEITY", "You are the unseen. They are the faithful."),
+        CodexPage::Miracles => (
+            "THE MIRACLES",
+            "Every power you may learn. The bar that carries them.",
+        ),
         CodexPage::Prayers => ("THE PRAYERS", "What the faithful ask of you."),
         CodexPage::World => (
             "THE WORLD",

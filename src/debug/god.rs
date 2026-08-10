@@ -30,18 +30,6 @@ pub(crate) struct EpithetBody;
 #[derive(Component)]
 pub(crate) struct StatValue(u8);
 
-/// A miracle card's live text: cost line or state line.
-#[derive(Component)]
-pub(crate) struct MiracleText {
-    miracle: crate::miracles::Miracle,
-    /// 0 cost, 1 state, 2 reason.
-    field: u8,
-}
-
-/// A miracle card's face, dressed by its lock state.
-#[derive(Component)]
-pub(crate) struct MiracleCard(crate::miracles::Miracle);
-
 /// A feelings line: the row, and whether this is the right-hand why.
 #[derive(Component)]
 pub(crate) struct FeelText {
@@ -99,97 +87,6 @@ fn deity_bar(
         turn,
         tint,
         round,
-    );
-}
-
-/// A lightning bolt: two leaning bars meeting at the strike.
-fn bolt_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
-    let c = glyph_canvas(commands, parent, 18.0);
-    deity_bar(commands, c, (7.5, 0.5, 4.0, 8.5), 18.0, tint, false);
-    deity_bar(commands, c, (6.0, 8.5, 4.0, 8.5), 18.0, tint, false);
-}
-
-/// A flourishing tree, in gold.
-fn flourish_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
-    let c = glyph_canvas(commands, parent, 18.0);
-    deity_bar(commands, c, (7.75, 11.0, 2.5, 6.0), 0.0, tint, false);
-    deity_bar(commands, c, (3.5, 6.5, 11.0, 5.0), 0.0, tint, true);
-    deity_bar(commands, c, (5.5, 2.5, 7.0, 4.5), 0.0, tint, true);
-}
-
-/// A bounty: three berries.
-fn berry_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
-    let c = glyph_canvas(commands, parent, 18.0);
-    deity_bar(commands, c, (3.0, 8.5, 5.5, 5.5), 0.0, tint, true);
-    deity_bar(
-        commands,
-        c,
-        (9.5, 8.5, 5.5, 5.5),
-        0.0,
-        tint.with_alpha(0.8),
-        true,
-    );
-    deity_bar(
-        commands,
-        c,
-        (6.25, 3.0, 5.5, 5.5),
-        0.0,
-        tint.with_alpha(0.9),
-        true,
-    );
-}
-
-/// Mended: a break made whole - two halves and the seam.
-fn mend_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
-    let c = glyph_canvas(commands, parent, 18.0);
-    deity_bar(commands, c, (3.0, 4.0, 5.0, 10.0), 0.0, tint, false);
-    deity_bar(commands, c, (10.0, 4.0, 5.0, 10.0), 0.0, tint, false);
-    deity_bar(
-        commands,
-        c,
-        (8.25, 2.0, 1.5, 14.0),
-        0.0,
-        tint.with_alpha(0.6),
-        false,
-    );
-}
-
-/// Quake: the ground thrown - a floor split at an angle.
-fn quake_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
-    let c = glyph_canvas(commands, parent, 18.0);
-    deity_bar(commands, c, (1.5, 10.0, 7.0, 3.5), -14.0, tint, false);
-    deity_bar(commands, c, (9.5, 8.0, 7.0, 3.5), 14.0, tint, false);
-    deity_bar(
-        commands,
-        c,
-        (7.0, 3.0, 4.0, 4.0),
-        45.0,
-        tint.with_alpha(0.7),
-        false,
-    );
-}
-
-/// Avatar: a body with nobody in it - head, trunk and two legs, waiting to
-/// be worn.
-fn avatar_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
-    let c = glyph_canvas(commands, parent, 18.0);
-    deity_bar(commands, c, (6.0, 1.0, 6.0, 6.0), 0.0, tint, true);
-    deity_bar(commands, c, (6.5, 7.5, 5.0, 6.5), 0.0, tint, false);
-    deity_bar(
-        commands,
-        c,
-        (6.5, 14.0, 1.5, 3.5),
-        0.0,
-        tint.with_alpha(0.7),
-        false,
-    );
-    deity_bar(
-        commands,
-        c,
-        (10.0, 14.0, 1.5, 3.5),
-        0.0,
-        tint.with_alpha(0.7),
-        false,
     );
 }
 
@@ -285,38 +182,6 @@ fn age_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
 
 /// The bottom band's height, and the left column matched to a quarter.
 const CREED_BAND: f32 = 112.0;
-
-/// Pressing an unlocked card on the deity page sets that miracle onto the
-/// bar's first empty slot — the way back for anything dragged off it. The
-/// book holds fourteen; the bar holds ten; this is the loadout's far side.
-pub(crate) fn place_from_the_book(
-    grimoire: Res<crate::miracles::Grimoire>,
-    mut hotbar: ResMut<crate::miracles::Hotbar>,
-    mut notices: MessageWriter<ui::Notice>,
-    cards: Query<(&Interaction, &MiracleCard), Changed<Interaction>>,
-) {
-    for (interaction, card) in &cards {
-        if *interaction != Interaction::Pressed || !grimoire.knows(card.0) {
-            continue;
-        }
-        if hotbar.slot_of(card.0).is_some() {
-            continue;
-        }
-        let before: usize = hotbar.0.iter().filter(|m| m.is_some()).count();
-        hotbar.take_in(card.0);
-        let after: usize = hotbar.0.iter().filter(|m| m.is_some()).count();
-        if after > before {
-            notices.write(ui::Notice::new(format!(
-                "{} takes its place on the bar",
-                card.0.name()
-            )));
-        } else {
-            notices.write(ui::Notice::new(
-                "The bar is full - drag a miracle off it to make room".to_string(),
-            ));
-        }
-    }
-}
 
 pub(crate) fn spawn_god_panel(
     mut commands: Commands,
@@ -760,149 +625,6 @@ pub(crate) fn spawn_god_panel(
         commands.spawn((ui::dim(caption), ChildOf(words)));
     }
 
-    // MIRACLES, ruled across, then the five cards spanning the width.
-    let rule_band = commands
-        .spawn((
-            Node {
-                width: percent(100),
-                flex_shrink: 0.0,
-                flex_direction: FlexDirection::Row,
-                align_items: AlignItems::Center,
-                column_gap: px(12),
-                ..default()
-            },
-            ChildOf(right),
-        ))
-        .id();
-    let rule = |commands: &mut Commands, parent| {
-        commands.spawn((
-            Node {
-                flex_grow: 1.0,
-                height: px(1),
-                ..default()
-            },
-            BackgroundColor(ui::theme::accent().with_alpha(0.25)),
-            ChildOf(parent),
-        ));
-    };
-    rule(&mut commands, rule_band);
-    commands.spawn((
-        Text::new("MIRACLES"),
-        ui::DisplayFace,
-        TextFont {
-            font_size: FontSize::Px(ui::theme::SMALL_SIZE + 1.0),
-            ..default()
-        },
-        TextColor(ui::theme::accent().with_alpha(0.9)),
-        ChildOf(rule_band),
-    ));
-    rule(&mut commands, rule_band);
-
-    use crate::miracles::Miracle;
-    let cards = commands
-        .spawn((
-            Node {
-                width: percent(100),
-                height: px(148),
-                flex_shrink: 0.0,
-                flex_direction: FlexDirection::Row,
-                column_gap: px(10),
-                overflow: Overflow::scroll_x(),
-                ..default()
-            },
-            ui::Scrollable,
-            ScrollPosition::DEFAULT,
-            Interaction::default(),
-            ChildOf(right),
-        ))
-        .id();
-    for miracle in Miracle::ALL {
-        let card = commands
-            .spawn((
-                MiracleCard(miracle),
-                Interaction::default(),
-                ui::HoverHint::new(
-                    miracle.name(),
-                    "press to set it on the bar, once it is yours",
-                ),
-                Node {
-                    flex_grow: 1.0,
-                    flex_basis: px(0),
-                    min_width: px(140),
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    row_gap: px(6),
-                    padding: UiRect::axes(px(8), px(10)),
-                    border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(px(0)),
-                    overflow: Overflow::clip(),
-                    ..default()
-                },
-                BackgroundColor(Color::BLACK.with_alpha(0.3)),
-                BorderColor::all(ui::theme::panel_border().with_alpha(0.2)),
-                ChildOf(cards),
-            ))
-            .id();
-        commands.spawn((
-            Text::new(miracle.name().to_uppercase()),
-            ui::DisplayFace,
-            TextFont {
-                font_size: FontSize::Px(13.0),
-                ..default()
-            },
-            TextColor(ui::theme::accent()),
-            ChildOf(card),
-        ));
-        let badge = commands
-            .spawn((
-                MiracleText { miracle, field: 3 },
-                Node {
-                    margin: UiRect::axes(px(0), px(4)),
-                    ..default()
-                },
-                ChildOf(card),
-            ))
-            .id();
-        let gold = ui::theme::accent();
-        match miracle {
-            Miracle::Flourish => flourish_glyph(&mut commands, badge, gold),
-            Miracle::Smite => bolt_glyph(&mut commands, badge, gold),
-            Miracle::Bounty => berry_glyph(&mut commands, badge, gold),
-            Miracle::Mend => mend_glyph(&mut commands, badge, gold),
-            Miracle::Quake => quake_glyph(&mut commands, badge, gold),
-            Miracle::Avatar => avatar_glyph(&mut commands, badge, gold),
-            // The wonders wear a plain seal here until each earns its own
-            // engraving; their true faces live on the hotbar's slots.
-            _ => {
-                commands.spawn((
-                    Node {
-                        position_type: PositionType::Absolute,
-                        left: px(15),
-                        top: px(15),
-                        width: px(12),
-                        height: px(12),
-                        border: UiRect::all(px(2)),
-                        border_radius: BorderRadius::all(px(3)),
-                        ..default()
-                    },
-                    BorderColor::all(gold),
-                    ChildOf(badge),
-                ));
-            }
-        }
-        for field in [0u8, 1, 2] {
-            commands.spawn((
-                MiracleText { miracle, field },
-                ui::dim(""),
-                Node {
-                    max_width: percent(100),
-                    ..default()
-                },
-                ChildOf(card),
-            ));
-        }
-    }
-
     // The congregation's heart, and the whole record of faith.
     let lower = commands
         .spawn((
@@ -1101,7 +823,6 @@ pub(crate) fn update_god_panel(
     panels: Query<&Visibility, With<GodPanel>>,
     name: Option<Res<crate::villager::DivineName>>,
     legend: Option<Res<crate::villager::belief::Legend>>,
-    grimoire: Res<crate::miracles::Grimoire>,
     belief: Option<Res<crate::villager::belief::Belief>>,
     clock: Res<crate::calendar::WorldClock>,
     site: Option<Res<crate::villager::SettlementSite>>,
@@ -1110,14 +831,12 @@ pub(crate) fn update_god_panel(
         (Option<&crate::villager::belief::Faith>, Option<&Witnessed>),
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
-    mut cards: Query<(&MiracleCard, &mut BackgroundColor, &mut BorderColor)>,
     mut presence_fills: Query<&mut Node, With<PresenceFill>>,
     mut texts: ParamSet<(
         Query<&mut Text, With<DeityName>>,
         Query<&mut Text, With<DeitySubline>>,
         Query<&mut Text, With<EpithetBody>>,
         Query<(&StatValue, &mut Text)>,
-        Query<(&MiracleText, &mut Text)>,
         Query<(&FeelText, &mut Text)>,
         Query<&mut Text, With<PresenceValue>>,
         Query<(&AlignText, &mut Text)>,
@@ -1128,7 +847,6 @@ pub(crate) fn update_god_panel(
     {
         return;
     }
-    use crate::miracles::Miracle;
 
     let set = |text: &mut Text, fresh: String| {
         if text.0 != fresh {
@@ -1196,58 +914,6 @@ pub(crate) fn update_god_panel(
         set(&mut text, fresh);
     }
 
-    // The powers, as the grimoire actually holds them: earned up the
-    // belief ladder or crystallised by legend.
-    let unlocked = |miracle: Miracle| grimoire.knows(miracle);
-    for (card, mut fill, mut border) in &mut cards {
-        let lit = unlocked(card.0);
-        fill.0 = if lit {
-            ui::theme::title_bg()
-        } else {
-            Color::BLACK.with_alpha(0.3)
-        };
-        *border = BorderColor::all(if lit {
-            ui::theme::accent().with_alpha(0.55)
-        } else {
-            ui::theme::panel_border().with_alpha(0.2)
-        });
-    }
-    for (label, mut text) in &mut texts.p4() {
-        if label.field == 3 {
-            continue;
-        }
-        let lit = unlocked(label.miracle);
-        let fresh = match label.field {
-            0 => {
-                if lit {
-                    format!("every {} days", label.miracle.cooldown_days())
-                } else {
-                    match label.miracle.unlock() {
-                        crate::miracles::Unlock::Founding => "from the founding".to_string(),
-                        crate::miracles::Unlock::Belief(rung) => {
-                            format!("at {rung:.0} belief")
-                        }
-                        crate::miracles::Unlock::Legend => "by legend".to_string(),
-                        crate::miracles::Unlock::Dread(depth) => {
-                            format!("by dread, {depth:.0} deep")
-                        }
-                    }
-                }
-            }
-            1 => if lit { "Active" } else { "Locked" }.to_string(),
-            _ => {
-                if lit {
-                    String::new()
-                } else if label.miracle == Miracle::Mend {
-                    "a legend of providence unlocks it".to_string()
-                } else {
-                    "a legend of dread unlocks it".to_string()
-                }
-            }
-        };
-        set(&mut text, fresh);
-    }
-
     // How they feel, in four lines.
     let avg = trust_sum / total.max(1) as f32;
     let mood = match avg {
@@ -1266,7 +932,7 @@ pub(crate) fn update_god_panel(
         }
     });
     let power = belief.as_ref().map_or(0.0, |b| b.available());
-    for (feel, mut text) in &mut texts.p5() {
+    for (feel, mut text) in &mut texts.p4() {
         let fresh = match (feel.row, feel.why) {
             (0, false) => format!("{believers} of {total} believe"),
             (0, true) => mood.to_string(),
@@ -1284,7 +950,7 @@ pub(crate) fn update_god_panel(
     for mut node in &mut presence_fills {
         node.width = percent((avg * 100.0).clamp(0.0, 100.0));
     }
-    if let Ok(mut text) = texts.p6().single_mut() {
+    if let Ok(mut text) = texts.p5().single_mut() {
         set(&mut text, format!("{:.0}%", avg * 100.0));
     }
 
@@ -1307,7 +973,7 @@ pub(crate) fn update_god_panel(
             }
         },
     );
-    for (align, mut text) in &mut texts.p7() {
+    for (align, mut text) in &mut texts.p6() {
         let fresh = if align.caption {
             align_caption.to_string()
         } else {

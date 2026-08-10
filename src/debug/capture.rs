@@ -114,7 +114,9 @@ pub(crate) fn capture_preselect(
     let wanted = match std::env::var("DIVUS_FACTUS_OPEN").as_deref() {
         Ok("village") => super::village::CodexPage::Ledger,
         Ok("history") => super::village::CodexPage::Chronicle,
-        Ok("god") => super::village::CodexPage::Deity,
+        Ok("god") | Ok("deity") => super::village::CodexPage::Deity,
+        Ok("miracles") => super::village::CodexPage::Miracles,
+        Ok("prayers") => super::village::CodexPage::Prayers,
         Ok("world") => super::village::CodexPage::World,
         Ok("settings") => super::village::CodexPage::Settings,
         _ => super::village::CodexPage::People,

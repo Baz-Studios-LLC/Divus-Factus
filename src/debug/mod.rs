@@ -29,6 +29,7 @@ mod manifest;
 pub(crate) mod ordo_trial;
 mod people;
 pub(crate) mod portrait;
+pub(crate) mod spellbook;
 pub(crate) mod timings;
 pub(crate) mod village;
 mod world;
@@ -65,6 +66,7 @@ impl Plugin for DebugPlugin {
                     spawn_chronicle_page.after(spawn_village_panel),
                     spawn_village_panel,
                     spawn_god_panel.after(spawn_village_panel),
+                    spellbook::spawn_spellbook_page.after(spawn_village_panel),
                     portrait::spawn_portrait_studio,
                 ),
             )
@@ -142,7 +144,7 @@ impl Plugin for DebugPlugin {
                         update_ledger_details,
                         village::update_prayer_board,
                         village::answer_the_board,
-                        place_from_the_book,
+                        spellbook::place_from_the_book,
                     ),
                     // Paired: the chain tuple is at Bevy's ceiling, and
                     // these two are one subject - the book's chrome.
@@ -155,7 +157,9 @@ impl Plugin for DebugPlugin {
                     apply_codex_page,
                     dress_ledger_banner,
                     update_dossier,
-                    update_god_panel,
+                    // Paired: the chain tuple is at Bevy's ceiling, and
+                    // these two are one subject - the god's own pages.
+                    (update_god_panel, spellbook::update_spellbook),
                     update_faith_chart,
                     capture_preselect,
                     style_roster_rows,
@@ -373,6 +377,9 @@ mod tests {
             .unwrap();
         world
             .run_system_once(portrait::spawn_portrait_studio)
+            .unwrap();
+        world
+            .run_system_once(spellbook::spawn_spellbook_page)
             .unwrap();
         // The commands applied without a duplicate-bundle panic, and the
         // codex stands.
