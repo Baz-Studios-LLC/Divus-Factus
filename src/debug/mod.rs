@@ -251,6 +251,10 @@ impl Plugin for DebugPlugin {
                     .and_then(|v| v.parse().ok())
                     .unwrap_or(9.0),
                 taken: false,
+                second: std::env::var("DIVUS_FACTUS_CAPTURE_PAIR")
+                    .ok()
+                    .and_then(|v| v.parse().ok()),
+                second_taken: false,
             })
             .add_systems(Update, auto_capture);
         }

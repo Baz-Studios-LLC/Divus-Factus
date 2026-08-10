@@ -13,6 +13,13 @@ pub(crate) struct AutoCapture {
     pub(crate) path: String,
     pub(crate) delay: f32,
     pub(crate) taken: bool,
+    /// DIVUS_FACTUS_CAPTURE_PAIR=seconds: a second shot that many seconds
+    /// after the first, saved beside it as `<stem>-b.png`. Two frames of
+    /// the same run are the only honest witnesses to a FLICKER - anything
+    /// that changes between two nearby frames of a still camera is either
+    /// the world moving or a defect, and a diff tells them apart.
+    pub(crate) second: Option<f32>,
+    pub(crate) second_taken: bool,
 }
 
 pub(crate) fn auto_capture(
@@ -29,8 +36,25 @@ pub(crate) fn auto_capture(
     mut exit: MessageWriter<AppExit>,
 ) {
     if capture.taken {
+        if let Some(gap) = capture.second
+            && !capture.second_taken
+        {
+            if time.elapsed_secs() >= capture.delay + gap {
+                capture.second_taken = true;
+                let twin = match capture.path.rsplit_once('.') {
+                    Some((stem, ext)) => format!("{stem}-b.{ext}"),
+                    None => format!("{}-b.png", capture.path),
+                };
+                let screenshot = match &target {
+                    Some(target) => Screenshot::image(target.image.clone()),
+                    None => Screenshot::primary_window(),
+                };
+                commands.spawn(screenshot).observe(save_to_disk(twin));
+            }
+            return;
+        }
         // Give the save a moment to land before tearing the app down.
-        if time.elapsed_secs() > capture.delay + 1.5 {
+        if time.elapsed_secs() > capture.delay + capture.second.unwrap_or(0.0) + 1.5 {
             exit.write(AppExit::Success);
         }
         return;

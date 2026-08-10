@@ -1369,6 +1369,14 @@ pub fn chunk_scatter_seed(world_seed: u32, coord: IVec2) -> u64 {
 /// transform tree can: every bush written per frame is a dirty transform
 /// the propagation and the renderer pay for again, and the far ones were
 /// most of the whole world's per-frame dirt.
+///
+/// Tried, convicted and PARDONED for the 2026-08-10 shadow flicker: the
+/// gate was reverted on one-run evidence, then acquitted by ten-run
+/// capture-pair rates on every side of the bisect. The true culprit was
+/// the timing probes threaded through Bevy's PostUpdate sets - see the
+/// history lesson in `debug/timings.rs` - and the fps gap that damned
+/// the gate was an armed run measured against a clean one. Judge nothing
+/// nondeterministic on a single run.
 const SWAY_REACH: f32 = 300.0;
 
 fn sway_foliage(

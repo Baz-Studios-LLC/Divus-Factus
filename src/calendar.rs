@@ -651,8 +651,12 @@ fn apply_sky_to_lights(
         // Aimed from where the sun IS. A directional light only cares about
         // the direction, but the distance keeps the transform readable in the
         // inspector and matches the body's own place.
-        *transform = Transform::from_translation(centre + sky.sun_direction * SUN_ORBIT)
-            .looking_at(centre, Vec3::Y);
+        // Probe: DIVUS_FACTUS_SUN_FREEZE=1 pins the sun where it stands, to
+        // tell a flicker fed by the sun's own crawl from every other kind.
+        if std::env::var("DIVUS_FACTUS_SUN_FREEZE").is_err() {
+            *transform = Transform::from_translation(centre + sky.sun_direction * SUN_ORBIT)
+                .looking_at(centre, Vec3::Y);
+        }
     }
     for (mut light, mut transform) in &mut fills {
         light.illuminance = sky.fill_illuminance;

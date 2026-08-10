@@ -316,23 +316,20 @@ impl Plugin for TimingsPlugin {
         // reported, or the split reads a frame's worth of nothing.
         app.init_resource::<Timings>()
             .add_systems(First, open_the_frame)
-            // The engine's own tail, in two spans: the interface being
-            // laid out, then transforms and visibility being propagated
-            // and everything after. If the unwatched column is fat and
-            // these are too, the cost is Bevy's built-ins, not an
-            // unwatched system of ours - and the split says which kind.
-            .add_systems(
-                PostUpdate,
-                (
-                    open_span("bevy: interface layout").before(bevy::ui::UiSystems::Layout),
-                    close_span("bevy: interface layout")
-                        .after(bevy::ui::UiSystems::Layout)
-                        .before(bevy::transform::TransformSystems::Propagate),
-                    open_span("bevy: the frame's tail")
-                        .after(bevy::ui::UiSystems::Layout)
-                        .before(bevy::transform::TransformSystems::Propagate),
-                ),
-            )
+            // The engine's tail is measured from the END of Update to the
+            // frame's close - one span, anchored only in OUR schedules.
+            //
+            // It was measured in two, once, with probes threaded BETWEEN
+            // Bevy's own PostUpdate sets (`after(UiSystems::Layout)`,
+            // `before(TransformSystems::Propagate)`) - and those edges
+            // re-sorted the neighbourhood where Bevy computes visibility
+            // and shadow-caster lists. The whole world's shadows toggled
+            // on alternate frames, arming or not per RUN, bisected to the
+            // instrumentation commit and to these probes by ten-run pair
+            // capture rates (0/10 without them, ~half armed with). The
+            // stopwatch must never place edges inside the engine's own
+            // ordering: measure around Bevy, not through it.
+            .add_systems(PostUpdate, open_span("bevy: the frame's tail"))
             .add_systems(
                 Last,
                 close_span("bevy: the frame's tail").before(close_the_frame),
