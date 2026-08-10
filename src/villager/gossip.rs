@@ -256,6 +256,105 @@ pub enum Chat {
     Roof,
     /// What the sky is doing to them.
     Weather,
+    /// Not small talk at all: a grievance one of them has with the
+    /// other, said out loud.
+    Quarrel(Grievance),
+}
+
+/// What the quarrel is ABOUT - and it is always something true.
+///
+/// Kept on the exchange rather than in the speakers' heads, so every
+/// later beat answers the same charge instead of reinventing one. No
+/// hostility is ever rolled for: if the simulation cannot name the
+/// grievance, there is no quarrel to have.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Grievance {
+    /// One of them is hungry while the town's sacks are thin. Somebody
+    /// is eating, and it is not them.
+    Hunger,
+    /// One sleeps under a roof and the other does not.
+    Roof,
+    /// One is idle, or has been, while the other's work goes on.
+    ///
+    /// Not yet named by anything: idleness is easy to see on screen and
+    /// hard to prove in the simulation, since a villager between jobs
+    /// looks exactly like one shirking. It waits for the work ledger to
+    /// remember who has carried nothing all day.
+    #[allow(dead_code)]
+    Idleness,
+    /// They already hold something against each other - the regard graph
+    /// remembers, and old grudges are the easiest quarrels to restart.
+    Grudge,
+    /// They cannot agree about what the god did, or whether it was the
+    /// god at all.
+    ///
+    /// Waiting on the pair's shared memory being compared rather than
+    /// merely retold - two witnesses of one act who read it differently
+    /// is the most interesting quarrel this game can have, and it should
+    /// be built when sermons become crowd scenes.
+    #[allow(dead_code)]
+    Faith,
+}
+
+/// What one of these two has against the other, if anything.
+///
+/// Read off facts both of them are living in, and ordered by how loudly
+/// it would be felt: an empty stomach beside a full one, a night in the
+/// open beside a bed, then whatever they were already carrying. A pair
+/// with nothing between them has nothing to quarrel about, and gets
+/// small talk like everybody else.
+fn grievance_between(
+    mine: (Option<&Needs>, bool),
+    theirs: (Option<&Needs>, bool),
+    regard: Option<f32>,
+) -> Option<Grievance> {
+    let (my_needs, my_roof) = mine;
+    let (their_needs, their_roof) = theirs;
+    let starving = |needs: Option<&Needs>| needs.is_some_and(|n| n.hunger > 0.62);
+    let fed = |needs: Option<&Needs>| needs.is_some_and(|n| n.hunger < 0.3);
+
+    // Hunger beside plenty. It takes BOTH: two hungry people commiserate
+    // - that is the food small talk - and it is the difference between
+    // them that stings.
+    if (starving(my_needs) && fed(their_needs)) || (starving(their_needs) && fed(my_needs)) {
+        return Some(Grievance::Hunger);
+    }
+    // A roof one of them has.
+    if my_roof != their_roof {
+        return Some(Grievance::Roof);
+    }
+    // And what they were already carrying. The regard graph is the
+    // village's own memory of who has wronged whom, so an old grudge
+    // needs no fresh cause - which is exactly why old grudges are the
+    // easiest quarrels to restart.
+    if regard.is_some_and(|feeling| feeling <= -0.35) {
+        return Some(Grievance::Grudge);
+    }
+    None
+}
+
+impl Grievance {
+    /// The tag the corpus knows this charge by.
+    pub fn tag(self) -> &'static str {
+        match self {
+            Grievance::Hunger => "over:hunger",
+            Grievance::Roof => "over:roof",
+            Grievance::Idleness => "over:idleness",
+            Grievance::Grudge => "over:grudge",
+            Grievance::Faith => "over:faith",
+        }
+    }
+
+    /// How it reads in the log and the chronicle.
+    pub fn describe(self) -> &'static str {
+        match self {
+            Grievance::Hunger => "an empty stomach and a thin store",
+            Grievance::Roof => "a roof one of them has and the other has not",
+            Grievance::Idleness => "work one of them thinks the other is not doing",
+            Grievance::Grudge => "something older than today",
+            Grievance::Faith => "what the god did, and whether it was the god",
+        }
+    }
 }
 
 impl Chat {
@@ -267,6 +366,17 @@ impl Chat {
             Chat::Food => "topic:food".to_string(),
             Chat::Roof => "topic:roof".to_string(),
             Chat::Weather => "topic:weather".to_string(),
+            Chat::Quarrel(over) => over.tag().to_string(),
+        }
+    }
+
+    /// Every tag this subject brings to the corpus. Small talk brings
+    /// one; a quarrel brings its register AND its charge, so a line
+    /// written for the charge is never said pleasantly.
+    pub fn tags(self) -> Vec<String> {
+        match self {
+            Chat::Quarrel(over) => vec!["quarrel".to_string(), over.tag().to_string()],
+            other => vec![other.tag()],
         }
     }
 }
@@ -346,6 +456,7 @@ pub(crate) fn meet_to_talk(
     spoke: Query<&SpokeLately>,
     // What there is to talk about besides miracles: the work in their
     // hands, whether they have eaten, whether they have a bed.
+    regards: Query<&super::regard::Regard>,
     circumstances: Query<(
         Option<&work::Vocation>,
         Option<&super::Needs>,
@@ -459,11 +570,30 @@ pub(crate) fn meet_to_talk(
                 let foul = weather
                     .as_ref()
                     .is_some_and(|weather| weather.intensity > 0.25 || weather.chill > 0.5);
-                match (shared_trade, both_hungry, both_roofless, foul) {
-                    (Some(trade), ..) => Chat::Work(trade),
-                    (_, true, ..) => Chat::Food,
-                    (_, _, true, _) => Chat::Roof,
-                    (_, _, _, true) => Chat::Weather,
+                // A grievance outranks small talk. Not because people
+                // would rather argue, but because a real one is louder
+                // than the weather: somebody hungry beside somebody who
+                // is not, somebody sleeping out beside somebody housed,
+                // an old grudge with a face on it.
+                //
+                // Never rolled for. If the simulation cannot name the
+                // charge, there is nothing to argue about - which is the
+                // whole difference between a quarrel and random
+                // hostility.
+                let grievance = grievance_between(
+                    (my_needs, my_roof),
+                    (their_needs, their_roof),
+                    regards
+                        .get(teller)
+                        .ok()
+                        .map(|regard| regard.toward(listener)),
+                );
+                match (grievance, shared_trade, both_hungry, both_roofless, foul) {
+                    (Some(over), ..) => Chat::Quarrel(over),
+                    (_, Some(trade), ..) => Chat::Work(trade),
+                    (_, _, true, ..) => Chat::Food,
+                    (_, _, _, true, _) => Chat::Roof,
+                    (_, _, _, _, true) => Chat::Weather,
                     // Nothing pressing in common: their own work, or the
                     // weather if they have no trade between them.
                     _ => my_trade.copied().map_or(Chat::Weather, Chat::Work),
@@ -473,7 +603,9 @@ pub(crate) fn meet_to_talk(
         // Logged, because a chat about the work writes no chronicle and
         // shows no bubble unless the god happens to be watching - which
         // leaves a soak no way at all to tell talking from silence.
-        if memory.is_none() {
+        if let Chat::Quarrel(over) = subject {
+            info!("two of them fell out over {}", over.describe());
+        } else if memory.is_none() {
             info!("two of them fell to talking about {}", subject.tag());
         }
         paired.push(teller);
@@ -886,10 +1018,11 @@ pub(crate) fn hold_conversations(
                     .unwrap_or(0.3);
                 let voice = voices.get(entity).ok().and_then(|(v, ..)| v.copied());
                 let answered = tongue.as_mut().and_then(|tongue| {
-                    tongue.turn(
+                    tongue.turn_about(
                         entity,
                         "chat:reply",
-                        &topic.tag(),
+                        &topic.tags().iter().map(String::as_str).collect::<Vec<_>>(),
+                        false,
                         crate::sermo::FaithBand::of(trust),
                         voice,
                         None,
@@ -957,7 +1090,7 @@ pub(crate) fn hold_conversations(
                     tongue.turn_about(
                         entity,
                         role,
-                        &topic.tag(),
+                        &topic.tags().iter().map(String::as_str).collect::<Vec<_>>(),
                         told,
                         crate::sermo::FaithBand::of(trust),
                         voice,

@@ -239,6 +239,7 @@ impl Tongue {
     /// knowledge - the story changed hands on the opener, and everything
     /// after it is interpretation. That split is what keeps a four-beat
     /// conversation from propagating a rumour four times.
+    #[allow(dead_code)]
     pub fn turn(
         &mut self,
         who: Entity,
@@ -248,7 +249,7 @@ impl Tongue {
         voice: Option<Vocation>,
         whom: Option<&str>,
     ) -> Option<String> {
-        self.turn_about(who, role, about, false, faith, voice, whom)
+        self.turn_about(who, role, &[about], false, faith, voice, whom)
     }
 
     /// As [`Tongue::turn`], but saying whether the subject is something
@@ -259,13 +260,18 @@ impl Tongue {
         &mut self,
         who: Entity,
         role: &'static str,
-        about: &str,
+        about: &[&str],
         told: bool,
         faith: FaithBand,
         voice: Option<Vocation>,
         whom: Option<&str>,
     ) -> Option<String> {
-        let mut tags = vec![role, about, faith_tag(faith)];
+        // A list, because one subject can need two words for it: a
+        // quarrel is BOTH `quarrel` and the charge it is over, and a line
+        // written for the charge alone would be said as pleasantly as the
+        // weather.
+        let mut tags = vec![role, faith_tag(faith)];
+        tags.extend(about.iter().copied());
         if told {
             tags.push("told");
         }

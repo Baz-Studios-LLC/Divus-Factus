@@ -410,6 +410,14 @@ mod tests {
             "topic:priest",
             "topic:roof",
             "topic:weather",
+            // What a quarrel is about. Never rolled for: a grievance is
+            // named by the simulation or there is no argument to have.
+            "quarrel",
+            "over:hunger",
+            "over:roof",
+            "over:idleness",
+            "over:grudge",
+            "over:faith",
         ];
         let voice = Corpus::load();
         for line in voice.lines() {
