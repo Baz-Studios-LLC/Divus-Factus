@@ -512,23 +512,41 @@ pub fn speaks_only_of(line: &str, known: &[&str]) -> bool {
     true
 }
 
-/// Tidies an admissible line into the shape the bubbles expect.
+/// Tidies an admissible line into the shape the bubbles expect:
+/// sentence case, and a full stop at the end.
+///
+/// This used to do the OPPOSITE — lowercase the opener, pop the final
+/// stop — because bubbles once read capitals as captions. Brett's
+/// preference is now written down (Notes From ChatGPT, 2026-08-10): he
+/// reads lowercase openers as sloppiness, not style. Sentence starts
+/// are capitalized (interior ones too, after . ! ?), terminal
+/// punctuation is guaranteed, and a line already authored correctly
+/// passes through untouched — so the older lowercase corpus is
+/// repaired at presentation while new lines are written properly in
+/// the JSON.
 pub fn tidy(line: &str) -> String {
-    let mut out = line.trim().trim_matches('"').trim().to_string();
-    // The bubbles run lower-case; a capital reads as a caption. The pronoun
-    // I is the one exception — it is capital anywhere, including first, and
-    // "i wish I had someone" was the bug that proved it.
-    let leading_i =
-        out == "I" || out.starts_with("I ") || out.starts_with("I'") || out.starts_with("I,");
-    if !leading_i
-        && let Some(first) = out.chars().next()
-        && first.is_uppercase()
-    {
-        out = first.to_lowercase().collect::<String>() + &out[first.len_utf8()..];
+    let trimmed = line.trim().trim_matches('"').trim();
+    let mut out = String::with_capacity(trimmed.len() + 1);
+    let mut at_sentence_start = true;
+    for ch in trimmed.chars() {
+        if ch.is_alphabetic() {
+            if at_sentence_start {
+                out.extend(ch.to_uppercase());
+            } else {
+                out.push(ch);
+            }
+            at_sentence_start = false;
+        } else {
+            out.push(ch);
+            if matches!(ch, '.' | '!' | '?') {
+                at_sentence_start = true;
+            } else if !ch.is_whitespace() {
+                at_sentence_start = false;
+            }
+        }
     }
-    // One sentence: drop a trailing full stop, keep a question or a cry.
-    if out.ends_with('.') {
-        out.pop();
+    if !out.is_empty() && !matches!(out.chars().last(), Some('.' | '!' | '?' | '…')) {
+        out.push('.');
     }
     out
 }
@@ -565,24 +583,26 @@ mod tests {
 
     #[test]
     fn lines_are_tidied_into_the_bubbles_own_voice() {
-        // The bubbles run lower-case and without full stops; a model's
-        // sentence case would read as a caption rather than speech.
+        // Plain English, proper grammar - Brett's word, for everything:
+        // sentence case at every sentence start, a full stop at the end.
+        // Correctly authored lines pass through untouched; the older
+        // lowercase corpus is repaired on its way to the screen.
         assert_eq!(
             tidy("Something lifted him clean off."),
-            "something lifted him clean off"
+            "Something lifted him clean off."
         );
-        assert_eq!(tidy("  \"he just rose\"  "), "he just rose");
-        // The speaking I keeps its capital even at the head of the line.
+        assert_eq!(tidy("  \"he just rose\"  "), "He just rose.");
+        // Interior sentences are sentences too.
         assert_eq!(
-            tidy("I wish I had someone to come home to."),
-            "I wish I had someone to come home to"
+            tidy("swept the whole floor today. it's a small thing."),
+            "Swept the whole floor today. It's a small thing."
         );
         assert_eq!(
             tidy("I'll not walk that field again"),
-            "I'll not walk that field again"
+            "I'll not walk that field again."
         );
         // A question or a cry keeps its mark.
-        assert_eq!(tidy("was it the god?"), "was it the god?");
+        assert_eq!(tidy("was it the god?"), "Was it the god?");
     }
 
     #[test]
