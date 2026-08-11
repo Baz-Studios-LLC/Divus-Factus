@@ -22,7 +22,7 @@ use crate::creature::{Airborne, Childhood, Corpse, Held, MoveTarget};
 use crate::palette;
 
 /// Seconds of burning one log buys.
-const SECONDS_PER_LOG: f32 = 75.0;
+pub(crate) const SECONDS_PER_LOG: f32 = 75.0;
 
 /// Below this much burn-time left, someone goes for wood.
 const LOW_FUEL: f32 = 45.0;

@@ -205,6 +205,7 @@ pub(super) fn receive_offerings(
         &Blueprint,
     )>,
     mut towns: Query<(Entity, &crate::villager::SettlementGround, &mut Stockpile)>,
+    mut fires: Query<(&Transform, &mut crate::villager::home::Bonfire)>,
     mut notices: MessageWriter<crate::ui::Notice>,
     mut witnessed: MessageWriter<crate::witness::DivineEvent>,
 ) {
@@ -336,6 +337,46 @@ pub(super) fn receive_offerings(
             continue;
         }
         let here = at.translation;
+
+        // Wood dropped ON the fire burns instead of banking. Brett: "the
+        // god should be able to add fuel to the fire the same way they add
+        // trees to the stockpile." A tight reach on purpose - the bonfire
+        // stands in the square within a few strides of the woodpile, and
+        // anything generous here would swallow every gift meant for the
+        // stores. You have to drop it on the flames.
+        const ONTO_THE_FLAMES: f32 = 3.0;
+        if timber > 0.0
+            && let Some((fire_at, mut fire)) = fires
+                .iter_mut()
+                .find(|(at, _)| at.translation.distance(here) < ONTO_THE_FLAMES)
+        {
+            let was_out = fire.fuel <= 0.0;
+            // Paid at the villagers' own rate, so a god-given tree buys
+            // exactly what the same tree buys carried in by hand.
+            fire.fuel += timber * crate::villager::home::SECONDS_PER_LOG;
+            crate::matter::burst_of(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                here,
+                fire_at.translation,
+                &colors,
+                18,
+            );
+            commands.entity(offering).despawn();
+            notices.write(crate::ui::Notice::new(if was_out {
+                "The god rekindles the village fire"
+            } else {
+                "The god feeds the village fire"
+            }));
+            witnessed.write(crate::witness::DivineEvent {
+                kind: crate::witness::DivineEventKind::Provided,
+                position: here,
+                subject: None,
+                intensity: 0.6,
+            });
+            continue;
+        }
 
         // A build site takes the offering for its own town; failing that, the
         // village stores take it at the woodpile. Whichever takes it is also
@@ -1804,7 +1845,10 @@ pub(super) fn do_work(
                         },
                     ));
                     commands.entity(tree).despawn();
-                    stripped.strip(job.site.x, job.site.z);
+                    // Cut, not cleared: the wood comes back over four
+                    // seasons unless this ground is inside the walls, which
+                    // `the_walls_keep_their_ground` settles daily.
+                    stripped.fell(job.site.x, job.site.z, clock.day());
                     // Shoulder the logs and turn for home. The timber only
                     // becomes the village's when it reaches the pile — and a
                     // sawmill wrings a third log from every tree.
@@ -2080,6 +2124,80 @@ mod tests {
             sparks >= 12,
             "the burst should fill the air with flecks; {sparks} spawned"
         );
+    }
+
+    #[test]
+    fn a_tree_dropped_on_the_fire_burns_instead_of_banking() {
+        // Brett: "the god should be able to add fuel to the fire the same
+        // way they add trees to the stockpile." Dropped ON the flames it
+        // burns; dropped beside them it still goes to the stores, because
+        // the fire stands a few strides from the woodpile and must not
+        // swallow every gift meant for the village.
+        let build = || {
+            let mut app = bevy::app::App::new();
+            app.add_plugins(bevy::app::ScheduleRunnerPlugin::default())
+                .add_message::<crate::ui::Notice>()
+                .add_message::<crate::witness::DivineEvent>()
+                .init_resource::<Assets<Mesh>>()
+                .init_resource::<Assets<StandardMaterial>>()
+                .add_systems(Update, receive_offerings);
+            let pile = Vec3::new(10.0, 40.0, -6.0);
+            app.world_mut().spawn((
+                crate::villager::SettlementGround {
+                    centre: pile,
+                    radius: 40.0,
+                    woodpile: pile,
+                    foodpile: pile,
+                },
+                Stockpile::default(),
+            ));
+            app.world_mut().spawn((
+                Transform::from_translation(pile + Vec3::X * 6.0),
+                crate::villager::home::Bonfire {
+                    fuel: 0.0,
+                    tender: None,
+                },
+            ));
+            (app, pile)
+        };
+
+        // Onto the flames.
+        let (mut app, pile) = build();
+        app.world_mut().spawn((
+            Transform::from_translation(pile + Vec3::X * 6.5),
+            crate::matter::Matter::felled_tree(1.0),
+            crate::hand::DivinelyPlaced { remaining: 20.0 },
+        ));
+        app.update();
+        let world = app.world_mut();
+        let fire = world
+            .query::<&crate::villager::home::Bonfire>()
+            .single(world)
+            .expect("the fire still stands");
+        assert!(
+            fire.fuel > 0.0,
+            "wood dropped on the fire should burn; the fire holds {}",
+            fire.fuel,
+        );
+        let store = world.query::<&Stockpile>().single(world).unwrap();
+        assert_eq!(store.timber, 0.0, "it burned, so the stores gain nothing");
+
+        // Beside them: the stores take it, as they always did.
+        let (mut app, pile) = build();
+        app.world_mut().spawn((
+            Transform::from_translation(pile + Vec3::X * 2.0),
+            crate::matter::Matter::felled_tree(1.0),
+            crate::hand::DivinelyPlaced { remaining: 20.0 },
+        ));
+        app.update();
+        let world = app.world_mut();
+        let store = world.query::<&Stockpile>().single(world).unwrap();
+        assert!(store.timber > 0.0, "a gift at the pile still banks");
+        let fire = world
+            .query::<&crate::villager::home::Bonfire>()
+            .single(world)
+            .unwrap();
+        assert_eq!(fire.fuel, 0.0, "the fire only takes what lands on it");
     }
 
     /// What the god's own deliveries pay, held against what labour pays.

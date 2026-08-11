@@ -798,13 +798,23 @@ fn handle_grab_and_release(
     trees: Query<(
         &crate::scatter::FellableTree,
         &crate::scatter::TreeBody,
-        &crate::scatter::InGrove,
+        // OPTIONAL: a tree growing back after the axe stands alone rather
+        // than in a grove - it has to be sapling-sized, and a grove is one
+        // mesh at one scale. Required here, a sapling was not a tree to
+        // the hand at all: it fell through to the generic grab, kept its
+        // regrowth record, and the next chunk rebuild grew a second one
+        // while the god was still holding the first.
+        Option<&crate::scatter::InGrove>,
     )>,
     mut grove_kit: (
         ResMut<Assets<Mesh>>,
         Res<crate::terrain::TerrainAssets>,
         ResMut<crate::scatter::DirtyGroves>,
         ResMut<crate::scatter::StrippedGround>,
+        // Rides here rather than as its own parameter: this system is at
+        // Bevy's sixteen, and the day is only ever asked for the sake of
+        // the ground below - what the hand takes, and when it grows back.
+        Res<crate::calendar::WorldClock>,
     ),
     // Paired: this system sits on Bevy's sixteen-parameter limit, so the
     // new query rides with a relative - both are "what is this thing I am
@@ -821,6 +831,13 @@ fn handle_grab_and_release(
             &crate::villager::MemberOf,
         )>,
         Query<&mut crate::villager::work::Stockpile>,
+        // What the ground loses when this is lifted: a boulder is gone for
+        // good, a bush grows back like a tree. Rides in the satchel because
+        // the system is at Bevy's sixteen parameters.
+        Query<(
+            Has<crate::matter::Boulder>,
+            Has<crate::scatter::FoodSource>,
+        )>,
     ),
     pointer: Res<PointerContext>,
     armed: Res<crate::miracles::SelectedMiracle>,
@@ -1115,6 +1132,23 @@ fn handle_grab_and_release(
                 .copied()
                 .unwrap_or_else(|_| transform.compute_transform());
             commands.entity(entity).remove::<ChildOf>().insert(flat);
+
+            // The ground has to remember, or the next chunk rebuild puts
+            // back whatever the hand just carried off. Stone never returns
+            // - Brett: "Rocks should not grow back, thats just weird lol" -
+            // and a bush comes back on the same four seasons as a tree.
+            // (The tree branch below keeps its own record: it has the
+            // uprooting to stage first.)
+            match matters.8.get(entity) {
+                Ok((true, _)) => grove_kit.3.strip(flat.translation.x, flat.translation.z),
+                Ok((_, true)) => {
+                    let day = grove_kit.4.day();
+                    grove_kit
+                        .3
+                        .fell(flat.translation.x, flat.translation.z, day);
+                }
+                _ => {}
+            }
         }
 
         // Grabbing a living tree is an uprooting: it leaves the ground's
@@ -1123,16 +1157,19 @@ fn handle_grab_and_release(
         if let Ok((tree, body, home)) = trees.get(entity) {
             // Torn from the ground AND from its grove: the tree takes its
             // own body with it, and the grove closes over the gap.
-            let (meshes, terrain_assets, dirty_groves, stripped) = &mut grove_kit;
-            crate::scatter::stand_alone(
-                &mut commands,
-                meshes,
-                terrain_assets.ground_material.clone(),
-                entity,
-                body,
-                home,
-                dirty_groves,
-            );
+            let (meshes, terrain_assets, dirty_groves, stripped, clock) = &mut grove_kit;
+            let day = clock.day();
+            if let Some(home) = home {
+                crate::scatter::stand_alone(
+                    &mut commands,
+                    meshes,
+                    terrain_assets.ground_material.clone(),
+                    entity,
+                    body,
+                    home,
+                    dirty_groves,
+                );
+            }
             // In FLAT coordinates, all of it. A tree is a child of its chunk
             // and the chunk stands at identity, so the tree's own Transform
             // already IS its flat world position - which is why no Transform
@@ -1151,7 +1188,10 @@ fn handle_grab_and_release(
             if std::env::var("DIVUS_FACTUS_CARRY_PROBE").is_ok() {
                 info!("grab probe: tree Transform {flat:?}, bent global {position:?}");
             }
-            stripped.strip(flat.x, flat.z);
+            // Torn up by the god, but the ground is not salted: the wood
+            // grows back over four seasons like any other cut, unless this
+            // is ground inside the walls.
+            stripped.fell(flat.x, flat.z, day);
             // The unparenting above already reasserted the flat Transform;
             // one writer, one truth.
             commands

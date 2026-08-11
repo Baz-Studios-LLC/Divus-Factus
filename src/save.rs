@@ -203,6 +203,10 @@ struct SaveGame {
     /// Ground stripped of its tree or boulder for good.
     #[serde(default)]
     stripped: Vec<(i32, i32)>,
+    /// Woodland cut but coming back, and the day the axe fell. Saves from
+    /// before regrowth simply have none, and their old clearings stay bare.
+    #[serde(default)]
+    regrowing: Vec<(i32, i32, u32)>,
     /// The larder by kind: berries, fish, meat, grain, bread. Older saves
     /// carried only the total (stores.0), which returns as berries.
     #[serde(default)]
@@ -796,7 +800,15 @@ fn gather(world: &mut World) -> Option<SaveGame> {
             .map(|wall| (wall.tier, wall.radius, wall.gates.clone())),
         stripped: world
             .get_resource::<crate::scatter::StrippedGround>()
-            .map_or_else(Vec::new, |s| s.0.iter().map(|c| (c.x, c.y)).collect()),
+            .map_or_else(Vec::new, |s| s.bare.iter().map(|c| (c.x, c.y)).collect()),
+        regrowing: world
+            .get_resource::<crate::scatter::StrippedGround>()
+            .map_or_else(Vec::new, |s| {
+                s.regrowing
+                    .iter()
+                    .map(|(c, day)| (c.x, c.y, *day))
+                    .collect()
+            }),
         larder,
         metals,
         deposits,
@@ -901,7 +913,8 @@ fn found_anew(world: &mut World) {
         trails.restore(std::iter::empty());
     }
     if let Some(mut stripped) = world.get_resource_mut::<crate::scatter::StrippedGround>() {
-        stripped.0.clear();
+        stripped.bare.clear();
+        stripped.regrowing.clear();
     }
     if let Some(mut groves) = world.get_resource_mut::<crate::scatter::DirtyGroves>() {
         groves.0.clear();
@@ -1034,10 +1047,15 @@ fn apply(world: &mut World, save: SaveGame) {
         trails.restore(save.trails.iter().copied());
     }
     if let Some(mut stripped) = world.get_resource_mut::<crate::scatter::StrippedGround>() {
-        stripped.0 = save
+        stripped.bare = save
             .stripped
             .iter()
             .map(|&(x, z)| IVec2::new(x, z))
+            .collect();
+        stripped.regrowing = save
+            .regrowing
+            .iter()
+            .map(|&(x, z, day)| (IVec2::new(x, z), day))
             .collect();
     }
     world.insert_resource(save.faith_history.clone());

@@ -43,6 +43,7 @@ impl Plugin for ScatterPlugin {
                     sink_spent,
                     rebake_groves,
                     collect_groves,
+                    the_seasons_turn_the_woods,
                 ),
             )
             // PostUpdate, deliberately: chunks spawned during Update - by
@@ -384,6 +385,7 @@ fn populate_chunks(
     terrain: Res<Terrain>,
     world_seed: Res<crate::WorldSeed>,
     stripped: Res<StrippedGround>,
+    clock: Res<crate::calendar::WorldClock>,
     settlement: Option<Res<crate::villager::SettlementSite>>,
     mut library: Local<Option<ScatterMeshes>>,
     chunks: Query<(Entity, &TerrainChunk), Added<TerrainChunk>>,
@@ -394,6 +396,7 @@ fn populate_chunks(
         return;
     }
     let library = library.get_or_insert_with(|| ScatterMeshes::build(&mut meshes, world_seed.0));
+    let today = clock.day();
     // DIVUS_FACTUS_SCARCE starves the land of berry bushes — the famine dial, for
     // exercising the prayer loop without waiting for a bad year.
     let scarcity = if std::env::var("DIVUS_FACTUS_SCARCE").is_ok() {
@@ -403,7 +406,6 @@ fn populate_chunks(
     };
 
     for (entity, chunk) in &chunks {
-        let mut rng = Rng::new(chunk_scatter_seed(world_seed.0, chunk.coord));
 
         let origin = Vec2::new(
             chunk.coord.x as f32 * CHUNK_SIZE,
@@ -424,11 +426,16 @@ fn populate_chunks(
         // Standing trees gather here and are spawned after the sweep:
         // real entities every one, bucketed into grove visuals so the
         // renderer sees a handful of meshes where the sim sees a forest.
-        let mut stands: Vec<(Vec3, TreeKind)> = Vec::new();
+        let mut stands: Vec<(Vec3, TreeKind, Growth)> = Vec::new();
         let steps = (CHUNK_SIZE / SCATTER_SPACING) as i32;
 
         for iz in 0..steps {
             for ix in 0..steps {
+                // This spot's own dice. See `spot_seed`: what grows here
+                // must never depend on what grew before it in the loop,
+                // or a terrace laid on one corner of a chunk rearranges
+                // the forest on the other.
+                let mut rng = Rng::new(spot_seed(world_seed.0, chunk.coord, ix, iz));
                 let x = origin.x + ix as f32 * SCATTER_SPACING + rng.range(-1.4, 1.4);
                 let z = origin.y + iz as f32 * SCATTER_SPACING + rng.range(-1.4, 1.4);
 
@@ -536,22 +543,26 @@ fn populate_chunks(
                 } else if forest > 0.50 && moisture > 0.38 {
                     let density = ((forest - 0.50) / 0.3).clamp(0.0, 1.0);
                     // Trees keep a canopy's berth from worked ground, and
-                    // stripped ground stays bare: the axe is permanent. But
-                    // EVERY position burns the same dice standing or gone —
-                    // suppression discards geometry, never random draws, or
-                    // one felled tree would rearrange the whole forest on
-                    // the next chunk rebuild.
+                    // stripped ground stays bare: the axe is permanent.
+                    // Suppression here is free - each spot rolls its own
+                    // dice (see `spot_seed`), so a felled tree cannot move
+                    // the forest around it however the chunk is rebuilt.
                     // The square belongs to the village: no tree seeds
                     // inside the banner's circle, whatever the noise says.
                     let square = settlement.as_ref().is_some_and(|site| {
                         Vec2::new(x - site.centre.x, z - site.centre.z).length() < 10.0
                     });
-                    let bare =
-                        terrain.is_worked_within(x, z, 4.0) || stripped.is_stripped(x, z) || square;
+                    // Cut woodland comes back over four seasons; a pad, a
+                    // square or ground cleared for good never does.
+                    let growth = if terrain.is_worked_within(x, z, 4.0) || square {
+                        Growth::Cleared
+                    } else {
+                        stripped.growth_at(x, z, today)
+                    };
                     if rng.chance(tree_chance * (0.55 + density)) {
                         let kind = *rng.pick(TreeKind::for_biome(biome));
-                        if !bare {
-                            stands.push((local, kind));
+                        if !matches!(growth, Growth::Cleared | Growth::Empty) {
+                            stands.push((local, kind, growth));
                         }
                     } else if rng.chance(0.16 * scarcity) {
                         let bush = spawn_bush(
@@ -561,9 +572,12 @@ fn populate_chunks(
                             local,
                             &mut rng,
                         );
-                        // A worked pad grows nothing - but the dice burned.
-                        // Cut-over ground, though, can flower into a heath.
-                        if terrain.is_worked_within(x, z, 4.0) {
+                        // A pad grows nothing, and ground a hand has already
+                        // picked clean stays clear until it has had its four
+                        // seasons - the same memory the trees keep.
+                        if terrain.is_worked_within(x, z, 4.0)
+                            || !matches!(stripped.growth_at(x, z, today), Growth::Grown)
+                        {
                             commands.entity(bush).despawn();
                         } else {
                             commands.entity(bush).insert(ChildOf(entity));
@@ -601,7 +615,11 @@ fn populate_chunks(
                         local,
                         &mut rng,
                     );
-                    commands.entity(bush).insert(ChildOf(entity));
+                    if matches!(stripped.growth_at(x, z, today), Growth::Grown) {
+                        commands.entity(bush).insert(ChildOf(entity));
+                    } else {
+                        commands.entity(bush).despawn();
+                    }
                 } else if moisture > 0.45 && rng.chance(0.012) {
                     let herb = spawn_sacred(
                         &mut commands,
@@ -679,7 +697,32 @@ fn populate_chunks(
         // exact spot the noise gave it — and raise one merged mesh per
         // bucket with the member trees as meshless entities beside it.
         let mut buckets: Vec<(IVec2, Vec<(Vec3, TreeKind)>)> = Vec::new();
-        for (local, kind) in stands {
+        // A young tree cannot join a grove: the grove is ONE mesh, and a
+        // sapling has to be sapling-sized. They are few - only ground the
+        // axe has taken in the last three seasons - so a mesh each costs
+        // nothing, and they fold back into the grove when they grow up.
+        let (stands, coming_back): (Vec<_>, Vec<_>) = stands
+            .into_iter()
+            .partition(|(_, _, growth)| matches!(growth, Growth::Grown));
+        for (local, kind, growth) in coming_back {
+            let body = TreeBody::at(kind, local.x, local.z);
+            let young = commands
+                .spawn((
+                    Name::new("A young tree"),
+                    FellableTree {
+                        maturity: growth.maturity(),
+                    },
+                    body,
+                    Mesh3d(body.bake(&mut meshes)),
+                    MeshMaterial3d(terrain_assets.ground_material.clone()),
+                    Transform::from_translation(local).with_scale(Vec3::splat(growth.scale())),
+                    Visibility::default(),
+                    crate::hand::PickRadius(1.6 * growth.scale()),
+                ))
+                .id();
+            commands.entity(young).insert(ChildOf(entity));
+        }
+        for (local, kind, _) in stands {
             let cell = IVec2::new(
                 (local.x / GROVE_SPAN).floor() as i32,
                 (local.z / GROVE_SPAN).floor() as i32,
@@ -811,27 +854,250 @@ const GROVE_SPAN: f32 = 14.0;
 #[allow(dead_code)]
 pub const TREE_HARVEST_RADIUS: f32 = 190.0;
 
-/// Ground the village has already stripped: felled trees and mined-out
-/// boulders, by rounded world position. The scatterer consults it before
-/// seeding, so a chunk rebuild never resurrects what hands took away —
-/// a woods worked hard stays visibly cut, and a farmed-out country reads
-/// as exactly that from the air.
+/// What stands at a spot the village has already worked.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Growth {
+    /// Cleared for good: a building pad, a mined-out boulder, ground
+    /// inside the walls. Nothing wild comes back here.
+    Cleared,
+    /// Felled within the season. Bare earth and a stump's worth of nothing.
+    Empty,
+    /// A season on: a thin whip of a thing, waist high.
+    Sapling,
+    /// Two seasons on: a real tree, too green to be worth an axe.
+    Young,
+    /// Grown, or never cut. The only tree a woodcutter will take.
+    Grown,
+}
+
+impl Growth {
+    /// How tall this stage stands against a full-grown tree of its kind.
+    pub fn scale(self) -> f32 {
+        match self {
+            Growth::Sapling => 0.28,
+            Growth::Young => 0.6,
+            _ => 1.0,
+        }
+    }
+
+    /// What a tree at this stage is worth to the axe. `harvestable()` wants
+    /// better than 0.85, so only the grown are ever felled - the woodcutter,
+    /// the forester's survey, the explorer's tally and the timber census all
+    /// read that one number and need no separate rule.
+    pub fn maturity(self) -> f32 {
+        match self {
+            Growth::Sapling => 0.25,
+            Growth::Young => 0.55,
+            _ => 1.0,
+        }
+    }
+}
+
+/// Ground the village has already worked: felled trees, mined-out boulders
+/// and cleared pads, by rounded world position. The scatterer consults it
+/// before seeding, so a chunk rebuild never resurrects what hands took
+/// away - a woods worked hard stays visibly cut, and a farmed-out country
+/// reads as exactly that from the air.
+///
+/// Two kinds of memory, because the axe and the quarry are not the same
+/// wound. Cleared ground stays cleared. Cut woodland comes BACK, over four
+/// seasons - Brett: "For one season the spot is empty, next season there is
+/// a sapling, next season a young tree and the next season a full grown
+/// tree." Stone does not: "Rocks should not grow back, thats just weird."
 #[derive(Resource, Default)]
-pub struct StrippedGround(pub bevy::platform::collections::HashSet<IVec2>);
+pub struct StrippedGround {
+    /// Cleared for good.
+    pub bare: bevy::platform::collections::HashSet<IVec2>,
+    /// Woodland taken by the axe, and the day it fell.
+    pub regrowing: bevy::platform::collections::HashMap<IVec2, u32>,
+}
+
+/// Days a cut spot spends at each stage. A season, so a felled wood is a
+/// year off being worth walking to again - and counted from the day the
+/// axe fell rather than from the turn of the calendar, so the woods fill
+/// in the way they emptied instead of every stump in the world sprouting
+/// on the same four mornings a year.
+pub const REGROWTH_STAGE: u32 = crate::calendar::DAYS_PER_SEASON;
+
+/// The stage length in play. `DIVUS_FACTUS_REGROWTH=2` walks a wood
+/// through all four stages in six days instead of three months, which is
+/// the only way to watch the whole ladder inside one sitting.
+pub fn regrowth_stage() -> u32 {
+    static STAGE: std::sync::LazyLock<u32> = std::sync::LazyLock::new(|| {
+        std::env::var("DIVUS_FACTUS_REGROWTH")
+            .ok()
+            .and_then(|days| days.parse().ok())
+            .filter(|days| *days > 0)
+            .unwrap_or(REGROWTH_STAGE)
+    });
+    *STAGE
+}
 
 impl StrippedGround {
     fn key(x: f32, z: f32) -> IVec2 {
         IVec2::new(x.round() as i32, z.round() as i32)
     }
 
-    /// Marks this spot as taken: nothing wild of the felled kind returns.
+    /// Marks this spot as taken for good: nothing wild returns here.
     pub fn strip(&mut self, x: f32, z: f32) {
-        self.0.insert(Self::key(x, z));
+        let key = Self::key(x, z);
+        self.regrowing.remove(&key);
+        self.bare.insert(key);
     }
 
-    pub fn is_stripped(&self, x: f32, z: f32) -> bool {
-        self.0.contains(&Self::key(x, z))
+    /// Marks a tree felled on this day. The wood comes back on its own
+    /// unless the ground has been cleared for good since.
+    pub fn fell(&mut self, x: f32, z: f32, day: u32) {
+        let key = Self::key(x, z);
+        if !self.bare.contains(&key) {
+            self.regrowing.insert(key, day);
+        }
     }
+
+    /// True where nothing wild will ever stand again. Stone asks this and
+    /// nothing else: a quarried spot is finished with.
+    pub fn is_stripped(&self, x: f32, z: f32) -> bool {
+        self.bare.contains(&Self::key(x, z))
+    }
+
+    /// What a tree at this spot should be today.
+    pub fn growth_at(&self, x: f32, z: f32, today: u32) -> Growth {
+        let key = Self::key(x, z);
+        if self.bare.contains(&key) {
+            return Growth::Cleared;
+        }
+        match self.regrowing.get(&key) {
+            None => Growth::Grown,
+            Some(&felled) => match today.saturating_sub(felled) / regrowth_stage() {
+                0 => Growth::Empty,
+                1 => Growth::Sapling,
+                2 => Growth::Young,
+                _ => Growth::Grown,
+            },
+        }
+    }
+
+    /// Drops the records of woods that have finished growing back. Pure
+    /// housekeeping - `growth_at` already reads a lapsed record as grown -
+    /// but it keeps a long game's save from carrying every tree ever cut.
+    pub fn forget_grown(&mut self, today: u32) {
+        self.regrowing
+            .retain(|_, felled| today.saturating_sub(*felled) < regrowth_stage() * 3);
+    }
+}
+
+/// Brings cut woodland on a stage, and settles what the walls own.
+///
+/// Two things happen on the turn of a season, and both need the world to
+/// be told: a spot that was empty is a sapling now (which only shows when
+/// its chunk is rebuilt), and any cut ground that has since ended up
+/// inside a town's walls stops coming back at all. Brett: "Trees and
+/// bushes cleared inside the wall never respawn." A town keeps its own
+/// ground clear, and it does not have to weed it twice.
+fn the_seasons_turn_the_woods(
+    mut commands: Commands,
+    clock: Res<crate::calendar::WorldClock>,
+    mut stripped: ResMut<StrippedGround>,
+    walls: Res<crate::navigation::Walls>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    terrain: Res<crate::terrain::Terrain>,
+    terrain_assets: Res<crate::terrain::TerrainAssets>,
+    mut loaded: ResMut<crate::terrain::LoadedChunks>,
+    mut last_seen: Local<u32>,
+) {
+    // In the small hours, not at the turn of the day. A stage change is a
+    // chunk rebuild, and a chunk rebuild is a visible swap - a sapling
+    // appearing where bare earth was, a young tree suddenly a head taller.
+    // The day rolls over at DAWN, which is when a player is most likely to
+    // be watching the ground; 0.92 is the darkest stretch before it, when
+    // the swap happens under a black sky with the village asleep. Brett:
+    // "we could have them grow when the night is darkest to hide that a
+    // bit more."
+    const THE_SMALL_HOURS: f32 = 0.92;
+    let today = clock.day();
+    let dark = clock.time_of_day() >= THE_SMALL_HOURS;
+    // The second clause is for a fast clock: at high speed a frame can
+    // step clean over the dark window, and a skipped night must not cost
+    // the woods a season. Caught up at the next opportunity instead.
+    if *last_seen == today || (!dark && *last_seen + 1 >= today) {
+        return;
+    }
+    *last_seen = today;
+
+    // Ground the walls have closed over is the town's now.
+    let taken: Vec<IVec2> = stripped
+        .regrowing
+        .keys()
+        .filter(|spot| {
+            let at = Vec2::new(spot.x as f32, spot.y as f32);
+            walls
+                .ramparts
+                .iter()
+                .any(|wall| at.distance(wall.at) < wall.radius)
+        })
+        .copied()
+        .collect();
+    for spot in taken {
+        stripped.regrowing.remove(&spot);
+        stripped.bare.insert(spot);
+    }
+
+    // Whose season turned today. The chunks holding them have to be
+    // rebuilt or the sapling waits for some unrelated building to break
+    // ground before it appears.
+    // By CHUNK, not by tree: a season's felling is hundreds of spots and
+    // a rebuild is per chunk, so the naive loop rebuilds the same woods
+    // hundreds of times over on the same frame.
+    let mut risen: Vec<IVec2> = stripped
+        .regrowing
+        .iter()
+        .filter(|(_, felled)| {
+            let age = today.saturating_sub(**felled);
+            age > 0 && age % regrowth_stage() == 0
+        })
+        .map(|(spot, _)| {
+            IVec2::new(
+                (spot.x as f32 / CHUNK_SIZE).floor() as i32,
+                (spot.y as f32 / CHUNK_SIZE).floor() as i32,
+            )
+        })
+        .collect();
+    risen.sort_unstable_by_key(|c| (c.x, c.y));
+    risen.dedup();
+    let woken = risen.len();
+    for chunk in risen {
+        crate::terrain::rebuild_chunks_near(
+            &mut commands,
+            &mut meshes,
+            &terrain_assets,
+            &terrain,
+            &mut loaded,
+            (chunk.x as f32 + 0.5) * CHUNK_SIZE,
+            (chunk.y as f32 + 0.5) * CHUNK_SIZE,
+            1.0,
+        );
+    }
+
+    if std::env::var("DIVUS_FACTUS_TREE_PROBE").is_ok() {
+        let mut empty = 0;
+        let mut sapling = 0;
+        let mut young = 0;
+        for felled in stripped.regrowing.values() {
+            match today.saturating_sub(*felled) / regrowth_stage() {
+                0 => empty += 1,
+                1 => sapling += 1,
+                _ => young += 1,
+            }
+        }
+        info!(
+            "woods probe day {today}: {empty} bare, {sapling} saplings, {young} young, \
+             {} cleared for good, {} chunks woken",
+            stripped.bare.len(),
+            woken,
+        );
+    }
+
+    stripped.forget_grown(today);
 }
 
 /// A tree the axe can reach. Maturity 1 is full-grown; a felled tree is
@@ -1355,6 +1621,31 @@ pub(crate) fn spawn_boulder(
 ///
 /// Derived from the chunk coordinate so the same chunk always generates the same
 /// trees, however many times it is loaded.
+/// The dice for ONE spot on the scatter grid.
+///
+/// Every spot rolls its own, and that is the whole point. The scatter
+/// used to walk a chunk drawing from a single stream, which meant every
+/// position's result depended on every position before it - so anything
+/// that changed how many draws an earlier spot took moved the entire
+/// rest of the chunk.
+///
+/// Felling was careful about it (a stripped spot still burned its dice)
+/// and terracing was not, because terracing changes the GROUND: a slope
+/// flattened for a building sends its spot down a different branch with
+/// a different number of draws, and every tree after it in that chunk
+/// came back somewhere else, as something else. Brett: "when a house or
+/// building breaks ground it seems like the groves get rebuilt and the
+/// trees arent the same."
+///
+/// Seeded from the spot itself, no branch anywhere can disturb its
+/// neighbours - and nobody has to remember to burn dice ever again.
+pub fn spot_seed(world_seed: u32, coord: IVec2, ix: i32, iz: i32) -> u64 {
+    chunk_scatter_seed(world_seed, coord)
+        ^ ((ix as u32 as u64) << 40)
+        ^ ((iz as u32 as u64) << 24)
+        ^ 0x9e37_79b9_7f4a_7c15
+}
+
 pub fn chunk_scatter_seed(world_seed: u32, coord: IVec2) -> u64 {
     (world_seed as u64) << 32
         ^ ((coord.x as u32 as u64) << 16)
@@ -1576,6 +1867,147 @@ mod tests {
             checked += 1;
         }
         assert!(checked > 100, "test found too few dry samples");
+    }
+
+    #[test]
+    fn cut_woodland_comes_back_over_four_seasons() {
+        // Brett: "For one season the spot is empty, next season there is a
+        // sapling, next season a young tree and the next season a full
+        // grown tree. Only full grown tress can be chopped down."
+        let mut ground = StrippedGround::default();
+        let day = 100;
+        ground.fell(12.0, -30.0, day);
+
+        let stage = |after: u32| ground.growth_at(12.0, -30.0, day + after);
+        assert_eq!(stage(0), Growth::Empty);
+        assert_eq!(stage(REGROWTH_STAGE - 1), Growth::Empty);
+        assert_eq!(stage(REGROWTH_STAGE), Growth::Sapling);
+        assert_eq!(stage(REGROWTH_STAGE * 2), Growth::Young);
+        assert_eq!(stage(REGROWTH_STAGE * 3), Growth::Grown);
+        assert_eq!(stage(REGROWTH_STAGE * 40), Growth::Grown);
+
+        // And the axe waits for it: `harvestable()` is the one gate every
+        // woodcutter, forester and timber census already reads.
+        let tree = |growth: Growth| FellableTree {
+            maturity: growth.maturity(),
+        };
+        assert!(!tree(Growth::Sapling).harvestable());
+        assert!(!tree(Growth::Young).harvestable());
+        assert!(tree(Growth::Grown).harvestable());
+
+        // Untouched ground is just woods.
+        assert_eq!(ground.growth_at(500.0, 500.0, day), Growth::Grown);
+
+        // Counted from the DAY IT FELL, not from the turn of the calendar
+        // season - Brett asked whether that staggers better, and it does.
+        // On season boundaries every cut tree in the world would come up
+        // on the same four days a year: a forest popping at once, and
+        // every chunk holding one rebuilt in the same frame. A tree felled
+        // a day later comes up a day later, and the woods fill in the way
+        // they emptied.
+        let mut a_day_later = StrippedGround::default();
+        a_day_later.fell(12.0, -30.0, day + 1);
+        assert_eq!(a_day_later.growth_at(12.0, -30.0, day + REGROWTH_STAGE), Growth::Empty);
+        assert_eq!(stage(REGROWTH_STAGE), Growth::Sapling);
+    }
+
+    #[test]
+    fn cleared_ground_and_quarried_stone_stay_gone() {
+        // A building pad, a burn scar and a mined-out boulder are not
+        // woodland taking a breather. Brett, on rocks: "Rocks should not
+        // grow back, thats just weird lol."
+        let mut ground = StrippedGround::default();
+        ground.strip(4.0, 4.0);
+        assert!(ground.is_stripped(4.0, 4.0));
+        for after in [0, REGROWTH_STAGE, REGROWTH_STAGE * 9] {
+            assert_eq!(ground.growth_at(4.0, 4.0, 200 + after), Growth::Cleared);
+        }
+
+        // Clearing outranks cutting, whichever order they arrive in - a
+        // house raised over last year's stumps holds the ground for good.
+        ground.fell(4.0, 4.0, 200);
+        assert_eq!(ground.growth_at(4.0, 4.0, 400), Growth::Cleared);
+        let mut other = StrippedGround::default();
+        other.fell(9.0, 9.0, 200);
+        other.strip(9.0, 9.0);
+        assert_eq!(other.growth_at(9.0, 9.0, 400), Growth::Cleared);
+
+        // Cut woodland is NOT stripped ground: stone asks that question,
+        // and a felled tree must not stop a boulder returning.
+        let mut wood = StrippedGround::default();
+        wood.fell(1.0, 1.0, 10);
+        assert!(!wood.is_stripped(1.0, 1.0));
+    }
+
+    #[test]
+    fn a_finished_wood_stops_being_remembered() {
+        // Housekeeping: a long game fells a great many trees, and there is
+        // no reason to carry a record for woods that grew back years ago.
+        let mut ground = StrippedGround::default();
+        ground.fell(0.0, 0.0, 10);
+        ground.fell(60.0, 0.0, 10 + REGROWTH_STAGE * 3);
+
+        ground.forget_grown(10 + REGROWTH_STAGE * 3);
+        assert_eq!(ground.regrowing.len(), 1, "the grown one should be dropped");
+        // Dropping the record must not change what stands there.
+        assert_eq!(ground.growth_at(0.0, 0.0, 10 + REGROWTH_STAGE * 3), Growth::Grown);
+        assert_eq!(
+            ground.growth_at(60.0, 0.0, 10 + REGROWTH_STAGE * 3),
+            Growth::Empty,
+        );
+    }
+
+    #[test]
+    fn what_grows_at_a_spot_depends_on_nothing_but_that_spot() {
+        // The grove bug. Scatter used to walk a chunk drawing from one
+        // stream, so a spot's result depended on every draw before it -
+        // and terracing a building pad changes how many draws an earlier
+        // spot takes (slope sends it down a different branch). Brett saw
+        // whole groves come back as different trees in different places
+        // the moment a house broke ground.
+        //
+        // Seeding each spot from its own grid position is what makes that
+        // impossible, so this is the property worth pinning: distinct per
+        // spot, stable across rebuilds, and untouched by its neighbours.
+        let seed = 2024;
+        let chunk = IVec2::new(3, -7);
+
+        assert_eq!(
+            spot_seed(seed, chunk, 5, 9),
+            spot_seed(seed, chunk, 5, 9),
+            "a spot must roll the same dice on every rebuild",
+        );
+
+        let mut seen = std::collections::HashSet::new();
+        for iz in 0..48 {
+            for ix in 0..48 {
+                assert!(
+                    seen.insert(spot_seed(seed, chunk, ix, iz)),
+                    "two spots share dice at ({ix}, {iz})",
+                );
+            }
+        }
+
+        // And the same grid position in a neighbouring chunk is a
+        // different spot in the world, so it must roll differently.
+        assert_ne!(
+            spot_seed(seed, chunk, 5, 9),
+            spot_seed(seed, IVec2::new(4, -7), 5, 9),
+        );
+
+        // The draws themselves, not just the seeds: a spot's whole
+        // sequence has to survive its neighbour taking a different
+        // branch, which is exactly what terracing does.
+        let roll = |ix, iz| {
+            let mut rng = Rng::new(spot_seed(seed, chunk, ix, iz));
+            (0..6).map(|_| rng.range(0.0, 1.0)).collect::<Vec<_>>()
+        };
+        let quiet = roll(5, 9);
+        let mut neighbour = Rng::new(spot_seed(seed, chunk, 4, 9));
+        for _ in 0..17 {
+            neighbour.range(0.0, 1.0);
+        }
+        assert_eq!(quiet, roll(5, 9), "a neighbour's draws moved this spot");
     }
 
     #[test]
