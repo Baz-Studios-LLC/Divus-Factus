@@ -298,6 +298,15 @@ fn speak(
         let talking_to = (!say.thought && !say.prayer)
             .then(|| talking.get(say.speaker).ok().map(|talk| talk.partner))
             .flatten();
+        // Which side of the thread this voice keeps, decided by the pair
+        // so both turns agree and neither changes seats mid-sentence.
+        let say_side = talking_to.map_or(0.0, |partner| {
+            if say.speaker.to_bits() < partner.to_bits() {
+                -1.0
+            } else {
+                1.0
+            }
+        });
         // One bubble each, as ever - except in a thread, where each of
         // them speaks twice and both turns have to stay up or it is not
         // a thread. Two is the whole of anyone's share.
@@ -338,18 +347,19 @@ fn speak(
                     // conversation: four beats at a few seconds each, and
                     // a thread whose first line has already gone is not a
                     // thread. A remark to nobody keeps its old life.
-                    until: time.elapsed_secs() + if talking_to.is_some() { 13.0 } else { 4.5 },
+                    // A turn of a conversation outlives the conversation
+                    // by a breath, so the last word can be read and the
+                    // whole thread stands while it is being said. A
+                    // remark to nobody keeps its old life.
+                    until: time.elapsed_secs()
+                        + if talking_to.is_some() {
+                            crate::villager::gossip::A_CHAT_RUNS as f32 + 4.0
+                        } else {
+                            4.5
+                        },
                     lift: if say.thought { 26.0 } else { 8.0 },
                     with: talking_to,
-                    side: talking_to.map_or(0.0, |partner| {
-                        // The pair decides, so both agree: the lower of
-                        // the two entities keeps the left.
-                        if say.speaker.to_bits() < partner.to_bits() {
-                            -1.0
-                        } else {
-                            1.0
-                        }
-                    }),
+                    side: say_side,
                 },
                 // The stand-down covers bubbles with the rest of the HUD:
                 // a word said under an open book plays to the frost.
@@ -405,11 +415,30 @@ fn speak(
             // degrees and hung half out of the bottom edge. Only its two
             // lower edges wear the border, so what shows is a bordered
             // triangle pointing at whoever is talking.
+            //
+            // In a thread it hangs under the speaker's OWN side, the way
+            // it does on a phone - a tail in the middle of a box that is
+            // itself pushed off-centre points at nobody. Brett: "the
+            // bubbles need the tail to be on the correct side and not in
+            // the middle."
+            let along = match talking_to {
+                Some(_) if say_side < 0.0 => percent(20),
+                Some(_) => percent(80),
+                None => percent(50),
+            };
             commands.spawn((
                 Node {
                     position_type: PositionType::Absolute,
-                    left: percent(50),
-                    bottom: px(-4),
+                    left: along,
+                    // Hung clear of the box rather than through it. At
+                    // four pixels the turned square's top corner reached
+                    // eight pixels UP into the bubble and its fill ate a
+                    // bite out of the bottom border - Brett: "it seems
+                    // like it is too high up and cuts into the bubble."
+                    // A ten pixel square turned a quarter measures seven
+                    // from its middle to its corner, so this hangs the
+                    // middle on the edge and shows only the half below.
+                    bottom: px(-9),
                     width: px(10),
                     height: px(10),
                     border: UiRect {
@@ -521,9 +550,17 @@ fn float_bubbles(
         // If the other one is gone - died, was picked up, walked off -
         // the words fall back over the speaker's own head, which is
         // where a remark to nobody belongs.
+        //
+        // Only while they are still STANDING TOGETHER, though. A thread
+        // hung between two people who have walked apart hangs over the
+        // grass between them, pointing at nobody - Brett: "they stay
+        // locked but seem to be following someone, I dont see the body
+        // that is talking." The moment they separate the words go back
+        // over the head of whoever said them.
         let between = bubble
             .with
             .and_then(|partner| speakers.get(partner).ok())
+            .filter(|partner| partner.translation().distance(speaker.translation()) < 16.0)
             .map(|partner| (speaker.translation() + partner.translation()) * 0.5);
         let overhead = between.unwrap_or(speaker.translation()) + Vec3::Y * 2.3;
         // Ordo's one depth curve, borrowed until the bubbles become
@@ -543,7 +580,14 @@ fn float_bubbles(
                 // side of the thread - one voice down the left, the other
                 // down the right - so who said what is legible before a
                 // word is read, the way it is on a phone.
-                let lean = bubble.side * (size.x * 0.5 + THREAD_GAP) * scale;
+                // Off to its own side of the thread - but only while
+                // there IS a thread. Words that have fallen back over
+                // their speaker's head sit squarely over it.
+                let lean = if between.is_some() {
+                    bubble.side * (size.x * 0.5 + THREAD_GAP) * scale
+                } else {
+                    0.0
+                };
                 let mut pos = Vec2::new(at.x - size.x * 0.5 + lean, at.y - size.y - bubble.lift);
                 // Two people talking shoulder to shoulder must not talk
                 // over each other's words: a bubble that would land on an

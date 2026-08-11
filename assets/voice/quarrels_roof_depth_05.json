@@ -99,7 +99,7 @@
   { "t": "I will pray that another roof rises soon. That is sincere.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged", "devout"] },
   { "t": "May the god shelter you and soften both our words.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged", "devout"] },
   { "t": "I may owe more than sympathy. Let me think what I can do.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged", "wavering"] },
-  { "t": "I was fortunate and defensive. Both can be true.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged", "wavering"] },
+  { "t": "I was sheltered and defensive. Both can be true.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged", "wavering"] },
   { "t": "Find whoever orders the work. I will stand there with you.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged", "doubting"] },
   { "t": "I will help seek shelter. I will not call the difference divine.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged", "doubting"] }
 ]

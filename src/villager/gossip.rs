@@ -451,12 +451,22 @@ pub struct Conversing {
 fn beat_role(teller: bool, beat: u8, elapsed: f64, until: f64) -> Option<&'static str> {
     match (teller, beat) {
         // The teller pushes, softens, or explains themselves.
-        (true, 1) if elapsed > until - 6.0 => Some("chat:followup"),
+        (true, 1) if elapsed > until - A_CHAT_RUNS + 13.0 => Some("chat:followup"),
         // And the listener closes it.
-        (false, 1) if elapsed > until - 3.0 => Some("chat:end"),
+        (false, 1) if elapsed > until - A_CHAT_RUNS + 19.0 => Some("chat:end"),
         _ => None,
     }
 }
+
+/// How long two people stand and talk, in seconds.
+///
+/// Fourteen once, which put the four beats at nought, five, eight and
+/// eleven - three seconds to read three lines of somebody else's
+/// sentence, and the last two landing almost together. Brett:
+/// "conversations move too quick to read everything sometimes." Six
+/// seconds a beat is the pace of people actually talking, and it gives
+/// a passing god time to read a whole exchange without pausing.
+pub(crate) const A_CHAT_RUNS: f64 = 24.0;
 
 /// Whoever has news finds an idle neighbour and goes TO them: both stop,
 /// meet, and hold an actual conversation instead of talking over their
@@ -639,7 +649,7 @@ pub(crate) fn meet_to_talk(
         }
         paired.push(teller);
         paired.push(listener);
-        let until = clock.elapsed + 14.0;
+        let until = clock.elapsed + A_CHAT_RUNS;
         commands.entity(teller).insert((
             Conversing {
                 partner: listener,
@@ -721,7 +731,16 @@ pub(crate) fn hold_conversations(
     let god = name.as_ref().map_or("the god", |n| n.0.as_str());
 
     for (entity, at, mut talk, mut activity, mut target) in &mut pairs {
-        if *activity != Activity::Chatting || clock.elapsed > talk.until {
+        // A conversation is two people standing together. When they are
+        // not, it is over - whatever the clock says. Brett: "If the
+        // people walk away from each other the conversation should end."
+        // It could not, before: a talk ran its full span from the moment
+        // it began, so one of them being called away by hunger or a
+        // wolf left the other answering an empty field, and the words
+        // hung in the air between two backs.
+        let apart = spot_of(talk.partner)
+            .is_none_or(|partner| partner.distance(at.translation) > EARSHOT * 2.2);
+        if *activity != Activity::Chatting || clock.elapsed > talk.until || apart {
             // Parting is where the conversation lands on the heart. Most
             // talk warms the two of them a little; now and then somebody
             // walks away rubbed the wrong way — each side rolls alone, so
@@ -1040,7 +1059,7 @@ pub(crate) fn hold_conversations(
             }
         }
         // The reply, a beat after the meeting settles, from the listener.
-        if !talk.opener && talk.beat == 0 && clock.elapsed > talk.until - 9.0 {
+        if !talk.opener && talk.beat == 0 && clock.elapsed > talk.until - A_CHAT_RUNS + 7.0 {
             talk.beat = 1;
             let regard = crate::attention::regard(attention.as_deref(), at.translation);
             // Their own answer, if it came back in time. Composed against
@@ -1111,7 +1130,7 @@ pub(crate) fn hold_conversations(
                     talk.spoke_at = Some(clock.elapsed);
                     Some("chat:open")
                 }
-                1 if clock.elapsed > talk.until - 6.0 => Some("chat:followup"),
+                1 if clock.elapsed > talk.until - A_CHAT_RUNS + 13.0 => Some("chat:followup"),
                 _ => None,
             }
         } else {
@@ -1353,34 +1372,42 @@ mod tests {
 
     #[test]
     fn a_conversation_runs_four_beats_in_order() {
-        // The whole exchange, on the clock it actually uses: a meeting
-        // that ends at 14 seconds. Nobody speaks out of turn, nobody
-        // speaks twice, and the two later beats do not fire until the
-        // ones before them have.
-        let until = 14.0;
-        let at = |t: f64| until - 14.0 + t;
+        // The whole exchange, on the clock it actually uses. Nobody
+        // speaks out of turn, nobody speaks twice, and the two later
+        // beats do not fire until the ones before them have.
+        let until = A_CHAT_RUNS;
+        let at = |t: f64| until - A_CHAT_RUNS + t;
 
         // The teller has opened (beat 1) and the listener has answered
-        // (beat 1). Neither later beat is due yet.
-        assert_eq!(beat_role(true, 1, at(6.0), until), None);
-        assert_eq!(beat_role(false, 1, at(6.0), until), None);
+        // (beat 1). Neither later beat is due yet - six seconds in is
+        // still the answer's own time to be read.
+        assert_eq!(beat_role(true, 1, at(10.0), until), None);
+        assert_eq!(beat_role(false, 1, at(10.0), until), None);
 
-        // Eight seconds in, the teller follows up - and only the teller.
-        assert_eq!(beat_role(true, 1, at(8.5), until), Some("chat:followup"));
-        assert_eq!(beat_role(false, 1, at(8.5), until), None);
+        // Thirteen seconds in, the teller follows up - and only them.
+        assert_eq!(beat_role(true, 1, at(13.5), until), Some("chat:followup"));
+        assert_eq!(beat_role(false, 1, at(13.5), until), None);
 
-        // Eleven, and the listener closes it.
-        assert_eq!(beat_role(false, 1, at(11.5), until), Some("chat:end"));
+        // Nineteen, and the listener closes it.
+        assert_eq!(beat_role(false, 1, at(19.5), until), Some("chat:end"));
+
+        // Every beat has room to be READ before the next one lands: no
+        // two turns fall within four seconds of each other. Brett:
+        // "conversations move too quick to read everything sometimes."
+        assert!(
+            A_CHAT_RUNS >= 20.0,
+            "four beats need a span somebody can read: {A_CHAT_RUNS}",
+        );
 
         // Nobody who has not taken their first beat gets a later one, and
         // nobody speaks a third time.
         for who in [true, false] {
             assert_eq!(
-                beat_role(who, 0, at(13.0), until),
+                beat_role(who, 0, at(21.0), until),
                 None,
                 "spoke out of turn"
             );
-            assert_eq!(beat_role(who, 2, at(13.0), until), None, "spoke twice");
+            assert_eq!(beat_role(who, 2, at(21.0), until), None, "spoke twice");
         }
     }
 
