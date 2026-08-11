@@ -69,8 +69,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist, stage | Out-Null
           Copy-Item target\release\divus-factus.exe stage\DivusFactus.exe
           Copy-Item -Recurse assets stage\assets
-          # The bench beside it, and the palette it paints from; its fonts come
-          # out of the assets folder already copied above.
           Compress-Archive -Path stage\* -DestinationPath dist\DivusFactus-windows-x86_64.zip -Force
 
       - name: Attach to release
