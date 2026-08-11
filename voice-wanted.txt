@@ -1,3 +1,5 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-    4  (worn pool) event:provided reply wavering
+    9  (worn pool) event:thrown of:person saw tell wavering
+    3  (worn pool) event:thrown reply wavering
+    1  (worn pool) devout event:thrown reply

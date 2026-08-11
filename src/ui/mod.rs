@@ -290,6 +290,26 @@ fn speak(
     let started = std::time::Instant::now();
     let mut spawned = 0u32;
     for say in messages.read() {
+        // `DIVUS_FACTUS_VOICE_LOG=1`: the whole transcript, whether or
+        // not anybody was watching. This is the one place every line in
+        // the game passes through, so it is the only honest place to
+        // read the corpus FROM - the log otherwise carries just the
+        // lines said near the camera, which is a biased sample of
+        // exactly the thing a corpus soak is trying to measure
+        // (repetition, mismatched replies, a register that never fires).
+        if std::env::var("DIVUS_FACTUS_VOICE_LOG").is_ok() {
+            info!(
+                "voice: [{}] {}",
+                if say.prayer {
+                    "prayer"
+                } else if say.thought {
+                    "thought"
+                } else {
+                    "said"
+                },
+                say.text,
+            );
+        }
         // Every Say sent is meant for the screen: the senders own the
         // question of WHETHER a moment speaks (and gate it on being
         // watched); this system only owns the bubble. The composed-only
