@@ -1750,6 +1750,7 @@ pub(crate) fn update_prayer_board(
             &Person,
             &crate::villager::belief::Prayer,
             Option<&crate::villager::work::Vocation>,
+            &crate::creature::genome::CreatureGenome,
         ),
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
@@ -1778,7 +1779,7 @@ pub(crate) fn update_prayer_board(
     let fresh = {
         use std::hash::{Hash, Hasher};
         let mut hasher = std::hash::DefaultHasher::new();
-        for (entity, _, prayer, _) in &open {
+        for (entity, _, prayer, _, _) in &open {
             entity.to_bits().hash(&mut hasher);
             hope_band(prayer.remaining).hash(&mut hasher);
         }
@@ -1809,7 +1810,7 @@ pub(crate) fn update_prayer_board(
             .and_modify(|mut node| {
                 node.flex_shrink = 0.0;
             });
-        for (who, person, prayer, vocation) in third {
+        for (who, person, prayer, vocation, genome) in third {
             // The tract column stays BARE, matching a short row's filler
             // exactly - border and padding on the column itself join the
             // flex arithmetic and stagger part-rows off the tracts. The
@@ -1894,7 +1895,13 @@ pub(crate) fn update_prayer_board(
                     ChildOf(head),
                 ))
                 .id();
-            commands.spawn((ui::body(person.name.clone()), ChildOf(names)));
+            let asker = commands
+                .spawn((ui::body(person.name.clone()), ChildOf(names)))
+                .id();
+            // Their own ink, the same as the roster and the bubbles.
+            commands
+                .entity(asker)
+                .insert(TextColor(ui::theme::name_ink(genome.sex)));
             commands.spawn((
                 ui::dim(
                     vocation

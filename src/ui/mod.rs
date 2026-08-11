@@ -276,7 +276,10 @@ fn speak(
     time: Res<Time<Real>>,
     mut messages: MessageReader<Say>,
     attention: Option<Res<crate::attention::Attention>>,
-    names: Query<&crate::villager::Person>,
+    names: Query<(
+        &crate::villager::Person,
+        &crate::creature::genome::CreatureGenome,
+    )>,
     // The FLAT transform: `regard` speaks sim coordinates and bends them
     // itself. (`float_bubbles` keeps the bent GlobalTransform - screen
     // projection is render-space work.)
@@ -425,9 +428,23 @@ fn speak(
             // itself pushed off-centre points at nobody. Brett: "the
             // bubbles need the tail to be on the correct side and not in
             // the middle."
+            //
+            // A tail belongs under its own speaker's OUTER edge - the
+            // left voice's at the left, the right voice's at the right -
+            // so it points down at the person rather than across the gap
+            // at the other one. Brett, watching a thread: "the tails are
+            // not on the right sides... they are opposite."
+            //
+            // These two numbers are set by WHAT RENDERS, not by what the
+            // arithmetic says: written the other way round, matching the
+            // reading of `left:` as a fraction of the box from its left,
+            // both tails came out on the inner edges. Something between
+            // the absolute placement and the turned square inverts it.
+            // Trust the picture; the sums here have been wrong once
+            // already.
             let along = match talking_to {
-                Some(_) if say_side < 0.0 => percent(20),
-                Some(_) => percent(80),
+                Some(_) if say_side < 0.0 => percent(80),
+                Some(_) => percent(20),
                 None => percent(50),
             };
             commands.spawn((
@@ -467,15 +484,17 @@ fn speak(
                 ChildOf(bubble),
             ));
         }
-        // The name over the words, so a crowd's chatter has owners.
-        if let Ok(person) = names.get(say.speaker) {
+        // The name over the words, so a crowd's chatter has owners -
+        // written in their own ink, so a thread says who is who before a
+        // word of it is read.
+        if let Ok((person, genome)) = names.get(say.speaker) {
             commands.spawn((
                 Text::new(person.name.clone()),
                 TextFont {
                     font_size: FontSize::Px(10.0),
                     ..default()
                 },
-                TextColor(theme::accent().with_alpha(0.9)),
+                TextColor(theme::name_ink(genome.sex).with_alpha(0.95)),
                 ChildOf(bubble),
             ));
         }
@@ -829,6 +848,7 @@ fn keep_the_prayer_shelf(
             &crate::villager::Person,
             &crate::villager::belief::Prayer,
             Option<&crate::villager::work::Vocation>,
+            &crate::creature::genome::CreatureGenome,
         ),
         (
             With<crate::villager::Villager>,
@@ -891,6 +911,7 @@ fn keep_the_prayer_shelf(
             &crate::villager::Person,
             &crate::villager::belief::Prayer,
             Option<&crate::villager::work::Vocation>,
+            &crate::creature::genome::CreatureGenome,
         ),
         usize,
     )> = Vec::new();
@@ -909,7 +930,7 @@ fn keep_the_prayer_shelf(
     let fresh = {
         use std::hash::{Hash, Hasher};
         let mut hasher = std::hash::DefaultHasher::new();
-        for ((who, _, prayer, _), voices) in clumped.iter().take(SHELF_CARDS) {
+        for ((who, _, prayer, _, _), voices) in clumped.iter().take(SHELF_CARDS) {
             who.to_bits().hash(&mut hasher);
             voices.hash(&mut hasher);
             crate::debug::village::hope_band(prayer.remaining).hash(&mut hasher);
@@ -938,7 +959,7 @@ fn keep_the_prayer_shelf(
         });
 
     let pink = crate::palette::shade(&crate::palette::CLOTH_PINK, 1.0);
-    for ((who, person, prayer, vocation), voices) in clumped.iter().take(SHELF_CARDS) {
+    for ((who, person, prayer, vocation, genome), voices) in clumped.iter().take(SHELF_CARDS) {
         let card = commands
             .spawn((
                 crate::debug::village::PrayerRow(*who),
@@ -1016,15 +1037,23 @@ fn keep_the_prayer_shelf(
         } else {
             prayer.kind.ask_line(&person.name)
         };
-        commands.spawn((
-            body(line),
-            Node {
-                flex_grow: 1.0,
-                min_width: px(0),
-                ..default()
-            },
-            ChildOf(head),
-        ));
+        // The asking, opening with the asker's name in their own ink -
+        // the card is the one place a name is the FIRST word, so it
+        // carries the tint for the whole line.
+        let asking = commands
+            .spawn((
+                body(line),
+                Node {
+                    flex_grow: 1.0,
+                    min_width: px(0),
+                    ..default()
+                },
+                ChildOf(head),
+            ))
+            .id();
+        commands
+            .entity(asking)
+            .insert(TextColor(theme::name_ink(genome.sex)));
         if let Some(words) = &prayer.words {
             let quoted = commands
                 .spawn((dim(format!("\u{201c}{words}\u{201d}")), ChildOf(card)))
@@ -1257,6 +1286,25 @@ pub mod theme {
     /// Emphasis: titles and the occasional word that matters.
     pub fn accent() -> Color {
         palette::shade(&palette::CLOTH_GOLD, 0.85)
+    }
+
+    /// The ink a person's name is written in, by who they are.
+    ///
+    /// Brett: "can we gender color the NPC names everywhere we see them,
+    /// that would let players quickly see." A roster is otherwise a wall
+    /// of invented syllables, and half of what a player wants from it -
+    /// who might marry, who is somebody's daughter, which way a family
+    /// runs - is legible at a glance the moment the names carry it.
+    ///
+    /// Cloth tones, not signal colours: this book is painted in rose and
+    /// slate, and a pair of highlighter inks would fight everything
+    /// around them. Both are lifted well up their ramps so they stay
+    /// READABLE as text first and a signal second.
+    pub fn name_ink(sex: crate::creature::genome::Sex) -> Color {
+        match sex {
+            crate::creature::genome::Sex::Female => palette::shade(&palette::CLOTH_PINK, 0.92),
+            crate::creature::genome::Sex::Male => palette::shade(&palette::CLOTH_BLUE, 0.9),
+        }
     }
 
     pub const TITLE_SIZE: f32 = 13.0;

@@ -1204,6 +1204,13 @@ pub(crate) fn update_people_panel(
                 ChildOf(words),
             ))
             .id();
+        // Written in their own ink, so a hall of forty invented names can
+        // be read for its families at a glance. Inserted rather than
+        // bundled: `ui::body` brings a TextColor of its own, and two in
+        // one bundle is a panic Bevy raises at spawn.
+        commands
+            .entity(name)
+            .insert(TextColor(ui::theme::name_ink(genome.sex)));
         commands.entity(name).insert(TextFont {
             font_size: FontSize::Px(15.0),
             ..default()
