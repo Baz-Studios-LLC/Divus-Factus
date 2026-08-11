@@ -28,28 +28,7 @@ strip "$APP/Contents/MacOS/divus-factus" 2>/dev/null || true
 
 cp -R "$ROOT/assets" "$APP/Contents/MacOS/assets"
 
-# The Atelier rides along, if it has been built. The title screen opens it and
-# stands down, so the bench a player reaches is always the one that matches the
-# game it feeds - the two share a file contract, and a bench a release behind
-# writes buildings the game reads differently.
-#
-# Its own crate, so its own target directory; the workflow builds it before
-# calling this. Missing is not an error: the game hides the button when there is
-# no bench beside it, and a build without one is simply a game.
-BENCH="$ROOT/atelier/target/release/divus-factus-atelier"
-if [ -f "$BENCH" ]; then
-  # The same name it takes on Windows. A bundle names its own executable in
-  # Info.plist so nothing here was ever at risk of being launched by mistake -
-  # but one name for the bench on both platforms is one name to look for.
-  cp "$BENCH" "$APP/Contents/MacOS/TheAtelier"
-  chmod +x "$APP/Contents/MacOS/TheAtelier"
-  strip "$APP/Contents/MacOS/TheAtelier" 2>/dev/null || true
-  # The palette the bench paints from, exported by the game. Its fonts come out
-  # of the game's own assets folder, which is already beside them.
-  cp -R "$ROOT/atelier/data" "$APP/Contents/MacOS/data"
-  echo "  with the Atelier"
-fi
-# Likewise the icon: CFBundleIconFile names it without the extension.
+# The icon: CFBundleIconFile names it without the extension.
 cp "$HERE/DivusFactus.icns" "$APP/Contents/Resources/DivusFactus.icns"
 sed "s/__VERSION__/$VERSION/g" "$HERE/Info.plist" > "$APP/Contents/Info.plist"
 

@@ -364,8 +364,11 @@ pub fn shade_blend(a: &Ramp, b: &Ramp, blend: f32, t: f32) -> Color {
 #[cfg(test)]
 mod tests {
     /// Writes the palette out for Opificium, which paints with the game's
-    /// own ramps but shares none of its code. Run by hand when the palette
-    /// changes: `cargo test export_palette_for_opificium -- --ignored`
+    /// own ramps but shares none of its code - it is a separate program in
+    /// a separate repository now, and `opificium/` here is this game's
+    /// PROJECT folder for it: palette, bodies, templates and authored work.
+    /// Run by hand when the palette changes:
+    /// `cargo test export_palette_for_opificium -- --ignored`
     #[test]
     #[ignore = "a hand-run export, not a check"]
     fn export_palette_for_opificium() {

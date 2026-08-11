@@ -83,62 +83,6 @@ struct SettingsButton;
 #[derive(Component)]
 struct QuitButton;
 
-/// The door to the maker's bench.
-#[derive(Component)]
-struct OpificiumButton;
-
-/// Where Opificium stands, if it stands anywhere.
-///
-/// Beside the game first, which is where a packaged build puts it: one bundle
-/// holding both, so the bench a player opens is always the one that matches the
-/// game it feeds. That matters more here than tidiness — the two share a file
-/// contract, and a bench a release behind the game writes buildings the game
-/// reads differently.
-///
-/// Then the source tree, because the bench is its own crate with its own target
-/// directory and does NOT sit beside the game while either is being worked on.
-///
-/// `None` means it is not installed, and the button does not appear at all. A
-/// door that opens onto nothing is worse than no door.
-fn opificium_beside_us() -> Option<std::path::PathBuf> {
-    // What it is called where it SHIPS, and what cargo calls it in a tree. The
-    // shipped name changed because a launcher that runs the first `.exe` in the
-    // folder ran the bench when a player pressed PLAY - so the bench now sorts
-    // after the game and cannot be mistaken for it either.
-    let shipped = if cfg!(windows) {
-        "Opificium.exe"
-    } else {
-        "Opificium"
-    };
-    let built = if cfg!(windows) {
-        "divus-factus-opificium.exe"
-    } else {
-        "divus-factus-opificium"
-    };
-    // The names the bench shipped under before it was Opificium. A launcher
-    // that merges an update over an old install can leave the old bench on
-    // disk beside the new game; a working door to the old bench beats a
-    // missing button until the next clean install sweeps it.
-    let legacy = if cfg!(windows) {
-        ["TheAtelier.exe", "divus-factus-atelier.exe"]
-    } else {
-        ["TheAtelier", "divus-factus-atelier"]
-    };
-    let us = std::env::current_exe().ok()?;
-    let here = us.parent()?;
-    for named in [shipped, built, legacy[0], legacy[1]] {
-        let beside = here.join(named);
-        if beside.is_file() {
-            return Some(beside);
-        }
-    }
-    // A source tree: the game runs from `target/release`, the bench builds into
-    // `opificium/target/release`.
-    let workspace = here.parent()?.parent()?;
-    let in_tree = workspace.join("opificium/target/release").join(built);
-    in_tree.is_file().then_some(in_tree)
-}
-
 /// Opens the saves window as a load menu.
 #[derive(Component)]
 struct LoadGameButton;
@@ -631,12 +575,6 @@ fn spawn_title(
     commands
         .entity(settings)
         .insert((SettingsButton, TitleMenu));
-    // Only when there is a bench to open. A button that does nothing teaches a
-    // player that buttons here might do nothing.
-    if opificium_beside_us().is_some() {
-        let bench = button_of_size(&mut commands, menu, "Opificium", 340.0, 21.0, 16.0);
-        commands.entity(bench).insert((OpificiumButton, TitleMenu));
-    }
     let quit = button_of_size(&mut commands, menu, "Quit", 340.0, 21.0, 16.0);
     commands.entity(quit).insert((QuitButton, TitleMenu));
 
@@ -1752,7 +1690,6 @@ fn handle_choice(
     mut saves_panels: Query<&mut Visibility, With<crate::save::SavesPanel>>,
     settings: Query<&Interaction, (Changed<Interaction>, With<SettingsButton>)>,
     quit: Query<&Interaction, (Changed<Interaction>, With<QuitButton>)>,
-    bench: Query<&Interaction, (Changed<Interaction>, With<OpificiumButton>)>,
     open_settings: Query<Entity, With<SettingsScreen>>,
     chunks: Option<Res<crate::terrain::LoadedChunks>>,
     site: Option<Res<crate::villager::SettlementSite>>,
@@ -1771,37 +1708,6 @@ fn handle_choice(
             );
         }
     }
-    // Opificium takes over: the bench opens and the game stands down.
-    //
-    // Two programs at once would be two programs fighting over one machine's
-    // graphics for no reason - nobody draws a building and plays at the same
-    // time - and the bench's whole promise is that what is saved there is
-    // carried in by hand afterwards, which is a thing you do on the way BACK.
-    for interaction in &bench {
-        if *interaction != Interaction::Pressed {
-            continue;
-        }
-        let Some(path) = opificium_beside_us() else {
-            continue;
-        };
-        // From its own folder, so it finds its palette and its fonts the way it
-        // does when a maker runs it themselves.
-        let home = path.parent().map(std::path::Path::to_path_buf);
-        let mut opening = std::process::Command::new(&path);
-        if let Some(home) = home {
-            opening.current_dir(home);
-        }
-        match opening.spawn() {
-            Ok(_) => {
-                info!("the bench is open: {}", path.display());
-                exit.write(AppExit::Success);
-            }
-            // Left standing rather than quitting into nothing: a game that
-            // closed and opened neither would look like a crash.
-            Err(why) => warn!("the bench would not open ({why}): {}", path.display()),
-        }
-    }
-
     // Load Game opens the saves window over the title; picking a slot there
     // restores the world and walks through the same door Begin uses.
     for interaction in &loads {

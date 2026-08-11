@@ -50,12 +50,6 @@ jobs:
       - name: Build (release)
         run: cargo build --release
 
-      # The bench is its own crate with its own lockfile, so the workspace build
-      # above does not touch it. It ships inside the game's bundle and the title
-      # screen opens it.
-      - name: Build Opificium (release)
-        run: cargo build --release --manifest-path opificium/Cargo.toml
-
       - name: Compute version (tag without leading v)
         id: ver
         shell: bash
@@ -77,12 +71,6 @@ jobs:
           Copy-Item -Recurse assets stage\assets
           # The bench beside it, and the palette it paints from; its fonts come
           # out of the assets folder already copied above.
-          # NAMED so it cannot be mistaken for the game, and named so it sorts
-          # after it: a launcher that takes the first .exe in the folder took
-          # `divus-factus-atelier.exe` and opened the editor when a player
-          # pressed PLAY.
-          Copy-Item opificium\target\release\divus-factus-opificium.exe stage\Opificium.exe
-          Copy-Item -Recurse opificium\data stage\data
           Compress-Archive -Path stage\* -DestinationPath dist\DivusFactus-windows-x86_64.zip -Force
 
       - name: Attach to release
