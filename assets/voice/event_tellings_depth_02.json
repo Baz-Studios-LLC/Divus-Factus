@@ -403,7 +403,7 @@
     ]
   },
   {
-    "t": "I saw the repair afterward, not who performed it.",
+    "t": "I saw the repair afterwards, not who performed it.",
     "tags": [
       "tell",
       "event:mended",
@@ -594,7 +594,7 @@
     ]
   },
   {
-    "t": "I counted the sacks before and after. More stood there afterward.",
+    "t": "I counted the sacks before and after. More stood there afterwards.",
     "tags": [
       "tell",
       "event:provided",
@@ -692,7 +692,7 @@
     ]
   },
   {
-    "t": "I felt an earthquake. Fear supplied the god afterward.",
+    "t": "I felt an earthquake. Fear supplied the god afterwards.",
     "tags": [
       "tell",
       "event:quaked",

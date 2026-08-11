@@ -1,79 +1,492 @@
 [
-  { "t": "The pot is too full to stir and too empty to feed everyone.", "tags": ["muse", "trade:cook"] },
-  { "t": "I need to soak the grain earlier tomorrow.", "tags": ["muse", "trade:cook"] },
-  { "t": "Everyone likes supper until it is their turn to clean the pot.", "tags": ["muse", "trade:cook"] },
-  { "t": "The roots are sweet today. That saves me from hearing complaints.", "tags": ["muse", "trade:cook"] },
-  { "t": "I can smell when the fire is too hot before I see it.", "tags": ["muse", "trade:cook"] },
-  { "t": "A little salt would rescue this whole meal.", "tags": ["muse", "trade:cook"] },
-  { "t": "I put aside a bowl for whoever comes in late.", "tags": ["muse", "trade:cook"] },
-  { "t": "The children know exactly when I start serving.", "tags": ["muse", "trade:cook"] },
-  { "t": "I should sharpen the small knife. It crushes more than it cuts.", "tags": ["muse", "trade:cook"] },
-  { "t": "Hot food makes a hard day easier to forgive.", "tags": ["muse", "trade:cook"] },
-
-  { "t": "The map looks certain where my feet remember mud.", "tags": ["muse", "trade:explorer"] },
-  { "t": "I should have marked that fork before walking past it.", "tags": ["muse", "trade:explorer"] },
-  { "t": "Every ridge promises a shorter route and usually lies.", "tags": ["muse", "trade:explorer"] },
-  { "t": "I found good water today. That makes the whole walk useful.", "tags": ["muse", "trade:explorer"] },
-  { "t": "My boots know this country better than the map does.", "tags": ["muse", "trade:explorer"] },
-  { "t": "The road home always looks clearer than the road out.", "tags": ["muse", "trade:explorer"] },
-  { "t": "I need more cord for marking trees.", "tags": ["muse", "trade:explorer"] },
-  { "t": "That valley deserves another look when the weather clears.", "tags": ["muse", "trade:explorer"] },
-  { "t": "I was certain the village lay west. It did not.", "tags": ["muse", "trade:explorer"] },
-  { "t": "A useful journey is mostly noticing what everyone else walked past.", "tags": ["muse", "trade:explorer"] },
-
-  { "t": "The soil breaks better after rain, but my back does not.", "tags": ["muse", "trade:farmer"] },
-  { "t": "I can tell which rows I rushed by looking from here.", "tags": ["muse", "trade:farmer"] },
-  { "t": "The birds wait until I turn around. They know the work.", "tags": ["muse", "trade:farmer"] },
-  { "t": "I should save more seed than feels necessary.", "tags": ["muse", "trade:farmer"] },
-  { "t": "One healthy shoot makes the empty patches easier to bear.", "tags": ["muse", "trade:farmer"] },
-  { "t": "The weeds grow wherever my hands are not.", "tags": ["muse", "trade:farmer"] },
-  { "t": "I watered that corner twice and it still looks offended.", "tags": ["muse", "trade:farmer"] },
-  { "t": "Straight rows please me more than they should.", "tags": ["muse", "trade:farmer"] },
-  { "t": "Harvest always feels far away until it arrives all at once.", "tags": ["muse", "trade:farmer"] },
-  { "t": "Tomorrow I start with the row I avoided today.", "tags": ["muse", "trade:farmer"] },
-
-  { "t": "Most of guarding is noticing the same quiet things again.", "tags": ["muse", "trade:guard"] },
-  { "t": "I should oil the spear shaft before the wood splits.", "tags": ["muse", "trade:guard"] },
-  { "t": "That shadow is a bush. It was also a bush yesterday.", "tags": ["muse", "trade:guard"] },
-  { "t": "I would rather be bored all night than surprised once.", "tags": ["muse", "trade:guard"] },
-  { "t": "The outer path needs another torch before winter.", "tags": ["muse", "trade:guard"] },
-  { "t": "People sleep better when they see someone standing watch.", "tags": ["muse", "trade:guard"] },
-  { "t": "My feet hurt more from standing than they ever did from walking.", "tags": ["muse", "trade:guard"] },
-  { "t": "I counted every house twice. Everyone is inside.", "tags": ["muse", "trade:guard"] },
-  { "t": "A loose gate makes every sound feel important.", "tags": ["muse", "trade:guard"] },
-  { "t": "Dawn is close. I can feel myself becoming less patient.", "tags": ["muse", "trade:guard"] },
-
-  { "t": "That bandage will hold if they stop touching it.", "tags": ["muse", "trade:healer"] },
-  { "t": "I need more clean water before the next dressing.", "tags": ["muse", "trade:healer"] },
-  { "t": "People remember pain clearly and instructions poorly.", "tags": ["muse", "trade:healer"] },
-  { "t": "The fever broke before dawn. I can breathe easier now.", "tags": ["muse", "trade:healer"] },
-  { "t": "I can stitch skin. I cannot stitch patience into the person wearing it.", "tags": ["muse", "trade:healer"] },
-  { "t": "The bruise looks worse today, which sometimes means it is healing.", "tags": ["muse", "trade:healer"] },
-  { "t": "I should check the old wound before they start work.", "tags": ["muse", "trade:healer"] },
-  { "t": "Clean cloth disappears faster than food around here.", "tags": ["muse", "trade:healer"] },
-  { "t": "I know when somebody is pretending not to limp.", "tags": ["muse", "trade:healer"] },
-  { "t": "A quiet patient worries me more than a complaining one.", "tags": ["muse", "trade:healer"] },
-
-  { "t": "The rock sounded hollow behind that face.", "tags": ["muse", "trade:miner"] },
-  { "t": "Dust finds its way through every fold of cloth.", "tags": ["muse", "trade:miner"] },
-  { "t": "I should replace the wedge before it breaks inside the crack.", "tags": ["muse", "trade:miner"] },
-  { "t": "Good stone separates cleanly. This stone wants an argument.", "tags": ["muse", "trade:miner"] },
-  { "t": "The lamp looked dim long before I admitted it.", "tags": ["muse", "trade:miner"] },
-  { "t": "Every load feels heavier once daylight is visible.", "tags": ["muse", "trade:miner"] },
-  { "t": "I found a dark seam today. I need better light before following it.", "tags": ["muse", "trade:miner"] },
-  { "t": "The supports held, but I heard them complain.", "tags": ["muse", "trade:miner"] },
-  { "t": "Stone chips have worked into both boots again.", "tags": ["muse", "trade:miner"] },
-  { "t": "I keep striking the same place because eventually the rock must lose.", "tags": ["muse", "trade:miner"] },
-
-  { "t": "That joint fits cleanly. I will notice it every time I pass.", "tags": ["muse", "trade:builder"] },
-  { "t": "I need a longer straightedge before the next wall.", "tags": ["muse", "trade:builder"] },
-  { "t": "The doorway looked wide until we moved the table through it.", "tags": ["muse", "trade:builder"] },
-  { "t": "A good roof hides how many arguments built it.", "tags": ["muse", "trade:builder"] },
-  { "t": "I should save those offcuts. Small wood solves large problems.", "tags": ["muse", "trade:builder"] },
-
-  { "t": "I should speak less at the shrine and listen longer afterward.", "tags": ["muse", "trade:priest"] },
-  { "t": "People bring practical troubles and expect sacred answers.", "tags": ["muse", "trade:priest"] },
-  { "t": "The same prayer sounds different from a full stomach.", "tags": ["muse", "trade:priest"] },
-  { "t": "I need to remember who came alone today.", "tags": ["muse", "trade:priest"] },
-  { "t": "Certainty is easy from the front of a crowd.", "tags": ["muse", "trade:priest"] }
+  {
+    "t": "The pot is too full to stir and too empty to feed everyone.",
+    "tags": [
+      "muse",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "I need to soak the grain earlier tomorrow.",
+    "tags": [
+      "muse",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "Everyone likes supper until it is their turn to clean the pot.",
+    "tags": [
+      "muse",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "The roots are sweet today. That saves me from hearing complaints.",
+    "tags": [
+      "muse",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "I can smell when the fire is too hot before I see it.",
+    "tags": [
+      "muse",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "A little salt would rescue this whole meal.",
+    "tags": [
+      "muse",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "I put aside a bowl for whoever comes in late.",
+    "tags": [
+      "muse",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "The children know exactly when I start serving.",
+    "tags": [
+      "muse",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "I should sharpen the small knife. It crushes more than it cuts.",
+    "tags": [
+      "muse",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "Hot food makes a hard day easier to forgive.",
+    "tags": [
+      "muse",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "The map looks certain where my feet remember mud.",
+    "tags": [
+      "muse",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "I should have marked that fork before walking past it.",
+    "tags": [
+      "muse",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "Every ridge promises a shorter route and usually lies.",
+    "tags": [
+      "muse",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "I found good water today. That makes the whole walk useful.",
+    "tags": [
+      "muse",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "My boots know this country better than the map does.",
+    "tags": [
+      "muse",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "The road home always looks clearer than the road out.",
+    "tags": [
+      "muse",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "I need more cord for marking trees.",
+    "tags": [
+      "muse",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "That valley deserves another look when the weather clears.",
+    "tags": [
+      "muse",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "I was certain the village lay west. It did not.",
+    "tags": [
+      "muse",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "A useful journey is mostly noticing what everyone else walked past.",
+    "tags": [
+      "muse",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "The soil breaks better after rain, but my back does not.",
+    "tags": [
+      "muse",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "I can tell which rows I rushed by looking from here.",
+    "tags": [
+      "muse",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "The birds wait until I turn around. They know the work.",
+    "tags": [
+      "muse",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "I should save more seed than feels necessary.",
+    "tags": [
+      "muse",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "One healthy shoot makes the empty patches easier to bear.",
+    "tags": [
+      "muse",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "The weeds grow wherever my hands are not.",
+    "tags": [
+      "muse",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "I watered that corner twice and it still looks offended.",
+    "tags": [
+      "muse",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "Straight rows please me more than they should.",
+    "tags": [
+      "muse",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "Harvest always feels far away until it arrives all at once.",
+    "tags": [
+      "muse",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "Tomorrow I start with the row I avoided today.",
+    "tags": [
+      "muse",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "Most of guarding is noticing the same quiet things again.",
+    "tags": [
+      "muse",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "I should oil the spear shaft before the wood splits.",
+    "tags": [
+      "muse",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "That shadow is a bush. It was also a bush yesterday.",
+    "tags": [
+      "muse",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "I would rather be bored all night than surprised once.",
+    "tags": [
+      "muse",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "The outer path needs another torch before winter.",
+    "tags": [
+      "muse",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "People sleep better when they see someone standing watch.",
+    "tags": [
+      "muse",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "My feet hurt more from standing than they ever did from walking.",
+    "tags": [
+      "muse",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "I counted every house twice. Everyone is inside.",
+    "tags": [
+      "muse",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "A loose gate makes every sound feel important.",
+    "tags": [
+      "muse",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "Dawn is close. I can feel myself becoming less patient.",
+    "tags": [
+      "muse",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "That bandage will hold if they stop touching it.",
+    "tags": [
+      "muse",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "I need more clean water before the next dressing.",
+    "tags": [
+      "muse",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "People remember pain clearly and instructions poorly.",
+    "tags": [
+      "muse",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "The fever broke before dawn. I can breathe easier now.",
+    "tags": [
+      "muse",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "I can stitch skin. I cannot stitch patience into the person wearing it.",
+    "tags": [
+      "muse",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "The bruise looks worse today, which sometimes means it is healing.",
+    "tags": [
+      "muse",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "I should check the old wound before they start work.",
+    "tags": [
+      "muse",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "Clean cloth disappears faster than food around here.",
+    "tags": [
+      "muse",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "I know when somebody is pretending not to limp.",
+    "tags": [
+      "muse",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "A quiet patient worries me more than a complaining one.",
+    "tags": [
+      "muse",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "The rock sounded hollow behind that face.",
+    "tags": [
+      "muse",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "Dust finds its way through every fold of cloth.",
+    "tags": [
+      "muse",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "I should replace the wedge before it breaks inside the crack.",
+    "tags": [
+      "muse",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "Good stone separates cleanly. This stone wants an argument.",
+    "tags": [
+      "muse",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "The lamp looked dim long before I admitted it.",
+    "tags": [
+      "muse",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "Every load feels heavier once daylight is visible.",
+    "tags": [
+      "muse",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "I found a dark seam today. I need better light before following it.",
+    "tags": [
+      "muse",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "The supports held, but I heard them complain.",
+    "tags": [
+      "muse",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "Stone chips have worked into both boots again.",
+    "tags": [
+      "muse",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "I keep striking the same place because eventually the rock must lose.",
+    "tags": [
+      "muse",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "That joint fits cleanly. I will notice it every time I pass.",
+    "tags": [
+      "muse",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "I need a longer straightedge before the next wall.",
+    "tags": [
+      "muse",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "The doorway looked wide until we moved the table through it.",
+    "tags": [
+      "muse",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "A good roof hides how many arguments built it.",
+    "tags": [
+      "muse",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "I should save those offcuts. Small wood solves large problems.",
+    "tags": [
+      "muse",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "I should speak less at the shrine and listen longer afterwards.",
+    "tags": [
+      "muse",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "People bring practical troubles and expect sacred answers.",
+    "tags": [
+      "muse",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "The same prayer sounds different from a full stomach.",
+    "tags": [
+      "muse",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "I need to remember who came alone today.",
+    "tags": [
+      "muse",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "Certainty is easy from the front of a crowd.",
+    "tags": [
+      "muse",
+      "trade:priest"
+    ]
+  }
 ]

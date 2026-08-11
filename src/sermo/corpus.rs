@@ -472,6 +472,14 @@ mod tests {
             ("offense", "offence"),
             ("gray", "grey"),
             ("plow", "plough"),
+            // Not a spelling pair but a preference, and the village keeps
+            // one: "afterward" and "toward" are the American forms, and
+            // thirty lines had crept in across eighteen files - the whole
+            // corpus, back to the earliest batches, without a single
+            // "afterwards" anywhere to argue with them. The hand-written
+            // list above is only as good as its last entry.
+            ("afterward", "afterwards"),
+            ("toward", "towards"),
         ];
         let voice = Corpus::load();
         for line in voice.lines() {

@@ -1,157 +1,1262 @@
 [
-  { "t": "I watched food appear beside people who had nothing left to eat.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "The ground was bare, then provisions stood there. I saw the change.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "Nobody approached the hungry, but food appeared within their reach.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "I saw empty hands reach down and come back holding food.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "The provisions appeared while everyone nearby was standing still.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "I looked away for a moment. When I looked back, there was food.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "Food appeared beside the hungry before anyone could fetch a meal.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "I watched them divide provisions that had not been there moments earlier.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "There was enough food to quiet several empty stomachs. Nobody brought it.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "I stood close enough to see that no person set those provisions down.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "The hungry found food at their feet while I was watching them.", "tags": ["tell", "event:provided", "saw"] },
-  { "t": "One moment they had nothing. The next, they were sharing a meal.", "tags": ["tell", "event:provided", "saw"] },
-
-  { "t": "I saw the god place food before people who had gone without.", "tags": ["tell", "event:provided", "saw", "devout"] },
-  { "t": "The god answered their hunger in front of us all.", "tags": ["tell", "event:provided", "saw", "devout"] },
-  { "t": "I watched providence arrive as plainly as any basket from the stores.", "tags": ["tell", "event:provided", "saw", "devout"] },
-  { "t": "They asked for food, and the god set it within reach.", "tags": ["tell", "event:provided", "saw", "devout"] },
-  { "t": "The god saw empty hands and filled them. I was standing there.", "tags": ["tell", "event:provided", "saw", "devout"] },
-  { "t": "Food appeared before the hungry. I know whose mercy we witnessed.", "tags": ["tell", "event:provided", "saw", "devout"] },
-  { "t": "I saw the god answer need without waiting for anyone to speak.", "tags": ["tell", "event:provided", "saw", "devout"] },
-  { "t": "The provisions came when human hands had nothing left to offer.", "tags": ["tell", "event:provided", "saw", "devout"] },
-  { "t": "I watched the god provide enough for hungry people to share.", "tags": ["tell", "event:provided", "saw", "devout"] },
-  { "t": "Their hunger was seen and answered. No other explanation fits what I witnessed.", "tags": ["tell", "event:provided", "saw", "devout"] },
-  { "t": "The god put supper where there had only been bare ground.", "tags": ["tell", "event:provided", "saw", "devout"] },
-  { "t": "I saw a prayer answered with food people could touch and eat.", "tags": ["tell", "event:provided", "saw", "devout"] },
-
-  { "t": "I saw food appear, though I still cannot explain who answered whom.", "tags": ["tell", "event:provided", "saw", "wavering"] },
-  { "t": "The hungry were fed before my eyes. Belief feels less simple now.", "tags": ["tell", "event:provided", "saw", "wavering"] },
-  { "t": "Nobody brought the provisions. I keep trying to find another explanation.", "tags": ["tell", "event:provided", "saw", "wavering"] },
-  { "t": "I watched food appear after hope had nearly left the room.", "tags": ["tell", "event:provided", "saw", "wavering"] },
-  { "t": "The timing felt like an answer, even if I cannot name the listener.", "tags": ["tell", "event:provided", "saw", "wavering"] },
-  { "t": "I counted what was there twice. The second count still troubled my doubts.", "tags": ["tell", "event:provided", "saw", "wavering"] },
-  { "t": "Food appeared beside the hungry. I almost thanked the god aloud.", "tags": ["tell", "event:provided", "saw", "wavering"] },
-  { "t": "I saw enough to question myself, though not enough to become certain.", "tags": ["tell", "event:provided", "saw", "wavering"] },
-  { "t": "The provisions were real. What placed them there remains difficult for me.", "tags": ["tell", "event:provided", "saw", "wavering"] },
-  { "t": "I watched hungry people eat food nobody had brought. That stays with me.", "tags": ["tell", "event:provided", "saw", "wavering"] },
-  { "t": "Perhaps the god provided. I know only that need received an answer.", "tags": ["tell", "event:provided", "saw", "wavering"] },
-  { "t": "I expected an ordinary explanation. None arrived with the food.", "tags": ["tell", "event:provided", "saw", "wavering"] },
-
-  { "t": "I saw food appear, but that does not tell me who placed it.", "tags": ["tell", "event:provided", "saw", "doubting"] },
-  { "t": "Nobody nearby brought the provisions. Somebody farther away still might have.", "tags": ["tell", "event:provided", "saw", "doubting"] },
-  { "t": "The food was real. The claim about the god came afterward.", "tags": ["tell", "event:provided", "saw", "doubting"] },
-  { "t": "I witnessed unexpected provisions, not the hand that left them.", "tags": ["tell", "event:provided", "saw", "doubting"] },
-  { "t": "Hungry people found food. That is fortunate without proving anything divine.", "tags": ["tell", "event:provided", "saw", "doubting"] },
-  { "t": "I checked the paths too late to know who delivered it.", "tags": ["tell", "event:provided", "saw", "doubting"] },
-  { "t": "Food does not become holy simply because nobody claims it.", "tags": ["tell", "event:provided", "saw", "doubting"] },
-  { "t": "I saw the provisions appear between glances. That leaves room for human hands.", "tags": ["tell", "event:provided", "saw", "doubting"] },
-  { "t": "The hungry ate. I will not turn their meal into proof.", "tags": ["tell", "event:provided", "saw", "doubting"] },
-  { "t": "Nobody confessed to bringing the food. That is all I can honestly say.", "tags": ["tell", "event:provided", "saw", "doubting"] },
-  { "t": "I saw full baskets, not heaven filling them.", "tags": ["tell", "event:provided", "saw", "doubting"] },
-  { "t": "People called it providence before checking whether anything had been moved.", "tags": ["tell", "event:provided", "saw", "doubting"] },
-
-  { "t": "I heard food appeared beside people who had gone hungry.", "tags": ["tell", "event:provided", "heard"] },
-  { "t": "They say provisions arrived without anyone walking them into the square.", "tags": ["tell", "event:provided", "heard"] },
-  { "t": "Someone told me the hungry found a meal waiting for them.", "tags": ["tell", "event:provided", "heard"] },
-  { "t": "I heard empty hands were suddenly holding enough food to share.", "tags": ["tell", "event:provided", "heard"] },
-  { "t": "The account says food appeared where several hungry people had gathered.", "tags": ["tell", "event:provided", "heard"] },
-  { "t": "People are saying nobody brought the provisions they ate.", "tags": ["tell", "event:provided", "heard"] },
-  { "t": "I heard a meal appeared before anyone returned from the stores.", "tags": ["tell", "event:provided", "heard"] },
-  { "t": "They say the hungry divided food that had not been there before.", "tags": ["tell", "event:provided", "heard"] },
-  { "t": "Word is that provisions appeared on bare ground near the hungry.", "tags": ["tell", "event:provided", "heard"] },
-  { "t": "I heard several people agree that no one approached with food.", "tags": ["tell", "event:provided", "heard"] },
-  { "t": "The story begins with hunger and ends with everyone eating.", "tags": ["tell", "event:provided", "heard"] },
-  { "t": "Someone said the provisions arrived before help could reach them.", "tags": ["tell", "event:provided", "heard"] },
-
-  { "t": "I heard the god provided food exactly where hungry people waited.", "tags": ["tell", "event:provided", "heard", "devout"] },
-  { "t": "They say the god answered empty stomachs with a meal.", "tags": ["tell", "event:provided", "heard", "devout"] },
-  { "t": "The account is plain: the hungry asked, and the god provided.", "tags": ["tell", "event:provided", "heard", "devout"] },
-  { "t": "I heard providence arrived before human help could manage it.", "tags": ["tell", "event:provided", "heard", "devout"] },
-  { "t": "People witnessed the god place provisions before those in need.", "tags": ["tell", "event:provided", "heard", "devout"] },
-  { "t": "They say nobody brought the food because the god did.", "tags": ["tell", "event:provided", "heard", "devout"] },
-  { "t": "I heard a hungry prayer received an answer everyone could eat.", "tags": ["tell", "event:provided", "heard", "devout"] },
-  { "t": "The god remembered people whose neighbours could not feed them.", "tags": ["tell", "event:provided", "heard", "devout"] },
-  { "t": "Word of the god's provision has already reached every doorway.", "tags": ["tell", "event:provided", "heard", "devout"] },
-  { "t": "I heard the hungry gave thanks before dividing what the god sent.", "tags": ["tell", "event:provided", "heard", "devout"] },
-  { "t": "The story says need was seen and answered without delay.", "tags": ["tell", "event:provided", "heard", "devout"] },
-  { "t": "They say the god provided enough that nobody nearby went without.", "tags": ["tell", "event:provided", "heard", "devout"] },
-
-  { "t": "I heard food appeared for the hungry. The account makes me wonder.", "tags": ["tell", "event:provided", "heard", "wavering"] },
-  { "t": "They say nobody brought the provisions. I want that to mean something.", "tags": ["tell", "event:provided", "heard", "wavering"] },
-  { "t": "Someone called it an answer. Someone else only called it supper.", "tags": ["tell", "event:provided", "heard", "wavering"] },
-  { "t": "I heard the food arrived when hope was running thin.", "tags": ["tell", "event:provided", "heard", "wavering"] },
-  { "t": "The timing sounds merciful, though I did not witness it myself.", "tags": ["tell", "event:provided", "heard", "wavering"] },
-  { "t": "They say several people saw it. That makes doubt harder, not impossible.", "tags": ["tell", "event:provided", "heard", "wavering"] },
-  { "t": "I heard the hungry were answered. I am unsure who heard them.", "tags": ["tell", "event:provided", "heard", "wavering"] },
-  { "t": "People sound changed when they describe the provisions appearing.", "tags": ["tell", "event:provided", "heard", "wavering"] },
-  { "t": "The account leaves me grateful, even while I question its explanation.", "tags": ["tell", "event:provided", "heard", "wavering"] },
-  { "t": "I heard food came without a giver anyone could name.", "tags": ["tell", "event:provided", "heard", "wavering"] },
-  { "t": "Maybe the god provided. The witnesses seem certain enough for all of us.", "tags": ["tell", "event:provided", "heard", "wavering"] },
-  { "t": "They say hunger ended suddenly. I hope the rest of the story is true.", "tags": ["tell", "event:provided", "heard", "wavering"] },
-
-  { "t": "I heard unexpected food became a miracle before anyone checked the stores.", "tags": ["tell", "event:provided", "heard", "doubting"] },
-  { "t": "They say nobody brought it. People often overlook the person doing the work.", "tags": ["tell", "event:provided", "heard", "doubting"] },
-  { "t": "Someone found provisions and others supplied the divine explanation.", "tags": ["tell", "event:provided", "heard", "doubting"] },
-  { "t": "I heard the claim about food appearing. I did not hear who counted it.", "tags": ["tell", "event:provided", "heard", "doubting"] },
-  { "t": "The hungry ate, which matters more than the tale growing around it.", "tags": ["tell", "event:provided", "heard", "doubting"] },
-  { "t": "They say the god provided. I hear no proof beyond surprise.", "tags": ["tell", "event:provided", "heard", "doubting"] },
-  { "t": "Food appeared in the account. Witnesses become less precise each time I ask.", "tags": ["tell", "event:provided", "heard", "doubting"] },
-  { "t": "I heard nobody claimed the provisions. That does not make them divine.", "tags": ["tell", "event:provided", "heard", "doubting"] },
-  { "t": "The story credits heaven and forgets whoever packed the food.", "tags": ["tell", "event:provided", "heard", "doubting"] },
-  { "t": "People prefer providence to admitting they lost track of a basket.", "tags": ["tell", "event:provided", "heard", "doubting"] },
-  { "t": "I heard hungry people were fed. Everything beyond that remains uncertain.", "tags": ["tell", "event:provided", "heard", "doubting"] },
-  { "t": "The claim travelled faster than anyone could examine the ground.", "tags": ["tell", "event:provided", "heard", "doubting"] },
-
-  { "t": "Word reached us that hungry people elsewhere received food from nowhere.", "tags": ["tell", "event:provided", "distant"] },
-  { "t": "A settlement farther on is telling of provisions appearing before the hungry.", "tags": ["tell", "event:provided", "distant"] },
-  { "t": "Travellers brought an account of food arriving where the stores had failed.", "tags": ["tell", "event:provided", "distant"] },
-  { "t": "They are speaking beyond our village of a meal nobody delivered.", "tags": ["tell", "event:provided", "distant"] },
-  { "t": "The road brought news that hungry strangers found provisions waiting.", "tags": ["tell", "event:provided", "distant"] },
-  { "t": "Somewhere beyond here, people claim food appeared on bare ground.", "tags": ["tell", "event:provided", "distant"] },
-  { "t": "I heard a distant village received food when its people needed it.", "tags": ["tell", "event:provided", "distant"] },
-  { "t": "The account crossed the road: empty hands, sudden provisions, and a shared meal.", "tags": ["tell", "event:provided", "distant"] },
-  { "t": "People from another settlement say nobody brought the food they found.", "tags": ["tell", "event:provided", "distant"] },
-  { "t": "A far household went hungry until unexpected provisions appeared nearby.", "tags": ["tell", "event:provided", "distant"] },
-  { "t": "The news comes from beyond our fields, where food supposedly arrived unaided.", "tags": ["tell", "event:provided", "distant"] },
-  { "t": "Someone on the road heard of hungry people finding enough to eat.", "tags": ["tell", "event:provided", "distant"] },
-
-  { "t": "Word came that the god fed hungry people in another settlement.", "tags": ["tell", "event:provided", "distant", "devout"] },
-  { "t": "The god's provision is being spoken of beyond our own fields.", "tags": ["tell", "event:provided", "distant", "devout"] },
-  { "t": "Travellers say the god answered hunger far from our village.", "tags": ["tell", "event:provided", "distant", "devout"] },
-  { "t": "Providence reached strangers on the road before their own help could.", "tags": ["tell", "event:provided", "distant", "devout"] },
-  { "t": "Another settlement has witnessed the same generous hand above us.", "tags": ["tell", "event:provided", "distant", "devout"] },
-  { "t": "I heard the god placed provisions before hungry families elsewhere.", "tags": ["tell", "event:provided", "distant", "devout"] },
-  { "t": "The account travelled here because mercy is worth passing on.", "tags": ["tell", "event:provided", "distant", "devout"] },
-  { "t": "Our god saw hunger beyond this village and answered it too.", "tags": ["tell", "event:provided", "distant", "devout"] },
-  { "t": "They say distant prayers received food before doubt could settle in.", "tags": ["tell", "event:provided", "distant", "devout"] },
-  { "t": "The god's gifts are becoming known wherever travellers stop.", "tags": ["tell", "event:provided", "distant", "devout"] },
-  { "t": "A far village gives thanks for provisions nobody there delivered.", "tags": ["tell", "event:provided", "distant", "devout"] },
-  { "t": "Word of answered hunger has crossed more ground than the hungry could.", "tags": ["tell", "event:provided", "distant", "devout"] },
-
-  { "t": "Farther on, they say food appeared for the hungry. I want to believe it.", "tags": ["tell", "event:provided", "distant", "wavering"] },
-  { "t": "The account has travelled far, but the witnesses still sound sincere.", "tags": ["tell", "event:provided", "distant", "wavering"] },
-  { "t": "I heard another settlement may have received an answer to hunger.", "tags": ["tell", "event:provided", "distant", "wavering"] },
-  { "t": "Travellers call it providence. Distance makes certainty difficult for me.", "tags": ["tell", "event:provided", "distant", "wavering"] },
-  { "t": "The story says provisions appeared far away. Hope may have added something.", "tags": ["tell", "event:provided", "distant", "wavering"] },
-  { "t": "People beyond our fields claim the god fed them. Perhaps that matters.", "tags": ["tell", "event:provided", "distant", "wavering"] },
-  { "t": "I cannot test the account, but I am glad somebody ate.", "tags": ["tell", "event:provided", "distant", "wavering"] },
-  { "t": "Word of sudden food reached us with more gratitude than detail.", "tags": ["tell", "event:provided", "distant", "wavering"] },
-  { "t": "Maybe mercy travelled farther than any of us knew.", "tags": ["tell", "event:provided", "distant", "wavering"] },
-  { "t": "They say distant hunger was answered. I keep listening for another account.", "tags": ["tell", "event:provided", "distant", "wavering"] },
-  { "t": "The road brought a hopeful story of provisions appearing before strangers.", "tags": ["tell", "event:provided", "distant", "wavering"] },
-  { "t": "I almost trust the tale because nobody telling it asks for anything.", "tags": ["tell", "event:provided", "distant", "wavering"] },
-
-  { "t": "A distant tale of free food has become divine before reaching us.", "tags": ["tell", "event:provided", "distant", "doubting"] },
-  { "t": "Travellers repeat the miracle, but none of them saw the provisions appear.", "tags": ["tell", "event:provided", "distant", "doubting"] },
-  { "t": "The account crossed several mouths before anyone here heard it.", "tags": ["tell", "event:provided", "distant", "doubting"] },
-  { "t": "Somewhere else, somebody found food. The rest may belong to the road.", "tags": ["tell", "event:provided", "distant", "doubting"] },
-  { "t": "Distance has turned a missing basket into an act of heaven.", "tags": ["tell", "event:provided", "distant", "doubting"] },
-  { "t": "They cannot name a witness, but they can describe the miracle perfectly.", "tags": ["tell", "event:provided", "distant", "doubting"] },
-  { "t": "I heard the story, not the people who supposedly received the food.", "tags": ["tell", "event:provided", "distant", "doubting"] },
-  { "t": "The road improves every account before delivering it here.", "tags": ["tell", "event:provided", "distant", "doubting"] },
-  { "t": "A far settlement ate well, and now everyone claims to know why.", "tags": ["tell", "event:provided", "distant", "doubting"] },
-  { "t": "The provisions may be real. The divine part has travelled much farther.", "tags": ["tell", "event:provided", "distant", "doubting"] },
-  { "t": "Nobody here can say where the account began.", "tags": ["tell", "event:provided", "distant", "doubting"] },
-  { "t": "I will believe hungry strangers ate. I will reserve judgment on heaven.", "tags": ["tell", "event:provided", "distant", "doubting"] }
+  {
+    "t": "I watched food appear beside people who had nothing left to eat.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "The ground was bare, then provisions stood there. I saw the change.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "Nobody approached the hungry, but food appeared within their reach.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "I saw empty hands reach down and come back holding food.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "The provisions appeared while everyone nearby was standing still.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "I looked away for a moment. When I looked back, there was food.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "Food appeared beside the hungry before anyone could fetch a meal.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "I watched them divide provisions that had not been there moments earlier.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "There was enough food to quiet several empty stomachs. Nobody brought it.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "I stood close enough to see that no person set those provisions down.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "The hungry found food at their feet while I was watching them.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "One moment they had nothing. The next, they were sharing a meal.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw"
+    ]
+  },
+  {
+    "t": "I saw the god place food before people who had gone without.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god answered their hunger in front of us all.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "I watched providence arrive as plainly as any basket from the stores.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "They asked for food, and the god set it within reach.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god saw empty hands and filled them. I was standing there.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "Food appeared before the hungry. I know whose mercy we witnessed.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "I saw the god answer need without waiting for anyone to speak.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "The provisions came when human hands had nothing left to offer.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "I watched the god provide enough for hungry people to share.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "Their hunger was seen and answered. No other explanation fits what I witnessed.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god put supper where there had only been bare ground.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "I saw a prayer answered with food people could touch and eat.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "devout"
+    ]
+  },
+  {
+    "t": "I saw food appear, though I still cannot explain who answered whom.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The hungry were fed before my eyes. Belief feels less simple now.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Nobody brought the provisions. I keep trying to find another explanation.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I watched food appear after hope had nearly left the room.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The timing felt like an answer, even if I cannot name the listener.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I counted what was there twice. The second count still troubled my doubts.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Food appeared beside the hungry. I almost thanked the god aloud.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I saw enough to question myself, though not enough to become certain.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The provisions were real. What placed them there remains difficult for me.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I watched hungry people eat food nobody had brought. That stays with me.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps the god provided. I know only that need received an answer.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I expected an ordinary explanation. None arrived with the food.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I saw food appear, but that does not tell me who placed it.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Nobody nearby brought the provisions. Somebody farther away still might have.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The food was real. The claim about the god came afterwards.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I witnessed unexpected provisions, not the hand that left them.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Hungry people found food. That is fortunate without proving anything divine.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I checked the paths too late to know who delivered it.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Food does not become holy simply because nobody claims it.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I saw the provisions appear between glances. That leaves room for human hands.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The hungry ate. I will not turn their meal into proof.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Nobody confessed to bringing the food. That is all I can honestly say.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I saw full baskets, not heaven filling them.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "People called it providence before checking whether anything had been moved.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "saw",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I heard food appeared beside people who had gone hungry.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "They say provisions arrived without anyone walking them into the square.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "Someone told me the hungry found a meal waiting for them.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "I heard empty hands were suddenly holding enough food to share.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "The account says food appeared where several hungry people had gathered.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "People are saying nobody brought the provisions they ate.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "I heard a meal appeared before anyone returned from the stores.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "They say the hungry divided food that had not been there before.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "Word is that provisions appeared on bare ground near the hungry.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "I heard several people agree that no one approached with food.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "The story begins with hunger and ends with everyone eating.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "Someone said the provisions arrived before help could reach them.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard"
+    ]
+  },
+  {
+    "t": "I heard the god provided food exactly where hungry people waited.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "They say the god answered empty stomachs with a meal.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "The account is plain: the hungry asked, and the god provided.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard providence arrived before human help could manage it.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "People witnessed the god place provisions before those in need.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "They say nobody brought the food because the god did.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard a hungry prayer received an answer everyone could eat.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god remembered people whose neighbours could not feed them.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "Word of the god's provision has already reached every doorway.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard the hungry gave thanks before dividing what the god sent.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "The story says need was seen and answered without delay.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "They say the god provided enough that nobody nearby went without.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard food appeared for the hungry. The account makes me wonder.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say nobody brought the provisions. I want that to mean something.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Someone called it an answer. Someone else only called it supper.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard the food arrived when hope was running thin.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The timing sounds merciful, though I did not witness it myself.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say several people saw it. That makes doubt harder, not impossible.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard the hungry were answered. I am unsure who heard them.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "People sound changed when they describe the provisions appearing.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The account leaves me grateful, even while I question its explanation.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard food came without a giver anyone could name.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe the god provided. The witnesses seem certain enough for all of us.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say hunger ended suddenly. I hope the rest of the story is true.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard unexpected food became a miracle before anyone checked the stores.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "They say nobody brought it. People often overlook the person doing the work.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Someone found provisions and others supplied the divine explanation.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I heard the claim about food appearing. I did not hear who counted it.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The hungry ate, which matters more than the tale growing around it.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "They say the god provided. I hear no proof beyond surprise.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Food appeared in the account. Witnesses become less precise each time I ask.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I heard nobody claimed the provisions. That does not make them divine.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The story credits heaven and forgets whoever packed the food.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "People prefer providence to admitting they lost track of a basket.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I heard hungry people were fed. Everything beyond that remains uncertain.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The claim travelled faster than anyone could examine the ground.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "heard",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Word reached us that hungry people elsewhere received food from nowhere.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "A settlement farther on is telling of provisions appearing before the hungry.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "Travellers brought an account of food arriving where the stores had failed.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "They are speaking beyond our village of a meal nobody delivered.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "The road brought news that hungry strangers found provisions waiting.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "Somewhere beyond here, people claim food appeared on bare ground.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "I heard a distant village received food when its people needed it.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "The account crossed the road: empty hands, sudden provisions, and a shared meal.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "People from another settlement say nobody brought the food they found.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "A far household went hungry until unexpected provisions appeared nearby.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "The news comes from beyond our fields, where food supposedly arrived unaided.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "Someone on the road heard of hungry people finding enough to eat.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant"
+    ]
+  },
+  {
+    "t": "Word came that the god fed hungry people in another settlement.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god's provision is being spoken of beyond our own fields.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "Travellers say the god answered hunger far from our village.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "Providence reached strangers on the road before their own help could.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "Another settlement has witnessed the same generous hand above us.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "I heard the god placed provisions before hungry families elsewhere.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "The account travelled here because mercy is worth passing on.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "Our god saw hunger beyond this village and answered it too.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "They say distant prayers received food before doubt could settle in.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "The god's gifts are becoming known wherever travellers stop.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "A far village gives thanks for provisions nobody there delivered.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "Word of answered hunger has crossed more ground than the hungry could.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "devout"
+    ]
+  },
+  {
+    "t": "Farther on, they say food appeared for the hungry. I want to believe it.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The account has travelled far, but the witnesses still sound sincere.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard another settlement may have received an answer to hunger.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Travellers call it providence. Distance makes certainty difficult for me.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The story says provisions appeared far away. Hope may have added something.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "People beyond our fields claim the god fed them. Perhaps that matters.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I cannot test the account, but I am glad somebody ate.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Word of sudden food reached us with more gratitude than detail.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe mercy travelled farther than any of us knew.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say distant hunger was answered. I keep listening for another account.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The road brought a hopeful story of provisions appearing before strangers.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I almost trust the tale because nobody telling it asks for anything.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A distant tale of free food has become divine before reaching us.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Travellers repeat the miracle, but none of them saw the provisions appear.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The account crossed several mouths before anyone here heard it.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Somewhere else, somebody found food. The rest may belong to the road.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Distance has turned a missing basket into an act of heaven.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "doubting"
+    ]
+  },
+  {
+    "t": "They cannot name a witness, but they can describe the miracle perfectly.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I heard the story, not the people who supposedly received the food.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The road improves every account before delivering it here.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "doubting"
+    ]
+  },
+  {
+    "t": "A far settlement ate well, and now everyone claims to know why.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "doubting"
+    ]
+  },
+  {
+    "t": "The provisions may be real. The divine part has travelled much farther.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Nobody here can say where the account began.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I will believe hungry strangers ate. I will reserve judgment on heaven.",
+    "tags": [
+      "tell",
+      "event:provided",
+      "distant",
+      "doubting"
+    ]
+  }
 ]

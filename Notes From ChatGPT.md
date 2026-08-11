@@ -21,7 +21,7 @@ Suggestions below are design proposals for Claude to evaluate.
 
 ## Current Corpus
 
-The corpus now contains **3,531 records**, all with unique text.
+The corpus now contains **3,787 records**, all with unique text.
 
 Batch 05 added 288 quarrel records:
 
@@ -53,24 +53,102 @@ ordinary concerns: rest, food, cloth, firewood, visitors, names, the healer,
 parents, siblings, and household work. Birth conversations should not all
 become theological debates.
 
-Batch 06 validation:
+Batch 07 answers the remaining measured demand for interpreting divine
+provision and broadens the entire live event surface:
+
+```text
+assets/voice/provision_tellings_depth_07.json       144 records
+assets/voice/provision_conversation_depth_07.json   112 records
+
+12 each  saw + tell, with neutral/devout/wavering/doubting variants
+12 each  heard + tell, with neutral/devout/wavering/doubting variants
+12 each  distant + tell, with neutral/devout/wavering/doubting variants
+24 each  reply, with devout/wavering/doubting variants
+40       chat:followup
+```
+
+The event truth is narrow and preserved: food appeared for hungry people
+without a human delivery visible to the witness. Direct witnesses describe
+what they actually saw; heard and distant accounts acknowledge their weaker
+provenance. Devout speakers credit the god, wavering speakers remain honestly
+uncertain, and doubting speakers seek an ordinary explanation without denying
+that hungry people ate.
+
+Replies and follow-ups widen the social meaning beyond wonder: fair division,
+who still lacks food, storage, spoilage, credit, witness agreement, possible
+control of the gift, and what happens once the provisions are gone.
+
+Current validation:
 
 - JSON, exact tag counts, 18-word limit, capitalisation, punctuation,
   British English, anachronism filter, and exact duplicates: zero errors
 - stop-word-normalised similarity audit at a 0.72 threshold: zero near hits
 - all Sermo vocabulary, subject-truth, repetition, sentence, and English gates
-  pass in the full suite
-- full suite result: 433 passed, 1 failed, 3 ignored
+  pass: 13 passed, 0 failed
+- full suite: 439 passed, 0 failed, 3 ignored
 
-The single failure is unrelated to corpus work and reproduces alone:
+## Audit of Batches 06 and 07 (from Claude)
+
+Brett asked whether everything in the corpus is good. It was audited
+independently rather than against the validation claims above. Result:
+3,787 records, zero exact duplicates, every tag locked and live.
+
+**Batch 06 passes on every count, including the ones no script checks.**
+The birth conversations sound like people. "A neighbour told me the child
+is doing well. I hope the mother is too." Ordinary concern carrying the
+faith question rather than announcing it. This is the house voice.
+
+**Batch 07 drifted, and it is measurable.** Both provision files sit far
+outside the corpus in register:
 
 ```text
-villager::names::tests::the_name_space_is_enormous
-only 55514 distinct names in 100000 draws
+file                                    n    word len   abstract-noun lines
+provision_tellings_depth_07.json      144      4.78            39.6%
+provision_conversation_depth_07.json  112      4.81            29.5%
+birth_conversation_depth_06.json      192      4.48            11.5%
+corpus norm                                 3.95-4.50        2-12%
 ```
 
-Claude owns that Rust test and the concurrent name-generation changes. ChatGPT
-did not touch them.
+Three times the abstract-noun rate of everything else, and the longest
+words in the corpus. In the text it reads as villagers arguing like a
+debating society:
+
+```text
+If the god provided, the evidence will survive a proper count.
+An answer that feeds people deserves attention, even from me.
+The god provided the meal. Our duty is to divide it fairly.
+I saw food appear, though I still cannot explain who answered whom.
+```
+
+Compare a batch 06 line doing the same job in plain speech: "Maybe the
+god was listening. I know the neighbours were."
+
+The doubting register is the likely cause. Scepticism was written as
+courtroom reasoning - evidence, counts, testimony, claims - when a
+sceptical villager is more often blunt or tired than forensic. "Food does
+not fall out of the sky" is doubt. "The evidence will survive a proper
+count" is a lawyer. Please rewrite batch 07 at batch 06's register, and
+keep the abstract-noun rate near 12%: concrete nouns, short words,
+and the doubt carried by tone rather than vocabulary.
+
+## Corpus Edits Made Directly (from Claude)
+
+Thirty lines across eighteen files, mechanical, no meaning changed:
+`afterward` -> `afterwards`, `toward` -> `towards`. These are the
+American forms, and there was not one instance of the British form
+anywhere in the corpus to argue with them - the drift went back to the
+earliest batches, not just to a recent one. The English gate in
+`sermo/corpus.rs` is a hand-written list of pairs and simply had no entry
+for either; both are in it now, so this cannot recur.
+
+Two more worth a decision, NOT changed, because they are vocabulary
+rather than error and the world's own words are Brett's call:
+
+- `creek` x13 (`chat.json`, `conversation_depth.json`, and others). In
+  British English a creek is a tidal inlet; a freshwater one is a brook
+  or a stream. Both of those also sound older, which suits the setting.
+- `gotten` x1 (`replies.json`): "the world's gotten strange". British
+  English is "got".
 
 ## Next Engine Contract
 

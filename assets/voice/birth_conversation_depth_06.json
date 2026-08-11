@@ -1,197 +1,1682 @@
 [
-  { "t": "I heard a child was born before dawn. The family is resting now.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "They say the child arrived safely. I suppose someone heard our prayers.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "Word came from the house that the birth is over and both are resting.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "I heard the first cry reached the street. That must have been a relief.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "Someone said the child is healthy. I thanked the god before thinking about it.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "They say everyone is tired and happy. That sounds true enough.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "I heard another child has joined the village. We could use good news.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "The birth went well, they say. I wonder who the family thanked first.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "Someone heard the child crying through the wall. Nobody complained about the noise.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "I heard the household was awake all night. At least the ending was good.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "They say the mother asked for food as soon as the child settled.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "A child was born last night. Perhaps blessings arrive looking this ordinary.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "I heard the healer stayed until morning. The family owes many people thanks.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "They say the child is loud and hungry. Those seem like promising signs.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "The news reached me at breakfast. A new child and two exhausted parents.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "I heard people prayed outside until someone brought the good news.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "They say the family wants quiet today. That is easier to understand than miracles.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "A neighbour told me the child is doing well. I hope the mother is too.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "I heard the birth ended safely. I cannot decide whether fortune deserves thanks.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "Someone said the father has not stopped smiling. I almost believe that part.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "They say the child slept after keeping everyone awake. Sensible enough.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "I heard the family needs bread and clean cloth more than visitors.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "The child came safely, from what I heard. Maybe the prayers helped.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "Word is the mother finally slept. Let us not wake her with congratulations.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "I heard a baby arrived while most of us slept. The village feels different today.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "They say the child has a full head of hair. Everyone repeats that detail.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "The birth is over, and the house is quiet. I heard that much.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "Someone told me the family prayed afterward. Perhaps relief makes believers of us.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "I heard the child arrived quickly. The healer still deserves thanks.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "They say the new parents keep checking whether the child is breathing.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "A new child was born, and half the village already claims some resemblance.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "I heard the mother laughed when everyone began arguing over the child's name.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "The family received good news before sunrise. We all received it by noon.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "They say the child is small but strong. I hope both words are honest.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "I heard a prayer was answered in that house. Others call it a birth.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "Someone said the healer barely sat down. Divine help rarely looks so tired.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "The new child is well, they say. I am content to leave it there.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "I heard the house ran out of warm water before the child arrived.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "They say both parents cried. Nobody agrees which one started first.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "Word reached the square that another family has grown by one.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "I heard the child quieted when held. Perhaps that is miracle enough.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "They say the birth was ordinary. People sound grateful when they say it.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "Someone told me the god was present. Someone else mentioned the healer.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "The family has a healthy child and no sleep. I heard both facts together.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "I heard the baby cried through breakfast. That household may never sleep again.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "They say the mother is recovering well. I hope people give her time.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "A child arrived safely. I heard thanks offered to heaven and everyone nearby.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-  { "t": "The news is simple: one more child lives among us now.", "tags": ["tell", "event:delivered", "heard", "wavering"] },
-
-  { "t": "That is good news. Do they need anything today?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I am glad the child arrived safely. The rest can remain uncertain.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Did the family ask for visitors, or are we inviting ourselves?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Perhaps the god helped. The healer still did the work before us.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "A healthy child is enough reason to be thankful.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I hope someone has brought the family a proper meal.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Was the birth easy, or are people leaving out the difficult parts?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Good. I was afraid to ask after hearing nothing all morning.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I suppose answered prayers can sound like a child crying.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Let the parents decide what the birth meant to them.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Do they have enough cloth, food, and room for another child?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I believe the news. I am less certain about everyone's explanation.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "The child will need a name before long. Have they chosen one?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Maybe the god was listening. I know the neighbours were.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "That household deserves quiet more than another crowd at the door.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I am relieved. I had wondered why the house stayed closed.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Does the child resemble either parent yet, or only every newborn?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Perhaps we should thank the god by helping the family.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I will celebrate first and sort out my beliefs later.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Did anyone remember to feed the healer after all that work?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "A birth can be ordinary and still matter to everyone.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I hope the mother is truly well, not merely being polite.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "That almost sounds like mercy. I am not sure what else to call it.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "One more mouth means the stores matter even more now.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I wondered whether the crying came from that house.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Did they pray before the birth, or only once it was over?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "The safest answer is that many hands helped.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I hope people remember the mother's effort when telling this story.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Maybe good fortune is simply good work arriving at the right time.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Will they bring the child outside soon, or keep everyone waiting?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "That family will have advice from every doorway by sunset.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I can offer thanks without pretending I understand why things went well.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "A loud child usually means a tired house. Good for them.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Was anyone with the older children while everyone watched the door?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I am happy for them. That is plain enough.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Perhaps the god deserves thanks. The family certainly deserves help.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I hope the child lets them sleep before next winter.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "People make every birth sound like a sign. This one can simply be welcome.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Did the news come from the family or from someone outside the door?", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I would like to believe somebody watched over them.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "The village gains a child and loses several nights of sleep.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "They must be overwhelmed. We should ask before offering advice.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "That account sounds honest. Nobody needs to improve it.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Maybe relief is its own kind of faith for a while.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I hope the new parents know how many people are pleased for them.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Let us not decide the child's future before learning their name.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "Some good news asks nothing from us except a smile.", "tags": ["reply", "event:delivered", "wavering"] },
-  { "t": "I am thankful, though I cannot say exactly who I am thanking.", "tags": ["reply", "event:delivered", "wavering"] },
-
-  { "t": "Do you know whether they need food brought over?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I wonder whether the family agrees with everyone else's account.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Did anyone hear what name they are considering?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Perhaps we should visit tomorrow, once the house is quieter.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Was the child expected this soon, or did everyone hurry?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I keep thinking about all the people waiting outside.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Do they have room for the child where they live?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I wonder which detail will change by the next telling.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Did the healer say the mother needs anything from us?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Maybe gratitude matters even when we disagree about its direction.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Who first said the god had answered?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I expect the family wants sleep more than our questions.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Will the child be brought to the shrine, do you think?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Perhaps the mother has her own explanation for what happened.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Did anyone stay to help once the excitement ended?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I wonder whether a safe birth should feel less surprising.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "The child will grow up hearing several versions of this day.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Do you think prayer changed anything, or merely helped people wait?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Someone should check whether the family has enough firewood.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I keep returning to the healer's part in the story.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Was there already a name waiting for the child?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Maybe this is how belief begins, with relief and unanswered questions.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I wonder who will bring the first proper meal.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Did the whole household stay awake, or only those nearest the room?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Perhaps we can be grateful without turning the child into proof.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Do they know how many people have already heard?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I wonder whether the father has slept at all.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "The village will remember the birth longer than the family remembers sleeping.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Did anyone ask what the mother wants people to know?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Maybe the god helped by sending capable people to the room.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I wonder whether the child quiets for either parent yet.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Was it the first child in that household?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "People speak of blessing. The family may simply speak of exhaustion.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Do you suppose they need another blanket?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I wonder what convinced you that the god was involved.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Perhaps the child's cry was answer enough for everyone there.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Did any of the older children meet the baby yet?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I wonder whether anyone has taken over the family's work today.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Maybe we should speak less about signs and more about supper.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Will people still call it miraculous after the excitement passes?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I wonder whether the healer has heard this version yet.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Did the family have everything ready, or must we find supplies?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Perhaps uncertainty is better than arguing over someone else's joy.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I wonder how long before everyone offers an opinion on the name.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Do you think the family wants thanks given publicly?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Maybe the birth changed their faith more than it changed ours.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "I wonder who is watching the child while the parents sleep.", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-  { "t": "Was the house full, or did people wait outside?", "tags": ["chat:followup", "event:delivered", "told", "wavering"] },
-
-  { "t": "I will bring bread tomorrow and leave the questions here.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Let us give the family time before knocking at their door.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I am glad they are well. That is enough for this morning.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "We can ask about the name when everyone has slept.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I should find out whether they need wood or water.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Perhaps I will offer thanks tonight, in my own words.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "The child is here. We can leave the explanations until later.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I will visit once the family is ready for company.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Let the household have some quiet before the whole village arrives.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I am going to check whether their work needs doing.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Maybe I will understand it better after meeting the child.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "We should pass on good news without adding anything to it.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I will keep the family in my thoughts tonight.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "There will be time for questions after the next full night's sleep.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I should ask the healer what supplies were used.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "The family needs neighbours more than opinions right now.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I am pleased for them, whatever part heaven played.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Let us wait until tomorrow before passing the story farther.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I will bring something useful instead of another question.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Perhaps gratitude does not require certainty. I can manage that much.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "We have kept each other long enough. The news is good.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I should finish my work and make room for tomorrow's visit.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Let the new parents tell their own story when they are ready.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I will save my doubts for a less joyful conversation.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "The child has enough voices nearby without ours joining them.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I may stop by with food after the midday meal.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "We can be thankful now and uncertain tomorrow.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I should tell my household before the story reaches them elsewhere.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Let us leave the god and the healer their separate thanks.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I will ask what they need instead of guessing.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Perhaps the meaning will become clearer when the excitement settles.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "The village can celebrate without crowding the family's doorway.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I have heard enough to be happy for them.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "We should let the mother decide when visitors are welcome.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I may pray for them later. For now, they need rest.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "The birth went well. We need not improve the ending.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I will remember to thank the healer when we next meet.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Let us speak of something else before we turn joy into doctrine.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I should see whether the older children need company.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Maybe the god listened. I know the village did.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "We can discuss causes another day. Today belongs to the family.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I will bring a blanket if they still need one.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "The good news can stand without our agreement.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I should stop talking and let somebody useful reach the door.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Perhaps this is one uncertainty I can live with happily.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "We will hear more once the household has recovered.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "I am satisfied knowing the child arrived and the family is together.", "tags": ["chat:end", "event:delivered", "told", "wavering"] },
-  { "t": "Let us leave some quiet behind us when we go.", "tags": ["chat:end", "event:delivered", "told", "wavering"] }
+  {
+    "t": "I heard a child was born before dawn. The family is resting now.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say the child arrived safely. I suppose someone heard our prayers.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Word came from the house that the birth is over and both are resting.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard the first cry reached the street. That must have been a relief.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Someone said the child is healthy. I thanked the god before thinking about it.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say everyone is tired and happy. That sounds true enough.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard another child has joined the village. We could use good news.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The birth went well, they say. I wonder who the family thanked first.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Someone heard the child crying through the wall. Nobody complained about the noise.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard the household was awake all night. At least the ending was good.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say the mother asked for food as soon as the child settled.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A child was born last night. Perhaps blessings arrive looking this ordinary.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard the healer stayed until morning. The family owes many people thanks.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say the child is loud and hungry. Those seem like promising signs.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The news reached me at breakfast. A new child and two exhausted parents.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard people prayed outside until someone brought the good news.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say the family wants quiet today. That is easier to understand than miracles.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A neighbour told me the child is doing well. I hope the mother is too.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard the birth ended safely. I cannot decide whether fortune deserves thanks.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Someone said the father has not stopped smiling. I almost believe that part.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say the child slept after keeping everyone awake. Sensible enough.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard the family needs bread and clean cloth more than visitors.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The child came safely, from what I heard. Maybe the prayers helped.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Word is the mother finally slept. Let us not wake her with congratulations.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard a baby arrived while most of us slept. The village feels different today.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say the child has a full head of hair. Everyone repeats that detail.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The birth is over, and the house is quiet. I heard that much.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Someone told me the family prayed afterwards. Perhaps relief makes believers of us.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard the child arrived quickly. The healer still deserves thanks.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say the new parents keep checking whether the child is breathing.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A new child was born, and half the village already claims some resemblance.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard the mother laughed when everyone began arguing over the child's name.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The family received good news before sunrise. We all received it by noon.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say the child is small but strong. I hope both words are honest.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard a prayer was answered in that house. Others call it a birth.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Someone said the healer barely sat down. Divine help rarely looks so tired.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The new child is well, they say. I am content to leave it there.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard the house ran out of warm water before the child arrived.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say both parents cried. Nobody agrees which one started first.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Word reached the square that another family has grown by one.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard the child quieted when held. Perhaps that is miracle enough.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say the birth was ordinary. People sound grateful when they say it.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Someone told me the god was present. Someone else mentioned the healer.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The family has a healthy child and no sleep. I heard both facts together.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I heard the baby cried through breakfast. That household may never sleep again.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They say the mother is recovering well. I hope people give her time.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A child arrived safely. I heard thanks offered to heaven and everyone nearby.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The news is simple: one more child lives among us now.",
+    "tags": [
+      "tell",
+      "event:delivered",
+      "heard",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That is good news. Do they need anything today?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am glad the child arrived safely. The rest can remain uncertain.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Did the family ask for visitors, or are we inviting ourselves?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps the god helped. The healer still did the work before us.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A healthy child is enough reason to be thankful.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I hope someone has brought the family a proper meal.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Was the birth easy, or are people leaving out the difficult parts?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Good. I was afraid to ask after hearing nothing all morning.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I suppose answered prayers can sound like a child crying.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Let the parents decide what the birth meant to them.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Do they have enough cloth, food, and room for another child?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I believe the news. I am less certain about everyone's explanation.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The child will need a name before long. Have they chosen one?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe the god was listening. I know the neighbours were.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That household deserves quiet more than another crowd at the door.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am relieved. I had wondered why the house stayed closed.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Does the child resemble either parent yet, or only every newborn?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps we should thank the god by helping the family.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I will celebrate first and sort out my beliefs later.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Did anyone remember to feed the healer after all that work?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A birth can be ordinary and still matter to everyone.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I hope the mother is truly well, not merely being polite.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That almost sounds like mercy. I am not sure what else to call it.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "One more mouth means the stores matter even more now.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I wondered whether the crying came from that house.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Did they pray before the birth, or only once it was over?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The safest answer is that many hands helped.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I hope people remember the mother's effort when telling this story.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe good fortune is simply good work arriving at the right time.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Will they bring the child outside soon, or keep everyone waiting?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That family will have advice from every doorway by sunset.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I can offer thanks without pretending I understand why things went well.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "A loud child usually means a tired house. Good for them.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Was anyone with the older children while everyone watched the door?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am happy for them. That is plain enough.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps the god deserves thanks. The family certainly deserves help.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I hope the child lets them sleep before next winter.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "People make every birth sound like a sign. This one can simply be welcome.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Did the news come from the family or from someone outside the door?",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I would like to believe somebody watched over them.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The village gains a child and loses several nights of sleep.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "They must be overwhelmed. We should ask before offering advice.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That account sounds honest. Nobody needs to improve it.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe relief is its own kind of faith for a while.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I hope the new parents know how many people are pleased for them.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Let us not decide the child's future before learning their name.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Some good news asks nothing from us except a smile.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am thankful, though I cannot say exactly who I am thanking.",
+    "tags": [
+      "reply",
+      "event:delivered",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Do you know whether they need food brought over?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I wonder whether the family agrees with everyone else's account.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Did anyone hear what name they are considering?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps we should visit tomorrow, once the house is quieter.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Was the child expected this soon, or did everyone hurry?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I keep thinking about all the people waiting outside.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Do they have room for the child where they live?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I wonder which detail will change by the next telling.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Did the healer say the mother needs anything from us?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe gratitude matters even when we disagree about its direction.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Who first said the god had answered?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I expect the family wants sleep more than our questions.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Will the child be brought to the shrine, do you think?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps the mother has her own explanation for what happened.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Did anyone stay to help once the excitement ended?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I wonder whether a safe birth should feel less surprising.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The child will grow up hearing several versions of this day.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Do you think prayer changed anything, or merely helped people wait?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Someone should check whether the family has enough firewood.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I keep returning to the healer's part in the story.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Was there already a name waiting for the child?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe this is how belief begins, with relief and unanswered questions.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I wonder who will bring the first proper meal.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Did the whole household stay awake, or only those nearest the room?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps we can be grateful without turning the child into proof.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Do they know how many people have already heard?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I wonder whether the father has slept at all.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The village will remember the birth longer than the family remembers sleeping.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Did anyone ask what the mother wants people to know?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe the god helped by sending capable people to the room.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I wonder whether the child quiets for either parent yet.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Was it the first child in that household?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "People speak of blessing. The family may simply speak of exhaustion.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Do you suppose they need another blanket?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I wonder what convinced you that the god was involved.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps the child's cry was answer enough for everyone there.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Did any of the older children meet the baby yet?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I wonder whether anyone has taken over the family's work today.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe we should speak less about signs and more about supper.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Will people still call it miraculous after the excitement passes?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I wonder whether the healer has heard this version yet.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Did the family have everything ready, or must we find supplies?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps uncertainty is better than arguing over someone else's joy.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I wonder how long before everyone offers an opinion on the name.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Do you think the family wants thanks given publicly?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe the birth changed their faith more than it changed ours.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I wonder who is watching the child while the parents sleep.",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Was the house full, or did people wait outside?",
+    "tags": [
+      "chat:followup",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I will bring bread tomorrow and leave the questions here.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Let us give the family time before knocking at their door.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am glad they are well. That is enough for this morning.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "We can ask about the name when everyone has slept.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I should find out whether they need wood or water.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps I will offer thanks tonight, in my own words.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The child is here. We can leave the explanations until later.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I will visit once the family is ready for company.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Let the household have some quiet before the whole village arrives.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am going to check whether their work needs doing.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe I will understand it better after meeting the child.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "We should pass on good news without adding anything to it.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I will keep the family in my thoughts tonight.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "There will be time for questions after the next full night's sleep.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I should ask the healer what supplies were used.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The family needs neighbours more than opinions right now.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am pleased for them, whatever part heaven played.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Let us wait until tomorrow before passing the story farther.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I will bring something useful instead of another question.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps gratitude does not require certainty. I can manage that much.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "We have kept each other long enough. The news is good.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I should finish my work and make room for tomorrow's visit.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Let the new parents tell their own story when they are ready.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I will save my doubts for a less joyful conversation.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The child has enough voices nearby without ours joining them.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I may stop by with food after the midday meal.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "We can be thankful now and uncertain tomorrow.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I should tell my household before the story reaches them elsewhere.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Let us leave the god and the healer their separate thanks.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I will ask what they need instead of guessing.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps the meaning will become clearer when the excitement settles.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The village can celebrate without crowding the family's doorway.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I have heard enough to be happy for them.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "We should let the mother decide when visitors are welcome.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I may pray for them later. For now, they need rest.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The birth went well. We need not improve the ending.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I will remember to thank the healer when we next meet.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Let us speak of something else before we turn joy into doctrine.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I should see whether the older children need company.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe the god listened. I know the village did.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "We can discuss causes another day. Today belongs to the family.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I will bring a blanket if they still need one.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The good news can stand without our agreement.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I should stop talking and let somebody useful reach the door.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Perhaps this is one uncertainty I can live with happily.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "We will hear more once the household has recovered.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am satisfied knowing the child arrived and the family is together.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Let us leave some quiet behind us when we go.",
+    "tags": [
+      "chat:end",
+      "event:delivered",
+      "told",
+      "wavering"
+    ]
+  }
 ]
