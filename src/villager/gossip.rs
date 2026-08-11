@@ -458,6 +458,17 @@ fn beat_role(teller: bool, beat: u8, elapsed: f64, until: f64) -> Option<&'stati
     }
 }
 
+/// How many tellings wear a story out of being news.
+///
+/// Enthusiasm for a retelling already decays - `Witnessed::told` counts
+/// it - and this is where that count starts to COST the story its
+/// precedence. Five is a story told to most of a small village.
+const WORN_BY: u32 = 5;
+
+/// And how many days, however few times it was told. A thing seen the
+/// day before yesterday is history in a village this size.
+const STALE_AFTER: u32 = 2;
+
 /// How long two people stand and talk, in seconds.
 ///
 /// Fourteen once, which put the four beats at nought, five, eight and
@@ -519,7 +530,15 @@ pub(crate) fn meet_to_talk(
         if paired.contains(&teller) {
             continue;
         }
+        // The freshest thing they carry - and how much of a story it
+        // still is. A sight nobody has heard yet interrupts anything; a
+        // story told five times over three days is not news any more,
+        // whatever it was when it happened.
         let memory = witnessed.recent.first().cloned();
+        let still_news = memory.as_ref().is_some_and(|memory| {
+            let days = clock.day().saturating_sub(memory.day);
+            witnessed.told < WORN_BY && days <= STALE_AFTER
+        });
         // Who is free to fall into conversation. News interrupts an idle
         // moment; ordinary talk also happens over the work, at the fire,
         // and under the eaves waiting out rain - which is most of when
@@ -593,7 +612,16 @@ pub(crate) fn meet_to_talk(
         // stomach, the same lack of a roof - because that is what people
         // actually talk about, and only then the sky, which is what you
         // fall back on with a stranger.
-        let subject = match memory.as_ref() {
+        // News outranks a grievance ONLY while it is still news.
+        //
+        // It used to outrank one always, and that emptied the quarrel
+        // system: with the god at work everybody permanently had
+        // something to tell, so nobody ever got round to what they had
+        // against each other. Ten minutes of a busy world produced one
+        // conversation and no quarrels at all. ChatGPT, reading the
+        // soak: "a familiar birth story told five times should not
+        // continually suppress a live grievance."
+        let subject = match memory.as_ref().filter(|_| still_news) {
             Some(memory) => Chat::Memory(memory.kind),
             None => {
                 let mine = circumstances.get(teller).ok();

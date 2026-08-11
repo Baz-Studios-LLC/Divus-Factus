@@ -1,6 +1,5 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-   22  (worn pool) chat:end event:delivered told wavering
    15  (worn pool) chat:followup event:delivered told wavering
-   11  (worn pool) event:delivered reply wavering
-    6  (worn pool) event:delivered heard tell wavering
+   12  (worn pool) event:delivered heard tell wavering
+    5  (worn pool) chat:end event:delivered told wavering
