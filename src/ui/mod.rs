@@ -430,15 +430,16 @@ fn speak(
                 Node {
                     position_type: PositionType::Absolute,
                     left: along,
-                    // Hung clear of the box rather than through it. At
-                    // four pixels the turned square's top corner reached
-                    // eight pixels UP into the bubble and its fill ate a
-                    // bite out of the bottom border - Brett: "it seems
-                    // like it is too high up and cuts into the bubble."
-                    // A ten pixel square turned a quarter measures seven
-                    // from its middle to its corner, so this hangs the
-                    // middle on the edge and shows only the half below.
-                    bottom: px(-9),
+                    // Found by looking, not by arithmetic. A ten pixel
+                    // square turned a quarter reaches seven from its
+                    // middle to its corner, and the bubble's own border
+                    // and rounded corners move the join a pixel or two
+                    // from wherever the maths says it is. Four had the
+                    // top corner biting up through the bottom border -
+                    // "too high up and cuts into the bubble" - and nine
+                    // hung it clear with daylight under the box - "a
+                    // littel too low". Seven touches.
+                    bottom: px(-7),
                     width: px(10),
                     height: px(10),
                     border: UiRect {
