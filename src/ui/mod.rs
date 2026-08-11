@@ -256,11 +256,15 @@ struct Bubble {
 /// talks over each other, nobody is worth watching.
 const BUBBLE_CAP: usize = 7;
 
-/// How far a conversation's turn sits off the thread's middle, in
-/// pixels. Wide enough that the two sides read as two voices and not as
-/// one ragged column, narrow enough that a long line still hangs over
-/// the pair rather than out in the field beside them.
-const THREAD_GAP: f32 = 14.0;
+/// How wide a thread stands, in pixels: the span between the left
+/// voice's margin and the right voice's.
+///
+/// Narrower than two bubbles side by side, on purpose. A turn hangs from
+/// its own margin and reaches across the middle, so the two sides
+/// OVERLAP the way a phone's do - which is what makes a thread read as
+/// one conversation leaning left and right, rather than as two people
+/// talking in separate columns.
+const THREAD_COLUMN: f32 = 150.0;
 
 /// Spawns a bubble per Say, skipping speakers who already have one.
 fn speak(
@@ -531,6 +535,51 @@ fn float_bubbles(
     else {
         return;
     };
+    // A thread is a STACK, not two columns. Brett, beside a photograph
+    // of a phone: "these are next to each other... see how they sort of
+    // overlap?" On a phone every message sits BELOW the one before it,
+    // newest at the bottom, and the two sides overlap freely across the
+    // middle - it is one column of turns, leaning left and right, not a
+    // pair of columns standing side by side.
+    //
+    // So each turn's place in its own thread is worked out first: how
+    // many turns came after it, and how tall they are. That is what
+    // lifts it clear of them. Collision-stacking cannot do this - two
+    // bubbles in opposite halves never touch, so they sat at the same
+    // height and read as two remarks that happened at once.
+    let mut turns: Vec<(Entity, Entity, f32, f32)> = bubbles
+        .iter()
+        .filter_map(|(entity, bubble, _, computed, ..)| {
+            bubble.with.map(|partner| {
+                // Keyed on the PAIR, either way round, so both voices
+                // stack into one thread.
+                let pair = if bubble.speaker.to_bits() < partner.to_bits() {
+                    bubble.speaker
+                } else {
+                    partner
+                };
+                (
+                    entity,
+                    pair,
+                    bubble.until,
+                    computed.size().y * computed.inverse_scale_factor(),
+                )
+            })
+        })
+        .collect();
+    turns.sort_by(|a, b| a.2.total_cmp(&b.2));
+    // How far above the thread's foot each turn hangs: the height of
+    // everything said after it, and a hair of air between.
+    let lift_of = |who: Entity| -> f32 {
+        let Some((_, pair, until, _)) = turns.iter().find(|(e, ..)| *e == who) else {
+            return 0.0;
+        };
+        turns
+            .iter()
+            .filter(|(_, other, later, _)| other == pair && *later > *until)
+            .map(|(_, _, _, height)| height + 6.0)
+            .sum()
+    };
     // Bubbles already settled this frame, so later ones can stack clear.
     let mut placed: Vec<Rect> = Vec::new();
     for (entity, bubble, mut node, computed, mut visibility, mut ui) in &mut bubbles {
@@ -577,36 +626,56 @@ fn float_bubbles(
                 // Lifted enough that the tail's point, not the box, meets
                 // the top of the speaker's head.
                 //
-                // A conversation's turn is pushed off centre to its own
-                // side of the thread - one voice down the left, the other
-                // down the right - so who said what is legible before a
-                // word is read, the way it is on a phone.
-                // Off to its own side of the thread - but only while
-                // there IS a thread. Words that have fallen back over
-                // their speaker's head sit squarely over it.
-                let lean = if between.is_some() {
-                    bubble.side * (size.x * 0.5 + THREAD_GAP) * scale
+                // In a thread, a turn hangs from its own margin - the
+                // left voice's left edge, the right voice's right edge -
+                // so the two sides OVERLAP across the middle instead of
+                // dividing the air into two columns. That overlap is
+                // what makes a phone's thread read as one conversation.
+                //
+                // And it sits above everything said after it, so the
+                // newest words are always at the foot of the stack.
+                let (lean, stacked) = if between.is_some() {
+                    let margin = THREAD_COLUMN * 0.5 * scale;
+                    (
+                        if bubble.side < 0.0 {
+                            -margin + size.x * 0.5
+                        } else {
+                            margin - size.x * 0.5
+                        },
+                        lift_of(entity),
+                    )
                 } else {
-                    0.0
+                    (0.0, 0.0)
                 };
-                let mut pos = Vec2::new(at.x - size.x * 0.5 + lean, at.y - size.y - bubble.lift);
+                let mut pos = Vec2::new(
+                    at.x - size.x * 0.5 + lean,
+                    at.y - size.y - bubble.lift - stacked,
+                );
                 // Two people talking shoulder to shoulder must not talk
                 // over each other's words: a bubble that would land on an
                 // earlier one climbs until it sits clear above it.
                 // The footprint counts the trimmings hanging under the box
                 // — a thought's circle trail reaches well below it, and
                 // must not drift into the bubble stacked beneath.
+                //
+                // A thread is exempt: its turns are placed against each
+                // other on purpose, overlapping across the middle, and
+                // shoving them apart here would undo the very thing that
+                // makes them read as one conversation.
                 let footprint = size + Vec2::new(0.0, bubble.lift);
-                let mut guard = 0;
-                loop {
-                    let rect = Rect::from_corners(pos, pos + footprint).inflate(3.0);
-                    let Some(hit) = placed.iter().find(|p| !p.intersect(rect).is_empty()) else {
-                        break;
-                    };
-                    pos.y = hit.min.y - footprint.y - 8.0;
-                    guard += 1;
-                    if guard > 8 {
-                        break;
+                if between.is_none() {
+                    let mut guard = 0;
+                    loop {
+                        let rect = Rect::from_corners(pos, pos + footprint).inflate(3.0);
+                        let Some(hit) = placed.iter().find(|p| !p.intersect(rect).is_empty())
+                        else {
+                            break;
+                        };
+                        pos.y = hit.min.y - footprint.y - 8.0;
+                        guard += 1;
+                        if guard > 8 {
+                            break;
+                        }
                     }
                 }
                 placed.push(Rect::from_corners(pos, pos + footprint));
