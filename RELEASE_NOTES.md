@@ -1,63 +1,97 @@
-## The village stops starving
+## The town builds a wall
 
-**A village founded anywhere can now feed itself.** Plant the flag deep in
-the forest — no berries in a walk, no water in sight — and the hunters
-bring venison home instead of standing about with spears. If the land
-offers nothing wild at all, somebody takes up the plough and breaks the
-first furrow. That was the fault behind most of last build's quiet
-disasters: villages that dwindled for no visible reason were villages
-whose land could not pay the trades they were given.
+**Once a village has grown enough hands to spare, it raises a fence at the
+cairns** — a real ring around the town, with gates in it. Villagers use
+the gates; they do not step over the fence because the shortest line home
+went that way. Guards walk the circuit and stand watch at the gateways.
 
-- **Hunters actually finish a hunt.** A kill was falling out of the
-  hunter's own sight the moment it landed, so the meat was never carried
-  home. Same village, same seed: nought venison before, thirty-nine after.
-- **Nobody keeps vigil at an empty larder any more** — least of all the
-  people whose job is to fill it. When the sacks run out, the hunters and
-  gatherers go out; before, everyone stood at the store together and the
-  village's food stopped arriving entirely.
-- **Meals reach the people who need them.** Villagers were starving twenty
-  paces from a full larder because the walk to the sacks was refused
-  outright — the food stands against the longhouse wall, and no route was
-  allowed to end there. Fixed, and a village on the seed that killed ten
-  now loses nobody and raises two children.
+It is a fence today. The wall and the castle wall come after it, and the
+posts and leaves are placeholders meant to be replaced in Opificium.
 
-## Doors and walls
+## Conversations you can actually read
 
-- **People use doors.** Villagers walked through their own walls on the way
-  in and out; now the last stretch of a walk aims at the doorway and goes
-  through it.
-- **A building's own doors are the ones that swing.** Carried designs draw
-  their doors, and those are the panels that open now — handle and all —
-  instead of a second door swinging past them. Frames and posts stay where
-  the builder put them.
-- **Double doors open together**, hinged at their outer edges, swinging
-  apart from the middle the way a hall's front doors should.
+**Two people talking now looks like a thread on a phone.** One speaker's
+lines stack down the left, the other's down the right, each bubble
+overlapping the one before it, with the tail on the speaker's own side.
 
-## The prayer board
+- **Names are written in their own ink.** Every villager's name is
+  coloured by sex wherever it appears — in bubbles, on the prayer board,
+  through the Codex — so you can read a crowd at a glance.
+- **Conversations end when people walk away from each other**, instead of
+  carrying on across the village.
+- **Lines hold on screen long enough to be read.**
 
-- **One asking, one card.** When half the village prays for the same thing,
-  the board says so on a single card — "Shyrwudei and eight others ask for
-  food" — rather than burying the rest of the ledger.
-- **Hunger arrives as a trickle, not a chorus.** Every soul now has their
-  own breaking point, so a hard week produces a handful of askings you can
-  actually read and answer instead of a wall of them at dawn.
-- The dead let go of their prayers, so the board's count is the living.
+## Villagers fall out
 
-## The village carries on
+**People argue now, and only ever about something true.** A quarrel is
+drawn from a real grievance — food that did not arrive, a roof nobody
+mended, an old slight — so there is always an answer to "what is this
+about". Both sides know which of them was wronged, and an argument never
+leaves them fonder than it found them.
 
-- **Two of the founding families arrive already married**, so households
-  form and children come in the first season rather than the third.
-- **A town stops at a hundred beds.** Past that, the pressure of a full
-  town sends a party out to found the next one.
-- Sleepers lie still and turn over in the night instead of walking on the
-  spot, and nobody shakes on a doorstep any more.
-- People say more, and repeat themselves less: over two thousand written
-  lines behind thoughts, prayers, retellings and small talk, with the
-  village's own record of what it had no words for feeding the next batch.
+Quarrels are meant to be uncommon. When one happens it is because the
+simulation produced a reason, not because the village was due some drama.
 
-## Known issue
+## The woods come back
 
-**Shadows can occasionally sit out a session** — missing past a certain
-distance, or very rarely blinking. It's an engine-level fault we've
-cornered with instruments and are fixing at the source; a restart usually
-rerolls it back to normal. If you catch it, a screenshot helps the hunt.
+**A felled tree grows back over four seasons** — bare ground, then a
+sapling, then a young tree, then a full one. Only full-grown trees are
+worth an axe, so a wood that has been worked hard stays visibly cut for a
+year. Each stump keeps its own clock from the day it fell, and the
+growing happens in the small hours while the village sleeps.
+
+- **Stone stays taken.** Carry a boulder off and it is gone; it used to
+  quietly reappear.
+- **Ground inside the walls stays clear.** Trees and bushes cleared
+  within a town's wall never come back.
+- **Groves stop rearranging themselves.** Breaking ground for a building
+  was shuffling every tree in the surrounding chunk into a different
+  place, as a different tree. That is fixed at the root — what grows at a
+  spot now depends on nothing but that spot.
+
+## Paths wear into the ground again
+
+**Walk the same line often enough and the ground goes brown under it.**
+Trails had been broken since the world became round — the wear was being
+recorded in the wrong coordinates entirely, so it landed nowhere near
+anyone's feet.
+
+## The god's hand
+
+- **Wood dropped on the village fire burns.** Feed the fire the same way
+  you feed the stockpile — a tree buys exactly what it would have bought
+  carried in by hand.
+- **Witnesses to a miracle fall to their knees** instead of shaking where
+  they stand.
+
+## Names, alerts and the ledger
+
+- **People get names you can say.** First names are shorter and
+  pronounceable — five or six letters — instead of the tongue-twisters
+  the generator used to produce.
+- **Great moments are proclaimed properly.** Births, deaths and miracles
+  now announce themselves in the upper third of the screen, larger, where
+  a herald's news belongs.
+- **The village speaks one English.** Thirty lines across eighteen files
+  had drifted into American spellings; the whole corpus is British now,
+  and the check that missed them has been tightened so it cannot happen
+  again.
+
+## The village keeps itself
+
+- **A town of twenty-two finally builds its hall.** It was possible for a
+  settlement to grow well past the threshold and never start one.
+- **Stores stop growing without limit.** Ten thousand units of food in a
+  storehouse is no longer possible: every shed holds what it can hold,
+  and once the larder is full people stop taking up food trades and go do
+  something the village actually needs.
+- **Nobody dies standing still.** Travellers on a long road no longer
+  starve mid-journey — the road feeds who walks it, and an errand that
+  cannot be finished is dropped rather than kept until it kills someone.
+
+## Testing dials
+
+- `DIVUS_FACTUS_REGROWTH=2` walks a felled wood through all four regrowth
+  stages in six days rather than three months.
+- `DIVUS_FACTUS_TREE_PROBE=1` prints a nightly tally of what is coming
+  back.
