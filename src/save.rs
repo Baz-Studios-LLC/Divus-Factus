@@ -193,6 +193,13 @@ struct SaveGame {
     /// Worn ground: (cell x, cell z, wear).
     #[serde(default)]
     trails: Vec<(i32, i32, f32)>,
+    /// The town's wall: what it is made of, how far out it stands, and
+    /// where its gates are. Saved because a wall that vanished on load
+    /// would be built AGAIN the moment the town noticed - and at a
+    /// different radius if the town had grown in the meantime, leaving
+    /// the old gates' worn roads pointing at a fence.
+    #[serde(default)]
+    rampart: Option<(crate::villager::rampart::RampartTier, f32, Vec<f32>)>,
     /// Ground stripped of its tree or boulder for good.
     #[serde(default)]
     stripped: Vec<(i32, i32)>,
@@ -784,6 +791,9 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         trails: world
             .get_resource::<crate::trails::Trails>()
             .map_or_else(Vec::new, |t| t.export()),
+        rampart: world
+            .get::<crate::villager::rampart::Rampart>(settlement_entity)
+            .map(|wall| (wall.tier, wall.radius, wall.gates.clone())),
         stripped: world
             .get_resource::<crate::scatter::StrippedGround>()
             .map_or_else(Vec::new, |s| s.0.iter().map(|c| (c.x, c.y)).collect()),
@@ -813,6 +823,10 @@ fn raze(world: &mut World) {
     sweep!(Field);
     sweep!(rites::Grave);
     sweep!(crate::villager::explore::Cairn);
+    // The old town's wall comes down with the old town. Left standing,
+    // its posts would ring the new world's empty ground.
+    sweep!(crate::villager::rampart::RampartPart);
+    sweep!(crate::villager::rampart::Gate);
     sweep!(StorePile);
     sweep!(Bonfire);
     sweep!(Settlement);
@@ -951,6 +965,21 @@ fn apply(world: &mut World, save: SaveGame) {
 
     // 4. Everything the fixtures own, put back the way it was.
     world.resource_mut::<SettlementSite>().woodpile = save.woodpile;
+    // The wall goes back up exactly where it stood, gates and all -
+    // `standing: false` so the posts are raised from the restored ring
+    // rather than saved as several hundred entities. A town whose fence
+    // came back on a different radius would leave its old gate roads
+    // pointing at a wall.
+    if let Some((tier, radius, gates)) = save.rampart.clone() {
+        world
+            .entity_mut(settlement_entity)
+            .insert(crate::villager::rampart::Rampart {
+                tier,
+                radius,
+                gates,
+                standing: false,
+            });
+    }
     if let Some(mut store) = world.get_mut::<Stockpile>(settlement_entity) {
         // Old saves kept one food number; it comes back as berries.
         store.larder = match save.larder {

@@ -279,16 +279,59 @@ pub(crate) fn stand_the_posts(
                 continue;
             }
             let at = Vec3::new(x, terrain.height_at(x, z), z);
-            commands.spawn((
-                Gate {
-                    out: Vec3::new(cos, 0.0, sin),
-                },
-                Name::new("The gate"),
-                Transform::from_translation(at).with_rotation(Quat::from_rotation_y(-angle)),
-                Visibility::default(),
-                crate::globe::RigidlySeated,
-                crate::villager::MemberOf(town),
-            ));
+            let gate = commands
+                .spawn((
+                    Gate {
+                        out: Vec3::new(cos, 0.0, sin),
+                    },
+                    Name::new("The gate"),
+                    Transform::from_translation(at).with_rotation(Quat::from_rotation_y(-angle)),
+                    Visibility::default(),
+                    crate::globe::RigidlySeated,
+                    crate::villager::MemberOf(town),
+                ))
+                .id();
+            // Two leaves, hung on the gate's own posts and swinging apart
+            // - the same machinery as a cottage door, at a cart's width.
+            // The gate stands turned so its own +X faces out of the ring,
+            // which is exactly what a doorway on the +X wall means, so
+            // the door hanger needs no new arithmetic to understand it.
+            let half = GATE_WIDTH * 0.5;
+            for side in [-1.0_f32, 1.0] {
+                super::work::buildings::hang_the_door(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    gate,
+                    &super::work::buildings::Doorway {
+                        at: Vec2::new(0.0, side * half * 0.5),
+                        out: Vec2::X,
+                    },
+                    side,
+                    half,
+                    // The middle of the opening, so both leaves read the
+                    // same traffic and swing as a pair.
+                    Vec2::ZERO,
+                    // Nothing drawn to adopt: a gate is ours to build.
+                    &[],
+                );
+            }
+            // And a post at each jamb, so the opening reads as a gate
+            // rather than a hole where the fence forgot itself.
+            for side in [-1.0_f32, 1.0] {
+                commands.spawn((
+                    RampartPart,
+                    Name::new("A gatepost"),
+                    Mesh3d(meshes.add(Cuboid::new(0.4, tier.height() + 0.9, 0.4))),
+                    MeshMaterial3d(timber.clone()),
+                    Transform::from_translation(
+                        at + Vec3::new(-sin, 0.0, cos) * side * half
+                            + Vec3::Y * ((tier.height() + 0.9) * 0.5 - 0.25),
+                    ),
+                    crate::globe::RigidlySeated,
+                    crate::villager::MemberOf(town),
+                ));
+            }
         }
         info!(
             "{} went up around the town: {stood} lengths on a ring {:.0} strides out, {} gates",

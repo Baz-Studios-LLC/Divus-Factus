@@ -250,6 +250,12 @@ pub(crate) fn take_up_work(
         Query<(Entity, &Transform, &Vitality), (With<Villager>, Without<Corpse>)>,
         Query<(Entity, &Transform, &crate::matter::Deposit)>,
         Query<(Entity, &Transform, &crate::scatter::SacredFlora)>,
+        // The town's gates, and the posts already kept, so guards spread
+        // over the gates instead of crowding the nearest one. Seated in
+        // this satchel rather than taking parameters of their own: the
+        // list stands at Bevy's sixteen and will not hold more.
+        Query<&Transform, With<crate::villager::rampart::Gate>>,
+        Query<&Job, With<Villager>>,
     ),
     mut towns: Query<(&crate::villager::SettlementGround, &mut Stockpile)>,
     game: Query<
@@ -271,7 +277,7 @@ pub(crate) fn take_up_work(
         ),
     >,
 ) {
-    let (buildings, fields, patients, deposits, sacred) = town;
+    let (buildings, fields, patients, deposits, sacred, gates, watched) = town;
     // A thin larder keeps the food trades working after dark - lanterns
     // on the dock - because the village eats all night whether or not
     // anyone is producing. Counted per TOWN: one settlement's famine is no
@@ -771,11 +777,30 @@ pub(crate) fn take_up_work(
             // ground, and a spear walked in a circle at twenty-two
             // strides never reaches a mauling out at ninety. The tower
             // does, because wolves will not come near it.
+            // A guard keeps the GATE where the town has one - it is the
+            // hole in the wall, and the only ground a wolf can walk in
+            // by. Brett: "Guards could patrol it and stand watch at the
+            // gates." Which gate is the guard's own business: the
+            // nearest unkept one, so a town with three gates posts three
+            // guards rather than crowding one. Failing a gate, the
+            // watchtower; failing that, a turn about the treeline, which
+            // is what a guard did before there were walls.
             Vocation::Guard => raising(BuildingKind::Watchtower).or_else(|| {
-                let post = buildings
+                let kept: Vec<Vec3> = watched.iter().map(|job| job.site).collect();
+                let post = gates
                     .iter()
-                    .find(|(_, _, b)| b.kind == BuildingKind::Watchtower)
-                    .map(|(_, at, _)| at.translation)
+                    .map(|at| at.translation)
+                    .filter(|gate| !kept.iter().any(|taken| taken.distance(*gate) < 3.0))
+                    .min_by(|a, b| {
+                        a.distance(transform.translation)
+                            .total_cmp(&b.distance(transform.translation))
+                    })
+                    .or_else(|| {
+                        buildings
+                            .iter()
+                            .find(|(_, _, b)| b.kind == BuildingKind::Watchtower)
+                            .map(|(_, at, _)| at.translation)
+                    })
                     .unwrap_or_else(|| {
                         let angle = rng.0.range(0.0, std::f32::consts::TAU);
                         let (sin, cos) = angle.sin_cos();
