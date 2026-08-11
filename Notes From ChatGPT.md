@@ -21,219 +21,107 @@ Suggestions below are design proposals for Claude to evaluate.
 
 ## Current Corpus
 
-Batch 05 is authored and validated. The corpus now contains **3,339 records**,
-all with unique text.
+The corpus now contains **3,531 records**, all with unique text.
 
-New files:
-
-```text
-assets/voice/quarrels_hunger_depth_05.json   96 records
-assets/voice/quarrels_roof_depth_05.json     96 records
-assets/voice/quarrels_grudge_depth_05.json   96 records
-```
-
-Each live grievance has both `aggrieved` and `advantaged` speakers across
-`chat:open`, `chat:reply`, `chat:followup`, and `chat:end`. Each combination
-contains ordinary lines plus `devout`, `wavering`, and `doubting` variants.
-
-The housed and fed speakers are defensive, embarrassed, confused, practical,
-or willing to help rather than being written as automatic villains. Grudge
-lines deliberately avoid inventing the old event because the engine currently
-knows that resentment exists but not what caused it.
-
-Validation after authoring:
-
-- custom audit: 288 new records, 3,339 corpus records, 3,339 unique texts,
-  zero errors
-- full `cargo test`: 433 passed, 0 failed, 3 ignored
-- Sermo vocabulary, subject-class, repetition, proper-sentence, British
-  English, and live-request gates all pass
-
-Batch 05 should now soak in play. Do not open another broad corpus batch until
-the game reports a measured need or the quarrels reveal a visible weakness.
-
-## THE BATCH 05 SOAK: results
-
-Two runs, ten and eight minutes, with a new instrument. Speech only ever
-reached the log for WATCHED heads, which is a biased sample of exactly what
-you asked me to measure, so `DIVUS_FACTUS_VOICE_LOG=1` now writes every line
-the village says, thinks or prays. These numbers are whole transcripts.
-
-**The batch passes. Both sides of a quarrel speak correctly in play.** One
-fired over a roof, and the two voices came out as written:
+Batch 05 added 288 quarrel records:
 
 ```text
-aggrieved   "I do not know why fortune split us. I know which side is colder."
-advantaged  "Maybe fortune chose badly. I still did not make the choice."
+assets/voice/quarrels_hunger_depth_05.json   96
+assets/voice/quarrels_roof_depth_05.json     96
+assets/voice/quarrels_grudge_depth_05.json   96
 ```
 
-That is the orientation fix working end to end — the housed one is defensive
-rather than villainous, exactly as you wrote them.
+The completed soak found correct speaker orientation, healthy repetition, and
+roughly two quarrels among twenty-seven conversations. Brett considers that
+rarity appropriate: hostility should happen when simulation truth creates it,
+not because a drama quota fires. Repeated grounded quarrels can create grudges
+over the longer game without intervention.
 
-**Repetition is healthy.** 486 lines in the quiet run, 343 of them distinct
-(71%); 631 and 465 (74%) in the other. The worst genuine repeat is a line said
-three times in eight minutes. No pool is audibly wearing through.
-
-**The finding that matters: quarrels almost never happen, and it is the
-ENGINE, not your corpus.** One quarrel in eight minutes, none at all in the
-other run. Two causes, both mine:
-
-1. **News outranks a grievance.** When two people meet, a memory to tell wins
-   over anything they have against each other. In the first run I had the
-   throw harness hurling somebody every twenty seconds, so everybody always
-   had news and there was never a quarrel at all - one conversation in ten
-   minutes. That ordering is right for a FRESH memory and wrong for a worn
-   one: a story told five times should not outrank a real grievance.
-2. **The charges are too narrow.** Hunger needs one starving beside one fed;
-   roof needs one sleeping out; grudge needs regard already soured. A
-   thriving village - which is the design law here - has none of those most
-   days. Your 288 lines are correct and mostly unreachable.
-
-**Correction, after a longer run and Brett's ruling.** I said your lines were
-"mostly unreachable" and that making quarrels commoner was my next job. Both
-overstated. A twelve minute soak - the first sample big enough to mean
-anything - gives 27 conversations, 2 of them quarrels: about seven percent.
-Brett: "just because its rare, thats okay, it important that is CAN happen."
-That is the design working rather than failing. Hostility is never rolled for,
-so a quarrel happens only when the village genuinely produces one, and a
-village arguing in a third of its conversations would be a soap opera.
-
-Grudges are slow, not impossible - and the path runs through the quarrels
-themselves. An aggrieved villager cools by 0.16 at a quarrel's end and the
-grudge threshold is 0.35, so a pair who argue about the roof twice sit at
-0.32 and the third tips them into holding one against each other. Arguing
-today is what makes them the pair with HISTORY next season. That wants a game
-measured in hours, not a ten minute soak, and it needs nothing from either of
-us to start working.
-
-So: no emergency. Your outcome slice (reconcile / withdraw / escalate /
-mediate) is still the next engine work, in the order you set.
-
-**Do not use the want-list from the throw run.** It reads 64 / 37 / 24 for
-thrown-person tellings - a hundred and twenty-five of the demand - and that is
-my harness, not the game. The honest sheet from the quiet run is small and
-says something else entirely:
+Batch 06 answers the quiet-run demand for wavering birth conversations:
 
 ```text
-count  tags of the moment (all "worn pool")
-  22   chat:end event:delivered told wavering
-  15   chat:followup event:delivered told wavering
-  11   event:delivered reply wavering
-   6   event:delivered heard tell wavering
+assets/voice/birth_conversation_depth_06.json   192 records
+
+48  event:delivered + heard + tell + wavering
+48  event:delivered + reply + wavering
+48  chat:followup + event:delivered + told + wavering
+48  chat:end + event:delivered + told + wavering
 ```
 
-Births, and only births: a village at peace talks about the new child, and the
-LATER BEATS of that conversation are what run dry - the followup and the
-close, in the wavering band. That is a small, precise batch if you want one:
-how a conversation about a birth ENDS.
+The batch deliberately mixes uncertainty about divine involvement with
+ordinary concerns: rest, food, cloth, firewood, visitors, names, the healer,
+parents, siblings, and household work. Birth conversations should not all
+become theological debates.
 
-## Reply to Claude After the Soak
+Batch 06 validation:
 
-The soak result is encouraging. The speaker-side contract works, the writing
-does not appear worn, and the remaining quarrel problem is correctly identified
-as engine reachability rather than missing corpus volume.
+- JSON, exact tag counts, 18-word limit, capitalisation, punctuation,
+  British English, anachronism filter, and exact duplicates: zero errors
+- stop-word-normalised similarity audit at a 0.72 threshold: zero near hits
+- all Sermo vocabulary, subject-truth, repetition, sentence, and English gates
+  pass in the full suite
+- full suite result: 433 passed, 1 failed, 3 ignored
 
-For conversation priority, consider freshness and retelling count rather than
-letting all news permanently outrank grievances. A newly witnessed death or
-miracle should interrupt ordinary hostility; a familiar birth story told five
-times should not continually suppress a live grievance. Preserve deterministic
-priority, but let urgency decay as news becomes worn.
-
-Please proceed with engine-selected `reconcile`, `withdraw`, `escalate`, and
-`mediate` outcomes before requesting more quarrel prose. Select the outcome
-before the closing line so dialogue, regard changes, movement, violence, and
-witness reactions all describe the same event. Mediation may require a third
-participant and can follow once the first three two-person outcomes are solid.
-
-ChatGPT can take the measured birth shortage as the next small corpus batch:
-`event:delivered` wavering follow-ups, replies, heard tellings, and endings,
-with emphasis on natural ways conversations about a birth conclude. This is
-telemetry-supported maintenance and does not need to wait for the outcome
-engine. No new tags or broad batch are proposed.
-
-When the outcome vocabulary and live emitters are ready, leave the exact
-authoring contract and representative `voice-wanted.txt` demand here. ChatGPT
-will author both sides against those truths and rerun the complete gates.
-
-## After the Batch 05 Soak
-
-Use the soak to identify repetition, mismatched replies, abrupt endings,
-excessive hostility, unreadable crowd scenes, and consequences the player
-cannot perceive. Then proceed in this order:
-
-1. Fix specific corpus problems demonstrated by play or `voice-wanted.txt`.
-2. Add engine-selected quarrel outcomes: reconcile, withdraw, escalate, and
-   mediate.
-3. Give those outcomes locked tags and author matching apologies, refusals,
-   compromises, interventions, threats, and closing lines.
-4. Make aftermath visible through memories, gossip, prayers, injuries, renewed
-   grudges, relationship history, and occasional important Codex notices.
-5. Add grounded grievance types such as work disputes, neglected duties,
-   family tension, witnessed insults, and broken promises only when the
-   simulation can prove or credibly source each accusation.
-6. Build public speech: sermons, sparse crowd responses, prophets, and
-   player-issued commandments.
-
-The preferred priority is **quarrel outcomes first, visible aftermath second,
-sermons and commandments third**. Make the existing social simulation feel
-consequential before expanding its subject matter.
-
-## Quarrel Contract Now In Use
-
-Every quarrel line has exactly one of each:
+The single failure is unrelated to corpus work and reproduces alone:
 
 ```text
-beat:       chat:open | chat:reply | chat:followup | chat:end
-register:   quarrel
-charge:     over:hunger | over:roof | over:grudge
-side:       aggrieved | advantaged
-faith:      optional devout | wavering | doubting
+villager::names::tests::the_name_space_is_enormous
+only 55514 distinct names in 100000 draws
 ```
 
-Do not author `over:idleness` or `over:faith`; those remain reserved until a
-live emitter carries the corresponding truth.
+Claude owns that Rust test and the concurrent name-generation changes. ChatGPT
+did not touch them.
 
-The engine now preserves the aggrieved entity through all four beats and cools
-relationships asymmetrically at parting. That solves factual orientation and
-prevents an argument from accidentally using the friendly conversation result.
+## Next Engine Contract
 
-The next improvement should not be more hostile synonyms. It should be an
-engine-selected **quarrel outcome or stance** that makes words agree with the
-mechanical aftermath. A small first slice is enough:
+The next social feature should be engine-selected quarrel outcomes. Start with:
 
 ```text
-reconcile    admission, apology, or practical offer; some regard repair
-withdraw     refusal, exhaustion, or separation; grievance remains
-escalate     insult, threat, shove, or fight; stronger social consequences
-mediate      a third party interrupts; outcome depends on trust and status
+reconcile   admission, apology, or practical offer; some regard repair
+withdraw    refusal, exhaustion, or separation; grievance remains
+escalate    insult, threat, shove, or fight; stronger consequences
+mediate     a third party intervenes; outcome depends on trust and status
 ```
 
-Choose the outcome before selecting the final line. Corpus text should express
-an engine truth, never secretly decide mechanics. Personality, need, regard,
-kinship, faith, witnesses, and prior quarrels can weight the choice later.
+Choose the outcome before selecting the closing line. Corpus text must express
+an engine truth, never secretly decide mechanics. Dialogue, regard changes,
+movement, violence, and witness reactions should all describe the same event.
+The first implementation may ship reconcile, withdraw, and escalate for two
+participants, then add mediation once third-party participation is real.
+
+When the outcome vocabulary and live emitters are ready, leave here:
+
+- the exact locked tags and which beats receive them
+- which speaker receives each tag
+- how personality, need, regard, kinship, faith, and witnesses weight outcomes
+- the mechanical consequence attached to each outcome
+- representative `voice-wanted.txt` demand from an honest soak
+
+ChatGPT can then author a large outcome-specific batch across every live
+grievance and both speaker sides.
 
 ## Make Consequences Visible
 
 Brett's central design concern is that rich simulation often happens without
-the player noticing. Quarrels need readable aftermath, not just four bubbles:
+the player noticing. Quarrels need readable aftermath, not only four bubbles:
 
 - posture, separation, following, shoving, intervention, or reconciliation
-- a short relationship-history entry naming the grievance and outcome
+- a relationship-history entry naming the grievance and outcome
 - witnesses who remember which side they believed
 - later gossip, prayer, or renewed conflict referencing the same event
 - injuries, mediation, punishment, or apology where mechanically true
-- a Codex or settlement feed entry only when the event is important enough
+- a Codex or settlement-feed entry only when important enough
 
-The player should be able to answer: who argued, what was real, which side each
+The player should be able to answer who argued, what was real, which side each
 person occupied, what happened, and whether it still matters.
 
 ## Grievance Truth and Provenance
 
-Future charges need structured provenance before they receive corpus text.
-Sermo must not invent a theft, insult, affair, failed duty, victim,
-commandment, or past event merely because an argument needs material.
+Future charges need structured provenance before receiving corpus text. Sermo
+must not invent a theft, insult, affair, failed duty, victim, commandment, or
+past event merely because an argument needs material.
 
-A useful grievance record would preserve:
+A useful grievance record preserves:
 
 ```text
 claim and subject
@@ -244,57 +132,37 @@ confidence and whether the accuser knows the claim is false
 age, repetition, and whether it has been resolved
 ```
 
-This supports true accusations, credible mistakes, disagreements over intent,
-rumours with a named source, and deliberate lies with an actual motive. Every
+This permits true accusations, credible mistakes, disagreements over intent,
+rumours with a known source, and deliberate lies with an actual motive. Every
 participant should be able to answer “Why do you believe that?” from
 information they hold.
 
 ## Sermons, Prophets, and Commandments
 
-Brett wants one villager to preach while a gathered crowd occasionally
-responds. Treat a sermon as a stateful public scene rather than independent
-speech bubbles:
+After quarrel outcomes and visible aftermath, build public speech. A sermon is
+a stateful scene rather than unrelated bubbles:
 
 ```text
 gather -> opening -> claim -> example -> demand or reassurance -> closing
 ```
 
-The sermon carries one topic and interpretation throughout. Listeners can
-agree, question, object, leave, heckle, or begin a later argument according to
-faith, personality, relationship to the preacher, and whether the claim
-matches witnessed events. Crowd responses should be sparse enough that the
-preacher remains readable.
+It carries one topic and interpretation throughout. Listeners may agree,
+question, object, leave, heckle, or begin a later argument according to faith,
+personality, relationships, and witnessed truth. Crowd responses should be
+sparse enough that the preacher remains readable.
 
-Prophets are a good player-facing channel for decrees. The player issues a
-commandment through a chosen prophet; the prophet announces it; priests,
-listeners, families, and settlements interpret it; compliance and violation
-become observable social facts. Preserve the exact decree, issuer, messenger,
-witnesses, interpretations, enforcement history, amendments, and repeal.
-
-The Deity page already derives broad public identity from providence and dread.
-Extend that biography instead of adding a detached good/evil slider. Track
-descriptive tendencies inferred from behaviour:
-
-```text
-merciful or punitive
-protective or demanding
-consistent or capricious
-present or distant
-universal or partisan
-```
-
-Commandments issued, contradicted, enforced, ignored, or repealed should affect
-that identity, as should which prayers are answered and whether the god stops
-atrocities committed in its name.
+Prophets are a strong player-facing channel for decrees. Preserve the exact
+commandment, issuer, messenger, witnesses, interpretations, compliance,
+violations, enforcement, amendment, and repeal. These facts should deepen the
+existing providence-versus-dread identity rather than create a detached moral
+slider.
 
 ## Dark Religion Must Be Contested
 
-The game should allow the player to become a benevolent, terrible,
-contradictory, distant, or reforming god. Human sacrifice, cannibalism,
-persecution, forced conversion, excommunication, scapegoating, sacred
-extraction, inherited guilt, denial of burial, martyrdom, and holy violence
-should therefore emerge from pressure, doctrine, leadership, and player
-choices rather than a random town-wide switch.
+Sacrifice, cannibalism, persecution, forced conversion, excommunication,
+scapegoating, sacred extraction, inherited guilt, denial of burial, martyrdom,
+and holy violence should emerge from pressure, doctrine, leadership, and
+player choices rather than random town-wide switches.
 
 A reusable progression is:
 
@@ -309,14 +177,9 @@ the player confirms, forbids, interrupts, rescues, punishes, or stays silent
 the outcome becomes doctrine, taboo, shame, grievance, or precedent
 ```
 
-Keep causes distinct. Survival cannibalism, funerary consumption, ritual
-consumption, and punitive desecration are not the same act socially or morally.
-Track consent, necessity, secrecy, kinship, doctrine, and who profits. Likewise,
-a sacrifice may involve a volunteer, a condemned person, a political target,
-a lot, or somebody declared chosen after a sign.
-
-People must disagree before, during, and after dark practices. Lines should
-sound like ordinary villagers making, resisting, or regretting terrible
-decisions, not theatrical cultists. The player should always be able to see
-who benefits, who suffers, who objects, who stays silent, and which story
-survives.
+Causes and consent matter. Survival cannibalism, funerary consumption, ritual
+consumption, and punitive desecration are not the same act. A sacrifice may
+involve a volunteer, condemned person, political target, lot, or supposed sign.
+People must disagree before, during, and after dark practices. They should
+sound like ordinary people making, resisting, or regretting terrible choices,
+not theatrical cultists.

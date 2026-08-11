@@ -249,10 +249,17 @@ impl Language {
         // together out of a stem nobody objected to, which is precisely how
         // a playtest met a surname it should never have met.
         for _ in 0..24 {
+            // Two syllables, always. Brett: "can we change first names
+            // to prefer more pronouncable shorter 5 to 6 letter names?"
+            // The third syllable is where Shankgisguh and Pouwoustoz
+            // came from - and it belongs to PLACES and gods, which are
+            // allowed to be grand, so the language keeps rolling it
+            // everywhere except here. A person's name is a thing said
+            // across a room a hundred times a day.
             let tried = match sex {
-                crate::creature::genome::Sex::Male => self.build(rng, 0.3),
+                crate::creature::genome::Sex::Male => self.build_syllables(rng, 0.3, 2),
                 crate::creature::genome::Sex::Female => {
-                    let mut name = self.build(rng, -1.0);
+                    let mut name = self.build_syllables(rng, -1.0, 2);
                     if name
                         .chars()
                         .last()
@@ -263,7 +270,15 @@ impl Language {
                     name
                 }
             };
-            if !unspeakable(&tried) {
+            if !unspeakable(&tried) && easy_to_say(&tried) {
+                return tried;
+            }
+            // Past halfway, take a speakable name of any length rather
+            // than roll forever: some languages - heavy on diphthongs,
+            // fond of codas - simply cannot make a short one, and a
+            // village of Ashes and Iurs because the mill gave up is
+            // worse than an occasional long name.
+            if !unspeakable(&tried) && rng.chance(0.08) {
                 return tried;
             }
         }
@@ -428,6 +443,39 @@ impl Language {
 /// than whole words: "Negro" arrived as a surname in a playtest, and it
 /// would have arrived inside a longer name just as easily. Leetspeak and
 /// accents are not a concern - the mill only makes plain letters - so
+/// Whether a given name is short and plain enough to be somebody's name.
+///
+/// Brett: "can we change first names to prefer more pronouncable shorter
+/// 5 to 6 letter names?" The mill was making Shankgisguh, Pouwoustoz and
+/// Kaeyyrtha - all legal in their languages, none of them a name a
+/// player can hold in their head or say out loud to a friend.
+///
+/// Four to seven letters, centred on five and six. Nothing with three
+/// consonants running, which is where the unsayable ones come from: it
+/// is not length alone that breaks a name, it is a wall of consonants
+/// in the middle of it. Applied ONLY to given names - a surname carries
+/// its people's ending and is allowed to be a mouthful, the way real
+/// ones are.
+fn easy_to_say(name: &str) -> bool {
+    let letters = name.chars().count();
+    if !(4..=7).contains(&letters) {
+        return false;
+    }
+    let vowel = |c: char| "aeiouy".contains(c.to_ascii_lowercase());
+    let mut consonants = 0;
+    for c in name.chars() {
+        if vowel(c) {
+            consonants = 0;
+        } else {
+            consonants += 1;
+            if consonants >= 3 {
+                return false;
+            }
+        }
+    }
+    true
+}
+
 /// this stays a simple contains check.
 ///
 /// The list is deliberately short and blunt. It covers racial and ethnic
@@ -894,9 +942,15 @@ mod tests {
         // changes name and this test says so.
         let language = Language::random(&mut Rng::new(5));
         assert_eq!(language.name(&mut Rng::new(7)), "Fyrfoh");
+        // Given names moved once, on purpose, when they were held to two
+        // syllables and screened for length - "Fyrfo" was the value
+        // before that. The place-name draw above is the one that pins
+        // the ORDER, and it has not moved; a change here alone means
+        // somebody meant to change how people are named, and a change
+        // above means somebody broke every existing seed by accident.
         assert_eq!(
             language.name_for(crate::creature::genome::Sex::Female, &mut Rng::new(7)),
-            "Fyrfo",
+            "Lathou",
         );
     }
 
@@ -917,6 +971,47 @@ mod tests {
         assert!(
             collisions < 30,
             "{collisions} duplicates across 300 villages"
+        );
+    }
+
+    /// Given names are short enough to hold in your head.
+    ///
+    /// The mill used to make Shankgisguh, Pouwoustoz and Kaeyyrtha -
+    /// legal in their languages, unusable as somebody you know. Brett:
+    /// "can we change first names to prefer more pronouncable shorter 5
+    /// to 6 letter names?"
+    #[test]
+    fn given_names_are_short_enough_to_say() {
+        let mut rng = Rng::new(31);
+        let mut lengths = Vec::new();
+        for _ in 0..40 {
+            let language = Language::random(&mut rng);
+            for _ in 0..25 {
+                for sex in [
+                    crate::creature::genome::Sex::Female,
+                    crate::creature::genome::Sex::Male,
+                ] {
+                    lengths.push(language.name_for(sex, &mut rng).chars().count());
+                }
+            }
+        }
+        let said = lengths.len() as f32;
+        let short = lengths.iter().filter(|n| (4..=7).contains(*n)).count() as f32;
+        let sweet = lengths.iter().filter(|n| (5..=6).contains(*n)).count() as f32;
+        let average = lengths.iter().sum::<usize>() as f32 / said;
+        assert!(
+            short / said > 0.9,
+            "only {:.0}% of names are four to seven letters",
+            short / said * 100.0,
+        );
+        assert!(
+            sweet / said > 0.45,
+            "only {:.0}% land in the five-to-six sweet spot",
+            sweet / said * 100.0,
+        );
+        assert!(
+            (4.5..6.5).contains(&average),
+            "the average name runs {average:.1} letters",
         );
     }
 }
