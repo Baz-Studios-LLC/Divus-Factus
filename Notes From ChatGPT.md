@@ -52,6 +52,66 @@ Validation after authoring:
 Batch 05 should now soak in play. Do not open another broad corpus batch until
 the game reports a measured need or the quarrels reveal a visible weakness.
 
+## THE BATCH 05 SOAK: results
+
+Two runs, ten and eight minutes, with a new instrument. Speech only ever
+reached the log for WATCHED heads, which is a biased sample of exactly what
+you asked me to measure, so `DIVUS_FACTUS_VOICE_LOG=1` now writes every line
+the village says, thinks or prays. These numbers are whole transcripts.
+
+**The batch passes. Both sides of a quarrel speak correctly in play.** One
+fired over a roof, and the two voices came out as written:
+
+```text
+aggrieved   "I do not know why fortune split us. I know which side is colder."
+advantaged  "Maybe fortune chose badly. I still did not make the choice."
+```
+
+That is the orientation fix working end to end — the housed one is defensive
+rather than villainous, exactly as you wrote them.
+
+**Repetition is healthy.** 486 lines in the quiet run, 343 of them distinct
+(71%); 631 and 465 (74%) in the other. The worst genuine repeat is a line said
+three times in eight minutes. No pool is audibly wearing through.
+
+**The finding that matters: quarrels almost never happen, and it is the
+ENGINE, not your corpus.** One quarrel in eight minutes, none at all in the
+other run. Two causes, both mine:
+
+1. **News outranks a grievance.** When two people meet, a memory to tell wins
+   over anything they have against each other. In the first run I had the
+   throw harness hurling somebody every twenty seconds, so everybody always
+   had news and there was never a quarrel at all - one conversation in ten
+   minutes. That ordering is right for a FRESH memory and wrong for a worn
+   one: a story told five times should not outrank a real grievance.
+2. **The charges are too narrow.** Hunger needs one starving beside one fed;
+   roof needs one sleeping out; grudge needs regard already soured. A
+   thriving village - which is the design law here - has none of those most
+   days. Your 288 lines are correct and mostly unreachable.
+
+So the next engine work is not more charges for their own sake but making the
+existing ones REACHABLE, and that is my job before you write another word of
+quarrel. Your outcome slice (reconcile / withdraw / escalate / mediate) still
+comes first in the order you set.
+
+**Do not use the want-list from the throw run.** It reads 64 / 37 / 24 for
+thrown-person tellings - a hundred and twenty-five of the demand - and that is
+my harness, not the game. The honest sheet from the quiet run is small and
+says something else entirely:
+
+```text
+count  tags of the moment (all "worn pool")
+  22   chat:end event:delivered told wavering
+  15   chat:followup event:delivered told wavering
+  11   event:delivered reply wavering
+   6   event:delivered heard tell wavering
+```
+
+Births, and only births: a village at peace talks about the new child, and the
+LATER BEATS of that conversation are what run dry - the followup and the
+close, in the wavering band. That is a small, precise batch if you want one:
+how a conversation about a birth ENDS.
+
 ## After the Batch 05 Soak
 
 Use the soak to identify repetition, mismatched replies, abrupt endings,
