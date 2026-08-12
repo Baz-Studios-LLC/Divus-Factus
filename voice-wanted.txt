@@ -1,33 +1,8 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-  161  (worn pool) housed married muse
-   58  (worn pool) event:smote saw tell
-   45  (worn pool) housed muse
-   40  (worn pool) event:flourished saw tell wavering
-   35  (worn pool) reply wavering
-   32  (worn pool) muse wavering
-   23  (worn pool) event:smote saw tell wavering
-   19  (worn pool) event:flourished reply wavering
-   13  (worn pool) event:smote reply wavering
-   12  (worn pool) event:flourished saw tell
-   10  (worn pool) chat:followup topic:forester
-    7  (worn pool) devout event:smote saw tell
-    6  (worn pool) chat:followup wavering
-    5  (worn pool) chat:end trade:forester
-    5  (worn pool) event:mauled reply wavering
-    4  (worn pool) chat:end event:smote told wavering
-    4  (worn pool) chat:end event:flourished told wavering
-    4  (worn pool) chat:end wavering
-    4  (worn pool) chat:end event:smote told
-    4  (worn pool) event:flourished retold saw tell
-    4  (worn pool) chat:end event:flourished told
-    3  (worn pool) devotion muse night prayer wavering
-    3  (worn pool) chat:followup topic:miner
-    3  (worn pool) chat:end topic:forester
-    2  (worn pool) chat:followup trade:forester
-    2  (worn pool) chat:end devout event:flourished told
-    2  (worn pool) event:flourished heard tell wavering
-    1  (worn pool) event:mauled of:person saw tell wavering
-    1  (worn pool) reply trade:priest
-    1  (worn pool) chat:end trade:hunter
-    1  (worn pool) reply trade:explorer
+    6  (worn pool) event:uprooted of:thing saw tell wavering
+    3  (worn pool) event:uprooted reply wavering
+    2  devout event:rained of:thing saw tell trade:farmer
+    2  devout event:rained of:thing saw tell trade:hunter
+    2  (worn pool) event:uprooted saw tell
+    1  (worn pool) chat:end devout event:delivered told

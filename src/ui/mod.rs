@@ -71,7 +71,23 @@ impl Plugin for UiPlugin {
                     speak.run_if(in_state(crate::GameState::Playing)),
                     float_bubbles,
                     update_date_card,
-                ),
+                )
+                    // BEFORE ORDO PAINTS, the same as the debug book.
+                    //
+                    // Ordo re-applies the theme once a frame to everything it
+                    // can see. Anything spawned after that has run spends a
+                    // frame in Bevy's own default font at Bevy's own default
+                    // size - and nothing in here was ordered against it, so
+                    // which side a prayer card landed on was whatever order
+                    // Bevy picked that run. Brett, after the same fault was
+                    // fixed in the codex: "these prayers on the left side are
+                    // doing the font flicker."
+                    //
+                    // `dress_display_text` belongs on this side too: it sets
+                    // the font FACE on text that has just appeared, and Ordo
+                    // sets the size and the ink over the top - so both land on
+                    // the frame the card is born rather than one each.
+                    .before(ordo::OrdoSet),
             );
     }
 }

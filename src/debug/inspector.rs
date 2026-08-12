@@ -750,19 +750,26 @@ pub(crate) fn update_inspector(
             if needs <= 0.0 && have <= 0.0 {
                 return;
             }
-            // A stone-built house founded on stone wants one line, not two.
-            match bill.iter_mut().find(|(had, ..)| had == name) {
-                Some(entry) => {
-                    entry.1 += have;
-                    entry.2 += needs;
-                }
-                None => bill.push((name.to_string(), have, needs)),
-            }
+            bill.push((name.to_string(), have, needs));
         };
-        want("Stone", construction.stone_laid.min(footing), footing);
+        // The footing and the walls are two lines even when they are the
+        // same material. Merging them was tidier and it lied by omission: a
+        // stone longhouse billed one "Stone: 16/19" with no timber line at
+        // all, and there is nothing on the card to say the walls are stone
+        // rather than the price being wrong. Brett, reasonably: "A
+        // longhouse only take 19 Stone and no timber?"
         let mut stuff = plan.stuff.word().to_string();
         stuff[..1].make_ascii_uppercase();
-        want(&stuff, construction.progress.min(frame), frame);
+        want(
+            &format!("{stuff} (walls)"),
+            construction.progress.min(frame),
+            frame,
+        );
+        want(
+            "Stone (footing)",
+            construction.stone_laid.min(footing),
+            footing,
+        );
         let lines: Vec<String> = bill
             .iter()
             .map(|(name, have, needs)| {
