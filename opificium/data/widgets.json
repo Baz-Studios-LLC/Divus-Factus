@@ -1,0 +1,8 @@
+{
+  "format": 1,
+  "marks": [
+    { "mark": "door", "ramp": "cloth-green", "shade": 0.6 },
+    { "mark": "sleep", "ramp": "cloth-blue", "shade": 0.7 },
+    { "mark": "table", "ramp": "wood", "shade": 0.6 }
+  ]
+}

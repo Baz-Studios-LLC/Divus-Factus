@@ -361,6 +361,55 @@ pub fn shade_blend(a: &Ramp, b: &Ramp, blend: f32, t: f32) -> Color {
     })
 }
 
+/// Every ramp that has a NAME, and the name it answers to.
+///
+/// The word is the contract: authored work speaks colour as
+/// `{"ramp": "wood", "shade": 0.7}` rather than as raw RGB, so a drawing made
+/// last year inherits this year's palette for free. Which means the names here
+/// are load-bearing in files outside this repository, and renaming one silently
+/// repaints whatever referred to it.
+///
+/// Lifted out of the export that used to hold it privately, because the
+/// vocabulary the game hands Opificium has to be checked against the same list
+/// the palette is written from - two copies of this would drift the first time
+/// a ramp was added to one of them.
+#[cfg_attr(not(test), allow(dead_code))]
+pub const NAMED_RAMPS: &[(&str, &Ramp)] = &[
+    ("stone", &STONE),
+    ("earth", &EARTH),
+    ("grass", &GRASS),
+    ("foliage", &FOLIAGE),
+    ("sand", &SAND),
+    ("water", &WATER),
+    ("sky", &SKY),
+    ("wood", &WOOD),
+    ("bone", &BONE),
+    ("cloth-red", &CLOTH_RED),
+    ("cloth-blue", &CLOTH_BLUE),
+    ("cloth-gold", &CLOTH_GOLD),
+    ("cloth-green", &CLOTH_GREEN),
+    ("skin-pale", &SKIN_PALE),
+    ("skin-mid", &SKIN_MID),
+    ("skin-deep", &SKIN_DEEP),
+    ("snow", &SNOW),
+    ("scrub", &SCRUB),
+    ("cloth-purple", &CLOTH_PURPLE),
+    ("cloth-wine", &CLOTH_WINE),
+    ("cloth-teal", &CLOTH_TEAL),
+    ("cloth-rust", &CLOTH_RUST),
+    ("cloth-sable", &CLOTH_SABLE),
+    ("cloth-pink", &CLOTH_PINK),
+];
+
+/// The ramp that answers to this name.
+#[cfg_attr(not(test), allow(dead_code))]
+pub fn ramp_named(name: &str) -> Option<&'static Ramp> {
+    NAMED_RAMPS
+        .iter()
+        .find(|(called, _)| *called == name)
+        .map(|(_, ramp)| *ramp)
+}
+
 #[cfg(test)]
 mod tests {
     /// Writes the palette out for Opificium, which paints with the game's
@@ -372,32 +421,7 @@ mod tests {
     #[test]
     #[ignore = "a hand-run export, not a check"]
     fn export_palette_for_opificium() {
-        let named: &[(&str, &super::Ramp)] = &[
-            ("stone", &super::STONE),
-            ("earth", &super::EARTH),
-            ("grass", &super::GRASS),
-            ("foliage", &super::FOLIAGE),
-            ("sand", &super::SAND),
-            ("water", &super::WATER),
-            ("sky", &super::SKY),
-            ("wood", &super::WOOD),
-            ("bone", &super::BONE),
-            ("cloth-red", &super::CLOTH_RED),
-            ("cloth-blue", &super::CLOTH_BLUE),
-            ("cloth-gold", &super::CLOTH_GOLD),
-            ("cloth-green", &super::CLOTH_GREEN),
-            ("skin-pale", &super::SKIN_PALE),
-            ("skin-mid", &super::SKIN_MID),
-            ("skin-deep", &super::SKIN_DEEP),
-            ("snow", &super::SNOW),
-            ("scrub", &super::SCRUB),
-            ("cloth-purple", &super::CLOTH_PURPLE),
-            ("cloth-wine", &super::CLOTH_WINE),
-            ("cloth-teal", &super::CLOTH_TEAL),
-            ("cloth-rust", &super::CLOTH_RUST),
-            ("cloth-sable", &super::CLOTH_SABLE),
-            ("cloth-pink", &super::CLOTH_PINK),
-        ];
+        let named = super::NAMED_RAMPS;
         let ramps: Vec<String> = named
             .iter()
             .map(|(name, ramp)| {

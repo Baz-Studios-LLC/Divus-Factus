@@ -1,1 +1,5 @@
-/target
+# Generated: baked again from the drawings on demand.
+out/baked/
+# The bench's scratch pad - whatever was standing when it last had to keep
+# something. A drawing becomes worth committing when it is given a name.
+out/buildings/workbench.baz

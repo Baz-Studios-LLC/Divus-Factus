@@ -159,6 +159,7 @@ fn carried() -> &'static Vec<Baked> {
                     .and_then(|text| serde_json::from_str::<Baked>(&text).ok())
                 {
                     Some(work) => {
+                        read_the_words(&work);
                         // A maker's drawing of the same name replaces the one
                         // that shipped: they drew it second, and meant it. It
                         // says so rather than doing it quietly - a village
@@ -194,6 +195,76 @@ fn carried() -> &'static Vec<Baked> {
         works.sort_by(|a, b| a.name.cmp(&b.name));
         works
     })
+}
+
+/// Every mark this game acts on, and the colour the bench should draw it.
+///
+/// THE GAME IS THE AUTHORITY ON WHAT A WORD MEANS. Opificium offers only the
+/// marks listed in a project's `data/widgets.json`, passes the word through
+/// untouched, and cannot check it against anything - it has never seen this
+/// source. So a mark the bench offers that this list does not carry is a trap:
+/// a maker places it, it bakes, it arrives, and nothing happens, with no error
+/// anywhere to say why.
+///
+/// Which is exactly what had happened. The bench was offering `sit`, `fire`,
+/// `smoke`, `work`, `store` and `light`, none of which anything here reads -
+/// and two of them were already standing in authored buildings, doing nothing.
+/// Meanwhile `table`, which this game DOES act on, was not offered at all, so
+/// no maker could place one.
+///
+/// `export_widgets_for_opificium` writes this list out as the project's
+/// widgets file, the same way the palette is exported. Add a mark here, teach
+/// the reader below to act on it, re-run the export, and the bench offers it.
+/// That is the whole ceremony, and it cannot drift.
+pub(crate) const MARKS_UNDERSTOOD: &[(&str, &str, f32)] = &[
+    // A doorway: where a wall may be walked through.
+    ("door", "cloth-green", 0.6),
+    // A bed: one villager sleeps here, and a house holds as many as it has.
+    ("sleep", "cloth-blue", 0.7),
+    // A table: where the household eats.
+    ("table", "wood", 0.6),
+];
+
+/// Says so when a drawing carries a word this game does not know.
+///
+/// Both directions of the contract fail silently otherwise - an unknown KIND
+/// means the drawing is never offered to any village, and an unknown MARK
+/// means whatever it was placed for simply never happens. Neither is
+/// detectable from the bench, so the game is the only place that can complain,
+/// and it should complain loudly and name what it does understand.
+fn read_the_words(work: &Baked) {
+    if !work.kind.is_empty() && claimed_by(work).is_none() {
+        let known: Vec<&str> = super::BuildingKind::every()
+            .iter()
+            .map(|kind| called(*kind))
+            .collect();
+        warn!(
+            "{}: baked as \"{}\", which this game has no building for - it will \
+             never be raised. Known kinds: {}",
+            work.name,
+            work.kind,
+            known.join(", "),
+        );
+    }
+    let mut complained: Vec<&str> = Vec::new();
+    for mark in &work.marks {
+        let known = MARKS_UNDERSTOOD.iter().any(|(word, ..)| *word == mark.mark);
+        if known || complained.contains(&mark.mark.as_str()) {
+            continue;
+        }
+        complained.push(&mark.mark);
+        warn!(
+            "{}: carries the mark \"{}\", which this game does not act on - it will \
+             do nothing. Marks understood: {}",
+            work.name,
+            mark.mark,
+            MARKS_UNDERSTOOD
+                .iter()
+                .map(|(word, ..)| *word)
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+    }
 }
 
 /// What a kind's drawings are named.
@@ -943,5 +1014,70 @@ mod tests {
             BuildingKind::Longhouse.sleeps() > BuildingKind::House.sleeps(),
             "a hall must shelter more than a family home"
         );
+    }
+
+    /// Writes the two vocabulary files out for Opificium.
+    ///
+    /// The bench offers only what a project's `kinds.json` and `widgets.json`
+    /// list, and matches nothing against this source - it cannot see it. So
+    /// these two files are a CONTRACT, and the only way a contract stays true
+    /// is if one side generates it. The palette has worked this way from the
+    /// start; there is no reason the vocabulary should not.
+    ///
+    /// Run by hand when a building kind or a mark is added:
+    /// `cargo test export_vocabulary_for_opificium -- --ignored`
+    #[test]
+    #[ignore = "a hand-run export, not a check"]
+    fn export_vocabulary_for_opificium() {
+        let kinds: Vec<String> = BuildingKind::every()
+            .iter()
+            .map(|kind| {
+                let word = super::called(*kind);
+                // TOWN HALL rather than TOWNHALL on the bench's own shelf.
+                // One word, two spellings: the game's is the contract, the
+                // label is only what a maker reads.
+                match word {
+                    "townhall" => {
+                        "    { \"word\": \"townhall\", \"label\": \"TOWN HALL\" }".to_string()
+                    }
+                    word => format!("    {{ \"word\": \"{word}\" }}"),
+                }
+            })
+            .collect();
+        let json = format!(
+            "{{\n  \"format\": 1,\n  \"kinds\": [\n{}\n  ]\n}}\n",
+            kinds.join(",\n")
+        );
+        std::fs::create_dir_all("opificium/data").expect("opificium/data");
+        std::fs::write("opificium/data/kinds.json", json).expect("write kinds.json");
+
+        let marks: Vec<String> = super::MARKS_UNDERSTOOD
+            .iter()
+            .map(|(mark, ramp, shade)| {
+                format!("    {{ \"mark\": \"{mark}\", \"ramp\": \"{ramp}\", \"shade\": {shade} }}")
+            })
+            .collect();
+        let json = format!(
+            "{{\n  \"format\": 1,\n  \"marks\": [\n{}\n  ]\n}}\n",
+            marks.join(",\n")
+        );
+        std::fs::write("opificium/data/widgets.json", json).expect("write widgets.json");
+    }
+
+    /// Every colour the vocabulary asks the bench to paint with must be a ramp
+    /// the game actually exports, or the bench falls back to its own and the
+    /// marks come out the wrong colour for reasons nobody can see.
+    #[test]
+    fn every_mark_paints_from_a_real_ramp() {
+        for (mark, ramp, shade) in super::MARKS_UNDERSTOOD {
+            assert!(
+                crate::palette::ramp_named(ramp).is_some(),
+                "the mark \"{mark}\" paints from \"{ramp}\", which is not a ramp the game has",
+            );
+            assert!(
+                (0.0..=1.0).contains(shade),
+                "the mark \"{mark}\" asks for shade {shade}, outside the ramp",
+            );
+        }
     }
 }

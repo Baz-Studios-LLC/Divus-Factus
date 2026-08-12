@@ -1,0 +1,23 @@
+{
+  "format": 1,
+  "kinds": [
+    { "word": "house" },
+    { "word": "longhouse" },
+    { "word": "sawmill" },
+    { "word": "blacksmith" },
+    { "word": "tavern" },
+    { "word": "townhall", "label": "TOWN HALL" },
+    { "word": "storehouse" },
+    { "word": "granary" },
+    { "word": "well" },
+    { "word": "smokehouse" },
+    { "word": "mill" },
+    { "word": "bakery" },
+    { "word": "weaver" },
+    { "word": "herbalist" },
+    { "word": "watchtower" },
+    { "word": "shrine" },
+    { "word": "dock" },
+    { "word": "mine" }
+  ]
+}
