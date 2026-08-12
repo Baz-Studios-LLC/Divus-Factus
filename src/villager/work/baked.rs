@@ -263,6 +263,16 @@ pub fn furnish_the_makers_bench() {
 
     // `install` is RELATIVE to the project, and points back out at the folder
     // this game reads a maker's own buildings from.
+    //
+    // DO NOT DROP THIS LINE AS REDUNDANT. Opificium's default for `install` is
+    // `../assets/buildings`, which is right for a project living inside a
+    // game's repository and wrong for this one: this project sits in
+    // Application Support beside the saves, and the buildings the game reads
+    // there are `made_by_hand("buildings")` - a sibling, not an `assets`
+    // folder. Left to the default, a player's bakes would land in
+    // `<app support>/Divus Factus/assets/buildings`, where nothing ever
+    // looks, and their building would simply never appear with no error to
+    // read. This is the case `install` exists for.
     let manifest = "{\n  \"format\": 1,\n  \"name\": \"Divus Factus\",\n  \
                     \"install\": \"../buildings\"\n}\n";
     let written = [
@@ -1395,6 +1405,43 @@ mod tests {
         assert!(
             super::drawing_of(BuildingKind::House, 3, "a-house-nobody-drew").is_some(),
             "a deleted drawing must fall back, not vanish",
+        );
+    }
+
+    /// A format 2 drawing, `levels` and all, is read as the building it is.
+    ///
+    /// The Opificium thread's word is that `levels` rides ALONGSIDE the
+    /// top-level `boxes` and `marks`, which still hold the base building
+    /// finished exactly as before - so this game reads what it always read
+    /// and ignores the upgrades until it has a use for them. Worth pinning
+    /// rather than believing: `Baked` does not deny unknown fields today,
+    /// and the day somebody adds `#[serde(deny_unknown_fields)]` for
+    /// tidiness, every format 2 building in the world stops loading.
+    #[test]
+    fn a_format_two_drawing_reads_as_its_base_building() {
+        let said = r#"{
+            "format": 2,
+            "name": "house9-test", "kind": "house",
+            "half_w": 3.6, "half_d": 4.2, "high": 7.6,
+            "boxes": [ { "at": [0,1.25,0], "size": [4,2.5,0.25], "turn": [0,0,0,1],
+                         "form": "box", "rgb": [110,92,70], "alpha": 1.0,
+                         "stage": "walls" } ],
+            "marks": [ { "mark": "door", "at": [3.6,0.4,0.0], "yaw": 0.0 } ],
+            "levels": [ { "name": "", "half_w": 3.6, "half_d": 4.2, "high": 7.6,
+                          "phases": [ { "boxes": [] } ], "marks": [] } ]
+        }"#;
+        let work: super::Baked = serde_json::from_str(said).expect("format 2 must parse");
+        assert_eq!(work.format, 2);
+        assert_eq!(work.boxes.len(), 1, "the base building is still the top level");
+        assert_eq!(work.marks.len(), 1);
+        assert!(
+            super::turned_away(&work).is_none(),
+            "a current-format building must be let in",
+        );
+        assert_eq!(
+            super::claimed_by(&work),
+            Some(BuildingKind::House),
+            "and raised as what it says it is",
         );
     }
 }

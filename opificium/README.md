@@ -18,7 +18,7 @@ file described here.
 | `data/bodies/`      | the game      | bodies for the animation bench to pose            |
 | `templates/`        | you           | starting shapes to draw from                      |
 | `out/buildings/`    | the bench     | saved drawings, `.baz` - **the source of truth**  |
-| `out/baked/`        | the bench     | baked output, when no `install` is set            |
+| `out/baked/`        | the bench     | baked output, only if `install` is set empty      |
 
 A `.baz` is JSON. It is the editable drawing and the thing worth keeping.
 
@@ -47,8 +47,11 @@ true, or have the game generate these two files the way it generates the palette
 ## What the bench hands the game
 
 Baking resolves a drawing into plain boxes with colours already looked up, and
-writes it where `install` in the manifest points - otherwise `out/baked/`. That
-output is **generated**: bake it again rather than editing it.
+writes it to **`../assets/buildings`** - the game's own assets folder, one step out
+of this one. That is the default and needs no setting; a game that keeps its assets
+elsewhere sets `install` in the manifest, and a game that wants nothing carried
+anywhere sets it to `""`, which keeps bakes in `out/baked/`. That output is
+**generated**: bake it again rather than editing it.
 
 ```json
 {
