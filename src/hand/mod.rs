@@ -230,8 +230,34 @@ struct HoverGlow {
     coat: Handle<StandardMaterial>,
 }
 
-/// How far the outline stands off the thing it outlines.
-const OUTLINE: f32 = 1.07;
+/// How far the outline stands off the thing it outlines, in METRES.
+///
+/// Not a percentage. It was 1.07 - seven per cent of each dimension - which
+/// is a constant standoff only on a cube, and almost nothing in a building
+/// is a cube. A six-metre beam wore twenty-one centimetres of gold past each
+/// end and seven millimetres along its sides, so every long piece speared
+/// out of the building at both ends, and a corner where posts and beams meet
+/// grew a cluster of crosses. Brett, with a picture of one: "why do the
+/// corners look like this?"
+///
+/// Four centimetres reads at the distance a building is looked at without
+/// swallowing the thin pieces.
+const OUTLINE: f32 = 0.04;
+
+/// The scale that puts a shell `OUTLINE` metres off a part of this size.
+///
+/// Per axis, from the part's own scale, because the shell is its child and
+/// inherits it. A piece thinner than the standoff would balloon - a
+/// two-centimetre peg would wear a coat four times its own size - so the
+/// growth is capped, and a very thin thing simply wears a thinner rim.
+fn outline_scale(size: Vec3) -> Vec3 {
+    Vec3::new(
+        1.0 + (OUTLINE / size.x.abs().max(0.001)),
+        1.0 + (OUTLINE / size.y.abs().max(0.001)),
+        1.0 + (OUTLINE / size.z.abs().max(0.001)),
+    )
+    .min(Vec3::splat(1.6))
+}
 
 fn brew_hover_glow(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>) {
     commands.insert_resource(HoverGlow {
@@ -272,6 +298,9 @@ fn outline_the_hovered(
     shells: Query<Entity, With<HoverShell>>,
     children: Query<&Children>,
     meshed: Query<&Mesh3d>,
+    // The part's own scale: what makes a shared cube into this particular
+    // beam, and what the standoff has to be measured against.
+    stood: Query<&Transform>,
     bodies: Query<&crate::scatter::TreeBody>,
     mut last: Local<Option<Entity>>,
 ) {
@@ -299,11 +328,12 @@ fn outline_the_hovered(
             continue;
         };
         dressed_any = true;
+        let size = stood.get(part).map_or(Vec3::ONE, |at| at.scale);
         commands.spawn((
             HoverShell,
             Mesh3d(mesh.0.clone()),
             MeshMaterial3d(glow.coat.clone()),
-            Transform::from_scale(Vec3::splat(OUTLINE)),
+            Transform::from_scale(outline_scale(size)),
             bevy::light::NotShadowCaster,
             ChildOf(part),
         ));
@@ -314,7 +344,9 @@ fn outline_the_hovered(
             HoverShell,
             Mesh3d(body.bake(&mut meshes)),
             MeshMaterial3d(glow.coat.clone()),
-            Transform::from_scale(Vec3::splat(OUTLINE)),
+            // A tree's baked body is already at its true size, so the shell
+            // takes the standoff against one metre.
+            Transform::from_scale(outline_scale(Vec3::ONE)),
             bevy::light::NotShadowCaster,
             ChildOf(entity),
         ));
@@ -2140,5 +2172,48 @@ mod tests {
         assert!(world_scale_at(12.0) < world_scale_at(90.0));
         // Continuous across the floor, so crossing it cannot pop.
         assert!((world_scale_at(99.9) - world_scale_at(100.1)).abs() < 0.01);
+    }
+
+    /// The outline stands the same distance off everything.
+    ///
+    /// A hovered building is dozens of boxes of wildly different shapes -
+    /// a six-metre beam, a quarter-metre post, a wall panel - and a shell
+    /// scaled by a PERCENTAGE puts twenty-one centimetres of gold past a
+    /// beam's ends and seven millimetres along its sides. Every long piece
+    /// speared out of the building, and a corner grew a cluster of crosses.
+    #[test]
+    fn the_outline_stands_the_same_distance_off_everything() {
+        let stands_off = |size: Vec3| {
+            let scaled = super::outline_scale(size) * size;
+            (scaled - size) * 0.5
+        };
+        // Every axis of every shape, held against the standoff itself.
+        for size in [
+            Vec3::new(0.25, 2.5, 0.25),  // a corner post
+            Vec3::new(6.0, 0.2, 0.2),    // a long beam
+            Vec3::new(4.0, 2.5, 0.25),   // a wall panel
+            Vec3::splat(1.0),            // a cube
+        ] {
+            let off = stands_off(size);
+            for axis in [off.x, off.y, off.z] {
+                assert!(
+                    (axis - super::OUTLINE * 0.5).abs() < 0.001,
+                    "{size:?} stands off {off:?}, which is not {} all round",
+                    super::OUTLINE * 0.5,
+                );
+            }
+        }
+    }
+
+    /// A piece thinner than the standoff wears a thinner rim rather than a
+    /// coat several times its own size.
+    #[test]
+    fn a_thin_piece_is_not_swallowed_by_its_own_outline() {
+        let peg = Vec3::new(0.02, 0.02, 0.02);
+        let scale = super::outline_scale(peg);
+        assert!(
+            scale.max_element() <= 1.6,
+            "a two-centimetre peg grew {scale:?} times its own size",
+        );
     }
 }
