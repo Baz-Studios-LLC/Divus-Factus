@@ -13,7 +13,39 @@ pub const HOUSE_TIMBER: f32 = 6.0;
 /// per head is the same, but it is a single long commitment rather than
 /// two small ones, which is why a village only starts one when it has hands
 /// enough to finish it.
-pub const LONGHOUSE_TIMBER: f32 = 12.0;
+///
+/// DERIVED from the house's price per bed rather than written down, because
+/// it was written down as 12 against eight beds - and the day the hall grew
+/// to sleep the whole founding of ten, that flat number quietly made it the
+/// cheaper roof per head, which is the one thing it must never be.
+/// The village's own hall, when nobody has drawn one: half-width, and the
+/// space one berth takes along its length.
+///
+/// Beds lie across the hall in a single row down one wall, so its DEPTH is
+/// however many it sleeps - the hall is not a fixed building that beds are
+/// fitted into, it is a row of beds with a roof over it. Derived, so that
+/// raising the capacity lengthens the hall instead of packing the same
+/// timber tighter: at eight berths this gave 6.0 to 7.2, which is what the
+/// hall measured when it was written down as a flat number.
+pub const LONGHOUSE_HALF_W: (f32, f32) = (2.7, 3.1);
+const BERTH_ALONG: (f32, f32) = (1.5, 1.8);
+
+/// How deep the village's own hall runs, at its shortest and longest.
+///
+/// The plot is measured against the longest, and so is the clearance every
+/// other building keeps from it - see `reach` in the siting. Two numbers
+/// that must agree, which is why they are one.
+pub fn longhouse_half_d() -> (f32, f32) {
+    let berths = crate::villager::home::LONGHOUSE_CAPACITY as f32;
+    (
+        berths * BERTH_ALONG.0 * 0.5,
+        berths * BERTH_ALONG.1 * 0.5,
+    )
+}
+
+pub const LONGHOUSE_TIMBER: f32 =
+    HOUSE_TIMBER / crate::villager::home::HOUSE_CAPACITY as f32
+        * crate::villager::home::LONGHOUSE_CAPACITY as f32;
 
 /// What a building is for. Shape, cost and effect all follow from it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -529,10 +561,11 @@ impl Blueprint {
                 // measured for the village's own.
                 half_w: carried
                     .map(|work| work.half_w)
-                    .unwrap_or_else(|| rng.range(2.7, 3.1)),
-                half_d: carried
-                    .map(|work| work.half_d)
-                    .unwrap_or_else(|| rng.range(6.0, 7.2)),
+                    .unwrap_or_else(|| rng.range(LONGHOUSE_HALF_W.0, LONGHOUSE_HALF_W.1)),
+                half_d: carried.map(|work| work.half_d).unwrap_or_else(|| {
+                    let (short, long) = longhouse_half_d();
+                    rng.range(short, long)
+                }),
                 wall_h: rng.range(2.0, 2.3),
                 walls: if rng.chance(0.7) {
                     pal::shade(&pal::WOOD, rng.range(0.5, 0.7))
@@ -3465,7 +3498,9 @@ pub(crate) fn plan_houses(
     // stay within their own range.
     let reach = match kind {
         BuildingKind::House => super::baked::widest(BuildingKind::House).unwrap_or(3.2),
-        BuildingKind::Longhouse => super::baked::widest(BuildingKind::Longhouse).unwrap_or(7.2),
+        BuildingKind::Longhouse => {
+            super::baked::widest(BuildingKind::Longhouse).unwrap_or(longhouse_half_d().1)
+        }
         BuildingKind::TownHall => super::baked::widest(BuildingKind::TownHall).unwrap_or(3.2),
         _ => 3.0,
     };
@@ -4282,5 +4317,107 @@ mod tests {
         let per_house = BuildingKind::House.timber_cost() / HOUSE_CAPACITY as f32;
         let per_long = BuildingKind::Longhouse.timber_cost() / LONGHOUSE_CAPACITY as f32;
         assert!((per_house - per_long).abs() < 0.01);
+    }
+
+    /// The village's own hall shelters the village's own founding.
+    ///
+    /// This is the one the wipe caught. The hall slept EIGHT against a
+    /// founding of ten and had done for as long as both numbers existed;
+    /// nothing noticed because an authored `longhouse1-10people` was carried
+    /// in over the top of it. The moment the drawings were cleared out to be
+    /// reauthored, the game's own hand was left holding a promise it could
+    /// not keep - two founders with nowhere to sleep on the first night.
+    ///
+    /// A modder may delete every drawing there is. What the game builds by
+    /// its own hand is the floor, and the floor has to hold.
+    #[test]
+    fn the_halls_the_game_builds_itself_sleep_the_founding() {
+        assert_eq!(
+            crate::villager::home::LONGHOUSE_CAPACITY,
+            crate::villager::STARTING_POPULATION,
+            "the hall the founders wake in must have a bed for each of them",
+        );
+
+        // And it is long enough to lay them out. Beds run in a row down one
+        // wall, one bed to a berth, so the shortest hall the dice can roll
+        // still has to give every berth more than a bed's own width.
+        let (short, _long) = super::longhouse_half_d();
+        let berths = crate::villager::home::LONGHOUSE_CAPACITY as f32;
+        let per_berth = short * 2.0 / berths;
+        assert!(
+            per_berth > 0.62 * 1.5,
+            "berths are {per_berth:.2}m apart, which packs the beds into each other",
+        );
+    }
+
+    /// The plot is cut for the biggest hall the village can build.
+    ///
+    /// The siting measures clearance against a fixed reach, and the hall's
+    /// length is rolled - two numbers that have to agree. They were 7.2 and
+    /// 7.2 by coincidence rather than by construction, and lengthening the
+    /// hall for ten would have left every plot cut for the eight-bed one,
+    /// packing halls wall into wall exactly as the siting comment warns.
+    #[test]
+    fn the_plot_is_cut_for_the_longest_hall_the_dice_can_roll() {
+        let (_short, long) = super::longhouse_half_d();
+        let mut rng = crate::rng::Rng::stream(7, "hall-lengths");
+        for _ in 0..500 {
+            let rolled = Blueprint::roll(BuildingKind::Longhouse, &mut rng);
+            assert!(
+                rolled.half_d <= long + 0.001,
+                "a hall rolled {:.2} deep, past the {long:.2} the plot is cut for",
+                rolled.half_d,
+            );
+        }
+    }
+
+    /// Every kind the game raises can be raised by the game's OWN hand.
+    ///
+    /// Brett's rule, and the reason for it in his words: "All buildings
+    /// should have defaults hardcoded if there is no authored buildings...
+    /// This way if a modder deletes everything the game still works." The
+    /// authored drawings are a layer ON TOP of a game that stands without
+    /// them, and a village whose folder is empty must still build a street.
+    ///
+    /// This runs with no drawings carried in at all - which is exactly the
+    /// state of the tree while the buildings are being reauthored - so what
+    /// it measures is the hardcoded floor and nothing else.
+    #[test]
+    fn every_kind_stands_up_without_a_single_drawing() {
+        let mut rng = crate::rng::Rng::stream(11, "defaults");
+        for kind in BuildingKind::every() {
+            let plan = Blueprint::roll(*kind, &mut rng);
+            assert!(
+                plan.half_w > 0.0 && plan.half_d > 0.0,
+                "{kind:?} rolls no footprint to stand on",
+            );
+            assert!(
+                plan.wall_h > 0.0,
+                "{kind:?} rolls no walls",
+            );
+            assert!(
+                kind.timber_cost() > 0.0,
+                "{kind:?} costs nothing to build, so nobody ever will",
+            );
+            assert!(
+                !kind.name().is_empty(),
+                "{kind:?} has nothing to call itself",
+            );
+        }
+    }
+
+    /// And the two that hold people hold the number they promise.
+    #[test]
+    fn the_roofs_that_sleep_people_sleep_what_they_say() {
+        for kind in [BuildingKind::House, BuildingKind::Longhouse] {
+            assert!(
+                kind.sleeps() > 0,
+                "{kind:?} promises beds and has none",
+            );
+        }
+        assert!(
+            BuildingKind::Longhouse.sleeps() > BuildingKind::House.sleeps(),
+            "the hall must shelter more than a family home",
+        );
     }
 }

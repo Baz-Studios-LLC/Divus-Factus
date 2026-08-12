@@ -30,8 +30,20 @@ const LOW_FUEL: f32 = 45.0;
 /// How many people one house sleeps: a couple and their children.
 pub const HOUSE_CAPACITY: usize = 4;
 
-/// How many the longhouse sleeps. Twice a house, and none of them kin.
-pub const LONGHOUSE_CAPACITY: usize = 8;
+/// How many the longhouse sleeps: the whole founding, and none of them kin.
+///
+/// It was EIGHT, against a founding of ten, and had been for as long as there
+/// has been a founding of ten - so the hall the ten founders wake up in has
+/// never had beds for two of them. Nothing caught it because an authored
+/// longhouse was carried in over the top, and its name says what it was doing:
+/// `longhouse1-10people`. The moment the drawings were cleared out to be
+/// reauthored, the game's own hand was left holding the promise, and it could
+/// not keep it.
+///
+/// A carried-in drawing still decides its own bed count - see
+/// `BuildingKind::sleeps` - so this is the floor under a village that has no
+/// drawings yet, and it must be one the opening can stand on.
+pub const LONGHOUSE_CAPACITY: usize = crate::villager::STARTING_POPULATION;
 
 /// How many can sleep rough in the fire's circle before the village is
 /// genuinely overfull. The founders' allowance, roughly.
