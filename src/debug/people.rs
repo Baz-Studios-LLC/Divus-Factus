@@ -707,17 +707,23 @@ pub(crate) fn spawn_people_panel(
         }
     }
 
-    // Every readout the hover card has, as a two-column grid of chipped
-    // rows - each stat wearing its little engraved glyph.
+    // Every readout the hover card has, as TWO COLUMNS of chipped rows -
+    // each stat wearing its little engraved glyph.
+    //
+    // Two real columns, not one wrapping row of half-width cells. Wrapping
+    // put both columns in a single flow, so a value that ran to two lines
+    // grew that flex line and shoved everything after it DOWN THE OTHER
+    // SIDE as well: a villager born to two long names pushed SEEN YOU out
+    // of step with nothing. Brett: "The family line shifts everything when
+    // it is two rows of text." Columns that do not know about each other
+    // cannot do that - a tall row costs its own side and nobody else's.
     let grid = commands
         .spawn((
             Node {
                 width: percent(100),
                 flex_grow: 1.0,
                 flex_direction: FlexDirection::Row,
-                flex_wrap: FlexWrap::Wrap,
-                align_content: AlignContent::SpaceEvenly,
-                row_gap: px(5),
+                column_gap: px(0),
                 padding: UiRect::all(px(super::village::RHYTHM)),
                 border_radius: BorderRadius::all(px(0)),
                 ..default()
@@ -726,7 +732,21 @@ pub(crate) fn spawn_people_panel(
             ChildOf(soul),
         ))
         .id();
-    for (value, label) in [
+    let column = |commands: &mut Commands| {
+        commands
+            .spawn((
+                Node {
+                    width: percent(50),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: px(5),
+                    ..default()
+                },
+                ChildOf(grid),
+            ))
+            .id()
+    };
+    let columns = [column(&mut commands), column(&mut commands)];
+    for (wide, (value, label)) in [
         (InspectorValue::State, "STATE"),
         (InspectorValue::Heart, "HEART"),
         (InspectorValue::Hunger, "HUNGER"),
@@ -738,11 +758,14 @@ pub(crate) fn spawn_people_panel(
         (InspectorValue::Spirits, "SPIRITS"),
         (InspectorValue::Family, "FAMILY"),
         (InspectorValue::Seen, "SEEN YOU"),
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let cell = commands
             .spawn((
                 Node {
-                    width: percent(50),
+                    width: percent(100),
                     flex_direction: FlexDirection::Row,
                     // Baseline, not Center: the dim label and the body value
                     // wear different type sizes, and centring the boxes left
@@ -754,7 +777,9 @@ pub(crate) fn spawn_people_panel(
                     padding: UiRect::axes(px(6), px(5)),
                     ..default()
                 },
-                ChildOf(grid),
+                // Left and right alternate down the list, so the pairs
+                // read across exactly as they did.
+                ChildOf(columns[wide % 2]),
             ))
             .id();
         stat_chip(&mut commands, cell, value);

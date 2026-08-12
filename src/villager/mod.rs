@@ -171,6 +171,20 @@ impl Plugin for VillagerPlugin {
             // read it run whether or not there is a village.
             .init_resource::<explore::KnownWorld>()
             .init_resource::<explore::GroundWanted>()
+            // AFTER the walk home is decided, so a bush at hand beats a
+            // larder half a mile off. Both systems steer the same hungry
+            // villager: `eat_from_store` now turns anyone past desperate
+            // toward the sacks wherever they are, and this one feeds them
+            // off the land they are standing on. Whichever runs last wins
+            // the errand - and the right answer is the food in arm's reach.
+            // Brett: "shouldnt they eat form bushes when on the road?"
+            //
+            // It only takes the errand when it FINDS something: no carcass
+            // and no fruiting bush leaves the walk home standing.
+            .add_systems(
+                Update,
+                explore::the_road_feeds_who_walks_it.after(work::eat_from_store),
+            )
             .add_systems(Startup, deal_the_dice)
             // The maker's own bench, furnished with this game's palette and
             // vocabulary before anybody opens it. Startup rather than a
@@ -225,7 +239,6 @@ impl Plugin for VillagerPlugin {
                     stretch_settlement,
                     explore::walk_the_world,
                     explore::expeditions,
-                    explore::the_road_feeds_who_walks_it,
                     explore::escort_duty,
                     explore::raise_cairns,
                 )
