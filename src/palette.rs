@@ -401,6 +401,28 @@ pub const NAMED_RAMPS: &[(&str, &Ramp)] = &[
     ("cloth-pink", &CLOTH_PINK),
 ];
 
+/// The palette as Opificium reads it.
+///
+/// Lifted out of the hand-run export that used to hold it, because the game
+/// writes this file itself now - see `baked::furnish_the_makers_bench` - and
+/// a player who never clones this repository still needs the true colours.
+pub fn as_json() -> String {
+    let ramps: Vec<String> = NAMED_RAMPS
+        .iter()
+        .map(|(name, ramp)| {
+            let steps: Vec<String> = ramp
+                .iter()
+                .map(|[r, g, b]| format!("[{r},{g},{b}]"))
+                .collect();
+            format!(
+                "    {{\"name\": \"{name}\", \"steps\": [{}]}}",
+                steps.join(", ")
+            )
+        })
+        .collect();
+    format!("{{\n  \"ramps\": [\n{}\n  ]\n}}\n", ramps.join(",\n"))
+}
+
 /// The ramp that answers to this name.
 #[cfg_attr(not(test), allow(dead_code))]
 pub fn ramp_named(name: &str) -> Option<&'static Ramp> {
@@ -421,23 +443,8 @@ mod tests {
     #[test]
     #[ignore = "a hand-run export, not a check"]
     fn export_palette_for_opificium() {
-        let named = super::NAMED_RAMPS;
-        let ramps: Vec<String> = named
-            .iter()
-            .map(|(name, ramp)| {
-                let steps: Vec<String> = ramp
-                    .iter()
-                    .map(|[r, g, b]| format!("[{r},{g},{b}]"))
-                    .collect();
-                format!(
-                    "    {{\"name\": \"{name}\", \"steps\": [{}]}}",
-                    steps.join(", ")
-                )
-            })
-            .collect();
-        let json = format!("{{\n  \"ramps\": [\n{}\n  ]\n}}\n", ramps.join(",\n"));
         std::fs::create_dir_all("opificium/data").expect("opificium/data");
-        std::fs::write("opificium/data/palette.json", json).expect("write palette.json");
+        std::fs::write("opificium/data/palette.json", super::as_json()).expect("write palette");
     }
 
     use super::*;

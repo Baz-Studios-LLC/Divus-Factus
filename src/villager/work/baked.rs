@@ -44,6 +44,10 @@ pub struct Mark {
 /// A whole building as the bench baked it.
 #[derive(serde::Deserialize, Clone)]
 pub struct Baked {
+    /// Which shape of file this is. Absent on drawings baked before the
+    /// bench stamped it, which are read as the format of their day.
+    #[serde(default)]
+    pub format: u32,
     pub name: String,
     /// What the village should raise this AS, said outright by the maker who
     /// baked it. A drawing used to be claimed by whatever kind-word its file
@@ -159,6 +163,10 @@ fn carried() -> &'static Vec<Baked> {
                     .and_then(|text| serde_json::from_str::<Baked>(&text).ok())
                 {
                     Some(work) => {
+                        if let Some(why) = turned_away(&work) {
+                            warn!("{}: {why}. Not carried in.", work.name);
+                            continue;
+                        }
                         read_the_words(&work);
                         // A maker's drawing of the same name replaces the one
                         // that shipped: they drew it second, and meant it. It
@@ -195,6 +203,158 @@ fn carried() -> &'static Vec<Baked> {
         works.sort_by(|a, b| a.name.cmp(&b.name));
         works
     })
+}
+
+/// The kinds this game can raise, as Opificium reads them.
+pub fn kinds_as_json() -> String {
+    let kinds: Vec<String> = super::BuildingKind::every()
+        .iter()
+        .map(|kind| match called(*kind) {
+            // TOWN HALL on the bench's shelf; `townhall` in the file. The word
+            // is the contract, the label is only what a maker reads.
+            "townhall" => "    { \"word\": \"townhall\", \"label\": \"TOWN HALL\" }".to_string(),
+            word => format!("    {{ \"word\": \"{word}\" }}"),
+        })
+        .collect();
+    format!(
+        "{{\n  \"format\": 1,\n  \"kinds\": [\n{}\n  ]\n}}\n",
+        kinds.join(",\n")
+    )
+}
+
+/// The marks this game acts on, as Opificium reads them.
+pub fn widgets_as_json() -> String {
+    let marks: Vec<String> = MARKS_UNDERSTOOD
+        .iter()
+        .map(|(mark, ramp, shade)| {
+            format!("    {{ \"mark\": \"{mark}\", \"ramp\": \"{ramp}\", \"shade\": {shade} }}")
+        })
+        .collect();
+    format!(
+        "{{\n  \"format\": 1,\n  \"marks\": [\n{}\n  ]\n}}\n",
+        marks.join(",\n")
+    )
+}
+
+/// Keeps a maker's own Opificium project furnished with this game's truth.
+///
+/// The point of the whole arrangement: somebody who has never seen this
+/// repository - who bought the game and downloaded the bench - opens Opificium,
+/// points it at this folder, and is drawing in the game's own colours with the
+/// game's own vocabulary, for the game's own VERSION. Nothing to copy, nothing
+/// to keep in step, and no way to author a building against a contract the
+/// installed game does not honour.
+///
+/// `install` points at the buildings folder the game already reads, so a bake
+/// lands where the next launch finds it. The bench writes its own README into
+/// the folder, and the drawings are the maker's; everything written here is
+/// this game's side of the contract and nothing else.
+///
+/// Written every launch, but only where it differs - a file rewritten for no
+/// reason is a file whose timestamp lies about when the game last changed.
+pub fn furnish_the_makers_bench() {
+    let Some(bench) = crate::carried::made_by_hand("opificium") else {
+        return;
+    };
+    let data = bench.join("data");
+    if std::fs::create_dir_all(&data).is_err() {
+        return;
+    }
+
+    // `install` is RELATIVE to the project, and points back out at the folder
+    // this game reads a maker's own buildings from.
+    let manifest = "{\n  \"format\": 1,\n  \"name\": \"Divus Factus\",\n  \
+                    \"install\": \"../buildings\"\n}\n";
+    let written = [
+        (bench.join("opificium.json"), manifest.to_string()),
+        (data.join("palette.json"), crate::palette::as_json()),
+        (data.join("kinds.json"), kinds_as_json()),
+        (data.join("widgets.json"), widgets_as_json()),
+    ];
+    let mut fresh = 0;
+    for (road, said) in written {
+        let same = std::fs::read_to_string(&road).is_ok_and(|had| had == said);
+        if same {
+            continue;
+        }
+        if std::fs::write(&road, said).is_ok() {
+            fresh += 1;
+        }
+    }
+    if fresh > 0 {
+        info!(
+            "the maker's bench is furnished with this game's palette and words: {}",
+            bench.display(),
+        );
+    }
+}
+
+/// The newest baked format this game can read.
+///
+/// A drawing from a NEWER bench is refused rather than half-read. Every field
+/// this game does not recognise is dropped in silence by the reader, so a
+/// format that moved something - marks into levels, a box's colour into a
+/// reference - would arrive as a building with no doors and no beds rather
+/// than as an error. That is a fine way to lose an afternoon on your own work
+/// and an unacceptable one to treat a stranger's.
+const NEWEST_FORMAT: u32 = 2;
+
+/// What one drawing may be, at the outside.
+///
+/// Not a budget - a real building is nowhere near any of these - but a floor
+/// under the damage a bad file can do. Every one of these is a plain JSON
+/// number in a file the game did not write, and once buildings arrive from
+/// the Workshop they are numbers written by strangers. A drawing with two
+/// hundred thousand boxes should be refused at the door with a message, not
+/// raised into a village where it becomes a frozen machine nobody can explain.
+const AT_MOST_BOXES: usize = 20_000;
+const AT_MOST_MARKS: usize = 2_000;
+/// Metres, half-extent. The largest thing anybody has drawn is a longhouse.
+const AT_MOST_ACROSS: f32 = 200.0;
+
+/// Whether this drawing can be let in at all.
+///
+/// Returns why not, for saying out loud. Refusal has to be LOUD and NAMED:
+/// a maker - or a modder who has never seen this source - is owed the
+/// difference between "your building is wrong" and "nothing happened".
+fn turned_away(work: &Baked) -> Option<String> {
+    if work.format > NEWEST_FORMAT {
+        return Some(format!(
+            "baked in format {} by a newer Opificium than this game can read \
+             (it knows up to {NEWEST_FORMAT}) - update the game, or bake it again \
+             from the drawing with a matching bench",
+            work.format,
+        ));
+    }
+    if work.boxes.is_empty() {
+        return Some("has no boxes in it at all".to_string());
+    }
+    if work.boxes.len() > AT_MOST_BOXES {
+        return Some(format!(
+            "has {} boxes, past the {AT_MOST_BOXES} this game will raise",
+            work.boxes.len(),
+        ));
+    }
+    if work.marks.len() > AT_MOST_MARKS {
+        return Some(format!(
+            "has {} marks, past the {AT_MOST_MARKS} this game will read",
+            work.marks.len(),
+        ));
+    }
+    let across = work.half_w.max(work.half_d);
+    if !across.is_finite() || !work.high.is_finite() {
+        return Some("measures itself in numbers that are not numbers".to_string());
+    }
+    if across > AT_MOST_ACROSS {
+        return Some(format!(
+            "measures {across:.0}m from its middle, past the {AT_MOST_ACROSS:.0}m \
+             a single building may cover",
+        ));
+    }
+    if work.half_w <= 0.0 || work.half_d <= 0.0 {
+        return Some("has no footprint to stand on".to_string());
+    }
+    None
 }
 
 /// Every mark this game acts on, and the colour the bench should draw it.
@@ -946,6 +1106,7 @@ mod tests {
     #[test]
     fn a_stated_kind_beats_the_name() {
         let named = |name: &str, kind: &str| Baked {
+            format: super::NEWEST_FORMAT,
             name: name.to_string(),
             kind: kind.to_string(),
             half_w: 1.0,
@@ -1018,50 +1179,17 @@ mod tests {
 
     /// Writes the two vocabulary files out for Opificium.
     ///
-    /// The bench offers only what a project's `kinds.json` and `widgets.json`
-    /// list, and matches nothing against this source - it cannot see it. So
-    /// these two files are a CONTRACT, and the only way a contract stays true
-    /// is if one side generates it. The palette has worked this way from the
-    /// start; there is no reason the vocabulary should not.
+    /// The same words the game furnishes a player's bench with at every
+    /// launch - this only puts them where THIS repository's project keeps
+    /// them, so the contract is reviewable in a diff.
     ///
-    /// Run by hand when a building kind or a mark is added:
     /// `cargo test export_vocabulary_for_opificium -- --ignored`
     #[test]
     #[ignore = "a hand-run export, not a check"]
     fn export_vocabulary_for_opificium() {
-        let kinds: Vec<String> = BuildingKind::every()
-            .iter()
-            .map(|kind| {
-                let word = super::called(*kind);
-                // TOWN HALL rather than TOWNHALL on the bench's own shelf.
-                // One word, two spellings: the game's is the contract, the
-                // label is only what a maker reads.
-                match word {
-                    "townhall" => {
-                        "    { \"word\": \"townhall\", \"label\": \"TOWN HALL\" }".to_string()
-                    }
-                    word => format!("    {{ \"word\": \"{word}\" }}"),
-                }
-            })
-            .collect();
-        let json = format!(
-            "{{\n  \"format\": 1,\n  \"kinds\": [\n{}\n  ]\n}}\n",
-            kinds.join(",\n")
-        );
         std::fs::create_dir_all("opificium/data").expect("opificium/data");
-        std::fs::write("opificium/data/kinds.json", json).expect("write kinds.json");
-
-        let marks: Vec<String> = super::MARKS_UNDERSTOOD
-            .iter()
-            .map(|(mark, ramp, shade)| {
-                format!("    {{ \"mark\": \"{mark}\", \"ramp\": \"{ramp}\", \"shade\": {shade} }}")
-            })
-            .collect();
-        let json = format!(
-            "{{\n  \"format\": 1,\n  \"marks\": [\n{}\n  ]\n}}\n",
-            marks.join(",\n")
-        );
-        std::fs::write("opificium/data/widgets.json", json).expect("write widgets.json");
+        std::fs::write("opificium/data/kinds.json", super::kinds_as_json()).expect("kinds");
+        std::fs::write("opificium/data/widgets.json", super::widgets_as_json()).expect("widgets");
     }
 
     /// Every colour the vocabulary asks the bench to paint with must be a ramp
@@ -1078,6 +1206,110 @@ mod tests {
                 (0.0..=1.0).contains(shade),
                 "the mark \"{mark}\" asks for shade {shade}, outside the ramp",
             );
+        }
+    }
+
+    /// A drawing from a newer bench is refused, not half-read.
+    ///
+    /// This is the one that matters once buildings arrive from strangers.
+    /// Serde drops every field it does not recognise without a word, so a
+    /// format that MOVED something - marks into levels, colour into a
+    /// reference - would be read as a building with no doors and no beds
+    /// rather than as an error.
+    #[test]
+    fn a_drawing_from_a_newer_bench_is_turned_away() {
+        let mut work = a_plain_work();
+        work.format = super::NEWEST_FORMAT + 1;
+        let why = super::turned_away(&work).expect("a newer format must be refused");
+        assert!(why.contains("newer"), "{why}");
+
+        // And the formats it does know are let in, including the drawings
+        // baked before the bench stamped one at all.
+        for format in [0, 1, super::NEWEST_FORMAT] {
+            work.format = format;
+            assert!(
+                super::turned_away(&work).is_none(),
+                "format {format} should be readable",
+            );
+        }
+    }
+
+    /// A stranger's numbers are still numbers, and some of them are absurd.
+    #[test]
+    fn an_absurd_drawing_is_turned_away_by_name() {
+        let bad: &[(&str, fn(&mut super::Baked))] = &[
+            ("no boxes", |w| w.boxes.clear()),
+            ("too many boxes", |w| {
+                w.boxes = (0..super::AT_MOST_BOXES + 1)
+                    .map(|_| w.boxes[0].clone())
+                    .collect()
+            }),
+            ("too wide", |w| w.half_w = super::AT_MOST_ACROSS + 1.0),
+            ("no footprint", |w| w.half_d = 0.0),
+            ("not a number", |w| w.high = f32::NAN),
+        ];
+        for (what, spoil) in bad {
+            let mut work = a_plain_work();
+            spoil(&mut work);
+            assert!(
+                super::turned_away(&work).is_some(),
+                "a drawing that is {what} should be refused",
+            );
+        }
+        // And an ordinary one is not.
+        assert!(super::turned_away(&a_plain_work()).is_none());
+    }
+
+    /// What the game furnishes a maker's bench with must be what the bench
+    /// can actually read - a project it cannot parse is worse than none.
+    #[test]
+    fn the_bench_is_furnished_with_readable_words() {
+        let kinds: serde_json::Value =
+            serde_json::from_str(&super::kinds_as_json()).expect("kinds.json is JSON");
+        assert_eq!(kinds["format"], 1);
+        assert_eq!(
+            kinds["kinds"].as_array().expect("a list").len(),
+            BuildingKind::every().len(),
+            "every kind the game raises must be offered",
+        );
+
+        let widgets: serde_json::Value =
+            serde_json::from_str(&super::widgets_as_json()).expect("widgets.json is JSON");
+        assert_eq!(widgets["format"], 1);
+        let offered: Vec<&str> = widgets["marks"]
+            .as_array()
+            .expect("a list")
+            .iter()
+            .map(|m| m["mark"].as_str().expect("a word"))
+            .collect();
+        for (mark, ..) in super::MARKS_UNDERSTOOD {
+            assert!(offered.contains(mark), "{mark} is read but never offered");
+        }
+
+        let palette: serde_json::Value =
+            serde_json::from_str(&crate::palette::as_json()).expect("palette.json is JSON");
+        assert!(!palette["ramps"].as_array().expect("a list").is_empty());
+    }
+
+    /// A plain, believable drawing to spoil in the tests above.
+    fn a_plain_work() -> super::Baked {
+        super::Baked {
+            format: super::NEWEST_FORMAT,
+            name: "house-test".into(),
+            kind: "house".into(),
+            half_w: 3.0,
+            half_d: 4.0,
+            high: 5.0,
+            boxes: vec![super::Box3 {
+                at: [0.0, 1.0, 0.0],
+                size: [4.0, 2.0, 0.25],
+                turn: [0.0, 0.0, 0.0, 1.0],
+                rgb: [110, 92, 70],
+                alpha: 1.0,
+                form: "box".into(),
+                stage: String::new(),
+            }],
+            marks: vec![],
         }
     }
 }

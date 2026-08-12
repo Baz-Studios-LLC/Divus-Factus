@@ -172,6 +172,13 @@ impl Plugin for VillagerPlugin {
             .init_resource::<explore::KnownWorld>()
             .init_resource::<explore::GroundWanted>()
             .add_systems(Startup, deal_the_dice)
+            // The maker's own bench, furnished with this game's palette and
+            // vocabulary before anybody opens it. Startup rather than a
+            // build step: what it writes has to match the game the player is
+            // actually running, not the one somebody packaged.
+            .add_systems(Startup, |_: Commands| {
+                work::baked::furnish_the_makers_bench()
+            })
             // Its own registration rather than the chain above: that
             // tuple is at Bevy's twenty-system ceiling, and the rising
             // needs no ordering against any of it.
