@@ -1464,13 +1464,17 @@ pub(crate) fn open_boardwalks(
 /// house that was drawn with a frame, so its posts stand alone on the
 /// footing for a while, the way a real house is raised.
 pub fn steps_for(plan: &Blueprint) -> u8 {
-    if let Some(work) = super::baked::drawing_of(plan.kind, plan.plan, &plan.drawing)
-        && super::baked::has_frame(work)
-    {
-        4
-    } else {
-        3
+    let Some(work) = super::baked::drawing_of(plan.kind, plan.plan, &plan.drawing) else {
+        // The village's own hand: footing, walls, roof.
+        return 3;
+    };
+    // The DRAWING says, in its phases - see `baked::phases_of`. A house
+    // drawn as one phase goes up in one step, whatever parts are in it.
+    if let Some(phases) = super::baked::phases_of(work) {
+        return (phases.len() as u8).max(1);
     }
+    // A drawing from before the bench wrote phases, read the old way.
+    if super::baked::has_frame(work) { 4 } else { 3 }
 }
 
 /// Which visual stage a build should show, at `progress` timber toward a

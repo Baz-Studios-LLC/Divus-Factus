@@ -41,6 +41,21 @@ pub struct Mark {
     pub yaw: f32,
 }
 
+/// One form of a building: the original, or one of its upgrades.
+#[derive(serde::Deserialize, Clone, Default)]
+pub struct Level {
+    /// One COMPLETE set of boxes for this step of raising it - not the
+    /// pieces added at this step, but everything standing once it is done.
+    #[serde(default)]
+    pub phases: Vec<Phase>,
+}
+
+#[derive(serde::Deserialize, Clone, Default)]
+pub struct Phase {
+    #[serde(default)]
+    pub boxes: Vec<Box3>,
+}
+
 /// A whole building as the bench baked it.
 #[derive(serde::Deserialize, Clone)]
 pub struct Baked {
@@ -63,6 +78,11 @@ pub struct Baked {
     pub high: f32,
     pub boxes: Vec<Box3>,
     pub marks: Vec<Mark>,
+    /// The building's whole life: the base form, then each upgrade. Only
+    /// the first is read today - upgrades are Opificium's to finish - but
+    /// its PHASES are how a building is raised.
+    #[serde(default)]
+    pub levels: Vec<Level>,
 }
 
 /// A building can be raised as drawn or as its own reflection, and half of them
@@ -904,6 +924,22 @@ fn prism(lengthwise: bool) -> Mesh {
     .with_inserted_indices(bevy::render::mesh::Indices::U32(indices))
 }
 
+/// Whether two boxes are the same piece of building.
+///
+/// Phases repeat everything that already stands, so telling "this is the
+/// wall I raised last step" from "this is a new wall in the same place"
+/// is what keeps a step from building the whole house again on top of
+/// itself. Compared on what it is and where, not on identity - two phases
+/// are two readings of the same file and share nothing else.
+fn same_piece(a: &Box3, b: &Box3) -> bool {
+    let near = |x: [f32; 3], y: [f32; 3]| {
+        x.iter()
+            .zip(y.iter())
+            .all(|(one, two)| (one - two).abs() < 0.0005)
+    };
+    near(a.at, b.at) && near(a.size, b.size) && a.form == b.form && a.rgb == b.rgb
+}
+
 /// Which of the game's three build stages a baked stage belongs to.
 fn stage_of(stage: &str, framed: bool) -> u8 {
     // A house drawn with no frame rises in three steps, not four, so its
@@ -918,6 +954,29 @@ fn stage_of(stage: &str, framed: bool) -> u8 {
         (_, true) => 3,
         (_, false) => 2,
     }
+}
+
+/// The steps this drawing is raised in.
+///
+/// THE PHASES SAY, and nothing else does. Each phase is one complete set
+/// of boxes - everything standing once that step is done - so a drawing
+/// with one phase goes up in one step, however many kinds of part it has
+/// in it.
+///
+/// The game used to count the `stage` words instead, which was reading the
+/// wrong field entirely: `footing`, `frame`, `walls`, `roof` and
+/// `furnishing` say what a piece IS, for the cutaway toggle that lifts a
+/// roof off and takes the walls down after it. Brett drew a house as a
+/// single phase and watched the village lay a footing, raise walls and put
+/// a roof on it in three steps he had not asked for.
+///
+/// A drawing with no phases at all is one from before the bench wrote
+/// them, and falls back to the old reading so that it still rises.
+pub fn phases_of(work: &Baked) -> Option<&[Phase]> {
+    work.levels
+        .first()
+        .map(|level| level.phases.as_slice())
+        .filter(|phases| !phases.is_empty())
 }
 
 /// Whether a carried-in building has a frame worth showing on its own -
@@ -940,11 +999,51 @@ pub fn raise_baked(
     let wedge = meshes.add(prism(false));
     let ridge = meshes.add(prism(true));
     let framed = has_frame(work);
-    for piece in work
-        .boxes
-        .iter()
-        .filter(|b| stage_of(&b.stage, framed) == stage)
-    {
+    // What this step raises.
+    //
+    // A phase is a COMPLETE set - everything standing once the step is done
+    // - and the site keeps what earlier steps put there, so what goes up now
+    // is this phase less the one before it. A drawing with no phases is one
+    // from before the bench wrote them, and is still split by what its
+    // pieces ARE.
+    let showing: Vec<&Box3> = match phases_of(work) {
+        Some(phases) => {
+            let now = phases.get(stage as usize).or_else(|| phases.last());
+            let before = (stage > 0)
+                .then(|| phases.get(stage as usize - 1))
+                .flatten();
+            match (now, before) {
+                (Some(now), Some(before)) => {
+                    let had = |piece: &Box3| before.boxes.iter().any(|b| same_piece(b, piece));
+                    // A phase that DROPS a piece cannot be honoured by a site
+                    // that only ever adds - scaffolding coming down would need
+                    // taking down. Nothing does that yet; say so if it ever
+                    // starts, rather than quietly leaving it standing.
+                    let gone = before
+                        .boxes
+                        .iter()
+                        .filter(|b| !now.boxes.iter().any(|k| same_piece(k, b)))
+                        .count();
+                    if gone > 0 {
+                        warn!(
+                            "{}: phase {stage} takes away {gone} pieces, which a rising \
+                             building cannot do - they will stay standing",
+                            work.name,
+                        );
+                    }
+                    now.boxes.iter().filter(|piece| !had(piece)).collect()
+                }
+                (Some(now), None) => now.boxes.iter().collect(),
+                _ => Vec::new(),
+            }
+        }
+        None => work
+            .boxes
+            .iter()
+            .filter(|b| stage_of(&b.stage, framed) == stage)
+            .collect(),
+    };
+    for piece in showing {
         // Exactly the colour it was painted, everywhere, always.
         //
         // The village used to re-dye each house's dominant wall and roof cloth
@@ -1209,6 +1308,7 @@ mod tests {
             format: super::NEWEST_FORMAT,
             name: name.to_string(),
             kind: kind.to_string(),
+            levels: Vec::new(),
             half_w: 1.0,
             half_d: 1.0,
             high: 1.0,
@@ -1415,6 +1515,7 @@ mod tests {
                 stage: String::new(),
             }],
             marks: vec![],
+            levels: Vec::new(),
         }
     }
 
@@ -1537,5 +1638,91 @@ mod tests {
             theirs.starts_with(&furnished),
             "a player's bakes must land inside the project the game furnishes",
         );
+    }
+
+    /// A drawing rises in the steps ITS PHASES ask for, not one per kind
+    /// of part it happens to contain.
+    ///
+    /// Brett drew a house as a single phase and watched the village lay a
+    /// footing, raise the walls and roof it - three steps he never asked
+    /// for. The game was counting the `stage` words on each box, which say
+    /// what a piece IS for the cutaway toggle, and have nothing to do with
+    /// how a building goes up.
+    #[test]
+    fn a_drawing_rises_in_the_steps_its_phases_ask_for() {
+        let piece = |x: f32, stage: &str| {
+            format!(
+                r#"{{"at":[{x},1.0,0.0],"size":[1,2,0.25],"turn":[0,0,0,1],
+                    "form":"box","rgb":[110,92,70],"alpha":1.0,"stage":"{stage}"}}"#
+            )
+        };
+        // One phase, four kinds of part in it - the shape of Brett's house.
+        let whole = format!(
+            r#"{{"format":2,"name":"one-phase","kind":"house","half_w":3,"half_d":3,"high":5,
+                 "boxes":[{a},{b},{c},{d}],"marks":[],
+                 "levels":[{{"phases":[{{"boxes":[{a},{b},{c},{d}]}}]}}]}}"#,
+            a = piece(0.0, "footing"),
+            b = piece(1.0, "walls"),
+            c = piece(2.0, "roof"),
+            d = piece(3.0, "furnishing"),
+        );
+        let work: super::Baked = serde_json::from_str(&whole).expect("parses");
+        let phases = super::phases_of(&work).expect("a phase");
+        assert_eq!(phases.len(), 1, "one phase means one step");
+        assert_eq!(phases[0].boxes.len(), 4);
+
+        // And a drawing that asks for three gets three.
+        let staged = format!(
+            r#"{{"format":2,"name":"three-phase","kind":"house","half_w":3,"half_d":3,"high":5,
+                 "boxes":[{a},{b},{c}],"marks":[],
+                 "levels":[{{"phases":[
+                    {{"boxes":[{a}]}},
+                    {{"boxes":[{a},{b}]}},
+                    {{"boxes":[{a},{b},{c}]}}]}}]}}"#,
+            a = piece(0.0, "footing"),
+            b = piece(1.0, "walls"),
+            c = piece(2.0, "roof"),
+        );
+        let work: super::Baked = serde_json::from_str(&staged).expect("parses");
+        assert_eq!(super::phases_of(&work).expect("phases").len(), 3);
+
+        // A drawing from before the bench wrote phases still rises the old
+        // way rather than not at all.
+        let old = format!(
+            r#"{{"format":1,"name":"no-phases","kind":"house","half_w":3,"half_d":3,"high":5,
+                 "boxes":[{a},{b}],"marks":[]}}"#,
+            a = piece(0.0, "footing"),
+            b = piece(1.0, "walls"),
+        );
+        let work: super::Baked = serde_json::from_str(&old).expect("parses");
+        assert!(super::phases_of(&work).is_none(), "no phases to read");
+    }
+
+    /// A later phase repeats what already stands, and the repeat is not
+    /// built twice.
+    ///
+    /// Phases are COMPLETE sets, so phase two carries phase one's walls
+    /// again. A site that only ever adds would raise a second house inside
+    /// the first if it took a phase at face value.
+    #[test]
+    fn a_phase_does_not_build_what_is_already_standing() {
+        let a = super::Box3 {
+            at: [0.0, 1.0, 0.0],
+            size: [1.0, 2.0, 0.25],
+            turn: [0.0, 0.0, 0.0, 1.0],
+            rgb: [110, 92, 70],
+            alpha: 1.0,
+            form: "box".into(),
+            stage: "walls".into(),
+        };
+        let mut b = a.clone();
+        b.at = [1.0, 1.0, 0.0];
+        assert!(super::same_piece(&a, &a.clone()), "a piece is itself");
+        assert!(!super::same_piece(&a, &b), "and not the one beside it");
+        // Painted differently is a different piece: a repaint between
+        // phases is something the eye would see.
+        let mut repainted = a.clone();
+        repainted.rgb = [10, 10, 10];
+        assert!(!super::same_piece(&a, &repainted));
     }
 }
