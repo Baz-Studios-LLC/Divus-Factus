@@ -948,6 +948,13 @@ pub struct Table;
 pub struct Doorway {
     pub at: Vec2,
     pub out: Vec2,
+    /// Whether anything hangs in it, or it is simply a gap in the wall.
+    ///
+    /// The routing does not care - a doorway is where a wall may be walked
+    /// through either way - so this is only about whether a leaf swings.
+    /// Brett, on the village's own hall: "it doesnt need a door though, just
+    /// openings is fine."
+    pub leaf: bool,
 }
 
 impl Doorway {
@@ -957,7 +964,13 @@ impl Doorway {
         Doorway {
             at: Vec2::new(half_w, z),
             out: Vec2::X,
+            leaf: true,
         }
+    }
+
+    /// The same doorway with nothing hanging in it.
+    pub fn open(self) -> Self {
+        Doorway { leaf: false, ..self }
     }
 }
 
@@ -1154,7 +1167,7 @@ fn the_makers_own_panel(door: &Doorway, parts: &[(Entity, Transform)]) -> Vec<(E
             here.dot(along).abs() < DOOR_HALF_SPAN + 0.15
                 && here.dot(out).abs() < 0.5
                 && (0.7..1.8).contains(&stood.translation.y)
-                && reach_along(stood, wall_way) >= 0.35
+                && (0.35..=DOOR_HALF_SPAN + 0.3).contains(&reach_along(stood, wall_way))
                 && reach_along(stood, out_way) <= 0.2
         })
         .min_by(|a, b| {
@@ -1216,6 +1229,9 @@ pub(crate) fn hang_the_doors(
             .filter_map(|piece| pieces.get(*piece).ok().map(|stood| (*piece, *stood)))
             .collect();
         for (i, door) in shell.doors.iter().enumerate() {
+            if !door.leaf {
+                continue;
+            }
             let twin = shell.doors.iter().enumerate().find(|(j, other)| {
                 *j != i && other.at.distance(door.at) < 1.7 && other.out.dot(door.out) > 0.7
             });
@@ -1810,7 +1826,10 @@ pub(crate) fn raise_the_founding_hall(
             commands.entity(hall).insert(Shell {
                 half_w: plan.half_w,
                 half_d: plan.half_d,
-                doors: vec![Doorway::on_x_wall(plan.half_w, 0.0)],
+                // AN OPENING, not a door. The hall the village raises by
+                // its own hand has a gap in its long wall and nothing in
+                // it - which is what a longhouse of this sort had.
+                doors: vec![Doorway::on_x_wall(plan.half_w, 0.0).open()],
             });
         }
     }
@@ -4293,6 +4312,7 @@ mod tests {
         let door = Doorway {
             at: Vec2::new(2.52, 0.5),
             out: Vec2::X,
+            leaf: true,
         };
         let hung: Vec<Entity> = the_makers_own_panel(&door, &parts)
             .iter()
@@ -4419,5 +4439,54 @@ mod tests {
             BuildingKind::Longhouse.sleeps() > BuildingKind::House.sleeps(),
             "the hall must shelter more than a family home",
         );
+    }
+
+    /// A wall is never mistaken for a door leaf.
+    ///
+    /// What Brett was looking at: the village's own longhouse swinging a
+    /// slab the size of its wall. The adoption asks for something thin,
+    /// door-height and at least a third of a metre across - all of which a
+    /// long wall panel answers, since a wall is thin too - and nothing said
+    /// how WIDE a door may be. The nearest wall segment won, and the hall
+    /// opened by swinging its side away.
+    #[test]
+    fn a_wall_is_never_adopted_as_a_door() {
+        let door = Doorway {
+            at: Vec2::new(3.0, 0.0),
+            out: Vec2::X,
+            leaf: true,
+        };
+        let piece = |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32| {
+            Transform::from_translation(Vec3::new(x, y, z)).with_scale(Vec3::new(sx, sy, sz))
+        };
+        // A wall panel: thin, tall, and three metres of it - centred on
+        // the doorway, which is what put it first in the running.
+        let wall = (Entity::from_raw_u32(1).unwrap(), piece(3.0, 1.2, 0.0, 0.2, 2.4, 3.0));
+        // And a real leaf: thin, tall, a door's width.
+        let leaf = (Entity::from_raw_u32(2).unwrap(), piece(3.0, 1.1, 0.0, 0.14, 2.0, 1.1));
+
+        let only_wall = the_makers_own_panel(&door, &[wall]);
+        assert!(
+            only_wall.is_empty(),
+            "a three-metre wall was adopted as a door leaf",
+        );
+
+        let both = the_makers_own_panel(&door, &[wall, leaf]);
+        let hung: Vec<Entity> = both.iter().map(|(entity, _)| *entity).collect();
+        assert!(hung.contains(&leaf.0), "the real leaf must be the one hung");
+        assert!(!hung.contains(&wall.0), "and the wall must stay where it is");
+    }
+
+    /// The hall the village raises itself is an opening, and nothing swings.
+    #[test]
+    fn the_villages_own_hall_has_no_door_to_swing() {
+        let opening = Doorway::on_x_wall(3.0, 0.0).open();
+        assert!(!opening.leaf, "the hall's doorway hangs nothing");
+        // But it is still a doorway: the routing steers walks through it,
+        // and the doorstep is measured from it, exactly as before.
+        assert_eq!(opening.at, Vec2::new(3.0, 0.0));
+        assert_eq!(opening.out, Vec2::X);
+        // A gate, by contrast, is all leaf.
+        assert!(Doorway::on_x_wall(3.0, 0.0).leaf);
     }
 }

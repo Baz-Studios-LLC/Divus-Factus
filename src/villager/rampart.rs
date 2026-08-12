@@ -306,6 +306,8 @@ pub(crate) fn stand_the_posts(
                     &super::work::buildings::Doorway {
                         at: Vec2::new(0.0, side * half * 0.5),
                         out: Vec2::X,
+                        // A gate is the one doorway that is ALL leaf.
+                        leaf: true,
                     },
                     side,
                     half,

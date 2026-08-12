@@ -125,6 +125,9 @@ pub fn doorways(work: &Baked, mirrored: bool) -> Vec<Doorway> {
             Doorway {
                 at: Vec2::new(at.x, at.z),
                 out: Vec2::new(out.x, out.z).normalize_or(Vec2::X),
+                // A drawn doorway gets a leaf: the maker drew a door
+                // panel there, or one is made to fit the gap they left.
+                leaf: true,
             }
         })
         .collect()
