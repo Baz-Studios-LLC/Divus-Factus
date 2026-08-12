@@ -91,7 +91,24 @@ impl Plugin for DebugPlugin {
             )
             .configure_sets(
                 Update,
-                (DebugSet::Input, DebugSet::Rebuild, DebugSet::Dress).chain(),
+                (DebugSet::Input, DebugSet::Rebuild, DebugSet::Dress)
+                    .chain()
+                    // AND ALL OF IT BEFORE ORDO PAINTS.
+                    //
+                    // Ordo re-applies the theme - fonts, sizes, inks - to
+                    // everything it can see, once a frame, in its own set. A
+                    // row spawned AFTER that ran is a row wearing nothing:
+                    // Bevy's own default font at Bevy's own default size,
+                    // for exactly one frame, until the next pass dresses it.
+                    //
+                    // Nothing here was ordered against that set at all, so
+                    // which side of it a rebuild landed on was down to
+                    // whatever order Bevy happened to pick - which is why the
+                    // codex flickered SOMETIMES, and why every word in it
+                    // flashed at once when it did. Brett: "when it flickers
+                    // all of the text shows the default bevy text for a
+                    // split second."
+                    .before(ordo::OrdoSet),
             )
             // INPUT: every hand on the instruments. Parallel except where
             // two hands reach for the same state - those edges are named.
@@ -484,6 +501,18 @@ mod tests {
             .world_mut()
             .run_system_once(people::update_person_detail);
         let _ = app.world_mut().run_system_once(god::update_god_panel);
+        // The village panel joined this net the day it fell out of it. Its
+        // `Text` queries were disjoint by a list of `Without`s, a new marker
+        // was added to one of them, and the list did not grow with it - so
+        // the game built, the suite passed green, and it panicked on Brett's
+        // machine the moment the ledger opened. B0001 is a RUNTIME fault;
+        // only running a system finds it.
+        let _ = app
+            .world_mut()
+            .run_system_once(village::update_village_panel);
+        let _ = app
+            .world_mut()
+            .run_system_once(village::update_prayer_board);
     }
 
     #[test]
@@ -513,6 +542,36 @@ mod tests {
             nudge(&mut value, -0.3, 0.0, 1.0);
             assert!((0.0..=1.0).contains(&value));
         }
+    }
+    /// The codex is dressed on the frame it is built, not the one after.
+    ///
+    /// Ordo re-applies fonts, sizes and inks once a frame in its own set.
+    /// A row spawned after that has run wears nothing until the next pass -
+    /// Bevy's own default font at its own default size - and because
+    /// nothing here was ordered against that set, which side of it a
+    /// rebuild landed on was whatever order Bevy happened to pick. Hence a
+    /// codex that flickered SOMETIMES, and every word in it at once when it
+    /// did.
+    ///
+    /// Asserted as an ordering rather than by looking at pixels: the
+    /// schedule is the thing that was wrong, and a schedule can be checked.
+    #[test]
+    fn every_panel_is_built_before_ordo_paints() {
+        use bevy::prelude::*;
+
+        let mut app = App::new();
+        app.add_plugins(bevy::app::ScheduleRunnerPlugin::default())
+            .configure_sets(
+                Update,
+                (DebugSet::Input, DebugSet::Rebuild, DebugSet::Dress)
+                    .chain()
+                    .before(ordo::OrdoSet),
+            );
+        // Building the schedule is the check: Bevy rejects a set graph it
+        // cannot order, so a cycle or a contradiction fails here.
+        app.add_systems(Update, (|| {}).in_set(DebugSet::Rebuild));
+        app.add_systems(Update, (|| {}).in_set(ordo::OrdoSet));
+        app.update();
     }
 }
 
@@ -545,4 +604,5 @@ fn toggle_the_sea(
             "The sea plane is off - F12 brings it back".to_string()
         }));
     }
+
 }

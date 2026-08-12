@@ -1381,6 +1381,9 @@ pub(crate) fn update_village_panel(
         (
             With<HappinessWhy>,
             Without<VillageCard>,
+            // The word under a card is a `Text` like any other, and this
+            // query has to say so or it overlaps the one that writes it.
+            Without<VillageCardLabel>,
             Without<VillageGaugeValue>,
             Without<VillageLand>,
             Without<LedgerName>,
