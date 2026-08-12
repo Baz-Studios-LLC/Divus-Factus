@@ -512,12 +512,22 @@ impl Terrain {
             );
             cut = cut.max((rim - height).abs());
         }
-        // One in four: graded earth rather than a quarry face, and a shallower
-        // grade than the one in three it used to cut - a bank a metre high now
-        // takes four metres to come back, which reads as ground rather than as
-        // groundwork. Smoothstep steepens toward the middle of the ring, so the
-        // true grade at the halfway line is a shade sharper than that.
-        let falloff = least.max((cut * 4.0).min(18.0));
+        // How far the skirt takes to come back to the land.
+        //
+        // One in four for the earth actually moved - a bank a metre high takes
+        // four metres - but that alone left gentle country looking dug. On the
+        // rolling ground a village actually sits on, a hall's pad is fifteen
+        // metres of dead flat with a bank of forty centimetres around it, and
+        // forty centimetres over the old two-and-a-half-metre floor is a lip
+        // you can see from the air: a big flat shelf with an edge, which is
+        // exactly what reads as a divot rather than as a terrace.
+        //
+        // So the skirt is also at least as wide as the building is - a big
+        // building disturbs more ground and needs longer to give it back, and
+        // on level ground where nothing is moved at all this costs nothing,
+        // because a falloff over no height difference changes no heights.
+        let spread = (half_w + half_d) * 0.75;
+        let falloff = least.max(spread).max((cut * 4.0).min(18.0));
         self.work(FlatSpot {
             x,
             z,
@@ -612,7 +622,12 @@ impl Terrain {
                 continue;
             }
             let w = ((spot.falloff - beyond) / spot.falloff).clamp(0.0, 1.0);
-            let w = w * w * (3.0 - 2.0 * w);
+            // Smootherstep, not smoothstep. Both are flat where the skirt
+            // meets the pad; only this one is flat where it meets the
+            // UNTOUCHED land as well, and that outer edge is the one a
+            // player is looking at - a crease there reads as a rim around
+            // the building, which is half of what made these look dug.
+            let w = w * w * w * (w * (w * 6.0 - 15.0) + 10.0);
             height = height * (1.0 - w) + spot.height * w;
         }
         height
@@ -641,7 +656,14 @@ impl Terrain {
         };
         let half_width = rivers::CHANNEL_HALF_WIDTH * width;
         if distance >= half_width {
-            return base;
+            // OUTSIDE the channel, but still within the river's influence -
+            // and this returned raw ground, skipping the worked pads
+            // entirely. Every levelled thing near a watercourse was levelled
+            // only where the river had nothing to say: a building's pad came
+            // out flat in the middle and untouched in patches, which is
+            // precisely the "unnatural divits" Brett was looking at. Villages
+            // are founded by water, so this was most of them.
+            return self.leveled(x, z, base);
         }
 
         // Parabolic bed below the course's water level, blending to untouched
@@ -3294,5 +3316,126 @@ mod the_shape_of_the_world {
                 "seed {seed} founded a village on a sandbar: only {dry} of 24 bearings are land"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod terracing {
+    use super::*;
+
+    /// A building's terrace meets the land it stands in, rather than
+    /// sitting on a shelf with an edge.
+    ///
+    /// Brett, on a hall in rolling country: "it currently makes unnatural
+    /// divits. We need to do a better job of making the terrian flat while
+    /// blending naturally into the terrain."
+    ///
+    /// Measured on real ground, that hall levelled fifteen metres of dead
+    /// flat and then gave the land back over two and a half - a wide plate
+    /// with a lip round it, which is what the eye reads as dug rather than
+    /// as terraced. The bank is no taller now; it is just allowed the room
+    /// to lie down.
+    #[test]
+    fn a_terrace_lies_down_into_the_land_it_sits_in() {
+        let terrain = Terrain::new(2024);
+        // Rolling ground, the sort a village is actually founded on.
+        let (mut x, mut z) = (0.0, 0.0);
+        for i in 0..6000 {
+            let (tx, tz) = ((i % 79) as f32 * 31.0, (i / 79) as f32 * 43.0);
+            if terrain.height_at(tx, tz) < WATER_LEVEL + 2.0 {
+                continue;
+            }
+            let slope = (terrain.height_at(tx + 8.0, tz) - terrain.height_at(tx - 8.0, tz)).abs();
+            if (0.8..1.6).contains(&slope) {
+                (x, z) = (tx, tz);
+                break;
+            }
+        }
+        assert!(x != 0.0, "no rolling ground found to test on");
+
+        let (half_w, half_d) = (5.0, 4.6);
+        let height = terrain.height_at(x, z);
+        let natural: Vec<f32> = (0..=30)
+            .map(|d| terrain.height_at(x - d as f32, z))
+            .collect();
+        terrain.terrace(x, z, half_w, half_d, 0.0, 2.5, 2.4, height);
+        let worked: Vec<f32> = (0..=30)
+            .map(|d| terrain.height_at(x - d as f32, z))
+            .collect();
+
+        // The pad itself is level.
+        for d in 0..=half_w as usize {
+            assert!(
+                (worked[d] - height).abs() < 0.01,
+                "the pad is not level at {d}m: {} against {height}",
+                worked[d],
+            );
+        }
+
+        // Walking out from the pad, the ground rises to meet the land
+        // without ever overshooting it - no trench outside the pad, and no
+        // bank standing proud of the hill it is cut into.
+        let uphill = natural[30] > natural[0];
+        for d in 1..=30 {
+            let over = worked[d] - natural[d];
+            assert!(
+                if uphill { over <= 0.02 } else { over >= -0.02 },
+                "at {d}m the terrace overshoots the land it is blending into",
+            );
+        }
+
+        // And it gives the land back gently: the last stretch before the
+        // untouched ground moves less than the first stretch outside the
+        // pad. A short skirt fails this - it is still moving half a metre
+        // when it stops, which is the lip.
+        let moved = |d: usize| (worked[d] - natural[d]).abs();
+        let far = (26..=30).map(moved).fold(0.0_f32, f32::max);
+        let near = (8..=12).map(moved).fold(0.0_f32, f32::max);
+        assert!(
+            far < near * 0.5,
+            "the skirt is still moving {far:.2}m of earth where it stops, \
+             against {near:.2}m beside the building - that edge is the divot",
+        );
+    }
+
+    /// Ground worked beside a river is still worked ground.
+    ///
+    /// The bug behind the divots, and the reason they looked like BITES
+    /// rather than like a bad grade: within a river's influence but outside
+    /// its channel, the ground was returned raw, and every levelled pad
+    /// simply stopped existing there. A building near water came out flat
+    /// where the river had no opinion and untouched where it did. Villages
+    /// are founded by water, so this was most of them.
+    #[test]
+    fn a_pad_beside_a_river_is_still_levelled() {
+        let terrain = Terrain::new(2024);
+        // Dry ground close enough to a course to be inside its influence
+        // but outside the channel itself - the exact strip that was skipped.
+        let mut found = None;
+        for i in 0..40_000 {
+            let (x, z) = ((i % 211) as f32 * 17.0, (i / 211) as f32 * 19.0);
+            if terrain.height_at(x, z) < WATER_LEVEL + 2.0 {
+                continue;
+            }
+            if let Some((_, distance, width)) = terrain.river_influence_at(x, z) {
+                let half = rivers::CHANNEL_HALF_WIDTH * width;
+                if distance > half * 1.15 && distance < half * 2.5 {
+                    found = Some((x, z));
+                    break;
+                }
+            }
+        }
+        let Some((x, z)) = found else {
+            // A seed with no river near dry ground has nothing to prove.
+            return;
+        };
+
+        let height = terrain.height_at(x, z) - 3.0;
+        terrain.flatten(x, z, 6.0, 4.0, height);
+        assert!(
+            (terrain.height_at(x, z) - height).abs() < 0.01,
+            "ground beside a river ignored the levelling: {} against {height}",
+            terrain.height_at(x, z),
+        );
     }
 }
