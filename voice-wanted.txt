@@ -1,18 +1,3 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-  103  (worn pool) housed married muse
-   21  (worn pool) event:smote saw tell
-   16  (worn pool) reply wavering
-    9  (worn pool) event:smote saw tell wavering
-    5  (worn pool) event:mauled of:person saw tell wavering
-    4  (worn pool) event:mauled reply wavering
-    4  (worn pool) muse wavering
-    4  (worn pool) devotion muse night prayer wavering
-    4  (worn pool) devout event:smote saw tell
-    3  (worn pool) chat:end event:smote told wavering
-    3  (worn pool) event:mauled of:person retold saw tell
-    2  (worn pool) event:mauled saw tell
-    2  (worn pool) chat:end event:smote told
-    2  (worn pool) event:delivered saw tell wavering
-    1  (worn pool) reply trade:priest
-    1  (worn pool) housed muse
+   15  (worn pool) devout hungry muse prayer

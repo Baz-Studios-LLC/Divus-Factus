@@ -1,35 +1,28 @@
-## The first drawn house
+## The ground a building stands on
 
-**Villages build a house somebody drew.** It is the first building to come
-out of Opificium since the bench became its own program, and it replaces
-the one the game builds by its own hand — so a village looks different
-again this build, and more deliberate.
+**Levelling a site now lies down into the land instead of denting it.** A
+building still gets the flat floor it needs, but the ground gives way to it
+gradually — the steeper the country, the longer the transition takes to
+come back to the hillside. Buildings on slopes look sited rather than
+stamped.
 
-It is a big house: roughly four times the floor of the village's own, with
-a double bed and two singles. Plots and the space between buildings are
-measured from the drawing itself, so a hamlet spreads further than it used
-to rather than packing its houses together.
+- **Ground beside a river is levelled like anywhere else.** It was not.
+  Within a watercourse's reach but outside its channel, the ground came
+  back untouched, so a building's pad was flat in the middle and raw in
+  patches — bites taken out of it. Villages are founded by water, so this
+  was most of them. **Expect ground around your older settlements to look
+  different**, hills or no hills.
+- **A mine redraws all the ground it moves.** Its cut reached well past the
+  ground it asked to have redrawn, leaving the outer edge standing at its
+  old shape until something unrelated came along and fixed it.
 
-## Buildings go up the way they were drawn
+## Looking
 
-- **A building rises in the steps its drawing asks for.** The game had been
-  reading the wrong thing entirely — it split a building by what its pieces
-  *were*, so a house drawn as one piece of work laid a foundation, raised
-  walls and roofed itself through a sequence nobody had asked for. It
-  follows the drawing now, and a house drawn in one step goes up in one.
-- **Buildings drawn before this still rise as they always did.**
-
-## Doors
-
-- **The hall the village builds itself has an open doorway**, and no longer
-  swings a slab the size of its wall. It was adopting the nearest wall
-  panel as a door leaf, because nothing said how wide a door may be.
-
-## For anyone drawing buildings
-
-- **Bakes are read from the project folder** — `opificium/out/baked` —
-  rather than being carried into the game's own assets. One place, whatever
-  game the bench is serving, and no path for a project to get wrong.
-- **A village that carries in no drawings says so**, and names the folders
-  it looked in. An empty project and a mistyped path used to look exactly
-  alike.
+- **Zoom, pan and turn all work while the game is paused.** The camera ran
+  on the world's clock, so pausing froze the eye along with everything
+  else. Looking around a stopped world is most of what a pause is for.
+- **The golden outline sits evenly around whatever you point at.** It was
+  scaled by a share of each piece's size rather than a fixed distance, so a
+  long beam wore a hand's width of gold past its ends and a hair along its
+  sides — and a corner where beams meet grew a cluster of crosses. It only
+  showed once buildings had hundreds of differently-shaped pieces in them.
