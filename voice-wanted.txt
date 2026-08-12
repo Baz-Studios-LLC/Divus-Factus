@@ -1,3 +1,3 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-   15  (worn pool) devout hungry muse prayer
+    1  (worn pool) devout event:provided saw tell

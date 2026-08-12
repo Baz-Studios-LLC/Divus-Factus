@@ -553,11 +553,22 @@ fn speak(
     }
 }
 
+/// How far up the talk stops being worth drawing.
+///
+/// The same number the debug altitude reads, because that is the number
+/// Brett was looking at when he said "at an alt of 100 chat bubbles are
+/// illegible". Ordo's depth curve shrinks distant talk toward presence
+/// rather than legibility, and there is a floor under that shrink - so
+/// from high up the words never got smaller than a smear, and a busy
+/// village wore a hundred smears. Above this they are simply not drawn.
+const TALK_UNREADABLE_ABOVE: f32 = 100.0;
+
 /// Bubbles ride above their speakers' heads and fade off with them.
 fn float_bubbles(
     mut commands: Commands,
     time: Res<Time<Real>>,
     cameras: Query<(&bevy::camera::Camera, &GlobalTransform)>,
+    rigs: Query<&crate::camera::CameraRig>,
     speakers: Query<&GlobalTransform, Without<Bubble>>,
     mut bubbles: Query<(
         Entity,
@@ -574,6 +585,21 @@ fn float_bubbles(
     else {
         return;
     };
+    // Too high to read: hide the lot and stop. They keep their lifetimes
+    // and their places in their threads, so dropping back down finds the
+    // conversation where it would have been rather than starting it again.
+    if rigs
+        .iter()
+        .next()
+        .is_some_and(|rig| rig.distance >= TALK_UNREADABLE_ABOVE)
+    {
+        for (.., mut visibility, _) in &mut bubbles {
+            if *visibility != Visibility::Hidden {
+                *visibility = Visibility::Hidden;
+            }
+        }
+        return;
+    }
     // A thread is a STACK, not two columns. Brett, beside a photograph
     // of a phone: "these are next to each other... see how they sort of
     // overlap?" On a phone every message sits BELOW the one before it,
