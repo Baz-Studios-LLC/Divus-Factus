@@ -625,7 +625,9 @@ fn read_camera_input(
     mouse_motion: Res<AccumulatedMouseMotion>,
     mouse_scroll: Res<AccumulatedMouseScroll>,
     pointer: Res<crate::ui::PointerContext>,
-    time: Res<Time>,
+    // Real time, for the same reason as the smoothing below: panning and
+    // turning are looking, and looking survives a pause.
+    time: Res<Time<Real>>,
     terrain: Option<Res<Terrain>>,
     mut follow: ResMut<FollowTarget>,
     windows: Query<&Window, With<PrimaryWindow>>,
@@ -1100,7 +1102,15 @@ fn follow_ground(
     );
 }
 
-fn apply_camera_smoothing(time: Res<Time>, mut rigs: Query<&mut CameraRig>) {
+/// Eases the camera toward wherever it has been asked to go.
+///
+/// REAL time, not the world's. The camera is the player's own eye, and
+/// pausing pauses the WORLD - not the ability to look at it. On the virtual
+/// clock every one of these deltas is zero while the game is paused, so the
+/// distance never travelled toward its target and the zoom simply did
+/// nothing until time started again. Brett: "I can't zoom while the speed is
+/// paused." Looking around a stopped world is most of what a pause is for.
+fn apply_camera_smoothing(time: Res<Time<Real>>, mut rigs: Query<&mut CameraRig>) {
     let Ok(mut rig) = rigs.single_mut() else {
         return;
     };
