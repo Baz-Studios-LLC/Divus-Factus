@@ -1972,9 +1972,16 @@ pub fn split_row(
 
 /// A big-number stat plate: the label as a centred header across the top,
 /// the glyph's ring medallion and the figure side by side beneath it.
-/// Returns (seat, number) — the caller puts its glyph in the seat and marks
+/// The caller puts its glyph in the seat and marks
 /// the number for live updates.
-pub fn stat_plate(commands: &mut Commands, parent: Entity, label_text: &str) -> (Entity, Entity) {
+/// Returns the glyph's seat, the big number, and the LABEL under it -
+/// the label because a number sometimes has to say what it is counting,
+/// and "souls" alone could not say how many of them were children.
+pub fn stat_plate(
+    commands: &mut Commands,
+    parent: Entity,
+    label_text: &str,
+) -> (Entity, Entity, Entity) {
     let plate = commands
         .spawn((
             Node {
@@ -1992,7 +1999,7 @@ pub fn stat_plate(commands: &mut Commands, parent: Entity, label_text: &str) -> 
             ChildOf(parent),
         ))
         .id();
-    commands.spawn((
+    let label = commands.spawn((
         Text::new(label_text.to_uppercase()),
         DisplayFace,
         TextFont {
@@ -2001,7 +2008,7 @@ pub fn stat_plate(commands: &mut Commands, parent: Entity, label_text: &str) -> 
         },
         TextColor(theme::text_dim()),
         ChildOf(plate),
-    ));
+    )).id();
     let row = commands
         .spawn((
             Node {
@@ -2050,7 +2057,7 @@ pub fn stat_plate(commands: &mut Commands, parent: Entity, label_text: &str) -> 
             ChildOf(row),
         ))
         .id();
-    (seat, number)
+    (seat, number, label)
 }
 
 /// A titled card well — the People footer's card face as a kit piece: a

@@ -1632,4 +1632,41 @@ mod tests {
              its people would starve inside their own gates",
         );
     }
+
+    /// A villager far from home can still find their way to a meal.
+    ///
+    /// The road deaths: "Zeiwo starved on the road, 259 strides from a
+    /// larder that held food". Distance alone does not explain it - a walk
+    /// of 259 strides takes under two minutes and dying takes five - so the
+    /// question is whether the route home is ever FOUND at that range. A
+    /// search that gives up returns no path, and a villager with no path
+    /// stands where they are.
+    #[test]
+    fn a_long_walk_home_is_still_found() {
+        let terrain = Terrain::new(2024);
+        // Open ground, and a walk of the length that killed them.
+        let mut home = Vec3::ZERO;
+        for i in 0..4000 {
+            let (x, z) = ((i % 63) as f32 * 41.0, (i / 63) as f32 * 37.0);
+            if terrain.height_at(x, z) > crate::terrain::WATER_LEVEL + 3.0 {
+                home = Vec3::new(x, terrain.height_at(x, z), z);
+                break;
+            }
+        }
+        let walls = Walls::default();
+        for strides in [60.0_f32, 120.0, 200.0, 259.0, 320.0] {
+            let (ox, oz) = (home.x + strides, home.z);
+            // Only meaningful where the ground is walkable at both ends.
+            if terrain.height_at(ox, oz) < crate::terrain::WATER_LEVEL + 1.0 {
+                continue;
+            }
+            let out = Vec3::new(ox, terrain.height_at(ox, oz), oz);
+            let path = find_path(&terrain, &walls, out, home, DEFAULT_BUDGET);
+            assert!(
+                path.is_some(),
+                "no way home from {strides} strides out - a villager there \
+                 stands still until they starve",
+            );
+        }
+    }
 }

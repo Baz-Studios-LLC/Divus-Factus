@@ -29,6 +29,17 @@ pub(crate) struct VillagePanel;
 #[derive(Component)]
 pub(crate) struct VillageCard(u8);
 
+/// The word under one of those numbers.
+///
+/// SOULS counts everybody, children included - which is also what the
+/// civic ladder counts when it asks whether a town has earned a hall, so
+/// the two must not be made to disagree by quietly hiding the young here.
+/// Brett, looking at fifteen and no hall: "some are kids and I think thats
+/// why the town hall doesnt trigger." It was not, but the panel gave him
+/// no way to tell. So the word says how many of them are children.
+#[derive(Component)]
+pub(crate) struct VillageCardLabel(u8);
+
 /// A dashboard statistic, drawn as a bar.
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum VillageStat {
@@ -696,8 +707,9 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         ))
         .id();
     for (index, label) in [(0u8, "souls"), (1, "houses"), (2, "believers")] {
-        let (seat, number) = ui::stat_plate(&mut commands, plates, label);
+        let (seat, number, caption) = ui::stat_plate(&mut commands, plates, label);
         commands.entity(number).insert(VillageCard(index));
+        commands.entity(caption).insert(VillageCardLabel(index));
         let tint = ui::theme::accent().with_alpha(0.8);
         match index {
             0 => person_glyph(&mut commands, seat, tint),
@@ -1378,7 +1390,16 @@ pub(crate) fn update_village_panel(
         ),
     >,
     mut gauges: ParamSet<(
-        Query<(&VillageCard, &mut Text)>,
+        // The three big numbers AND the words under them, in one member:
+        // a ParamSet holds eight, and this set was full.
+        Query<
+            (
+                Option<&VillageCard>,
+                Option<&VillageCardLabel>,
+                &mut Text,
+            ),
+            Or<(With<VillageCard>, With<VillageCardLabel>)>,
+        >,
         Query<(&VillageGaugeFill, &mut Node)>,
         Query<(&VillageGaugeValue, &mut Text)>,
         Query<&mut Text, (With<VillageLand>, Without<HappinessWhy>)>,
@@ -1393,6 +1414,7 @@ pub(crate) fn update_village_panel(
     }
 
     let living = villagers.iter().count().max(1);
+    let young = villagers.iter().filter(|(.., child, _)| *child).count();
     let mut spirits = 0.0;
     let mut fed = 0.0;
     let mut housed = 0usize;
@@ -1477,11 +1499,23 @@ pub(crate) fn update_village_panel(
         }
     }
 
-    for (card, mut text) in &mut gauges.p0() {
-        let fresh = match card.0 {
-            0 => format!("{}", living),
-            1 => format!("{houses}"),
-            _ => format!("{believers}"),
+    for (card, label, mut text) in &mut gauges.p0() {
+        let fresh = match (card, label) {
+            (Some(card), _) => match card.0 {
+                0 => format!("{}", living),
+                1 => format!("{houses}"),
+                _ => format!("{believers}"),
+            },
+            // SOULS is everybody, because that is what the civic ladder
+            // counts when it decides a town has earned its hall - so the
+            // word says how many of them are children rather than the
+            // number quietly leaving them out and disagreeing with it.
+            (_, Some(label)) if label.0 == 0 => match young {
+                0 => "SOULS".to_string(),
+                1 => "SOULS - 1 CHILD".to_string(),
+                many => format!("SOULS - {many} CHILDREN"),
+            },
+            _ => continue,
         };
         if text.0 != fresh {
             *text = Text::new(fresh);

@@ -1054,6 +1054,28 @@ pub(crate) fn eat_from_store(
                     *activity = Activity::Idle;
                 }
             }
+            // ANY other errand, once hunger stops being a background
+            // discomfort and starts being the thing that kills them.
+            //
+            // This arm was `_ => {}`, and that is how people died on the
+            // road. The decision to go and eat was only ever taken by
+            // somebody already idle or wandering - so a forester walking
+            // out to the treeline, an explorer three hundred strides into
+            // the country, anyone at all with an errand in hand, simply
+            // never took it. They walked on with their work while the
+            // hunger ran to the top, and died with a full larder behind
+            // them. Brett, twice now: "People on the road are still
+            // starving."
+            //
+            // Deliberately later than the down-tools line, so an errand is
+            // not abandoned over ordinary appetite: this is the point where
+            // finishing the job stops being worth it.
+            _ if needs.hunger > crate::villager::belief::DESPERATE_HUNGER
+                && store.food() >= 1.0 =>
+            {
+                *activity = Activity::VisitingStore;
+                target.0 = Some(table_seat(who, table));
+            }
             Activity::Idle | Activity::Wandering => {
                 // The store is the table: anyone hungry enough to put
                 // their tools down comes to the sacks, bushes or no
@@ -1354,6 +1376,45 @@ mod tests {
             ground.woodpile,
             Vec3::new(-6.0, 0.0, 2.0),
             "timber deliveries move with the woodpile",
+        );
+    }
+
+    /// Hunger interrupts an errand, wherever the errand has taken them.
+    ///
+    /// The road deaths. Deciding to go and eat was only ever done by
+    /// somebody already idle or wandering, so anyone with work in hand -
+    /// a forester walking out to the treeline, an explorer three hundred
+    /// strides into the country - walked on with it until they died, with
+    /// a full larder behind them. Brett, twice: "People on the road are
+    /// still starving."
+    ///
+    /// The threshold is what the test pins, because a rule that fires too
+    /// early empties the fields over ordinary appetite and one that fires
+    /// too late is what we already had.
+    #[test]
+    fn a_working_villager_stops_to_eat_before_starving() {
+        use crate::villager::belief::DESPERATE_HUNGER;
+
+        // Desperate is well short of dying, so there is a walk's worth of
+        // life left when the errand is dropped: from here to the hunger
+        // that starts killing takes minutes, and the longest road home a
+        // village has takes about two.
+        let seconds_of_life_left =
+            (0.99 - DESPERATE_HUNGER) * crate::villager::SECONDS_TO_STARVE;
+        let strides_home = 259.0;
+        let walking = 2.4;
+        assert!(
+            seconds_of_life_left > strides_home / walking,
+            "a villager who turns for home at {DESPERATE_HUNGER} hunger has \
+             {seconds_of_life_left:.0}s of life and needs {:.0}s to walk it",
+            strides_home / walking,
+        );
+
+        // And it fires later than the ordinary down-tools line, so a full
+        // day's work is not abandoned over an appetite.
+        assert!(
+            DESPERATE_HUNGER > super::super::DOWN_TOOLS_HUNGER,
+            "hunger would pull people off their work before they were hungry",
         );
     }
 }
