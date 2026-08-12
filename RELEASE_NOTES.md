@@ -1,43 +1,35 @@
-## The village builds by its own hand again
+## The first drawn house
 
-**Every authored building has been cleared out, to be drawn again from
-scratch.** So villages in this build raise the game's own shapes rather
-than the ones drawn in Opificium — houses and halls will look different
-from last build, and that is deliberate. New drawings arrive as they are
-made.
+**Villages build a house somebody drew.** It is the first building to come
+out of Opificium since the bench became its own program, and it replaces
+the one the game builds by its own hand — so a village looks different
+again this build, and more deliberate.
 
-Which turned out to be worth doing on its own, because standing on those
-defaults for the first time in a while showed they could not hold.
+It is a big house: roughly four times the floor of the village's own, with
+a double bed and two singles. Plots and the space between buildings are
+measured from the drawing itself, so a hamlet spreads further than it used
+to rather than packing its houses together.
 
-- **The longhouse sleeps ten.** It slept eight, against a founding of
-  ten, and had done for as long as both numbers existed — the ten
-  founders woke up in a hall with beds for eight of them. Nothing caught
-  it because an authored longhouse had been carried in over the top of
-  it, keeping a promise the game itself could not.
-- **And it is a longer hall, not a tighter one.** Beds lie in a row down
-  one wall, so the building's length follows how many it sleeps. The plot
-  it stands on and the timber it costs both grew with it — the hall is a
-  bigger commitment than a house, never a cheaper one per bed.
+## Buildings go up the way they were drawn
 
-## Buildings you draw
+- **A building rises in the steps its drawing asks for.** The game had been
+  reading the wrong thing entirely — it split a building by what its pieces
+  *were*, so a house drawn as one piece of work laid a foundation, raised
+  walls and roofed itself through a sequence nobody had asked for. It
+  follows the drawing now, and a house drawn in one step goes up in one.
+- **Buildings drawn before this still rise as they always did.**
 
-- **A new drawing no longer rebuilds your village.** A house remembered
-  which design it followed by its position in a list, so carrying one new
-  drawing in re-pointed every house already standing — on ground levelled
-  for a different footprint. Buildings remember their design by name now.
-- **A drawing the game cannot use says so.** A building drawn as
-  something this game has no answer for, or carrying a marking it does
-  not understand, used to be dropped in silence. It now names the word
-  and lists what the game does know.
-- **The bench is handed the game's own truth.** Divus Factus writes its
-  colours and its vocabulary into a maker's Opificium folder every time
-  it starts, so anything drawn there is drawn against the version you are
-  actually running.
-- **A building from a newer bench is refused rather than half-read**, and
-  a file with absurd numbers in it is turned away at the door instead of
-  being raised into a village.
+## Doors
 
-## Elsewhere
+- **The hall the village builds itself has an open doorway**, and no longer
+  swings a slab the size of its wall. It was adopting the nearest wall
+  panel as a door leaf, because nothing said how wide a door may be.
 
-- The village speaks one English throughout: thirty lines had drifted
-  into American spellings, and the check that missed them is tighter.
+## For anyone drawing buildings
+
+- **Bakes are read from the project folder** — `opificium/out/baked` —
+  rather than being carried into the game's own assets. One place, whatever
+  game the bench is serving, and no path for a project to get wrong.
+- **A village that carries in no drawings says so**, and names the folders
+  it looked in. An empty project and a mistyped path used to look exactly
+  alike.
