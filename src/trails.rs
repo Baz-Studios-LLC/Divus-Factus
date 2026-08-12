@@ -17,7 +17,7 @@ use crate::terrain::{CHUNK_SIZE, Terrain, TerrainChunk, ground_color_at};
 use crate::villager::Villager;
 
 /// The side of one wear cell, in world units.
-const CELL: f32 = 1.7;
+pub const CELL: f32 = 1.7;
 
 /// Wear at which the dirt fully shows through the grass.
 const VISIBLE: f32 = 6.0;
@@ -69,6 +69,14 @@ impl Trails {
             Some(cell) if cell.wear >= VISIBLE => HASTE,
             _ => 1.0,
         }
+    }
+
+    /// How bare the ground is here, from nothing to fully trodden.
+    ///
+    /// The same number the painter tints with, so what the grass thins
+    /// against and what the ground looks like can never disagree.
+    pub fn bareness(&self, x: f32, z: f32) -> f32 {
+        (self.wear_near(x, z) / VISIBLE).clamp(0.0, 1.0)
     }
 
     /// How worn the ground looks at a point: the strongest nearby cell,
@@ -146,11 +154,13 @@ fn tread(
 /// vertex colours are repainted — toward bare earth where feet insist,
 /// back toward the true ground colour where they have stopped.
 fn paint(
+    mut commands: Commands,
     time: Res<Time>,
     mut since_last: Local<f32>,
     terrain: Option<Res<Terrain>>,
     mut trails: ResMut<Trails>,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut grass: Option<ResMut<crate::grass::GrassChunks>>,
     chunks: Query<(&TerrainChunk, &Mesh3d)>,
     fresh: Query<&TerrainChunk, Added<TerrainChunk>>,
     watch: Res<crate::debug::timings::Timings>,
@@ -226,6 +236,23 @@ fn paint(
     }
     if dirty.is_empty() {
         return;
+    }
+
+    // The blades over a chunk whose tint just moved are now standing on a
+    // path, so they are thrown away and grown again against it - grass
+    // thins as the ground goes brown rather than waiting for something
+    // unrelated to rebuild the chunk. Only where the paint ACTUALLY
+    // changed, which the band quantising above already keeps rare: a
+    // village walking its usual rounds repaints a handful of chunks a
+    // minute, not every chunk every frame.
+    if let Some(grass) = grass.as_mut() {
+        for coord in &dirty {
+            let centre = Vec2::new(
+                (coord.x as f32 + 0.5) * CHUNK_SIZE,
+                (coord.y as f32 + 0.5) * CHUNK_SIZE,
+            );
+            grass.invalidate_near(&mut commands, centre.x, centre.y, CHUNK_SIZE * 0.5);
+        }
     }
 
     let dirt = crate::palette::shade(&crate::palette::EARTH, 0.42).to_linear();

@@ -80,8 +80,16 @@ impl MaterialExtension for GrassExtension {
 }
 
 /// Advances the wind clock.
+/// Advances the wind clock on REAL time.
+///
+/// It ran on the world's, which multiplies by whatever speed the game is
+/// set to - so at four times the grass swayed four times as fast, and at
+/// eight it shook. Brett: "sometimes the grass shakes like crazy." It also
+/// froze mid-lean whenever the world was paused and snapped when it
+/// resumed. Wind is weather a player is watching, not work the village is
+/// doing.
 fn drive_wind(
-    time: Res<Time>,
+    time: Res<Time<Real>>,
     weather: Option<Res<crate::weather::Weather>>,
     mut materials: ResMut<Assets<GrassMaterial>>,
     watch: Res<crate::debug::timings::Timings>,
@@ -180,7 +188,12 @@ fn biome_growth(biome: Biome) -> (f32, f32) {
 ///
 /// Deterministic per chunk and seed, like every other generated thing: a chunk
 /// that unloads and reloads grows back identical.
-pub fn build_grass_mesh(terrain: &Terrain, seed: u32, coord: IVec2) -> Option<Mesh> {
+pub fn build_grass_mesh(
+    terrain: &Terrain,
+    trails: Option<&crate::trails::Trails>,
+    seed: u32,
+    coord: IVec2,
+) -> Option<Mesh> {
     let origin = Vec2::new(coord.x as f32 * CHUNK_SIZE, coord.y as f32 * CHUNK_SIZE);
     // Blades are measured from the chunk's MIDDLE, and the patch is seated
     // there. A blade must stand along its own local up, so the patch is
@@ -219,6 +232,18 @@ pub fn build_grass_mesh(terrain: &Terrain, seed: u32, coord: IVec2) -> Option<Me
             }
             if terrain.slope_at(x, z) > 0.4 {
                 continue;
+            }
+            // A path is bare because feet made it bare. The blades thin as
+            // the wear deepens rather than vanishing at a threshold, so a
+            // road has worn shoulders instead of a mown edge - and the
+            // number here is the same one the ground is tinted by, so what
+            // is brown and what is bald cannot drift apart. Brett: "where
+            // the trails turn brown grass should stop growing."
+            if let Some(trails) = trails {
+                let bare = trails.bareness(x, z);
+                if bare > 0.15 && rng.range(0.0, 1.0) < (bare - 0.15) / 0.55 {
+                    continue;
+                }
             }
             if terrain
                 .river_influence_at(x, z)
@@ -284,6 +309,7 @@ fn stream_grass(
     mut meshes: ResMut<Assets<Mesh>>,
     terrain: Option<Res<Terrain>>,
     assets: Option<Res<GrassAssets>>,
+    trails: Option<Res<crate::trails::Trails>>,
     world_seed: Res<crate::WorldSeed>,
     mut chunks: ResMut<GrassChunks>,
     cameras: Query<&crate::camera::CameraRig>,
@@ -329,7 +355,7 @@ fn stream_grass(
             continue;
         }
 
-        let entity = match build_grass_mesh(&terrain, world_seed.0, coord) {
+        let entity = match build_grass_mesh(&terrain, trails.as_deref(), world_seed.0, coord) {
             Some(mesh) => commands
                 .spawn((
                     Name::new("Grass"),
@@ -381,8 +407,8 @@ mod tests {
         let terrain = Terrain::new(77);
         let coord = grassy_chunk(&terrain).expect("no grassland anywhere near spawn");
 
-        let a = build_grass_mesh(&terrain, 77, coord).expect("grassland grew nothing");
-        let b = build_grass_mesh(&terrain, 77, coord).expect("second build failed");
+        let a = build_grass_mesh(&terrain, None, 77, coord).expect("grassland grew nothing");
+        let b = build_grass_mesh(&terrain, None, 77, coord).expect("second build failed");
         assert_eq!(a.count_vertices(), b.count_vertices());
         assert!(a.count_vertices() >= 300, "suspiciously sparse meadow");
     }
@@ -393,7 +419,7 @@ mod tests {
         // whole field across the ground.
         let terrain = Terrain::new(77);
         let coord = grassy_chunk(&terrain).expect("no grassland");
-        let mesh = build_grass_mesh(&terrain, 77, coord).unwrap();
+        let mesh = build_grass_mesh(&terrain, None, 77, coord).unwrap();
 
         let Some(bevy::mesh::VertexAttributeValues::Float32x2(uvs)) =
             mesh.attribute(Mesh::ATTRIBUTE_UV_0)
@@ -408,5 +434,66 @@ mod tests {
             assert_eq!(blade[1][0], 0.0, "root sways");
             assert!(blade[2][0] > 0.9, "tip is pinned");
         }
+    }
+
+    /// Grass thins where feet have worn the ground, and is gone where they
+    /// have worn it bare.
+    ///
+    /// Brett: "where the trails turn brown grass should stop growing." The
+    /// thinning is gradual on purpose - a road with a mown edge looks more
+    /// artificial than one with no edge at all - and it reads the same
+    /// number the ground is tinted by, so what is brown and what is bald
+    /// cannot drift apart.
+    #[test]
+    fn a_worn_path_grows_no_grass() {
+        let terrain = Terrain::new(77);
+        let coord = grassy_chunk(&terrain).expect("no grassland anywhere near spawn");
+        let before = build_grass_mesh(&terrain, None, 77, coord)
+            .expect("grassland grew nothing")
+            .count_vertices();
+        assert!(before > 0, "no grassland found to wear down");
+
+        // Wear the whole chunk to bare earth.
+        let mut trails = crate::trails::Trails::default();
+        let origin = Vec2::new(coord.x as f32 * CHUNK_SIZE, coord.y as f32 * CHUNK_SIZE);
+        let mut walked = Vec::new();
+        let step = 1.0;
+        let mut z = -step;
+        while z < CHUNK_SIZE + step {
+            let mut x = -step;
+            while x < CHUNK_SIZE + step {
+                walked.push((
+                    ((origin.x + x) / crate::trails::CELL).floor() as i32,
+                    ((origin.y + z) / crate::trails::CELL).floor() as i32,
+                    50.0,
+                ));
+                x += step;
+            }
+            z += step;
+        }
+        trails.restore(walked.into_iter());
+
+        let after = build_grass_mesh(&terrain, Some(&trails), 77, coord)
+            .map_or(0, |mesh| mesh.count_vertices());
+        assert!(
+            after * 4 < before,
+            "ground worn to bare earth still grows {after} of its {before} blades",
+        );
+    }
+
+    /// And untouched ground is untouched: an empty trail map takes nothing.
+    #[test]
+    fn wild_ground_keeps_every_blade() {
+        let terrain = Terrain::new(77);
+        let at = grassy_chunk(&terrain).expect("no grassland anywhere near spawn");
+        let wild = build_grass_mesh(&terrain, None, 77, at).expect("grassland grew nothing");
+        let empty = crate::trails::Trails::default();
+        let same = build_grass_mesh(&terrain, Some(&empty), 77, at)
+            .expect("the same ground grew nothing the second time");
+        assert_eq!(
+            wild.count_vertices(),
+            same.count_vertices(),
+            "an empty trail map thinned wild grass",
+        );
     }
 }
