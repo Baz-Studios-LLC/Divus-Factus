@@ -1308,7 +1308,7 @@ pub(super) fn do_work(
                 // A carried-in building brings its own shell, doors and
                 // furnishings out of its own marks, below. Only a kind
                 // the bench has not drawn gets the village's own walls.
-                let drawn = baked::drawing_at(kind, plan.plan);
+                let drawn = baked::drawing_of(kind, plan.plan, &plan.drawing);
                 match kind {
                     BuildingKind::House => {
                         done.insert(Hut);
@@ -1479,7 +1479,7 @@ pub(super) fn do_work(
             // and the chimney, so blocks placed by them ringed the house a
             // stride out from its walls. Brett: "there should be nothing
             // built outside of the design from atelier."
-            if baked::drawing_at(plan.kind, plan.plan).is_none() {
+            if baked::drawing_of(plan.kind, plan.plan, &plan.drawing).is_none() {
                 let (w, d) = (plan.half_w, plan.half_d);
                 let slots = [
                     (-w, -d),

@@ -393,18 +393,34 @@ pub(crate) const MARKS_UNDERSTOOD: &[(&str, &str, f32)] = &[
 /// detectable from the bench, so the game is the only place that can complain,
 /// and it should complain loudly and name what it does understand.
 fn read_the_words(work: &Baked) {
-    if !work.kind.is_empty() && claimed_by(work).is_none() {
+    if claimed_by(work).is_none() {
         let known: Vec<&str> = super::BuildingKind::every()
             .iter()
             .map(|kind| called(*kind))
             .collect();
-        warn!(
-            "{}: baked as \"{}\", which this game has no building for - it will \
-             never be raised. Known kinds: {}",
-            work.name,
-            work.kind,
-            known.join(", "),
-        );
+        // Two ways to arrive unclaimed, and the second one is quieter and
+        // more likely. A STATED kind that matches nothing is a typo or a
+        // building this game does not have. NO stated kind - every drawing
+        // baked before the bench started asking - falls back to "the kind is
+        // whatever word begins the file name", and a perfectly good drawing
+        // called `guard-tower1` matches nothing at all, because the word here
+        // is `watchtower`. It bakes, it is valid, it is simply never raised.
+        match work.kind.is_empty() {
+            false => warn!(
+                "{}: baked as \"{}\", which this game has no building for - it will \
+                 never be raised. Known kinds: {}",
+                work.name,
+                work.kind,
+                known.join(", "),
+            ),
+            true => warn!(
+                "{}: says no kind, and no known kind begins its name, so nothing \
+                 will ever raise it. Bake it again from a bench that asks what it \
+                 is, or rename it to begin with one of: {}",
+                work.name,
+                known.join(", "),
+            ),
+        }
     }
     let mut complained: Vec<&str> = Vec::new();
     for mark in &work.marks {
@@ -507,6 +523,28 @@ pub fn drawings(kind: super::BuildingKind) -> Vec<&'static Baked> {
 pub fn drawing_at(kind: super::BuildingKind, plan: usize) -> Option<&'static Baked> {
     let all = drawings(kind);
     (!all.is_empty()).then(|| all[plan % all.len()])
+}
+
+/// The drawing a standing building follows: BY NAME where it has one.
+///
+/// A blueprint's `plan` is an index into the drawings for its kind, and an
+/// index only means anything while the list behind it holds still. Carry one
+/// new house into the folder and the list grows: every standing house's
+/// `plan % len` lands somewhere else, and a village loaded from a save comes
+/// back as different buildings - standing on ground that was terraced for the
+/// footprints of the old ones. Which is precisely what a maker does, over and
+/// over, all afternoon.
+///
+/// So the name is the answer where there is one, and the index is kept for the
+/// saves written before there was. A named drawing that has since been deleted
+/// falls back the same way rather than leaving a hole in the village.
+pub fn drawing_of(kind: super::BuildingKind, plan: usize, named: &str) -> Option<&'static Baked> {
+    if !named.is_empty()
+        && let Some(known) = drawings(kind).into_iter().find(|work| work.name == named)
+    {
+        return Some(known);
+    }
+    drawing_at(kind, plan)
 }
 
 /// The widest drawing of a kind. Ground is broken before a plan is
@@ -1311,5 +1349,52 @@ mod tests {
             }],
             marks: vec![],
         }
+    }
+
+    /// A standing building keeps its drawing when a new one is carried in.
+    ///
+    /// The maker's actual afternoon: play, bake a second house into the
+    /// folder, restart, load the save. By index alone every standing house
+    /// would re-point - `plan % 1` and `plan % 2` are not the same house -
+    /// and each would come back as a different building on ground terraced
+    /// for the one before it.
+    #[test]
+    fn a_new_drawing_does_not_rebuild_the_village() {
+        let all = super::drawings(BuildingKind::House);
+        if all.len() < 2 {
+            // With one drawing carried in there is nothing to re-point TO,
+            // so the property is trivially held and the test says so rather
+            // than pretending to have checked it.
+            assert!(
+                super::drawing_of(BuildingKind::House, 7, "house1-1couple-2kids").is_some()
+                    || all.is_empty(),
+                "a named drawing that exists must be found by name",
+            );
+            return;
+        }
+        // Every drawing must be findable by its own name, from any index -
+        // which is what makes the stored name authoritative over the roll.
+        for (roll, work) in all.iter().enumerate() {
+            let found = super::drawing_of(BuildingKind::House, roll + 1, &work.name)
+                .expect("a named drawing is found");
+            assert_eq!(found.name, work.name, "the name must win over the index");
+        }
+    }
+
+    /// Saves written before there was a name still raise their buildings, and
+    /// a name that has since been deleted does not leave a hole.
+    #[test]
+    fn a_nameless_or_missing_drawing_still_finds_one() {
+        if super::drawings(BuildingKind::House).is_empty() {
+            return;
+        }
+        assert!(
+            super::drawing_of(BuildingKind::House, 3, "").is_some(),
+            "an old save carries no name and must still build",
+        );
+        assert!(
+            super::drawing_of(BuildingKind::House, 3, "a-house-nobody-drew").is_some(),
+            "a deleted drawing must fall back, not vanish",
+        );
     }
 }
