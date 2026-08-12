@@ -896,7 +896,19 @@ impl ConstructionSite {
 ///
 /// Returns where the hill stands at its full height, so nothing has to
 /// reproduce this arithmetic to ask about it.
-pub(crate) fn bank_the_mine(terrain: &Terrain, face: Vec3, uphill: Vec3, plan: &Blueprint) -> Vec3 {
+/// Returns where the crown sits, and HOW FAR the whole working reaches -
+/// which the caller needs, because ground is only redrawn where it is asked
+/// to be. The reach used to be a guess at the call site (`half_w + 9`)
+/// against a crown that stands past three times that, so the outermost
+/// metres of the cut changed height in chunks nobody rebuilt and stayed
+/// standing at their old shape: a hard seam in the hillside, waiting for
+/// something unrelated to come along and redraw it.
+pub(crate) fn bank_the_mine(
+    terrain: &Terrain,
+    face: Vec3,
+    uphill: Vec3,
+    plan: &Blueprint,
+) -> (Vec3, f32) {
     // The yard: the level ground the mine stands on, and an apron at its
     // mouth. Kept tight, because rule three prices every unit of it.
     let yard_radius = plan.half_w + 1.0;
@@ -914,7 +926,10 @@ pub(crate) fn bank_the_mine(terrain: &Terrain, face: Vec3, uphill: Vec3, plan: &
         face.y + plan.wall_h + 1.4,
     );
     terrain.flatten(face.x, face.z, yard_radius, yard_falloff, face.y);
-    crown
+    // From the FACE, since that is what the caller redraws around: the
+    // crown's far lip is the furthest the working moves any earth.
+    let reach = (crown_offset + crown_radius + 3.2).max(yard_radius + yard_falloff);
+    (crown, reach)
 }
 
 /// A finished building of any kind.
@@ -3339,7 +3354,7 @@ pub(crate) fn plan_houses(
         // hillside for it to stand against.
         let face = face + uphill * 1.4;
 
-        bank_the_mine(&terrain, face, uphill, &plan);
+        let (_, worked) = bank_the_mine(&terrain, face, uphill, &plan);
         let (chunks, grass, chunk_assets, stripped, dirty_groves) = &mut ground;
         // The felling comes FIRST, before the chunks are swapped. A
         // scattered tree is a child of its chunk, and a chunk despawn
@@ -3368,9 +3383,9 @@ pub(crate) fn plan_houses(
             chunks,
             face.x,
             face.z,
-            plan.half_w + 9.0,
+            worked + 4.0,
         );
-        grass.invalidate_near(&mut commands, face.x, face.z, plan.half_w + 9.0);
+        grass.invalidate_near(&mut commands, face.x, face.z, worked + 4.0);
 
         let building = commands
             .spawn((
@@ -3949,7 +3964,7 @@ mod tests {
         // Asked exactly where the code says the hill stands, rather than at a
         // distance guessed here - two copies of that arithmetic is how the
         // burial got in.
-        let crown = bank_the_mine(&terrain, face, uphill, &plan);
+        let (crown, _) = bank_the_mine(&terrain, face, uphill, &plan);
         let ground = terrain.height_at(crown.x, crown.z);
         assert!(
             ground > face.y + plan.wall_h,
@@ -4492,5 +4507,50 @@ mod tests {
         assert_eq!(opening.out, Vec2::X);
         // A gate, by contrast, is all leaf.
         assert!(Doorway::on_x_wall(3.0, 0.0).leaf);
+    }
+
+    /// A working redraws all the ground it moves.
+    ///
+    /// Ground is only redrawn where the site asks for it, so a levelling
+    /// that reaches further than the ask leaves its outermost metres
+    /// standing at their old shape - a seam in the hillside that waits for
+    /// something unrelated to come along and redraw it. The mine's reach was
+    /// guessed at the call site while its crown stands past three times the
+    /// guess.
+    #[test]
+    fn a_mine_redraws_every_metre_it_moves() {
+        let land = Terrain::new(31);
+        let face = Vec3::new(200.0, land.height_at(200.0, 40.0), 40.0);
+        let uphill = Vec3::new(0.0, 0.0, 1.0);
+        let mut rng = crate::rng::Rng::stream(7, "mine-test");
+        let plan = Blueprint::roll(BuildingKind::Mine, &mut rng);
+        let (_, reach) = bank_the_mine(&land, face, uphill, &plan);
+
+        // Walk out past the reported reach and find the furthest metre the
+        // working actually moved.
+        let untouched = Terrain::new(31);
+        let before: Vec<f32> = (0..80)
+            .map(|d| untouched.height_at(face.x, face.z + d as f32))
+            .collect();
+        let land2 = Terrain::new(31);
+        let mut rng2 = crate::rng::Rng::stream(7, "mine-test");
+        let plan2 = Blueprint::roll(BuildingKind::Mine, &mut rng2);
+        bank_the_mine(&land2, face, uphill, &plan2);
+        let mut furthest = 0.0_f32;
+        for d in 0..80 {
+            let after = land2.height_at(face.x, face.z + d as f32);
+            if (after - before[d]).abs() > 0.01 {
+                furthest = d as f32;
+            }
+        }
+        assert!(
+            furthest <= reach,
+            "the working moves earth {furthest}m out but only asks for {reach}m to be redrawn",
+        );
+        // And the old guess would not have covered it.
+        assert!(
+            reach > plan.half_w + 9.0,
+            "this test is not exercising the fault it exists for",
+        );
     }
 }

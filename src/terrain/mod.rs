@@ -499,6 +499,10 @@ impl Terrain {
         let (sin, cos) = yaw.sin_cos();
         let (reach_w, reach_d) = (half_w + margin, half_d + margin);
         let mut cut: f32 = 0.0;
+        // And how steep the land ITSELF falls out there. The skirt is sized
+        // against this: a hillside earns a long lazy swale, gentle country a
+        // short one.
+        let mut land_grade: f32 = 0.0;
         for step in 0..16 {
             let turn = std::f32::consts::TAU * step as f32 / 16.0;
             let (s, c) = turn.sin_cos();
@@ -506,11 +510,17 @@ impl Terrain {
             // the ray leaves through.
             let scale = (reach_w / c.abs()).min(reach_d / s.abs());
             let (along, across) = (c * scale, s * scale);
-            let rim = self.height_at(
+            let (rim_x, rim_z) = (
                 x + along * cos + across * sin,
                 z - along * sin + across * cos,
             );
+            let rim = self.height_at(rim_x, rim_z);
             cut = cut.max((rim - height).abs());
+            // Four metres further out along the same ray: the natural fall of
+            // the ground the skirt has to lie down into.
+            let out = Vec2::new(rim_x - x, rim_z - z).normalize_or_zero() * 4.0;
+            let beyond = self.height_at(rim_x + out.x, rim_z + out.y);
+            land_grade = land_grade.max((beyond - rim).abs() / 4.0);
         }
         // How far the skirt takes to come back to the land.
         //
@@ -526,8 +536,51 @@ impl Terrain {
         // building disturbs more ground and needs longer to give it back, and
         // on level ground where nothing is moved at all this costs nothing,
         // because a falloff over no height difference changes no heights.
-        let spread = (half_w + half_d) * 0.75;
-        let falloff = least.max(spread).max((cut * 4.0).min(18.0));
+        // Two different jobs, and they pull opposite ways.
+        //
+        // On gentle ground the earth moved is inches, and the fault is a LIP:
+        // a wide plate of flat with a visible edge. That wants room, so the
+        // floor under the skirt follows the building's own size.
+        //
+        // On a hillside the earth moved is metres, and the fault is a CRATER:
+        // feathering a three-metre cut across twelve turns a bank into a
+        // scoop dug out of the hill, with a matching apron pushed out below
+        // it. Brett: "on smaller hills it flattens the ground in a littel
+        // crater instead of cleanly smoothing the land around it." That wants
+        // the opposite - a shorter, more definite bank that reads as ground
+        // cut for a building rather than as a dent in the world.
+        //
+        // So the size term is modest and the height term is steeper and
+        // capped nearer, and whichever is larger wins.
+        // WIDTH DOES NOT CHANGE HOW STEEP THE BANK GETS. It changes how
+        // fast the slope CHANGES, and that is the thing an eye reads as an
+        // edge.
+        //
+        // Worth writing down, because it is the opposite of what it feels
+        // like and it cost an afternoon. A flat pad meeting a slope always
+        // transitions about one and seven tenths to two and a fifth times
+        // steeper than the land itself, and that ratio is fixed: as the skirt
+        // widens, the height it has to make up widens exactly in step. Five
+        // metres or a hundred and twenty, the steepest point is identical.
+        // Moving the pad up or down does not help either - it only trades the
+        // uphill bank against the downhill one.
+        //
+        // What width does buy is CURVATURE. Over two and a half metres the
+        // slope changes by 0.37 per metre; over thirty, by 0.03 - twelve
+        // times gentler, on the same bank at the same angle. A crease is a
+        // fast change of slope, so that is the number the eye was objecting
+        // to all along. Brett: "its that middle trasistion that needs to be
+        // wider I think to make the trasition have a less steep angle."
+        //
+        // So the skirt is sized against the land's own fall: a hillside gets
+        // a long lazy swale, gentle country gets a short one, and neither
+        // gets a rim. The floor on the land's grade keeps flat ground from
+        // asking for an infinitely wide skirt, and the cap keeps a cliff from
+        // asking for half the valley.
+        let gentle = land_grade.max(0.04);
+        let lie_down = 1.5 * cut / gentle;
+        let spread = (half_w + half_d) * 0.8;
+        let falloff = least.max(spread).max(lie_down.min(30.0));
         self.work(FlatSpot {
             x,
             z,
@@ -622,12 +675,12 @@ impl Terrain {
                 continue;
             }
             let w = ((spot.falloff - beyond) / spot.falloff).clamp(0.0, 1.0);
-            // Smootherstep, not smoothstep. Both are flat where the skirt
-            // meets the pad; only this one is flat where it meets the
-            // UNTOUCHED land as well, and that outer edge is the one a
-            // player is looking at - a crease there reads as a rim around
-            // the building, which is half of what made these look dug.
-            let w = w * w * w * (w * (w * 6.0 - 15.0) + 10.0);
+            // Smoothstep rather than smootherstep. Both meet the pad and the
+            // untouched land without a crease; the difference is what they do
+            // in BETWEEN, and smootherstep buys its flatter ends by steepening
+            // the middle by a quarter. The middle is the bank - the part a
+            // player actually sees as a slope - so the gentler curve wins.
+            let w = w * w * (3.0 - 2.0 * w);
             height = height * (1.0 - w) + spot.height * w;
         }
         height
@@ -3436,6 +3489,97 @@ mod terracing {
             (terrain.height_at(x, z) - height).abs() < 0.01,
             "ground beside a river ignored the levelling: {} against {height}",
             terrain.height_at(x, z),
+        );
+    }
+
+    #[test]
+    #[ignore = "a probe, not a check"]
+    fn how_much_the_mesh_loses() {
+        let terrain = Terrain::new(2024);
+        let (mut x, mut z) = (0.0, 0.0);
+        for i in 0..6000 {
+            let (tx, tz) = ((i % 79) as f32 * 31.0, (i / 79) as f32 * 43.0);
+            if terrain.height_at(tx, tz) < WATER_LEVEL + 2.0 {
+                continue;
+            }
+            let slope = (terrain.height_at(tx + 8.0, tz) - terrain.height_at(tx - 8.0, tz)).abs();
+            if (0.8..1.6).contains(&slope) {
+                (x, z) = (tx, tz);
+                break;
+            }
+        }
+        let cell = CHUNK_SIZE / CHUNK_CELLS as f32;
+        let height = terrain.height_at(x, z);
+        terrain.terrace(x, z, 5.0, 4.6, 0.0, 2.5, 2.4, height);
+
+        // The mesh only has vertices every `cell` metres and draws straight
+        // lines between them. How far does that stray from the true ground?
+        let mut worst: f32 = 0.0;
+        let mut worst_at = 0.0;
+        let mut d = -20.0_f32;
+        while d < 20.0 {
+            let lo = (d / cell).floor() * cell;
+            let hi = lo + cell;
+            let (a, b) = (terrain.height_at(x + lo, z), terrain.height_at(x + hi, z));
+            let t = (d - lo) / cell;
+            let drawn = a + (b - a) * t;
+            let truth = terrain.height_at(x + d, z);
+            if (drawn - truth).abs() > worst {
+                worst = (drawn - truth).abs();
+                worst_at = d;
+            }
+            d += 0.1;
+        }
+        println!("cell {cell}m; worst mesh error {worst:.3}m at {worst_at:.1}m from centre");
+    }
+
+    #[test]
+    #[ignore = "a probe, not a check"]
+    fn print_a_hillside_profile() {
+        let terrain = Terrain::new(2024);
+        // A real hillside: what Brett built his longhouse on.
+        let (mut x, mut z) = (0.0, 0.0);
+        for i in 0..8000 {
+            let (tx, tz) = ((i % 91) as f32 * 29.0, (i / 91) as f32 * 37.0);
+            if terrain.height_at(tx, tz) < WATER_LEVEL + 2.0 {
+                continue;
+            }
+            let slope = (terrain.height_at(tx + 8.0, tz) - terrain.height_at(tx - 8.0, tz)).abs();
+            if (3.0..5.0).contains(&slope) {
+                (x, z) = (tx, tz);
+                break;
+            }
+        }
+        let height = terrain.height_at(x, z);
+        let before: Vec<f32> = (-30..=30).map(|d| terrain.height_at(x + d as f32, z)).collect();
+        terrain.terrace(x, z, 3.0, 12.0, 0.0, 2.5, 2.4, height);
+        let after: Vec<f32> = (-30..=30).map(|d| terrain.height_at(x + d as f32, z)).collect();
+        let mut furthest = 0;
+        for (i, d) in (-30_i32..=30).enumerate() {
+            if (after[i] - before[i]).abs() > 0.05 {
+                furthest = furthest.max(d.abs());
+            }
+        }
+        let deepest = (0..before.len())
+            .map(|i| after[i] - before[i])
+            .fold(0.0_f32, |w, m| if m.abs() > w.abs() { m } else { w });
+        // The steepest metre of the SKIRT - outside the flat pad, where the
+        // worked ground is bending back to the land. This is the number the
+        // eye reacts to.
+        let mut steepest_before = 0.0_f32;
+        let mut steepest_after = 0.0_f32;
+        for i in 0..before.len() - 1 {
+            let d = (i as i32 - 30).abs();
+            if d < 15 {
+                continue;
+            }
+            steepest_before = steepest_before.max((before[i + 1] - before[i]).abs());
+            steepest_after = steepest_after.max((after[i + 1] - after[i]).abs());
+        }
+        println!(
+            "hillside at ({x:.0},{z:.0}): earth moved out to {furthest}m, worst {deepest:+.2}m; \
+             steepest metre of skirt {steepest_after:.2}m (1:{:.1}), natural land {steepest_before:.2}m",
+            1.0 / steepest_after.max(0.0001),
         );
     }
 }
