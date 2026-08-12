@@ -217,6 +217,23 @@ fn carried() -> &'static Vec<Baked> {
                 }
             }
         }
+        // Nothing anywhere is a legitimate world - the village builds by its
+        // own hand - but it is also exactly what a path one directory wrong
+        // looks like, and that is worth being able to tell apart in a log.
+        if works.is_empty() {
+            info!(
+                "no drawings carried in; the village will build by its own hand. Looked in: {}",
+                [
+                    crate::carried::folder(BAKED_UNDER),
+                    crate::carried::made_by_hand(BAKED_UNDER),
+                ]
+                .into_iter()
+                .flatten()
+                .map(|road| road.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", "),
+            );
+        }
         // read_dir's order is the filesystem's business; a world seed's is ours.
         works.sort_by(|a, b| a.name.cmp(&b.name));
         works
@@ -317,7 +334,17 @@ pub fn furnish_the_makers_bench() {
 /// The one path every game and the bench agree on, relative to a project
 /// root - which is `opificium/` inside this repository, and the player's
 /// own project beside their saves. See `carried()`.
-pub const BAKED_UNDER: &str = "opificium/out/baked";
+///
+/// The LAST component is not decoration. The bench namespaces a bake by
+/// what it is, so that clips can land in `out/baked/clips` later without
+/// colliding with buildings, and this pointed at `out/baked` itself - one
+/// directory too high. It found the folder `buildings` sitting there, saw
+/// a directory name with no `.json` on the end, skipped it by the same
+/// filter that skips any other stray file, and carried in nothing at all.
+///
+/// An empty project and a full one looked exactly alike, which is the
+/// whole reason `carried` now says out loud when it finds nothing.
+pub const BAKED_UNDER: &str = "opificium/out/baked/buildings";
 
 /// The newest baked format this game can read.
 ///
@@ -1486,9 +1513,12 @@ mod tests {
     fn the_bakes_are_read_from_the_project_that_made_them() {
         let tree = crate::carried::folder(super::BAKED_UNDER)
             .expect("the tree's own project has a baked folder");
+        // The WHOLE path. A test that only checked `out/baked` passed while
+        // the game was reading one directory above the buildings and finding
+        // none of them - the Opificium thread's own catch.
         assert!(
-            tree.ends_with("opificium/out/baked"),
-            "read from {}, which is not the project's own",
+            tree.ends_with("opificium/out/baked/buildings"),
+            "read from {}, which is not where the bench puts buildings",
             tree.display(),
         );
 
@@ -1497,7 +1527,11 @@ mod tests {
         // inside the project it was drawn in.
         let theirs = crate::carried::made_by_hand(super::BAKED_UNDER)
             .expect("a player has a project too");
-        assert!(theirs.ends_with("opificium/out/baked"), "{}", theirs.display());
+        assert!(
+            theirs.ends_with("opificium/out/baked/buildings"),
+            "{}",
+            theirs.display(),
+        );
         let furnished = crate::carried::made_by_hand("opificium").expect("the bench folder");
         assert!(
             theirs.starts_with(&furnished),
