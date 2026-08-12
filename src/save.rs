@@ -253,6 +253,22 @@ pub struct PendingNewWorld;
 #[derive(Resource)]
 pub struct PendingLoad(pub u8);
 
+/// How many times a world has been restored from a slot this session.
+///
+/// A restore re-spawns every soul, hall and banner, so to anything
+/// watching for `Added<...>` an old world looks like a world of brand new
+/// things - and systems that announce those things have to swallow that
+/// first frame. Doing it with a one-shot `Local` was enough while the only
+/// way to load was from the title, where such a system had never run; from
+/// INSIDE a game it had long since primed itself, and a load fired a
+/// trumpet over every building in the town at once. Brett: "a bunch of
+/// banners start popping up in the middle of the screen."
+///
+/// A count rather than a flag, so a second load in the same session is
+/// just as loud a signal as the first.
+#[derive(Resource, Default)]
+pub struct Restorations(pub u32);
+
 fn request_pending(
     save: Option<Res<PendingSave>>,
     load: Option<Res<PendingLoad>>,
@@ -957,6 +973,13 @@ fn apply(world: &mut World, save: SaveGame) {
     world.insert_resource(crate::calendar::WorldClock {
         elapsed: save.elapsed,
     });
+
+    // Say that a world has been restored, for everything that has to
+    // treat this frame's flood of new entities as old news.
+    let restorations = world
+        .get_resource::<Restorations>()
+        .map_or(0, |seen| seen.0);
+    world.insert_resource(Restorations(restorations + 1));
 
     // 3. Re-raise the fixtures through the founding code, under the old names.
     world.insert_resource(RestoringSeed {

@@ -45,7 +45,19 @@ fn proclaim_the_great_days(
     founded: Query<(Entity, &Settlement), Added<Settlement>>,
     mut any_town_yet: Local<bool>,
     mut primed: Local<bool>,
+    // How many worlds have been restored, against how many this system has
+    // already swallowed. A `Local` primes ONCE, which was enough while the
+    // only way to load was from the title - this system had never run. From
+    // inside a game it had primed itself long ago, so a load walked past the
+    // guard below and blew a trumpet over every hall in the town at once.
+    restorations: Option<Res<crate::save::Restorations>>,
+    mut swallowed: Local<u32>,
 ) {
+    let restored = restorations.map_or(0, |seen| seen.0);
+    if restored != *swallowed {
+        *swallowed = restored;
+        *primed = false;
+    }
     // The first pass swallows the standing world in silence. On a loaded
     // save every soul, hall and banner reads as freshly added, and an
     // unprimed bridge blew a salvo of trumpets over old news.

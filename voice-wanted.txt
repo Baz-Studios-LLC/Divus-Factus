@@ -1,3 +1,12 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-    1  (worn pool) devout event:provided saw tell
+   35  (worn pool) devout event:flourished saw tell
+   18  (worn pool) devout event:flourished reply
+   11  (worn pool) event:flourished saw tell
+   10  (worn pool) devout reply
+    4  (worn pool) chat:end devout event:flourished told
+    4  (worn pool) event:flourished reply wavering
+    3  (worn pool) chat:end event:flourished told wavering
+    2  (worn pool) event:flourished saw tell wavering
+    2  (worn pool) chat:end devout event:delivered told
+    2  (worn pool) chat:end event:flourished told

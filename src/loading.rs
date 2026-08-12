@@ -149,7 +149,16 @@ fn finish_when_world_is_built(
     time: Res<Time<Real>>,
     started: Option<Res<LoadingStarted>>,
     chunks: Option<Res<LoadedChunks>>,
-    restoring: Option<Res<crate::villager::RestoringSeed>>,
+    // A FOUNDED world, not a restoring one. `RestoringSeed` is a marker
+    // the restore carries while it re-raises the fixtures and takes away
+    // again the moment it is done - so by the time this ran it was always
+    // gone, and every loaded world was handed back to the player as a
+    // fresh one: standing on the title's flag, in a world already full of
+    // people. Brett: "From the title screen you are still holding a flag."
+    //
+    // Whether the world has a settlement in it is the honest question, and
+    // razing for a new world takes that away, so it cannot go stale.
+    settled: Option<Res<crate::villager::SettlementSite>>,
     mut next: ResMut<NextState<GameState>>,
 ) {
     let elapsed = started.map_or(0.0, |s| time.elapsed_secs() - s.0);
@@ -158,13 +167,20 @@ fn finish_when_world_is_built(
     }
 
     if chunks.is_some_and(|c| c.is_complete()) {
-        // A restored world already knows where it stands; a new one is
-        // handed to the player with a flag and no village in it.
-        next.set(if restoring.is_some() {
-            GameState::Playing
-        } else {
-            GameState::Choosing
-        });
+        next.set(door_after_loading(settled.is_some()));
+    }
+}
+
+/// Which door a finished load opens.
+///
+/// A world with a settlement in it is already founded, and the player is
+/// put back into it. A world with none has never been planted, so it opens
+/// on the founding screen with a flag in hand.
+fn door_after_loading(settled: bool) -> GameState {
+    if settled {
+        GameState::Playing
+    } else {
+        GameState::Choosing
     }
 }
 
@@ -179,5 +195,27 @@ mod tests {
         let chunks = LoadedChunks::default();
         assert_eq!(chunks.progress(), 0.0);
         assert!(!chunks.is_complete());
+    }
+
+    /// A world with a settlement in it is a world already founded, and the
+    /// player is put back in it rather than handed a flag.
+    ///
+    /// The fork used to read `RestoringSeed`, which the restore inserts to
+    /// re-raise the fixtures and REMOVES the moment it is done - so it was
+    /// always gone by the time this asked, and every loaded world opened on
+    /// the founding screen with a flag in hand over a world already full of
+    /// people. Brett: "From the title screen you are still holding a flag."
+    #[test]
+    fn a_founded_world_is_played_and_an_empty_one_is_founded() {
+        assert_eq!(
+            door_after_loading(true),
+            GameState::Playing,
+            "a world with a village in it is one to be played",
+        );
+        assert_eq!(
+            door_after_loading(false),
+            GameState::Choosing,
+            "a world with none still asks where to plant the flag",
+        );
     }
 }
