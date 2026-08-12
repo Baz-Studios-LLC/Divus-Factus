@@ -1,0 +1,5 @@
+Where Opificium bakes, and where the game reads its buildings from.
+
+Generated - bake again rather than editing anything here - but COMMITTED,
+which the bench's README leaves to the game: it is what ships, and a fresh
+clone should raise a village without anybody running a bake first.

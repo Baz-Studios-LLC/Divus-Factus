@@ -85,9 +85,14 @@ mod tests {
     /// stands empty whenever the buildings are being reauthored - a village
     /// with no drawings falls back to its own hand and plays perfectly well.
     /// Demanding a building in it made an empty bench a broken build.
+    ///
+    /// And it is the PROJECT'S folder now, not one inside `assets`: one path
+    /// every game that uses the bench can agree on, rather than each of them
+    /// telling the bench where to carry things.
     #[test]
     fn the_game_can_find_its_own_buildings() {
-        let home = folder("assets/buildings").expect("the buildings are somewhere");
+        let home = folder(crate::villager::work::baked::BAKED_UNDER)
+            .expect("the buildings are somewhere");
         assert!(
             std::fs::read_dir(&home)
                 .expect("the folder opens")

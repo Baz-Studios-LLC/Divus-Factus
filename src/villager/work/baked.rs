@@ -142,11 +142,26 @@ static CARRIED: std::sync::OnceLock<Vec<Baked>> = std::sync::OnceLock::new();
 fn carried() -> &'static Vec<Baked> {
     CARRIED.get_or_init(|| {
         let mut works: Vec<Baked> = Vec::new();
-        // What shipped, and then the maker's own on top of it. That second
-        // folder is what makes the shipped pair self-sufficient: a building
-        // baked out of the bench in the launcher build has somewhere to land,
-        // with no source tree anywhere in the story.
+        // THE PROJECT'S OWN BAKED FOLDER, first and second: this game's,
+        // and then the player's, on top of it.
+        //
+        // One convention rather than a path per game. Brett: "shouldnt the
+        // game read the bakes from a folder in opificium? That way all
+        // games that use bakes dont have to specify a certain folder or
+        // file?" - and the exception proved him right. `install` exists so
+        // a game can say where its content lives, and its default guesses
+        // `../assets/buildings`, which is a guess about a game's insides.
+        // The one place that guess had to be corrected was the player's
+        // own project, where it would have carried their buildings into a
+        // folder nothing reads. Reading the project's own `out/baked`
+        // means neither project needs to say anything at all.
+        //
+        // The last two are where bakes used to land, kept so that nobody
+        // who baked before this loses their buildings. They can go once
+        // nobody has any.
         for dir in [
+            crate::carried::folder(BAKED_UNDER),
+            crate::carried::made_by_hand(BAKED_UNDER),
             crate::carried::folder("assets/buildings"),
             crate::carried::made_by_hand("buildings"),
         ]
@@ -264,20 +279,15 @@ pub fn furnish_the_makers_bench() {
         return;
     }
 
-    // `install` is RELATIVE to the project, and points back out at the folder
-    // this game reads a maker's own buildings from.
-    //
-    // DO NOT DROP THIS LINE AS REDUNDANT. Opificium's default for `install` is
-    // `../assets/buildings`, which is right for a project living inside a
-    // game's repository and wrong for this one: this project sits in
-    // Application Support beside the saves, and the buildings the game reads
-    // there are `made_by_hand("buildings")` - a sibling, not an `assets`
-    // folder. Left to the default, a player's bakes would land in
-    // `<app support>/Divus Factus/assets/buildings`, where nothing ever
-    // looks, and their building would simply never appear with no error to
-    // read. This is the case `install` exists for.
+    // NOTHING TO CARRY ANYWHERE. `install` empty means the bench leaves a
+    // bake in the project's own `out/baked`, which is exactly where this
+    // game reads it from - see `BAKED_UNDER`. It used to point back out at
+    // a sibling folder, because the bench's default guesses at a game's
+    // insides (`../assets/buildings`) and that guess is wrong for a project
+    // living beside somebody's saves. One convention instead of a guess and
+    // a correction.
     let manifest = "{\n  \"format\": 1,\n  \"name\": \"Divus Factus\",\n  \
-                    \"install\": \"../buildings\"\n}\n";
+                    \"install\": \"\"\n}\n";
     let written = [
         (bench.join("opificium.json"), manifest.to_string()),
         (data.join("palette.json"), crate::palette::as_json()),
@@ -301,6 +311,13 @@ pub fn furnish_the_makers_bench() {
         );
     }
 }
+
+/// Where a project keeps what the bench baked.
+///
+/// The one path every game and the bench agree on, relative to a project
+/// root - which is `opificium/` inside this repository, and the player's
+/// own project beside their saves. See `carried()`.
+pub const BAKED_UNDER: &str = "opificium/out/baked";
 
 /// The newest baked format this game can read.
 ///
@@ -1455,6 +1472,36 @@ mod tests {
             super::claimed_by(&work),
             Some(BuildingKind::House),
             "and raised as what it says it is",
+        );
+    }
+
+    /// The convention resolves, in the tree and beside a player's saves.
+    ///
+    /// One path every game that uses the bench can agree on, instead of each
+    /// telling it where to carry things. Worth pinning at both ends: the
+    /// source tree's project is where these buildings are reviewed, and the
+    /// player's is where their own land - and the second of those is the one
+    /// that used to need a special `install` line pointing back out of it.
+    #[test]
+    fn the_bakes_are_read_from_the_project_that_made_them() {
+        let tree = crate::carried::folder(super::BAKED_UNDER)
+            .expect("the tree's own project has a baked folder");
+        assert!(
+            tree.ends_with("opificium/out/baked"),
+            "read from {}, which is not the project's own",
+            tree.display(),
+        );
+
+        // The player's, beside their saves - the same folder the game
+        // furnishes with the palette and the vocabulary, so a bake lands
+        // inside the project it was drawn in.
+        let theirs = crate::carried::made_by_hand(super::BAKED_UNDER)
+            .expect("a player has a project too");
+        assert!(theirs.ends_with("opificium/out/baked"), "{}", theirs.display());
+        let furnished = crate::carried::made_by_hand("opificium").expect("the bench folder");
+        assert!(
+            theirs.starts_with(&furnished),
+            "a player's bakes must land inside the project the game furnishes",
         );
     }
 }

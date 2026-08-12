@@ -28,6 +28,12 @@ strip "$APP/Contents/MacOS/divus-factus" 2>/dev/null || true
 
 cp -R "$ROOT/assets" "$APP/Contents/MacOS/assets"
 
+# The buildings, from the project the bench bakes into. One convention for
+# every game that uses Opificium, rather than a path each - so the folder
+# rides along under the name the game looks for it by.
+mkdir -p "$APP/Contents/MacOS/opificium/out"
+cp -R "$ROOT/opificium/out/baked" "$APP/Contents/MacOS/opificium/out/baked"
+
 # The icon: CFBundleIconFile names it without the extension.
 cp "$HERE/DivusFactus.icns" "$APP/Contents/Resources/DivusFactus.icns"
 sed "s/__VERSION__/$VERSION/g" "$HERE/Info.plist" > "$APP/Contents/Info.plist"
