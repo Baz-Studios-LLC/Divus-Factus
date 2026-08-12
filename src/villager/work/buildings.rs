@@ -271,7 +271,7 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
         Blacksmith | Granary | Tavern | Weaver | Herbalist | Watchtower => 10,
         Mill | Shrine => 12,
         Bakery => 14,
-        TownHall => 18,
+        TownHall => 14,
         // Shelter is not civic ambition: both roofs are planned by need in
         // `plan_houses`, never by this ladder.
         House | Longhouse => 0,
@@ -324,12 +324,18 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
             // between them is what puts a watch on the treeline.
             Shrine => needs.believers as f32 * 0.12 + needs.betrothed as f32 * 0.5,
             Watchtower => needs.peril * 0.4,
-            // Measured from below its own minimum, so the number that
-            // says when a town has earned a hall is the number that
-            // gives it one. From sixteen, an eighteen-soul town scored a
-            // quarter against a floor of nearly a half, and the ladder
-            // quietly meant twenty while the ledger said eighteen.
-            TownHall => (needs.population as f32 - 14.0) / 8.0,
+            // Measured from FOUR BELOW its own minimum, so the number
+            // that says when a town has earned a hall is the number that
+            // gives it one: a town standing exactly at the threshold
+            // scores a half against the floor of 0.45 below, and builds.
+            //
+            // The two have to move together. From sixteen, an
+            // eighteen-soul town scored a quarter against that floor, and
+            // the ladder quietly meant twenty while the ledger said
+            // eighteen. Brett has asked for fourteen; leaving this at
+            // fourteen too would have scored nought and meant eighteen
+            // all over again.
+            TownHall => (needs.population as f32 - 10.0) / 8.0,
             House | Longhouse => 0.0,
         };
         if score > best.map_or(0.0, |(b, _)| b) {

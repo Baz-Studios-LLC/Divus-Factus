@@ -2357,7 +2357,7 @@ mod tests {
     /// in days, and the planner returned at that branch every time it ran.
     /// The ladder itself was always willing, which is what this pins.
     #[test]
-    fn a_town_of_twenty_two_wants_its_hall() {
+    fn a_town_of_fourteen_wants_its_hall() {
         let built = [
             BuildingKind::Well,
             BuildingKind::Dock,
@@ -2384,9 +2384,16 @@ mod tests {
             Some(BuildingKind::TownHall),
         );
 
-        // Eighteen is the stated price of a hall, so eighteen buys one.
+        // FOURTEEN is the stated price of a hall, so fourteen buys one.
+        //
+        // Two numbers say that - the floor a kind must clear to be
+        // considered at all, and the score it earns once it is - and they
+        // have to agree or the ladder quietly means something other than
+        // the ledger does. It has happened once already: a hall priced at
+        // eighteen scored as though it were twenty. So the price is
+        // asserted at the price, and a soul below it.
         let just_enough = CivicNeeds {
-            population: 18,
+            population: 14,
             ..grown
         };
         assert_eq!(
@@ -2394,9 +2401,9 @@ mod tests {
             Some(BuildingKind::TownHall),
         );
 
-        // Seventeen does not.
+        // Thirteen does not.
         let hamlet = CivicNeeds {
-            population: 17,
+            population: 13,
             ..grown
         };
         assert_eq!(next_civic(&hamlet, |k| built.contains(&k)), None);
