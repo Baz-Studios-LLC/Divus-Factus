@@ -400,10 +400,26 @@ pub(super) fn kneel(
         let on_the_road = home
             .and_then(|town| grounds.get(town).ok())
             .is_some_and(|ground| at.translation.distance(ground.centre) > 80.0);
-        let store_has_food = !on_the_road
-            && home
-                .and_then(|town| stores.get(town).ok())
-                .is_some_and(|store| store.food() >= 1.0);
+        // A FULL TOWN SILENCES THE PRAYER WHEREVER THE HUNGRY ARE STANDING.
+        //
+        // This used to be `!on_the_road && ...`, so anyone eighty strides
+        // out prayed for food over a granary holding fifty-two of it -
+        // Brett: "peopel are praying for food even though the grainery has
+        // 52 food." That was honest when it was written, because distance
+        // meant the larder might as well not exist: nobody with an errand
+        // in hand ever turned back for it, whatever their hunger.
+        //
+        // They do now (see `eat_from_store`: any errand is dropped past
+        // desperate), so the walk home IS the answer to being hungry on the
+        // road, and a prayer over a full larder is a false alarm - the
+        // loudest kind, since the god is being asked for something the
+        // village already has.
+        //
+        // What still gets through is the one that matters: `dying_regardless`
+        // below, for whoever cannot reach it in time.
+        let store_has_food = home
+            .and_then(|town| stores.get(town).ok())
+            .is_some_and(|store| store.food() >= 1.0);
         // A stocked larder is only comfort if it can actually feed them. At
         // the edge of death the prayer goes up REGARDLESS: stores go
         // unreachable — a square terraced for the hall, a route refused —
@@ -1631,12 +1647,30 @@ mod tests {
         assert_eq!(receipts, 1, "one gift, one answer, one receipt");
     }
 
-    /// A stocked larder eighty strides behind you feeds you nothing now:
-    /// whoever hungers on the road prays at desperate, not at death's
-    /// door. Kileb starved 172 strides out while the old gate read his
-    /// town's full sacks as comfort.
+    /// A full larder holds the prayer wherever the hungry are standing -
+    /// and lets it go the moment the walk home can no longer save them.
+    ///
+    /// This rule has now been round the houses twice, and both readings
+    /// were right about the game they were written for.
+    ///
+    /// It began as "a stocked larder is comfort", which killed Kileb 172
+    /// strides out: his town's sacks were full, his prayer was held, and
+    /// nobody came. So the road was exempted - out there, hunger prayed at
+    /// desperate whatever the larder said.
+    ///
+    /// That was honest while NOBODY ON THE ROAD EVER TURNED BACK TO EAT,
+    /// which was true until today: the decision to go and eat was only ever
+    /// taken by somebody already idle, so an errand in hand meant walking
+    /// on until you died. With that fixed, the walk home IS the answer to
+    /// being hungry on the road, and a prayer over a full granary is a
+    /// false alarm - Brett: "peopel are praying for food even though the
+    /// grainery has 52 food."
+    ///
+    /// So the larder holds the prayer at any distance, and `dying_regardless`
+    /// releases it for whoever cannot reach it in time. Kileb would walk
+    /// home now; if something stopped him, he would still be heard.
     #[test]
-    fn the_road_prays_at_desperate_not_at_deaths_door() {
+    fn a_full_larder_holds_the_prayer_until_it_cannot_save_them() {
         let (mut app, soul) = starving_world();
         let settlement = app.world().resource::<SettlementSite>().settlement;
         app.world_mut()
@@ -1664,16 +1698,25 @@ mod tests {
             "a stocked larder in walking reach should hold the prayer",
         );
 
-        // On the road, the same hunger kneels: the larder is no comfort
-        // a hundred strides behind you.
+        // And on the road it still waits, because the walk home is now a
+        // thing that actually happens.
         app.world_mut()
             .get_mut::<Transform>(soul)
             .unwrap()
             .translation = Vec3::new(120.0, 0.0, 0.0);
         app.update();
         assert!(
+            app.world().get::<Prayer>(soul).is_none(),
+            "a full larder and a walk they will take is not worth a prayer",
+        );
+
+        // Past saving, it goes up wherever they are: this is the one that
+        // Kileb needed, and the one that must never be gated on comfort.
+        app.world_mut().get_mut::<Needs>(soul).unwrap().hunger = 0.95;
+        app.update();
+        assert!(
             app.world().get::<Prayer>(soul).is_some(),
-            "hunger on the road must pray while the walk home can still be made",
+            "whoever cannot reach the food in time must still be heard",
         );
     }
 
