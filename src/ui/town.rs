@@ -93,7 +93,11 @@ pub(crate) fn spawn_town_strip(mut commands: Commands) {
             node.padding = bevy::ui::UiRect {
                 left: px(8.0),
                 right: px(8.0),
-                top: px(16.0),
+                // Fourteen of these are off the screen - the slide above -
+                // so what a reader actually sees over the name is the
+                // remainder. At sixteen that left two, and the name sat on
+                // the edge it hangs from.
+                top: px(26.0),
                 bottom: px(7.0),
             };
             node.row_gap = px(2.0);
