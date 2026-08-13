@@ -1,105 +1,914 @@
 [
-  { "t": "You shut a door at night while I look for dry ground.", "tags": ["chat:open", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "I saw you leave your bed this morning. I had no bed to leave.", "tags": ["chat:open", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "The rain sounds different when it lands on somebody else's roof.", "tags": ["chat:open", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "You complain about a draft. I would welcome walls around mine.", "tags": ["chat:open", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "One of us slept indoors. Guess which one is tired of hearing excuses.", "tags": ["chat:open", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "I am done pretending your comfort and my cold are unrelated.", "tags": ["chat:open", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "The god placed a roof above you. What duty came with that gift?", "tags": ["chat:open", "quarrel", "over:roof", "aggrieved", "devout"] },
-  { "t": "You thank the god for shelter while stepping past people without it.", "tags": ["chat:open", "quarrel", "over:roof", "aggrieved", "devout"] },
-  { "t": "Maybe your roof is a blessing. I wonder what that makes my night.", "tags": ["chat:open", "quarrel", "over:roof", "aggrieved", "wavering"] },
-  { "t": "I almost believe shelter means favour. Then I look at who lacks it.", "tags": ["chat:open", "quarrel", "over:roof", "aggrieved", "wavering"] },
-  { "t": "People built your roof. People can explain why I have none.", "tags": ["chat:open", "quarrel", "over:roof", "aggrieved", "doubting"] },
-  { "t": "Do not call your good fortune divine while I sleep in mud.", "tags": ["chat:open", "quarrel", "over:roof", "aggrieved", "doubting"] },
-
-  { "t": "You have been staring at my door all morning. Say what you mean.", "tags": ["chat:open", "quarrel", "over:roof", "advantaged"] },
-  { "t": "I did not put you outside, whatever that look says.", "tags": ["chat:open", "quarrel", "over:roof", "advantaged"] },
-  { "t": "My roof does not become larger because you resent it.", "tags": ["chat:open", "quarrel", "over:roof", "advantaged"] },
-  { "t": "Ask me for help plainly. I will not answer silent blame.", "tags": ["chat:open", "quarrel", "over:roof", "advantaged"] },
-  { "t": "I know where you slept. I do not know why you blame me.", "tags": ["chat:open", "quarrel", "over:roof", "advantaged"] },
-  { "t": "You speak as though I chose every bed in this village.", "tags": ["chat:open", "quarrel", "over:roof", "advantaged"] },
-  { "t": "The god gave me shelter. I never asked that you be denied it.", "tags": ["chat:open", "quarrel", "over:roof", "advantaged", "devout"] },
-  { "t": "I thank the god for my roof and pray for yours. Is that wrong?", "tags": ["chat:open", "quarrel", "over:roof", "advantaged", "devout"] },
-  { "t": "Maybe fortune chose badly. I still did not make the choice.", "tags": ["chat:open", "quarrel", "over:roof", "advantaged", "wavering"] },
-  { "t": "I have wondered why I am inside and you are not.", "tags": ["chat:open", "quarrel", "over:roof", "advantaged", "wavering"] },
-  { "t": "Builders made this roof. Take your complaint to whoever directs them.", "tags": ["chat:open", "quarrel", "over:roof", "advantaged", "doubting"] },
-  { "t": "A roof is timber and work, not proof that heaven prefers me.", "tags": ["chat:open", "quarrel", "over:roof", "advantaged", "doubting"] },
-
-  { "t": "You did not put me outside. You simply stopped noticing I was there.", "tags": ["chat:reply", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "Your doorway has room for sympathy, if nothing else.", "tags": ["chat:reply", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "I asked plainly before. You answered by changing the subject.", "tags": ["chat:reply", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "I am not asking you to stretch the walls with your hands.", "tags": ["chat:reply", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "Then stand beside me when I ask why the building has stopped.", "tags": ["chat:reply", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "You cannot choose every bed. You can choose whether this matters.", "tags": ["chat:reply", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "A blessing kept only for yourself begins to look like selfishness.", "tags": ["chat:reply", "quarrel", "over:roof", "aggrieved", "devout"] },
-  { "t": "The god sees the fire inside and the person outside it.", "tags": ["chat:reply", "quarrel", "over:roof", "aggrieved", "devout"] },
-  { "t": "Perhaps nobody chose this. Somebody still has to change it.", "tags": ["chat:reply", "quarrel", "over:roof", "aggrieved", "wavering"] },
-  { "t": "I do not know why fortune split us. I know which side is colder.", "tags": ["chat:reply", "quarrel", "over:roof", "aggrieved", "wavering"] },
-  { "t": "Good. Leave heaven aside and help me question the building order.", "tags": ["chat:reply", "quarrel", "over:roof", "aggrieved", "doubting"] },
-  { "t": "No prayer laid those beams. Work did, and more work can follow.", "tags": ["chat:reply", "quarrel", "over:roof", "aggrieved", "doubting"] },
-
-  { "t": "You accuse me of indifference because I cannot offer what I lack.", "tags": ["chat:reply", "quarrel", "over:roof", "advantaged"] },
-  { "t": "I saw you outside. I also saw every sleeping place already taken.", "tags": ["chat:reply", "quarrel", "over:roof", "advantaged"] },
-  { "t": "I can speak for another roof. I cannot promise when it rises.", "tags": ["chat:reply", "quarrel", "over:roof", "advantaged"] },
-  { "t": "Being indoors does not give me command over the builders.", "tags": ["chat:reply", "quarrel", "over:roof", "advantaged"] },
-  { "t": "I did not know you had asked me before. I know now.", "tags": ["chat:reply", "quarrel", "over:roof", "advantaged"] },
-  { "t": "I will listen. Stop speaking as if my bed was stolen from yours.", "tags": ["chat:reply", "quarrel", "over:roof", "advantaged"] },
-  { "t": "The god gave shelter through many hands. I will add mine where possible.", "tags": ["chat:reply", "quarrel", "over:roof", "advantaged", "devout"] },
-  { "t": "I can pray beside you and ask the builders what remains.", "tags": ["chat:reply", "quarrel", "over:roof", "advantaged", "devout"] },
-  { "t": "Maybe I called my roof providence because gratitude was easier than guilt.", "tags": ["chat:reply", "quarrel", "over:roof", "advantaged", "wavering"] },
-  { "t": "I cannot explain the difference. I can admit it is unjust.", "tags": ["chat:reply", "quarrel", "over:roof", "advantaged", "wavering"] },
-  { "t": "Exactly. People placed the beds. People can decide what comes next.", "tags": ["chat:reply", "quarrel", "over:roof", "advantaged", "doubting"] },
-  { "t": "Blame poor planning before blaming somebody who happened to get a room.", "tags": ["chat:reply", "quarrel", "over:roof", "advantaged", "doubting"] },
-
-  { "t": "You keep defending the walls while I keep waking wet.", "tags": ["chat:followup", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "I am tired of asking sheltered people to imagine the weather.", "tags": ["chat:followup", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "If you truly noticed, stop explaining and stand with me.", "tags": ["chat:followup", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "Another night outside will not make me easier to speak with.", "tags": ["chat:followup", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "Find me when you have help instead of reasons.", "tags": ["chat:followup", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "Perhaps you are only the nearest person with a door.", "tags": ["chat:followup", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "The god will hear me outside whether the housed do or not.", "tags": ["chat:followup", "quarrel", "over:roof", "aggrieved", "devout"] },
-  { "t": "Keep the blessing if you must. The god will know how you used it.", "tags": ["chat:followup", "quarrel", "over:roof", "aggrieved", "devout"] },
-  { "t": "Maybe I am angry at chance and giving it your face.", "tags": ["chat:followup", "quarrel", "over:roof", "aggrieved", "wavering"] },
-  { "t": "I want shelter more than I want an answer about providence.", "tags": ["chat:followup", "quarrel", "over:roof", "aggrieved", "wavering"] },
-  { "t": "The sky is not judging me. The village is simply failing me.", "tags": ["chat:followup", "quarrel", "over:roof", "aggrieved", "doubting"] },
-  { "t": "Save the blessing talk. Show me where the next beam goes.", "tags": ["chat:followup", "quarrel", "over:roof", "aggrieved", "doubting"] },
-
-  { "t": "I cannot tear down my roof to make this fair.", "tags": ["chat:followup", "quarrel", "over:roof", "advantaged"] },
-  { "t": "You want me ashamed when what you need is another building.", "tags": ["chat:followup", "quarrel", "over:roof", "advantaged"] },
-  { "t": "I offered my voice. I will not accept blame for every missing bed.", "tags": ["chat:followup", "quarrel", "over:roof", "advantaged"] },
-  { "t": "I see the unfairness. I resent being treated as its architect.", "tags": ["chat:followup", "quarrel", "over:roof", "advantaged"] },
-  { "t": "Keep shouting at my door. It will remain the same size.", "tags": ["chat:followup", "quarrel", "over:roof", "advantaged"] },
-  { "t": "I should have spoken sooner. That much belongs to me.", "tags": ["chat:followup", "quarrel", "over:roof", "advantaged"] },
-  { "t": "The god sheltered me. I can use that shelter to help others.", "tags": ["chat:followup", "quarrel", "over:roof", "advantaged", "devout"] },
-  { "t": "I will pray and work for another roof. I will not apologise for mine.", "tags": ["chat:followup", "quarrel", "over:roof", "advantaged", "devout"] },
-  { "t": "Perhaps my gratitude kept me from examining your need.", "tags": ["chat:followup", "quarrel", "over:roof", "advantaged", "wavering"] },
-  { "t": "I do not know why I sleep inside. I know this anger builds nothing.", "tags": ["chat:followup", "quarrel", "over:roof", "advantaged", "wavering"] },
-  { "t": "If you want fairness, challenge the order of construction.", "tags": ["chat:followup", "quarrel", "over:roof", "advantaged", "doubting"] },
-  { "t": "The god did not choose my bed. The village did.", "tags": ["chat:followup", "quarrel", "over:roof", "advantaged", "doubting"] },
-
-  { "t": "I am leaving before another cold night speaks through me.", "tags": ["chat:end", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "Keep your reasons. I need to find somewhere dry.", "tags": ["chat:end", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "I should not blame you for every wall. I still blame your silence.", "tags": ["chat:end", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "Remember this conversation when you close your door tonight.", "tags": ["chat:end", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "Do not follow me unless you know where I can sleep.", "tags": ["chat:end", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "I spoke harshly. The cold remains, but those words were mine.", "tags": ["chat:end", "quarrel", "over:roof", "aggrieved"] },
-  { "t": "I will ask at the shrine and stop asking at your door.", "tags": ["chat:end", "quarrel", "over:roof", "aggrieved", "devout"] },
-  { "t": "The god will decide whether shelter excused that answer.", "tags": ["chat:end", "quarrel", "over:roof", "aggrieved", "devout"] },
-  { "t": "Perhaps nobody intended this. I still need distance from you.", "tags": ["chat:end", "quarrel", "over:roof", "aggrieved", "wavering"] },
-  { "t": "I need sleep before I decide whether I owe an apology.", "tags": ["chat:end", "quarrel", "over:roof", "aggrieved", "wavering"] },
-  { "t": "I will ask builders instead of heaven. At least they answer plainly.", "tags": ["chat:end", "quarrel", "over:roof", "aggrieved", "doubting"] },
-  { "t": "There is no divine meaning here worth discussing. I need a roof.", "tags": ["chat:end", "quarrel", "over:roof", "aggrieved", "doubting"] },
-
-  { "t": "I will speak for another roof. That is what I can offer.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged"] },
-  { "t": "I am sorry you slept outside. I am not sorry I slept indoors.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged"] },
-  { "t": "Find me tomorrow. We can ask what the next building needs.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged"] },
-  { "t": "I have heard enough blame for one doorway. I am leaving.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged"] },
-  { "t": "Next time I see you outside, I will not look away.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged"] },
-  { "t": "You deserve shelter. You did not deserve to accuse me of denying it.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged"] },
-  { "t": "I will pray that another roof rises soon. That is sincere.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged", "devout"] },
-  { "t": "May the god shelter you and soften both our words.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged", "devout"] },
-  { "t": "I may owe more than sympathy. Let me think what I can do.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged", "wavering"] },
-  { "t": "I was sheltered and defensive. Both can be true.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged", "wavering"] },
-  { "t": "Find whoever orders the work. I will stand there with you.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged", "doubting"] },
-  { "t": "I will help seek shelter. I will not call the difference divine.", "tags": ["chat:end", "quarrel", "over:roof", "advantaged", "doubting"] }
+  {
+    "t": "You shut a door at night while I look for dry ground.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "I saw you leave your bed this morning. I had no bed to leave.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "The rain sounds different when it lands on somebody else's roof.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "You complain about a draft. I would welcome walls around mine.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "One of us slept indoors. Guess which one is tired of hearing excuses.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "I am done pretending your comfort and my cold are unrelated.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "{god} placed a roof above you. What duty came with that gift?",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "devout"
+    ]
+  },
+  {
+    "t": "You thank {god} for shelter while stepping past people without it.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "devout"
+    ]
+  },
+  {
+    "t": "Maybe your roof is a blessing. I wonder what that makes my night.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I almost believe shelter means favour. Then I look at who lacks it.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "wavering"
+    ]
+  },
+  {
+    "t": "People built your roof. People can explain why I have none.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Do not call your good fortune divine while I sleep in mud.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "doubting"
+    ]
+  },
+  {
+    "t": "You have been staring at my door all morning. Say what you mean.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "I did not put you outside, whatever that look says.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "My roof does not become larger because you resent it.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "Ask me for help plainly. I will not answer silent blame.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "I know where you slept. I do not know why you blame me.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "You speak as though I chose every bed in this village.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "{god} gave me shelter. I never asked that you be denied it.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "devout"
+    ]
+  },
+  {
+    "t": "I thank {god} for my roof and pray for yours. Is that wrong?",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "devout"
+    ]
+  },
+  {
+    "t": "Maybe fortune chose badly. I still did not make the choice.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I have wondered why I am inside and you are not.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Builders made this roof. Take your complaint to whoever directs them.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "doubting"
+    ]
+  },
+  {
+    "t": "A roof is timber and work, not proof that heaven prefers me.",
+    "tags": [
+      "chat:open",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "doubting"
+    ]
+  },
+  {
+    "t": "You did not put me outside. You simply stopped noticing I was there.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "Your doorway has room for sympathy, if nothing else.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "I asked plainly before. You answered by changing the subject.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "I am not asking you to stretch the walls with your hands.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "Then stand beside me when I ask why the building has stopped.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "You cannot choose every bed. You can choose whether this matters.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "A blessing kept only for yourself begins to look like selfishness.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "devout"
+    ]
+  },
+  {
+    "t": "{god} sees the fire inside and the person outside it.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "devout"
+    ]
+  },
+  {
+    "t": "Perhaps nobody chose this. Somebody still has to change it.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I do not know why fortune split us. I know which side is colder.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Good. Leave heaven aside and help me question the building order.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "doubting"
+    ]
+  },
+  {
+    "t": "No prayer laid those beams. Work did, and more work can follow.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "doubting"
+    ]
+  },
+  {
+    "t": "You accuse me of indifference because I cannot offer what I lack.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "I saw you outside. I also saw every sleeping place already taken.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "I can speak for another roof. I cannot promise when it rises.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "Being indoors does not give me command over the builders.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "I did not know you had asked me before. I know now.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "I will listen. Stop speaking as if my bed was stolen from yours.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "{god} gave shelter through many hands. I will add mine where possible.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "devout"
+    ]
+  },
+  {
+    "t": "I can pray beside you and ask the builders what remains.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "devout"
+    ]
+  },
+  {
+    "t": "Maybe I called my roof providence because gratitude was easier than guilt.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I cannot explain the difference. I can admit it is unjust.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Exactly. People placed the beds. People can decide what comes next.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Blame poor planning before blaming somebody who happened to get a room.",
+    "tags": [
+      "chat:reply",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "doubting"
+    ]
+  },
+  {
+    "t": "You keep defending the walls while I keep waking wet.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "I am tired of asking sheltered people to imagine the weather.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "If you truly noticed, stop explaining and stand with me.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "Another night outside will not make me easier to speak with.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "Find me when you have help instead of reasons.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "Perhaps you are only the nearest person with a door.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "{god} will hear me outside whether the housed do or not.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "devout"
+    ]
+  },
+  {
+    "t": "Keep the blessing if you must. {god} will know how you used it.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "devout"
+    ]
+  },
+  {
+    "t": "Maybe I am angry at chance and giving it your face.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I want shelter more than I want an answer about providence.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The sky is not judging me. The village is simply failing me.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "doubting"
+    ]
+  },
+  {
+    "t": "Save the blessing talk. Show me where the next beam goes.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I cannot tear down my roof to make this fair.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "You want me ashamed when what you need is another building.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "I offered my voice. I will not accept blame for every missing bed.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "I see the unfairness. I resent being treated as its architect.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "Keep shouting at my door. It will remain the same size.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "I should have spoken sooner. That much belongs to me.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "{god} sheltered me. I can use that shelter to help others.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "devout"
+    ]
+  },
+  {
+    "t": "I will pray and work for another roof. I will not apologise for mine.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "devout"
+    ]
+  },
+  {
+    "t": "Perhaps my gratitude kept me from examining your need.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I do not know why I sleep inside. I know this anger builds nothing.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "wavering"
+    ]
+  },
+  {
+    "t": "If you want fairness, challenge the order of construction.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "doubting"
+    ]
+  },
+  {
+    "t": "{god} did not choose my bed. The village did.",
+    "tags": [
+      "chat:followup",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I am leaving before another cold night speaks through me.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "Keep your reasons. I need to find somewhere dry.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "I should not blame you for every wall. I still blame your silence.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "Remember this conversation when you close your door tonight.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "Do not follow me unless you know where I can sleep.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "I spoke harshly. The cold remains, but those words were mine.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "aggrieved"
+    ]
+  },
+  {
+    "t": "I will ask at the shrine and stop asking at your door.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "devout"
+    ]
+  },
+  {
+    "t": "{god} will decide whether shelter excused that answer.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "devout"
+    ]
+  },
+  {
+    "t": "Perhaps nobody intended this. I still need distance from you.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I need sleep before I decide whether I owe an apology.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I will ask builders instead of heaven. At least they answer plainly.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "doubting"
+    ]
+  },
+  {
+    "t": "There is no divine meaning here worth discussing. I need a roof.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "aggrieved",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I will speak for another roof. That is what I can offer.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "I am sorry you slept outside. I am not sorry I slept indoors.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "Find me tomorrow. We can ask what the next building needs.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "I have heard enough blame for one doorway. I am leaving.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "Next time I see you outside, I will not look away.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "You deserve shelter. You did not deserve to accuse me of denying it.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "advantaged"
+    ]
+  },
+  {
+    "t": "I will pray that another roof rises soon. That is sincere.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "devout"
+    ]
+  },
+  {
+    "t": "May {god} shelter you and soften both our words.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "devout"
+    ]
+  },
+  {
+    "t": "I may owe more than sympathy. Let me think what I can do.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I was sheltered and defensive. Both can be true.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Find whoever orders the work. I will stand there with you.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I will help seek shelter. I will not call the difference divine.",
+    "tags": [
+      "chat:end",
+      "quarrel",
+      "over:roof",
+      "advantaged",
+      "doubting"
+    ]
+  }
 ]

@@ -1,4681 +1,4681 @@
 [
- {
-  "t": "I've been turning it over all day and I'm no further on",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "I wouldn't say it if I hadn't been there",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "you can think what you like. I know what I saw",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "I keep expecting somebody to tell me I imagined it",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "I'm not asking you to believe me. I just needed to say it out loud",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "that's the whole of it. I've told you as straight as I can",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "and that's the god's hand, whatever anybody says",
-  "tags": [
-   "chat:followup",
-   "devout",
-   "told"
-  ]
- },
- {
-  "t": "I've stopped looking for another explanation",
-  "tags": [
-   "chat:followup",
-   "devout",
-   "told"
-  ]
- },
- {
-  "t": "you can feel it, can't you? something is here",
-  "tags": [
-   "chat:followup",
-   "devout",
-   "told"
-  ]
- },
- {
-  "t": "I don't know what to make of it and I've had a day to try",
-  "tags": [
-   "chat:followup",
-   "wavering",
-   "told"
-  ]
- },
- {
-  "t": "half of me believes it and half of me doesn't. that's honest",
-  "tags": [
-   "chat:followup",
-   "wavering",
-   "told"
-  ]
- },
- {
-  "t": "I'm telling you what happened, not what it means",
-  "tags": [
-   "chat:followup",
-   "doubting",
-   "told"
-  ]
- },
- {
-  "t": "there'll be a reason for it. there always is",
-  "tags": [
-   "chat:followup",
-   "doubting",
-   "told"
-  ]
- },
- {
-  "t": "I'd rather be wrong about this than right",
-  "tags": [
-   "chat:followup",
-   "doubting",
-   "told"
-  ]
- },
- {
-  "t": "I can still see the shape of it when I shut my eyes",
-  "tags": [
-   "chat:followup",
-   "event:smote"
-  ]
- },
- {
-  "t": "nobody should have to watch that twice",
-  "tags": [
-   "chat:followup",
-   "event:smote"
-  ]
- },
- {
-  "t": "I'm not walking that road alone again. neither should you",
-  "tags": [
-   "chat:followup",
-   "event:mauled"
-  ]
- },
- {
-  "t": "we need somebody on the treeline. I'll do it myself if I have to",
-  "tags": [
-   "chat:followup",
-   "event:mauled"
-  ]
- },
- {
-  "t": "we ate. that's the part I keep coming back to",
-  "tags": [
-   "chat:followup",
-   "event:provided"
-  ]
- },
- {
-  "t": "whoever left it, I'd like to thank them",
-  "tags": [
-   "chat:followup",
-   "event:provided"
-  ]
- },
- {
-  "t": "I keep thinking about what I could have done sooner",
-  "tags": [
-   "chat:followup",
-   "event:perished"
-  ]
- },
- {
-  "t": "we should do it properly. they were one of ours",
-  "tags": [
-   "chat:followup",
-   "event:perished"
-  ]
- },
- {
-  "t": "I had to sit down after. my legs went",
-  "tags": [
-   "chat:followup",
-   "event:quaked"
-  ]
- },
- {
-  "t": "the whole village felt it, so at least I'm not mad",
-  "tags": [
-   "chat:followup",
-   "event:quaked"
-  ]
- },
- {
-  "t": "everybody's alright. that's not nothing, these days",
-  "tags": [
-   "chat:followup",
-   "event:delivered"
-  ]
- },
- {
-  "t": "the village needed a bit of good news",
-  "tags": [
-   "chat:followup",
-   "event:delivered"
-  ]
- },
- {
-  "t": "I've never seen the bushes come in like that",
-  "tags": [
-   "chat:followup",
-   "event:flourished"
-  ]
- },
- {
-  "t": "we should get out there before the birds do",
-  "tags": [
-   "chat:followup",
-   "event:flourished"
-  ]
- },
- {
-  "t": "I looked twice. there wasn't a mark left on it",
-  "tags": [
-   "chat:followup",
-   "event:mended"
-  ]
- },
- {
-  "t": "I don't have an explanation and I've tried",
-  "tags": [
-   "chat:followup",
-   "event:mended"
-  ]
- },
- {
-  "t": "roots and all, straight out of the ground",
-  "tags": [
-   "chat:followup",
-   "event:uprooted"
-  ]
- },
- {
-  "t": "it's still lying there if you want to see for yourself",
-  "tags": [
-   "chat:followup",
-   "event:uprooted"
-  ]
- },
- {
-  "t": "feet off the ground, clear air underneath. I saw it",
-  "tags": [
-   "chat:followup",
-   "event:lifted"
-  ]
- },
- {
-  "t": "I don't know how you explain that away",
-  "tags": [
-   "chat:followup",
-   "event:lifted"
-  ]
- },
- {
-  "t": "they went further than a person goes. that's all I'll say",
-  "tags": [
-   "chat:followup",
-   "event:thrown"
-  ]
- },
- {
-  "t": "I've been trying to work out the distance and it doesn't help",
-  "tags": [
-   "chat:followup",
-   "event:thrown"
-  ]
- },
- {
-  "t": "not a scratch on them. that's the part that gets me",
-  "tags": [
-   "chat:followup",
-   "event:setdown"
-  ]
- },
- {
-  "t": "gentle, is what it was. that's a strange thing to say about it",
-  "tags": [
-   "chat:followup",
-   "event:setdown"
-  ]
- },
- {
-  "t": "the ground took it harder than any fall I've seen",
-  "tags": [
-   "chat:followup",
-   "event:impact"
-  ]
- },
- {
-  "t": "I felt it come up through my boots",
-  "tags": [
-   "chat:followup",
-   "event:impact"
-  ]
- },
- {
-  "t": "well. I'll be thinking about that",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "thanks for telling me. I mean it",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I don't know what to say to that",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "let me sit with it a while",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I'd better get back to it. but thank you",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "we'll talk again. I want to hear it once more",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "right. I'm going to go and do something ordinary now",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "then we should be grateful, and say so",
-  "tags": [
-   "chat:end",
-   "devout"
-  ]
- },
- {
-  "t": "I'll say something at the shrine tonight",
-  "tags": [
-   "chat:end",
-   "devout"
-  ]
- },
- {
-  "t": "I want to believe you. give me a day",
-  "tags": [
-   "chat:end",
-   "wavering"
-  ]
- },
- {
-  "t": "maybe. I'll keep my eyes open",
-  "tags": [
-   "chat:end",
-   "wavering"
-  ]
- },
- {
-  "t": "I'm not saying you're lying. I'm saying I wasn't there",
-  "tags": [
-   "chat:end",
-   "doubting"
-  ]
- },
- {
-  "t": "people see things. it doesn't make them wrong or right",
-  "tags": [
-   "chat:end",
-   "doubting"
-  ]
- },
- {
-  "t": "if that costs us the stores, I need to know now",
-  "tags": [
-   "chat:end",
-   "trade:cook"
-  ]
- },
- {
-  "t": "I'll walk the edge tonight either way",
-  "tags": [
-   "chat:end",
-   "trade:guard"
-  ]
- },
- {
-  "t": "send them to me if they're hurt. don't let them tough it out",
-  "tags": [
-   "chat:end",
-   "trade:healer"
-  ]
- },
- {
-  "t": "that's worth writing down properly",
-  "tags": [
-   "chat:end",
-   "trade:priest"
-  ]
- },
- {
-  "t": "I'll keep an eye out on the road",
-  "tags": [
-   "chat:end",
-   "trade:explorer"
-  ]
- },
- {
-  "t": "well, the roof won't build itself either way",
-  "tags": [
-   "chat:end",
-   "trade:builder"
-  ]
- },
- {
-  "t": "the good bushes are getting picked over. we're walking further every day",
-  "tags": [
-   "chat:open",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "found a patch out past the ridge nobody's touched yet",
-  "tags": [
-   "chat:open",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "my back's had enough of bending today, I'll tell you that",
-  "tags": [
-   "chat:open",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "I've noticed that too. it was easier a week ago",
-  "tags": [
-   "chat:reply",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "show me where and I'll come out with you tomorrow",
-  "tags": [
-   "chat:reply",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "at least it's not raining on us for once",
-  "tags": [
-   "chat:reply",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "the water's been quiet. I've had two all morning",
-  "tags": [
-   "chat:open",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "there's a deeper spot round the point I want to try",
-  "tags": [
-   "chat:open",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "if we had a proper dock I'd not be wading to my knees",
-  "tags": [
-   "chat:open",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "quiet for me as well. something's moved them on",
-  "tags": [
-   "chat:reply",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "worth a try. anything's better than standing here",
-  "tags": [
-   "chat:reply",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "I keep saying the same thing about that dock",
-  "tags": [
-   "chat:reply",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "saw tracks by the treeline this morning. big ones",
-  "tags": [
-   "chat:open",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "I'd rather hunt with someone than alone, honestly",
-  "tags": [
-   "chat:open",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "two clean kills this week. I'll take that",
-  "tags": [
-   "chat:open",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "big ones how? wolf big?",
-  "tags": [
-   "chat:reply",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "I'll walk out with you. I don't like it out there either",
-  "tags": [
-   "chat:reply",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "we all eat better when you have a good week",
-  "tags": [
-   "chat:reply",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "the near stand's about done. it's a long haul from the next one",
-  "tags": [
-   "chat:open",
-   "topic:forester"
-  ]
- },
- {
-  "t": "this axe wants an edge putting back on it",
-  "tags": [
-   "chat:open",
-   "topic:forester"
-  ]
- },
- {
-  "t": "I dropped one clean today, straight where I wanted it",
-  "tags": [
-   "chat:open",
-   "topic:forester"
-  ]
- },
- {
-  "t": "I noticed the pile's coming in slower",
-  "tags": [
-   "chat:reply",
-   "topic:forester"
-  ]
- },
- {
-  "t": "borrow mine, it's just been done",
-  "tags": [
-   "chat:reply",
-   "topic:forester"
-  ]
- },
- {
-  "t": "that's the whole job, isn't it. drop it where you want it",
-  "tags": [
-   "chat:reply",
-   "topic:forester"
-  ]
- },
- {
-  "t": "I've been chipping at the same rock since dawn",
-  "tags": [
-   "chat:open",
-   "topic:miner"
-  ]
- },
- {
-  "t": "there's better stone up the rise but it's a walk",
-  "tags": [
-   "chat:open",
-   "topic:miner"
-  ]
- },
- {
-  "t": "everything I own has dust in it now",
-  "tags": [
-   "chat:open",
-   "topic:miner"
-  ]
- },
- {
-  "t": "is it worth the walk? we need the stone",
-  "tags": [
-   "chat:reply",
-   "topic:miner"
-  ]
- },
- {
-  "t": "I'll come up with you and we'll carry double",
-  "tags": [
-   "chat:reply",
-   "topic:miner"
-  ]
- },
- {
-  "t": "you and me both. I've stopped trying to keep clean",
-  "tags": [
-   "chat:reply",
-   "topic:miner"
-  ]
- },
- {
-  "t": "that frame's nearly closed in. one more good day",
-  "tags": [
-   "chat:open",
-   "topic:builder"
-  ]
- },
- {
-  "t": "we could use another pair of hands on it, if you're free",
-  "tags": [
-   "chat:open",
-   "topic:builder"
-  ]
- },
- {
-  "t": "I'd rather do it slow and right than twice",
-  "tags": [
-   "chat:open",
-   "topic:builder"
-  ]
- },
- {
-  "t": "I'll give you the morning. I've nothing better",
-  "tags": [
-   "chat:reply",
-   "topic:builder"
-  ]
- },
- {
-  "t": "good. people are still sleeping out",
-  "tags": [
-   "chat:reply",
-   "topic:builder"
-  ]
- },
- {
-  "t": "that's the only way to do it",
-  "tags": [
-   "chat:reply",
-   "topic:builder"
-  ]
- },
- {
-  "t": "the near row came up thin. I don't know what it wants",
-  "tags": [
-   "chat:open",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "if the rain holds off another few days we'll be alright",
-  "tags": [
-   "chat:open",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "I could do with a second pair of hands at the harvest",
-  "tags": [
-   "chat:open",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "give it water and stop worrying at it",
-  "tags": [
-   "chat:reply",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "it always holds off until you say that out loud",
-  "tags": [
-   "chat:reply",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "count me in when it comes",
-  "tags": [
-   "chat:reply",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "quiet night. I like the quiet nights",
-  "tags": [
-   "chat:open",
-   "topic:guard"
-  ]
- },
- {
-  "t": "I don't like how close the woods come to the road there",
-  "tags": [
-   "chat:open",
-   "topic:guard"
-  ]
- },
- {
-  "t": "if you're going out past the trees, don't go alone",
-  "tags": [
-   "chat:open",
-   "topic:guard"
-  ]
- },
- {
-  "t": "long may it stay quiet",
-  "tags": [
-   "chat:reply",
-   "topic:guard"
-  ]
- },
- {
-  "t": "somebody should put a post up that end",
-  "tags": [
-   "chat:reply",
-   "topic:guard"
-  ]
- },
- {
-  "t": "I hear you. I'll take someone with me",
-  "tags": [
-   "chat:reply",
-   "topic:guard"
-  ]
- },
- {
-  "t": "three people this week who should have come to me sooner",
-  "tags": [
-   "chat:open",
-   "topic:healer"
-  ]
- },
- {
-  "t": "I'm short on anything to bind a wound with",
-  "tags": [
-   "chat:open",
-   "topic:healer"
-  ]
- },
- {
-  "t": "tell people to rest. they never listen to me",
-  "tags": [
-   "chat:open",
-   "topic:healer"
-  ]
- },
- {
-  "t": "nobody wants to be the one who complains",
-  "tags": [
-   "chat:reply",
-   "topic:healer"
-  ]
- },
- {
-  "t": "I'll keep an eye out for what you need",
-  "tags": [
-   "chat:reply",
-   "topic:healer"
-  ]
- },
- {
-  "t": "they'd listen if you shouted more",
-  "tags": [
-   "chat:reply",
-   "topic:healer"
-  ]
- },
- {
-  "t": "I can make it stretch, but not forever",
-  "tags": [
-   "chat:open",
-   "topic:cook"
-  ]
- },
- {
-  "t": "hot food does more for people than anyone admits",
-  "tags": [
-   "chat:open",
-   "topic:cook"
-  ]
- },
- {
-  "t": "bring me something other than fish and I'll make it worth it",
-  "tags": [
-   "chat:open",
-   "topic:cook"
-  ]
- },
- {
-  "t": "it's appreciated. more than we say",
-  "tags": [
-   "chat:reply",
-   "topic:cook"
-  ]
- },
- {
-  "t": "true. I feel human again after",
-  "tags": [
-   "chat:reply",
-   "topic:cook"
-  ]
- },
- {
-  "t": "I'll see what I can do",
-  "tags": [
-   "chat:reply",
-   "topic:cook"
-  ]
- },
- {
-  "t": "people only come to me when they want something",
-  "tags": [
-   "chat:open",
-   "topic:priest"
-  ]
- },
- {
-  "t": "I don't have answers. I have somewhere to put the question",
-  "tags": [
-   "chat:open",
-   "topic:priest"
-  ]
- },
- {
-  "t": "it helps to say it out loud to someone. that's most of it",
-  "tags": [
-   "chat:open",
-   "topic:priest"
-  ]
- },
- {
-  "t": "that's people for you",
-  "tags": [
-   "chat:reply",
-   "topic:priest"
-  ]
- },
- {
-  "t": "that's more honest than I expected",
-  "tags": [
-   "chat:reply",
-   "topic:priest"
-  ]
- },
- {
-  "t": "maybe that's all any of it is",
-  "tags": [
-   "chat:reply",
-   "topic:priest"
-  ]
- },
- {
-  "t": "there's a valley two days out I want to see the end of",
-  "tags": [
-   "chat:open",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "I mark the trees so I can find my own way back",
-  "tags": [
-   "chat:open",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "the map in my head is getting bigger than my memory",
-  "tags": [
-   "chat:open",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "bring something back worth having",
-  "tags": [
-   "chat:reply",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "sensible. I'd get lost inside an hour",
-  "tags": [
-   "chat:reply",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "write it down before you lose it",
-  "tags": [
-   "chat:reply",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "I keep thinking about supper and it's hours off",
-  "tags": [
-   "chat:open",
-   "topic:food"
-  ]
- },
- {
-  "t": "have you looked in the stores lately? I have, and I wish I hadn't",
-  "tags": [
-   "chat:open",
-   "topic:food"
-  ]
- },
- {
-  "t": "I'd eat almost anything right now",
-  "tags": [
-   "chat:open",
-   "topic:food"
-  ]
- },
- {
-  "t": "we're not starving. I just want that on the record before I complain",
-  "tags": [
-   "chat:open",
-   "topic:food"
-  ]
- },
- {
-  "t": "don't. I've been trying not to think about it",
-  "tags": [
-   "chat:reply",
-   "topic:food"
-  ]
- },
- {
-  "t": "it'll come in. it always comes in",
-  "tags": [
-   "chat:reply",
-   "topic:food"
-  ]
- },
- {
-  "t": "there's berries out past the fire if you're desperate",
-  "tags": [
-   "chat:reply",
-   "topic:food"
-  ]
- },
- {
-  "t": "complain away. I'm right there with you",
-  "tags": [
-   "chat:reply",
-   "topic:food"
-  ]
- },
- {
-  "t": "another night on the ground for me",
-  "tags": [
-   "chat:open",
-   "topic:roof"
-  ]
- },
- {
-  "t": "I've stopped asking when. I just watch the frames go up",
-  "tags": [
-   "chat:open",
-   "topic:roof"
-  ]
- },
- {
-  "t": "my back has opinions about sleeping outside",
-  "tags": [
-   "chat:open",
-   "topic:roof"
-  ]
- },
- {
-  "t": "when I get four walls I'm not coming out for a day",
-  "tags": [
-   "chat:open",
-   "topic:roof"
-  ]
- },
- {
-  "t": "same. at least it's not just me",
-  "tags": [
-   "chat:reply",
-   "topic:roof"
-  ]
- },
- {
-  "t": "they're going up faster than they were",
-  "tags": [
-   "chat:reply",
-   "topic:roof"
-  ]
- },
- {
-  "t": "you and me both, friend",
-  "tags": [
-   "chat:reply",
-   "topic:roof"
-  ]
- },
- {
-  "t": "I'll help you move in when it happens",
-  "tags": [
-   "chat:reply",
-   "topic:roof"
-  ]
- },
- {
-  "t": "{cold|raw|bitter} one today",
-  "tags": [
-   "chat:open",
-   "topic:weather"
-  ]
- },
- {
-  "t": "this rain has settled in for the day, I reckon",
-  "tags": [
-   "chat:open",
-   "topic:weather"
-  ]
- },
- {
-  "t": "clear sky for once. I'll {take it|not complain}",
-  "tags": [
-   "chat:open",
-   "topic:weather"
-  ]
- },
- {
-  "t": "wind's getting up. mind the fire tonight",
-  "tags": [
-   "chat:open",
-   "topic:weather"
-  ]
- },
- {
-  "t": "colder tomorrow, I'd say",
-  "tags": [
-   "chat:reply",
-   "topic:weather"
-  ]
- },
- {
-  "t": "it always does when there's work outside",
-  "tags": [
-   "chat:reply",
-   "topic:weather"
-  ]
- },
- {
-  "t": "makes a change from last week",
-  "tags": [
-   "chat:reply",
-   "topic:weather"
-  ]
- },
- {
-  "t": "I'll bank it up before I turn in",
-  "tags": [
-   "chat:reply",
-   "topic:weather"
-  ]
- },
- {
-  "t": "anyway. back to it",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "good {talking|speaking} to you",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "right, that's me. see you at the fire",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "we should do this more than we do",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "how's your {day|morning} been, then?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "you look about as {tired|worn out|done in} as I feel",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "not stopping. just saying hello",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "anything happening your end?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "{long|slow|hard} day, isn't it",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "much the same as {yesterday|always}, honestly",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "can't complain. well, I could, but I won't",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "nothing worth telling. how about you?",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "getting there. {slowly|bit by bit}",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "same as ever",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "anyway, that's where I'm at with it",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "I've been meaning to say that to somebody all day",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "you know how it is",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "it's not a complaint. it's just the truth of it",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "I'll not go on about it",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "I'd not say it to everyone, but I've been counting what's left",
-  "tags": [
-   "chat:followup",
-   "topic:food"
-  ]
- },
- {
-  "t": "one good haul and I'll stop going on about it",
-  "tags": [
-   "chat:followup",
-   "topic:food"
-  ]
- },
- {
-  "t": "I'm not asking to be first. I'd just like to know I'm on the list",
-  "tags": [
-   "chat:followup",
-   "topic:roof"
-  ]
- },
- {
-  "t": "it's the mornings that get me, more than the nights",
-  "tags": [
-   "chat:followup",
-   "topic:roof"
-  ]
- },
- {
-  "t": "mind you, we've had worse and lived",
-  "tags": [
-   "chat:followup",
-   "topic:weather"
-  ]
- },
- {
-  "t": "it'll turn. it always turns",
-  "tags": [
-   "chat:followup",
-   "topic:weather"
-  ]
- },
- {
-  "t": "I'll show you the spot if you keep it to yourself",
-  "tags": [
-   "chat:followup",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "it's not the picking, it's the walking",
-  "tags": [
-   "chat:followup",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "I'll give it another hour and then admit defeat",
-  "tags": [
-   "chat:followup",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "some days the water just says no",
-  "tags": [
-   "chat:followup",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "I'd rather come back with nothing than come back short a leg",
-  "tags": [
-   "chat:followup",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "it's the waiting that's the work, not the killing",
-  "tags": [
-   "chat:followup",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "my shoulders will tell me about this tomorrow",
-  "tags": [
-   "chat:followup",
-   "topic:forester"
-  ]
- },
- {
-  "t": "it's good wood, at least. worth the haul",
-  "tags": [
-   "chat:followup",
-   "topic:forester"
-  ]
- },
- {
-  "t": "I'll be picking grit out of my teeth for a week",
-  "tags": [
-   "chat:followup",
-   "topic:miner"
-  ]
- },
- {
-  "t": "the rock doesn't care how I feel about it",
-  "tags": [
-   "chat:followup",
-   "topic:miner"
-  ]
- },
- {
-  "t": "I want it standing before the weather turns",
-  "tags": [
-   "chat:followup",
-   "topic:builder"
-  ]
- },
- {
-  "t": "measure twice. I've learned that the expensive way",
-  "tags": [
-   "chat:followup",
-   "topic:builder"
-  ]
- },
- {
-  "t": "I've done what I can. the rest is the weather's business",
-  "tags": [
-   "chat:followup",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "give it a week and we'll know",
-  "tags": [
-   "chat:followup",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "I'd rather be bored than busy, in this job",
-  "tags": [
-   "chat:followup",
-   "topic:guard"
-  ]
- },
- {
-  "t": "I'll walk you back if you're going that way",
-  "tags": [
-   "chat:followup",
-   "topic:guard"
-  ]
- },
- {
-  "t": "I'd rather see them early than carry them in late",
-  "tags": [
-   "chat:followup",
-   "topic:healer"
-  ]
- },
- {
-  "t": "half of it is just telling people it's alright",
-  "tags": [
-   "chat:followup",
-   "topic:healer"
-  ]
- },
- {
-  "t": "bring me anything and I'll do something with it",
-  "tags": [
-   "chat:followup",
-   "topic:cook"
-  ]
- },
- {
-  "t": "it's not the cooking, it's the counting",
-  "tags": [
-   "chat:followup",
-   "topic:cook"
-  ]
- },
- {
-  "t": "I'll be at the shrine tonight if you want to come",
-  "tags": [
-   "chat:followup",
-   "topic:priest"
-  ]
- },
- {
-  "t": "I don't have an answer. I'll sit with you anyway",
-  "tags": [
-   "chat:followup",
-   "topic:priest"
-  ]
- },
- {
-  "t": "I'll be off again in a few days, once my feet forgive me",
-  "tags": [
-   "chat:followup",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "there's always another ridge",
-  "tags": [
-   "chat:followup",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "right. I've got to get on",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I'll let you get back to it",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "anyway, I've kept you long enough",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "we'll pick this up later",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I'm glad I ran into you",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "say hello to your {family|lot|people} for me",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "look after yourself",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I'll see you at supper",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "same time tomorrow, probably",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "don't let me hold you up",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "well, that's the day nearly gone",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I feel better for saying it out loud",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I'd best go before I talk your ear off",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "you've given me something to think about",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "that's the most sense anyone's made all day",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I won't keep you standing in the {cold|sun|wind}",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "come find me if you {hear|learn} anything else",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "let me know how it turns out",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I hope you're wrong, no offence",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I hope you're right about that",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "we'll know soon enough either way",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "there's no use standing here worrying about it",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I'll think on it while I work",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "you always know what to say, you know that?",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I don't think either of us is going to settle this today",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "let's not talk it to death",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "fair enough. I'll leave it there",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "that's me told, then",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "alright. I'll stop arguing",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I've said my bit",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "we can disagree and still get the work done",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "no hard feelings",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I'm too tired to make a case for it",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "ask me again when I've slept",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "come by later if you want to keep talking",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "the fire'll be going tonight if you want to sit",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "well. onward",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "back to it, I suppose",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "there's always something needs doing",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I've got about a hundred things waiting on me",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "my hands are going stiff standing about",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "you take care out there",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "mind how you go",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "don't work too hard",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I'll walk with you part of the way",
-  "tags": [
-   "chat:end"
-  ]
- },
- {
-  "t": "I'll say a word tonight, for both of us",
-  "tags": [
-   "chat:end",
-   "devout"
-  ]
- },
- {
-  "t": "we're looked after. I do believe that",
-  "tags": [
-   "chat:end",
-   "devout"
-  ]
- },
- {
-  "t": "there's a reason for it. there always is",
-  "tags": [
-   "chat:end",
-   "devout"
-  ]
- },
- {
-  "t": "I'll give thanks for the telling, if nothing else",
-  "tags": [
-   "chat:end",
-   "devout"
-  ]
- },
- {
-  "t": "keep faith. that's all any of us can do",
-  "tags": [
-   "chat:end",
-   "devout"
-  ]
- },
- {
-  "t": "I don't know what to make of any of it, honestly",
-  "tags": [
-   "chat:end",
-   "wavering"
-  ]
- },
- {
-  "t": "half of me believes you and half of me doesn't",
-  "tags": [
-   "chat:end",
-   "wavering"
-  ]
- },
- {
-  "t": "I'll wait and see. that's all I've got",
-  "tags": [
-   "chat:end",
-   "wavering"
-  ]
- },
- {
-  "t": "ask me tomorrow. I change my mind daily",
-  "tags": [
-   "chat:end",
-   "wavering"
-  ]
- },
- {
-  "t": "I want it to be true. that's not the same as believing it",
-  "tags": [
-   "chat:end",
-   "wavering"
-  ]
- },
- {
-  "t": "maybe I'm just not the sort it shows itself to",
-  "tags": [
-   "chat:end",
-   "wavering"
-  ]
- },
- {
-  "t": "I'd like to see something myself, one day",
-  "tags": [
-   "chat:end",
-   "wavering"
-  ]
- },
- {
-  "t": "you sound sure. I wish I were",
-  "tags": [
-   "chat:end",
-   "wavering"
-  ]
- },
- {
-  "t": "I'll believe it when it happens in front of me",
-  "tags": [
-   "chat:end",
-   "doubting"
-  ]
- },
- {
-  "t": "people want it to be true, so they see it",
-  "tags": [
-   "chat:end",
-   "doubting"
-  ]
- },
- {
-  "t": "I'm not calling you a liar. I'm just not convinced",
-  "tags": [
-   "chat:end",
-   "doubting"
-  ]
- },
- {
-  "t": "there's usually a plainer reason",
-  "tags": [
-   "chat:end",
-   "doubting"
-  ]
- },
- {
-  "t": "we tell each other a lot of things",
-  "tags": [
-   "chat:end",
-   "doubting"
-  ]
- },
- {
-  "t": "I've told you as plain as I know how",
-  "tags": [
-   "chat:end",
-   "told"
-  ]
- },
- {
-  "t": "that's everything I've got. do what you like with it",
-  "tags": [
-   "chat:end",
-   "told"
-  ]
- },
- {
-  "t": "you're the last person I'm telling, I've worn myself out on it",
-  "tags": [
-   "chat:end",
-   "told"
-  ]
- },
- {
-  "t": "if you hear it repeated back to you, it started with me",
-  "tags": [
-   "chat:end",
-   "told"
-  ]
- },
- {
-  "t": "I'll not go over it again after today",
-  "tags": [
-   "chat:end",
-   "told"
-  ]
- },
- {
-  "t": "well. now you know as much as I do",
-  "tags": [
-   "chat:end",
-   "told"
-  ]
- },
- {
-  "t": "I feel lighter for having said it",
-  "tags": [
-   "chat:end",
-   "told"
-  ]
- },
- {
-  "t": "I'll be down at the rock face if you need me",
-  "tags": [
-   "chat:end",
-   "trade:miner"
-  ]
- },
- {
-  "t": "there's stone waiting on me either way",
-  "tags": [
-   "chat:end",
-   "trade:miner"
-  ]
- },
- {
-  "t": "my back's telling me to get moving",
-  "tags": [
-   "chat:end",
-   "trade:miner"
-  ]
- },
- {
-  "t": "the field won't wait on a conversation",
-  "tags": [
-   "chat:end",
-   "trade:farmer"
-  ]
- },
- {
-  "t": "I've got beds to turn before dark",
-  "tags": [
-   "chat:end",
-   "trade:farmer"
-  ]
- },
- {
-  "t": "rain or no rain, it goes in this week",
-  "tags": [
-   "chat:end",
-   "trade:farmer"
-  ]
- },
- {
-  "t": "I've got a pot on, I can't stand here",
-  "tags": [
-   "chat:end",
-   "trade:cook"
-  ]
- },
- {
-  "t": "come by at supper and I'll feed you",
-  "tags": [
-   "chat:end",
-   "trade:cook"
-  ]
- },
- {
-  "t": "I'll put something aside for you",
-  "tags": [
-   "chat:end",
-   "trade:cook"
-  ]
- },
- {
-  "t": "I'm off past the ridge in the morning",
-  "tags": [
-   "chat:end",
-   "trade:explorer"
-  ]
- },
- {
-  "t": "I'll tell you what's out there when I'm back",
-  "tags": [
-   "chat:end",
-   "trade:explorer"
-  ]
- },
- {
-  "t": "there's more map than there is daylight",
-  "tags": [
-   "chat:end",
-   "trade:explorer"
-  ]
- },
- {
-  "t": "I'll hold it in mind tonight",
-  "tags": [
-   "chat:end",
-   "trade:priest"
-  ]
- },
- {
-  "t": "come to the shrine if you want to talk properly",
-  "tags": [
-   "chat:end",
-   "trade:priest"
-  ]
- },
- {
-  "t": "that's worth saying aloud where it counts",
-  "tags": [
-   "chat:end",
-   "trade:priest"
-  ]
- },
- {
-  "t": "send anyone to me who needs it",
-  "tags": [
-   "chat:end",
-   "trade:healer"
-  ]
- },
- {
-  "t": "I've got someone waiting on a poultice",
-  "tags": [
-   "chat:end",
-   "trade:healer"
-  ]
- },
- {
-  "t": "rest. that's my advice about everything",
-  "tags": [
-   "chat:end",
-   "trade:healer"
-  ]
- },
- {
-  "t": "I'm out at first light regardless",
-  "tags": [
-   "chat:end",
-   "trade:hunter"
-  ]
- },
- {
-  "t": "the tracks won't read themselves",
-  "tags": [
-   "chat:end",
-   "trade:hunter"
-  ]
- },
- {
-  "t": "I'll bring something back if the day's kind",
-  "tags": [
-   "chat:end",
-   "trade:hunter"
-  ]
- },
- {
-  "t": "tide won't hold for me",
-  "tags": [
-   "chat:end",
-   "trade:fisher"
-  ]
- },
- {
-  "t": "I've nets to see to",
-  "tags": [
-   "chat:end",
-   "trade:fisher"
-  ]
- },
- {
-  "t": "there'll be fish tonight, one way or another",
-  "tags": [
-   "chat:end",
-   "trade:fisher"
-  ]
- },
- {
-  "t": "I've trees to bring down before dark",
-  "tags": [
-   "chat:end",
-   "trade:forester"
-  ]
- },
- {
-  "t": "the axe is waiting on me",
-  "tags": [
-   "chat:end",
-   "trade:forester"
-  ]
- },
- {
-  "t": "we'll want more timber than we've got",
-  "tags": [
-   "chat:end",
-   "trade:forester"
-  ]
- },
- {
-  "t": "I know a patch that wants picking",
-  "tags": [
-   "chat:end",
-   "trade:gatherer"
-  ]
- },
- {
-  "t": "there's berries going over while we talk",
-  "tags": [
-   "chat:end",
-   "trade:gatherer"
-  ]
- },
- {
-  "t": "I'll fill a basket before dusk",
-  "tags": [
-   "chat:end",
-   "trade:gatherer"
-  ]
- },
- {
-  "t": "I'm on the edge tonight",
-  "tags": [
-   "chat:end",
-   "trade:guard"
-  ]
- },
- {
-  "t": "I'll keep watch either way",
-  "tags": [
-   "chat:end",
-   "trade:guard"
-  ]
- },
- {
-  "t": "nothing gets past me if I can help it",
-  "tags": [
-   "chat:end",
-   "trade:guard"
-  ]
- },
- {
-  "t": "I've a wall waiting on me",
-  "tags": [
-   "chat:end",
-   "trade:builder"
-  ]
- },
- {
-  "t": "that roof isn't going to close itself",
-  "tags": [
-   "chat:end",
-   "trade:builder"
-  ]
- },
- {
-  "t": "I'll get more done than I will standing here",
-  "tags": [
-   "chat:end",
-   "trade:builder"
-  ]
- },
- {
-  "t": "oh, tell me about it",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "you're not wrong",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "that's exactly what I said",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "I was thinking the same thing this morning",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "funny, I'd not thought of it that way",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "go on",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "really? that's the first I've heard",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "huh. and here I thought it was just me",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "well, that's one way to look at it",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "I suppose that's fair",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "you reckon?",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "I'm not sure I follow",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "say that again? I was miles away",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "sorry, I was somewhere else entirely",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "you've got my attention now",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "I've been meaning to ask you about that",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "it's good to hear somebody say it",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "everyone's been thinking it and nobody says it",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "I'd not have guessed",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "that makes more sense than what I'd assumed",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "you'd know better than me",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "I'll take your word for it",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "that's a relief, honestly",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "well that's put my mind at rest",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "now I'm worried, thanks",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "don't tell me things like that",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "I could have gone without knowing that",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "and how are you taking it?",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "how are you keeping, anyway?",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "you look tired, if you don't mind me saying",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "you seem in better spirits than yesterday",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "it's been a strange few days all round",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "the whole place has felt off",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "I've had my head down, I've heard nothing",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "I'm the last to know anything around here",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "you always hear it before I do",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "who told you that?",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "does anyone else know?",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "and you believe it?",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "that's a lot to take in standing up",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "let me get this straight",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "you're serious",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "I can't say I'm surprised",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "I am surprised, actually",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "that's the sort of thing that keeps you up",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "well I'm glad it wasn't worse",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "could have been much worse",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "small mercies",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "it's always something",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "nothing's ever simple here",
-  "tags": [
-   "chat:reply"
-  ]
- },
- {
-  "t": "I've been asking myself the same thing all week",
-  "tags": [
-   "chat:reply",
-   "wavering"
-  ]
- },
- {
-  "t": "I go back and forth on it, honestly",
-  "tags": [
-   "chat:reply",
-   "wavering"
-  ]
- },
- {
-  "t": "I don't know what I think any more",
-  "tags": [
-   "chat:reply",
-   "wavering"
-  ]
- },
- {
-  "t": "then we've been looked after, and we should say so",
-  "tags": [
-   "chat:reply",
-   "devout"
-  ]
- },
- {
-  "t": "I've felt it too. I really have",
-  "tags": [
-   "chat:reply",
-   "devout"
-  ]
- },
- {
-  "t": "there'll be a plain reason, there usually is",
-  "tags": [
-   "chat:reply",
-   "doubting"
-  ]
- },
- {
-  "t": "I'd want to see it before I said that out loud",
-  "tags": [
-   "chat:reply",
-   "doubting"
-  ]
- },
- {
-  "t": "the more I think about it, the less I understand it",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "I've not been able to leave it alone",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "and that's not even the strangest part",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "there's more to it, if you've got a minute",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "I've been wanting to tell someone all day",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "you're taking it better than I did",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "I thought I was going mad, for a bit",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "I've stopped trying to explain it",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "anyway, that's what's been on my mind",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "it's been sat on my chest since",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "I'd rather know than not know, I think",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "part of me wishes I hadn't seen it",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "you can see why I've been quiet",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "I've said it out loud now, so that's something",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "I don't expect you to have an answer",
-  "tags": [
-   "chat:followup"
-  ]
- },
- {
-  "t": "I keep going over it and I still can't decide what I saw",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "I want to believe it. I'm just not there yet",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "some days I'm sure. today I'm not",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "don't ask me what it means. I've no idea",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "I'd feel better if someone else had seen it too",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "I've told it three times now and it comes out the same",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "you're the only one who's not looked at me sideways",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "I'll keep telling it. somebody should write it down",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "say it back to me. I want to hear how it sounds",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "I'm not embroidering it. that's what happened",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "got a minute?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "have you got a moment, or are you flat out?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "you're just the person I wanted to see",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "I've been looking for you",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "can I walk with you a bit?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "how's your day been?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "busy one?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "you been keeping well?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "how are you holding up?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "you eaten today?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "did you sleep? you look like you didn't",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "quiet morning",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "long day already",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "I'm about ready to sit down",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "anything happening I should know about?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "heard anything?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "what's the word today?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "you look like you've got something to say",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "out with it, whatever it is",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "you've been quiet lately",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "we've not talked properly in days",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "I feel like I never see you",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "I'll not keep you, I just wanted to say hello",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "I don't suppose you've got a hand free?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "I could do with a second pair of hands",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "mind if I ask you something?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "can I say something daft?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "tell me I'm not the only one who's noticed",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "does the place feel different to you lately?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "I've been meaning to catch you",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "not stopping, just saying hello",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "you settled in alright?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "you know your way round yet?",
-  "tags": [
-   "chat:open"
-  ]
- },
- {
-  "t": "how are the stores looking to you?",
-  "tags": [
-   "chat:open",
-   "topic:food"
-  ]
- },
- {
-  "t": "we eating well this week or not?",
-  "tags": [
-   "chat:open",
-   "topic:food"
-  ]
- },
- {
-  "t": "better than last week, I'll say that",
-  "tags": [
-   "chat:reply",
-   "topic:food"
-  ]
- },
- {
-  "t": "there's enough. not much over",
-  "tags": [
-   "chat:reply",
-   "topic:food"
-  ]
- },
- {
-  "t": "it's the winter I think about, not now",
-  "tags": [
-   "chat:followup",
-   "topic:food"
-  ]
- },
- {
-  "t": "we've been thin before and come through",
-  "tags": [
-   "chat:followup",
-   "topic:food"
-  ]
- },
- {
-  "t": "I'll not go hungry tonight, that's something",
-  "tags": [
-   "chat:end",
-   "topic:food"
-  ]
- },
- {
-  "t": "we'll manage. we always do",
-  "tags": [
-   "chat:end",
-   "topic:food"
-  ]
- },
- {
-  "t": "how's the building going?",
-  "tags": [
-   "chat:open",
-   "topic:roof"
-  ]
- },
- {
-  "t": "are we any closer to everyone under cover?",
-  "tags": [
-   "chat:open",
-   "topic:roof"
-  ]
- },
- {
-  "t": "slower than I'd like",
-  "tags": [
-   "chat:reply",
-   "topic:roof"
-  ]
- },
- {
-  "t": "walls are up. it's the roof that takes the time",
-  "tags": [
-   "chat:reply",
-   "topic:roof"
-  ]
- },
- {
-  "t": "I'd sleep better knowing everyone's inside",
-  "tags": [
-   "chat:followup",
-   "topic:roof"
-  ]
- },
- {
-  "t": "there's people still by the fire at night",
-  "tags": [
-   "chat:followup",
-   "topic:roof"
-  ]
- },
- {
-  "t": "it'll be done before the cold, I hope",
-  "tags": [
-   "chat:end",
-   "topic:roof"
-  ]
- },
- {
-  "t": "one more roof and we're most of the way",
-  "tags": [
-   "chat:end",
-   "topic:roof"
-  ]
- },
- {
-  "t": "think it'll hold?",
-  "tags": [
-   "chat:open",
-   "topic:weather"
-  ]
- },
- {
-  "t": "that sky doesn't look friendly",
-  "tags": [
-   "chat:open",
-   "topic:weather"
-  ]
- },
- {
-  "t": "it'll rain before dark, mark me",
-  "tags": [
-   "chat:reply",
-   "topic:weather"
-  ]
- },
- {
-  "t": "we've had worse and got the work done",
-  "tags": [
-   "chat:reply",
-   "topic:weather"
-  ]
- },
- {
-  "t": "my knee tells me before the sky does",
-  "tags": [
-   "chat:followup",
-   "topic:weather"
-  ]
- },
- {
-  "t": "wet ground makes every job twice as long",
-  "tags": [
-   "chat:followup",
-   "topic:weather"
-  ]
- },
- {
-  "t": "I'll get what I can done before it comes in",
-  "tags": [
-   "chat:end",
-   "topic:weather"
-  ]
- },
- {
-  "t": "we'll be soaked either way",
-  "tags": [
-   "chat:end",
-   "topic:weather"
-  ]
- },
- {
-  "t": "much sign out there?",
-  "tags": [
-   "chat:open",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "the hunting any good this week?",
-  "tags": [
-   "chat:open",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "tracks everywhere, and nothing to show for it",
-  "tags": [
-   "chat:reply",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "brought one back yesterday. lean thing",
-  "tags": [
-   "chat:reply",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "they're moving further off than they used to",
-  "tags": [
-   "chat:followup",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "I go out further every season",
-  "tags": [
-   "chat:followup",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "there'll be meat tonight or there won't",
-  "tags": [
-   "chat:end",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "I'll try the far side tomorrow",
-  "tags": [
-   "chat:end",
-   "topic:hunter"
-  ]
- },
- {
-  "t": "how's the timber holding?",
-  "tags": [
-   "chat:open",
-   "topic:forester"
-  ]
- },
- {
-  "t": "you cutting near or far today?",
-  "tags": [
-   "chat:open",
-   "topic:forester"
-  ]
- },
- {
-  "t": "we've stripped everything close in",
-  "tags": [
-   "chat:reply",
-   "topic:forester"
-  ]
- },
- {
-  "t": "there's plenty standing, it's the carrying",
-  "tags": [
-   "chat:reply",
-   "topic:forester"
-  ]
- },
- {
-  "t": "it's the walk back that kills you",
-  "tags": [
-   "chat:followup",
-   "topic:forester"
-  ]
- },
- {
-  "t": "a cart would change my whole life",
-  "tags": [
-   "chat:followup",
-   "topic:forester"
-  ]
- },
- {
-  "t": "I'll bring down what I can before dark",
-  "tags": [
-   "chat:end",
-   "topic:forester"
-  ]
- },
- {
-  "t": "there's enough for the next roof, just",
-  "tags": [
-   "chat:end",
-   "topic:forester"
-  ]
- },
- {
-  "t": "any luck at the rock?",
-  "tags": [
-   "chat:open",
-   "topic:miner"
-  ]
- },
- {
-  "t": "how's the stone coming?",
-  "tags": [
-   "chat:open",
-   "topic:miner"
-  ]
- },
- {
-  "t": "slow. it's always slow",
-  "tags": [
-   "chat:reply",
-   "topic:miner"
-  ]
- },
- {
-  "t": "the drift's giving up more than the boulders ever did",
-  "tags": [
-   "chat:reply",
-   "topic:miner"
-  ]
- },
- {
-  "t": "every foundation wants it and nobody wants to cut it",
-  "tags": [
-   "chat:followup",
-   "topic:miner"
-  ]
- },
- {
-  "t": "my shoulders know exactly how much we've moved",
-  "tags": [
-   "chat:followup",
-   "topic:miner"
-  ]
- },
- {
-  "t": "there'll be stone for the footings, give me time",
-  "tags": [
-   "chat:end",
-   "topic:miner"
-  ]
- },
- {
-  "t": "I'll get another load up before dark",
-  "tags": [
-   "chat:end",
-   "topic:miner"
-  ]
- },
- {
-  "t": "how are the beds looking?",
-  "tags": [
-   "chat:open",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "anything showing yet?",
-  "tags": [
-   "chat:open",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "coming up, slowly",
-  "tags": [
-   "chat:reply",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "ground's still cold in the mornings",
-  "tags": [
-   "chat:reply",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "it all depends on the rain now",
-  "tags": [
-   "chat:followup",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "one bad week and it's a lean season",
-  "tags": [
-   "chat:followup",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "I'll be out there at first light either way",
-  "tags": [
-   "chat:end",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "it goes in this week, rain or not",
-  "tags": [
-   "chat:end",
-   "topic:farmer"
-  ]
- },
- {
-  "t": "water been kind to you?",
-  "tags": [
-   "chat:open",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "anything in the nets?",
-  "tags": [
-   "chat:open",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "a fair few. not a boast, but a fair few",
-  "tags": [
-   "chat:reply",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "quiet morning. it happens",
-  "tags": [
-   "chat:reply",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "the water's higher than last month",
-  "tags": [
-   "chat:followup",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "you learn to read it after a while",
-  "tags": [
-   "chat:followup",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "there'll be fish tonight",
-  "tags": [
-   "chat:end",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "I'll go out again on the turn",
-  "tags": [
-   "chat:end",
-   "topic:fisher"
-  ]
- },
- {
-  "t": "quiet on the edge?",
-  "tags": [
-   "chat:open",
-   "topic:guard"
-  ]
- },
- {
-  "t": "you been out on watch again?",
-  "tags": [
-   "chat:open",
-   "topic:guard"
-  ]
- },
- {
-  "t": "quiet. I like quiet",
-  "tags": [
-   "chat:reply",
-   "topic:guard"
-  ]
- },
- {
-  "t": "I heard something last night. probably nothing",
-  "tags": [
-   "chat:reply",
-   "topic:guard"
-  ]
- },
- {
-  "t": "it only takes the one time",
-  "tags": [
-   "chat:followup",
-   "topic:guard"
-  ]
- },
- {
-  "t": "the tower helps. they don't come near it",
-  "tags": [
-   "chat:followup",
-   "topic:guard"
-  ]
- },
- {
-  "t": "I'll be out there tonight regardless",
-  "tags": [
-   "chat:end",
-   "topic:guard"
-  ]
- },
- {
-  "t": "nothing's getting in while I'm awake",
-  "tags": [
-   "chat:end",
-   "topic:guard"
-  ]
- },
- {
-  "t": "what are you putting up?",
-  "tags": [
-   "chat:open",
-   "topic:builder"
-  ]
- },
- {
-  "t": "how's it coming along?",
-  "tags": [
-   "chat:open",
-   "topic:builder"
-  ]
- },
- {
-  "t": "it'll stand a hundred years or fall over tomorrow",
-  "tags": [
-   "chat:reply",
-   "topic:builder"
-  ]
- },
- {
-  "t": "well enough. I want more hands",
-  "tags": [
-   "chat:reply",
-   "topic:builder"
-  ]
- },
- {
-  "t": "it's the waiting on stone that slows everything",
-  "tags": [
-   "chat:followup",
-   "topic:builder"
-  ]
- },
- {
-  "t": "everyone wants it finished, nobody wants to carry",
-  "tags": [
-   "chat:followup",
-   "topic:builder"
-  ]
- },
- {
-  "t": "another day or two and it's closed in",
-  "tags": [
-   "chat:end",
-   "topic:builder"
-  ]
- },
- {
-  "t": "I'll get the frame up before I stop",
-  "tags": [
-   "chat:end",
-   "topic:builder"
-  ]
- },
- {
-  "t": "anyone in your care?",
-  "tags": [
-   "chat:open",
-   "topic:healer"
-  ]
- },
- {
-  "t": "much sickness about?",
-  "tags": [
-   "chat:open",
-   "topic:healer"
-  ]
- },
- {
-  "t": "a few coughs. nothing that worries me",
-  "tags": [
-   "chat:reply",
-   "topic:healer"
-  ]
- },
- {
-  "t": "one bad arm and a lot of tired people",
-  "tags": [
-   "chat:reply",
-   "topic:healer"
-  ]
- },
- {
-  "t": "people leave it too long before they come to me",
-  "tags": [
-   "chat:followup",
-   "topic:healer"
-  ]
- },
- {
-  "t": "rest is the whole of my advice and nobody takes it",
-  "tags": [
-   "chat:followup",
-   "topic:healer"
-  ]
- },
- {
-  "t": "send them to me and I'll see to it",
-  "tags": [
-   "chat:end",
-   "topic:healer"
-  ]
- },
- {
-  "t": "they'll mend. most things mend",
-  "tags": [
-   "chat:end",
-   "topic:healer"
-  ]
- },
- {
-  "t": "baskets full?",
-  "tags": [
-   "chat:open",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "much out there to pick?",
-  "tags": [
-   "chat:open",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "enough, if you know where to look",
-  "tags": [
-   "chat:reply",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "the near patches are picked bare",
-  "tags": [
-   "chat:reply",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "you have to go further every week",
-  "tags": [
-   "chat:followup",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "everything's a season early this year",
-  "tags": [
-   "chat:followup",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "I'll have it in before dark",
-  "tags": [
-   "chat:end",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "there's a patch I've been saving",
-  "tags": [
-   "chat:end",
-   "topic:gatherer"
-  ]
- },
- {
-  "t": "what's in the pot?",
-  "tags": [
-   "chat:open",
-   "topic:cook"
-  ]
- },
- {
-  "t": "we eating anything good tonight?",
-  "tags": [
-   "chat:open",
-   "topic:cook"
-  ]
- },
- {
-  "t": "what I'm given, same as always",
-  "tags": [
-   "chat:reply",
-   "topic:cook"
-  ]
- },
- {
-  "t": "something hot, that's all I'll promise",
-  "tags": [
-   "chat:reply",
-   "topic:cook"
-  ]
- },
- {
-  "t": "it's making it last that's the trick",
-  "tags": [
-   "chat:followup",
-   "topic:cook"
-  ]
- },
- {
-  "t": "I can stretch anything except nothing",
-  "tags": [
-   "chat:followup",
-   "topic:cook"
-  ]
- },
- {
-  "t": "come by and I'll feed you",
-  "tags": [
-   "chat:end",
-   "topic:cook"
-  ]
- },
- {
-  "t": "there'll be enough to go round",
-  "tags": [
-   "chat:end",
-   "topic:cook"
-  ]
- },
- {
-  "t": "much said at the shrine lately?",
-  "tags": [
-   "chat:open",
-   "topic:priest"
-  ]
- },
- {
-  "t": "are people coming to you?",
-  "tags": [
-   "chat:open",
-   "topic:priest"
-  ]
- },
- {
-  "t": "more than they used to",
-  "tags": [
-   "chat:reply",
-   "topic:priest"
-  ]
- },
- {
-  "t": "some. mostly when they're frightened",
-  "tags": [
-   "chat:reply",
-   "topic:priest"
-  ]
- },
- {
-  "t": "they only remember it when they need it",
-  "tags": [
-   "chat:followup",
-   "topic:priest"
-  ]
- },
- {
-  "t": "it's not for me to say who's sincere",
-  "tags": [
-   "chat:followup",
-   "topic:priest"
-  ]
- },
- {
-  "t": "I'll be there tonight if anyone wants to come",
-  "tags": [
-   "chat:end",
-   "topic:priest"
-  ]
- },
- {
-  "t": "come by. you don't have to say anything",
-  "tags": [
-   "chat:end",
-   "topic:priest"
-  ]
- },
- {
-  "t": "what's out past the ridge?",
-  "tags": [
-   "chat:open",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "how far did you get?",
-  "tags": [
-   "chat:open",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "further than last time",
-  "tags": [
-   "chat:reply",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "more country than I expected",
-  "tags": [
-   "chat:reply",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "there's good ground out there, if we ever want it",
-  "tags": [
-   "chat:followup",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "you can walk a whole day and see nobody",
-  "tags": [
-   "chat:followup",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "I'll go further in the morning",
-  "tags": [
-   "chat:end",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "I'll draw it out for you when I've eaten",
-  "tags": [
-   "chat:end",
-   "topic:explorer"
-  ]
- },
- {
-  "t": "you'd not believe what we shifted today",
-  "tags": [
-   "chat:open",
-   "trade:miner"
-  ]
- },
- {
-  "t": "my hands are grey to the wrist",
-  "tags": [
-   "chat:open",
-   "trade:miner"
-  ]
- },
- {
-  "t": "everything's easier than cutting stone, believe me",
-  "tags": [
-   "chat:reply",
-   "trade:miner"
-  ]
- },
- {
-  "t": "try doing it with a pick and then tell me",
-  "tags": [
-   "chat:reply",
-   "trade:miner"
-  ]
- },
- {
-  "t": "nobody thinks about where the footings come from",
-  "tags": [
-   "chat:followup",
-   "trade:miner"
-  ]
- },
- {
-  "t": "it's honest work. it's just heavy",
-  "tags": [
-   "chat:followup",
-   "trade:miner"
-  ]
- },
- {
-  "t": "ground's finally warming up",
-  "tags": [
-   "chat:open",
-   "trade:farmer"
-  ]
- },
- {
-  "t": "I've been on my knees in the beds since dawn",
-  "tags": [
-   "chat:open",
-   "trade:farmer"
-  ]
- },
- {
-  "t": "everything comes down to the weather in the end",
-  "tags": [
-   "chat:reply",
-   "trade:farmer"
-  ]
- },
- {
-  "t": "you can't hurry growing",
-  "tags": [
-   "chat:reply",
-   "trade:farmer"
-  ]
- },
- {
-  "t": "a season's a long time to be wrong about something",
-  "tags": [
-   "chat:followup",
-   "trade:farmer"
-  ]
- },
- {
-  "t": "you plant and then you wait. that's the whole trade",
-  "tags": [
-   "chat:followup",
-   "trade:farmer"
-  ]
- },
- {
-  "t": "you're thinner than last month, you know that?",
-  "tags": [
-   "chat:open",
-   "trade:cook"
-  ]
- },
- {
-  "t": "I've been at the pot since before light",
-  "tags": [
-   "chat:open",
-   "trade:cook"
-  ]
- },
- {
-  "t": "everyone's an expert until they're hungry",
-  "tags": [
-   "chat:reply",
-   "trade:cook"
-  ]
- },
- {
-  "t": "I can work with anything except an empty shelf",
-  "tags": [
-   "chat:reply",
-   "trade:cook"
-  ]
- },
- {
-  "t": "feeding people is the only work that gets noticed daily",
-  "tags": [
-   "chat:followup",
-   "trade:cook"
-  ]
- },
- {
-  "t": "you find out a lot about people at supper",
-  "tags": [
-   "chat:followup",
-   "trade:cook"
-  ]
- },
- {
-  "t": "I got further than I meant to yesterday",
-  "tags": [
-   "chat:open",
-   "trade:explorer"
-  ]
- },
- {
-  "t": "you ever wonder what's past the far ridge?",
-  "tags": [
-   "chat:open",
-   "trade:explorer"
-  ]
- },
- {
-  "t": "the world's bigger than this valley, that's all I know",
-  "tags": [
-   "chat:reply",
-   "trade:explorer"
-  ]
- },
- {
-  "t": "I've walked a long way and I still can't answer that",
-  "tags": [
-   "chat:reply",
-   "trade:explorer"
-  ]
- },
- {
-  "t": "I sleep better outside than in, which worries me",
-  "tags": [
-   "chat:followup",
-   "trade:explorer"
-  ]
- },
- {
-  "t": "there's country out there nobody's named",
-  "tags": [
-   "chat:followup",
-   "trade:explorer"
-  ]
- },
- {
-  "t": "I've not seen you at the shrine lately",
-  "tags": [
-   "chat:open",
-   "trade:priest"
-  ]
- },
- {
-  "t": "you can talk to me about it, if you want",
-  "tags": [
-   "chat:open",
-   "trade:priest"
-  ]
- },
- {
-  "t": "people say more than they mean to, in my hearing",
-  "tags": [
-   "chat:reply",
-   "trade:priest"
-  ]
- },
- {
-  "t": "I'd rather ask than assume",
-  "tags": [
-   "chat:reply",
-   "trade:priest"
-  ]
- },
- {
-  "t": "I don't have answers. I have somewhere to put the questions",
-  "tags": [
-   "chat:followup",
-   "trade:priest"
-  ]
- },
- {
-  "t": "it's not my business to judge which of it is true",
-  "tags": [
-   "chat:followup",
-   "trade:priest"
-  ]
- },
- {
-  "t": "let me look at that hand before you argue",
-  "tags": [
-   "chat:open",
-   "trade:healer"
-  ]
- },
- {
-  "t": "you've been favouring that leg all week",
-  "tags": [
-   "chat:open",
-   "trade:healer"
-  ]
- },
- {
-  "t": "everyone tells me they're fine. nobody is",
-  "tags": [
-   "chat:reply",
-   "trade:healer"
-  ]
- },
- {
-  "t": "rest, and then tell me how it feels",
-  "tags": [
-   "chat:reply",
-   "trade:healer"
-  ]
- },
- {
-  "t": "people come to me last, when they should come first",
-  "tags": [
-   "chat:followup",
-   "trade:healer"
-  ]
- },
- {
-  "t": "half of what I do is telling people to sit down",
-  "tags": [
-   "chat:followup",
-   "trade:healer"
-  ]
- },
- {
-  "t": "saw tracks I didn't recognise today",
-  "tags": [
-   "chat:open",
-   "trade:hunter"
-  ]
- },
- {
-  "t": "the game's gone further out again",
-  "tags": [
-   "chat:open",
-   "trade:hunter"
-  ]
- },
- {
-  "t": "you learn to wait, in my line",
-  "tags": [
-   "chat:reply",
-   "trade:hunter"
-  ]
- },
- {
-  "t": "everything's easier to find than a deer that's heard you",
-  "tags": [
-   "chat:reply",
-   "trade:hunter"
-  ]
- },
- {
-  "t": "it's a lot of walking for one good morning",
-  "tags": [
-   "chat:followup",
-   "trade:hunter"
-  ]
- },
- {
-  "t": "the woods tell you plenty if you shut up and listen",
-  "tags": [
-   "chat:followup",
-   "trade:hunter"
-  ]
- },
- {
-  "t": "water was flat as glass this morning",
-  "tags": [
-   "chat:open",
-   "trade:fisher"
-  ]
- },
- {
-  "t": "I've been out since the tide turned",
-  "tags": [
-   "chat:open",
-   "trade:fisher"
-  ]
- },
- {
-  "t": "the water decides. I just show up",
-  "tags": [
-   "chat:reply",
-   "trade:fisher"
-  ]
- },
- {
-  "t": "some days it gives and some days it doesn't",
-  "tags": [
-   "chat:reply",
-   "trade:fisher"
-  ]
- },
- {
-  "t": "you can't argue with a river, I've tried",
-  "tags": [
-   "chat:followup",
-   "trade:fisher"
-  ]
- },
- {
-  "t": "I like the quiet of it, mostly",
-  "tags": [
-   "chat:followup",
-   "trade:fisher"
-  ]
- },
- {
-  "t": "we're going to run out of close timber before long",
-  "tags": [
-   "chat:open",
-   "trade:forester"
-  ]
- },
- {
-  "t": "I've been swinging since dawn and my shoulders know it",
-  "tags": [
-   "chat:open",
-   "trade:forester"
-  ]
- },
- {
-  "t": "everything this village stands up is something I cut down",
-  "tags": [
-   "chat:reply",
-   "trade:forester"
-  ]
- },
- {
-  "t": "it's the carrying, not the cutting",
-  "tags": [
-   "chat:reply",
-   "trade:forester"
-  ]
- },
- {
-  "t": "I take one and I don't like taking it, but we need roofs",
-  "tags": [
-   "chat:followup",
-   "trade:forester"
-  ]
- },
- {
-  "t": "the near woods are thinner than they were",
-  "tags": [
-   "chat:followup",
-   "trade:forester"
-  ]
- },
- {
-  "t": "the near patches are picked clean",
-  "tags": [
-   "chat:open",
-   "trade:gatherer"
-  ]
- },
- {
-  "t": "I found something worth eating today, for once",
-  "tags": [
-   "chat:open",
-   "trade:gatherer"
-  ]
- },
- {
-  "t": "you have to know where to look, that's all it is",
-  "tags": [
-   "chat:reply",
-   "trade:gatherer"
-  ]
- },
- {
-  "t": "everything's a week early this year",
-  "tags": [
-   "chat:reply",
-   "trade:gatherer"
-  ]
- },
- {
-  "t": "nobody thinks it's real work until the baskets are empty",
-  "tags": [
-   "chat:followup",
-   "trade:gatherer"
-  ]
- },
- {
-  "t": "I walk further every week for the same amount",
-  "tags": [
-   "chat:followup",
-   "trade:gatherer"
-  ]
- },
- {
-  "t": "did you hear anything last night, or was it me?",
-  "tags": [
-   "chat:open",
-   "trade:guard"
-  ]
- },
- {
-  "t": "I've been up since the small hours",
-  "tags": [
-   "chat:open",
-   "trade:guard"
-  ]
- },
- {
-  "t": "I'd rather be bored than busy, in my job",
-  "tags": [
-   "chat:reply",
-   "trade:guard"
-  ]
- },
- {
-  "t": "it only has to go wrong once",
-  "tags": [
-   "chat:reply",
-   "trade:guard"
-  ]
- },
- {
-  "t": "everyone forgets about me until something howls",
-  "tags": [
-   "chat:followup",
-   "trade:guard"
-  ]
- },
- {
-  "t": "I stand about all night so nobody has to think about it",
-  "tags": [
-   "chat:followup",
-   "trade:guard"
-  ]
- },
- {
-  "t": "give it a week and you won't recognise that corner",
-  "tags": [
-   "chat:open",
-   "trade:builder"
-  ]
- },
- {
-  "t": "I need hands more than I need materials",
-  "tags": [
-   "chat:open",
-   "trade:builder"
-  ]
- },
- {
-  "t": "everything takes twice as long as I tell people",
-  "tags": [
-   "chat:reply",
-   "trade:builder"
-  ]
- },
- {
-  "t": "I'd rather do it once and do it right",
-  "tags": [
-   "chat:reply",
-   "trade:builder"
-  ]
- },
- {
-  "t": "I like walking past something I put up",
-  "tags": [
-   "chat:followup",
-   "trade:builder"
-  ]
- },
- {
-  "t": "it's not finished until somebody sleeps in it",
-  "tags": [
-   "chat:followup",
-   "trade:builder"
-  ]
- },
- {
-  "t": "I've turned it over all day and I'm no closer",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "I believe you saw something. I can't tell you what",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "if it happened to me I'd want someone to take me seriously",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "I'm not going to pretend I've got it worked out",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "part of me is frightened it's true and part of me is frightened it isn't",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "ask me again in a week and you'll get a different answer",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "I've heard enough of these now that I can't dismiss them",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "I used to be certain about things. that was easier",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "you're not the first to tell me and that's what unsettles me",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "I keep waiting for it to make sense and it doesn't",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "don't take my doubting personally. it's not about you",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "I want proof and I'm ashamed of wanting it",
-  "tags": [
-   "chat:followup",
-   "told",
-   "wavering"
-  ]
- },
- {
-  "t": "I've said it to three people and none of them knew what to do with it",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "it came out of nowhere and it's still with me",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "I'd not have believed it from anyone else",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "you can tell whoever you like. I'm past caring who knows",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "I've stopped trying to make it sound reasonable",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "the telling doesn't do it justice, that's the trouble",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "I've gone over it so often I've worn the edges off it",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "I only tell people I trust with it",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "I'd rather have told you than have you hear it second-hand",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "there. that's the whole of it off my chest",
-  "tags": [
-   "chat:followup",
-   "told"
-  ]
- },
- {
-  "t": "I don't know what I believe and I'm tired of pretending I do",
-  "tags": [
-   "chat:followup",
-   "wavering"
-  ]
- },
- {
-  "t": "something's going on. that's as far as I'll commit",
-  "tags": [
-   "chat:followup",
-   "wavering"
-  ]
- },
- {
-  "t": "I'd like to be the sort who's sure. I'm not",
-  "tags": [
-   "chat:followup",
-   "wavering"
-  ]
- },
- {
-  "t": "I go to the shrine and I still come out uncertain",
-  "tags": [
-   "chat:followup",
-   "wavering"
-  ]
- },
- {
-  "t": "maybe it doesn't matter what I think about it",
-  "tags": [
-   "chat:followup",
-   "wavering"
-  ]
- },
- {
-  "t": "I'll not argue either side of it today",
-  "tags": [
-   "chat:followup",
-   "wavering"
-  ]
- },
- {
-  "t": "I've been of two minds about that all week",
-  "tags": [
-   "chat:reply",
-   "wavering"
-  ]
- },
- {
-  "t": "don't ask me. I change my mind hourly",
-  "tags": [
-   "chat:reply",
-   "wavering"
-  ]
- },
- {
-  "t": "I'd like to think so. I'm not sure I do",
-  "tags": [
-   "chat:reply",
-   "wavering"
-  ]
- },
- {
-  "t": "there's something in it. I just can't say what",
-  "tags": [
-   "chat:reply",
-   "wavering"
-  ]
- },
- {
-  "t": "I've stopped being certain about anything much",
-  "tags": [
-   "chat:reply",
-   "wavering"
-  ]
- },
- {
-  "t": "I'm somewhere in the middle on that one",
-  "tags": [
-   "chat:reply",
-   "wavering"
-  ]
- },
- {
-  "t": "I'd not bet either way",
-  "tags": [
-   "chat:reply",
-   "wavering"
-  ]
- },
- {
-  "t": "some of it, maybe. not all of it",
-  "tags": [
-   "chat:reply",
-   "wavering"
-  ]
- },
- {
-  "t": "then somebody's watching, and I'm glad of it",
-  "tags": [
-   "chat:reply",
-   "devout"
-  ]
- },
- {
-  "t": "that settles it for me. it really does",
-  "tags": [
-   "chat:reply",
-   "devout"
-  ]
- },
- {
-  "t": "I've never doubted it and I'm not starting now",
-  "tags": [
-   "chat:reply",
-   "devout"
-  ]
- },
- {
-  "t": "we're kept. I don't know how else to put it",
-  "tags": [
-   "chat:reply",
-   "devout"
-  ]
- },
- {
-  "t": "I'd need to see that with my own eyes",
-  "tags": [
-   "chat:reply",
-   "doubting"
-  ]
- },
- {
-  "t": "people believe what they need to believe",
-  "tags": [
-   "chat:reply",
-   "doubting"
-  ]
- },
- {
-  "t": "there's an ordinary answer and nobody's looked for it",
-  "tags": [
-   "chat:reply",
-   "doubting"
-  ]
- },
- {
-  "t": "I'm not saying it's nonsense. I'm saying it's not proved",
-  "tags": [
-   "chat:reply",
-   "doubting"
-  ]
- },
- {
-  "t": "I hear worse than that on watch most nights",
-  "tags": [
-   "chat:reply",
-   "trade:guard"
-  ]
- },
- {
-  "t": "as long as it stays outside the line, it's not my problem yet",
-  "tags": [
-   "chat:reply",
-   "trade:guard"
-  ]
- },
- {
-  "t": "nothing surprises me after a day underground",
-  "tags": [
-   "chat:reply",
-   "trade:miner"
-  ]
- },
- {
-  "t": "you spend enough time in the dark, you stop ruling things out",
-  "tags": [
-   "chat:reply",
-   "trade:miner"
-  ]
- },
- {
-  "t": "the ground doesn't care either way, and nor do I some days",
-  "tags": [
-   "chat:reply",
-   "trade:farmer"
-  ]
- },
- {
-  "t": "I'll worry about it after harvest",
-  "tags": [
-   "chat:reply",
-   "trade:farmer"
-  ]
- },
- {
-  "t": "you can tell me over a bowl of something",
-  "tags": [
-   "chat:reply",
-   "trade:cook"
-  ]
- },
- {
-  "t": "everybody talks more once they're fed",
-  "tags": [
-   "chat:reply",
-   "trade:cook"
-  ]
- },
- {
-  "t": "I've seen odd things out in the trees, I'll say that",
-  "tags": [
-   "chat:reply",
-   "trade:hunter"
-  ]
- },
- {
-  "t": "you learn not to argue with what you saw",
-  "tags": [
-   "chat:reply",
-   "trade:hunter"
-  ]
- },
- {
-  "t": "the water throws up stranger things than that",
-  "tags": [
-   "chat:reply",
-   "trade:fisher"
-  ]
- },
- {
-  "t": "I've had whole mornings I couldn't explain",
-  "tags": [
-   "chat:reply",
-   "trade:fisher"
-  ]
- },
- {
-  "t": "the woods are full of noises. most of them are nothing",
-  "tags": [
-   "chat:reply",
-   "trade:forester"
-  ]
- },
- {
-  "t": "I'd have heard it if it happened near my cutting",
-  "tags": [
-   "chat:reply",
-   "trade:forester"
-  ]
- },
- {
-  "t": "I'm out further than anybody. I'd have seen it",
-  "tags": [
-   "chat:reply",
-   "trade:gatherer"
-  ]
- },
- {
-  "t": "you notice things when you're on your own all day",
-  "tags": [
-   "chat:reply",
-   "trade:gatherer"
-  ]
- },
- {
-  "t": "as long as it doesn't knock my wall down",
-  "tags": [
-   "chat:reply",
-   "trade:builder"
-  ]
- },
- {
-  "t": "I'll believe anything that doesn't cost me a day's work",
-  "tags": [
-   "chat:reply",
-   "trade:builder"
-  ]
- },
- {
-  "t": "I hear people at their worst. it's usually simpler than they think",
-  "tags": [
-   "chat:reply",
-   "trade:healer"
-  ]
- },
- {
-  "t": "bring them to me and I'll tell you what's real",
-  "tags": [
-   "chat:reply",
-   "trade:healer"
-  ]
- },
- {
-  "t": "I'd rather listen than pronounce on it",
-  "tags": [
-   "chat:reply",
-   "trade:priest"
-  ]
- },
- {
-  "t": "say it all. I've time",
-  "tags": [
-   "chat:reply",
-   "trade:priest"
-  ]
- },
- {
-  "t": "I've been further than most and I've seen less than you'd think",
-  "tags": [
-   "chat:reply",
-   "trade:explorer"
-  ]
- },
- {
-  "t": "there's stranger country than this out there",
-  "tags": [
-   "chat:reply",
-   "trade:explorer"
-  ]
- },
- {
-  "t": "how's the wood holding up your way? we're into the good stands now",
-  "tags": [
-   "chat:open",
-   "topic:forester"
-  ]
- },
- {
-  "t": "you hear that big one come down this {morning|afternoon}? felt it through my boots",
-  "tags": [
-   "chat:open",
-   "topic:forester"
-  ]
- },
- {
-  "t": "I marked six more for felling. straight as spears, all of them",
-  "tags": [
-   "chat:open",
-   "topic:forester"
-  ]
- },
- {
-  "t": "the saplings took, the ones we planted by the {creek|north path}. all but two",
-  "tags": [
-   "chat:open",
-   "topic:forester"
-  ]
- }
+  {
+    "t": "I've been turning it over all day and I'm no further on",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "I wouldn't say it if I hadn't been there",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "you can think what you like. I know what I saw",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "I keep expecting somebody to tell me I imagined it",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "I'm not asking you to believe me. I just needed to say it out loud",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "that's the whole of it. I've told you as straight as I can",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "and that's {god}'s hand, whatever anybody says",
+    "tags": [
+      "chat:followup",
+      "devout",
+      "told"
+    ]
+  },
+  {
+    "t": "I've stopped looking for another explanation",
+    "tags": [
+      "chat:followup",
+      "devout",
+      "told"
+    ]
+  },
+  {
+    "t": "you can feel it, can't you? something is here",
+    "tags": [
+      "chat:followup",
+      "devout",
+      "told"
+    ]
+  },
+  {
+    "t": "I don't know what to make of it and I've had a day to try",
+    "tags": [
+      "chat:followup",
+      "wavering",
+      "told"
+    ]
+  },
+  {
+    "t": "half of me believes it and half of me doesn't. that's honest",
+    "tags": [
+      "chat:followup",
+      "wavering",
+      "told"
+    ]
+  },
+  {
+    "t": "I'm telling you what happened, not what it means",
+    "tags": [
+      "chat:followup",
+      "doubting",
+      "told"
+    ]
+  },
+  {
+    "t": "there'll be a reason for it. there always is",
+    "tags": [
+      "chat:followup",
+      "doubting",
+      "told"
+    ]
+  },
+  {
+    "t": "I'd rather be wrong about this than right",
+    "tags": [
+      "chat:followup",
+      "doubting",
+      "told"
+    ]
+  },
+  {
+    "t": "I can still see the shape of it when I shut my eyes",
+    "tags": [
+      "chat:followup",
+      "event:smote"
+    ]
+  },
+  {
+    "t": "nobody should have to watch that twice",
+    "tags": [
+      "chat:followup",
+      "event:smote"
+    ]
+  },
+  {
+    "t": "I'm not walking that road alone again. neither should you",
+    "tags": [
+      "chat:followup",
+      "event:mauled"
+    ]
+  },
+  {
+    "t": "we need somebody on the treeline. I'll do it myself if I have to",
+    "tags": [
+      "chat:followup",
+      "event:mauled"
+    ]
+  },
+  {
+    "t": "we ate. that's the part I keep coming back to",
+    "tags": [
+      "chat:followup",
+      "event:provided"
+    ]
+  },
+  {
+    "t": "whoever left it, I'd like to thank them",
+    "tags": [
+      "chat:followup",
+      "event:provided"
+    ]
+  },
+  {
+    "t": "I keep thinking about what I could have done sooner",
+    "tags": [
+      "chat:followup",
+      "event:perished"
+    ]
+  },
+  {
+    "t": "we should do it properly. they were one of ours",
+    "tags": [
+      "chat:followup",
+      "event:perished"
+    ]
+  },
+  {
+    "t": "I had to sit down after. my legs went",
+    "tags": [
+      "chat:followup",
+      "event:quaked"
+    ]
+  },
+  {
+    "t": "the whole village felt it, so at least I'm not mad",
+    "tags": [
+      "chat:followup",
+      "event:quaked"
+    ]
+  },
+  {
+    "t": "everybody's alright. that's not nothing, these days",
+    "tags": [
+      "chat:followup",
+      "event:delivered"
+    ]
+  },
+  {
+    "t": "the village needed a bit of good news",
+    "tags": [
+      "chat:followup",
+      "event:delivered"
+    ]
+  },
+  {
+    "t": "I've never seen the bushes come in like that",
+    "tags": [
+      "chat:followup",
+      "event:flourished"
+    ]
+  },
+  {
+    "t": "we should get out there before the birds do",
+    "tags": [
+      "chat:followup",
+      "event:flourished"
+    ]
+  },
+  {
+    "t": "I looked twice. there wasn't a mark left on it",
+    "tags": [
+      "chat:followup",
+      "event:mended"
+    ]
+  },
+  {
+    "t": "I don't have an explanation and I've tried",
+    "tags": [
+      "chat:followup",
+      "event:mended"
+    ]
+  },
+  {
+    "t": "roots and all, straight out of the ground",
+    "tags": [
+      "chat:followup",
+      "event:uprooted"
+    ]
+  },
+  {
+    "t": "it's still lying there if you want to see for yourself",
+    "tags": [
+      "chat:followup",
+      "event:uprooted"
+    ]
+  },
+  {
+    "t": "feet off the ground, clear air underneath. I saw it",
+    "tags": [
+      "chat:followup",
+      "event:lifted"
+    ]
+  },
+  {
+    "t": "I don't know how you explain that away",
+    "tags": [
+      "chat:followup",
+      "event:lifted"
+    ]
+  },
+  {
+    "t": "they went further than a person goes. that's all I'll say",
+    "tags": [
+      "chat:followup",
+      "event:thrown"
+    ]
+  },
+  {
+    "t": "I've been trying to work out the distance and it doesn't help",
+    "tags": [
+      "chat:followup",
+      "event:thrown"
+    ]
+  },
+  {
+    "t": "not a scratch on them. that's the part that gets me",
+    "tags": [
+      "chat:followup",
+      "event:setdown"
+    ]
+  },
+  {
+    "t": "gentle, is what it was. that's a strange thing to say about it",
+    "tags": [
+      "chat:followup",
+      "event:setdown"
+    ]
+  },
+  {
+    "t": "the ground took it harder than any fall I've seen",
+    "tags": [
+      "chat:followup",
+      "event:impact"
+    ]
+  },
+  {
+    "t": "I felt it come up through my boots",
+    "tags": [
+      "chat:followup",
+      "event:impact"
+    ]
+  },
+  {
+    "t": "well. I'll be thinking about that",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "thanks for telling me. I mean it",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I don't know what to say to that",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "let me sit with it a while",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I'd better get back to it. but thank you",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "we'll talk again. I want to hear it once more",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "right. I'm going to go and do something ordinary now",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "then we should be grateful, and say so",
+    "tags": [
+      "chat:end",
+      "devout"
+    ]
+  },
+  {
+    "t": "I'll say something at the shrine tonight",
+    "tags": [
+      "chat:end",
+      "devout"
+    ]
+  },
+  {
+    "t": "I want to believe you. give me a day",
+    "tags": [
+      "chat:end",
+      "wavering"
+    ]
+  },
+  {
+    "t": "maybe. I'll keep my eyes open",
+    "tags": [
+      "chat:end",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I'm not saying you're lying. I'm saying I wasn't there",
+    "tags": [
+      "chat:end",
+      "doubting"
+    ]
+  },
+  {
+    "t": "people see things. it doesn't make them wrong or right",
+    "tags": [
+      "chat:end",
+      "doubting"
+    ]
+  },
+  {
+    "t": "if that costs us the stores, I need to know now",
+    "tags": [
+      "chat:end",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "I'll walk the edge tonight either way",
+    "tags": [
+      "chat:end",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "send them to me if they're hurt. don't let them tough it out",
+    "tags": [
+      "chat:end",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "that's worth writing down properly",
+    "tags": [
+      "chat:end",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "I'll keep an eye out on the road",
+    "tags": [
+      "chat:end",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "well, the roof won't build itself either way",
+    "tags": [
+      "chat:end",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "the good bushes are getting picked over. we're walking further every day",
+    "tags": [
+      "chat:open",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "found a patch out past the ridge nobody's touched yet",
+    "tags": [
+      "chat:open",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "my back's had enough of bending today, I'll tell you that",
+    "tags": [
+      "chat:open",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "I've noticed that too. it was easier a week ago",
+    "tags": [
+      "chat:reply",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "show me where and I'll come out with you tomorrow",
+    "tags": [
+      "chat:reply",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "at least it's not raining on us for once",
+    "tags": [
+      "chat:reply",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "the water's been quiet. I've had two all morning",
+    "tags": [
+      "chat:open",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "there's a deeper spot round the point I want to try",
+    "tags": [
+      "chat:open",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "if we had a proper dock I'd not be wading to my knees",
+    "tags": [
+      "chat:open",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "quiet for me as well. something's moved them on",
+    "tags": [
+      "chat:reply",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "worth a try. anything's better than standing here",
+    "tags": [
+      "chat:reply",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "I keep saying the same thing about that dock",
+    "tags": [
+      "chat:reply",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "saw tracks by the treeline this morning. big ones",
+    "tags": [
+      "chat:open",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "I'd rather hunt with someone than alone, honestly",
+    "tags": [
+      "chat:open",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "two clean kills this week. I'll take that",
+    "tags": [
+      "chat:open",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "big ones how? wolf big?",
+    "tags": [
+      "chat:reply",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "I'll walk out with you. I don't like it out there either",
+    "tags": [
+      "chat:reply",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "we all eat better when you have a good week",
+    "tags": [
+      "chat:reply",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "the near stand's about done. it's a long haul from the next one",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "this axe wants an edge putting back on it",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "I dropped one clean today, straight where I wanted it",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "I noticed the pile's coming in slower",
+    "tags": [
+      "chat:reply",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "borrow mine, it's just been done",
+    "tags": [
+      "chat:reply",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "that's the whole job, isn't it. drop it where you want it",
+    "tags": [
+      "chat:reply",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "I've been chipping at the same rock since dawn",
+    "tags": [
+      "chat:open",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "there's better stone up the rise but it's a walk",
+    "tags": [
+      "chat:open",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "everything I own has dust in it now",
+    "tags": [
+      "chat:open",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "is it worth the walk? we need the stone",
+    "tags": [
+      "chat:reply",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "I'll come up with you and we'll carry double",
+    "tags": [
+      "chat:reply",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "you and me both. I've stopped trying to keep clean",
+    "tags": [
+      "chat:reply",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "that frame's nearly closed in. one more good day",
+    "tags": [
+      "chat:open",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "we could use another pair of hands on it, if you're free",
+    "tags": [
+      "chat:open",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "I'd rather do it slow and right than twice",
+    "tags": [
+      "chat:open",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "I'll give you the morning. I've nothing better",
+    "tags": [
+      "chat:reply",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "good. people are still sleeping out",
+    "tags": [
+      "chat:reply",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "that's the only way to do it",
+    "tags": [
+      "chat:reply",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "the near row came up thin. I don't know what it wants",
+    "tags": [
+      "chat:open",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "if the rain holds off another few days we'll be alright",
+    "tags": [
+      "chat:open",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "I could do with a second pair of hands at the harvest",
+    "tags": [
+      "chat:open",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "give it water and stop worrying at it",
+    "tags": [
+      "chat:reply",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "it always holds off until you say that out loud",
+    "tags": [
+      "chat:reply",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "count me in when it comes",
+    "tags": [
+      "chat:reply",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "quiet night. I like the quiet nights",
+    "tags": [
+      "chat:open",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "I don't like how close the woods come to the road there",
+    "tags": [
+      "chat:open",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "if you're going out past the trees, don't go alone",
+    "tags": [
+      "chat:open",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "long may it stay quiet",
+    "tags": [
+      "chat:reply",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "somebody should put a post up that end",
+    "tags": [
+      "chat:reply",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "I hear you. I'll take someone with me",
+    "tags": [
+      "chat:reply",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "three people this week who should have come to me sooner",
+    "tags": [
+      "chat:open",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "I'm short on anything to bind a wound with",
+    "tags": [
+      "chat:open",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "tell people to rest. they never listen to me",
+    "tags": [
+      "chat:open",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "nobody wants to be the one who complains",
+    "tags": [
+      "chat:reply",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "I'll keep an eye out for what you need",
+    "tags": [
+      "chat:reply",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "they'd listen if you shouted more",
+    "tags": [
+      "chat:reply",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "I can make it stretch, but not forever",
+    "tags": [
+      "chat:open",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "hot food does more for people than anyone admits",
+    "tags": [
+      "chat:open",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "bring me something other than fish and I'll make it worth it",
+    "tags": [
+      "chat:open",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "it's appreciated. more than we say",
+    "tags": [
+      "chat:reply",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "true. I feel human again after",
+    "tags": [
+      "chat:reply",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "I'll see what I can do",
+    "tags": [
+      "chat:reply",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "people only come to me when they want something",
+    "tags": [
+      "chat:open",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "I don't have answers. I have somewhere to put the question",
+    "tags": [
+      "chat:open",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "it helps to say it out loud to someone. that's most of it",
+    "tags": [
+      "chat:open",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "that's people for you",
+    "tags": [
+      "chat:reply",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "that's more honest than I expected",
+    "tags": [
+      "chat:reply",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "maybe that's all any of it is",
+    "tags": [
+      "chat:reply",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "there's a valley two days out I want to see the end of",
+    "tags": [
+      "chat:open",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "I mark the trees so I can find my own way back",
+    "tags": [
+      "chat:open",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "the map in my head is getting bigger than my memory",
+    "tags": [
+      "chat:open",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "bring something back worth having",
+    "tags": [
+      "chat:reply",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "sensible. I'd get lost inside an hour",
+    "tags": [
+      "chat:reply",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "write it down before you lose it",
+    "tags": [
+      "chat:reply",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "I keep thinking about supper and it's hours off",
+    "tags": [
+      "chat:open",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "have you looked in the stores lately? I have, and I wish I hadn't",
+    "tags": [
+      "chat:open",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "I'd eat almost anything right now",
+    "tags": [
+      "chat:open",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "we're not starving. I just want that on the record before I complain",
+    "tags": [
+      "chat:open",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "don't. I've been trying not to think about it",
+    "tags": [
+      "chat:reply",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "it'll come in. it always comes in",
+    "tags": [
+      "chat:reply",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "there's berries out past the fire if you're desperate",
+    "tags": [
+      "chat:reply",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "complain away. I'm right there with you",
+    "tags": [
+      "chat:reply",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "another night on the ground for me",
+    "tags": [
+      "chat:open",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "I've stopped asking when. I just watch the frames go up",
+    "tags": [
+      "chat:open",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "my back has opinions about sleeping outside",
+    "tags": [
+      "chat:open",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "when I get four walls I'm not coming out for a day",
+    "tags": [
+      "chat:open",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "same. at least it's not just me",
+    "tags": [
+      "chat:reply",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "they're going up faster than they were",
+    "tags": [
+      "chat:reply",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "you and me both, friend",
+    "tags": [
+      "chat:reply",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "I'll help you move in when it happens",
+    "tags": [
+      "chat:reply",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "{cold|raw|bitter} one today",
+    "tags": [
+      "chat:open",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "this rain has settled in for the day, I reckon",
+    "tags": [
+      "chat:open",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "clear sky for once. I'll {take it|not complain}",
+    "tags": [
+      "chat:open",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "wind's getting up. mind the fire tonight",
+    "tags": [
+      "chat:open",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "colder tomorrow, I'd say",
+    "tags": [
+      "chat:reply",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "it always does when there's work outside",
+    "tags": [
+      "chat:reply",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "makes a change from last week",
+    "tags": [
+      "chat:reply",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "I'll bank it up before I turn in",
+    "tags": [
+      "chat:reply",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "anyway. back to it",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "good {talking|speaking} to you",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "right, that's me. see you at the fire",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "we should do this more than we do",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "how's your {day|morning} been, then?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "you look about as {tired|worn out|done in} as I feel",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "not stopping. just saying hello",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "anything happening your end?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "{long|slow|hard} day, isn't it",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "much the same as {yesterday|always}, honestly",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "can't complain. well, I could, but I won't",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "nothing worth telling. how about you?",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "getting there. {slowly|bit by bit}",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "same as ever",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "anyway, that's where I'm at with it",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "I've been meaning to say that to somebody all day",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "you know how it is",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "it's not a complaint. it's just the truth of it",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "I'll not go on about it",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "I'd not say it to everyone, but I've been counting what's left",
+    "tags": [
+      "chat:followup",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "one good haul and I'll stop going on about it",
+    "tags": [
+      "chat:followup",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "I'm not asking to be first. I'd just like to know I'm on the list",
+    "tags": [
+      "chat:followup",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "it's the mornings that get me, more than the nights",
+    "tags": [
+      "chat:followup",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "mind you, we've had worse and lived",
+    "tags": [
+      "chat:followup",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "it'll turn. it always turns",
+    "tags": [
+      "chat:followup",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "I'll show you the spot if you keep it to yourself",
+    "tags": [
+      "chat:followup",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "it's not the picking, it's the walking",
+    "tags": [
+      "chat:followup",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "I'll give it another hour and then admit defeat",
+    "tags": [
+      "chat:followup",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "some days the water just says no",
+    "tags": [
+      "chat:followup",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "I'd rather come back with nothing than come back short a leg",
+    "tags": [
+      "chat:followup",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "it's the waiting that's the work, not the killing",
+    "tags": [
+      "chat:followup",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "my shoulders will tell me about this tomorrow",
+    "tags": [
+      "chat:followup",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "it's good wood, at least. worth the haul",
+    "tags": [
+      "chat:followup",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "I'll be picking grit out of my teeth for a week",
+    "tags": [
+      "chat:followup",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "the rock doesn't care how I feel about it",
+    "tags": [
+      "chat:followup",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "I want it standing before the weather turns",
+    "tags": [
+      "chat:followup",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "measure twice. I've learned that the expensive way",
+    "tags": [
+      "chat:followup",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "I've done what I can. the rest is the weather's business",
+    "tags": [
+      "chat:followup",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "give it a week and we'll know",
+    "tags": [
+      "chat:followup",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "I'd rather be bored than busy, in this job",
+    "tags": [
+      "chat:followup",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "I'll walk you back if you're going that way",
+    "tags": [
+      "chat:followup",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "I'd rather see them early than carry them in late",
+    "tags": [
+      "chat:followup",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "half of it is just telling people it's alright",
+    "tags": [
+      "chat:followup",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "bring me anything and I'll do something with it",
+    "tags": [
+      "chat:followup",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "it's not the cooking, it's the counting",
+    "tags": [
+      "chat:followup",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "I'll be at the shrine tonight if you want to come",
+    "tags": [
+      "chat:followup",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "I don't have an answer. I'll sit with you anyway",
+    "tags": [
+      "chat:followup",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "I'll be off again in a few days, once my feet forgive me",
+    "tags": [
+      "chat:followup",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "there's always another ridge",
+    "tags": [
+      "chat:followup",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "right. I've got to get on",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I'll let you get back to it",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "anyway, I've kept you long enough",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "we'll pick this up later",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I'm glad I ran into you",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "say hello to your {family|lot|people} for me",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "look after yourself",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I'll see you at supper",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "same time tomorrow, probably",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "don't let me hold you up",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "well, that's the day nearly gone",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I feel better for saying it out loud",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I'd best go before I talk your ear off",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "you've given me something to think about",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "that's the most sense anyone's made all day",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I won't keep you standing in the {cold|sun|wind}",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "come find me if you {hear|learn} anything else",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "let me know how it turns out",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I hope you're wrong, no offence",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I hope you're right about that",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "we'll know soon enough either way",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "there's no use standing here worrying about it",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I'll think on it while I work",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "you always know what to say, you know that?",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I don't think either of us is going to settle this today",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "let's not talk it to death",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "fair enough. I'll leave it there",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "that's me told, then",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "alright. I'll stop arguing",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I've said my bit",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "we can disagree and still get the work done",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "no hard feelings",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I'm too tired to make a case for it",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "ask me again when I've slept",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "come by later if you want to keep talking",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "the fire'll be going tonight if you want to sit",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "well. onward",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "back to it, I suppose",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "there's always something needs doing",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I've got about a hundred things waiting on me",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "my hands are going stiff standing about",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "you take care out there",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "mind how you go",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "don't work too hard",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I'll walk with you part of the way",
+    "tags": [
+      "chat:end"
+    ]
+  },
+  {
+    "t": "I'll say a word tonight, for both of us",
+    "tags": [
+      "chat:end",
+      "devout"
+    ]
+  },
+  {
+    "t": "we're looked after. I do believe that",
+    "tags": [
+      "chat:end",
+      "devout"
+    ]
+  },
+  {
+    "t": "there's a reason for it. there always is",
+    "tags": [
+      "chat:end",
+      "devout"
+    ]
+  },
+  {
+    "t": "I'll give thanks for the telling, if nothing else",
+    "tags": [
+      "chat:end",
+      "devout"
+    ]
+  },
+  {
+    "t": "keep faith. that's all any of us can do",
+    "tags": [
+      "chat:end",
+      "devout"
+    ]
+  },
+  {
+    "t": "I don't know what to make of any of it, honestly",
+    "tags": [
+      "chat:end",
+      "wavering"
+    ]
+  },
+  {
+    "t": "half of me believes you and half of me doesn't",
+    "tags": [
+      "chat:end",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I'll wait and see. that's all I've got",
+    "tags": [
+      "chat:end",
+      "wavering"
+    ]
+  },
+  {
+    "t": "ask me tomorrow. I change my mind daily",
+    "tags": [
+      "chat:end",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I want it to be true. that's not the same as believing it",
+    "tags": [
+      "chat:end",
+      "wavering"
+    ]
+  },
+  {
+    "t": "maybe I'm just not the sort it shows itself to",
+    "tags": [
+      "chat:end",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I'd like to see something myself, one day",
+    "tags": [
+      "chat:end",
+      "wavering"
+    ]
+  },
+  {
+    "t": "you sound sure. I wish I were",
+    "tags": [
+      "chat:end",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I'll believe it when it happens in front of me",
+    "tags": [
+      "chat:end",
+      "doubting"
+    ]
+  },
+  {
+    "t": "people want it to be true, so they see it",
+    "tags": [
+      "chat:end",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I'm not calling you a liar. I'm just not convinced",
+    "tags": [
+      "chat:end",
+      "doubting"
+    ]
+  },
+  {
+    "t": "there's usually a plainer reason",
+    "tags": [
+      "chat:end",
+      "doubting"
+    ]
+  },
+  {
+    "t": "we tell each other a lot of things",
+    "tags": [
+      "chat:end",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I've told you as plain as I know how",
+    "tags": [
+      "chat:end",
+      "told"
+    ]
+  },
+  {
+    "t": "that's everything I've got. do what you like with it",
+    "tags": [
+      "chat:end",
+      "told"
+    ]
+  },
+  {
+    "t": "you're the last person I'm telling, I've worn myself out on it",
+    "tags": [
+      "chat:end",
+      "told"
+    ]
+  },
+  {
+    "t": "if you hear it repeated back to you, it started with me",
+    "tags": [
+      "chat:end",
+      "told"
+    ]
+  },
+  {
+    "t": "I'll not go over it again after today",
+    "tags": [
+      "chat:end",
+      "told"
+    ]
+  },
+  {
+    "t": "well. now you know as much as I do",
+    "tags": [
+      "chat:end",
+      "told"
+    ]
+  },
+  {
+    "t": "I feel lighter for having said it",
+    "tags": [
+      "chat:end",
+      "told"
+    ]
+  },
+  {
+    "t": "I'll be down at the rock face if you need me",
+    "tags": [
+      "chat:end",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "there's stone waiting on me either way",
+    "tags": [
+      "chat:end",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "my back's telling me to get moving",
+    "tags": [
+      "chat:end",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "the field won't wait on a conversation",
+    "tags": [
+      "chat:end",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "I've got beds to turn before dark",
+    "tags": [
+      "chat:end",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "rain or no rain, it goes in this week",
+    "tags": [
+      "chat:end",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "I've got a pot on, I can't stand here",
+    "tags": [
+      "chat:end",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "come by at supper and I'll feed you",
+    "tags": [
+      "chat:end",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "I'll put something aside for you",
+    "tags": [
+      "chat:end",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "I'm off past the ridge in the morning",
+    "tags": [
+      "chat:end",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "I'll tell you what's out there when I'm back",
+    "tags": [
+      "chat:end",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "there's more map than there is daylight",
+    "tags": [
+      "chat:end",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "I'll hold it in mind tonight",
+    "tags": [
+      "chat:end",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "come to the shrine if you want to talk properly",
+    "tags": [
+      "chat:end",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "that's worth saying aloud where it counts",
+    "tags": [
+      "chat:end",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "send anyone to me who needs it",
+    "tags": [
+      "chat:end",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "I've got someone waiting on a poultice",
+    "tags": [
+      "chat:end",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "rest. that's my advice about everything",
+    "tags": [
+      "chat:end",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "I'm out at first light regardless",
+    "tags": [
+      "chat:end",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "the tracks won't read themselves",
+    "tags": [
+      "chat:end",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "I'll bring something back if the day's kind",
+    "tags": [
+      "chat:end",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "tide won't hold for me",
+    "tags": [
+      "chat:end",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "I've nets to see to",
+    "tags": [
+      "chat:end",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "there'll be fish tonight, one way or another",
+    "tags": [
+      "chat:end",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "I've trees to bring down before dark",
+    "tags": [
+      "chat:end",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "the axe is waiting on me",
+    "tags": [
+      "chat:end",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "we'll want more timber than we've got",
+    "tags": [
+      "chat:end",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "I know a patch that wants picking",
+    "tags": [
+      "chat:end",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "there's berries going over while we talk",
+    "tags": [
+      "chat:end",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "I'll fill a basket before dusk",
+    "tags": [
+      "chat:end",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "I'm on the edge tonight",
+    "tags": [
+      "chat:end",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "I'll keep watch either way",
+    "tags": [
+      "chat:end",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "nothing gets past me if I can help it",
+    "tags": [
+      "chat:end",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "I've a wall waiting on me",
+    "tags": [
+      "chat:end",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "that roof isn't going to close itself",
+    "tags": [
+      "chat:end",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "I'll get more done than I will standing here",
+    "tags": [
+      "chat:end",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "oh, tell me about it",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "you're not wrong",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "that's exactly what I said",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "I was thinking the same thing this morning",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "funny, I'd not thought of it that way",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "go on",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "really? that's the first I've heard",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "huh. and here I thought it was just me",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "well, that's one way to look at it",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "I suppose that's fair",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "you reckon?",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "I'm not sure I follow",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "say that again? I was miles away",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "sorry, I was somewhere else entirely",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "you've got my attention now",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "I've been meaning to ask you about that",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "it's good to hear somebody say it",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "everyone's been thinking it and nobody says it",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "I'd not have guessed",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "that makes more sense than what I'd assumed",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "you'd know better than me",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "I'll take your word for it",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "that's a relief, honestly",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "well that's put my mind at rest",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "now I'm worried, thanks",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "don't tell me things like that",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "I could have gone without knowing that",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "and how are you taking it?",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "how are you keeping, anyway?",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "you look tired, if you don't mind me saying",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "you seem in better spirits than yesterday",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "it's been a strange few days all round",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "the whole place has felt off",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "I've had my head down, I've heard nothing",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "I'm the last to know anything around here",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "you always hear it before I do",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "who told you that?",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "does anyone else know?",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "and you believe it?",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "that's a lot to take in standing up",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "let me get this straight",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "you're serious",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "I can't say I'm surprised",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "I am surprised, actually",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "that's the sort of thing that keeps you up",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "well I'm glad it wasn't worse",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "could have been much worse",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "small mercies",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "it's always something",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "nothing's ever simple here",
+    "tags": [
+      "chat:reply"
+    ]
+  },
+  {
+    "t": "I've been asking myself the same thing all week",
+    "tags": [
+      "chat:reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I go back and forth on it, honestly",
+    "tags": [
+      "chat:reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I don't know what I think any more",
+    "tags": [
+      "chat:reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "then we've been looked after, and we should say so",
+    "tags": [
+      "chat:reply",
+      "devout"
+    ]
+  },
+  {
+    "t": "I've felt it too. I really have",
+    "tags": [
+      "chat:reply",
+      "devout"
+    ]
+  },
+  {
+    "t": "there'll be a plain reason, there usually is",
+    "tags": [
+      "chat:reply",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I'd want to see it before I said that out loud",
+    "tags": [
+      "chat:reply",
+      "doubting"
+    ]
+  },
+  {
+    "t": "the more I think about it, the less I understand it",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "I've not been able to leave it alone",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "and that's not even the strangest part",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "there's more to it, if you've got a minute",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "I've been wanting to tell someone all day",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "you're taking it better than I did",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "I thought I was going mad, for a bit",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "I've stopped trying to explain it",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "anyway, that's what's been on my mind",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "it's been sat on my chest since",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "I'd rather know than not know, I think",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "part of me wishes I hadn't seen it",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "you can see why I've been quiet",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "I've said it out loud now, so that's something",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "I don't expect you to have an answer",
+    "tags": [
+      "chat:followup"
+    ]
+  },
+  {
+    "t": "I keep going over it and I still can't decide what I saw",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I want to believe it. I'm just not there yet",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "some days I'm sure. today I'm not",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "don't ask me what it means. I've no idea",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I'd feel better if someone else had seen it too",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I've told it three times now and it comes out the same",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "you're the only one who's not looked at me sideways",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "I'll keep telling it. somebody should write it down",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "say it back to me. I want to hear how it sounds",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "I'm not embroidering it. that's what happened",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "got a minute?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "have you got a moment, or are you flat out?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "you're just the person I wanted to see",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "I've been looking for you",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "can I walk with you a bit?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "how's your day been?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "busy one?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "you been keeping well?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "how are you holding up?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "you eaten today?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "did you sleep? you look like you didn't",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "quiet morning",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "long day already",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "I'm about ready to sit down",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "anything happening I should know about?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "heard anything?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "what's the word today?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "you look like you've got something to say",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "out with it, whatever it is",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "you've been quiet lately",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "we've not talked properly in days",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "I feel like I never see you",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "I'll not keep you, I just wanted to say hello",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "I don't suppose you've got a hand free?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "I could do with a second pair of hands",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "mind if I ask you something?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "can I say something daft?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "tell me I'm not the only one who's noticed",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "does the place feel different to you lately?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "I've been meaning to catch you",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "not stopping, just saying hello",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "you settled in alright?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "you know your way round yet?",
+    "tags": [
+      "chat:open"
+    ]
+  },
+  {
+    "t": "how are the stores looking to you?",
+    "tags": [
+      "chat:open",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "we eating well this week or not?",
+    "tags": [
+      "chat:open",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "better than last week, I'll say that",
+    "tags": [
+      "chat:reply",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "there's enough. not much over",
+    "tags": [
+      "chat:reply",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "it's the winter I think about, not now",
+    "tags": [
+      "chat:followup",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "we've been thin before and come through",
+    "tags": [
+      "chat:followup",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "I'll not go hungry tonight, that's something",
+    "tags": [
+      "chat:end",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "we'll manage. we always do",
+    "tags": [
+      "chat:end",
+      "topic:food"
+    ]
+  },
+  {
+    "t": "how's the building going?",
+    "tags": [
+      "chat:open",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "are we any closer to everyone under cover?",
+    "tags": [
+      "chat:open",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "slower than I'd like",
+    "tags": [
+      "chat:reply",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "walls are up. it's the roof that takes the time",
+    "tags": [
+      "chat:reply",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "I'd sleep better knowing everyone's inside",
+    "tags": [
+      "chat:followup",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "there's people still by the fire at night",
+    "tags": [
+      "chat:followup",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "it'll be done before the cold, I hope",
+    "tags": [
+      "chat:end",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "one more roof and we're most of the way",
+    "tags": [
+      "chat:end",
+      "topic:roof"
+    ]
+  },
+  {
+    "t": "think it'll hold?",
+    "tags": [
+      "chat:open",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "that sky doesn't look friendly",
+    "tags": [
+      "chat:open",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "it'll rain before dark, mark me",
+    "tags": [
+      "chat:reply",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "we've had worse and got the work done",
+    "tags": [
+      "chat:reply",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "my knee tells me before the sky does",
+    "tags": [
+      "chat:followup",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "wet ground makes every job twice as long",
+    "tags": [
+      "chat:followup",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "I'll get what I can done before it comes in",
+    "tags": [
+      "chat:end",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "we'll be soaked either way",
+    "tags": [
+      "chat:end",
+      "topic:weather"
+    ]
+  },
+  {
+    "t": "much sign out there?",
+    "tags": [
+      "chat:open",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "the hunting any good this week?",
+    "tags": [
+      "chat:open",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "tracks everywhere, and nothing to show for it",
+    "tags": [
+      "chat:reply",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "brought one back yesterday. lean thing",
+    "tags": [
+      "chat:reply",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "they're moving further off than they used to",
+    "tags": [
+      "chat:followup",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "I go out further every season",
+    "tags": [
+      "chat:followup",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "there'll be meat tonight or there won't",
+    "tags": [
+      "chat:end",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "I'll try the far side tomorrow",
+    "tags": [
+      "chat:end",
+      "topic:hunter"
+    ]
+  },
+  {
+    "t": "how's the timber holding?",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "you cutting near or far today?",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "we've stripped everything close in",
+    "tags": [
+      "chat:reply",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "there's plenty standing, it's the carrying",
+    "tags": [
+      "chat:reply",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "it's the walk back that kills you",
+    "tags": [
+      "chat:followup",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "a cart would change my whole life",
+    "tags": [
+      "chat:followup",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "I'll bring down what I can before dark",
+    "tags": [
+      "chat:end",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "there's enough for the next roof, just",
+    "tags": [
+      "chat:end",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "any luck at the rock?",
+    "tags": [
+      "chat:open",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "how's the stone coming?",
+    "tags": [
+      "chat:open",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "slow. it's always slow",
+    "tags": [
+      "chat:reply",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "the drift's giving up more than the boulders ever did",
+    "tags": [
+      "chat:reply",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "every foundation wants it and nobody wants to cut it",
+    "tags": [
+      "chat:followup",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "my shoulders know exactly how much we've moved",
+    "tags": [
+      "chat:followup",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "there'll be stone for the footings, give me time",
+    "tags": [
+      "chat:end",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "I'll get another load up before dark",
+    "tags": [
+      "chat:end",
+      "topic:miner"
+    ]
+  },
+  {
+    "t": "how are the beds looking?",
+    "tags": [
+      "chat:open",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "anything showing yet?",
+    "tags": [
+      "chat:open",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "coming up, slowly",
+    "tags": [
+      "chat:reply",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "ground's still cold in the mornings",
+    "tags": [
+      "chat:reply",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "it all depends on the rain now",
+    "tags": [
+      "chat:followup",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "one bad week and it's a lean season",
+    "tags": [
+      "chat:followup",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "I'll be out there at first light either way",
+    "tags": [
+      "chat:end",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "it goes in this week, rain or not",
+    "tags": [
+      "chat:end",
+      "topic:farmer"
+    ]
+  },
+  {
+    "t": "water been kind to you?",
+    "tags": [
+      "chat:open",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "anything in the nets?",
+    "tags": [
+      "chat:open",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "a fair few. not a boast, but a fair few",
+    "tags": [
+      "chat:reply",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "quiet morning. it happens",
+    "tags": [
+      "chat:reply",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "the water's higher than last month",
+    "tags": [
+      "chat:followup",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "you learn to read it after a while",
+    "tags": [
+      "chat:followup",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "there'll be fish tonight",
+    "tags": [
+      "chat:end",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "I'll go out again on the turn",
+    "tags": [
+      "chat:end",
+      "topic:fisher"
+    ]
+  },
+  {
+    "t": "quiet on the edge?",
+    "tags": [
+      "chat:open",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "you been out on watch again?",
+    "tags": [
+      "chat:open",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "quiet. I like quiet",
+    "tags": [
+      "chat:reply",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "I heard something last night. probably nothing",
+    "tags": [
+      "chat:reply",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "it only takes the one time",
+    "tags": [
+      "chat:followup",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "the tower helps. they don't come near it",
+    "tags": [
+      "chat:followup",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "I'll be out there tonight regardless",
+    "tags": [
+      "chat:end",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "nothing's getting in while I'm awake",
+    "tags": [
+      "chat:end",
+      "topic:guard"
+    ]
+  },
+  {
+    "t": "what are you putting up?",
+    "tags": [
+      "chat:open",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "how's it coming along?",
+    "tags": [
+      "chat:open",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "it'll stand a hundred years or fall over tomorrow",
+    "tags": [
+      "chat:reply",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "well enough. I want more hands",
+    "tags": [
+      "chat:reply",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "it's the waiting on stone that slows everything",
+    "tags": [
+      "chat:followup",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "everyone wants it finished, nobody wants to carry",
+    "tags": [
+      "chat:followup",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "another day or two and it's closed in",
+    "tags": [
+      "chat:end",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "I'll get the frame up before I stop",
+    "tags": [
+      "chat:end",
+      "topic:builder"
+    ]
+  },
+  {
+    "t": "anyone in your care?",
+    "tags": [
+      "chat:open",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "much sickness about?",
+    "tags": [
+      "chat:open",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "a few coughs. nothing that worries me",
+    "tags": [
+      "chat:reply",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "one bad arm and a lot of tired people",
+    "tags": [
+      "chat:reply",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "people leave it too long before they come to me",
+    "tags": [
+      "chat:followup",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "rest is the whole of my advice and nobody takes it",
+    "tags": [
+      "chat:followup",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "send them to me and I'll see to it",
+    "tags": [
+      "chat:end",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "they'll mend. most things mend",
+    "tags": [
+      "chat:end",
+      "topic:healer"
+    ]
+  },
+  {
+    "t": "baskets full?",
+    "tags": [
+      "chat:open",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "much out there to pick?",
+    "tags": [
+      "chat:open",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "enough, if you know where to look",
+    "tags": [
+      "chat:reply",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "the near patches are picked bare",
+    "tags": [
+      "chat:reply",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "you have to go further every week",
+    "tags": [
+      "chat:followup",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "everything's a season early this year",
+    "tags": [
+      "chat:followup",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "I'll have it in before dark",
+    "tags": [
+      "chat:end",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "there's a patch I've been saving",
+    "tags": [
+      "chat:end",
+      "topic:gatherer"
+    ]
+  },
+  {
+    "t": "what's in the pot?",
+    "tags": [
+      "chat:open",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "we eating anything good tonight?",
+    "tags": [
+      "chat:open",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "what I'm given, same as always",
+    "tags": [
+      "chat:reply",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "something hot, that's all I'll promise",
+    "tags": [
+      "chat:reply",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "it's making it last that's the trick",
+    "tags": [
+      "chat:followup",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "I can stretch anything except nothing",
+    "tags": [
+      "chat:followup",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "come by and I'll feed you",
+    "tags": [
+      "chat:end",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "there'll be enough to go round",
+    "tags": [
+      "chat:end",
+      "topic:cook"
+    ]
+  },
+  {
+    "t": "much said at the shrine lately?",
+    "tags": [
+      "chat:open",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "are people coming to you?",
+    "tags": [
+      "chat:open",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "more than they used to",
+    "tags": [
+      "chat:reply",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "some. mostly when they're frightened",
+    "tags": [
+      "chat:reply",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "they only remember it when they need it",
+    "tags": [
+      "chat:followup",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "it's not for me to say who's sincere",
+    "tags": [
+      "chat:followup",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "I'll be there tonight if anyone wants to come",
+    "tags": [
+      "chat:end",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "come by. you don't have to say anything",
+    "tags": [
+      "chat:end",
+      "topic:priest"
+    ]
+  },
+  {
+    "t": "what's out past the ridge?",
+    "tags": [
+      "chat:open",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "how far did you get?",
+    "tags": [
+      "chat:open",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "further than last time",
+    "tags": [
+      "chat:reply",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "more country than I expected",
+    "tags": [
+      "chat:reply",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "there's good ground out there, if we ever want it",
+    "tags": [
+      "chat:followup",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "you can walk a whole day and see nobody",
+    "tags": [
+      "chat:followup",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "I'll go further in the morning",
+    "tags": [
+      "chat:end",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "I'll draw it out for you when I've eaten",
+    "tags": [
+      "chat:end",
+      "topic:explorer"
+    ]
+  },
+  {
+    "t": "you'd not believe what we shifted today",
+    "tags": [
+      "chat:open",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "my hands are grey to the wrist",
+    "tags": [
+      "chat:open",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "everything's easier than cutting stone, believe me",
+    "tags": [
+      "chat:reply",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "try doing it with a pick and then tell me",
+    "tags": [
+      "chat:reply",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "nobody thinks about where the footings come from",
+    "tags": [
+      "chat:followup",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "it's honest work. it's just heavy",
+    "tags": [
+      "chat:followup",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "ground's finally warming up",
+    "tags": [
+      "chat:open",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "I've been on my knees in the beds since dawn",
+    "tags": [
+      "chat:open",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "everything comes down to the weather in the end",
+    "tags": [
+      "chat:reply",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "you can't hurry growing",
+    "tags": [
+      "chat:reply",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "a season's a long time to be wrong about something",
+    "tags": [
+      "chat:followup",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "you plant and then you wait. that's the whole trade",
+    "tags": [
+      "chat:followup",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "you're thinner than last month, you know that?",
+    "tags": [
+      "chat:open",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "I've been at the pot since before light",
+    "tags": [
+      "chat:open",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "everyone's an expert until they're hungry",
+    "tags": [
+      "chat:reply",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "I can work with anything except an empty shelf",
+    "tags": [
+      "chat:reply",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "feeding people is the only work that gets noticed daily",
+    "tags": [
+      "chat:followup",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "you find out a lot about people at supper",
+    "tags": [
+      "chat:followup",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "I got further than I meant to yesterday",
+    "tags": [
+      "chat:open",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "you ever wonder what's past the far ridge?",
+    "tags": [
+      "chat:open",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "the world's bigger than this valley, that's all I know",
+    "tags": [
+      "chat:reply",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "I've walked a long way and I still can't answer that",
+    "tags": [
+      "chat:reply",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "I sleep better outside than in, which worries me",
+    "tags": [
+      "chat:followup",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "there's country out there nobody's named",
+    "tags": [
+      "chat:followup",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "I've not seen you at the shrine lately",
+    "tags": [
+      "chat:open",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "you can talk to me about it, if you want",
+    "tags": [
+      "chat:open",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "people say more than they mean to, in my hearing",
+    "tags": [
+      "chat:reply",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "I'd rather ask than assume",
+    "tags": [
+      "chat:reply",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "I don't have answers. I have somewhere to put the questions",
+    "tags": [
+      "chat:followup",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "it's not my business to judge which of it is true",
+    "tags": [
+      "chat:followup",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "let me look at that hand before you argue",
+    "tags": [
+      "chat:open",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "you've been favouring that leg all week",
+    "tags": [
+      "chat:open",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "everyone tells me they're fine. nobody is",
+    "tags": [
+      "chat:reply",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "rest, and then tell me how it feels",
+    "tags": [
+      "chat:reply",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "people come to me last, when they should come first",
+    "tags": [
+      "chat:followup",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "half of what I do is telling people to sit down",
+    "tags": [
+      "chat:followup",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "saw tracks I didn't recognise today",
+    "tags": [
+      "chat:open",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "the game's gone further out again",
+    "tags": [
+      "chat:open",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "you learn to wait, in my line",
+    "tags": [
+      "chat:reply",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "everything's easier to find than a deer that's heard you",
+    "tags": [
+      "chat:reply",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "it's a lot of walking for one good morning",
+    "tags": [
+      "chat:followup",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "the woods tell you plenty if you shut up and listen",
+    "tags": [
+      "chat:followup",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "water was flat as glass this morning",
+    "tags": [
+      "chat:open",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "I've been out since the tide turned",
+    "tags": [
+      "chat:open",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "the water decides. I just show up",
+    "tags": [
+      "chat:reply",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "some days it gives and some days it doesn't",
+    "tags": [
+      "chat:reply",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "you can't argue with a river, I've tried",
+    "tags": [
+      "chat:followup",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "I like the quiet of it, mostly",
+    "tags": [
+      "chat:followup",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "we're going to run out of close timber before long",
+    "tags": [
+      "chat:open",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "I've been swinging since dawn and my shoulders know it",
+    "tags": [
+      "chat:open",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "everything this village stands up is something I cut down",
+    "tags": [
+      "chat:reply",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "it's the carrying, not the cutting",
+    "tags": [
+      "chat:reply",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "I take one and I don't like taking it, but we need roofs",
+    "tags": [
+      "chat:followup",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "the near woods are thinner than they were",
+    "tags": [
+      "chat:followup",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "the near patches are picked clean",
+    "tags": [
+      "chat:open",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "I found something worth eating today, for once",
+    "tags": [
+      "chat:open",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "you have to know where to look, that's all it is",
+    "tags": [
+      "chat:reply",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "everything's a week early this year",
+    "tags": [
+      "chat:reply",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "nobody thinks it's real work until the baskets are empty",
+    "tags": [
+      "chat:followup",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "I walk further every week for the same amount",
+    "tags": [
+      "chat:followup",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "did you hear anything last night, or was it me?",
+    "tags": [
+      "chat:open",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "I've been up since the small hours",
+    "tags": [
+      "chat:open",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "I'd rather be bored than busy, in my job",
+    "tags": [
+      "chat:reply",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "it only has to go wrong once",
+    "tags": [
+      "chat:reply",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "everyone forgets about me until something howls",
+    "tags": [
+      "chat:followup",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "I stand about all night so nobody has to think about it",
+    "tags": [
+      "chat:followup",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "give it a week and you won't recognise that corner",
+    "tags": [
+      "chat:open",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "I need hands more than I need materials",
+    "tags": [
+      "chat:open",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "everything takes twice as long as I tell people",
+    "tags": [
+      "chat:reply",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "I'd rather do it once and do it right",
+    "tags": [
+      "chat:reply",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "I like walking past something I put up",
+    "tags": [
+      "chat:followup",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "it's not finished until somebody sleeps in it",
+    "tags": [
+      "chat:followup",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "I've turned it over all day and I'm no closer",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I believe you saw something. I can't tell you what",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "if it happened to me I'd want someone to take me seriously",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I'm not going to pretend I've got it worked out",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "part of me is frightened it's true and part of me is frightened it isn't",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "ask me again in a week and you'll get a different answer",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I've heard enough of these now that I can't dismiss them",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I used to be certain about things. that was easier",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "you're not the first to tell me and that's what unsettles me",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I keep waiting for it to make sense and it doesn't",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "don't take my doubting personally. it's not about you",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I want proof and I'm ashamed of wanting it",
+    "tags": [
+      "chat:followup",
+      "told",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I've said it to three people and none of them knew what to do with it",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "it came out of nowhere and it's still with me",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "I'd not have believed it from anyone else",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "you can tell whoever you like. I'm past caring who knows",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "I've stopped trying to make it sound reasonable",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "the telling doesn't do it justice, that's the trouble",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "I've gone over it so often I've worn the edges off it",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "I only tell people I trust with it",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "I'd rather have told you than have you hear it second-hand",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "there. that's the whole of it off my chest",
+    "tags": [
+      "chat:followup",
+      "told"
+    ]
+  },
+  {
+    "t": "I don't know what I believe and I'm tired of pretending I do",
+    "tags": [
+      "chat:followup",
+      "wavering"
+    ]
+  },
+  {
+    "t": "something's going on. that's as far as I'll commit",
+    "tags": [
+      "chat:followup",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I'd like to be the sort who's sure. I'm not",
+    "tags": [
+      "chat:followup",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I go to the shrine and I still come out uncertain",
+    "tags": [
+      "chat:followup",
+      "wavering"
+    ]
+  },
+  {
+    "t": "maybe it doesn't matter what I think about it",
+    "tags": [
+      "chat:followup",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I'll not argue either side of it today",
+    "tags": [
+      "chat:followup",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I've been of two minds about that all week",
+    "tags": [
+      "chat:reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "don't ask me. I change my mind hourly",
+    "tags": [
+      "chat:reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I'd like to think so. I'm not sure I do",
+    "tags": [
+      "chat:reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "there's something in it. I just can't say what",
+    "tags": [
+      "chat:reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I've stopped being certain about anything much",
+    "tags": [
+      "chat:reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I'm somewhere in the middle on that one",
+    "tags": [
+      "chat:reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I'd not bet either way",
+    "tags": [
+      "chat:reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "some of it, maybe. not all of it",
+    "tags": [
+      "chat:reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "then somebody's watching, and I'm glad of it",
+    "tags": [
+      "chat:reply",
+      "devout"
+    ]
+  },
+  {
+    "t": "that settles it for me. it really does",
+    "tags": [
+      "chat:reply",
+      "devout"
+    ]
+  },
+  {
+    "t": "I've never doubted it and I'm not starting now",
+    "tags": [
+      "chat:reply",
+      "devout"
+    ]
+  },
+  {
+    "t": "we're kept. I don't know how else to put it",
+    "tags": [
+      "chat:reply",
+      "devout"
+    ]
+  },
+  {
+    "t": "I'd need to see that with my own eyes",
+    "tags": [
+      "chat:reply",
+      "doubting"
+    ]
+  },
+  {
+    "t": "people believe what they need to believe",
+    "tags": [
+      "chat:reply",
+      "doubting"
+    ]
+  },
+  {
+    "t": "there's an ordinary answer and nobody's looked for it",
+    "tags": [
+      "chat:reply",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I'm not saying it's nonsense. I'm saying it's not proved",
+    "tags": [
+      "chat:reply",
+      "doubting"
+    ]
+  },
+  {
+    "t": "I hear worse than that on watch most nights",
+    "tags": [
+      "chat:reply",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "as long as it stays outside the line, it's not my problem yet",
+    "tags": [
+      "chat:reply",
+      "trade:guard"
+    ]
+  },
+  {
+    "t": "nothing surprises me after a day underground",
+    "tags": [
+      "chat:reply",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "you spend enough time in the dark, you stop ruling things out",
+    "tags": [
+      "chat:reply",
+      "trade:miner"
+    ]
+  },
+  {
+    "t": "the ground doesn't care either way, and nor do I some days",
+    "tags": [
+      "chat:reply",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "I'll worry about it after harvest",
+    "tags": [
+      "chat:reply",
+      "trade:farmer"
+    ]
+  },
+  {
+    "t": "you can tell me over a bowl of something",
+    "tags": [
+      "chat:reply",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "everybody talks more once they're fed",
+    "tags": [
+      "chat:reply",
+      "trade:cook"
+    ]
+  },
+  {
+    "t": "I've seen odd things out in the trees, I'll say that",
+    "tags": [
+      "chat:reply",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "you learn not to argue with what you saw",
+    "tags": [
+      "chat:reply",
+      "trade:hunter"
+    ]
+  },
+  {
+    "t": "the water throws up stranger things than that",
+    "tags": [
+      "chat:reply",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "I've had whole mornings I couldn't explain",
+    "tags": [
+      "chat:reply",
+      "trade:fisher"
+    ]
+  },
+  {
+    "t": "the woods are full of noises. most of them are nothing",
+    "tags": [
+      "chat:reply",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "I'd have heard it if it happened near my cutting",
+    "tags": [
+      "chat:reply",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "I'm out further than anybody. I'd have seen it",
+    "tags": [
+      "chat:reply",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "you notice things when you're on your own all day",
+    "tags": [
+      "chat:reply",
+      "trade:gatherer"
+    ]
+  },
+  {
+    "t": "as long as it doesn't knock my wall down",
+    "tags": [
+      "chat:reply",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "I'll believe anything that doesn't cost me a day's work",
+    "tags": [
+      "chat:reply",
+      "trade:builder"
+    ]
+  },
+  {
+    "t": "I hear people at their worst. it's usually simpler than they think",
+    "tags": [
+      "chat:reply",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "bring them to me and I'll tell you what's real",
+    "tags": [
+      "chat:reply",
+      "trade:healer"
+    ]
+  },
+  {
+    "t": "I'd rather listen than pronounce on it",
+    "tags": [
+      "chat:reply",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "say it all. I've time",
+    "tags": [
+      "chat:reply",
+      "trade:priest"
+    ]
+  },
+  {
+    "t": "I've been further than most and I've seen less than you'd think",
+    "tags": [
+      "chat:reply",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "there's stranger country than this out there",
+    "tags": [
+      "chat:reply",
+      "trade:explorer"
+    ]
+  },
+  {
+    "t": "how's the wood holding up your way? we're into the good stands now",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "you hear that big one come down this {morning|afternoon}? felt it through my boots",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "I marked six more for felling. straight as spears, all of them",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "the saplings took, the ones we planted by the {creek|north path}. all but two",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  }
 ]

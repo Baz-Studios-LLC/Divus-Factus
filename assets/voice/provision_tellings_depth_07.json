@@ -96,7 +96,7 @@
     ]
   },
   {
-    "t": "I saw the god place food before people who had gone without.",
+    "t": "I saw {god} place food before people who had gone without.",
     "tags": [
       "tell",
       "event:provided",
@@ -105,7 +105,7 @@
     ]
   },
   {
-    "t": "The god answered their hunger in front of us all.",
+    "t": "{god} answered their hunger in front of us all.",
     "tags": [
       "tell",
       "event:provided",
@@ -123,7 +123,7 @@
     ]
   },
   {
-    "t": "They asked for food, and the god set it within reach.",
+    "t": "They asked for food, and {god} set it within reach.",
     "tags": [
       "tell",
       "event:provided",
@@ -132,7 +132,7 @@
     ]
   },
   {
-    "t": "The god saw empty hands and filled them. I was standing there.",
+    "t": "{god} saw empty hands and filled them. I was standing there.",
     "tags": [
       "tell",
       "event:provided",
@@ -150,7 +150,7 @@
     ]
   },
   {
-    "t": "I saw the god answer need without waiting for anyone to speak.",
+    "t": "I saw {god} answer need without waiting for anyone to speak.",
     "tags": [
       "tell",
       "event:provided",
@@ -168,7 +168,7 @@
     ]
   },
   {
-    "t": "I watched the god provide enough for hungry people to share.",
+    "t": "I watched {god} provide enough for hungry people to share.",
     "tags": [
       "tell",
       "event:provided",
@@ -186,7 +186,7 @@
     ]
   },
   {
-    "t": "The god put supper where there had only been bare ground.",
+    "t": "{god} put supper where there had only been bare ground.",
     "tags": [
       "tell",
       "event:provided",
@@ -258,7 +258,7 @@
     ]
   },
   {
-    "t": "Food appeared beside the hungry. I almost thanked the god aloud.",
+    "t": "Food appeared beside the hungry. I almost thanked {god} aloud.",
     "tags": [
       "tell",
       "event:provided",
@@ -294,7 +294,7 @@
     ]
   },
   {
-    "t": "Perhaps the god provided. I know only that need received an answer.",
+    "t": "Perhaps {god} provided. I know only that need received an answer.",
     "tags": [
       "tell",
       "event:provided",
@@ -330,7 +330,7 @@
     ]
   },
   {
-    "t": "The food was real. The claim about the god came afterwards.",
+    "t": "The food was real. The claim about {god} came afterwards.",
     "tags": [
       "tell",
       "event:provided",
@@ -516,7 +516,7 @@
     ]
   },
   {
-    "t": "I heard the god provided food exactly where hungry people waited.",
+    "t": "I heard {god} provided food exactly where hungry people waited.",
     "tags": [
       "tell",
       "event:provided",
@@ -525,7 +525,7 @@
     ]
   },
   {
-    "t": "They say the god answered empty stomachs with a meal.",
+    "t": "They say {god} answered empty stomachs with a meal.",
     "tags": [
       "tell",
       "event:provided",
@@ -534,7 +534,7 @@
     ]
   },
   {
-    "t": "The account is plain: the hungry asked, and the god provided.",
+    "t": "The account is plain: the hungry asked, and {god} provided.",
     "tags": [
       "tell",
       "event:provided",
@@ -552,7 +552,7 @@
     ]
   },
   {
-    "t": "People witnessed the god place provisions before those in need.",
+    "t": "People witnessed {god} place provisions before those in need.",
     "tags": [
       "tell",
       "event:provided",
@@ -561,7 +561,7 @@
     ]
   },
   {
-    "t": "They say nobody brought the food because the god did.",
+    "t": "They say nobody brought the food because {god} did.",
     "tags": [
       "tell",
       "event:provided",
@@ -579,7 +579,7 @@
     ]
   },
   {
-    "t": "The god remembered people whose neighbours could not feed them.",
+    "t": "{god} remembered people whose neighbours could not feed them.",
     "tags": [
       "tell",
       "event:provided",
@@ -588,7 +588,7 @@
     ]
   },
   {
-    "t": "Word of the god's provision has already reached every doorway.",
+    "t": "Word of {god}'s provision has already reached every doorway.",
     "tags": [
       "tell",
       "event:provided",
@@ -597,7 +597,7 @@
     ]
   },
   {
-    "t": "I heard the hungry gave thanks before dividing what the god sent.",
+    "t": "I heard the hungry gave thanks before dividing what {god} sent.",
     "tags": [
       "tell",
       "event:provided",
@@ -615,7 +615,7 @@
     ]
   },
   {
-    "t": "They say the god provided enough that nobody nearby went without.",
+    "t": "They say {god} provided enough that nobody nearby went without.",
     "tags": [
       "tell",
       "event:provided",
@@ -714,7 +714,7 @@
     ]
   },
   {
-    "t": "Maybe the god provided. The witnesses seem certain enough for all of us.",
+    "t": "Maybe {god} provided. The witnesses seem certain enough for all of us.",
     "tags": [
       "tell",
       "event:provided",
@@ -777,7 +777,7 @@
     ]
   },
   {
-    "t": "They say the god provided. I hear no proof beyond surprise.",
+    "t": "They say {god} provided. I hear no proof beyond surprise.",
     "tags": [
       "tell",
       "event:provided",
@@ -936,7 +936,7 @@
     ]
   },
   {
-    "t": "Word came that the god fed hungry people in another settlement.",
+    "t": "Word came that {god} fed hungry people in another settlement.",
     "tags": [
       "tell",
       "event:provided",
@@ -945,7 +945,7 @@
     ]
   },
   {
-    "t": "The god's provision is being spoken of beyond our own fields.",
+    "t": "{god}'s provision is being spoken of beyond our own fields.",
     "tags": [
       "tell",
       "event:provided",
@@ -954,7 +954,7 @@
     ]
   },
   {
-    "t": "Travellers say the god answered hunger far from our village.",
+    "t": "Travellers say {god} answered hunger far from our village.",
     "tags": [
       "tell",
       "event:provided",
@@ -981,7 +981,7 @@
     ]
   },
   {
-    "t": "I heard the god placed provisions before hungry families elsewhere.",
+    "t": "I heard {god} placed provisions before hungry families elsewhere.",
     "tags": [
       "tell",
       "event:provided",
@@ -1017,7 +1017,7 @@
     ]
   },
   {
-    "t": "The god's gifts are becoming known wherever travellers stop.",
+    "t": "{god}'s gifts are becoming known wherever travellers stop.",
     "tags": [
       "tell",
       "event:provided",
@@ -1089,7 +1089,7 @@
     ]
   },
   {
-    "t": "People beyond our fields claim the god fed them. Perhaps that matters.",
+    "t": "People beyond our fields claim {god} fed them. Perhaps that matters.",
     "tags": [
       "tell",
       "event:provided",

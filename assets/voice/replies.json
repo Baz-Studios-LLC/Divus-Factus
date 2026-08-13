@@ -43,7 +43,7 @@
     ]
   },
   {
-    "t": "that's the god's work. plain as anything",
+    "t": "that's {god}'s work. plain as anything",
     "tags": [
       "reply",
       "devout"
@@ -127,7 +127,7 @@
     ]
   },
   {
-    "t": "maybe it was the god. maybe it was just a bad day",
+    "t": "maybe it was {god}. maybe it was just a bad day",
     "tags": [
       "reply",
       "wavering"
@@ -141,7 +141,7 @@
     ]
   },
   {
-    "t": "then the god is closer than people think",
+    "t": "then {god} is closer than people think",
     "tags": [
       "reply",
       "devout"

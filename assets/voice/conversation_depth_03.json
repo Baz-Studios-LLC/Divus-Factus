@@ -372,7 +372,7 @@
     ]
   },
   {
-    "t": "I tell it because the god's acts should not disappear into ordinary days.",
+    "t": "I tell it because {god}'s acts should not disappear into ordinary days.",
     "tags": [
       "chat:followup",
       "told",
@@ -388,7 +388,7 @@
     ]
   },
   {
-    "t": "I remember it clearly because the god made it clear.",
+    "t": "I remember it clearly because {god} made it clear.",
     "tags": [
       "chat:followup",
       "told",
@@ -396,7 +396,7 @@
     ]
   },
   {
-    "t": "People should know when the god reaches into our lives.",
+    "t": "People should know when {god} reaches into our lives.",
     "tags": [
       "chat:followup",
       "told",
@@ -412,7 +412,7 @@
     ]
   },
   {
-    "t": "The important part is not my fear. It is what the god did.",
+    "t": "The important part is not my fear. It is what {god} did.",
     "tags": [
       "chat:followup",
       "told",
@@ -452,7 +452,7 @@
     ]
   },
   {
-    "t": "I will not soften the god's power to make anyone comfortable.",
+    "t": "I will not soften {god}'s power to make anyone comfortable.",
     "tags": [
       "chat:followup",
       "told",
@@ -592,7 +592,7 @@
     ]
   },
   {
-    "t": "Thank you. I will remember what the god has shown us.",
+    "t": "Thank you. I will remember what {god} has shown us.",
     "tags": [
       "chat:end",
       "devout"
@@ -613,7 +613,7 @@
     ]
   },
   {
-    "t": "May the god keep you. I should return to work.",
+    "t": "May {god} keep you. I should return to work.",
     "tags": [
       "chat:end",
       "devout"
@@ -680,7 +680,7 @@
     ]
   },
   {
-    "t": "The god protected them. I will give thanks and let them rest.",
+    "t": "{god} protected them. I will give thanks and let them rest.",
     "tags": [
       "chat:end",
       "event:delivered",
@@ -793,7 +793,7 @@
     ]
   },
   {
-    "t": "I will thank the god after we bring the harvest in.",
+    "t": "I will thank {god} after we bring the harvest in.",
     "tags": [
       "chat:end",
       "event:flourished",

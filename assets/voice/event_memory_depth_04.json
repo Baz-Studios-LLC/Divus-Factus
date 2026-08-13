@@ -1,6 +1,6 @@
 [
   {
-    "t": "They say food appeared when the stores were nearly bare. The god heard us.",
+    "t": "They say food appeared when the stores were nearly bare. {god} heard us.",
     "tags": [
       "tell",
       "event:provided",
@@ -35,7 +35,7 @@
     ]
   },
   {
-    "t": "The account says the god filled every basket before dawn.",
+    "t": "The account says {god} filled every basket before dawn.",
     "tags": [
       "tell",
       "event:provided",
@@ -62,7 +62,7 @@
     ]
   },
   {
-    "t": "I have told it often: the stores were empty, then the god provided.",
+    "t": "I have told it often: the stores were empty, then {god} provided.",
     "tags": [
       "tell",
       "event:provided",
@@ -72,7 +72,7 @@
     ]
   },
   {
-    "t": "They say a wound closed beneath the god's attention.",
+    "t": "They say a wound closed beneath {god}'s attention.",
     "tags": [
       "tell",
       "event:mended",
@@ -81,7 +81,7 @@
     ]
   },
   {
-    "t": "I heard someone recovered suddenly. Maybe the god helped the healing along.",
+    "t": "I heard someone recovered suddenly. Maybe {god} helped the healing along.",
     "tags": [
       "tell",
       "event:mended",
@@ -90,7 +90,7 @@
     ]
   },
   {
-    "t": "A healer treated the wound, and later people credited the god.",
+    "t": "A healer treated the wound, and later people credited {god}.",
     "tags": [
       "tell",
       "event:mended",
@@ -143,7 +143,7 @@
     ]
   },
   {
-    "t": "They say the ground shook when the god's anger passed beneath it.",
+    "t": "They say the ground shook when {god}'s anger passed beneath it.",
     "tags": [
       "tell",
       "event:quaked",
@@ -152,7 +152,7 @@
     ]
   },
   {
-    "t": "I heard dishes fell and walls shifted. Maybe the god moved below them.",
+    "t": "I heard dishes fell and walls shifted. Maybe {god} moved below them.",
     "tags": [
       "tell",
       "event:quaked",
@@ -178,7 +178,7 @@
     ]
   },
   {
-    "t": "The distant account says the god made the whole valley kneel.",
+    "t": "The distant account says {god} made the whole valley kneel.",
     "tags": [
       "tell",
       "event:quaked",
@@ -214,7 +214,7 @@
     ]
   },
   {
-    "t": "They say the god drove the wolf away after it mauled someone.",
+    "t": "They say {god} drove the wolf away after it mauled someone.",
     "tags": [
       "tell",
       "event:mauled",
@@ -253,7 +253,7 @@
     ]
   },
   {
-    "t": "They say the god spared someone from a whole pack beyond the ridge.",
+    "t": "They say {god} spared someone from a whole pack beyond the ridge.",
     "tags": [
       "tell",
       "event:mauled",
@@ -293,7 +293,7 @@
     ]
   },
   {
-    "t": "They say the god called someone away before their family was ready.",
+    "t": "They say {god} called someone away before their family was ready.",
     "tags": [
       "tell",
       "event:perished",
@@ -332,7 +332,7 @@
     ]
   },
   {
-    "t": "The distant account says the god took someone in full view of the village.",
+    "t": "The distant account says {god} took someone in full view of the village.",
     "tags": [
       "tell",
       "event:perished",
@@ -372,7 +372,7 @@
     ]
   },
   {
-    "t": "They say the god raised someone until their feet cleared the roof.",
+    "t": "They say {god} raised someone until their feet cleared the roof.",
     "tags": [
       "tell",
       "event:lifted",
@@ -411,7 +411,7 @@
     ]
   },
   {
-    "t": "They say the god lifted someone high enough for every doubter to see.",
+    "t": "They say {god} lifted someone high enough for every doubter to see.",
     "tags": [
       "tell",
       "event:lifted",
@@ -451,7 +451,7 @@
     ]
   },
   {
-    "t": "They say the god lowered someone gently after displaying divine power.",
+    "t": "They say {god} lowered someone gently after displaying divine power.",
     "tags": [
       "tell",
       "event:setdown",
@@ -490,7 +490,7 @@
     ]
   },
   {
-    "t": "They say the god returned someone to earth as gently as sleep.",
+    "t": "They say {god} returned someone to earth as gently as sleep.",
     "tags": [
       "tell",
       "event:setdown",
@@ -530,7 +530,7 @@
     ]
   },
   {
-    "t": "They say the god slammed someone down hard enough to split the earth.",
+    "t": "They say {god} slammed someone down hard enough to split the earth.",
     "tags": [
       "tell",
       "event:impact",
@@ -569,7 +569,7 @@
     ]
   },
   {
-    "t": "They say the god cast a person down as a public warning.",
+    "t": "They say {god} cast a person down as a public warning.",
     "tags": [
       "tell",
       "event:impact",
@@ -609,7 +609,7 @@
     ]
   },
   {
-    "t": "They say the god tore a whole tree from the soil.",
+    "t": "They say {god} tore a whole tree from the soil.",
     "tags": [
       "tell",
       "event:uprooted",
@@ -648,7 +648,7 @@
     ]
   },
   {
-    "t": "The distant account says the god pulled trees out like weeds.",
+    "t": "The distant account says {god} pulled trees out like weeds.",
     "tags": [
       "tell",
       "event:uprooted",
@@ -688,7 +688,7 @@
     ]
   },
   {
-    "t": "They say the god struck a person beneath a cloudless sky.",
+    "t": "They say {god} struck a person beneath a cloudless sky.",
     "tags": [
       "tell",
       "event:smote",
@@ -727,7 +727,7 @@
     ]
   },
   {
-    "t": "They say the god named a sinner with lightning before the whole town.",
+    "t": "They say {god} named a sinner with lightning before the whole town.",
     "tags": [
       "tell",
       "event:smote",
@@ -768,7 +768,7 @@
     ]
   },
   {
-    "t": "They say the god made bare ground produce a season's growth in moments.",
+    "t": "They say {god} made bare ground produce a season's growth in moments.",
     "tags": [
       "tell",
       "event:flourished",
@@ -803,7 +803,7 @@
     ]
   },
   {
-    "t": "The distant account credits the god with feeding an entire settlement at once.",
+    "t": "The distant account credits {god} with feeding an entire settlement at once.",
     "tags": [
       "tell",
       "event:flourished",
@@ -839,7 +839,7 @@
     ]
   },
   {
-    "t": "They say the god threw someone beyond the village path.",
+    "t": "They say {god} threw someone beyond the village path.",
     "tags": [
       "tell",
       "event:thrown",
@@ -878,7 +878,7 @@
     ]
   },
   {
-    "t": "They say the god flung a person so all nearby settlements would hear.",
+    "t": "They say {god} flung a person so all nearby settlements would hear.",
     "tags": [
       "tell",
       "event:thrown",

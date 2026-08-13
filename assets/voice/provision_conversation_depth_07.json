@@ -1,6 +1,6 @@
 [
   {
-    "t": "The god fed people when nobody else could. That deserves thanks.",
+    "t": "{god} fed people when nobody else could. That deserves thanks.",
     "tags": [
       "reply",
       "event:provided",
@@ -24,7 +24,7 @@
     ]
   },
   {
-    "t": "The god answered need before hunger became another grave.",
+    "t": "{god} answered need before hunger became another grave.",
     "tags": [
       "reply",
       "event:provided",
@@ -56,7 +56,7 @@
     ]
   },
   {
-    "t": "The god provided the meal. Our duty is to divide it fairly.",
+    "t": "{god} provided the meal. Our duty is to divide it fairly.",
     "tags": [
       "reply",
       "event:provided",
@@ -80,7 +80,7 @@
     ]
   },
   {
-    "t": "The god has done a generous thing. We should answer generously too.",
+    "t": "{god} has done a generous thing. We should answer generously too.",
     "tags": [
       "reply",
       "event:provided",
@@ -96,7 +96,7 @@
     ]
   },
   {
-    "t": "Nobody can say the god ignored us after food arrived like that.",
+    "t": "Nobody can say {god} ignored us after food arrived like that.",
     "tags": [
       "reply",
       "event:provided",
@@ -112,7 +112,7 @@
     ]
   },
   {
-    "t": "The god provided for need, not for whoever reaches the basket first.",
+    "t": "{god} provided for need, not for whoever reaches the basket first.",
     "tags": [
       "reply",
       "event:provided",
@@ -144,7 +144,7 @@
     ]
   },
   {
-    "t": "I hope those who ate remembered to thank the god.",
+    "t": "I hope those who ate remembered to thank {god}.",
     "tags": [
       "reply",
       "event:provided",
@@ -160,7 +160,7 @@
     ]
   },
   {
-    "t": "The god filled empty hands. Full hands must now help others.",
+    "t": "{god} filled empty hands. Full hands must now help others.",
     "tags": [
       "reply",
       "event:provided",
@@ -216,7 +216,7 @@
     ]
   },
   {
-    "t": "Perhaps the god provided. We still decide who receives the next portion.",
+    "t": "Perhaps {god} provided. We still decide who receives the next portion.",
     "tags": [
       "reply",
       "event:provided",
@@ -288,7 +288,7 @@
     ]
   },
   {
-    "t": "That account leaves room for the god and for questions.",
+    "t": "That account leaves room for {god} and for questions.",
     "tags": [
       "reply",
       "event:provided",
@@ -344,7 +344,7 @@
     ]
   },
   {
-    "t": "Maybe the god saw them. I am glad somebody did.",
+    "t": "Maybe {god} saw them. I am glad somebody did.",
     "tags": [
       "reply",
       "event:provided",
@@ -488,7 +488,7 @@
     ]
   },
   {
-    "t": "The god receives credit quickly when human generosity stays quiet.",
+    "t": "{god} receives credit quickly when human generosity stays quiet.",
     "tags": [
       "reply",
       "event:provided",
@@ -512,7 +512,7 @@
     ]
   },
   {
-    "t": "If the god provided, the evidence will survive a proper count.",
+    "t": "If {god} provided, the evidence will survive a proper count.",
     "tags": [
       "reply",
       "event:provided",
@@ -544,7 +544,7 @@
     ]
   },
   {
-    "t": "One unexplained meal cannot settle every question about the god.",
+    "t": "One unexplained meal cannot settle every question about {god}.",
     "tags": [
       "reply",
       "event:provided",
@@ -807,7 +807,7 @@
     ]
   },
   {
-    "t": "I wonder whether the god expected anything in return.",
+    "t": "I wonder whether {god} expected anything in return.",
     "tags": [
       "chat:followup",
       "event:provided"
@@ -842,7 +842,7 @@
     ]
   },
   {
-    "t": "Did the provision change anyone's mind about the god?",
+    "t": "Did the provision change anyone's mind about {god}?",
     "tags": [
       "chat:followup",
       "event:provided"

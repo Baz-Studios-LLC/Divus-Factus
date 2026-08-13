@@ -1,6 +1,6 @@
 [
   {
-    "t": "I heard the child cry, and I thanked the god before anyone spoke.",
+    "t": "I heard the child cry, and I thanked {god} before anyone spoke.",
     "tags": [
       "tell",
       "event:delivered",
@@ -9,7 +9,7 @@
     ]
   },
   {
-    "t": "Both survived. Maybe skill saved them, and maybe the god helped.",
+    "t": "Both survived. Maybe skill saved them, and maybe {god} helped.",
     "tags": [
       "tell",
       "event:delivered",
@@ -27,7 +27,7 @@
     ]
   },
   {
-    "t": "They say the god guarded the birth. Mother and child are safe.",
+    "t": "They say {god} guarded the birth. Mother and child are safe.",
     "tags": [
       "tell",
       "event:delivered",
@@ -62,7 +62,7 @@
     ]
   },
   {
-    "t": "I watched the field thicken before my eyes. The god made it answer.",
+    "t": "I watched the field thicken before my eyes. {god} made it answer.",
     "tags": [
       "tell",
       "event:flourished",
@@ -89,7 +89,7 @@
     ]
   },
   {
-    "t": "They say the god filled the land with new growth.",
+    "t": "They say {god} filled the land with new growth.",
     "tags": [
       "tell",
       "event:flourished",
@@ -124,7 +124,7 @@
     ]
   },
   {
-    "t": "I saw someone strike the ground hard. The god put them there.",
+    "t": "I saw someone strike the ground hard. {god} put them there.",
     "tags": [
       "tell",
       "event:impact",
@@ -154,7 +154,7 @@
     ]
   },
   {
-    "t": "They say the god drove someone into the ground.",
+    "t": "They say {god} drove someone into the ground.",
     "tags": [
       "tell",
       "event:impact",
@@ -247,7 +247,7 @@
     ]
   },
   {
-    "t": "I watched the god lift a person clear of the ground.",
+    "t": "I watched {god} lift a person clear of the ground.",
     "tags": [
       "tell",
       "event:lifted",
@@ -257,7 +257,7 @@
     ]
   },
   {
-    "t": "Their feet rose above my head. I think the god was there.",
+    "t": "Their feet rose above my head. I think {god} was there.",
     "tags": [
       "tell",
       "event:lifted",
@@ -277,7 +277,7 @@
     ]
   },
   {
-    "t": "They say the god raised someone where the whole square could see.",
+    "t": "They say {god} raised someone where the whole square could see.",
     "tags": [
       "tell",
       "event:lifted",
@@ -316,7 +316,7 @@
     ]
   },
   {
-    "t": "I saw the wolf tear into them, and the god kept them alive.",
+    "t": "I saw the wolf tear into them, and {god} kept them alive.",
     "tags": [
       "tell",
       "event:mauled",
@@ -346,7 +346,7 @@
     ]
   },
   {
-    "t": "They say the god spared someone from a wolf's teeth.",
+    "t": "They say {god} spared someone from a wolf's teeth.",
     "tags": [
       "tell",
       "event:mauled",
@@ -385,7 +385,7 @@
     ]
   },
   {
-    "t": "I watched the damage close under the god's hand.",
+    "t": "I watched the damage close under {god}'s hand.",
     "tags": [
       "tell",
       "event:mended",
@@ -412,7 +412,7 @@
     ]
   },
   {
-    "t": "They say the god repaired what no worker could fix.",
+    "t": "They say {god} repaired what no worker could fix.",
     "tags": [
       "tell",
       "event:mended",
@@ -447,7 +447,7 @@
     ]
   },
   {
-    "t": "I was there when they died. The god received them.",
+    "t": "I was there when they died. {god} received them.",
     "tags": [
       "tell",
       "event:perished",
@@ -477,7 +477,7 @@
     ]
   },
   {
-    "t": "They say the god called someone away last night.",
+    "t": "They say {god} called someone away last night.",
     "tags": [
       "tell",
       "event:perished",
@@ -516,7 +516,7 @@
     ]
   },
   {
-    "t": "I saw the food arrive with nobody bringing it. The god provided.",
+    "t": "I saw the food arrive with nobody bringing it. {god} provided.",
     "tags": [
       "tell",
       "event:provided",
@@ -543,7 +543,7 @@
     ]
   },
   {
-    "t": "They say the god filled empty hands with food.",
+    "t": "They say {god} filled empty hands with food.",
     "tags": [
       "tell",
       "event:provided",
@@ -674,7 +674,7 @@
     ]
   },
   {
-    "t": "I felt the god move the earth under my feet.",
+    "t": "I felt {god} move the earth under my feet.",
     "tags": [
       "tell",
       "event:quaked",
@@ -692,7 +692,7 @@
     ]
   },
   {
-    "t": "I felt an earthquake. Fear supplied the god afterwards.",
+    "t": "I felt an earthquake. Fear supplied {god} afterwards.",
     "tags": [
       "tell",
       "event:quaked",
@@ -701,7 +701,7 @@
     ]
   },
   {
-    "t": "They say the god shook every wall in the village.",
+    "t": "They say {god} shook every wall in the village.",
     "tags": [
       "tell",
       "event:quaked",
@@ -736,7 +736,7 @@
     ]
   },
   {
-    "t": "I watched the god lower a person safely to the ground.",
+    "t": "I watched {god} lower a person safely to the ground.",
     "tags": [
       "tell",
       "event:setdown",
@@ -766,7 +766,7 @@
     ]
   },
   {
-    "t": "They say the god returned someone gently to the earth.",
+    "t": "They say {god} returned someone gently to the earth.",
     "tags": [
       "tell",
       "event:setdown",
@@ -805,7 +805,7 @@
     ]
   },
   {
-    "t": "I saw the god strike a person under a clear sky.",
+    "t": "I saw {god} strike a person under a clear sky.",
     "tags": [
       "tell",
       "event:smote",
@@ -835,7 +835,7 @@
     ]
   },
   {
-    "t": "They say the god struck someone before the whole square.",
+    "t": "They say {god} struck someone before the whole square.",
     "tags": [
       "tell",
       "event:smote",
@@ -874,7 +874,7 @@
     ]
   },
   {
-    "t": "I watched the god throw a person across the ground.",
+    "t": "I watched {god} throw a person across the ground.",
     "tags": [
       "tell",
       "event:thrown",
@@ -884,7 +884,7 @@
     ]
   },
   {
-    "t": "They flew farther than any fall should send them. I think the god acted.",
+    "t": "They flew farther than any fall should send them. I think {god} acted.",
     "tags": [
       "tell",
       "event:thrown",
@@ -904,7 +904,7 @@
     ]
   },
   {
-    "t": "They say the god flung someone clear across the square.",
+    "t": "They say {god} flung someone clear across the square.",
     "tags": [
       "tell",
       "event:thrown",
@@ -943,7 +943,7 @@
     ]
   },
   {
-    "t": "I watched the god pull a tree out by every root.",
+    "t": "I watched {god} pull a tree out by every root.",
     "tags": [
       "tell",
       "event:uprooted",
@@ -973,7 +973,7 @@
     ]
   },
   {
-    "t": "They say the god tore a tree from sound ground.",
+    "t": "They say {god} tore a tree from sound ground.",
     "tags": [
       "tell",
       "event:uprooted",

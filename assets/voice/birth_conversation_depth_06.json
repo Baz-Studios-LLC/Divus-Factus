@@ -36,7 +36,7 @@
     ]
   },
   {
-    "t": "Someone said the child is healthy. I thanked the god before thinking about it.",
+    "t": "Someone said the child is healthy. I thanked {god} before thinking about it.",
     "tags": [
       "tell",
       "event:delivered",
@@ -378,7 +378,7 @@
     ]
   },
   {
-    "t": "Someone told me the god was present. Someone else mentioned the healer.",
+    "t": "Someone told me {god} was present. Someone else mentioned the healer.",
     "tags": [
       "tell",
       "event:delivered",
@@ -456,7 +456,7 @@
     ]
   },
   {
-    "t": "Perhaps the god helped. The healer still did the work before us.",
+    "t": "Perhaps {god} helped. The healer still did the work before us.",
     "tags": [
       "reply",
       "event:delivered",
@@ -536,7 +536,7 @@
     ]
   },
   {
-    "t": "Maybe the god was listening. I know the neighbours were.",
+    "t": "Maybe {god} was listening. I know the neighbours were.",
     "tags": [
       "reply",
       "event:delivered",
@@ -568,7 +568,7 @@
     ]
   },
   {
-    "t": "Perhaps we should thank the god by helping the family.",
+    "t": "Perhaps we should thank {god} by helping the family.",
     "tags": [
       "reply",
       "event:delivered",
@@ -712,7 +712,7 @@
     ]
   },
   {
-    "t": "Perhaps the god deserves thanks. The family certainly deserves help.",
+    "t": "Perhaps {god} deserves thanks. The family certainly deserves help.",
     "tags": [
       "reply",
       "event:delivered",
@@ -906,7 +906,7 @@
     ]
   },
   {
-    "t": "Who first said the god had answered?",
+    "t": "Who first said {god} had answered?",
     "tags": [
       "chat:followup",
       "event:delivered",
@@ -1077,7 +1077,7 @@
     ]
   },
   {
-    "t": "Maybe the god helped by sending capable people to the room.",
+    "t": "Maybe {god} helped by sending capable people to the room.",
     "tags": [
       "chat:followup",
       "event:delivered",
@@ -1122,7 +1122,7 @@
     ]
   },
   {
-    "t": "I wonder what convinced you that the god was involved.",
+    "t": "I wonder what convinced you that {god} was involved.",
     "tags": [
       "chat:followup",
       "event:delivered",
@@ -1500,7 +1500,7 @@
     ]
   },
   {
-    "t": "Let us leave the god and the healer their separate thanks.",
+    "t": "Let us leave {god} and the healer their separate thanks.",
     "tags": [
       "chat:end",
       "event:delivered",
@@ -1599,7 +1599,7 @@
     ]
   },
   {
-    "t": "Maybe the god listened. I know the village did.",
+    "t": "Maybe {god} listened. I know the village did.",
     "tags": [
       "chat:end",
       "event:delivered",

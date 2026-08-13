@@ -1,54 +1,372 @@
 [
-  { "t": "They leave their boots in the doorway, and I trip over them every night.", "tags": ["muse", "housed", "married"] },
-  { "t": "We need another blanket before the cold settles in.", "tags": ["muse", "housed", "married"] },
-  { "t": "They fixed the loose peg after I complained once. I should notice that aloud.", "tags": ["muse", "housed", "married"] },
-  { "t": "The house is small enough that every disagreement fills it.", "tags": ["muse", "housed", "married"] },
-  { "t": "I like hearing them move around while I am half asleep.", "tags": ["muse", "housed", "married"] },
-  { "t": "We should invite somebody for supper before we forget how.", "tags": ["muse", "housed", "married"] },
-  { "t": "They always leave the warmer side of the hearth for me.", "tags": ["muse", "housed", "married"] },
-  { "t": "I promised to patch the draft three days ago.", "tags": ["muse", "housed", "married"] },
-  { "t": "We finally agree where the table belongs. It only took a season.", "tags": ["muse", "housed", "married"] },
-  { "t": "Their cup is beside mine every morning. I still like seeing that.", "tags": ["muse", "housed", "married"] },
-  { "t": "I should bring something home besides work on my clothes.", "tags": ["muse", "housed", "married"] },
-  { "t": "They talk in their sleep and deny every word by daylight.", "tags": ["muse", "housed", "married"] },
-  { "t": "The floor needs sweeping, but sitting together sounds better tonight.", "tags": ["muse", "housed", "married"] },
-  { "t": "We have two opinions about every repair and one set of tools.", "tags": ["muse", "housed", "married"] },
-  { "t": "They know when I am worried before I say anything.", "tags": ["muse", "housed", "married"] },
-  { "t": "I was angry this morning. I should go home kinder than I left.", "tags": ["muse", "housed", "married"] },
-  { "t": "The rain sounds better when somebody else is listening beside you.", "tags": ["muse", "housed", "married"] },
-  { "t": "We keep saving the good bowl for each other.", "tags": ["muse", "housed", "married"] },
-  { "t": "I should tell them I will be late before late becomes worry.", "tags": ["muse", "housed", "married"] },
-  { "t": "The house is ours, including the leaks and the arguments.", "tags": ["muse", "housed", "married"] },
-
-  { "t": "The latch sticks when the air is damp.", "tags": ["muse", "housed"] },
-  { "t": "I should move the stool before I bruise my leg on it again.", "tags": ["muse", "housed"] },
-  { "t": "The roof held through last night. I checked twice anyway.", "tags": ["muse", "housed"] },
-  { "t": "A little ash keeps finding its way onto every clean surface.", "tags": ["muse", "housed"] },
-  { "t": "I need a proper place for wet clothes.", "tags": ["muse", "housed"] },
-  { "t": "The door shuts cleanly now. That repair was worth the trouble.", "tags": ["muse", "housed"] },
-  { "t": "I can find the water cup in complete darkness.", "tags": ["muse", "housed"] },
-  { "t": "The chimney draws poorly when the wind comes from the east.", "tags": ["muse", "housed"] },
-  { "t": "I should hang herbs near the window. The room smells too much like smoke.", "tags": ["muse", "housed"] },
-  { "t": "There is always one more small repair once I start looking.", "tags": ["muse", "housed"] },
-  { "t": "My coat has a peg, my cup has a shelf, and I have a bed.", "tags": ["muse", "housed"] },
-  { "t": "I heard rain and stayed where I was. That still feels luxurious.", "tags": ["muse", "housed"] },
-  { "t": "The floor is cold, but at least there is a floor.", "tags": ["muse", "housed"] },
-  { "t": "I should bank the fire before leaving tomorrow.", "tags": ["muse", "housed"] },
-  { "t": "This place looks better after five minutes of putting things away.", "tags": ["muse", "housed"] },
-
-  { "t": "I want to believe the good days mean something. Wanting is not proof.", "tags": ["muse", "wavering"] },
-  { "t": "I have prayed twice this week and felt foolish only once.", "tags": ["muse", "wavering"] },
-  { "t": "Some people sound certain because they never ask themselves difficult questions.", "tags": ["muse", "wavering"] },
-  { "t": "The god feels close today. Yesterday, there was only weather.", "tags": ["muse", "wavering"] },
-  { "t": "I keep noticing answers after deciding nobody listened.", "tags": ["muse", "wavering"] },
-  { "t": "Belief would be easier if everyone stopped explaining it to me.", "tags": ["muse", "wavering"] },
-  { "t": "I trust what I saw. I do not trust what people say it meant.", "tags": ["muse", "wavering"] },
-  { "t": "Maybe gratitude is enough without certainty.", "tags": ["muse", "wavering"] },
-  { "t": "I nearly thanked the god this morning. Nearly still counts for something.", "tags": ["muse", "wavering"] },
-  { "t": "Every miracle gives me one answer and three new questions.", "tags": ["muse", "wavering"] },
-  { "t": "I envy people whose faith stays the same all day.", "tags": ["muse", "wavering"] },
-  { "t": "Silence feels like absence until something unexpected happens.", "tags": ["muse", "wavering"] },
-  { "t": "I am not faithless. I am simply unconvinced before breakfast.", "tags": ["muse", "wavering"] },
-  { "t": "The village believes loudly. My belief speaks under its breath.", "tags": ["muse", "wavering"] },
-  { "t": "I would like one quiet sign that nobody else interprets for me.", "tags": ["muse", "wavering"] }
+  {
+    "t": "They leave their boots in the doorway, and I trip over them every night.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "We need another blanket before the cold settles in.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "They fixed the loose peg after I complained once. I should notice that aloud.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "The house is small enough that every disagreement fills it.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "I like hearing them move around while I am half asleep.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "We should invite somebody for supper before we forget how.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "They always leave the warmer side of the hearth for me.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "I promised to patch the draft three days ago.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "We finally agree where the table belongs. It only took a season.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "Their cup is beside mine every morning. I still like seeing that.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "I should bring something home besides work on my clothes.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "They talk in their sleep and deny every word by daylight.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "The floor needs sweeping, but sitting together sounds better tonight.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "We have two opinions about every repair and one set of tools.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "They know when I am worried before I say anything.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "I was angry this morning. I should go home kinder than I left.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "The rain sounds better when somebody else is listening beside you.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "We keep saving the good bowl for each other.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "I should tell them I will be late before late becomes worry.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "The house is ours, including the leaks and the arguments.",
+    "tags": [
+      "muse",
+      "housed",
+      "married"
+    ]
+  },
+  {
+    "t": "The latch sticks when the air is damp.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I should move the stool before I bruise my leg on it again.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "The roof held through last night. I checked twice anyway.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "A little ash keeps finding its way onto every clean surface.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I need a proper place for wet clothes.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "The door shuts cleanly now. That repair was worth the trouble.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I can find the water cup in complete darkness.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "The chimney draws poorly when the wind comes from the east.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I should hang herbs near the window. The room smells too much like smoke.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "There is always one more small repair once I start looking.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "My coat has a peg, my cup has a shelf, and I have a bed.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I heard rain and stayed where I was. That still feels luxurious.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "The floor is cold, but at least there is a floor.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I should bank the fire before leaving tomorrow.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "This place looks better after five minutes of putting things away.",
+    "tags": [
+      "muse",
+      "housed"
+    ]
+  },
+  {
+    "t": "I want to believe the good days mean something. Wanting is not proof.",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I have prayed twice this week and felt foolish only once.",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Some people sound certain because they never ask themselves difficult questions.",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "{god} feels close today. Yesterday, there was only weather.",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I keep noticing answers after deciding nobody listened.",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Belief would be easier if everyone stopped explaining it to me.",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I trust what I saw. I do not trust what people say it meant.",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe gratitude is enough without certainty.",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I nearly thanked {god} this morning. Nearly still counts for something.",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Every miracle gives me one answer and three new questions.",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I envy people whose faith stays the same all day.",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Silence feels like absence until something unexpected happens.",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am not faithless. I am simply unconvinced before breakfast.",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "The village believes loudly. My belief speaks under its breath.",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I would like one quiet sign that nobody else interprets for me.",
+    "tags": [
+      "muse",
+      "wavering"
+    ]
+  }
 ]

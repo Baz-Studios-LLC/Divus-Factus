@@ -188,6 +188,15 @@ impl Retelling {
 pub struct Tongue {
     voice: corpus::Corpus,
     dice: crate::rng::Rng,
+    /// What the village calls the god, filled into every `{god}` a line
+    /// carries.
+    ///
+    /// Held here rather than passed in at each of the dozen call sites,
+    /// because it is one fact about the world and none of those callers
+    /// have an opinion about it. "The god" until the player names
+    /// themselves - and `tidy` sentence-cases the result, so the fallback
+    /// reads right at the head of a sentence as well as inside one.
+    god: String,
     /// Thoughts picked and waiting to be shown: the words, and whether
     /// they are voiced aloud.
     mused: HashMap<Entity, (String, bool)>,
@@ -223,7 +232,7 @@ impl Tongue {
             tags.push("retold");
         }
         let whom = of.whom.as_ref().map(|w| w.name.clone());
-        let mut slots: Vec<(&str, &str)> = Vec::new();
+        let mut slots: Vec<(&str, &str)> = vec![("god", self.god.as_str())];
         if let Some(whom) = whom.as_deref() {
             slots.push(("whom", whom));
         }
@@ -276,7 +285,9 @@ impl Tongue {
             tags.push("told");
         }
         tags.extend(voice.map(trade_tag));
-        let slots: Vec<(&str, &str)> = whom.map(|whom| ("whom", whom)).into_iter().collect();
+        let slots: Vec<(&str, &str)> = std::iter::once(("god", self.god.as_str()))
+            .chain(whom.map(|whom| ("whom", whom)))
+            .collect();
         self.voice
             .pick(who.to_bits(), &tags, &slots, &mut self.dice)
             .map(|said| tidy(&said))
@@ -338,7 +349,9 @@ impl Tongue {
         let mut tags = vec!["muse", faith_tag(faith)];
         tags.extend(body.iter().copied());
         tags.push("prayer");
-        let slots: Vec<(&str, &str)> = whom.map(|whom| ("whom", whom)).into_iter().collect();
+        let slots: Vec<(&str, &str)> = std::iter::once(("god", self.god.as_str()))
+            .chain(whom.map(|whom| ("whom", whom)))
+            .collect();
         // The register wall: whatever the pool's condition, a prayer never
         // borrows smalltalk. Stale beats absurd.
         self.voice
@@ -463,8 +476,9 @@ impl Plugin for SermoPlugin {
             dice: crate::rng::Rng::new(0x1e11),
             mused: HashMap::new(),
             replies: HashMap::new(),
+            god: "the god".to_string(),
         });
-        app.add_systems(Update, flush_the_want_list);
+        app.add_systems(Update, (flush_the_want_list, the_village_learns_the_name));
     }
 }
 
@@ -658,12 +672,58 @@ mod corpus_wiring_tests {
     use super::*;
 
     #[test]
+    /// Every line that speaks of the god names them, and an unnamed god
+    /// still reads as English.
+    ///
+    /// Brett: "They should refer to me by name, not just 'the god'." The
+    /// corpus said "the god" 289 times; it carries a `{god}` now, and the
+    /// Tongue fills it. What must NOT have been swept up is the indefinite
+    /// and the plural - "a god", "no god", "gods" - where a name does not
+    /// fit and never did.
+    #[test]
+    fn the_corpus_names_the_god_and_leaves_the_others_alone() {
+        let voice = corpus::Corpus::load();
+        let mut definite = 0;
+        for line in voice.lines() {
+            assert!(
+                !regex_lite_the_god(&line.t),
+                "still says 'the god' rather than naming them: {}",
+                line.t,
+            );
+            if line.t.contains("{god}") {
+                definite += 1;
+            }
+        }
+        assert!(definite > 200, "only {definite} lines name the god");
+
+        // And the fallback reads: unnamed, a line at the head of a
+        // sentence is still sentence-cased by `tidy`.
+        assert_eq!(tidy(&"{god} provided.".replace("{god}", "the god")), "The god provided.");
+    }
+
+    /// A crude search for the definite singular, without pulling in a
+    /// regex crate for one test: "the god" not followed by an 's'.
+    fn regex_lite_the_god(line: &str) -> bool {
+        let lower = line.to_lowercase();
+        let mut from = 0;
+        while let Some(at) = lower[from..].find("the god") {
+            let at = from + at;
+            let after = lower[at + 7..].chars().next();
+            if !matches!(after, Some('s')) {
+                return true;
+            }
+            from = at + 7;
+        }
+        false
+    }
+
     fn a_musing_is_answered_from_the_book() {
         let mut tongue = Tongue {
             voice: corpus::Corpus::load(),
             dice: crate::rng::Rng::new(1),
             mused: HashMap::new(),
             replies: HashMap::new(),
+            god: "the god".to_string(),
         };
         let who = Entity::from_raw_u32(7).unwrap();
         tongue.muse(Musing {
@@ -678,5 +738,28 @@ mod corpus_wiring_tests {
         let (line, ..) = tongue.take_musing(who).expect("the book must answer");
         assert!(!line.is_empty());
         println!("said: {line}");
+    }
+}
+
+/// Tells the village what to call the god.
+///
+/// The name is the player's, set on the deity page and restored with a
+/// save, so it can arrive or change long after the corpus is loaded. One
+/// system keeps the Tongue's copy in step; until there is a name, every
+/// line reads "the god" exactly as it always did.
+fn the_village_learns_the_name(
+    named: Option<Res<crate::villager::DivineName>>,
+    mut tongue: ResMut<Tongue>,
+) {
+    let Some(named) = named else {
+        return;
+    };
+    if !named.is_changed() && !tongue.god.is_empty() {
+        if tongue.god == named.0 {
+            return;
+        }
+    }
+    if tongue.god != named.0 && !named.0.trim().is_empty() {
+        tongue.god = named.0.clone();
     }
 }

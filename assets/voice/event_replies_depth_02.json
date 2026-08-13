@@ -1,6 +1,6 @@
 [
   {
-    "t": "The god watched over that birth. I am certain of it.",
+    "t": "{god} watched over that birth. I am certain of it.",
     "tags": [
       "reply",
       "event:delivered",
@@ -16,7 +16,7 @@
     ]
   },
   {
-    "t": "The god kept both of them here. That matters.",
+    "t": "{god} kept both of them here. That matters.",
     "tags": [
       "reply",
       "event:delivered",
@@ -24,7 +24,7 @@
     ]
   },
   {
-    "t": "Maybe the god helped. I am mostly glad they are safe.",
+    "t": "Maybe {god} helped. I am mostly glad they are safe.",
     "tags": [
       "reply",
       "event:delivered",
@@ -64,7 +64,7 @@
     ]
   },
   {
-    "t": "I am glad they lived. I will leave the god out of it.",
+    "t": "I am glad they lived. I will leave {god} out of it.",
     "tags": [
       "reply",
       "event:delivered",
@@ -72,7 +72,7 @@
     ]
   },
   {
-    "t": "The god made the ground generous. We should not waste what grew.",
+    "t": "{god} made the ground generous. We should not waste what grew.",
     "tags": [
       "reply",
       "event:flourished",
@@ -80,7 +80,7 @@
     ]
   },
   {
-    "t": "That harvest has the god's hand all over it.",
+    "t": "That harvest has {god}'s hand all over it.",
     "tags": [
       "reply",
       "event:flourished",
@@ -88,7 +88,7 @@
     ]
   },
   {
-    "t": "The land answered because the god willed it. Give thanks.",
+    "t": "The land answered because {god} willed it. Give thanks.",
     "tags": [
       "reply",
       "event:flourished",
@@ -144,7 +144,7 @@
     ]
   },
   {
-    "t": "The god threw them down. There is no softer way to say it.",
+    "t": "{god} threw them down. There is no softer way to say it.",
     "tags": [
       "reply",
       "event:impact",
@@ -160,7 +160,7 @@
     ]
   },
   {
-    "t": "The god spared them the worst of that fall.",
+    "t": "{god} spared them the worst of that fall.",
     "tags": [
       "reply",
       "event:impact",
@@ -216,7 +216,7 @@
     ]
   },
   {
-    "t": "The god lifted them for everyone to see. That was no accident.",
+    "t": "{god} lifted them for everyone to see. That was no accident.",
     "tags": [
       "reply",
       "event:lifted",
@@ -232,7 +232,7 @@
     ]
   },
   {
-    "t": "The god took hold of them and set doubt aside.",
+    "t": "{god} took hold of them and set doubt aside.",
     "tags": [
       "reply",
       "event:lifted",
@@ -248,7 +248,7 @@
     ]
   },
   {
-    "t": "That is hard to explain without the god. Hard is not impossible.",
+    "t": "That is hard to explain without {god}. Hard is not impossible.",
     "tags": [
       "reply",
       "event:lifted",
@@ -288,7 +288,7 @@
     ]
   },
   {
-    "t": "The god saw the wolf and saw who suffered. Help will come.",
+    "t": "{god} saw the wolf and saw who suffered. Help will come.",
     "tags": [
       "reply",
       "event:mauled",
@@ -304,7 +304,7 @@
     ]
   },
   {
-    "t": "The god spared their life. We must tend the wounds.",
+    "t": "{god} spared their life. We must tend the wounds.",
     "tags": [
       "reply",
       "event:mauled",
@@ -320,7 +320,7 @@
     ]
   },
   {
-    "t": "I do not know why the god allowed it. I am glad they survived.",
+    "t": "I do not know why {god} allowed it. I am glad they survived.",
     "tags": [
       "reply",
       "event:mauled",
@@ -360,7 +360,7 @@
     ]
   },
   {
-    "t": "The god made the broken thing whole. That is mercy.",
+    "t": "{god} made the broken thing whole. That is mercy.",
     "tags": [
       "reply",
       "event:mended",
@@ -368,7 +368,7 @@
     ]
   },
   {
-    "t": "No tool did that work. Give the god the credit.",
+    "t": "No tool did that work. Give {god} the credit.",
     "tags": [
       "reply",
       "event:mended",
@@ -376,7 +376,7 @@
     ]
   },
   {
-    "t": "The god restored what we could not. We should remember it.",
+    "t": "{god} restored what we could not. We should remember it.",
     "tags": [
       "reply",
       "event:mended",
@@ -400,7 +400,7 @@
     ]
   },
   {
-    "t": "Maybe the god repaired it. Someone should still inspect the work.",
+    "t": "Maybe {god} repaired it. Someone should still inspect the work.",
     "tags": [
       "reply",
       "event:mended",
@@ -432,7 +432,7 @@
     ]
   },
   {
-    "t": "The god received them. We should support the people left behind.",
+    "t": "{god} received them. We should support the people left behind.",
     "tags": [
       "reply",
       "event:perished",
@@ -440,7 +440,7 @@
     ]
   },
   {
-    "t": "Their life mattered to the god. It should matter to us.",
+    "t": "Their life mattered to {god}. It should matter to us.",
     "tags": [
       "reply",
       "event:perished",
@@ -456,7 +456,7 @@
     ]
   },
   {
-    "t": "I hope someone was there at the end. I hope the god was.",
+    "t": "I hope someone was there at the end. I hope {god} was.",
     "tags": [
       "reply",
       "event:perished",
@@ -504,7 +504,7 @@
     ]
   },
   {
-    "t": "The god fed us when the stores failed. We owe thanks.",
+    "t": "{god} fed us when the stores failed. We owe thanks.",
     "tags": [
       "reply",
       "event:provided",
@@ -520,7 +520,7 @@
     ]
   },
   {
-    "t": "The god heard an empty stomach and answered it.",
+    "t": "{god} heard an empty stomach and answered it.",
     "tags": [
       "reply",
       "event:provided",
@@ -576,7 +576,7 @@
     ]
   },
   {
-    "t": "The god shook the ground beneath us. That was a warning.",
+    "t": "{god} shook the ground beneath us. That was a warning.",
     "tags": [
       "reply",
       "event:quaked",
@@ -584,7 +584,7 @@
     ]
   },
   {
-    "t": "Even the earth moves when the god commands it.",
+    "t": "Even the earth moves when {god} commands it.",
     "tags": [
       "reply",
       "event:quaked",
@@ -600,7 +600,7 @@
     ]
   },
   {
-    "t": "The earth moved, certainly. Whether the god moved it is another question.",
+    "t": "The earth moved, certainly. Whether {god} moved it is another question.",
     "tags": [
       "reply",
       "event:quaked",
@@ -648,7 +648,7 @@
     ]
   },
   {
-    "t": "The god put them down gently. Mercy followed power.",
+    "t": "{god} put them down gently. Mercy followed power.",
     "tags": [
       "reply",
       "event:setdown",
@@ -656,7 +656,7 @@
     ]
   },
   {
-    "t": "They were returned safely because the god chose it.",
+    "t": "They were returned safely because {god} chose it.",
     "tags": [
       "reply",
       "event:setdown",
@@ -664,7 +664,7 @@
     ]
   },
   {
-    "t": "Give thanks that the god set them down instead of dropping them.",
+    "t": "Give thanks that {god} set them down instead of dropping them.",
     "tags": [
       "reply",
       "event:setdown",
@@ -720,7 +720,7 @@
     ]
   },
   {
-    "t": "The god struck them. We should ask what brought that judgment.",
+    "t": "{god} struck them. We should ask what brought that judgment.",
     "tags": [
       "reply",
       "event:smote",
@@ -736,7 +736,7 @@
     ]
   },
   {
-    "t": "The god answered with wrath. Nobody should celebrate that lightly.",
+    "t": "{god} answered with wrath. Nobody should celebrate that lightly.",
     "tags": [
       "reply",
       "event:smote",
@@ -744,7 +744,7 @@
     ]
   },
   {
-    "t": "That sounds like the god, and I wish it did not.",
+    "t": "That sounds like {god}, and I wish it did not.",
     "tags": [
       "reply",
       "event:smote",
@@ -792,7 +792,7 @@
     ]
   },
   {
-    "t": "The god cast them aside. That kind of power deserves caution.",
+    "t": "{god} cast them aside. That kind of power deserves caution.",
     "tags": [
       "reply",
       "event:thrown",
@@ -800,7 +800,7 @@
     ]
   },
   {
-    "t": "Nobody flies that far without the god's hand behind it.",
+    "t": "Nobody flies that far without {god}'s hand behind it.",
     "tags": [
       "reply",
       "event:thrown",
@@ -808,7 +808,7 @@
     ]
   },
   {
-    "t": "The god threw them and still let them live. Remember both parts.",
+    "t": "{god} threw them and still let them live. Remember both parts.",
     "tags": [
       "reply",
       "event:thrown",
@@ -824,7 +824,7 @@
     ]
   },
   {
-    "t": "That story frightens me more if the god truly did it.",
+    "t": "That story frightens me more if {god} truly did it.",
     "tags": [
       "reply",
       "event:thrown",
@@ -864,7 +864,7 @@
     ]
   },
   {
-    "t": "The god pulled that tree from the earth. Nothing else could.",
+    "t": "{god} pulled that tree from the earth. Nothing else could.",
     "tags": [
       "reply",
       "event:uprooted",
@@ -872,7 +872,7 @@
     ]
   },
   {
-    "t": "Roots and all means the god wanted our attention.",
+    "t": "Roots and all means {god} wanted our attention.",
     "tags": [
       "reply",
       "event:uprooted",
@@ -880,7 +880,7 @@
     ]
   },
   {
-    "t": "The god cleared the ground with one act. We should ask why.",
+    "t": "{god} cleared the ground with one act. We should ask why.",
     "tags": [
       "reply",
       "event:uprooted",
@@ -896,7 +896,7 @@
     ]
   },
   {
-    "t": "Maybe the god moved it. Maybe the roots were already gone.",
+    "t": "Maybe {god} moved it. Maybe the roots were already gone.",
     "tags": [
       "reply",
       "event:uprooted",

@@ -1,6 +1,6 @@
 [
   {
-    "t": "I heard the first cry and knew the god had stayed with us.",
+    "t": "I heard the first cry and knew {god} had stayed with us.",
     "tags": [
       "tell",
       "event:delivered",
@@ -9,7 +9,7 @@
     ]
   },
   {
-    "t": "The room went quiet, then the child cried. I thanked the god at once.",
+    "t": "The room went quiet, then the child cried. I thanked {god} at once.",
     "tags": [
       "tell",
       "event:delivered",
@@ -18,7 +18,7 @@
     ]
   },
   {
-    "t": "I watched the mother hold on until the god brought the child through.",
+    "t": "I watched the mother hold on until {god} brought the child through.",
     "tags": [
       "tell",
       "event:delivered",
@@ -27,7 +27,7 @@
     ]
   },
   {
-    "t": "Both were breathing when it ended. The god was merciful in that room.",
+    "t": "Both were breathing when it ended. {god} was merciful in that room.",
     "tags": [
       "tell",
       "event:delivered",
@@ -54,7 +54,7 @@
     ]
   },
   {
-    "t": "The healer worked, the mother endured, and the god brought them through.",
+    "t": "The healer worked, the mother endured, and {god} brought them through.",
     "tags": [
       "tell",
       "event:delivered",
@@ -63,7 +63,7 @@
     ]
   },
   {
-    "t": "I saw the child open their eyes. That was the god's kindness.",
+    "t": "I saw the child open their eyes. That was {god}'s kindness.",
     "tags": [
       "tell",
       "event:delivered",
@@ -72,7 +72,7 @@
     ]
   },
   {
-    "t": "The birth turned dangerous, but the god did not abandon them.",
+    "t": "The birth turned dangerous, but {god} did not abandon them.",
     "tags": [
       "tell",
       "event:delivered",
@@ -81,7 +81,7 @@
     ]
   },
   {
-    "t": "I watched a new life enter this village under the god's protection.",
+    "t": "I watched a new life enter this village under {god}'s protection.",
     "tags": [
       "tell",
       "event:delivered",
@@ -90,7 +90,7 @@
     ]
   },
   {
-    "t": "The mother asked for the god, and the child arrived safely soon after.",
+    "t": "The mother asked for {god}, and the child arrived safely soon after.",
     "tags": [
       "tell",
       "event:delivered",
@@ -99,7 +99,7 @@
     ]
   },
   {
-    "t": "Nobody in that room stood alone. The god was with every one of us.",
+    "t": "Nobody in that room stood alone. {god} was with every one of us.",
     "tags": [
       "tell",
       "event:delivered",
@@ -117,7 +117,7 @@
     ]
   },
   {
-    "t": "Both survived. I thanked the healer first and the god quietly afterwards.",
+    "t": "Both survived. I thanked the healer first and {god} quietly afterwards.",
     "tags": [
       "tell",
       "event:delivered",
@@ -198,7 +198,7 @@
     ]
   },
   {
-    "t": "Perhaps the god helped. I know the people beside her certainly did.",
+    "t": "Perhaps {god} helped. I know the people beside her certainly did.",
     "tags": [
       "tell",
       "event:delivered",
@@ -261,7 +261,7 @@
     ]
   },
   {
-    "t": "Everyone credits the god after forgetting who cleaned the blood.",
+    "t": "Everyone credits {god} after forgetting who cleaned the blood.",
     "tags": [
       "tell",
       "event:delivered",
@@ -324,7 +324,7 @@
     ]
   },
   {
-    "t": "They say the birth was difficult, but the god guarded both lives.",
+    "t": "They say the birth was difficult, but {god} guarded both lives.",
     "tags": [
       "tell",
       "event:delivered",
@@ -333,7 +333,7 @@
     ]
   },
   {
-    "t": "Word came that the child cried strongly. The god was kind.",
+    "t": "Word came that the child cried strongly. {god} was kind.",
     "tags": [
       "tell",
       "event:delivered",
@@ -378,7 +378,7 @@
     ]
   },
   {
-    "t": "The healer delivered the child safely. People have added the god since.",
+    "t": "The healer delivered the child safely. People have added {god} since.",
     "tags": [
       "tell",
       "event:delivered",
@@ -415,7 +415,7 @@
     ]
   },
   {
-    "t": "The god struck them before anyone could move. I will remember that warning.",
+    "t": "{god} struck them before anyone could move. I will remember that warning.",
     "tags": [
       "tell",
       "event:smote",
@@ -435,7 +435,7 @@
     ]
   },
   {
-    "t": "One moment they stood there, and the next the god had answered.",
+    "t": "One moment they stood there, and the next {god} had answered.",
     "tags": [
       "tell",
       "event:smote",
@@ -445,7 +445,7 @@
     ]
   },
   {
-    "t": "The clear sky made the god's intent impossible to miss.",
+    "t": "The clear sky made {god}'s intent impossible to miss.",
     "tags": [
       "tell",
       "event:smote",
@@ -455,7 +455,7 @@
     ]
   },
   {
-    "t": "I saw the god's power land on a person. Nobody nearby spoke afterwards.",
+    "t": "I saw {god}'s power land on a person. Nobody nearby spoke afterwards.",
     "tags": [
       "tell",
       "event:smote",
@@ -505,7 +505,7 @@
     ]
   },
   {
-    "t": "I watched it happen and still cannot decide whether the god meant it.",
+    "t": "I watched it happen and still cannot decide whether {god} meant it.",
     "tags": [
       "tell",
       "event:smote",
@@ -585,7 +585,7 @@
     ]
   },
   {
-    "t": "I watched new growth cover the bare ground after the god acted.",
+    "t": "I watched new growth cover the bare ground after {god} acted.",
     "tags": [
       "tell",
       "event:flourished",
@@ -594,7 +594,7 @@
     ]
   },
   {
-    "t": "The plants thickened before us. The god had answered our need.",
+    "t": "The plants thickened before us. {god} had answered our need.",
     "tags": [
       "tell",
       "event:flourished",
@@ -612,7 +612,7 @@
     ]
   },
   {
-    "t": "The god made poor ground generous while we watched.",
+    "t": "{god} made poor ground generous while we watched.",
     "tags": [
       "tell",
       "event:flourished",
@@ -630,7 +630,7 @@
     ]
   },
   {
-    "t": "I watched the god give the village another harvest.",
+    "t": "I watched {god} give the village another harvest.",
     "tags": [
       "tell",
       "event:flourished",
@@ -747,7 +747,7 @@
     ]
   },
   {
-    "t": "The god threw {whom} so hard that nobody dared approach at first.",
+    "t": "{god} threw {whom} so hard that nobody dared approach at first.",
     "tags": [
       "tell",
       "event:thrown",
@@ -757,7 +757,7 @@
     ]
   },
   {
-    "t": "I watched {whom} leave the ground under the god's hand.",
+    "t": "I watched {whom} leave the ground under {god}'s hand.",
     "tags": [
       "tell",
       "event:thrown",
@@ -767,7 +767,7 @@
     ]
   },
   {
-    "t": "{whom} crossed half the square without taking a step. The god did that.",
+    "t": "{whom} crossed half the square without taking a step. {god} did that.",
     "tags": [
       "tell",
       "event:thrown",
@@ -777,7 +777,7 @@
     ]
   },
   {
-    "t": "I ran towards {whom} only after the god released them.",
+    "t": "I ran towards {whom} only after {god} released them.",
     "tags": [
       "tell",
       "event:thrown",
@@ -787,7 +787,7 @@
     ]
   },
   {
-    "t": "The god lifted {whom} from their feet and cast them aside.",
+    "t": "{god} lifted {whom} from their feet and cast them aside.",
     "tags": [
       "tell",
       "event:thrown",
@@ -807,7 +807,7 @@
     ]
   },
   {
-    "t": "{whom} landed hard, and I thanked the god they still moved.",
+    "t": "{whom} landed hard, and I thanked {god} they still moved.",
     "tags": [
       "tell",
       "event:thrown",
@@ -817,7 +817,7 @@
     ]
   },
   {
-    "t": "Nobody touched {whom}. The god's warning was plain enough.",
+    "t": "Nobody touched {whom}. {god}'s warning was plain enough.",
     "tags": [
       "tell",
       "event:thrown",
@@ -987,7 +987,7 @@
     ]
   },
   {
-    "t": "The god protected that birth. I am glad you told me.",
+    "t": "{god} protected that birth. I am glad you told me.",
     "tags": [
       "reply",
       "event:delivered",
@@ -1011,7 +1011,7 @@
     ]
   },
   {
-    "t": "Maybe the god helped. Either way, I am relieved.",
+    "t": "Maybe {god} helped. Either way, I am relieved.",
     "tags": [
       "reply",
       "event:delivered",
@@ -1059,7 +1059,7 @@
     ]
   },
   {
-    "t": "The god made that field answer our hunger.",
+    "t": "{god} made that field answer our hunger.",
     "tags": [
       "reply",
       "event:flourished",
@@ -1131,7 +1131,7 @@
     ]
   },
   {
-    "t": "The god judged them openly. We should pay attention.",
+    "t": "{god} judged them openly. We should pay attention.",
     "tags": [
       "reply",
       "event:smote",
@@ -1171,7 +1171,7 @@
     ]
   },
   {
-    "t": "If the god chose them, I need to understand the reason.",
+    "t": "If {god} chose them, I need to understand the reason.",
     "tags": [
       "reply",
       "event:smote",

@@ -577,7 +577,7 @@
     ]
   },
   {
-    "t": "I was ready to dismiss the god yesterday. Today feels less simple.",
+    "t": "I was ready to dismiss {god} yesterday. Today feels less simple.",
     "tags": [
       "muse",
       "wavering"
@@ -619,7 +619,7 @@
     ]
   },
   {
-    "t": "I want the god to be kind more than I want the god to be real.",
+    "t": "I want {god} to be kind more than I want {god} to be real.",
     "tags": [
       "muse",
       "wavering"
@@ -647,7 +647,7 @@
     ]
   },
   {
-    "t": "The god may be listening. I should think before asking for anything.",
+    "t": "{god} may be listening. I should think before asking for anything.",
     "tags": [
       "muse",
       "wavering"

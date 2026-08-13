@@ -208,7 +208,7 @@
     ]
   },
   {
-    "t": "The god kept watch through that birth. I was there, and I know what I felt.",
+    "t": "{god} kept watch through that birth. I was there, and I know what I felt.",
     "tags": [
       "tell",
       "event:delivered",
@@ -217,7 +217,7 @@
     ]
   },
   {
-    "t": "Both lived. Maybe that was the god, or maybe we were lucky. I will take either.",
+    "t": "Both lived. Maybe that was {god}, or maybe we were lucky. I will take either.",
     "tags": [
       "tell",
       "event:delivered",
@@ -235,7 +235,7 @@
     ]
   },
   {
-    "t": "They say the god watched over the birth. I say the healer deserves some credit too.",
+    "t": "They say {god} watched over the birth. I say the healer deserves some credit too.",
     "tags": [
       "tell",
       "event:delivered",

@@ -1,46 +1,302 @@
 [
-  { "t": "I believe {part|some} of it. I am still working out which part.", "tags": ["reply", "wavering"] },
-  { "t": "That could be the god. It could also be people filling in the gaps.", "tags": ["reply", "wavering"] },
-  { "t": "I want to take your word for it. Give me a little time.", "tags": ["reply", "wavering"] },
-  { "t": "You sound certain. I wish certainty passed between people that easily.", "tags": ["reply", "wavering"] },
-  { "t": "I am not dismissing it. I am trying not to rush into believing it.", "tags": ["reply", "wavering"] },
-  { "t": "Maybe that is what happened. I cannot say it as firmly as you can.", "tags": ["reply", "wavering"] },
-  { "t": "Part of me believes you already. The rest is being stubborn.", "tags": ["reply", "wavering"] },
-  { "t": "I have changed my mind twice while you were speaking.", "tags": ["reply", "wavering"] },
-  { "t": "That sounds true until I try to explain it to myself.", "tags": ["reply", "wavering"] },
-  { "t": "I will say maybe today. Ask me again {tomorrow|after I sleep}.", "tags": ["reply", "wavering"] },
-  { "t": "I do not think you are lying. I am less sure about what it means.", "tags": ["reply", "wavering"] },
-  { "t": "There might be something to it. That is as far as I can go.", "tags": ["reply", "wavering"] },
-  { "t": "Start again from the beginning. I missed something.", "tags": ["reply"] },
-  { "t": "Who told you first? That usually matters.", "tags": ["reply"] },
-  { "t": "I had not heard that. I am glad you told me.", "tags": ["reply"] },
-  { "t": "That explains what everyone was whispering about {this morning|by the fire}.", "tags": ["reply"] },
-  { "t": "I need to think before I answer that properly.", "tags": ["reply"] },
-  { "t": "You have my attention. Keep going.", "tags": ["reply"] },
-  { "t": "I heard a different version, but yours makes more sense.", "tags": ["reply"] },
-  { "t": "That is going to spread before supper.", "tags": ["reply"] },
-  { "t": "Have you seen how far we walk for a straight tree now?", "tags": ["chat:open", "topic:forester"] },
-  { "t": "I spent more time hauling than cutting today.", "tags": ["chat:open", "topic:forester"] },
-  { "t": "The axe head is loose again. I tightened it this morning.", "tags": ["chat:open", "topic:forester"] },
-  { "t": "There is good timber {past the creek|over the ridge}, but the ground is miserable.", "tags": ["chat:open", "topic:forester"] },
-  { "t": "I found rot in three trunks today. They looked sound from outside.", "tags": ["chat:open", "topic:forester"] },
-  { "t": "We should leave the young stand alone for another season.", "tags": ["chat:open", "topic:forester"] },
-  { "t": "The woodpile looked low when I passed it. Did you notice?", "tags": ["chat:open", "topic:forester"] },
-  { "t": "One of the new saplings has taken well. The others need water.", "tags": ["chat:open", "topic:forester"] },
-  { "t": "I could hear your tree come down from the ridge.", "tags": ["chat:open", "topic:forester"] },
-  { "t": "The far stand is better wood, but it adds {hours|half a day} of carrying.", "tags": ["chat:open", "topic:forester"] },
-  { "t": "My hands are still shaking from that last trunk.", "tags": ["chat:open", "trade:forester"] },
-  { "t": "I sharpened this axe yesterday, and the edge is already gone.", "tags": ["chat:open", "trade:forester"] },
-  { "t": "We need a better path before we go any farther out.", "tags": ["chat:reply", "topic:forester"] },
-  { "t": "I saw the rot too. Mark those trees before somebody trusts one.", "tags": ["chat:reply", "topic:forester"] },
-  { "t": "The pile will hold if tomorrow goes well.", "tags": ["chat:reply", "topic:forester"] },
-  { "t": "Leave the saplings. We will need them later.", "tags": ["chat:reply", "topic:forester"] },
-  { "t": "I will take the far side tomorrow. You work near the creek.", "tags": ["chat:followup", "topic:forester"] },
-  { "t": "We should bring rope next time. That slope is asking for trouble.", "tags": ["chat:followup", "topic:forester"] },
-  { "t": "I will mark the sound trunks before dark.", "tags": ["chat:followup", "topic:forester"] },
-  { "t": "The hauling is the part nobody counts until their back hurts.", "tags": ["chat:followup", "topic:forester"] },
-  { "t": "I will see you at the woodpile before supper.", "tags": ["chat:end", "topic:forester"] },
-  { "t": "Let us finish the close stand before we argue about the far one.", "tags": ["chat:end", "topic:forester"] },
-  { "t": "Bring the wedge tomorrow. Mine is nearly done.", "tags": ["chat:end", "topic:forester"] },
-  { "t": "We can settle it after we count what came in today.", "tags": ["chat:end", "topic:forester"] }
+  {
+    "t": "I believe {part|some} of it. I am still working out which part.",
+    "tags": [
+      "reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That could be {god}. It could also be people filling in the gaps.",
+    "tags": [
+      "reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I want to take your word for it. Give me a little time.",
+    "tags": [
+      "reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "You sound certain. I wish certainty passed between people that easily.",
+    "tags": [
+      "reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I am not dismissing it. I am trying not to rush into believing it.",
+    "tags": [
+      "reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Maybe that is what happened. I cannot say it as firmly as you can.",
+    "tags": [
+      "reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Part of me believes you already. The rest is being stubborn.",
+    "tags": [
+      "reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I have changed my mind twice while you were speaking.",
+    "tags": [
+      "reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "That sounds true until I try to explain it to myself.",
+    "tags": [
+      "reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I will say maybe today. Ask me again {tomorrow|after I sleep}.",
+    "tags": [
+      "reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "I do not think you are lying. I am less sure about what it means.",
+    "tags": [
+      "reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "There might be something to it. That is as far as I can go.",
+    "tags": [
+      "reply",
+      "wavering"
+    ]
+  },
+  {
+    "t": "Start again from the beginning. I missed something.",
+    "tags": [
+      "reply"
+    ]
+  },
+  {
+    "t": "Who told you first? That usually matters.",
+    "tags": [
+      "reply"
+    ]
+  },
+  {
+    "t": "I had not heard that. I am glad you told me.",
+    "tags": [
+      "reply"
+    ]
+  },
+  {
+    "t": "That explains what everyone was whispering about {this morning|by the fire}.",
+    "tags": [
+      "reply"
+    ]
+  },
+  {
+    "t": "I need to think before I answer that properly.",
+    "tags": [
+      "reply"
+    ]
+  },
+  {
+    "t": "You have my attention. Keep going.",
+    "tags": [
+      "reply"
+    ]
+  },
+  {
+    "t": "I heard a different version, but yours makes more sense.",
+    "tags": [
+      "reply"
+    ]
+  },
+  {
+    "t": "That is going to spread before supper.",
+    "tags": [
+      "reply"
+    ]
+  },
+  {
+    "t": "Have you seen how far we walk for a straight tree now?",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "I spent more time hauling than cutting today.",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "The axe head is loose again. I tightened it this morning.",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "There is good timber {past the creek|over the ridge}, but the ground is miserable.",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "I found rot in three trunks today. They looked sound from outside.",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "We should leave the young stand alone for another season.",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "The woodpile looked low when I passed it. Did you notice?",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "One of the new saplings has taken well. The others need water.",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "I could hear your tree come down from the ridge.",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "The far stand is better wood, but it adds {hours|half a day} of carrying.",
+    "tags": [
+      "chat:open",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "My hands are still shaking from that last trunk.",
+    "tags": [
+      "chat:open",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "I sharpened this axe yesterday, and the edge is already gone.",
+    "tags": [
+      "chat:open",
+      "trade:forester"
+    ]
+  },
+  {
+    "t": "We need a better path before we go any farther out.",
+    "tags": [
+      "chat:reply",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "I saw the rot too. Mark those trees before somebody trusts one.",
+    "tags": [
+      "chat:reply",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "The pile will hold if tomorrow goes well.",
+    "tags": [
+      "chat:reply",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "Leave the saplings. We will need them later.",
+    "tags": [
+      "chat:reply",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "I will take the far side tomorrow. You work near the creek.",
+    "tags": [
+      "chat:followup",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "We should bring rope next time. That slope is asking for trouble.",
+    "tags": [
+      "chat:followup",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "I will mark the sound trunks before dark.",
+    "tags": [
+      "chat:followup",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "The hauling is the part nobody counts until their back hurts.",
+    "tags": [
+      "chat:followup",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "I will see you at the woodpile before supper.",
+    "tags": [
+      "chat:end",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "Let us finish the close stand before we argue about the far one.",
+    "tags": [
+      "chat:end",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "Bring the wedge tomorrow. Mine is nearly done.",
+    "tags": [
+      "chat:end",
+      "topic:forester"
+    ]
+  },
+  {
+    "t": "We can settle it after we count what came in today.",
+    "tags": [
+      "chat:end",
+      "topic:forester"
+    ]
+  }
 ]

@@ -99,7 +99,7 @@
     ]
   },
   {
-    "t": "The room was all work until the child arrived. Then everybody started thanking the god.",
+    "t": "The room was all work until the child arrived. Then everybody started thanking {god}.",
     "tags": [
       "tell",
       "event:delivered",
@@ -135,7 +135,7 @@
     ]
   },
   {
-    "t": "The healer said the danger had passed. I nearly thanked the god aloud.",
+    "t": "The healer said the danger had passed. I nearly thanked {god} aloud.",
     "tags": [
       "tell",
       "event:delivered",
@@ -243,7 +243,7 @@
     ]
   },
   {
-    "t": "The healer never mentioned the god. Everyone waiting outside did.",
+    "t": "The healer never mentioned {god}. Everyone waiting outside did.",
     "tags": [
       "tell",
       "event:delivered",
@@ -286,7 +286,7 @@
     ]
   },
   {
-    "t": "Did the mother think the god helped, or is that everyone else's account?",
+    "t": "Did the mother think {god} helped, or is that everyone else's account?",
     "tags": [
       "reply",
       "event:delivered",
@@ -310,7 +310,7 @@
     ]
   },
   {
-    "t": "Maybe the god answered. Maybe the healer did. I can honour both.",
+    "t": "Maybe {god} answered. Maybe the healer did. I can honour both.",
     "tags": [
       "reply",
       "event:delivered",
@@ -390,7 +390,7 @@
     ]
   },
   {
-    "t": "That account leaves room for the god, though it does not require one.",
+    "t": "That account leaves room for {god}, though it does not require one.",
     "tags": [
       "reply",
       "event:delivered",
@@ -414,7 +414,7 @@
     ]
   },
   {
-    "t": "I hope the god helped. Hope is the honest word.",
+    "t": "I hope {god} helped. Hope is the honest word.",
     "tags": [
       "reply",
       "event:delivered",
@@ -438,7 +438,7 @@
     ]
   },
   {
-    "t": "The god may deserve thanks, but the healer certainly does.",
+    "t": "{god} may deserve thanks, but the healer certainly does.",
     "tags": [
       "reply",
       "event:delivered",
@@ -496,7 +496,7 @@
     ]
   },
   {
-    "t": "We can debate the god after the mother has slept.",
+    "t": "We can debate {god} after the mother has slept.",
     "tags": [
       "chat:end",
       "event:delivered",
@@ -559,7 +559,7 @@
     ]
   },
   {
-    "t": "I will think about the god after checking on the mother.",
+    "t": "I will think about {god} after checking on the mother.",
     "tags": [
       "chat:end",
       "event:delivered",
@@ -738,7 +738,7 @@
     ]
   },
   {
-    "t": "Do you know whether the mother had asked for the god?",
+    "t": "Do you know whether the mother had asked for {god}?",
     "tags": [
       "chat:followup",
       "event:delivered",
@@ -801,7 +801,7 @@
     ]
   },
   {
-    "t": "Perhaps the god worked through the healer. I could accept that.",
+    "t": "Perhaps {god} worked through the healer. I could accept that.",
     "tags": [
       "chat:followup",
       "event:delivered",
@@ -855,7 +855,7 @@
     ]
   },
   {
-    "t": "The god may have helped, but the mother still bore the pain.",
+    "t": "{god} may have helped, but the mother still bore the pain.",
     "tags": [
       "chat:followup",
       "event:delivered",

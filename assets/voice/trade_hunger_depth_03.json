@@ -357,7 +357,7 @@
     ]
   },
   {
-    "t": "People watch my face when the god does something frightening.",
+    "t": "People watch my face when {god} does something frightening.",
     "tags": [
       "muse",
       "trade:priest"
@@ -385,7 +385,7 @@
     ]
   },
   {
-    "t": "The god sees these empty bowls. Help must be coming.",
+    "t": "{god} sees these empty bowls. Help must be coming.",
     "tags": [
       "muse",
       "hungry",
@@ -393,7 +393,7 @@
     ]
   },
   {
-    "t": "I will endure this hunger. The god has not forgotten us.",
+    "t": "I will endure this hunger. {god} has not forgotten us.",
     "tags": [
       "muse",
       "hungry",
@@ -409,7 +409,7 @@
     ]
   },
   {
-    "t": "I should share what remains and trust the god with tomorrow.",
+    "t": "I should share what remains and trust {god} with tomorrow.",
     "tags": [
       "muse",
       "hungry",
@@ -425,7 +425,7 @@
     ]
   },
   {
-    "t": "The god fed us once. I will remember that before complaining.",
+    "t": "{god} fed us once. I will remember that before complaining.",
     "tags": [
       "muse",
       "hungry",
@@ -449,7 +449,7 @@
     ]
   },
   {
-    "t": "Maybe the god knows we are hungry. Knowing is not feeding.",
+    "t": "Maybe {god} knows we are hungry. Knowing is not feeding.",
     "tags": [
       "muse",
       "hungry",
@@ -489,7 +489,7 @@
     ]
   },
   {
-    "t": "Perhaps the god is testing us. Perhaps the stores are simply bare.",
+    "t": "Perhaps {god} is testing us. Perhaps the stores are simply bare.",
     "tags": [
       "muse",
       "hungry",
@@ -513,7 +513,7 @@
     ]
   },
   {
-    "t": "The god cannot fill a storehouse that nobody works to fill.",
+    "t": "{god} cannot fill a storehouse that nobody works to fill.",
     "tags": [
       "muse",
       "hungry",
@@ -537,7 +537,7 @@
     ]
   },
   {
-    "t": "People thank the god when workers finally bring food home.",
+    "t": "People thank {god} when workers finally bring food home.",
     "tags": [
       "muse",
       "hungry",
