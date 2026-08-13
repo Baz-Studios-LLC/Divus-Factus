@@ -276,6 +276,25 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
         // `plan_houses`, never by this ladder.
         House | Longhouse => 0,
     };
+    // THE HALL IS A MILESTONE, NOT A WANT.
+    //
+    // Everything else on this ladder is a need with a number behind it, and
+    // the loudest number wins - which the hall could never be. Brett's
+    // village of fourteen, with a hall it had just earned: storehouse
+    // 10.88, granary 1.19, bakery 0.94, blacksmith 0.70, town hall 0.50.
+    // The threshold made it a CANDIDATE and the queue made sure it stayed
+    // one, because a rich town always wants a shed more than it wants a
+    // seat of government. Brett, twice: "Still not building a town hall".
+    //
+    // So a town that has earned its hall builds its hall, and goes back to
+    // wanting sheds afterwards. It is the one building here that marks an
+    // occasion rather than answering a shortage.
+    if !has(TownHall)
+        && needs.population >= min_pop(TownHall)
+        && needs.stone >= TownHall.stone_cost()
+    {
+        return Some(TownHall);
+    }
     let mut best: Option<(f32, BuildingKind)> = None;
     for kind in candidates {
         if has(kind) || needs.population < min_pop(kind) || needs.stone < kind.stone_cost() {

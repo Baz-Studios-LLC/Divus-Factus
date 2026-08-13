@@ -1,5 +1,7 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
+    6  (worn pool) event:flourished reply wavering
+    4  (worn pool) chat:end event:flourished told wavering
+    2  (worn pool) chat:end event:flourished told
     2  (worn pool) event:uprooted reply wavering
     2  (worn pool) event:uprooted of:thing saw tell wavering
-    1  (worn pool) chat:end event:flourished told wavering

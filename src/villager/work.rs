@@ -2407,6 +2407,31 @@ mod tests {
             ..grown
         };
         assert_eq!(next_civic(&hamlet, |k| built.contains(&k)), None);
+
+        // AND IT BEATS THE SHED. Brett's own village: fourteen souls, 245
+        // timber, 27 stone, 83 food - and every ordinary want scoring
+        // above the hall, the storehouse at nearly eleven. A ladder that
+        // takes the loudest number can never reach a building that marks
+        // an occasion rather than answering a shortage.
+        let rich = CivicNeeds {
+            population: 14,
+            timber_stored: 245.0,
+            stone_stored: 27.0,
+            food_stored: 83.0,
+            stone: 27.0,
+            ..Default::default()
+        };
+        assert_eq!(
+            next_civic(&rich, |_| false),
+            Some(BuildingKind::TownHall),
+            "an earned hall must outrank a storehouse a town is merely rich enough for",
+        );
+
+        // And once it stands, the town goes back to wanting sheds.
+        assert_ne!(
+            next_civic(&rich, |k| k == BuildingKind::TownHall),
+            Some(BuildingKind::TownHall),
+        );
     }
 
     #[test]
