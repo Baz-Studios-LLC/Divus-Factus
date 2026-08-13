@@ -767,7 +767,9 @@ impl Ground {
                 // is at plank level, so the climb charge prices the ramp and
                 // not the seabed.
                 at: Vec3::new(x, terrain.stand_height_at(x, z), z),
-                walkable: terrain.is_walkable(x, z),
+                // Remembered across searches: the ground does not change
+                // between two villagers deciding to walk over it.
+                walkable: terrain.cell_is_walkable((cell.x, cell.y), x, z),
             }
         })
     }
@@ -815,6 +817,87 @@ fn step_cost(
 /// within the budget.
 ///
 /// The returned path excludes the starting cell and ends at the goal.
+/// Routes a journey that crosses a town wall through one of its gates.
+///
+/// `None` when no wall is in the way, or when either leg cannot be walked -
+/// and then the ordinary search runs and answers for itself, so this can
+/// only ever make a journey cheaper, never impossible.
+fn through_the_gate(
+    terrain: &Terrain,
+    walls: &Walls,
+    start: Vec3,
+    goal: Vec3,
+    budget: usize,
+) -> Option<Vec<Vec3>> {
+    let (from, to) = (Vec2::new(start.x, start.z), Vec2::new(goal.x, goal.z));
+    let ring = walls.ramparts.iter().find(|ring| ring.bars(from, to))?;
+
+    // The gate to make for: the one nearest the way you are already
+    // travelling, measured from whichever side of the wall you are on.
+    let outside = if (from - ring.at).length() > ring.radius {
+        from
+    } else {
+        to
+    };
+    let bearing = (outside - ring.at).to_angle();
+    let gate = *ring
+        .gates
+        .iter()
+        .min_by(|a, b| {
+            let apart = |gate: f32| {
+                let mut apart = (bearing - gate).abs() % std::f32::consts::TAU;
+                if apart > std::f32::consts::PI {
+                    apart = std::f32::consts::TAU - apart;
+                }
+                apart
+            };
+            apart(**a).total_cmp(&apart(**b))
+        })?;
+
+    // A step each side of the gate's mouth, on its own radial line. Far
+    // enough out that neither leg's straight line clips the ring beside
+    // the opening, near enough that the step between them is the gateway.
+    let (sin, cos) = gate.sin_cos();
+    let radial = Vec2::new(cos, sin);
+    let mouth = |reach: f32| {
+        let at = ring.at + radial * (ring.radius + reach);
+        Vec3::new(at.x, terrain.height_at(at.x, at.y), at.y)
+    };
+    let (outer, inner) = (mouth(CELL * 2.0), mouth(-CELL * 2.0));
+
+    // The APPROACH, and it is the piece that makes this cheaper rather
+    // than dearer. A straight line between two points outside a ring can
+    // still cut through it - which is what a walk from the far side to the
+    // gate's mouth is - and then the leg pays exactly the cost the gate was
+    // supposed to save. So the outside leg first comes round at its own
+    // distance from the middle, where no chord to the gate's bearing can
+    // reach the wall, and only then turns in.
+    let out_by = (outside - ring.at).length().max(ring.radius + CELL * 4.0);
+    let approach = {
+        let at = ring.at + radial * out_by;
+        Vec3::new(at.x, terrain.height_at(at.x, at.y), at.y)
+    };
+
+    // Whichever side the traveller is on, they come round to the gate,
+    // step through it, and walk on from the other side.
+    let leaving = (from - ring.at).length() > ring.radius;
+    let mut path = if leaving {
+        let mut legs = walk_it_out(terrain, walls, start, approach, budget)?;
+        legs.push(outer);
+        legs.push(inner);
+        legs.extend(walk_it_out(terrain, walls, inner, goal, budget)?);
+        legs
+    } else {
+        let mut legs = walk_it_out(terrain, walls, start, inner, budget)?;
+        legs.push(outer);
+        legs.push(approach);
+        legs.extend(walk_it_out(terrain, walls, approach, goal, budget)?);
+        legs
+    };
+    path.dedup_by(|a, b| a.distance(*b) < 0.01);
+    Some(path)
+}
+
 pub fn find_path(
     terrain: &Terrain,
     walls: &Walls,
@@ -837,13 +920,51 @@ pub fn find_path(
     //
     // Only journeys that actually cross a wall pay for it; everything else
     // searches as narrowly as it ever did.
+    // A WALL IS WALKED THROUGH ITS GATE, NOT SEARCHED AROUND.
+    //
+    // Brett: "Is there a simpler way to do pathfinding when far away like
+    // give them a cardinal direction and tighten it when they get closer to
+    // town?" - and he is right about the shape of it. A rampart between
+    // here and there is not a longer walk, it is a different one: the
+    // frontier cannot go straight, so it spreads along the ring hunting for
+    // a gap. Measured on the fence a town of fourteen raises, that cost
+    // THIRTY-SIX MILLISECONDS for a single walk home - two whole frames,
+    // for one villager deciding to go and eat.
+    //
+    // But the gates are known. There is no need to search for a gap whose
+    // position is written down: aim at the nearest one, and the journey
+    // becomes two short walks in open ground with a step through the gate
+    // between them. Neither leg crosses the ring, so neither pays for it.
+    if let Some(stitched) = through_the_gate(terrain, walls, start, goal, budget) {
+        return Some(stitched);
+    }
+    // No wall in the way, or the gate could not be stitched: search it out
+    // the long way, with the room to go round a ring if one is there.
     let barred = walls.ramparts.iter().any(|ring| {
-        ring.bars(
-            Vec2::new(start.x, start.z),
-            Vec2::new(goal.x, goal.z),
-        )
+        ring.bars(Vec2::new(start.x, start.z), Vec2::new(goal.x, goal.z))
     });
-    let budget = if barred { budget.max(16_000) } else { budget };
+    walk_it_out(
+        terrain,
+        walls,
+        start,
+        goal,
+        if barred { budget.max(16_000) } else { budget },
+    )
+}
+
+/// The search itself, with no opinion about gates.
+///
+/// Split from [`find_path`] so the gate router can walk its two legs
+/// without calling back into the router and round again - each leg is a
+/// plain walk in open ground, and asking it to reconsider the wall it was
+/// invented to avoid is how that recursion begins.
+fn walk_it_out(
+    terrain: &Terrain,
+    walls: &Walls,
+    start: Vec3,
+    goal: Vec3,
+    budget: usize,
+) -> Option<Vec<Vec3>> {
     let start_cell = to_cell(start);
     // A goal that lands on an unwalkable cell — a banner plinth, a hall
     // slab, a freshly terraced ledge — is not a refusal, it is an errand to
@@ -1743,6 +1864,123 @@ mod tests {
                  there starves against their own wall",
                 turn.to_degrees(),
             );
+        }
+    }
+
+    #[test]
+    #[ignore = "a measurement, not a check"]
+    fn what_a_walk_home_costs() {
+        let terrain = Terrain::new(2024);
+        let mut home = Vec3::ZERO;
+        for i in 0..4000 {
+            let (x, z) = ((i % 63) as f32 * 41.0, (i / 63) as f32 * 37.0);
+            if terrain.height_at(x, z) > crate::terrain::WATER_LEVEL + 3.0 {
+                home = Vec3::new(x, terrain.height_at(x, z), z);
+                break;
+            }
+        }
+        let radius = crate::villager::rampart::ring_for(
+            crate::villager::rampart::RampartTier::Fence,
+            14,
+        );
+        let walls = Walls {
+            buildings: Vec::new(),
+            ramparts: vec![Rampart {
+                at: Vec2::new(home.x, home.z),
+                radius,
+                gates: crate::villager::rampart::gates_for_tests(
+                    crate::villager::rampart::RampartTier::Fence,
+                ),
+                gate_half: gate_arc(radius, GATE_WIDTH),
+            }],
+        };
+        let open = Walls::default();
+        for (label, walls) in [("through the wall", &walls), ("open country", &open)] {
+            for degrees in [0.0_f32, 135.0] {
+                let (s, c) = degrees.to_radians().sin_cos();
+                let (x, z) = (home.x + c * (radius + 40.0), home.z + s * (radius + 40.0));
+                let out = Vec3::new(x, terrain.height_at(x, z), z);
+                let start = std::time::Instant::now();
+                let runs = 20;
+                for _ in 0..runs {
+                    let _ = find_path(&terrain, walls, out, home, DEFAULT_BUDGET);
+                }
+                println!(
+                    "{label:17} {degrees:5.0} deg -> {:.2}ms a walk",
+                    start.elapsed().as_secs_f32() * 1000.0 / runs as f32,
+                );
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "a measurement, not a check"]
+    fn what_one_cell_costs() {
+        let terrain = Terrain::new(2024);
+        let runs = 20_000;
+        let start = std::time::Instant::now();
+        let mut walkable = 0;
+        for i in 0..runs {
+            let (x, z) = ((i % 400) as f32 * 2.5, (i / 400) as f32 * 2.5);
+            if terrain.is_walkable(x, z) {
+                walkable += 1;
+            }
+        }
+        let each = start.elapsed().as_secs_f64() * 1000.0 / runs as f64;
+        println!("is_walkable: {each:.4}ms each ({walkable} of {runs} walkable)");
+        println!("  a 3000-cell search spends {:.1}ms just asking", each * 3000.0);
+        println!("  a 16000-cell search spends {:.1}ms just asking", each * 16000.0);
+
+        // And the pieces it is made of.
+        for (what, cost) in [
+            ("height_at", {
+                let t = std::time::Instant::now();
+                for i in 0..runs { let _ = terrain.height_at((i % 400) as f32 * 2.5, (i / 400) as f32 * 2.5); }
+                t.elapsed().as_secs_f64() * 1000.0 / runs as f64
+            }),
+            ("slope_at", {
+                let t = std::time::Instant::now();
+                for i in 0..runs { let _ = terrain.slope_at((i % 400) as f32 * 2.5, (i / 400) as f32 * 2.5); }
+                t.elapsed().as_secs_f64() * 1000.0 / runs as f64
+            }),
+        ] {
+            println!("  {what}: {cost:.4}ms");
+        }
+    }
+
+    #[test]
+    #[ignore = "a measurement, not a check"]
+    fn does_the_gate_route_fire() {
+        let terrain = Terrain::new(2024);
+        let mut home = Vec3::ZERO;
+        for i in 0..4000 {
+            let (x, z) = ((i % 63) as f32 * 41.0, (i / 63) as f32 * 37.0);
+            if terrain.height_at(x, z) > crate::terrain::WATER_LEVEL + 3.0 {
+                home = Vec3::new(x, terrain.height_at(x, z), z);
+                break;
+            }
+        }
+        let radius = crate::villager::rampart::ring_for(
+            crate::villager::rampart::RampartTier::Fence, 14);
+        let walls = Walls {
+            buildings: Vec::new(),
+            ramparts: vec![Rampart {
+                at: Vec2::new(home.x, home.z),
+                radius,
+                gates: crate::villager::rampart::gates_for_tests(
+                    crate::villager::rampart::RampartTier::Fence),
+                gate_half: gate_arc(radius, GATE_WIDTH),
+            }],
+        };
+        for step in 0..8 {
+            let turn = std::f32::consts::TAU * step as f32 / 8.0;
+            let (s, c) = turn.sin_cos();
+            let (x, z) = (home.x + c * (radius + 40.0), home.z + s * (radius + 40.0));
+            if terrain.height_at(x, z) < crate::terrain::WATER_LEVEL + 1.0 { continue; }
+            let out = Vec3::new(x, terrain.height_at(x, z), z);
+            let stitched = through_the_gate(&terrain, &walls, out, home, DEFAULT_BUDGET);
+            println!("{:5.0} deg  gate route: {}", turn.to_degrees(),
+                if stitched.is_some() { "yes" } else { "NO - falls back to the long search" });
         }
     }
 }

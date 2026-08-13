@@ -366,6 +366,19 @@ pub struct Terrain {
     /// Built decks over water — walkable planks the ground itself answers
     /// for, so navigation needs no special cases. Registered when docks rise.
     boardwalks: Arc<RwLock<Vec<Boardwalk>>>,
+    /// What the pathfinder has already learnt about the ground.
+    ///
+    /// Asking whether one cell can be walked costs about six terrain
+    /// evaluations - a height, four more for the slope, and a river - and
+    /// measured, that is 0.005ms a cell. A single search touches thousands,
+    /// so a villager deciding to walk home was spending fifteen
+    /// milliseconds of a sixteen-millisecond frame asking questions about
+    /// dirt that had not changed since the last time it asked.
+    ///
+    /// The answers do not change unless hands change them, so they are
+    /// kept. Cleared whenever ground is worked or planks are laid, which is
+    /// the only way any of them can become wrong.
+    walkable: Arc<RwLock<std::collections::HashMap<(i32, i32), bool>>>,
 }
 
 /// One deck of planks run out over the water.
@@ -392,6 +405,7 @@ impl Terrain {
             seed,
             rivers: Arc::new(rivers::RiverIndex::default()),
             worked: Arc::default(),
+            walkable: Arc::default(),
             boardwalks: Arc::default(),
         }
     }
@@ -422,6 +436,9 @@ impl Terrain {
                 deck,
             });
         }
+        // Planks make water walkable, which is the one change that turns a
+        // remembered "no" into a yes.
+        self.forget_the_ground();
     }
 
     /// The deck underfoot, if any: the world height of the planks there.
@@ -470,6 +487,39 @@ impl Terrain {
         if let Ok(mut worked) = self.worked.write() {
             worked.push(spot);
         }
+        self.forget_the_ground();
+    }
+
+    /// Throws away what the pathfinder had learnt.
+    ///
+    /// Called wherever the ground itself changes. Everything, rather than
+    /// the worked circle alone: a pad's bank reaches further than its
+    /// radius, a boardwalk's deck is not a circle at all, and a stale
+    /// "cannot walk there" is a villager who starves beside an open road.
+    /// Learning the ground again costs a few milliseconds spread over the
+    /// walks that follow; getting it wrong costs somebody's life.
+    fn forget_the_ground(&self) {
+        if let Ok(mut walkable) = self.walkable.write() {
+            walkable.clear();
+        }
+    }
+
+    /// Whether the pathfinder may stand on this cell, remembered.
+    ///
+    /// For the NAVIGATION GRID only - it answers per cell, and two points
+    /// in one cell get one answer. Anything asking about a particular
+    /// point still wants `is_walkable`.
+    pub fn cell_is_walkable(&self, cell: (i32, i32), x: f32, z: f32) -> bool {
+        if let Ok(known) = self.walkable.read()
+            && let Some(answer) = known.get(&cell)
+        {
+            return *answer;
+        }
+        let answer = self.is_walkable(x, z);
+        if let Ok(mut known) = self.walkable.write() {
+            known.insert(cell, answer);
+        }
+        answer
     }
 
     /// Levels a pad and banks it back into the land with a bank cut to the
@@ -621,6 +671,7 @@ impl Terrain {
 
     /// Restores worked pads from a save.
     pub fn import_worked(&self, spots: &[WorkedGround]) {
+        self.forget_the_ground();
         if let Ok(mut worked) = self.worked.write() {
             worked.clear();
             worked.extend(spots.iter().map(|s| FlatSpot {
