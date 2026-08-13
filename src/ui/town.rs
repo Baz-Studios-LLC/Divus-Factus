@@ -13,10 +13,10 @@
 
 use bevy::prelude::*;
 use bevy::ui::{
-    AlignItems, FlexDirection, GlobalZIndex, JustifyContent, Node, PositionType, UiRect, Val::Px as px,
+    FlexDirection, GlobalZIndex, JustifyContent, Node, PositionType, Val::Px as px,
 };
 
-use super::{body, theme};
+use super::theme;
 
 /// The strip itself.
 #[derive(Component)]
@@ -50,18 +50,19 @@ const TOO_HIGH_FOR_A_TOWN: f32 = 220.0;
 const EDGE_GRACE: f32 = 0.15;
 
 pub(crate) fn spawn_town_strip(mut commands: Commands) {
-    let strip = commands
+    // The strip HANGS from the top edge, so it is centred by a full-width
+    // rail rather than by guessing at a left margin.
+    let rail = commands
         .spawn((
             Name::new("Town Strip"),
             TownStrip,
             Node {
                 position_type: PositionType::Absolute,
-                top: px(12.0),
+                top: px(0.0),
                 left: px(0.0),
                 right: px(0.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                row_gap: px(1.0),
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::Center,
                 ..default()
             },
             // Above the world, below the book: this is a glance, and it
@@ -71,26 +72,30 @@ pub(crate) fn spawn_town_strip(mut commands: Commands) {
         ))
         .id();
 
-    // `body` already dresses its text, TextColor included - a second one
-    // in the same bundle is a duplicate component, and Bevy panics on
-    // those at spawn rather than picking a winner.
+    // The plate and its cells come from ORDO, not from colours picked
+    // here. Brett: "Make sure you use ordo for this... add to ordo if it
+    // is missing something" - and it was missing both of these, so they
+    // were cut into the kit where the next game can wear them too.
+    let strip = commands
+        .spawn((ordo::hanging_rail(), ChildOf(rail)))
+        .id();
+
     let name = commands
-        .spawn((TownStripName, body(""), ChildOf(strip)))
+        .spawn((TownStripName, ordo::heading(""), ChildOf(strip)))
         .id();
     commands.entity(name).insert(super::DisplayFace);
 
-    let row = commands
-        .spawn((
-            Node {
-                flex_direction: FlexDirection::Row,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                column_gap: px(18.0),
-                ..default()
-            },
-            ChildOf(strip),
-        ))
-        .id();
+    // `ordo::row` brings its own Node - a second one in the same bundle
+    // is a duplicate component, and Bevy refuses those at spawn - so the
+    // gap between the cells is set on the row it already has.
+    let row = commands.spawn((ordo::row(), ChildOf(strip))).id();
+    commands
+        .entity(row)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.justify_content = JustifyContent::Center;
+            node.column_gap = px(6.0);
+        });
 
     for reading in [
         TownReading::Souls,
@@ -98,17 +103,11 @@ pub(crate) fn spawn_town_strip(mut commands: Commands) {
         TownReading::Stone,
         TownReading::Food,
     ] {
+        // One width for all four, the way the bench cuts its mode
+        // buttons: readings that step in and out as the eye runs along
+        // them read as four unrelated things.
         let cell = commands
-            .spawn((
-                Node {
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    column_gap: px(5.0),
-                    padding: UiRect::axes(px(2.0), px(0.0)),
-                    ..default()
-                },
-                ChildOf(row),
-            ))
+            .spawn((ordo::readout(74.0), ChildOf(row)))
             .id();
         let tint = theme::accent().with_alpha(0.85);
         match reading {
@@ -117,7 +116,7 @@ pub(crate) fn spawn_town_strip(mut commands: Commands) {
             TownReading::Stone => crate::debug::village::stone_glyph(&mut commands, cell, tint),
             TownReading::Food => crate::debug::village::food_glyph(&mut commands, cell, tint),
         }
-        commands.spawn((reading, body("0"), ChildOf(cell)));
+        commands.spawn((reading, ordo::body("0"), ChildOf(cell)));
     }
 }
 

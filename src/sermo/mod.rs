@@ -671,7 +671,6 @@ mod tests {
 mod corpus_wiring_tests {
     use super::*;
 
-    #[test]
     /// Every line that speaks of the god names them, and an unnamed god
     /// still reads as English.
     ///
@@ -717,6 +716,7 @@ mod corpus_wiring_tests {
         false
     }
 
+    #[test]
     fn a_musing_is_answered_from_the_book() {
         let mut tongue = Tongue {
             voice: corpus::Corpus::load(),
