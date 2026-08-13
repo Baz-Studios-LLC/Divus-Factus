@@ -504,6 +504,23 @@ impl Person {
     /// *identified* rather than merely mentioned. Logs and notices keep to
     /// the given name — "Daekru raised a house" reads better than the full
     /// formal version, and the village would say it that way too.
+    /// The name as a roster lists it: "Tiwep, Rafant".
+    ///
+    /// A roll of people is read by SURNAME - you look for a family and
+    /// then for the one you want inside it - and an A-Z list of given
+    /// names scatters every household across the page. Brett: "the people
+    /// list in the codex should be Last, First."
+    ///
+    /// Everywhere else keeps `full_name`: over their head, in the ledger's
+    /// prose, in a bubble, a person is Rafant Tiwep.
+    pub fn roll_name(&self) -> String {
+        if self.surname.is_empty() {
+            self.name.clone()
+        } else {
+            format!("{}, {}", self.surname, self.name)
+        }
+    }
+
     pub fn full_name(&self) -> String {
         if self.surname.is_empty() {
             self.name.clone()

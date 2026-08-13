@@ -1,9 +1,5 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-    6  (worn pool) event:uprooted of:thing saw tell wavering
-    3  devout event:rained of:thing saw tell trade:farmer
-    3  (worn pool) event:uprooted reply wavering
-    3  (worn pool) event:uprooted saw tell
-    2  devout event:rained of:thing saw tell trade:hunter
-    1  (worn pool) chat:end devout event:delivered told
-    1  event:rained of:thing saw tell trade:hunter wavering
+    2  (worn pool) event:uprooted reply wavering
+    2  (worn pool) event:uprooted of:thing saw tell wavering
+    1  (worn pool) chat:end event:flourished told wavering

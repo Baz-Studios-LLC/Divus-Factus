@@ -1007,8 +1007,15 @@ fn keep_the_prayer_shelf(
     *fingerprint = fresh;
 
     commands.entity(shelf).despawn_related::<Children>();
-    // Display follows content: no askings, no layout.
-    let showing = !open.is_empty();
+    // Display follows WHAT IS DRAWN, not what is asked.
+    //
+    // These were two different counts: the shelf appeared when any prayer
+    // was open, and the tail line appeared when more souls were asking
+    // than the cards spoke for. Two counts that can disagree is how a
+    // "and 1 more asking" ends up hanging over the world with no cards
+    // under it - Brett had one sitting on an empty screen. One count now,
+    // and the tail is only written beneath a card that exists.
+    let showing = !clumped.is_empty();
     commands
         .entity(shelf)
         .entry::<Node>()
@@ -1136,7 +1143,7 @@ fn keep_the_prayer_shelf(
         .take(SHELF_CARDS)
         .map(|(_, voices)| 1 + voices)
         .sum();
-    if asking > covered {
+    if asking > covered && !clumped.is_empty() {
         commands.spawn((
             dim(format!("and {} more asking", asking - covered)),
             ChildOf(shelf),

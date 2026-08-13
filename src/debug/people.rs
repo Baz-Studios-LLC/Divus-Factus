@@ -1126,7 +1126,13 @@ pub(crate) fn update_people_panel(
         .iter()
         .filter(|(.., vocation)| filter.0.is_none() || vocation.copied() == filter.0)
         .collect();
-    names.sort_by(|a, b| a.1.name.cmp(&b.1.name));
+    // By the name it is LISTED under: surname first, then the given name
+    // within a family, so the households read as households.
+    names.sort_by(|a, b| {
+        a.1.surname
+            .cmp(&b.1.surname)
+            .then_with(|| a.1.name.cmp(&b.1.name))
+    });
     if sort.0 {
         names.reverse();
     }
@@ -1224,7 +1230,7 @@ pub(crate) fn update_people_panel(
         let name = commands
             .spawn((
                 RowLabel(entity),
-                ui::body(person.full_name()),
+                ui::body(person.roll_name()),
                 TextLayout::linebreak(LineBreak::NoWrap),
                 ChildOf(words),
             ))
