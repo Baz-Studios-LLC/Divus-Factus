@@ -513,6 +513,15 @@ mod tests {
         let _ = app
             .world_mut()
             .run_system_once(village::update_prayer_board);
+        // The town strip: three Text queries and two Visibility ones in a
+        // single system, which is precisely the shape that panicked on
+        // Brett's machine last time and built perfectly well first.
+        let _ = app
+            .world_mut()
+            .run_system_once(crate::ui::town::update_town_strip);
+        let _ = app
+            .world_mut()
+            .run_system_once(crate::ui::town::spawn_town_strip);
     }
 
     #[test]

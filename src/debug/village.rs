@@ -239,6 +239,21 @@ pub(crate) fn tree_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     bar(commands, c, (7.0, 1.0, 4.5, 3.0), 0.0, tint, false);
 }
 
+/// Stone: a cairn - two rough blocks with a third set across them.
+pub(crate) fn stone_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+    let c = glyph_canvas(commands, parent, 18.0);
+    bar(commands, c, (2.5, 9.5, 6.0, 5.0), -6.0, tint, false);
+    bar(commands, c, (9.0, 10.0, 6.5, 4.5), 5.0, tint, false);
+    bar(commands, c, (5.0, 4.5, 7.5, 5.0), 3.0, tint, false);
+}
+
+/// Food: a loaf on the board, rounded over a straight cut.
+pub(crate) fn food_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
+    let c = glyph_canvas(commands, parent, 18.0);
+    bar(commands, c, (2.5, 5.0, 13.0, 7.0), 0.0, tint, true);
+    bar(commands, c, (2.5, 11.0, 13.0, 2.5), 0.0, tint, false);
+}
+
 /// Faith: two bars leant together in prayer.
 pub(crate) fn hands_glyph(commands: &mut Commands, parent: Entity, tint: Color) {
     let c = glyph_canvas(commands, parent, 18.0);

@@ -19,6 +19,8 @@ use bevy::prelude::*;
 
 use crate::palette;
 
+pub(crate) mod town;
+
 pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
@@ -44,6 +46,7 @@ impl Plugin for UiPlugin {
                     spawn_date_card,
                 ),
             )
+            .add_systems(Startup, town::spawn_town_strip)
             .add_systems(PreUpdate, track_pointer.after(bevy::ui::UiSystems::Focus))
             .add_systems(
                 Update,
@@ -71,6 +74,7 @@ impl Plugin for UiPlugin {
                     speak.run_if(in_state(crate::GameState::Playing)),
                     float_bubbles,
                     update_date_card,
+                    town::update_town_strip.run_if(in_state(crate::GameState::Playing)),
                 )
                     // BEFORE ORDO PAINTS, the same as the debug book.
                     //
