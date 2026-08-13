@@ -514,7 +514,26 @@ pub(crate) fn update_dev_overlay(
         if *visibility == Visibility::Hidden {
             continue;
         }
-        let fresh = format!("fps {fps:.0} / {frame:.1}ms / worst {:.0}ms", *worst);
+        // What the village is thinking, under the frame times. Brett, after
+        // three rounds of a town hall that would not rise: "Can you have
+        // some kind of log output what the priorities are, maybe to the dev
+        // panel?" Nobody could see the queue, so nobody could see that the
+        // queue was the problem.
+        let wants = crate::villager::work::buildings::CIVIC_THINKING
+            .read()
+            .map(|said| said.clone())
+            .unwrap_or_default();
+        let chose = crate::villager::work::buildings::CIVIC_CHOICE
+            .read()
+            .map(|said| said.clone())
+            .unwrap_or_default();
+        let mut fresh = format!("fps {fps:.0} / {frame:.1}ms / worst {:.0}ms", *worst);
+        if !wants.is_empty() {
+            fresh.push_str(&format!("\nwants: {wants}"));
+        }
+        if !chose.is_empty() {
+            fresh.push_str(&format!("\nbroke ground: {chose}"));
+        }
         if text.0 != fresh {
             *text = Text::new(fresh);
         }

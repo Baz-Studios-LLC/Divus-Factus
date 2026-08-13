@@ -304,6 +304,12 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
     {
         return Some(TownHall);
     }
+    // Everything the town could want, scored - kept rather than reduced to
+    // a winner on the way past, so the dev panel can say what a village is
+    // actually thinking. Brett, after three rounds of a hall that would not
+    // rise: "Can you have some kind of log output what the priorities are".
+    // Nobody could see the queue, so nobody could see it was the queue.
+    let mut ranked: Vec<(f32, BuildingKind)> = Vec::new();
     let mut best: Option<(f32, BuildingKind)> = None;
     for kind in candidates {
         if has(kind) || needs.population < min_pop(kind) || needs.stone < kind.stone_cost() {
@@ -393,12 +399,33 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
             TownHall => (needs.population as f32 - 10.0) / 8.0,
             House | Longhouse => 0.0,
         };
+        ranked.push((score, kind));
         if score > best.map_or(0.0, |(b, _)| b) {
             best = Some((score, kind));
         }
     }
+    if let Ok(mut said) = CIVIC_THINKING.write() {
+        ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
+        *said = ranked
+            .iter()
+            .take(4)
+            .map(|(score, kind)| format!("{} {score:.2}", kind.name().to_lowercase()))
+            .collect::<Vec<_>>()
+            .join(", ");
+    }
     best.filter(|(score, _)| *score >= 0.45).map(|(_, k)| k)
 }
+
+/// What the civic ladder last scored, for the dev panel to read.
+///
+/// A global rather than a resource because `next_civic` is a plain
+/// function - it is asked questions by a closure inside a system that is
+/// already at Bevy's parameter ceiling, and threading a writer down to it
+/// would cost more than the readout is worth.
+pub static CIVIC_THINKING: std::sync::RwLock<String> = std::sync::RwLock::new(String::new());
+
+/// The last thing a village decided to break ground for, and why.
+pub static CIVIC_CHOICE: std::sync::RwLock<String> = std::sync::RwLock::new(String::new());
 
 /// What the village's two roofs are carrying, and what is already rising.
 #[derive(Default, Debug, Clone, Copy)]
@@ -3239,12 +3266,31 @@ pub(crate) fn plan_houses(
     // spare hands for what it merely wants. One need outranks even the
     // roof: an empty larder beside open water breaks ground on the dock
     // first, because hunger kills faster than rain.
-    let kind = if population >= 5
+    let (kind, because) = if population >= 5
         && store_now.food() < (population as f32 * 0.8).max(8.0)
         && shore_near
         && !has_kind(BuildingKind::Dock)
     {
-        BuildingKind::Dock
+        (BuildingKind::Dock, "hungry beside water")
+    // A TOWN THAT HAS EARNED ITS HALL BUILDS ITS HALL, and it does it here
+    // rather than down on the civic ladder - because the ladder is the last
+    // thing this chain asks, and everything above it was quietly starving
+    // the hall out. A trade with no works raises its own works FIRST, and
+    // with fifteen souls there is nearly always a priest without a shrine
+    // or a healer without an herbalist, so the ladder was never reached at
+    // all. Brett, three times: "Still not building a town hall" - at
+    // fifteen souls, 252 timber and 33 stone.
+    //
+    // Behind shelter, though, and deliberately: a hall raised over people
+    // sleeping in the open is the one way this could be worse than it was.
+    // Everyone under a roof, and then the town may have its seat.
+    } else if roofless_adults == 0
+        && !has_kind(BuildingKind::TownHall)
+        && population >= 14
+        && store_now.stone >= BuildingKind::TownHall.stone_cost()
+        && store_now.timber >= 2.0
+    {
+        (BuildingKind::TownHall, "the town has earned its hall")
     // A trade with no works to work at raises its own — see OWN_WORKS.
     // The person who needs the building is the person who breaks ground
     // for it. Never before the first hall, though: ten beds under one
@@ -3269,7 +3315,7 @@ pub(crate) fn plan_houses(
         })
         .flatten()
     {
-        works
+        (works, "a trade with no works to work at")
     // And one need outranks even that: a village that has been bitten
     // puts up a watch. This jumps the whole queue on purpose. The civic
     // ladder wants everyone housed first, ten souls in the town and six
@@ -3288,7 +3334,7 @@ pub(crate) fn plan_houses(
         // lookout over people asleep in the open.
         && (standing_longhouses > 0 || roofless_adults == 0)
     {
-        BuildingKind::Watchtower
+        (BuildingKind::Watchtower, "the village has been bitten")
     } else if let Some(roof) = {
         let rising = |kind: BuildingKind| {
             pending
@@ -3316,7 +3362,7 @@ pub(crate) fn plan_houses(
             halls: standing(BuildingKind::TownHall),
         })
     } {
-        roof
+        (roof, "somebody has no roof")
     } else if roofless_adults > 0 {
         // Nobody builds and people sleep rough: the ceiling, named. A
         // silent planner here reads as a stall; the truth is the town is
@@ -3376,15 +3422,20 @@ pub(crate) fn plan_houses(
             return;
         }
         match civic_ladder() {
-            Some(kind) => kind,
+            Some(kind) => (kind, "the ladder, while a roof stands stalled"),
             None => return,
         }
     } else {
         match civic_ladder() {
-            Some(kind) => kind,
+            Some(kind) => (kind, "the ladder"),
             None => return,
         }
     };
+    // What the village decided, and which rule decided it - the thing
+    // nobody could see through three rounds of a hall that would not rise.
+    if let Ok(mut said) = CIVIC_CHOICE.write() {
+        *said = format!("{}: {because}", kind.name().to_lowercase());
+    }
     let _ = roofs;
 
     // A mine is sited by the rock, not by the rings: the nearest walkable
