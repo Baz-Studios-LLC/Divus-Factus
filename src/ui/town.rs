@@ -130,7 +130,7 @@ pub(crate) fn spawn_town_strip(mut commands: Commands) {
         // buttons: readings that step in and out as the eye runs along
         // them read as four unrelated things.
         let cell = commands
-            .spawn((ordo::readout(58.0), ChildOf(row)))
+            .spawn((ordo::readout(72.0), ChildOf(row)))
             .id();
         let tint = theme::accent().with_alpha(0.85);
         match reading {
