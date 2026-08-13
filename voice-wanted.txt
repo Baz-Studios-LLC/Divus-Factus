@@ -1,24 +1,3 @@
 # Moments that went without words - write lines for these.
 # count  tags of the moment
-   43  (worn pool) devout event:provided reply
-   30  (worn pool) devout event:provided saw tell
-   25  (worn pool) chat:followup devout told
-   10  (worn pool) chat:end devout
-    8  (worn pool) muse roofless
-    8  (worn pool) devout reply
-    5  (worn pool) chat:end told
-    5  (worn pool) devotion devout muse prayer
-    3  (worn pool) devout event:uprooted of:thing saw tell
-    3  devout event:beckoned of:thing saw tell trade:forester
-    2  devout event:beckoned of:thing saw tell trade:builder
-    2  devout event:beckoned of:thing saw tell trade:gatherer
-    2  (worn pool) devout muse
-    2  devout event:beckoned of:thing saw tell trade:farmer
-    1  devout event:beckoned of:thing retold saw tell trade:priest
-    1  event:beckoned of:thing saw tell wavering
-    1  devout event:beckoned of:thing saw tell trade:priest
-    1  devout event:beckoned of:thing saw tell
-    1  (worn pool) chat:end devout event:flourished told
-    1  (worn pool) chat:end trade:forester
-    1  (worn pool) chat:end trade:builder
-    1  (worn pool) devotion devout muse night prayer
+    3  (worn pool) devout event:provided saw tell

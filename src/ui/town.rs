@@ -58,7 +58,14 @@ pub(crate) fn spawn_town_strip(mut commands: Commands) {
             TownStrip,
             Node {
                 position_type: PositionType::Absolute,
-                top: px(0.0),
+                // ABOVE the top edge, by more than the panel's own corner
+                // radius. A plate that stops short of the edge reads as a
+                // box floating near the top; one whose top corners are off
+                // the screen entirely reads as a tab fixed to it, which is
+                // what it is. Brett: "have the panel slid up a bit so the
+                // top edge is off the screen so that it looks like a tab on
+                // the top instead of a floating box".
+                top: px(-14.0),
                 left: px(0.0),
                 right: px(0.0),
                 flex_direction: FlexDirection::Row,
@@ -76,9 +83,21 @@ pub(crate) fn spawn_town_strip(mut commands: Commands) {
     // here. Brett: "Make sure you use ordo for this... add to ordo if it
     // is missing something" - and it was missing both of these, so they
     // were cut into the kit where the next game can wear them too.
-    let strip = commands
-        .spawn((ordo::hanging_rail(), ChildOf(rail)))
-        .id();
+    let strip = commands.spawn((ordo::hanging_rail(), ChildOf(rail))).id();
+    // Ordo's padding is cut for a page; a tab wants less air, and its top
+    // half is off the screen anyway.
+    commands
+        .entity(strip)
+        .entry::<Node>()
+        .and_modify(|mut node| {
+            node.padding = bevy::ui::UiRect {
+                left: px(8.0),
+                right: px(8.0),
+                top: px(16.0),
+                bottom: px(7.0),
+            };
+            node.row_gap = px(2.0);
+        });
 
     let name = commands
         .spawn((TownStripName, ordo::heading(""), ChildOf(strip)))
@@ -94,7 +113,7 @@ pub(crate) fn spawn_town_strip(mut commands: Commands) {
         .entry::<Node>()
         .and_modify(|mut node| {
             node.justify_content = JustifyContent::Center;
-            node.column_gap = px(6.0);
+            node.column_gap = px(4.0);
         });
 
     for reading in [
@@ -107,7 +126,7 @@ pub(crate) fn spawn_town_strip(mut commands: Commands) {
         // buttons: readings that step in and out as the eye runs along
         // them read as four unrelated things.
         let cell = commands
-            .spawn((ordo::readout(74.0), ChildOf(row)))
+            .spawn((ordo::readout(58.0), ChildOf(row)))
             .id();
         let tint = theme::accent().with_alpha(0.85);
         match reading {
