@@ -822,6 +822,28 @@ pub fn find_path(
     goal: Vec3,
     budget: usize,
 ) -> Option<Vec<Vec3>> {
+    // A WALL IS WORTH A WIDER SEARCH.
+    //
+    // A rampart between here and there is not a longer walk, it is a
+    // different shape of one: the frontier cannot go straight, so it
+    // spreads along the ring until it reaches a gate, and that spreading is
+    // what the budget is spent on. Measured on the fence a town of fourteen
+    // actually raises - radius 120, three gates - a walk home from the far
+    // side of the ring needs past six thousand cells where the open country
+    // beside it needs a few hundred. At three thousand it simply failed,
+    // the errand was dropped, and whoever was out there stood still until
+    // they died with a full larder behind the wall. Brett, three times now:
+    // "People on the road are still starving."
+    //
+    // Only journeys that actually cross a wall pay for it; everything else
+    // searches as narrowly as it ever did.
+    let barred = walls.ramparts.iter().any(|ring| {
+        ring.bars(
+            Vec2::new(start.x, start.z),
+            Vec2::new(goal.x, goal.z),
+        )
+    });
+    let budget = if barred { budget.max(16_000) } else { budget };
     let start_cell = to_cell(start);
     // A goal that lands on an unwalkable cell — a banner plinth, a hall
     // slab, a freshly terraced ledge — is not a refusal, it is an errand to
@@ -1666,6 +1688,60 @@ mod tests {
                 path.is_some(),
                 "no way home from {strides} strides out - a villager there \
                  stands still until they starve",
+            );
+        }
+    }
+
+    /// A walk home from outside the wall finds the gate.
+    ///
+    /// The road deaths again, at 125 strides this time - past the fence a
+    /// town raises once it has hands to spare. If a route from outside a
+    /// rampart to the square inside it cannot be found, whoever is out
+    /// there stands where they are with a full larder behind the wall.
+    #[test]
+    fn a_walk_home_finds_the_gate() {
+        let terrain = Terrain::new(2024);
+        let mut home = Vec3::ZERO;
+        for i in 0..4000 {
+            let (x, z) = ((i % 63) as f32 * 41.0, (i / 63) as f32 * 37.0);
+            if terrain.height_at(x, z) > crate::terrain::WATER_LEVEL + 3.0 {
+                home = Vec3::new(x, terrain.height_at(x, z), z);
+                break;
+            }
+        }
+        // The fence a town of fourteen actually raises, with the gates the
+        // game actually puts in it - invented geometry proves nothing.
+        let radius = crate::villager::rampart::ring_for(
+            crate::villager::rampart::RampartTier::Fence,
+            14,
+        );
+        let ring = Rampart {
+            at: Vec2::new(home.x, home.z),
+            radius,
+            gates: crate::villager::rampart::gates_for_tests(
+                crate::villager::rampart::RampartTier::Fence,
+            ),
+            gate_half: gate_arc(radius, GATE_WIDTH),
+        };
+        let walls = Walls {
+            buildings: Vec::new(),
+            ramparts: vec![ring],
+        };
+
+        // From every direction, not just the ones a gate faces.
+        for step in 0..8 {
+            let turn = std::f32::consts::TAU * step as f32 / 8.0;
+            let (s, c) = turn.sin_cos();
+            let (x, z) = (home.x + c * (radius + 40.0), home.z + s * (radius + 40.0));
+            if terrain.height_at(x, z) < crate::terrain::WATER_LEVEL + 1.0 {
+                continue;
+            }
+            let out = Vec3::new(x, terrain.height_at(x, z), z);
+            assert!(
+                find_path(&terrain, &walls, out, home, DEFAULT_BUDGET).is_some(),
+                "no way in through the gate from {:.0} degrees - anyone out \
+                 there starves against their own wall",
+                turn.to_degrees(),
             );
         }
     }

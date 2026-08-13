@@ -133,6 +133,13 @@ pub fn ring_for(tier: RampartTier, population: usize) -> f32 {
 /// into the ground the gates should be sited on the deepest of them,
 /// which is the whole reason paths and walls belong in the same season of
 /// work.
+/// The same gates, for tests that must use the real geometry rather than
+/// invent their own - an invented ring proves nothing about this one.
+#[cfg(test)]
+pub fn gates_for_tests(tier: RampartTier) -> Vec<f32> {
+    gates_for(tier)
+}
+
 fn gates_for(tier: RampartTier) -> Vec<f32> {
     let count = match tier {
         RampartTier::Fence => 3,
