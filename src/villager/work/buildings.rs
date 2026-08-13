@@ -262,6 +262,15 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
         Well, Dock, Mine, Storehouse, Sawmill, Blacksmith, Smokehouse, Granary, Tavern, Mill,
         Bakery, Weaver, Herbalist, Shrine, Watchtower, TownHall,
     ];
+    // What the open yard holds before timber and stone are simply heaped.
+    const YARD_HOLDS: f32 = 40.0;
+    /// The most any single want may shout.
+    ///
+    /// Without a ceiling one loud need drowns the ladder - which is exactly
+    /// how a town of fourteen came to have a hall it had earned and a
+    /// storehouse it wanted eleven times more. A want may be twice as
+    /// urgent as the next thing; it may not be twenty times.
+    const APPETITE: f32 = 2.5;
     let min_pop = |kind: BuildingKind| match kind {
         Well | Dock => 5,
         Mine => 7,
@@ -325,9 +334,36 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
                     0.0
                 }
             }
-            // Goods heaped in the open argue for a roof over them.
-            Storehouse => (needs.timber_stored + needs.stone_stored) / 25.0,
-            Granary => needs.food_stored / 70.0,
+            // Goods heaped in the open argue for a roof over them - but
+            // only until they have one. Brett: "you would think that if it
+            // has a ton of food and stone and timber that it would want
+            // stuff like that less since that need is satisfied."
+            //
+            // He is right, and the old arithmetic could never say so: raw
+            // stock over a constant, climbing forever. A village with 245
+            // timber wanted a storehouse at 9.8, and one with a thousand
+            // would have wanted it at forty - not a town wanting forty
+            // sheds, just a number with no ceiling. Nothing was ever
+            // enough, so nothing was ever satisfied.
+            //
+            // A want is a SHORTFALL now: how much there is against how much
+            // the town can already keep. Fill the store and the want falls
+            // away on its own, which is what having enough is supposed to
+            // feel like.
+            Storehouse => ((needs.timber_stored + needs.stone_stored) / YARD_HOLDS).min(APPETITE),
+            Granary => {
+                // Against the larder's REAL ceiling, which the storehouse
+                // and the smokehouse have already raised if they stand: a
+                // town whose sacks are half full does not need a granary,
+                // however much food that half is.
+                let ceiling = crate::villager::work::stores::larder_ceiling(
+                    needs.population,
+                    has(Storehouse),
+                    false,
+                    has(Smokehouse),
+                );
+                (needs.food_stored / ceiling.max(1.0)).min(APPETITE)
+            }
             // Working trades argue for the works that serve them.
             Sawmill => needs.foresters as f32 * 0.25 + needs.pending_builds as f32 * 0.15,
             Smokehouse => needs.fishers as f32 * 0.3,

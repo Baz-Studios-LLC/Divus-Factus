@@ -2200,6 +2200,63 @@ mod tests {
         assert_eq!(fire.fuel, 0.0, "the fire only takes what lands on it");
     }
 
+    /// A need that is met stops being a need.
+    ///
+    /// Brett: "you would think that if it has a ton of food and stone and
+    /// timber that it would want stuff like that less since that need is
+    /// satisfied." The old arithmetic could never say so - raw stock over
+    /// a constant, climbing forever, so a village with a thousand timber
+    /// wanted a storehouse forty times over.
+    #[test]
+    fn a_town_stops_wanting_what_it_already_has() {
+        let plenty = CivicNeeds {
+            population: 14,
+            stone: 27.0,
+            stone_stored: 27.0,
+            timber_stored: 245.0,
+            food_stored: 83.0,
+            avg_spirits: 0.8,
+            ..Default::default()
+        };
+
+        // With nowhere to keep it, the food argues for a granary.
+        let nothing_built = [BuildingKind::TownHall];
+        assert_eq!(
+            next_civic(&plenty, |k| nothing_built.contains(&k)),
+            Some(BuildingKind::Storehouse),
+            "goods in the open still want a roof first",
+        );
+
+        // Once the storehouse stands, THE SAME food no longer does: the
+        // larder's ceiling rose, and eighty-three against it is not a
+        // town in want of anything.
+        let roofed = [
+            BuildingKind::TownHall,
+            BuildingKind::Storehouse,
+            BuildingKind::Well,
+            BuildingKind::Sawmill,
+            BuildingKind::Blacksmith,
+            BuildingKind::Tavern,
+            BuildingKind::Watchtower,
+            BuildingKind::Weaver,
+            BuildingKind::Herbalist,
+        ];
+        assert_ne!(
+            next_civic(&plenty, |k| roofed.contains(&k)),
+            Some(BuildingKind::Granary),
+            "a half-full larder under a roof is not a want",
+        );
+
+        // And no single want may drown the ladder however rich the town.
+        let hoard = CivicNeeds {
+            timber_stored: 10_000.0,
+            food_stored: 10_000.0,
+            ..plenty
+        };
+        let loudest = next_civic(&hoard, |k| nothing_built.contains(&k));
+        assert!(loudest.is_some(), "a rich town still wants something");
+    }
+
     /// What the god's own deliveries pay, held against what labour pays.
     ///
     /// A dropped tree must be worth what felling it is worth - the god saves
