@@ -83,25 +83,11 @@ pub(crate) fn spawn_town_strip(mut commands: Commands) {
     // here. Brett: "Make sure you use ordo for this... add to ordo if it
     // is missing something" - and it was missing both of these, so they
     // were cut into the kit where the next game can wear them too.
+    // Ordo owns the plate's geometry now, `Hanging` and all - the game
+    // reaching in to set padding was being quietly overwritten every time
+    // the theme moved, which is exactly how the name ended up sitting on
+    // the top edge with two pixels over it.
     let strip = commands.spawn((ordo::hanging_rail(), ChildOf(rail))).id();
-    // Ordo's padding is cut for a page; a tab wants less air, and its top
-    // half is off the screen anyway.
-    commands
-        .entity(strip)
-        .entry::<Node>()
-        .and_modify(|mut node| {
-            node.padding = bevy::ui::UiRect {
-                left: px(8.0),
-                right: px(8.0),
-                // Fourteen of these are off the screen - the slide above -
-                // so what a reader actually sees over the name is the
-                // remainder. At sixteen that left two, and the name sat on
-                // the edge it hangs from.
-                top: px(26.0),
-                bottom: px(7.0),
-            };
-            node.row_gap = px(2.0);
-        });
 
     let name = commands
         .spawn((TownStripName, ordo::heading(""), ChildOf(strip)))
