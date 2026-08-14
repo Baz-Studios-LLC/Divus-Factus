@@ -10,6 +10,11 @@ use bevy::prelude::*;
 
 use super::*;
 
+/// Who is unwed and who is walking out, for the dev overlay. Written every
+/// time courtship wakes, so a village that has stopped growing can say
+/// whether it has stopped marrying.
+pub static COURTING_THINKING: std::sync::RwLock<String> = std::sync::RwLock::new(String::new());
+
 /// Courtship: an unwed man and an unwed woman who find themselves near each
 /// other may wed.
 ///
@@ -67,6 +72,23 @@ pub(crate) fn form_bonds(
     }
 
     let today = clock.day();
+    // What the village's courting looks like, for the dev overlay. A town
+    // that stops growing is usually a town that stopped marrying, and until
+    // this line nothing anywhere said whether it had unwed adults at all.
+    if let Ok(mut said) = COURTING_THINKING.write() {
+        let walking = women.iter().filter(|(_, _, _, c)| c.is_some()).count();
+        let ripe = women
+            .iter()
+            .filter(|(_, _, _, c)| {
+                c.is_some_and(|c| today.saturating_sub(c.since) >= COURTSHIP_DAYS)
+            })
+            .count();
+        *said = format!(
+            "{} unwed women, {} unwed men, {walking} walking out ({ripe} old enough to wed)",
+            women.len(),
+            men.len(),
+        );
+    }
     for (woman, at, her, courting) in women {
         // Who she is walking out with, if he is still unwed and alive. A
         // courtship survives the working day: they are courting, not

@@ -2537,12 +2537,25 @@ fn starvation_watch(
 /// Whether the village is doing well enough to grow.
 /// Whether the village can bear another child, against the current roof —
 /// the town hall raises it.
+/// How full the village's bellies must be, on average, for it to grow.
+pub const GROWTH_HUNGER: f32 = 0.55;
+
+/// And how many meals it must have put by, per head.
+pub const GROWTH_LARDER: f32 = 1.5;
+
+/// Why the village is or is not growing, for the dev overlay. Written every
+/// time `births` wakes, whether or not a child comes of it.
+pub static GROWTH_THINKING: std::sync::RwLock<String> = std::sync::RwLock::new(String::new());
+
 fn can_grow_to(living: usize, average_hunger: f32, food_stored: f32, cap: usize) -> bool {
     // Births need SURPLUS, not merely absence of famine: a child arrives
     // into a larder holding at least a meal and a half per head, or the
     // village overshoots its food supply and starves at the cap - growth
     // constrained by hunger before hunger ever kills.
-    living >= 2 && living < cap && average_hunger < 0.55 && food_stored >= living as f32 * 1.5
+    living >= 2
+        && living < cap
+        && average_hunger < GROWTH_HUNGER
+        && food_stored >= living as f32 * GROWTH_LARDER
 }
 
 /// Brings children into fed villages.
@@ -2817,6 +2830,15 @@ pub fn fertility(borne: u32) -> f32 {
     0.68_f32.powi(borne as i32)
 }
 
+/// How long a mother nurses before she may bear again.
+///
+/// Half a season. It was twenty-four days - most of one - and with the four
+/// or five mothers a young village has, that shut the nursery more often
+/// than it left it open, which is a good part of why a town would sit at
+/// seventeen for years. Brett: "Maybe the cooldown for a new child could be
+/// reduced to 14 as well."
+pub const NURSING_DAYS: f64 = 14.0;
+
 #[derive(Component)]
 pub struct NewMother {
     pub until: f64,
@@ -2892,18 +2914,23 @@ fn births(
         .iter()
         .filter(|b| b.kind == work::BuildingKind::TownHall)
         .count();
-    let cap = home::shelter_capacity(huts.iter().count(), longhouses.iter().count(), halls);
+    let houses = huts.iter().count();
+    let long = longhouses.iter().count();
+    let cap = home::shelter_capacity(houses, long, halls);
     let food_stored = site
         .as_ref()
         .and_then(|s| stores.get(s.settlement).ok())
         .map_or(0.0, |s| s.food());
-    if !can_grow_to(living, average_hunger, food_stored, cap) || !rng.0.chance(0.6) {
-        return;
-    }
 
     // Children come of marriages. A wife whose husband is alive and grown may
     // bear a child; the couple with the least on their plate is not modelled —
     // the pick among eligible mothers is even.
+    //
+    // Counted BEFORE the gates rather than after, so that a village which is
+    // not growing can say whether it has anyone to grow from. Brett: "The
+    // game gets to about 17 people and the population stops growing... I
+    // wonder what is going on with the needs and wants for courting,
+    // marriage, family home and children?" - and nothing anywhere said.
     let mothers: Vec<_> = villagers
         .iter()
         .filter(|(_, _, genome, _, _, spouse, recovery, _)| {
@@ -2922,6 +2949,43 @@ fn births(
         })
         .collect();
 
+    // The whole of why the village is or is not growing, in two lines, named
+    // in the order the gates are actually asked.
+    let nursing = villagers
+        .iter()
+        .filter(|(_, _, g, _, _, spouse, recovery, _)| {
+            g.sex == Sex::Female && spouse.is_some() && recovery.is_some_and(|r| clock.elapsed <= r.until)
+        })
+        .count();
+    let held = if living < 2 {
+        "too few souls"
+    } else if living >= cap {
+        "NO ROOM - build houses"
+    } else if average_hunger >= GROWTH_HUNGER {
+        "HUNGER - the village eats too late"
+    } else if food_stored < living as f32 * GROWTH_LARDER {
+        "THE LARDER - not enough put by"
+    } else if mothers.is_empty() && nursing > 0 {
+        "every mother is nursing"
+    } else if mothers.is_empty() {
+        "NO MOTHERS - nobody is wed"
+    } else {
+        "nothing - it grows"
+    };
+    if let Ok(mut said) = GROWTH_THINKING.write() {
+        *said = format!(
+            "{living}/{cap} souls (fire {} + {houses} houses + {long} long + {halls} hall), \
+             hunger {average_hunger:.2}/{GROWTH_HUNGER:.2}, food {food_stored:.0}/{:.0}, \
+             mothers {} + {nursing} nursing\n  held by: {held}",
+            home::FIRE_CIRCLE_SHELTER,
+            living as f32 * GROWTH_LARDER,
+            mothers.len(),
+        );
+    }
+
+    if !can_grow_to(living, average_hunger, food_stored, cap) || !rng.0.chance(0.6) {
+        return;
+    }
     if mothers.is_empty() {
         return;
     }
@@ -2977,8 +3041,9 @@ fn births(
     commands.entity(*mother).insert(Motherhood {
         borne: already_borne + 1,
     });
+    // A birth is followed by a stretch of nursing before the next.
     commands.entity(*mother).insert(NewMother {
-        until: clock.elapsed + crate::calendar::DAY_SECONDS as f64 * 24.0,
+        until: clock.elapsed + crate::calendar::DAY_SECONDS as f64 * NURSING_DAYS,
     });
 
     let child_genome = CreatureGenome::child_of(mother_g, father_g, &mut rng.0);

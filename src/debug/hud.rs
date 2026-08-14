@@ -534,6 +534,25 @@ pub(crate) fn update_dev_overlay(
         if !chose.is_empty() {
             fresh.push_str(&format!("\nbroke ground: {chose}"));
         }
+        // And whether the village is growing, for the same reason. Brett,
+        // stalled at seventeen souls through eight seasons: "I wonder what
+        // is going on with the needs and wants for courting, marriage,
+        // family home and children?" Five gates decide a birth and none of
+        // them said a word.
+        let growth = crate::villager::GROWTH_THINKING
+            .read()
+            .map(|said| said.clone())
+            .unwrap_or_default();
+        if !growth.is_empty() {
+            fresh.push_str(&format!("\ngrowth: {growth}"));
+        }
+        let courting = crate::villager::gossip::COURTING_THINKING
+            .read()
+            .map(|said| said.clone())
+            .unwrap_or_default();
+        if !courting.is_empty() {
+            fresh.push_str(&format!("\ncourting: {courting}"));
+        }
         if text.0 != fresh {
             *text = Text::new(fresh);
         }
