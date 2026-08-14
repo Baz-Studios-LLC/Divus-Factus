@@ -1549,6 +1549,53 @@ mod tests {
         }
     }
 
+    /// Every drawing of a kind turns up as often as every other.
+    ///
+    /// Brett, with two houses drawn: "I have two houses baked and this shows
+    /// 5 houses built and they are all the same house." The roll asked
+    /// `range_i(0, len)`, and `range_i` counts BOTH ends - a three-sided die
+    /// for two drawings, whose third face `drawing_at` wrapped back onto the
+    /// first. Two-thirds one house, and worse the more the maker draws: with
+    /// three carried in, half of everything would have been the first.
+    ///
+    /// The far end of the roll is the last INDEX, and this is the test that
+    /// says so - it fails at 2:1 on the old line, not merely at 3:0.
+    #[test]
+    fn the_maker_s_drawings_come_up_evenly() {
+        let all = super::drawings(BuildingKind::House);
+        if all.len() < 2 {
+            return;
+        }
+        let mut rng = crate::rng::Rng::new(20_260_813);
+        let mut times = vec![0usize; all.len()];
+        const ROLLS: usize = 3_000;
+        for _ in 0..ROLLS {
+            let plan = super::super::Blueprint::roll(BuildingKind::House, &mut rng).plan;
+            // The roll must land ON the list. `drawing_at` wraps for the sake
+            // of saves written when the folder held fewer drawings, and that
+            // wrap is exactly what hid this: a roll past the end came back a
+            // legal house instead of a panic.
+            assert!(
+                plan < all.len(),
+                "a fresh roll landed at {plan} with {} drawings carried in - \
+                 past the end, and only the save-compat wrap hides it",
+                all.len(),
+            );
+            times[plan] += 1;
+        }
+        let fair = ROLLS / all.len();
+        for (plan, count) in times.iter().enumerate() {
+            let off = (*count as f32 - fair as f32).abs() / fair as f32;
+            assert!(
+                off < 0.15,
+                "{} came up {count} times in {ROLLS}, {:.0}% off an even {fair} - \
+                 the drawings are not being picked evenly",
+                all[plan].name,
+                off * 100.0,
+            );
+        }
+    }
+
     /// Saves written before there was a name still raise their buildings, and
     /// a name that has since been deleted does not leave a hole.
     #[test]

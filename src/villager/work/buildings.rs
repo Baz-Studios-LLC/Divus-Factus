@@ -596,7 +596,16 @@ impl Blueprint {
         use crate::palette as pal;
         // Which of the maker's houses this one will be. Rolled for every
         // kind so the dice fall the same way whatever is being built.
-        let plan = rng.range_i(0, super::baked::drawings(kind).len().max(1) as i32) as usize;
+        //
+        // `range_i` COUNTS BOTH ENDS, so the far end is the last index and
+        // not the number of drawings. Asking for one of two houses as
+        // `range_i(0, 2)` throws a three-sided die, and the wrap in
+        // `drawing_at` folds that third face back onto the first - so a
+        // maker who drew two houses got the first of them two-thirds of
+        // the time, and a street of five that all looked alike one time in
+        // eight. With three drawn it would have been half.
+        let drawn = super::baked::drawings(kind).len().max(1) as i32;
+        let plan = rng.range_i(0, drawn - 1) as usize;
         let carried = super::baked::drawing_at(kind, plan);
         let drawing = carried.map(|work| work.name.clone()).unwrap_or_default();
         match kind {
@@ -4635,7 +4644,16 @@ mod tests {
         let face = Vec3::new(200.0, land.height_at(200.0, 40.0), 40.0);
         let uphill = Vec3::new(0.0, 0.0, 1.0);
         let mut rng = crate::rng::Rng::stream(7, "mine-test");
-        let plan = Blueprint::roll(BuildingKind::Mine, &mut rng);
+        let mut plan = Blueprint::roll(BuildingKind::Mine, &mut rng);
+        // The footprint is PINNED rather than taken from the roll. What this
+        // test is about is the working's reach against the earth it actually
+        // moves, and it self-checks at the bottom that the old guess would
+        // have missed - so leaving the size to the dice meant any change
+        // anywhere upstream in the stream could quietly stop it exercising
+        // the fault. It did: fixing the drawing roll shifted every stream by
+        // one number and this test fell over its own guard.
+        plan.half_w = 3.0;
+        plan.half_d = 4.0;
         let (_, reach) = bank_the_mine(&land, face, uphill, &plan);
 
         // Walk out past the reported reach and find the furthest metre the
@@ -4645,9 +4663,7 @@ mod tests {
             .map(|d| untouched.height_at(face.x, face.z + d as f32))
             .collect();
         let land2 = Terrain::new(31);
-        let mut rng2 = crate::rng::Rng::stream(7, "mine-test");
-        let plan2 = Blueprint::roll(BuildingKind::Mine, &mut rng2);
-        bank_the_mine(&land2, face, uphill, &plan2);
+        bank_the_mine(&land2, face, uphill, &plan);
         let mut furthest = 0.0_f32;
         for d in 0..80 {
             let after = land2.height_at(face.x, face.z + d as f32);
