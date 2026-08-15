@@ -20,6 +20,10 @@ use crate::palette;
 use crate::rng::Rng;
 use crate::terrain::{Biome, CHUNK_SIZE, Terrain, TerrainAssets, TerrainChunk, WATER_LEVEL};
 
+/// Marks a scatter visual entity (grove, boulder, bush, flora) that can be culled when veiled.
+#[derive(Component)]
+pub struct ScatterEntity;
+
 /// Marks foliage that sways in the wind.
 #[derive(Component)]
 pub struct Foliage {
@@ -44,6 +48,7 @@ impl Plugin for ScatterPlugin {
                     rebake_groves,
                     collect_groves,
                     the_seasons_turn_the_woods,
+                    cull_veiled_scatter,
                 ),
             )
             // PostUpdate, deliberately: chunks spawned during Update - by
@@ -351,6 +356,7 @@ fn spawn_bush(
     commands
         .spawn((
             Name::new("Berry Bush"),
+            ScatterEntity,
             Mesh3d(meshes.add(builder.build())),
             MeshMaterial3d(material),
             Transform::from_translation(position)
@@ -371,6 +377,12 @@ fn spawn_bush(
 
 /// Populates chunks with scenery as they stream in.
 ///
+/// Marks a terrain chunk whose scatter (trees, groves, boulders) has been populated.
+#[derive(Component)]
+pub struct PopulatedScatter;
+
+/// Populates chunks with scenery as they stream in.
+///
 /// Trees and rocks are baked into a single mesh parented to the chunk; bushes are
 /// spawned as entities, also parented. Either way, unloading the chunk takes its
 /// scatter with it.
@@ -387,14 +399,19 @@ fn populate_chunks(
     stripped: Res<StrippedGround>,
     clock: Res<crate::calendar::WorldClock>,
     settlement: Option<Res<crate::villager::SettlementSite>>,
+    state: Res<State<crate::GameState>>,
+    fog: Option<Res<crate::fog::FogMode>>,
+    known: Option<Res<crate::villager::explore::KnownWorld>>,
     mut library: Local<Option<ScatterMeshes>>,
-    chunks: Query<(Entity, &TerrainChunk), Added<TerrainChunk>>,
+    chunks: Query<(Entity, &TerrainChunk), Without<PopulatedScatter>>,
     watch: Res<crate::debug::timings::Timings>,
 ) {
     let _t = watch.watch("scatter: populate_chunks");
     if chunks.is_empty() {
         return;
     }
+    let veil_active =
+        fog.as_ref().is_none_or(|f| f.0) && *state.get() == crate::GameState::Playing;
     let library = library.get_or_insert_with(|| ScatterMeshes::build(&mut meshes, world_seed.0));
     let today = clock.day();
     // DIVUS_FACTUS_SCARCE starves the land of berry bushes — the famine dial, for
@@ -406,6 +423,19 @@ fn populate_chunks(
     };
 
     for (entity, chunk) in &chunks {
+        let chunk_center = Vec2::new(
+            (chunk.coord.x as f32 + 0.5) * CHUNK_SIZE,
+            (chunk.coord.y as f32 + 0.5) * CHUNK_SIZE,
+        );
+        let chunk_known = !veil_active || known.as_ref().is_some_and(|k| {
+            chunk_center.distance(k.centre.xz()) < k.radius + 32.0
+                || k.pockets.iter().any(|p| chunk_center.distance(p.at.xz()) < p.radius + 32.0)
+        });
+        if !chunk_known {
+            continue;
+        }
+        commands.entity(entity).insert(PopulatedScatter);
+
         let origin = Vec2::new(
             chunk.coord.x as f32 * CHUNK_SIZE,
             chunk.coord.y as f32 * CHUNK_SIZE,
@@ -673,15 +703,6 @@ fn populate_chunks(
                     &mut commands,
                     &mut meshes,
                     terrain_assets.ground_material.clone(),
-                    // Where it actually stands. A chunk's transform is the
-                    // identity and its mesh carries world seats, so everything
-                    // hanging off one is placed in WORLD coordinates - see
-                    // `local` above, which is named for a frame it does not
-                    // use. Taking the chunk's middle off first put every node's
-                    // boulders within half a chunk of the flat world's origin,
-                    // and the flat origin is the top of the globe: from
-                    // anywhere else on the planet they hung in the sky, all of
-                    // them, in one clump.
                     stood,
                     &mut rng,
                     roll,
@@ -708,6 +729,7 @@ fn populate_chunks(
             let young = commands
                 .spawn((
                     Name::new("A young tree"),
+                    ScatterEntity,
                     FellableTree {
                         maturity: growth.maturity(),
                     },
@@ -749,9 +771,11 @@ fn populate_chunks(
                 .spawn((
                     Name::new("A grove"),
                     GroveMesh,
+                    ScatterEntity,
                     Mesh3d(meshes.add(grove_mesh.build())),
                     MeshMaterial3d(terrain_assets.ground_material.clone()),
                     Transform::from_translation(anchor),
+                    Visibility::default(),
                     ChildOf(entity),
                 ))
                 .id();
@@ -772,6 +796,7 @@ fn populate_chunks(
         if !builder.is_empty() {
             commands.spawn((
                 Name::new("Chunk Scenery"),
+                ScatterEntity,
                 Mesh3d(meshes.add(builder.build())),
                 MeshMaterial3d(terrain_assets.ground_material.clone()),
                 Transform::from_xyz(
@@ -779,6 +804,7 @@ fn populate_chunks(
                     0.0,
                     origin.y + CHUNK_SIZE * 0.5,
                 ),
+                Visibility::default(),
                 ChildOf(entity),
             ));
         }
@@ -1307,7 +1333,7 @@ pub fn stand_alone(
     commands
         .entity(tree)
         .remove::<InGrove>()
-        .insert((Mesh3d(mesh), MeshMaterial3d(material)));
+        .insert((ScatterEntity, Mesh3d(mesh), MeshMaterial3d(material)));
 }
 
 /// A felled tree mid-fall: it leans, crashes, lies a beat, and sinks
@@ -1514,6 +1540,7 @@ fn spawn_sacred(
                 SacredKind::Incense => "A stand of incense herb",
                 SacredKind::Dye => "A clump of dyeflowers",
             }),
+            ScatterEntity,
             Mesh3d(meshes.add(builder.build())),
             MeshMaterial3d(material),
             Transform::from_translation(position)
@@ -1604,6 +1631,7 @@ pub(crate) fn spawn_boulder(
     commands
         .spawn((
             Name::new(if outcrop { "An outcrop" } else { "A boulder" }),
+            ScatterEntity,
             crate::matter::Boulder,
             crate::matter::Matter::boulder(roll.mass, roll.radius),
             Mesh3d(mesh),
@@ -1711,6 +1739,34 @@ pub fn regrow_food(
         // Bushes follow the season; winter berries are a memory.
         source.amount = (source.amount + source.regrowth * dt * clock.season().growth())
             .min(FoodSource::CAPACITY);
+    }
+}
+
+/// Hides scatter objects (trees, groves, boulders, bushes) that sit in unexplored
+/// territory under the veil.
+fn cull_veiled_scatter(
+    mode: Option<Res<crate::fog::FogMode>>,
+    state: Res<State<crate::GameState>>,
+    known: Option<Res<crate::villager::explore::KnownWorld>>,
+    mut scatter: Query<(&Transform, &mut Visibility), With<ScatterEntity>>,
+    watch: Res<crate::debug::timings::Timings>,
+) {
+    let _t = watch.watch("scatter: cull_veiled");
+    let veil_active = mode.is_none_or(|f| f.0) && *state.get() == crate::GameState::Playing;
+    let Some(known) = known else {
+        return;
+    };
+    for (transform, mut visibility) in &mut scatter {
+        let pos = transform.translation;
+        let should_show = !veil_active || known.knows_flat(pos.x, pos.z, 0.0);
+        let wanted = if should_show {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+        if *visibility != wanted {
+            *visibility = wanted;
+        }
     }
 }
 

@@ -925,7 +925,7 @@ fn grow_patch(
     // And the water standing on it, as a child so it is shown, hidden and
     // felled with the ground it covers. Render layers are not inherited, so
     // it states its own.
-    let water = build_patch_water(terrain, key).map(|sheet| {
+    let water = build_patch_water(terrain, veil, key).map(|sheet| {
         let handle = meshes.add(sheet);
         commands.spawn((
             PatchWater,
@@ -1069,7 +1069,6 @@ fn build_patch(
 
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity(stride * stride + stride * 4);
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity(positions.capacity());
-    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(positions.capacity());
     let mut indices: Vec<u32> = Vec::with_capacity(n * n * 6 + n * 24);
 
     for gj in 0..stride {
@@ -1077,7 +1076,6 @@ fn build_patch(
             let (pi, pj) = (gi + 1, gj + 1);
             let here = at(pi, pj);
             let dir = here.normalize();
-            let (x, z, h, wet) = ground[pj * padded + pi];
 
             let across = at(pi + 1, pj) - at(pi - 1, pj);
             let down = at(pi, pj + 1) - at(pi, pj - 1);
@@ -1085,30 +1083,13 @@ fn build_patch(
             if normal.dot(dir) < 0.0 {
                 normal = -normal;
             }
-            let slope = (1.0 - normal.dot(dir)).clamp(0.0, 1.0);
 
             positions.push(here.to_array());
             normals.push(normal.to_array());
-            let mut color = paint(terrain, x, z, h, wet, slope);
-            // The fog of war wraps the whole planet: ground the village has not
-            // walked takes the veil, sea and land alike. The god does not see
-            // round the world; the god sees what has been SHOWN, and from orbit
-            // that is a handful of clearings on a shrouded ball.
-            //
-            // Carried in the ALPHA channel, and applied by the skin's shader
-            // after the lighting - see `PlanetMaterial`. Blending the veil's
-            // colour into the rgb here instead put a LIT version of it on the
-            // world, which is a different colour from the unlit cloths that
-            // hide the same ground at play height, and a different colour
-            // again where the sun grazes the limb.
-            if let Some(known) = veil
-                && !known.knows(Vec3::new(x, h, z))
-            {
-                color[3] = 0.0;
-            }
-            colors.push(color);
         }
     }
+
+    let colors = paint_patch_colors(terrain, veil, key);
 
     // Winding, tested on geometry: `(b - a) × (c - a) · outward > 0` means
     // `[a, b, c]` runs counter-clockwise seen from outside the sphere, which
@@ -1159,7 +1140,6 @@ fn build_patch(
             let low_index = positions.len() as u32;
             positions.push((here - dir * drop).to_array());
             normals.push(normals[top_index as usize]);
-            colors.push(colors[top_index as usize]);
             if let Some((last_top, last_low)) = previous {
                 for triangle in [
                     [last_top, top_index, last_low],
@@ -1176,12 +1156,162 @@ fn build_patch(
 
     Mesh::new(
         PrimitiveTopology::TriangleList,
-        RenderAssetUsages::RENDER_WORLD,
+        RenderAssetUsages::default(),
     )
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
     .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colors)
     .with_inserted_indices(Indices::U32(indices))
+}
+
+/// Computes vertex colors and veil alpha for one patch of the globe.
+fn paint_patch_colors(
+    terrain: &Terrain,
+    veil: Option<&crate::villager::explore::KnownWorld>,
+    key: PatchKey,
+) -> Vec<[f32; 4]> {
+    let n = PATCH_CELLS;
+    let stride = n + 1;
+    let padded = n + 3;
+    let (u0, v0, side) = key.rect();
+    let (outward, along_u, along_v) = face_axes(key.face);
+    let step = side / n as f32;
+
+    let mut grid: Vec<Vec3> = Vec::with_capacity(padded * padded);
+    let mut ground: Vec<(f32, f32, f32, f32)> = Vec::with_capacity(padded * padded);
+    for gj in 0..padded {
+        for gi in 0..padded {
+            let u = u0 + (gi as f32 - 1.0) * step;
+            let v = v0 + (gj as f32 - 1.0) * step;
+            let dir = (outward + along_u * u + along_v * v).normalize();
+            let (x, z) = ground_coordinates(dir);
+            let (h, wet) = terrain.ground_and_water_at(x, z);
+            grid.push(dir * drawn_radial(h));
+            ground.push((x, z, h, wet));
+        }
+    }
+    let at = |gi: usize, gj: usize| grid[gj * padded + gi];
+
+    let mut colors: Vec<[f32; 4]> = Vec::with_capacity(stride * stride + stride * 4);
+
+    for gj in 0..stride {
+        for gi in 0..stride {
+            let (pi, pj) = (gi + 1, gj + 1);
+            let here = at(pi, pj);
+            let dir = here.normalize();
+            let (x, z, h, wet) = ground[pj * padded + pi];
+
+            let across = at(pi + 1, pj) - at(pi - 1, pj);
+            let down = at(pi, pj + 1) - at(pi, pj - 1);
+            let mut normal = across.cross(down).normalize_or(dir);
+            if normal.dot(dir) < 0.0 {
+                normal = -normal;
+            }
+            let slope = (1.0 - normal.dot(dir)).clamp(0.0, 1.0);
+
+            let mut color = paint(terrain, x, z, h, wet, slope);
+            if let Some(known) = veil
+                && !known.knows(Vec3::new(x, h, z))
+            {
+                color[3] = 0.0;
+            }
+            colors.push(color);
+        }
+    }
+
+    let edges: [Vec<(usize, usize)>; 4] = [
+        (0..stride).map(|i| (i, 0)).collect(),
+        (0..stride).map(|i| (i, n)).collect(),
+        (0..stride).map(|j| (0, j)).collect(),
+        (0..stride).map(|j| (n, j)).collect(),
+    ];
+    for edge in edges {
+        for (gi, gj) in edge {
+            let top_index = gj * stride + gi;
+            colors.push(colors[top_index]);
+        }
+    }
+
+    colors
+}
+
+/// Warms up and repaints the veil on an existing patch mesh immediately in-place
+/// without expensive terrain noise re-sampling.
+fn repaint_patch_veil(
+    mesh: &mut Mesh,
+    veil: Option<&crate::villager::explore::KnownWorld>,
+    key: PatchKey,
+) {
+    let Some(bevy::render::mesh::VertexAttributeValues::Float32x4(colors)) =
+        mesh.attribute_mut(Mesh::ATTRIBUTE_COLOR)
+    else {
+        return;
+    };
+
+    let Some(known) = veil else {
+        for c in colors.iter_mut() {
+            c[3] = 1.0;
+        }
+        return;
+    };
+
+    let n = PATCH_CELLS;
+    let stride = n + 1;
+    let (u0, v0, side) = key.rect();
+    let (outward, along_u, along_v) = face_axes(key.face);
+    let step = side / n as f32;
+
+    // Fast reject if the whole patch is far from the known world:
+    let patch_centre = key.centre_dir();
+    let patch_reach = key.cell_arc() * (n as f32) * 0.9;
+    let home_dir = chart_direction(known.centre.xz());
+    let home_reach = (known.radius + 64.0) / PLANET_RADIUS;
+    let angle_to_home = patch_centre.dot(home_dir).clamp(-1.0, 1.0).acos();
+
+    let touches_home = angle_to_home <= (patch_reach + home_reach);
+    let touches_any_pocket = known.pockets.iter().any(|pocket| {
+        let p_dir = chart_direction(pocket.at.xz());
+        let p_reach = (pocket.radius + 64.0) / PLANET_RADIUS;
+        let angle = patch_centre.dot(p_dir).clamp(-1.0, 1.0).acos();
+        angle <= (patch_reach + p_reach)
+    });
+
+    if !touches_home && !touches_any_pocket {
+        for c in colors.iter_mut() {
+            c[3] = 0.0;
+        }
+        return;
+    }
+
+    for gj in 0..stride {
+        for gi in 0..stride {
+            let u = u0 + gi as f32 * step;
+            let v = v0 + gj as f32 * step;
+            let dir = (outward + along_u * u + along_v * v).normalize();
+            let (x, z) = ground_coordinates(dir);
+            let idx = gj * stride + gi;
+            if idx < colors.len() {
+                colors[idx][3] = if known.knows(Vec3::new(x, 0.0, z)) { 1.0 } else { 0.0 };
+            }
+        }
+    }
+
+    let edges: [Vec<(usize, usize)>; 4] = [
+        (0..stride).map(|i| (i, 0)).collect(),
+        (0..stride).map(|i| (i, n)).collect(),
+        (0..stride).map(|j| (0, j)).collect(),
+        (0..stride).map(|j| (n, j)).collect(),
+    ];
+    let mut skirt_idx = stride * stride;
+    for edge in edges {
+        for (gi, gj) in edge {
+            let top_index = gj * stride + gi;
+            if skirt_idx < colors.len() && top_index < colors.len() {
+                colors[skirt_idx][3] = colors[top_index][3];
+            }
+            skirt_idx += 1;
+        }
+    }
 }
 
 /// The `(x, z)` the terrain speaks, for a direction in the scaffold's frame.
@@ -1243,7 +1373,11 @@ fn drawn_radial(h: f32) -> f32 {
 /// The cost is that the depth read here runs `PATCH_SINK - WATER_CLEARANCE`
 /// too deep, so a shore drawn by a patch will not foam. Shores near enough to
 /// look at are drawn by chunks, which measure honestly.
-fn build_patch_water(terrain: &Terrain, key: PatchKey) -> Option<Mesh> {
+fn build_patch_water(
+    terrain: &Terrain,
+    veil: Option<&crate::villager::explore::KnownWorld>,
+    key: PatchKey,
+) -> Option<Mesh> {
     let n = PATCH_CELLS;
     let stride = n + 1;
     let (u0, v0, side) = key.rect();
@@ -1265,7 +1399,8 @@ fn build_patch_water(terrain: &Terrain, key: PatchKey) -> Option<Mesh> {
             // The same question the ground asked, so the two agree vertex for
             // vertex. See `Terrain::ground_and_water_at`.
             let (h, wet) = terrain.ground_and_water_at(x, z);
-            let under = h < wet;
+            let known_here = veil.map_or(true, |k| k.knows(Vec3::new(x, 0.0, z)));
+            let under = h < wet && known_here;
             any |= under;
             drowned[gj * stride + gi] = under;
             positions.push((dir * (PLANET_RADIUS + wet - WATER_CLEARANCE)).to_array());
@@ -1493,6 +1628,7 @@ fn tend_the_tree(
                     .iter()
                     .map(|(at, radius)| (chart_direction(*at), (radius + 48.0) / PLANET_RADIUS))
                     .collect();
+                let paint_beat = tree.paint_beat;
                 for (key, patch) in tree.built.iter_mut() {
                     let reach = key.cell_arc() * PATCH_CELLS as f32 * 0.8;
                     let dir = key.centre_dir();
@@ -1501,11 +1637,29 @@ fn tend_the_tree(
                         dir.dot(*disc) > limit.cos()
                     });
                     if touched {
+                        if let Some(mut mesh) = meshes.get_mut(&patch.mesh) {
+                            repaint_patch_veil(&mut *mesh, shroud, *key);
+                            patch.painted = paint_beat;
+                        } else {
+                            patch.painted = 0;
+                        }
+                    }
+                }
+            }
+            None => {
+                // When toggling or first starting the game / entering playing mode:
+                // WARM UP IMMEDIATELY on all resident layers in ~0.3ms!
+                tree.paint_beat += 1;
+                let beat = tree.paint_beat;
+                for (key, patch) in tree.built.iter_mut() {
+                    if let Some(mut mesh) = meshes.get_mut(&patch.mesh) {
+                        repaint_patch_veil(&mut *mesh, shroud, *key);
+                        patch.painted = beat;
+                    } else {
                         patch.painted = 0;
                     }
                 }
             }
-            None => tree.paint_beat += 1,
         }
         tree.veil_seen = fresh;
     }

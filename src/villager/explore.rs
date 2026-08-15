@@ -61,6 +61,17 @@ impl KnownWorld {
             .any(|pocket| at.distance(pocket.at) < pocket.radius)
     }
 
+    /// Whether the village knows flat coordinate (x, z) within margin.
+    pub fn knows_flat(&self, x: f32, z: f32, margin: f32) -> bool {
+        let p = Vec2::new(x, z);
+        if p.distance(self.centre.xz()) < self.radius + margin {
+            return true;
+        }
+        self.pockets
+            .iter()
+            .any(|pocket| p.distance(pocket.at.xz()) < pocket.radius + margin)
+    }
+
     /// Learns a patch of ground, keeping the map inside the veil shader's
     /// budget by tidying rather than by forgetting.
     ///

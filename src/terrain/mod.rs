@@ -2041,9 +2041,13 @@ fn stream_chunks(
             loaded.let_go = 0.0;
         }
     }
-    let wanted = chunks_in_view(centre, radius);
+    let wanted = if radius <= 0 {
+        Vec::new()
+    } else {
+        chunks_in_view(centre, radius)
+    };
     let wanted_set: HashSet<IVec2> = wanted.iter().copied().collect();
-    let mut kept: HashSet<IVec2> = if loaded.held > radius {
+    let mut kept: HashSet<IVec2> = if loaded.held > 0 && loaded.held > radius {
         chunks_in_view(centre, loaded.held).into_iter().collect()
     } else {
         wanted_set.clone()
@@ -2178,18 +2182,21 @@ pub(crate) fn spawn_chunk(
     if let Some(sea) = sea {
         commands.spawn((
             Name::new("Sea"),
+            WaterPlane,
             Mesh3d(sea),
             MeshMaterial3d(assets.sea_material.clone()),
             Transform::default(),
             // World-space seats already, like its chunk's. See the river below.
             crate::globe::BentInPlace,
             NotShadowCaster,
+            Visibility::Hidden,
             ChildOf(entity),
         ));
     }
     if let Some(river) = river {
         commands.spawn((
             Name::new("River"),
+            WaterPlane,
             Mesh3d(river),
             MeshMaterial3d(assets.river_material.clone()),
             Transform::default(),
@@ -2200,6 +2207,7 @@ pub(crate) fn spawn_chunk(
             // its carved channel painted on a dry valley floor.
             crate::globe::BentInPlace,
             NotShadowCaster,
+            Visibility::Hidden,
             ChildOf(entity),
         ));
     }

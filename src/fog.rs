@@ -32,7 +32,7 @@ const MAX_POCKETS: usize = 128;
 /// The tallest current tree is a shade over eight metres; sixteen gives the
 /// shroud headroom for roofs and future scenery without letting silhouettes
 /// poke through its top.
-const VEIL_HIGH: f32 = 16.0;
+const VEIL_HIGH: f32 = 0.0;
 
 /// Whether the veil is up. It is, from the first frame: the world a
 /// village has actually walked is the world the game is about, and the
@@ -164,11 +164,8 @@ impl Material for FogMaterial {
         AlphaMode::Blend
     }
 
-    // A fully opaque fragment in the transparent pass still needs to arrive
-    // after the sea and other see-through scenery, or those things can draw on
-    // top of the unknown world.
     fn depth_bias(&self) -> f32 {
-        10_000.0
+        0.0
     }
 }
 
@@ -336,25 +333,13 @@ impl Default for VeilRising {
     }
 }
 
-/// Seconds for the veil to come all the way up behind a new village.
-const VEIL_RISES_OVER: f32 = 4.0;
-
-/// The veil starts down over ground nobody has settled yet.
-fn the_veil_is_down(mut rising: ResMut<VeilRising>, chosen: Res<crate::villager::ChosenGround>) {
-    // Only for a world founded this session. A load already has its fog.
-    if chosen.0.is_some() {
-        rising.risen = 0.0;
-    }
+/// The veil is fully opaque from the first frame.
+fn the_veil_is_down(mut rising: ResMut<VeilRising>) {
+    rising.risen = 1.0;
 }
 
-/// And comes up behind them. Only the FRACTION lives here; the weight it
-/// is a fraction of belongs to each cloth, and `drape_the_veil` applies
-/// it where both are known.
-fn raise_the_veil(time: Res<Time>, mut rising: ResMut<VeilRising>) {
-    if rising.risen >= 1.0 {
-        return;
-    }
-    rising.risen = (rising.risen + time.delta_secs() / VEIL_RISES_OVER).min(1.0);
+fn raise_the_veil(_time: Res<Time>, mut rising: ResMut<VeilRising>) {
+    rising.risen = 1.0;
 }
 
 /// Keeps the veil's holes where the village's knowledge actually is.

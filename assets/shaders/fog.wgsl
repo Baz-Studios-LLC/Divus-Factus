@@ -83,24 +83,18 @@ fn flat_ground(world_position: vec3<f32>) -> vec2<f32> {
     return vec2<f32>(lon * fog.planet.w, -lat * fog.planet.w);
 }
 
-// Positive is inside knowledge, negative is in the unknown. Both the vertex
-// and fragment stages use precisely this field, so the opaque bank and its
-// dithered discovery edge cannot drift apart.
+// Positive is inside knowledge, negative is in the unknown.
 fn known_at(ground: vec2<f32>) -> f32 {
     let home_delta = ground - fog.home.xz;
-    var known = fog.home.w
-        + frontier_wobble(fog.home.xz, atan2(home_delta.y, home_delta.x))
-        - length(home_delta);
+    var known = fog.home.w - length(home_delta);
     let live = i32(fog.dials.x);
     for (var i = 0; i < live; i = i + 1) {
         let pocket = fog.pockets[i];
         let delta = ground - pocket.xz;
-        let pocket_known = pocket.w
-            + frontier_wobble(pocket.xz, atan2(delta.y, delta.x))
-            - length(delta);
-        known = smax(known, pocket_known, 18.0);
+        let pocket_known = pocket.w - length(delta);
+        known = smax(known, pocket_known, 8.0);
     }
-    return known + wobble(ground / 37.0) * 3.0 + wobble(ground / 11.0) * 1.0;
+    return known;
 }
 
 @vertex
@@ -112,16 +106,10 @@ fn vertex(vertex: Vertex) -> VertexOutput {
         world_from_local,
         vec4(vertex.position, 1.0),
     );
-    let known = known_at(flat_ground(ground_position.xyz));
 
-    // The bank begins just under explored ground, emerges immediately outside
-    // it, then reaches full height over the next thirty strides. Keeping that
-    // first edge below the terrain makes one opaque mesh appear to taper into
-    // the world rather than ending at a visible line.
-    let bank = 1.0 - smoothstep(-30.0, 4.0, known);
     let radial = normalize(ground_position.xyz - fog.planet.xyz);
     let world_position = vec4(
-        ground_position.xyz + radial * (fog.dials.z * bank - 0.2),
+        ground_position.xyz + radial * 0.05,
         1.0,
     );
 
@@ -147,9 +135,8 @@ fn vertex(vertex: Vertex) -> VertexOutput {
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let ground = flat_ground(in.world_position.xyz);
     let known = known_at(ground);
-    // The vertex bank has already disappeared beneath known terrain. Discard
-    // that submerged overlap and render every visible fragment fully opaque.
-    if known > 4.0 || fog.tint.a < 0.004 {
+    // Explored ground is clear; unknown ground wears the veil.
+    if known > 0.0 || fog.tint.a < 0.004 {
         discard;
     }
     return vec4<f32>(fog.tint.rgb, fog.tint.a);

@@ -303,7 +303,6 @@ pub fn build_grass_mesh(
     builder.build()
 }
 
-/// Streams grass in a disc around the camera focus, nearest first.
 fn stream_grass(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -313,6 +312,9 @@ fn stream_grass(
     world_seed: Res<crate::WorldSeed>,
     mut chunks: ResMut<GrassChunks>,
     cameras: Query<&crate::camera::CameraRig>,
+    state: Res<State<crate::GameState>>,
+    fog: Option<Res<crate::fog::FogMode>>,
+    known: Option<Res<crate::villager::explore::KnownWorld>>,
     watch: Res<crate::debug::timings::Timings>,
 ) {
     let _t = watch.watch("grass: stream_grass");
@@ -333,11 +335,30 @@ fn stream_grass(
         }
     });
 
+    let veil_active =
+        fog.as_ref().is_none_or(|f| f.0) && *state.get() == crate::GameState::Playing;
+
     let mut wanted = Vec::new();
     for dz in -GRASS_RADIUS..=GRASS_RADIUS {
         for dx in -GRASS_RADIUS..=GRASS_RADIUS {
             if dx * dx + dz * dz <= GRASS_RADIUS * GRASS_RADIUS {
-                wanted.push(centre + IVec2::new(dx, dz));
+                let coord = centre + IVec2::new(dx, dz);
+                if veil_active && let Some(known) = known.as_ref() {
+                    let chunk_center = Vec2::new(
+                        (coord.x as f32 + 0.5) * CHUNK_SIZE,
+                        (coord.y as f32 + 0.5) * CHUNK_SIZE,
+                    );
+                    let reach = known.radius + 32.0;
+                    let near_home = chunk_center.distance(known.centre.xz()) < reach;
+                    let near_pocket = known
+                        .pockets
+                        .iter()
+                        .any(|p| chunk_center.distance(p.at.xz()) < p.radius + 32.0);
+                    if !near_home && !near_pocket {
+                        continue;
+                    }
+                }
+                wanted.push(coord);
             }
         }
     }
@@ -359,6 +380,7 @@ fn stream_grass(
             Some(mesh) => commands
                 .spawn((
                     Name::new("Grass"),
+                    crate::scatter::ScatterEntity,
                     Mesh3d(meshes.add(mesh)),
                     MeshMaterial3d(assets.material.clone()),
                     Transform::from_xyz(

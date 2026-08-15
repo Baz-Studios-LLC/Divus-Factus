@@ -305,11 +305,13 @@ fn drive_the_deck(
         params.dials.z = time.elapsed_secs();
         // Nothing stands between the eye and the hand - nor sits on the
         // camera's own back. Clouds inside this corridor go fully clear,
-        // feathered at the rim so the hole has no edge to find. Brett:
-        // "I constantly zoom out and get blinded by clouds."
+        // feathered at the rim so the hole has no edge to find.
+        // Fades out as the camera rises above the deck so orbit view sees unbroken weather.
         if let Some((focus, eye)) = sightline {
-            params.sight = focus.extend(CORRIDOR_CLEAR);
-            params.eye = eye.extend(CORRIDOR_FEATHER);
+            let corridor_weight =
+                (1.0 - (above_sea - CLEAR_FROM) / (CLEAR_BY - CLEAR_FROM)).clamp(0.0, 1.0);
+            params.sight = focus.extend(CORRIDOR_CLEAR * corridor_weight);
+            params.eye = eye.extend(CORRIDOR_FEATHER * corridor_weight);
         }
         // Cloud takes the light the ground takes: white at noon, gilded at
         // dusk, and the sunless side goes the colour of the night sky rather
