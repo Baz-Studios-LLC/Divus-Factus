@@ -235,7 +235,7 @@ fn drape_the_veil(
         ),
         Or<(With<TerrainChunk>, With<WaterPlane>)>,
     >,
-    veils: Query<Entity, With<Veil>>,
+    veils: Query<(Entity, &Visibility), With<Veil>>,
     watch: Res<crate::debug::timings::Timings>,
 ) {
     let _t = watch.watch("fog: drape_the_veil");
@@ -255,7 +255,7 @@ fn drape_the_veil(
     // knowledge to draw. Take any cloths down and let the world be seen.
     if !mode.0 || *state.get() != crate::GameState::Playing {
         if !veils.is_empty() {
-            for veil in &veils {
+            for (veil, _) in &veils {
                 commands.entity(veil).try_despawn();
             }
         }
@@ -321,7 +321,15 @@ fn drape_the_veil(
         // the veil to save resouces" - done at the one granularity that takes
         // the trees, the grass, the boulders and the terrain together, since
         // every one of them is a child of this entity.
-        if let (Some(known), Some(ground)) = (known.as_ref(), ground)
+        // NOT WHILE THE VEIL IS STILL COMING UP. The fog rises over the first
+        // moments of a founding rather than snapping on, and during that rise
+        // the bank is too thin to draw at all - so culling then does not hide
+        // a chunk UNDER something, it just takes a bite out of an open world.
+        // The founding shot came out as a ragged island with chunk corners
+        // for a coastline. A chunk may only vanish once the thing that would
+        // have covered it is actually standing.
+        if rising.risen >= 0.999
+            && let (Some(known), Some(ground)) = (known.as_ref(), ground)
             && !known.knows_flat(
                 (ground.coord.x as f32 + 0.5) * crate::terrain::CHUNK_SIZE,
                 (ground.coord.y as f32 + 0.5) * crate::terrain::CHUNK_SIZE,
@@ -333,6 +341,24 @@ fn drape_the_veil(
             if *showing != Visibility::Hidden {
                 commands.entity(chunk).try_insert(Visibility::Hidden);
             }
+            // BUT ITS VEIL STAYS UP. Brett: "What if the veil renders farther
+            // out then the land by a chunk or two, then the rendered veil will
+            // over lap the non rendered veil." Hiding the chunk would take its
+            // veil down with it - the cloth is a child of the ground it hides -
+            // and the bank would stop dead at the frontier, exactly where it is
+            // most needed. `Visibility::Visible` shows a child whatever its
+            // parent is doing, so the land goes and the shroud over it stays,
+            // running on across every loaded chunk until it settles onto the
+            // patches' own painted veil. The two overlap instead of meeting.
+            if let Some(kids) = children {
+                for kid in kids.iter() {
+                    if let Ok((veil, showing)) = veils.get(kid)
+                        && *showing != Visibility::Visible
+                    {
+                        commands.entity(veil).try_insert(Visibility::Visible);
+                    }
+                }
+            }
             continue;
         }
         let dressed = children.map_or(0, |kids| {
@@ -341,6 +367,20 @@ fn drape_the_veil(
         // Decent, and may be seen.
         if dressed > 0 {
             reveal(&mut commands, chunk, showing);
+            // And its cloth goes back under the chunk's own command. A veil
+            // forced `Visible` while its ground was culled would otherwise
+            // stay forced for the rest of the world's life, outliving the
+            // reason - and would hang there alone the next time this chunk
+            // was parked for a trip to globe view.
+            if let Some(kids) = children {
+                for kid in kids.iter() {
+                    if let Ok((veil, showing)) = veils.get(kid)
+                        && *showing == Visibility::Visible
+                    {
+                        commands.entity(veil).try_insert(Visibility::Inherited);
+                    }
+                }
+            }
             continue;
         }
         {

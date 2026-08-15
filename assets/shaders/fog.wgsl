@@ -137,7 +137,27 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     // Smoothstep, so the bank leaves the ground and reaches its ceiling
     // without a crease at either end.
     let eased = climb * climb * (3.0 - 2.0 * climb);
-    let lift = fog.dials.z * eased - VEIL_SINK;
+
+    // AND IT LIES BACK DOWN FURTHER OUT.
+    //
+    // The bank is a copy of the CHUNK's ground, and chunks stop. Past them the
+    // planet's own patches carry the veil as flat paint at ground level - so a
+    // bank that stayed sixteen metres up all the way to the last chunk ended
+    // in a sixteen-metre cliff with the patch surface far below it. Brett:
+    // "that is rendered chunk's veil floting over theterrian while the
+    // unrendered chucnks terrain is at a different height."
+    //
+    // Height is only wanted at the frontier, which is the one place a tree can
+    // stand on ground the village has not seen and still be lit. Deeper in,
+    // everything is veiled whichever way you paint it. So the bank is a RIDGE
+    // along the edge of the known, and it settles back onto the ground well
+    // before the chunks run out, where the patches' paint meets it flush.
+    let settle_from = fog.dials.w * 3.0;
+    let settle_to = fog.dials.w * 6.0;
+    let sinking = clamp((beyond - settle_from) / max(settle_to - settle_from, 0.001), 0.0, 1.0);
+    let settle = 1.0 - sinking * sinking * (3.0 - 2.0 * sinking);
+
+    let lift = fog.dials.z * eased * settle - VEIL_SINK;
     let world_position = vec4(
         ground_position.xyz + radial * lift,
         1.0,
