@@ -48,7 +48,7 @@ mod weather;
 mod witness;
 
 use bevy::camera::visibility::RenderLayers;
-use bevy::light::CascadeShadowConfigBuilder;
+use bevy::light::{CascadeShadowConfigBuilder, VolumetricLight};
 use bevy::prelude::*;
 
 /// Environment variable that puts the game into unattended capture mode: render
@@ -303,6 +303,10 @@ pub fn spawn_lighting(mut commands: Commands) {
             shadow_maps_enabled: true,
             ..default()
         },
+        // One shadowed light gives the near volumetric bank its soft shafts.
+        // The fill and moon remain ordinary lights, keeping this bounded to a
+        // single raymarched shadow source.
+        VolumetricLight,
         // Cascades sized to the world. The default configuration covers a few dozen
         // units, which on a map this size means shadows simply stop a short way from
         // the camera — one of the things that reads as "flat".
