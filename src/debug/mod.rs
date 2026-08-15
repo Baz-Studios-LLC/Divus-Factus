@@ -247,10 +247,12 @@ impl Plugin for DebugPlugin {
             )
             .add_systems(
                 Update,
-                report_frames.run_if(|| std::env::var("DIVUS_FACTUS_FRAMES").is_ok()),
+                (
+                    villager_profile::handle_profile_actions,
+                    report_frames.run_if(|| std::env::var("DIVUS_FACTUS_FRAMES").is_ok()),
+                ),
             )
-            .add_systems(PostUpdate, villager_profile::open_villager_profile)
-            .add_observer(villager_profile::close_villager_profile);
+            .add_systems(PostUpdate, villager_profile::open_villager_profile);
 
         // The parallel court's own inspector: DIVUS_FACTUS_AMBIGUITY=1
         // makes the scheduler list every unordered pair that shares
@@ -377,7 +379,7 @@ fn health_word(harm: f32) -> &'static str {
 }
 
 /// Who someone is, in a phrase.
-fn person_phrase(sex: Sex, age: Age) -> &'static str {
+pub(crate) fn person_phrase(sex: Sex, age: Age) -> &'static str {
     match (age, sex) {
         (Age::Child, Sex::Female) => "a girl",
         (Age::Child, Sex::Male) => "a boy",
@@ -531,6 +533,23 @@ mod tests {
         let _ = app
             .world_mut()
             .run_system_once(crate::ui::town::spawn_town_strip);
+        // The villager dossier, which arrived from the Aspectus fork with
+        // four systems and a great many queries and joined this net the
+        // moment it landed rather than the moment it panicked. It is the
+        // shape that has caught us twice: one system reading several `Text`
+        // queries that are disjoint only by a list of `Without`s.
+        let _ = app
+            .world_mut()
+            .run_system_once(villager_profile::spawn_villager_profile);
+        let _ = app
+            .world_mut()
+            .run_system_once(villager_profile::update_villager_profile);
+        let _ = app
+            .world_mut()
+            .run_system_once(villager_profile::handle_profile_actions);
+        let _ = app
+            .world_mut()
+            .run_system_once(villager_profile::open_villager_profile);
     }
 
     #[test]

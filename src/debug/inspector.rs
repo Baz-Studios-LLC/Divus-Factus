@@ -856,7 +856,7 @@ pub(crate) fn update_inspector(
             }
             if let Ok(mut subtitle) = texts.p1().single_mut() {
                 *subtitle = Text::new(format!(
-                    "{} · {} · {}",
+                    "{}, {}, {}",
                     counted(resident_count, "resident", "residents"),
                     counted(children, "child", "children"),
                     sleep_phrase(sleeping),
@@ -871,13 +871,13 @@ pub(crate) fn update_inspector(
             } else {
                 let free = capacity - resident_count;
                 format!(
-                    "{resident_count} of {capacity} filled · {}",
+                    "{resident_count} of {capacity} filled - {}",
                     counted(free, "bed free", "beds free")
                 )
             };
             let stores = store.map(|store| {
                 format!(
-                    "food {} · timber {}",
+                    "food {} - timber {}",
                     food_horizon(store.food(), mouths),
                     timber_horizon(store.timber, mouths),
                 )
@@ -956,16 +956,9 @@ pub(crate) fn update_inspector(
         let frame = plan.kind.timber_cost();
         let mut missing: Vec<(String, f32, f32)> = Vec::new();
         let mut want = |name: &str, have: f32, needs: f32| {
-            // A material the build neither wants nor holds is not part of the
-            // bill. The dock is all carpentry and was still billed "Stone:
-            // 0/0" - Brett: "if it doesn't take any stone it should just not
-            // mention it." A material that IS wanted stays on the card once
-            // it is full, because "Timber 7/7" is how you read that the
-            // timber is done rather than forgotten.
-            if needs <= 0.0 && have <= 0.0 {
-                return;
+            if needs > 0.0 && have < needs {
+                missing.push((name.to_string(), have, needs));
             }
-            missing.push((name.to_string(), have, needs));
         };
         // The walls take their material's name; the footing is always stone
         // and is called what it is, which keeps the two apart on a stone
@@ -995,9 +988,9 @@ pub(crate) fn update_inspector(
             }
         }
         let population = match children {
-            0 => format!("{} · no children", counted(grown, "adult", "adults")),
+            0 => format!("{}, no children", counted(grown, "adult", "adults")),
             _ => format!(
-                "{} · {}",
+                "{}, {}",
                 counted(grown, "adult", "adults"),
                 counted(children, "child", "children")
             ),
@@ -1025,12 +1018,12 @@ pub(crate) fn update_inspector(
         let stores = if materials.is_empty() {
             "No building materials laid by".to_string()
         } else {
-            format!("Materials: {}", materials.join(" · "))
+            format!("Materials: {}", materials.join(", "))
         };
         let shelter = match beds.saturating_sub(mouths) {
             0 => format!("Shelter: {beds} beds, all occupied"),
             free => format!(
-                "Shelter: {beds} beds · {}",
+                "Shelter: {beds} beds - {}",
                 counted(free, "bed free", "beds free")
             ),
         };

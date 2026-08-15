@@ -745,8 +745,11 @@ fn knock_on_roofs(
 fn handle_grab_and_release(
     mut commands: Commands,
     time: Res<Time>,
-    buttons: Res<ButtonInput<MouseButton>>,
-    mouse: Res<crate::keymap::MouseScheme>,
+    inputs: (
+        Res<ButtonInput<MouseButton>>,
+        Res<ButtonInput<KeyCode>>,
+        Res<crate::keymap::MouseScheme>,
+    ),
     terrain: Option<Res<Terrain>>,
     mut hand: ResMut<DivineHand>,
     mut motions: Query<&mut CreatureMotion>,
@@ -806,6 +809,7 @@ fn handle_grab_and_release(
         MessageWriter<crate::sfx::PlaySfx>,
     ),
 ) {
+    let (buttons, keys, mouse) = (&inputs.0, &inputs.1, &inputs.2);
     let (witnessed, sounds) = (&mut told.0, &mut told.1);
     let Some(terrain) = terrain else {
         return;
@@ -1042,12 +1046,15 @@ fn handle_grab_and_release(
     // The ACTION button, which Black and White puts on the right: pick up,
     // carry, drop, throw. The left button is the land — see
     // `camera::orbit_and_pan`.
+    let inspecting_villager = (keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight))
+        && hand.hovered.is_some_and(|e| matters.9.get(e).is_ok());
+
     if buttons.just_pressed(mouse.action())
         && !pointer.over_ui
+        && !inspecting_villager
         && armed.0.is_none()
         && hand.held.is_none()
         && let Some(entity) = hand.hovered
-        && matters.9.get(entity).is_err()
         && rooted.get(entity).is_err()
         && let Ok(transform) = transforms.get(entity)
     {
