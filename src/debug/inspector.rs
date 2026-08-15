@@ -758,32 +758,22 @@ pub(crate) fn update_inspector(
         // all, and there is nothing on the card to say the walls are stone
         // rather than the price being wrong. Brett, reasonably: "A
         // longhouse only take 19 Stone and no timber?"
+        // The walls take the material's name; the footing is always stone
+        // and is called what it is, which keeps the two apart on a stone
+        // building without either line having to explain itself.
         let mut stuff = plan.stuff.word().to_string();
         stuff[..1].make_ascii_uppercase();
-        want(
-            &format!("{stuff} (walls)"),
-            construction.progress.min(frame),
-            frame,
-        );
-        want(
-            "Stone (footing)",
-            construction.stone_laid.min(footing),
-            footing,
-        );
+        want(&stuff, construction.progress.min(frame), frame);
+        want("Footing", construction.stone_laid.min(footing), footing);
+        // Numbers and nothing else. Brett: "The building a building tooltip
+        // doesn't need to say anything except what it is missing lol. If the
+        // timber is 7/7 for example that is all they need to put." The card
+        // used to explain that a full frame still waits on a carpenter's
+        // hands; the rule has not changed, but it is not news any more, and
+        // a hover card is a glance rather than a lesson.
         let lines: Vec<String> = bill
             .iter()
-            .map(|(name, have, needs)| {
-                // The last half-measure of the frame is the carpenter's, by
-                // the same rule that governs helpers: materials and even the
-                // god speed a build, a person finishes it. Written on the
-                // card, because "4/5" reads as one-more-log when no log will
-                // move it - Brett fed a full frame twice before asking.
-                if *have >= needs - 0.5 && *have < *needs {
-                    format!("{name}: ready - a carpenter finishes it")
-                } else {
-                    format!("{name}: {have:.0}/{needs:.0}")
-                }
-            })
+            .map(|(name, have, needs)| format!("{name} {have:.0}/{needs:.0}"))
             .collect();
         (format!("{}, rising", plan.kind.name()), lines.join("\n"))
     } else if let Ok((settlement, store)) = settlement_info.get(entity) {
