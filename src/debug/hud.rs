@@ -758,3 +758,61 @@ pub(crate) fn toggle_dev_overlay(
         };
     }
 }
+
+/// Shift-click the ground while the F1 panel is open to mark that chunk
+/// walked.
+///
+/// A dev tool for the veil, which is the one part of the game whose whole
+/// judgement is visual: to see what an edge looks like you have to have an
+/// edge, and getting one honestly means sending explorers out and waiting.
+/// Brett: "Can I have a way to click the ground while in dev mode and mark a
+/// chunk exsplored? Maybe while F1 is open if I hold shift and left click?"
+///
+/// Behind the F1 panel deliberately. This writes to the village's real
+/// knowledge - the same `learn` an expedition calls when it comes home - so it
+/// is a cheat, and a cheat should be somewhere you have to have opened
+/// something to reach.
+pub(crate) fn walk_the_ground_by_hand(
+    panels: Query<&Visibility, With<HudPanel>>,
+    keys: Res<ButtonInput<KeyCode>>,
+    buttons: Res<ButtonInput<MouseButton>>,
+    hand: Res<crate::hand::DivineHand>,
+    terrain: Option<Res<crate::terrain::Terrain>>,
+    known: Option<ResMut<crate::villager::explore::KnownWorld>>,
+) {
+    if panels.iter().all(|showing| *showing == Visibility::Hidden) {
+        return;
+    }
+    if !buttons.just_pressed(MouseButton::Left) {
+        return;
+    }
+    if !keys.pressed(KeyCode::ShiftLeft) && !keys.pressed(KeyCode::ShiftRight) {
+        return;
+    }
+    let (Some(terrain), Some(mut known), Some(seat)) = (terrain, known, hand.cursor_world) else {
+        return;
+    };
+    // The cursor meets the ground in DRAWN space, on the bent world; knowledge
+    // is written in the flat coordinates the simulation runs in. Unbend it, or
+    // clicking anywhere but the tangent point learns somewhere else entirely.
+    let flat = crate::globe::unbend(seat);
+    let coord = terrain.chunk_of(flat.x, flat.z);
+    let centre = Vec3::new(
+        (coord.x as f32 + 0.5) * crate::terrain::CHUNK_SIZE,
+        0.0,
+        (coord.y as f32 + 0.5) * crate::terrain::CHUNK_SIZE,
+    );
+    // The whole chunk, corners and all: half its diagonal. Learning a circle
+    // the width of a chunk would leave its four corners dark and the map
+    // would freckle.
+    known.learn(
+        centre,
+        crate::terrain::CHUNK_SIZE * std::f32::consts::SQRT_2 * 0.5,
+    );
+    info!(
+        "the god walked chunk {},{} by hand - {} pockets known",
+        coord.x,
+        coord.y,
+        known.pockets.len()
+    );
+}

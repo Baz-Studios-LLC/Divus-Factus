@@ -190,6 +190,13 @@ impl Plugin for DebugPlugin {
                     .chain(),
             )
             // REBUILD: every page keeps its own content up, in parallel.
+            // The veil's dev tool: shift-click ground with F1 open to mark that
+            // chunk walked. Registered ALONE, in Input: the tuple below is a
+            // Rebuild set, and a system named in two sets that have a
+            // before/after relationship between them is a schedule that
+            // refuses to build - it panics on boot, and no test in the suite
+            // builds a schedule.
+            .add_systems(Update, walk_the_ground_by_hand.in_set(DebugSet::Input))
             .add_systems(
                 Update,
                 (

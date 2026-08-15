@@ -1998,7 +1998,9 @@ pub struct TerrainAssets {
 fn setup_terrain(
     mut commands: Commands,
     _meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    // Every surface this raises - ground, rivers, sea - wears the material
+    // that carries the veil, so there is no plain `StandardMaterial` left to
+    // ask for here.
     mut ground_materials: ResMut<Assets<crate::fog::GroundMaterial>>,
     world_seed: Res<crate::WorldSeed>,
 ) {
