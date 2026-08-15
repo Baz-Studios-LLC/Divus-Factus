@@ -497,6 +497,11 @@ const EVERGREEN: u8 = 4;
 #[derive(Resource)]
 struct PlanetSkin(Handle<PlanetMaterial>);
 
+/// The same skin, cut for water: it carries the veil the way the ground does,
+/// so the sea darkens with the coast instead of glowing through it.
+#[derive(Resource)]
+struct PlanetSeaSkin(Handle<PlanetMaterial>);
+
 /// Ordinary ground, plus the fog of war mixed in AFTER the lighting.
 ///
 /// The cloths that hide unknown ground at play height are unlit — their shader
@@ -838,22 +843,38 @@ fn plant_the_tree(
     // should have had was nowhere. The real sun covers this layer now; see
     // `main::setup` and `calendar::apply_sky_to_lights`.
 
+    let veil_paint = || VeilExtension {
+        // Unknown ground is solid at play height, and the far planet uses
+        // the same rule so climbing cannot make the shroud transparent.
+        tint: Vec4::new(
+            crate::fog::VEIL_TINT[0],
+            crate::fog::VEIL_TINT[1],
+            crate::fog::VEIL_TINT[2],
+            1.0,
+        ),
+    };
     commands.insert_resource(PlanetSkin(materials.add(PlanetMaterial {
         base: StandardMaterial {
             base_color: Color::WHITE,
             perceptual_roughness: 1.0,
             ..default()
         },
-        extension: VeilExtension {
-            // Unknown ground is solid at play height, and the far planet uses
-            // the same rule so climbing cannot make the shroud transparent.
-            tint: Vec4::new(
-                crate::fog::VEIL_TINT[0],
-                crate::fog::VEIL_TINT[1],
-                crate::fog::VEIL_TINT[2],
-                1.0,
-            ),
+        extension: veil_paint(),
+    })));
+
+    // THE SEA WEARS THE VEIL TOO. It used to wear a plain `StandardMaterial`,
+    // which has no way to read the mark - so every ocean on the planet lay in
+    // full daylight while the continents around it went dark, and knowledge
+    // was reduced to deciding whether the water was BUILT at all. Same shader,
+    // same tint, water's own finish: smooth and glossy where the ground is
+    // rough, so the sea still reads as sea.
+    commands.insert_resource(PlanetSeaSkin(materials.add(PlanetMaterial {
+        base: StandardMaterial {
+            base_color: Color::WHITE,
+            perceptual_roughness: 0.12,
+            ..default()
         },
+        extension: veil_paint(),
     })));
 
     // Exactly the evergreens, and no deeper. The bake used to go one level
@@ -965,10 +986,10 @@ struct PatchWater;
 /// what water looks like.
 fn dress_the_patch_water(
     mut commands: Commands,
-    assets: Option<Res<crate::terrain::TerrainAssets>>,
-    bare: Query<Entity, (With<PatchWater>, Without<MeshMaterial3d<StandardMaterial>>)>,
+    skin: Option<Res<PlanetSeaSkin>>,
+    bare: Query<Entity, (With<PatchWater>, Without<MeshMaterial3d<PlanetMaterial>>)>,
 ) {
-    let Some(assets) = assets else {
+    let Some(skin) = skin else {
         return;
     };
     for sea in &bare {
@@ -978,7 +999,7 @@ fn dress_the_patch_water(
         // patch that died mid-frame is legitimately skippable.
         commands
             .entity(sea)
-            .try_insert(MeshMaterial3d(assets.sea_material.clone()));
+            .try_insert(MeshMaterial3d(skin.0.clone()));
     }
 }
 
@@ -1399,15 +1420,29 @@ fn build_patch_water(
             // The same question the ground asked, so the two agree vertex for
             // vertex. See `Terrain::ground_and_water_at`.
             let (h, wet) = terrain.ground_and_water_at(x, z);
-            let known_here = veil.map_or(true, |k| k.knows(Vec3::new(x, 0.0, z)));
-            let under = h < wet && known_here;
+            // WHETHER THERE IS SEA HERE IS A QUESTION ABOUT THE WORLD, NOT
+            // ABOUT WHO HAS SEEN IT. Knowledge used to decide the water's
+            // EXISTENCE - `h < wet && known_here` - which left the ocean only
+            // two possible readings, full daylight or absent, and never the
+            // one the land gets. So every sea on the planet lay lit while the
+            // continents around it went dark, which is precisely backwards:
+            // unwalked water is the least known ground there is.
+            let under = h < wet;
             any |= under;
             drowned[gj * stride + gi] = under;
             positions.push((dir * (PLANET_RADIUS + wet - WATER_CLEARANCE)).to_array());
             normals.push(dir.to_array());
             // Depth against the bed, exactly as the chunks' own sea reads it,
             // so the two agree where they meet. See `terrain::water_colour`.
-            colors.push(crate::terrain::water_colour(wet - h));
+            let mut colour = crate::terrain::water_colour(wet - h);
+            // And the veil is worn the way the land wears it: alpha zero is
+            // the mark `paint_patch_colors` makes on unknown ground, and the
+            // planet's skin reads that one mark for both. One veil, one
+            // colour - see `paint_patch_colors`.
+            if veil.is_some_and(|known| !known.knows(Vec3::new(x, 0.0, z))) {
+                colour[3] = 0.0;
+            }
+            colors.push(colour);
         }
     }
     if !any {
