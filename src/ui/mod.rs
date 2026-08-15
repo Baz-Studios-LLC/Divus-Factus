@@ -34,6 +34,7 @@ impl Plugin for UiPlugin {
         app.init_resource::<PointerContext>()
             .init_resource::<SetAside>()
             .init_resource::<WindowDrag>()
+            .init_resource::<BubbleClock>()
             .add_message::<Notice>()
             .add_message::<Say>()
             .add_systems(
@@ -71,8 +72,11 @@ impl Plugin for UiPlugin {
                     focus_windows,
                     dress_display_text,
                     switch_tabs,
-                    speak.run_if(in_state(crate::GameState::Playing)),
-                    float_bubbles,
+                    advance_bubble_clock,
+                    speak
+                        .run_if(in_state(crate::GameState::Playing))
+                        .after(advance_bubble_clock),
+                    float_bubbles.after(advance_bubble_clock),
                     update_date_card,
                     town::update_town_strip.run_if(in_state(crate::GameState::Playing)),
                 )
@@ -252,6 +256,9 @@ fn sentence(text: &str) -> String {
 #[derive(Component)]
 struct Bubble {
     speaker: Entity,
+    /// The displayed sentence, held only long enough to prevent two async
+    /// delivery paths from putting the exact same words over one head.
+    text: String,
     until: f32,
     /// How far above the head the box floats — a thought's circle trail
     /// needs more room than a speech tail.
@@ -270,6 +277,26 @@ struct Bubble {
     /// Decided by the pair, not the speaker, so both turns of the same
     /// exchange agree and neither voice ever changes sides mid-sentence.
     side: f32,
+}
+
+/// Real-world seconds in which speech is allowed to age. Bubbles should not
+/// rush away under fast-forward, but neither should a paused player lose a
+/// line while reading it.
+#[derive(Resource, Default)]
+struct BubbleClock {
+    elapsed: f32,
+}
+
+fn advance_bubble_clock(
+    real_time: Res<Time<Real>>,
+    virtual_time: Res<Time<Virtual>>,
+    speed: Option<Res<crate::speed::SimSpeed>>,
+    mut clock: ResMut<BubbleClock>,
+) {
+    if virtual_time.is_paused() || speed.is_some_and(|speed| speed.paused) {
+        return;
+    }
+    clock.elapsed += real_time.delta_secs();
 }
 
 /// At most this many bubbles at once: sparse is the point. If everyone
@@ -291,9 +318,10 @@ fn speak(
     mut commands: Commands,
     // Scrub telemetry: a bubble's true cost, attributed rather than guessed.
     mut spent: Local<f32>,
-    // Real time: a bubble is for the player's eyes, and must stay
-    // readable however hard the world is hasted.
-    time: Res<Time<Real>>,
+    // Unpaused real time: a bubble is for the player's eyes, and must stay
+    // readable however hard the world is hasted without disappearing while
+    // the player has stopped the clock to read it.
+    bubble_clock: Res<BubbleClock>,
     mut messages: MessageReader<Say>,
     attention: Option<Res<crate::attention::Attention>>,
     names: Query<(
@@ -310,6 +338,7 @@ fn speak(
     let started = std::time::Instant::now();
     let mut spawned = 0u32;
     for say in messages.read() {
+        let text = sentence(&say.text);
         // `DIVUS_FACTUS_VOICE_LOG=1`: the whole transcript, whether or
         // not anybody was watching. This is the one place every line in
         // the game passes through, so it is the only honest place to
@@ -337,6 +366,12 @@ fn speak(
         // judging days, and its last effect was silencing written lines
         // that had every right to play.
         if live.iter().count() >= BUBBLE_CAP {
+            continue;
+        }
+        if live
+            .iter()
+            .any(|bubble| bubble.speaker == say.speaker && bubble.text == text)
+        {
             continue;
         }
         // Whether this is one turn of a conversation, and with whom. A
@@ -390,6 +425,7 @@ fn speak(
             .spawn((
                 Bubble {
                     speaker: say.speaker,
+                    text: text.clone(),
                     // A turn of a conversation waits for the rest of the
                     // conversation: four beats at a few seconds each, and
                     // a thread whose first line has already gone is not a
@@ -398,7 +434,7 @@ fn speak(
                     // by a breath, so the last word can be read and the
                     // whole thread stands while it is being said. A
                     // remark to nobody keeps its old life.
-                    until: time.elapsed_secs()
+                    until: bubble_clock.elapsed
                         + if talking_to.is_some() {
                             crate::villager::gossip::A_CHAT_RUNS as f32 + 4.0
                         } else {
@@ -539,7 +575,7 @@ fn speak(
             ));
         }
         commands.spawn((
-            Text::new(sentence(&say.text)),
+            Text::new(text),
             // The text itself must know the wrap width: a shrink-wrapped
             // bubble measures its text at full one-line width, and the
             // late wrap spills lines out the bottom of the border. The
@@ -586,7 +622,7 @@ const TALK_UNREADABLE_ABOVE: f32 = 100.0;
 /// Bubbles ride above their speakers' heads and fade off with them.
 fn float_bubbles(
     mut commands: Commands,
-    time: Res<Time<Real>>,
+    bubble_clock: Res<BubbleClock>,
     cameras: Query<(&bevy::camera::Camera, &GlobalTransform)>,
     rigs: Query<&crate::camera::CameraRig>,
     speakers: Query<&GlobalTransform, Without<Bubble>>,
@@ -668,7 +704,7 @@ fn float_bubbles(
     // Bubbles already settled this frame, so later ones can stack clear.
     let mut placed: Vec<Rect> = Vec::new();
     for (entity, bubble, mut node, computed, mut visibility, mut ui) in &mut bubbles {
-        if time.elapsed_secs() > bubble.until {
+        if bubble_clock.elapsed > bubble.until {
             commands.entity(entity).despawn();
             continue;
         }
@@ -2026,16 +2062,18 @@ pub fn stat_plate(
             ChildOf(parent),
         ))
         .id();
-    let label = commands.spawn((
-        Text::new(label_text.to_uppercase()),
-        DisplayFace,
-        TextFont {
-            font_size: FontSize::Px(14.0),
-            ..default()
-        },
-        TextColor(theme::text_dim()),
-        ChildOf(plate),
-    )).id();
+    let label = commands
+        .spawn((
+            Text::new(label_text.to_uppercase()),
+            DisplayFace,
+            TextFont {
+                font_size: FontSize::Px(14.0),
+                ..default()
+            },
+            TextColor(theme::text_dim()),
+            ChildOf(plate),
+        ))
+        .id();
     let row = commands
         .spawn((
             Node {

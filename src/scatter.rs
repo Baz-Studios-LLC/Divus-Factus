@@ -406,7 +406,6 @@ fn populate_chunks(
     };
 
     for (entity, chunk) in &chunks {
-
         let origin = Vec2::new(
             chunk.coord.x as f32 * CHUNK_SIZE,
             chunk.coord.y as f32 * CHUNK_SIZE,
@@ -1907,7 +1906,10 @@ mod tests {
         // they emptied.
         let mut a_day_later = StrippedGround::default();
         a_day_later.fell(12.0, -30.0, day + 1);
-        assert_eq!(a_day_later.growth_at(12.0, -30.0, day + REGROWTH_STAGE), Growth::Empty);
+        assert_eq!(
+            a_day_later.growth_at(12.0, -30.0, day + REGROWTH_STAGE),
+            Growth::Empty
+        );
         assert_eq!(stage(REGROWTH_STAGE), Growth::Sapling);
     }
 
@@ -1950,7 +1952,10 @@ mod tests {
         ground.forget_grown(10 + REGROWTH_STAGE * 3);
         assert_eq!(ground.regrowing.len(), 1, "the grown one should be dropped");
         // Dropping the record must not change what stands there.
-        assert_eq!(ground.growth_at(0.0, 0.0, 10 + REGROWTH_STAGE * 3), Growth::Grown);
+        assert_eq!(
+            ground.growth_at(0.0, 0.0, 10 + REGROWTH_STAGE * 3),
+            Growth::Grown
+        );
         assert_eq!(
             ground.growth_at(60.0, 0.0, 10 + REGROWTH_STAGE * 3),
             Growth::Empty,

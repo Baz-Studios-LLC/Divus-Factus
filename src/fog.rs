@@ -29,21 +29,10 @@ const MAX_POCKETS: usize = 128;
 
 /// How high the veil's bank of mist stands.
 ///
-/// The tallest tree in the world is a shade over eight metres, so a bank that
-/// reaches twelve swallows the woods whole. The sheet drawn at that height is
-/// the TOP of the bank; everything under it is inside the mist, and the shader
-/// weighs each pixel by how far its ray travels through that depth — see
-/// `fog.wgsl`. It used to be six thin sheets climbing to this height, which
-/// worked from above and read as six countable contour lines from the side.
-const VEIL_HIGH: f32 = 12.0;
-
-/// The sea takes its sheet almost on the water.
-///
-/// There is nothing floating on the sea that needs twelve metres of hiding, and
-/// a deep slab over a shelving seabed drew a contour line at every step of it.
-/// Low and thin, the only line it can draw is the waterline itself — where the
-/// land's own veil takes over anyway.
-const SEA_SHEET: f32 = 0.35;
+/// The tallest current tree is a shade over eight metres; sixteen gives the
+/// shroud headroom for roofs and future scenery without letting silhouettes
+/// poke through its top.
+const VEIL_HIGH: f32 = 16.0;
 
 /// Whether the veil is up. It is, from the first frame: the world a
 /// village has actually walked is the world the game is about, and the
@@ -139,21 +128,11 @@ pub struct FogParams {
 impl Default for FogParams {
     fn default() -> Self {
         FogParams {
-            // Nine parts in ten, looked at SQUARELY: dark enough to hide a
-            // wood, light enough that the ground's own shape still tells
-            // underneath it. The shader turns this into an extinction and every
-            // other angle follows from it, so a grazing look at the bank comes
-            // out heavier than this without being told to.
-            //
-            // It was 0.32 when the veil was six stacked sheets, because that is
-            // what one of six had to be for the six to come to nine tenths.
-            // Left at a sheet's weight while the sheets became a slab, the whole
-            // bank would be a third opaque from above and the unknown world
-            // would show through it.
-            tint: Vec4::new(VEIL_TINT[0], VEIL_TINT[1], VEIL_TINT[2], 0.9),
+            // Full unknownness is solid. Alpha drives the veil's rising and
+            // dithered discovery edge, not translucency through the world.
+            tint: Vec4::new(VEIL_TINT[0], VEIL_TINT[1], VEIL_TINT[2], 1.0),
             home: Vec4::new(0.0, 0.0, 0.0, 170.0),
-            // z is how deep the bank stands, which the shader turns into an
-            // extinction: see `fog.wgsl`.
+            // z is the bank's physical height above its terrain mesh.
             dials: Vec4::new(0.0, 9.0, VEIL_HIGH, 0.0),
             planet: crate::globe::planet_centre().extend(crate::terrain::PLANET_RADIUS),
             pockets: [Vec4::ZERO; MAX_POCKETS],
@@ -168,23 +147,26 @@ pub struct FogMaterial {
 }
 
 impl Material for FogMaterial {
+    fn vertex_shader() -> ShaderRef {
+        SHADER_PATH.into()
+    }
+
     fn fragment_shader() -> ShaderRef {
         SHADER_PATH.into()
     }
 
     fn alpha_mode(&self) -> AlphaMode {
+        // The shader supplies full alpha for unknown ground, so this still
+        // hides everything behind the shroud. Keeping it in the transparent
+        // pass matters at god-height: the opaque pass turned the planet into a
+        // pale solid disc instead of letting the sky's finishing pass treat the
+        // veil like the atmosphere it is.
         AlphaMode::Blend
     }
 
-    /// The veil is drawn LAST of the see-through things, always.
-    ///
-    /// Blended meshes are sorted by how far their origins sit from the
-    /// camera, and the sea's veil hangs a hand's breadth over a sea whose
-    /// origin is the world's. Two origins that close sort by rounding
-    /// error: turn the camera and the order flipped, and the water came
-    /// out on top of the fog that was supposed to be hiding it. A bias
-    /// this large is not a nudge, it is a statement - nothing transparent
-    /// in this world is ever meant to be in front of the veil.
+    // A fully opaque fragment in the transparent pass still needs to arrive
+    // after the sea and other see-through scenery, or those things can draw on
+    // top of the unknown world.
     fn depth_bias(&self) -> f32 {
         10_000.0
     }
@@ -230,6 +212,7 @@ fn drape_the_veil(
             Option<&Children>,
             Has<WaterPlane>,
             &Visibility,
+            Has<crate::terrain::ParkedChunk>,
         ),
         Or<(With<TerrainChunk>, With<WaterPlane>)>,
     >,
@@ -257,7 +240,10 @@ fn drape_the_veil(
                 commands.entity(veil).try_despawn();
             }
         }
-        for (chunk, _, _, _, showing) in &chunks {
+        for (chunk, _, _, _, showing, parked) in &chunks {
+            if parked {
+                continue;
+            }
             reveal(&mut commands, chunk, showing);
         }
         return;
@@ -294,7 +280,10 @@ fn drape_the_veil(
             stuff.params.tint.w = full * rising.risen;
         }
     }
-    for (chunk, mesh, children, sea, showing) in &chunks {
+    for (chunk, mesh, children, sea, showing, parked) in &chunks {
+        if parked {
+            continue;
+        }
         let dressed = children.map_or(0, |kids| {
             kids.iter().filter(|kid| veils.contains(*kid)).count()
         });
@@ -304,32 +293,16 @@ fn drape_the_veil(
             continue;
         }
         {
-            // The sea's veil lies almost on the water; the land's stands at the
-            // top of the bank, over the treetops, draping the ground's own
-            // shape so it draws no contours of its own.
-            let lift = if sea { SEA_SHEET } else { VEIL_HIGH };
+            let _ = sea;
             commands.spawn((
                 Veil,
                 Mesh3d(mesh.0.clone()),
                 MeshMaterial3d(cloth.clone()),
-                // Lifted RADIALLY, not along world Y. The sheets copy the
-                // chunk's own mesh, and those vertices are seated on the
-                // sphere - so "up" is away from the planet's centre, and it
-                // differs everywhere. A uniform scale about that centre
-                // raises every vertex by `lift` along its own radial at
-                // once: p' = centre + k(p - centre), which is exactly a
-                // scale of k plus a translation of centre(1 - k). Lifting
-                // along Y instead only worked at the reference point and
-                // sheared the veil off the world everywhere else.
-                {
-                    let centre = crate::globe::planet_centre();
-                    let k = (crate::terrain::PLANET_RADIUS + lift) / crate::terrain::PLANET_RADIUS;
-                    Transform {
-                        translation: centre * (1.0 - k),
-                        rotation: Quat::IDENTITY,
-                        scale: Vec3::splat(k),
-                    }
-                },
+                // The vertex shader lifts this exact terrain copy according
+                // to its explored-state distance field. Known ground stays at
+                // ground level, the frontier rises smoothly, and unknown land
+                // reaches the full bank height - one uninterrupted surface.
+                Transform::IDENTITY,
                 // The veil is not a THING. Six sheets hanging over the
                 // world threw six sheets of shadow onto the ground they
                 // were meant to be hiding, and the known island - the one

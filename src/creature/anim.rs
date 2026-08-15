@@ -14,6 +14,102 @@ use super::body::CreatureRig;
 use super::genome::CreatureGenome;
 use super::genome::Garment;
 
+/// Upper-arm and elbow angles for a person working at a real job. The two arms
+/// intentionally differ: a pick needs a bracing hand, a basket stays low, and
+/// a censer swings from a relaxed wrist rather than both arms pumping alike.
+fn work_arm_pose(
+    vocation: crate::villager::work::Vocation,
+    arm: usize,
+    time: f32,
+    offset: f32,
+) -> (f32, f32) {
+    use crate::villager::work::Vocation;
+    let right = arm == 1;
+    let strike = (time * 4.7 + offset).sin();
+    let tap = (time * 7.5 + offset).sin().max(0.0);
+    match vocation {
+        Vocation::Forester | Vocation::Miner => {
+            if right {
+                (-0.75 + strike * 0.92, 1.05)
+            } else {
+                (-0.48 + strike * 0.54, 0.82)
+            }
+        }
+        Vocation::Builder => {
+            if right {
+                (-0.42 + tap * 0.72, 1.02)
+            } else {
+                (-0.34, 0.78)
+            }
+        }
+        Vocation::Farmer => {
+            if right {
+                (-0.56 + strike * 0.38, 0.96)
+            } else {
+                (-0.42 - strike * 0.22, 0.88)
+            }
+        }
+        Vocation::Fisher => {
+            if right {
+                (-0.48 + (time * 2.4 + offset).sin() * 0.16, 0.82)
+            } else {
+                (-0.30, 0.62)
+            }
+        }
+        Vocation::Hunter => {
+            if right {
+                // The drawing hand comes back and releases; the bow hand is
+                // held out toward the quarry instead of making a spear jab.
+                (-0.18 + (time * 2.1 + offset).sin().max(0.0) * 0.42, 1.08)
+            } else {
+                (-0.82, 0.72)
+            }
+        }
+        Vocation::Guard => {
+            if right {
+                (-0.20, 0.64)
+            } else {
+                (-0.34, 0.72)
+            }
+        }
+        Vocation::Gatherer => {
+            if right {
+                (-0.22 + (time * 3.5 + offset).sin() * 0.22, 0.70)
+            } else {
+                (-0.16, 0.60)
+            }
+        }
+        Vocation::Cook => {
+            if right {
+                (-0.28, 0.90)
+            } else {
+                (-0.20, 0.62)
+            }
+        }
+        Vocation::Healer => {
+            if right {
+                (-0.22 + (time * 2.8 + offset).sin() * 0.14, 0.90)
+            } else {
+                (-0.30, 0.78)
+            }
+        }
+        Vocation::Priest => {
+            if right {
+                (0.04, 0.76)
+            } else {
+                (-0.08, 0.70)
+            }
+        }
+        Vocation::Explorer => {
+            if right {
+                (-0.16, 0.62)
+            } else {
+                (-0.04, 0.48)
+            }
+        }
+    }
+}
+
 /// Per-creature animation state, advanced every frame.
 #[derive(Component, Default)]
 pub struct CreatureMotion {
@@ -88,6 +184,8 @@ pub fn animate_creatures(
         &CreatureGenome,
         &CreatureMotion,
         &GlobalTransform,
+        Option<&crate::villager::work::Vocation>,
+        Option<&crate::villager::Activity>,
         Has<super::Held>,
         Has<super::Airborne>,
         Has<super::Laden>,
@@ -96,7 +194,7 @@ pub fn animate_creatures(
 ) {
     let t = time.elapsed_secs();
 
-    for (rig, genome, motion, global, held, airborne, laden) in &creatures {
+    for (rig, genome, motion, global, vocation, activity, held, airborne, laden) in &creatures {
         let gait = &genome.gait;
 
         // Walking blend: 0 standing still, 1 at full walking speed. Everything
@@ -168,6 +266,12 @@ pub fn animate_creatures(
         // for a box hanging on -Y, POSITIVE X rotation carries its free end
         // forward. So elbows bend positive (forearm rises in front) and
         // knees bend negative (shin folds behind).
+        let at_work = activity
+            .is_some_and(|activity| *activity == crate::villager::Activity::Working)
+            && vocation.is_some()
+            && walk < 0.2
+            && !held;
+        let mut arm_number = 0usize;
         for limb in &rig.limbs {
             let Ok(mut transform) = transforms.get_mut(limb.entity) else {
                 continue;
@@ -197,7 +301,16 @@ pub fn animate_creatures(
             // the legs are stood on and stay put.
             let off_ground = held || airborne;
             let working = motion.flail > 0.0 && !off_ground;
-            let flail = if motion.flail > 0.0 && (limb.is_arm || off_ground) {
+            let craft_pose = if limb.is_arm && at_work {
+                let arm = arm_number;
+                arm_number += 1;
+                vocation.map(|vocation| work_arm_pose(*vocation, arm, t, motion.idle_offset))
+            } else {
+                None
+            };
+            let flail = if craft_pose.is_some() {
+                0.0
+            } else if motion.flail > 0.0 && (limb.is_arm || off_ground) {
                 let thrash = ((t * 13.0 + limb.phase * 2.0).sin()) * motion.flail;
                 if working {
                     // Lift the arms forward and pump around that pose.
@@ -226,8 +339,10 @@ pub fn animate_creatures(
                 kneel * 0.35
             };
 
-            transform.rotation =
-                Quat::from_rotation_x((swing + flail + drift) * (1.0 - kneel) + kneel_upper);
+            let crafted_upper = craft_pose.map_or(0.0, |pose| pose.0);
+            transform.rotation = Quat::from_rotation_x(
+                (swing + flail + drift + crafted_upper) * (1.0 - kneel) + kneel_upper,
+            );
 
             // The hinge. Bends are one-signed - a knee does not hyperextend -
             // so each contribution is shaped before it is summed.
@@ -241,7 +356,9 @@ pub fn animate_creatures(
                 // panic in the air throws it around.
                 let rest = 0.18;
                 let stride = swing.max(0.0) * 0.8;
-                let work = if working {
+                let work = if let Some(pose) = craft_pose {
+                    pose.1
+                } else if working {
                     // Damped by the kneel like every stride term: a pray-er
                     // brushed by a nearby commotion must not hammer the air.
                     (0.9 + ((t * 13.0 + limb.phase).sin()) * 0.35)

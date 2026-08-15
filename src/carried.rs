@@ -91,14 +91,16 @@ mod tests {
     /// telling the bench where to carry things.
     #[test]
     fn the_game_can_find_its_own_buildings() {
-        let home = folder(crate::villager::work::baked::BAKED_UNDER)
-            .expect("the buildings are somewhere");
+        let home =
+            folder(crate::villager::work::baked::BAKED_UNDER).expect("the buildings are somewhere");
         assert!(
             std::fs::read_dir(&home)
                 .expect("the folder opens")
                 .flatten()
-                .all(|entry| entry.path().extension().is_none_or(|kind| kind == "json"
-                    || entry.path().file_name().is_some_and(|f| f == ".gitkeep"))),
+                .all(
+                    |entry| entry.path().extension().is_none_or(|kind| kind == "json"
+                        || entry.path().file_name().is_some_and(|f| f == ".gitkeep"))
+                ),
             "{} holds a file that is not a baked drawing",
             home.display()
         );

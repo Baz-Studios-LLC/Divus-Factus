@@ -16,6 +16,7 @@ pub mod names;
 pub mod rampart;
 pub mod rites;
 pub mod speech;
+pub mod tools;
 pub mod traits;
 pub mod work;
 
@@ -213,9 +214,22 @@ impl Plugin for VillagerPlugin {
                 Update,
                 (attire::dress_for_work, attire::twirl_to_redress).chain(),
             )
+            .add_systems(
+                Update,
+                (tools::equip_work_tools, tools::animate_work_tools).chain(),
+            )
+            .add_systems(Update, work::advance_hunting_arrows)
             // Civic life: the ballot and the decree, neither ordered
             // against anything - a mayor chosen a frame late is chosen.
-            .add_systems(Update, (civic::hold_elections, civic::set_the_agenda))
+            .add_systems(
+                Update,
+                (
+                    civic::hold_elections,
+                    civic::set_the_agenda,
+                    civic::stage_civic_assemblies,
+                )
+                    .chain(),
+            )
             .add_systems(
                 Update,
                 name_the_god.run_if(not(resource_exists::<DivineName>)),
@@ -237,6 +251,7 @@ impl Plugin for VillagerPlugin {
                     speech::remember_what_was_said,
                     speech::show_musings,
                     stretch_settlement,
+                    explore::chart_worksites,
                     explore::walk_the_world,
                     explore::expeditions,
                     explore::escort_duty,
@@ -332,7 +347,7 @@ impl Plugin for VillagerPlugin {
                         work::plan_houses,
                         work::take_up_work,
                         work::open_boardwalks,
-                        work::do_work,
+                        (work::do_work, work::apply_work_facing).chain(),
                         work::grow_crops,
                         work::sermons,
                         work::eat_from_store,
@@ -1795,6 +1810,9 @@ pub(crate) fn spawn_settlement(
         .map(|r| r.centre)
         .or(chosen.0)
         .unwrap_or_else(|| choose_settlement_site(&ground.0, &mut rng));
+    ground
+        .1
+        .prime_first_zoom(ground.0.chunk_of(centre.x, centre.z));
 
     // The place is named in the same tongue as its people, because the people
     // named it.
@@ -2954,7 +2972,9 @@ fn births(
     let nursing = villagers
         .iter()
         .filter(|(_, _, g, _, _, spouse, recovery, _)| {
-            g.sex == Sex::Female && spouse.is_some() && recovery.is_some_and(|r| clock.elapsed <= r.until)
+            g.sex == Sex::Female
+                && spouse.is_some()
+                && recovery.is_some_and(|r| clock.elapsed <= r.until)
         })
         .count();
     let held = if living < 2 {

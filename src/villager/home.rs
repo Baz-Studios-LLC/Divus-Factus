@@ -93,6 +93,17 @@ fn should_rehome(wants_longhouse: bool, in_longhouse: bool, room_in_wanted: bool
     wants_longhouse != in_longhouse && room_in_wanted
 }
 
+/// A child belongs with a living parent when that parent has room. Being under
+/// *a* family roof is not enough: a lone child in an unrelated empty house is
+/// technically housed but still reads, and lives, as abandoned.
+fn should_rejoin_parent(
+    current: Entity,
+    parent_home: Option<Entity>,
+    parent_has_room: bool,
+) -> bool {
+    parent_home.is_some_and(|home| home != current && parent_has_room)
+}
+
 /// The village fire: fuel in seconds of burning, and who is off fetching wood
 /// for it, so the whole village does not converge on one log.
 #[derive(Component, Debug)]
@@ -741,6 +752,7 @@ pub(super) fn tend_fire(
             Without<crate::avatar::Ridden>,
             Without<Airborne>,
             Without<Corpse>,
+            Without<crate::villager::civic::CivicGuest>,
         ),
     >,
 ) {
@@ -924,42 +936,51 @@ pub(super) fn assign_homes(
         let acceptable =
             |long: bool| long == want_longhouse || (long && !want_longhouse && !house_open);
         let kin_roof = kin.filter(|roof| {
-            roofs
-                .get(*roof)
-                .is_ok_and(|(_, _, long)| acceptable(long) && has_room(*roof, long, &occupancy))
+            roofs.get(*roof).is_ok_and(|(_, _, long)| {
+                // A child follows a parent wherever that parent currently
+                // sleeps. They do not claim an empty family house merely
+                // because one exists; the parent must make that home first.
+                (child || acceptable(long)) && has_room(*roof, long, &occupancy)
+            })
         });
 
-        let roof = kin_roof.or_else(|| {
-            // Otherwise the nearest roof of the right kind. The unattached
-            // want the longhouse; the wed and their children want a house —
-            // and a house holds ONE family: without kin already under it,
-            // only an empty house will do. Boarding with somebody else's
-            // family is exactly what the longhouse exists to prevent, and
-            // it was happening to widows and fresh couples squeezed into
-            // half-full homes.
-            roofs
-                .iter()
-                .filter(|(roof, _, long)| {
-                    acceptable(*long)
-                        && if *long {
-                            has_room(*roof, *long, &occupancy)
-                        } else {
-                            occupancy.get(roof).copied().unwrap_or(0) == 0
-                        }
-                })
-                // An empty house first, then a bed in the hall: the
-                // preference survives, only the refusal goes. Nearest
-                // breaks the tie within a kind.
-                .map(|(roof, at, long)| {
-                    (
-                        roof,
-                        (long != want_longhouse) as u8,
-                        at.translation.distance(transform.translation),
-                    )
-                })
-                .min_by(|a, b| a.1.cmp(&b.1).then(a.2.total_cmp(&b.2)))
-                .map(|(roof, ..)| roof)
-        });
+        let roof = if child {
+            // No fallback. A child without a placed parent waits by the fire
+            // rather than becoming the sole resident of a new family home.
+            kin_roof
+        } else {
+            kin_roof.or_else(|| {
+                // Otherwise the nearest roof of the right kind. The unattached
+                // want the longhouse; the wed and their children want a house —
+                // and a house holds ONE family: without kin already under it,
+                // only an empty house will do. Boarding with somebody else's
+                // family is exactly what the longhouse exists to prevent, and
+                // it was happening to widows and fresh couples squeezed into
+                // half-full homes.
+                roofs
+                    .iter()
+                    .filter(|(roof, _, long)| {
+                        acceptable(*long)
+                            && if *long {
+                                has_room(*roof, *long, &occupancy)
+                            } else {
+                                occupancy.get(roof).copied().unwrap_or(0) == 0
+                            }
+                    })
+                    // An empty house first, then a bed in the hall: the
+                    // preference survives, only the refusal goes. Nearest
+                    // breaks the tie within a kind.
+                    .map(|(roof, at, long)| {
+                        (
+                            roof,
+                            (long != want_longhouse) as u8,
+                            at.translation.distance(transform.translation),
+                        )
+                    })
+                    .min_by(|a, b| a.1.cmp(&b.1).then(a.2.total_cmp(&b.2)))
+                    .map(|(roof, ..)| roof)
+            })
+        };
 
         let Some(roof) = roof else {
             // No bed of the right kind. Sleeping by the fire beats taking a
@@ -1013,16 +1034,18 @@ pub(super) fn rehome_the_misplaced(
             &Home,
             &Activity,
             Option<&Spouse>,
+            Option<&Parentage>,
             Has<Childhood>,
         ),
         (With<Villager>, Without<Corpse>, Without<Held>),
     >,
+    living_homes: Query<&Home, (With<Villager>, Without<Corpse>)>,
 ) {
     *since_last += time.delta_secs();
-    if *since_last < 9.0 {
-        return;
+    let reshuffle_due = *since_last >= 9.0;
+    if reshuffle_due {
+        *since_last = 0.0;
     }
-    *since_last = 0.0;
 
     // Never at night, and never mid-errand: a villager hidden inside a
     // building is being stood in for by that building, and pulling their
@@ -1049,13 +1072,42 @@ pub(super) fn rehome_the_misplaced(
     // One move a pass. A village that reshuffles six people at once reads
     // as a glitch; one person walking their bedding across the square reads
     // as a life changing.
-    for (entity, person, home, activity, spouse, child) in &housed {
+    for (entity, person, home, activity, spouse, parentage, child) in &housed {
         if !matches!(*activity, Activity::Idle | Activity::Wandering) {
             continue;
         }
         let Ok((_, in_longhouse)) = roofs.get(home.0) else {
             continue;
         };
+        let parent_home = child.then(|| parentage).flatten().and_then(|parents| {
+            [parents.mother, parents.father]
+                .into_iter()
+                .find_map(|parent| living_homes.get(parent).ok().map(|home| home.0))
+        });
+        let parent_has_room = parent_home.is_some_and(|roof| {
+            let cap = roofs
+                .get(roof)
+                .map(|(_, longhouse)| {
+                    if longhouse {
+                        crate::villager::work::BuildingKind::Longhouse.sleeps()
+                    } else {
+                        crate::villager::work::BuildingKind::House.sleeps()
+                    }
+                })
+                .unwrap_or(0);
+            occupancy.get(&roof).copied().unwrap_or(0) < cap
+        });
+        if should_rejoin_parent(home.0, parent_home, parent_has_room) {
+            commands.entity(entity).remove::<Home>();
+            info!("{} went back under a parent's roof", person.name);
+            return;
+        }
+        // The rest of the village only rearranges on its quiet cadence. Kin
+        // reunion is above that queue: a child alone in another house is not
+        // a harmless temporary placement the player should have to watch.
+        if !reshuffle_due {
+            continue;
+        }
         let wants_longhouse = !wants_family_roof(spouse, child);
         if !should_rehome(
             wants_longhouse,
@@ -1697,6 +1749,7 @@ pub(super) fn rouse_the_taken(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bevy::ecs::system::RunSystemOnce;
 
     #[test]
     fn one_log_buys_more_burning_than_the_low_mark() {
@@ -1780,6 +1833,72 @@ mod tests {
 
     fn home_of(app: &App, who: Entity) -> Option<Entity> {
         app.world().entity(who).get::<Home>().map(|h| h.0)
+    }
+
+    #[test]
+    fn a_child_rejoins_a_living_parent_instead_of_holding_a_house_alone() {
+        let (mut app, family_house, longhouse) = village();
+        let stray_house = app
+            .world_mut()
+            .spawn((Hut, Transform::from_xyz(40.0, 0.0, 0.0)))
+            .id();
+        let mother = villager(&mut app, "Mother", Some(family_house));
+        let father = villager(&mut app, "Father", Some(family_house));
+        app.world_mut().entity_mut(mother).insert(Spouse(father));
+        app.world_mut().entity_mut(father).insert(Spouse(mother));
+        let child = villager(&mut app, "Child", Some(stray_house));
+        app.world_mut()
+            .entity_mut(child)
+            .insert((Childhood { remaining: 60.0 }, Parentage { mother, father }));
+
+        // The kin correction removes the mistaken home; ordinary assignment
+        // remains the sole authority that places the child under a roof.
+        app.world_mut()
+            .run_system_once(rehome_the_misplaced)
+            .unwrap();
+        assert_eq!(home_of(&app, child), None);
+        app.world_mut().run_system_once(assign_homes).unwrap();
+
+        assert_eq!(home_of(&app, child), Some(family_house));
+        assert_ne!(home_of(&app, child), Some(longhouse));
+    }
+
+    #[test]
+    fn a_child_never_claims_an_empty_family_home_ahead_of_a_parent() {
+        let (mut app, house, _) = village();
+        let mother = villager(&mut app, "Mother", None);
+        let father = villager(&mut app, "Father", None);
+        let child = villager(&mut app, "Child", None);
+        app.world_mut()
+            .entity_mut(child)
+            .insert((Childhood { remaining: 60.0 }, Parentage { mother, father }));
+
+        app.world_mut().run_system_once(assign_homes).unwrap();
+
+        let child_home = home_of(&app, child);
+        assert_ne!(home_of(&app, child), Some(house));
+        assert!(
+            child_home.is_none()
+                || child_home == home_of(&app, mother)
+                || child_home == home_of(&app, father),
+            "a child may only take a roof already occupied by a parent"
+        );
+    }
+
+    #[test]
+    fn a_child_joins_a_parent_in_the_longhouse_before_any_empty_house() {
+        let (mut app, house, longhouse) = village();
+        let mother = villager(&mut app, "Mother", Some(longhouse));
+        let father = villager(&mut app, "Father", None);
+        let child = villager(&mut app, "Child", None);
+        app.world_mut()
+            .entity_mut(child)
+            .insert((Childhood { remaining: 60.0 }, Parentage { mother, father }));
+
+        app.world_mut().run_system_once(assign_homes).unwrap();
+
+        assert_eq!(home_of(&app, child), Some(longhouse));
+        assert_ne!(home_of(&app, child), Some(house));
     }
 
     #[test]

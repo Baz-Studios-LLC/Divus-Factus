@@ -5,35 +5,27 @@
 // stored, it is a distance field evaluated per pixel from a handful of
 // circles. Ground the village knows is clear; everything else takes the veil.
 //
-// This draws on a COPY of the terrain's own mesh, lifted over the treetops, so
-// the veil follows every hill and hollow instead of slicing through them the
-// way a flat plane would.
+// This draws on a COPY of the terrain's own mesh. The vertex stage raises that
+// exact surface only as it crosses from known ground into the unknown, making
+// the veil one continuous bank instead of a flat lid plus a separate wall.
 //
-// ONE sheet, and its weight comes from how far the view ray travels through the
-// bank rather than from how many sheets it crosses. It used to be a stack of
-// six, each thin, and looking along them from a low camera you could count
-// them: six pale contour lines lying across the distance. On the flat world the
-// DISTANCE FOG hid that, by fading everything far away into the horizon before
-// the sheets could be resolved; the round world hides its own distance over the
-// horizon instead, the fog went with it, and the stack was left standing there
-// to be counted.
-//
-// A slab is the honest model of a bank of mist, and it is one draw rather than
-// six. Looking down through it the ray crosses the bank's own height; looking
-// along it the ray crosses a great deal more, so the far edge of the veil
-// thickens into a wall by itself — which is the thing the stack was built to
-// fake in the first place.
+// The veil is an OCCLUDER, not a tint laid over readable ground. Its inner end
+// begins beneath the terrain, so the ground itself hides the join while the
+// solid bank rises into the unknown.
 
-#import bevy_pbr::forward_io::VertexOutput
-#import bevy_pbr::mesh_view_bindings::view
+#import bevy_pbr::{
+    mesh_functions,
+    forward_io::{Vertex, VertexOutput},
+    mesh_view_bindings::view,
+}
 
 struct FogParams {
-    // rgb is the veil's colour, a is how heavy it gets at its thickest.
+    // rgb is the veil's colour, a is how much of the stippled shroud has risen.
     tint: vec4<f32>,
     // xyz the home ground's centre, w its radius.
     home: vec4<f32>,
     // x how many pockets are live, y how many metres the edge takes to fade,
-    // z how deep the bank of mist stands, w unused.
+    // z how high the bank of mist rises, w unused.
     dials: vec4<f32>,
     // xyz the planet's centre, w its radius.
     planet: vec4<f32>,
@@ -65,60 +57,100 @@ fn wobble(at: vec2<f32>) -> f32 {
     return mix(mix(a, b, u.x), mix(c, d, u.x), u.y) - 0.5;
 }
 
-@fragment
-fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    // The FLAT ground this pixel stands on, which is not where it is drawn.
-    //
-    // The veil is a sheet on the bent world; what the village knows is written
-    // in the flat coordinates the simulation runs in. Taking the drawn position
-    // as the flat one works near the tangent point - the top of the globe, where
-    // home usually is - and falls apart everywhere else, so a village planted on
-    // the far side of the world never lifted its own fog.
-    //
-    // Undoing the bend is the mapping read backwards: longitude and latitude are
-    // arc lengths over the radius, and the planet is turned a quarter turn about
-    // X to stand it up. See `terrain::direction_at` and `globe::bend_frame`.
-    let from_centre = in.world_position.xyz - fog.planet.xyz;
-    // The stance, inverted: a rotation of -90 degrees about X takes the world
-    // back to the frame the map was written in, so (x, y, z) becomes (x, -z, y).
+// Knowledge is stored as simple circles because that makes exploration cheap
+// and inspectable. This stable contour turns each circle's drawn edge into a
+// piece of landscape instead of a compass line. `fog.rs::frontier_wobble`
+// uses the same terms when it builds the opaque wall.
+fn frontier_wobble(centre: vec2<f32>, angle: f32) -> f32 {
+    let tau = 6.28318530718;
+    let first = sin(centre.x * 0.013 + centre.y * 0.021) * tau;
+    let second = sin(centre.x * 0.029 - centre.y * 0.011) * tau;
+    let third = sin(centre.x * 0.007 + centre.y * 0.037) * tau;
+    return sin(angle * 2.0 + first) * 26.0
+        + sin(angle * 5.0 + second) * 12.0
+        + sin(angle * 9.0 + third) * 6.0;
+}
+
+// Undo the world bend and recover the map coordinates used by the simulation.
+// Direction is all that matters, so this works for the terrain itself and for
+// the same vertex after the veil has lifted it away from the planet.
+fn flat_ground(world_position: vec3<f32>) -> vec2<f32> {
+    let from_centre = world_position - fog.planet.xyz;
     let unturned = vec3<f32>(from_centre.x, -from_centre.z, from_centre.y);
     let dir = normalize(unturned);
     let lat = asin(clamp(dir.y, -1.0, 1.0));
     let lon = atan2(dir.x, dir.z);
-    let ground = vec2<f32>(lon * fog.planet.w, -lat * fog.planet.w);
-    let soft = max(fog.dials.y, 0.001);
+    return vec2<f32>(lon * fog.planet.w, -lat * fog.planet.w);
+}
 
-    // How far INSIDE the known world this pixel lies, in metres. Negative is
-    // outside. The union of circles is smoothed, and the boundary itself
-    // wavers a few strides - two scales of it, so neither reads as tiling.
-    var known = fog.home.w - distance(ground, fog.home.xz);
+// Positive is inside knowledge, negative is in the unknown. Both the vertex
+// and fragment stages use precisely this field, so the opaque bank and its
+// dithered discovery edge cannot drift apart.
+fn known_at(ground: vec2<f32>) -> f32 {
+    let home_delta = ground - fog.home.xz;
+    var known = fog.home.w
+        + frontier_wobble(fog.home.xz, atan2(home_delta.y, home_delta.x))
+        - length(home_delta);
     let live = i32(fog.dials.x);
     for (var i = 0; i < live; i = i + 1) {
         let pocket = fog.pockets[i];
-        known = smax(known, pocket.w - distance(ground, pocket.xz), 18.0);
+        let delta = ground - pocket.xz;
+        let pocket_known = pocket.w
+            + frontier_wobble(pocket.xz, atan2(delta.y, delta.x))
+            - length(delta);
+        known = smax(known, pocket_known, 18.0);
     }
-    known += wobble(ground / 37.0) * 14.0 + wobble(ground / 11.0) * 5.0;
+    return known + wobble(ground / 37.0) * 3.0 + wobble(ground / 11.0) * 1.0;
+}
 
-    let veil = 1.0 - smoothstep(-soft, soft, known);
-    if veil < 0.004 {
+@vertex
+fn vertex(vertex: Vertex) -> VertexOutput {
+    var out: VertexOutput;
+
+    let world_from_local = mesh_functions::get_world_from_local(vertex.instance_index);
+    let ground_position = mesh_functions::mesh_position_local_to_world(
+        world_from_local,
+        vec4(vertex.position, 1.0),
+    );
+    let known = known_at(flat_ground(ground_position.xyz));
+
+    // The bank begins just under explored ground, emerges immediately outside
+    // it, then reaches full height over the next thirty strides. Keeping that
+    // first edge below the terrain makes one opaque mesh appear to taper into
+    // the world rather than ending at a visible line.
+    let bank = 1.0 - smoothstep(-30.0, 4.0, known);
+    let radial = normalize(ground_position.xyz - fog.planet.xyz);
+    let world_position = vec4(
+        ground_position.xyz + radial * (fog.dials.z * bank - 0.2),
+        1.0,
+    );
+
+    out.world_position = world_position;
+    out.position = view.clip_from_world * world_position;
+    out.world_normal = mesh_functions::mesh_normal_local_to_world(
+        vertex.normal,
+        vertex.instance_index,
+    );
+#ifdef VERTEX_UVS_A
+    out.uv = vertex.uv;
+#endif
+#ifdef VERTEX_COLORS
+    out.color = vertex.color;
+#endif
+#ifdef VERTEX_OUTPUT_INSTANCE_INDEX
+    out.instance_index = vertex.instance_index;
+#endif
+    return out;
+}
+
+@fragment
+fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
+    let ground = flat_ground(in.world_position.xyz);
+    let known = known_at(ground);
+    // The vertex bank has already disappeared beneath known terrain. Discard
+    // that submerged overlap and render every visible fragment fully opaque.
+    if known > 4.0 || fog.tint.a < 0.004 {
         discard;
     }
-
-    // How much bank this pixel's ray actually goes through. The sheet is the
-    // TOP of a slab standing `dials.z` deep on the ground, so a ray meeting it
-    // squarely crosses that depth and a ray meeting it at a graze crosses
-    // depth / cos(angle) — unbounded in the limit, which is why it is clamped
-    // to a few times the depth rather than allowed to run away at the horizon.
-    let to_eye = normalize(view.world_position.xyz - in.world_position.xyz);
-    let facing = max(abs(dot(normalize(in.world_normal), to_eye)), 0.0001);
-    let depth = max(fog.dials.z, 0.001);
-    let travelled = min(depth / facing, depth * 6.0);
-
-    // Beer-Lambert. `tint.a` is the weight of one depth of bank looked at
-    // squarely, so the extinction that reproduces it is -ln(1 - a) / depth, and
-    // every other angle follows from the same law instead of being tuned.
-    let extinction = -log(max(1.0 - fog.tint.a, 0.002)) / depth;
-    let density = 1.0 - exp(-extinction * travelled);
-
-    return vec4<f32>(fog.tint.rgb, density * veil);
+    return vec4<f32>(fog.tint.rgb, fog.tint.a);
 }

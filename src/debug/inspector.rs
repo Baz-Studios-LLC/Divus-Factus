@@ -73,6 +73,27 @@ pub(crate) fn feelings_phrase(
 #[derive(Component)]
 pub(crate) struct InspectorPersonBlock;
 
+/// Everything that belongs only to a dwelling's quick household card. Keeping
+/// it separate from the person dossier lets one inspector become a composed
+/// information surface instead of a single block of equally loud prose.
+#[derive(Component)]
+pub(crate) struct InspectorHouseBlock;
+
+/// The live values in a dwelling card.
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum InspectorHouseValue {
+    Beds,
+    Stores,
+    Mood,
+    Faith,
+    Life,
+    Concern,
+}
+
+/// The concern row disappears entirely when this home has nothing pressing.
+#[derive(Component)]
+pub(crate) struct InspectorHouseConcern;
+
 /// The recent-memories text, in the villager's own phrasing.
 #[derive(Component)]
 pub(crate) struct InspectorMemories;
@@ -121,8 +142,13 @@ pub(crate) struct SoulSight<'w, 's> {
             &'static Person,
             &'static crate::villager::home::Home,
             &'static Activity,
+            &'static MemberOf,
+            Option<&'static Needs>,
+            Option<&'static Morale>,
+            Option<&'static crate::villager::belief::Faith>,
+            Option<&'static crate::creature::genome::CreatureGenome>,
         ),
-        Without<crate::creature::Corpse>,
+        (With<Villager>, Without<crate::creature::Corpse>),
     >,
     residents: Query<
         'w,
@@ -194,6 +220,10 @@ pub(crate) struct RisingSight<'w, 's> {
         ),
     >,
     deposits: Query<'w, 's, &'static crate::matter::Deposit>,
+    trees: Query<'w, 's, &'static crate::scatter::FellableTree>,
+    boulders: Query<'w, 's, &'static crate::matter::Matter, With<crate::matter::Boulder>>,
+    food_sources: Query<'w, 's, &'static crate::scatter::FoodSource>,
+    fires: Query<'w, 's, &'static crate::villager::home::Bonfire>,
     hints: Query<'w, 's, (&'static Interaction, &'static ui::HoverHint)>,
     /// What a held thing is WORTH, for the card.
     worth: Query<
@@ -218,6 +248,7 @@ pub(crate) struct RisingSight<'w, 's> {
             Without<InspectorPanel>,
             Without<InspectorPersonBlock>,
             Without<InspectorDetail>,
+            Without<InspectorHouseBlock>,
         ),
     >,
 }
@@ -235,7 +266,25 @@ pub(crate) struct InspectorInk<'w, 's> {
         'w,
         's,
         (&'static mut Visibility, &'static mut Node),
-        (With<InspectorPersonBlock>, Without<InspectorPanel>),
+        (
+            With<InspectorPersonBlock>,
+            Without<InspectorPanel>,
+            Without<InspectorHouseBlock>,
+        ),
+    >,
+    house_block: Query<
+        'w,
+        's,
+        (
+            &'static mut Visibility,
+            &'static mut Node,
+            Option<&'static InspectorHouseConcern>,
+        ),
+        (
+            With<InspectorHouseBlock>,
+            Without<InspectorPanel>,
+            Without<InspectorPersonBlock>,
+        ),
     >,
     texts: ParamSet<
         'w,
@@ -251,11 +300,26 @@ pub(crate) struct InspectorInk<'w, 's> {
                     With<InspectorDetail>,
                     Without<InspectorPanel>,
                     Without<InspectorPersonBlock>,
+                    Without<InspectorHouseBlock>,
                 ),
             >,
             Query<'w, 's, (&'static InspectorValue, &'static mut Text)>,
             Query<'w, 's, &'static mut Text, With<InspectorMemories>>,
             Query<'w, 's, &'static mut Text, With<InspectorLife>>,
+            Query<
+                'w,
+                's,
+                (&'static InspectorHouseValue, &'static mut Text),
+                (
+                    With<InspectorHouseBlock>,
+                    Without<InspectorName>,
+                    Without<InspectorSubtitle>,
+                    Without<InspectorDetail>,
+                    Without<InspectorMemories>,
+                    Without<InspectorLife>,
+                    Without<InspectorValue>,
+                ),
+            >,
         ),
     >,
 }
@@ -292,11 +356,20 @@ pub(crate) fn update_inspector(
     let InspectorInk {
         mut panels,
         mut person_block,
+        mut house_block,
         mut texts,
     } = ink;
     let Ok(mut visibility) = panels.single_mut() else {
         return;
     };
+
+    // House-only furniture stays out of every other card. `Display::None`
+    // matters as much as hidden visibility here: an empty section still has
+    // height, which is how a card develops mysterious blank gutters.
+    for (mut block, mut node, _) in &mut house_block {
+        *block = Visibility::Hidden;
+        node.display = Display::None;
+    }
 
     // The open book smothers every tooltip: the codex covers the world,
     // and its own controls explain themselves. Brett: "nothing in the
@@ -690,75 +763,211 @@ pub(crate) fn update_inspector(
         node.display = Display::None;
     }
 
-    let (title, description) = if let Ok(longhouse) = huts.get(entity) {
-        // A finished roof: who sleeps under it, and what each of them is
-        // up to. Which roof it is says who they are to each other.
+    if let Ok(longhouse) = huts.get(entity) {
+        // A finished roof is a household, not merely a list of sleepers. The
+        // card gives the god one quick read of who belongs here, whether there
+        // is room, how their shared town is provisioned, and what is pressing
+        // on them right now.
         let village = settlements
             .iter()
             .next()
             .map_or_else(|| "the village".to_string(), |s| s.name.clone());
-        let residents: Vec<String> = households
+        let household: Vec<_> = households
             .iter()
-            .filter(|(_, home, _)| home.0 == entity)
-            .map(|(person, _, activity)| {
-                format!(
-                    "{} - {}",
-                    person.full_name(),
-                    state_phrase(Some(activity), None)
-                )
-            })
+            .filter(|(_, home, ..)| home.0 == entity)
             .collect();
+        let resident_count = household.len();
+        let children = household
+            .iter()
+            .filter(|(_, _, _, _, _, _, _, genome)| {
+                genome.is_some_and(|genome| genome.age == Age::Child)
+            })
+            .count();
+        let sleeping = household
+            .iter()
+            .filter(|(_, _, activity, ..)| matches!(activity, Activity::Sleeping))
+            .count();
+        let capacity = if longhouse {
+            crate::villager::home::LONGHOUSE_CAPACITY
+        } else {
+            crate::villager::home::HOUSE_CAPACITY
+        };
+        let household_town = household.first().map(|(_, _, _, member, ..)| member.0);
+        let mouths = household_town.map_or(0, |town| {
+            residents
+                .iter()
+                .filter(|(member, _)| member.0 == town)
+                .count()
+        });
+        let store = household_town.and_then(|town| settlement_info.get(town).ok().map(|(_, s)| s));
+        let average_spirits = household
+            .iter()
+            .filter_map(|(_, _, _, _, _, morale, ..)| morale.map(|morale| morale.spirits))
+            .sum::<f32>();
+        let spirits_count = household
+            .iter()
+            .filter(|(_, _, _, _, _, morale, ..)| morale.is_some())
+            .count();
+        let average_faith = household
+            .iter()
+            .filter_map(|(_, _, _, _, _, _, faith, _)| faith.map(|faith| faith.trust))
+            .sum::<f32>();
+        let faith_count = household
+            .iter()
+            .filter(|(_, _, _, _, _, _, faith, _)| faith.is_some())
+            .count();
         // A house is a FAMILY'S: it bears their name, not the town's. The
         // longhouse, which belongs to no one family, keeps the village's.
-        let family = households
+        let family = household
             .iter()
-            .filter(|(_, home, _)| home.0 == entity)
-            .map(|(person, _, _)| person.surname.clone())
+            .map(|(person, ..)| person.surname.clone())
             .find(|surname| !surname.is_empty());
-        (
-            if longhouse {
-                format!("The longhouse of {village}")
+        let title = if longhouse {
+            format!("The longhouse of {village}")
+        } else {
+            match family {
+                Some(name) => format!("The house of {name}"),
+                None => format!("An empty house of {village}"),
+            }
+        };
+        if let Ok(mut name) = texts.p0().single_mut() {
+            *name = Text::new(title);
+        }
+        if household.is_empty() {
+            let empty = if longhouse {
+                "No one has taken a bed here yet."
             } else {
-                match family {
-                    Some(name) => format!("The house of {name}"),
-                    None => format!("An empty house of {village}"),
+                "No one yet calls it home."
+            };
+            if let Ok(mut subtitle) = texts.p1().single_mut() {
+                *subtitle = Text::new("UNCLAIMED");
+            }
+            if let Ok((mut detail, mut detail_visibility)) = texts.p2().single_mut() {
+                *detail = Text::new(empty);
+                *detail_visibility = Visibility::Inherited;
+            }
+            return;
+        } else {
+            for (mut block, mut node, concern) in &mut house_block {
+                if concern.is_none() {
+                    *block = Visibility::Inherited;
+                    node.display = Display::Flex;
                 }
-            },
-            if residents.is_empty() {
-                if longhouse {
-                    "no one has taken a bed here yet".to_string()
-                } else {
-                    "no one yet calls it home".to_string()
-                }
+            }
+            if let Ok(mut subtitle) = texts.p1().single_mut() {
+                *subtitle = Text::new(format!(
+                    "{} · {} · {}",
+                    counted(resident_count, "resident", "residents"),
+                    counted(children, "child", "children"),
+                    sleep_phrase(sleeping),
+                ));
+            }
+            if let Ok((mut detail, mut detail_visibility)) = texts.p2().single_mut() {
+                *detail = Text::new("");
+                *detail_visibility = Visibility::Hidden;
+            }
+            let beds = if resident_count > capacity {
+                format!("Crowded: {resident_count} people for {capacity} beds")
             } else {
-                residents.join("\n")
-            },
-        )
-    } else if let Ok((construction, plan)) = rising.builds.get(entity) {
-        // The whole bill, plainly: every material this build wants, how
-        // much is in it, how much it takes. A tooltip that named only the
-        // line the site happened to be stuck on left you guessing what
-        // the building cost and how far along it was.
+                let free = capacity - resident_count;
+                format!(
+                    "{resident_count} of {capacity} filled · {}",
+                    counted(free, "bed free", "beds free")
+                )
+            };
+            let stores = store.map(|store| {
+                format!(
+                    "food {} · timber {}",
+                    food_horizon(store.food(), mouths),
+                    timber_horizon(store.timber, mouths),
+                )
+            });
+            let mood =
+                (spirits_count > 0).then(|| household_mood(average_spirits / spirits_count as f32));
+            let faith =
+                (faith_count > 0).then(|| household_faith(average_faith / faith_count as f32));
+            let life = household
+                .iter()
+                .take(2)
+                .map(|(person, _, activity, ..)| {
+                    format!("{} is {}.", person.name, state_phrase(Some(activity), None))
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            let concern = household
+                .iter()
+                .filter_map(|(person, _, _, _, needs, ..)| {
+                    needs
+                        .filter(|needs| needs.hunger >= 0.6)
+                        .map(|needs| (person.name.as_str(), needs.hunger))
+                })
+                .max_by(|(_, left), (_, right)| left.total_cmp(right))
+                .map(|(name, hunger)| {
+                    if hunger >= 0.85 {
+                        format!("{name} is starving")
+                    } else {
+                        format!("{name} is hungry")
+                    }
+                })
+                .or_else(|| {
+                    (resident_count > capacity).then(|| "There are not enough beds".to_string())
+                })
+                .or_else(|| {
+                    store
+                        .filter(|store| mouths > 0 && store.food() / (mouths as f32) < 1.0)
+                        .map(|_| "The village food store is running low".to_string())
+                })
+                .or_else(|| {
+                    (spirits_count > 0 && average_spirits / (spirits_count as f32) < 0.35)
+                        .then(|| "Their spirits are low".to_string())
+                });
+            for (value, mut text) in &mut texts.p6() {
+                let fresh = match value {
+                    InspectorHouseValue::Beds => beds.clone(),
+                    InspectorHouseValue::Stores => {
+                        stores.clone().unwrap_or_else(|| "unread".to_string())
+                    }
+                    InspectorHouseValue::Mood => mood.unwrap_or("unread").to_string(),
+                    InspectorHouseValue::Faith => faith.unwrap_or("unread").to_string(),
+                    InspectorHouseValue::Life => life.clone(),
+                    InspectorHouseValue::Concern => concern.clone().unwrap_or_default(),
+                };
+                if text.0 != fresh {
+                    *text = Text::new(fresh);
+                }
+            }
+            if concern.is_some() {
+                for (mut block, mut node, concern) in &mut house_block {
+                    if concern.is_some() {
+                        *block = Visibility::Inherited;
+                        node.display = Display::Flex;
+                    }
+                }
+            }
+            return;
+        }
+    }
+
+    let (title, description) = if let Ok((construction, plan)) = rising.builds.get(entity) {
+        // This is a needs list, not a progress report. Completed materials
+        // disappear so the card answers the useful question: what still has
+        // to arrive before this building can be finished?
         let footing = construction.footing_stone(plan.kind);
         let frame = plan.kind.timber_cost();
-        let mut bill: Vec<(String, f32, f32)> = Vec::new();
+        let mut missing: Vec<(String, f32, f32)> = Vec::new();
         let mut want = |name: &str, have: f32, needs: f32| {
-            // A material the build neither wants nor holds is not part of
-            // the bill. The dock is all carpentry and was still billed
-            // "Stone: 0/0" - Brett: "if it doesn't take any stone it should
-            // just not mention it."
+            // A material the build neither wants nor holds is not part of the
+            // bill. The dock is all carpentry and was still billed "Stone:
+            // 0/0" - Brett: "if it doesn't take any stone it should just not
+            // mention it." A material that IS wanted stays on the card once
+            // it is full, because "Timber 7/7" is how you read that the
+            // timber is done rather than forgotten.
             if needs <= 0.0 && have <= 0.0 {
                 return;
             }
-            bill.push((name.to_string(), have, needs));
+            missing.push((name.to_string(), have, needs));
         };
-        // The footing and the walls are two lines even when they are the
-        // same material. Merging them was tidier and it lied by omission: a
-        // stone longhouse billed one "Stone: 16/19" with no timber line at
-        // all, and there is nothing on the card to say the walls are stone
-        // rather than the price being wrong. Brett, reasonably: "A
-        // longhouse only take 19 Stone and no timber?"
-        // The walls take the material's name; the footing is always stone
+        // The walls take their material's name; the footing is always stone
         // and is called what it is, which keeps the two apart on a stone
         // building without either line having to explain itself.
         let mut stuff = plan.stuff.word().to_string();
@@ -767,11 +976,8 @@ pub(crate) fn update_inspector(
         want("Footing", construction.stone_laid.min(footing), footing);
         // Numbers and nothing else. Brett: "The building a building tooltip
         // doesn't need to say anything except what it is missing lol. If the
-        // timber is 7/7 for example that is all they need to put." The card
-        // used to explain that a full frame still waits on a carpenter's
-        // hands; the rule has not changed, but it is not news any more, and
-        // a hover card is a glance rather than a lesson.
-        let lines: Vec<String> = bill
+        // timber is 7/7 for example that is all they need to put."
+        let lines: Vec<String> = missing
             .iter()
             .map(|(name, have, needs)| format!("{name} {have:.0}/{needs:.0}"))
             .collect();
@@ -788,16 +994,53 @@ pub(crate) fn update_inspector(
                 }
             }
         }
+        let population = match children {
+            0 => format!("{} · no children", counted(grown, "adult", "adults")),
+            _ => format!(
+                "{} · {}",
+                counted(grown, "adult", "adults"),
+                counted(children, "child", "children")
+            ),
+        };
+        let mouths = grown + children;
+        let (houses, longhouses) = huts.iter().fold((0usize, 0usize), |(houses, halls), long| {
+            if long {
+                (houses, halls + 1)
+            } else {
+                (houses + 1, halls)
+            }
+        });
+        let beds = houses * crate::villager::home::HOUSE_CAPACITY
+            + longhouses * crate::villager::home::LONGHOUSE_CAPACITY;
+        let materials = [
+            (store.timber, "timber"),
+            (store.stone, "stone"),
+            (store.clay, "clay"),
+            (store.ore, "ore"),
+        ]
+        .into_iter()
+        .filter(|(amount, _)| *amount >= 0.5)
+        .map(|(amount, kind)| format!("{amount:.0} {kind}"))
+        .collect::<Vec<_>>();
+        let stores = if materials.is_empty() {
+            "No building materials laid by".to_string()
+        } else {
+            format!("Materials: {}", materials.join(" · "))
+        };
+        let shelter = match beds.saturating_sub(mouths) {
+            0 => format!("Shelter: {beds} beds, all occupied"),
+            free => format!(
+                "Shelter: {beds} beds · {}",
+                counted(free, "bed free", "beds free")
+            ),
+        };
         (
             settlement.name.clone(),
             format!(
-                "a village, founded on day {}\n\
-                 {grown} grown, {children} children\n\
-                 stores  {:.0} food, {:.0} timber, {:.0} stone",
+                "Founded on day {}\n{population}\n{shelter}\nFood: {:.0} ({})\n{stores}",
                 settlement.founded,
                 store.food(),
-                store.timber,
-                store.stone,
+                food_horizon(store.food(), mouths),
             ),
         )
     } else if let Ok(vitality) = corpse {
@@ -816,7 +1059,58 @@ pub(crate) fn update_inspector(
         // village could still carry out of it.
         (
             deposit.kind.title().to_string(),
-            format!("{:.0} loads left in the ground", deposit.amount),
+            format!("{:.0} loads still worth working", deposit.amount),
+        )
+    } else if let Ok(fire) = rising.fires.get(entity) {
+        let tending = fire
+            .tender
+            .and_then(|tender| kin_names.get(tender).ok())
+            .map(|person| format!("{} is tending it.", person.name));
+        let state = match fire.fuel {
+            fuel if fuel <= 0.0 => "Cold. It needs a log before nightfall.".to_string(),
+            fuel if fuel < crate::villager::home::SECONDS_PER_LOG * 0.35 => {
+                "Burning low. It will need wood soon.".to_string()
+            }
+            fuel => format!(
+                "Burning steadily for about {} more minutes.",
+                (fuel / 60.0).ceil()
+            ),
+        };
+        (
+            "The village fire".to_string(),
+            tending.map_or(state.clone(), |tending| format!("{state}\n{tending}")),
+        )
+    } else if let Ok(tree) = rising.trees.get(entity) {
+        let description = match tree.maturity {
+            maturity if maturity >= 0.95 => "Mature timber. A forester can fell it.",
+            maturity if maturity >= 0.55 => "Young growth. It will make better timber with time.",
+            _ => "A sapling taking root.",
+        };
+        ("A tree".to_string(), description.to_string())
+    } else if let Ok(source) = rising.food_sources.get(entity) {
+        let description = match source.amount {
+            amount if amount < 0.5 => "Picked bare. Its berries will grow back.".to_string(),
+            amount => format!(
+                "A gatherer can collect about {:.0} meals of berries.",
+                amount.floor()
+            ),
+        };
+        ("A berry bush".to_string(), description)
+    } else if let Ok(boulder) = rising.boulders.get(entity) {
+        let (_, stone) = crate::villager::work::offering_worth(boulder);
+        let description = if boulder.radius >= 1.6 {
+            format!("A rich source of stone. About {stone:.0} loads can be worked from it.")
+        } else {
+            format!("Loose building stone. About {stone:.0} loads can be carried away.")
+        };
+        (
+            if boulder.radius >= 1.6 {
+                "An outcrop"
+            } else {
+                "A boulder"
+            }
+            .to_string(),
+            description,
         )
     } else {
         let what = names
@@ -861,21 +1155,76 @@ pub(crate) fn update_inspector(
         (
             what,
             match worth {
-                Some(worth) => format!("in your grasp - {worth}"),
-                None if held => "in your grasp".to_string(),
-                None => "beneath your hand".to_string(),
+                Some(worth) => format!("Held: {worth}"),
+                None if held => "Held in your grasp".to_string(),
+                None => "No interaction available.".to_string(),
             },
         )
     };
 
     if let Ok(mut name) = texts.p0().single_mut() {
-        *name = Text::new(title);
+        *name = Text::new(title.clone());
     }
     if let Ok(mut subtitle) = texts.p1().single_mut() {
         *subtitle = Text::new("");
     }
     if let Ok((mut detail, mut detail_visibility)) = texts.p2().single_mut() {
         *detail = Text::new(description);
-        *detail_visibility = Visibility::Inherited;
+        *detail_visibility = if detail.0.is_empty() {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
+    }
+}
+
+fn food_horizon(food: f32, mouths: usize) -> String {
+    if mouths == 0 || food <= 0.0 {
+        return "empty".to_string();
+    }
+    let days = food / mouths as f32 / 2.0;
+    match days {
+        d if d < 0.5 => "less than a day".to_string(),
+        d if d < 1.5 => "about 1 day".to_string(),
+        d => format!("about {:.0} days", d.floor()),
+    }
+}
+
+fn counted(count: usize, singular: &str, plural: &str) -> String {
+    format!("{count} {}", if count == 1 { singular } else { plural })
+}
+
+fn sleep_phrase(sleeping: usize) -> String {
+    match sleeping {
+        0 => "all awake".to_string(),
+        1 => "1 asleep".to_string(),
+        count => format!("{count} asleep"),
+    }
+}
+
+fn timber_horizon(timber: f32, mouths: usize) -> &'static str {
+    match timber / mouths.max(1) as f32 {
+        t if t < 0.5 => "barely any",
+        t if t < 2.0 => "low",
+        t if t < 6.0 => "modest",
+        _ => "plentiful",
+    }
+}
+
+fn household_mood(spirits: f32) -> &'static str {
+    match spirits {
+        s if s > 0.75 => "content",
+        s if s > 0.5 => "steady",
+        s if s > 0.3 => "uneasy",
+        _ => "troubled",
+    }
+}
+
+fn household_faith(trust: f32) -> &'static str {
+    match trust {
+        t if t > 0.75 => "devoted",
+        t if t > 0.5 => "believing",
+        t if t > 0.25 => "doubtful",
+        _ => "resentful",
     }
 }

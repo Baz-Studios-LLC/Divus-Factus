@@ -52,6 +52,7 @@ const ANACHRONISMS: &[&str] = &[
     "electricity",
     "camera",
     "video",
+    "wireless",
     "internet",
     "okay",
     "guys",

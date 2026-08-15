@@ -1411,11 +1411,7 @@ pub(crate) fn update_village_panel(
         // The three big numbers AND the words under them, in one member:
         // a ParamSet holds eight, and this set was full.
         Query<
-            (
-                Option<&VillageCard>,
-                Option<&VillageCardLabel>,
-                &mut Text,
-            ),
+            (Option<&VillageCard>, Option<&VillageCardLabel>, &mut Text),
             Or<(With<VillageCard>, With<VillageCardLabel>)>,
         >,
         Query<(&VillageGaugeFill, &mut Node)>,

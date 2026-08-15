@@ -134,6 +134,39 @@ impl KnownWorld {
 #[derive(Component)]
 pub struct Cairn;
 
+/// Marks a construction site whose working ground has already been added to
+/// the village's knowledge. A settlement cannot begin raising a building in
+/// land it has not reached.
+#[derive(Component)]
+pub(super) struct WorksiteKnown;
+
+/// A building site is proof that villagers have travelled there, surveyed the
+/// ground, and are now returning with materials. Reveal the whole work area at
+/// once so the veil's slope always begins beyond the construction, rather than
+/// cutting through a roof or a foundation.
+pub(super) fn chart_worksites(
+    mut commands: Commands,
+    mut known: ResMut<KnownWorld>,
+    sites: Query<
+        (Entity, &Transform, &work::buildings::Blueprint),
+        (
+            With<work::buildings::ConstructionSite>,
+            Without<WorksiteKnown>,
+        ),
+    >,
+) {
+    // The fog bank takes roughly 34 strides to rise. Leave a little more than
+    // that beyond the largest side of a building so its entire taper remains
+    // outside the place people are actively working.
+    const VEIL_CLEARANCE: f32 = 42.0;
+
+    for (entity, transform, blueprint) in &sites {
+        let footprint = blueprint.half_w.max(blueprint.half_d);
+        known.learn(transform.translation, footprint + VEIL_CLEARANCE);
+        commands.entity(entity).insert(WorksiteKnown);
+    }
+}
+
 /// How far from the banner counts as being away, where the stores-only
 /// law lifts. Past the town's own ground and most of the way to the
 /// working reach: a gatherer in the near fields walks home to eat, and

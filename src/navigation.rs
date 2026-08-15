@@ -840,19 +840,16 @@ fn through_the_gate(
         to
     };
     let bearing = (outside - ring.at).to_angle();
-    let gate = *ring
-        .gates
-        .iter()
-        .min_by(|a, b| {
-            let apart = |gate: f32| {
-                let mut apart = (bearing - gate).abs() % std::f32::consts::TAU;
-                if apart > std::f32::consts::PI {
-                    apart = std::f32::consts::TAU - apart;
-                }
-                apart
-            };
-            apart(**a).total_cmp(&apart(**b))
-        })?;
+    let gate = *ring.gates.iter().min_by(|a, b| {
+        let apart = |gate: f32| {
+            let mut apart = (bearing - gate).abs() % std::f32::consts::TAU;
+            if apart > std::f32::consts::PI {
+                apart = std::f32::consts::TAU - apart;
+            }
+            apart
+        };
+        apart(**a).total_cmp(&apart(**b))
+    })?;
 
     // A step each side of the gate's mouth, on its own radial line. Far
     // enough out that neither leg's straight line clips the ring beside
@@ -940,9 +937,10 @@ pub fn find_path(
     }
     // No wall in the way, or the gate could not be stitched: search it out
     // the long way, with the room to go round a ring if one is there.
-    let barred = walls.ramparts.iter().any(|ring| {
-        ring.bars(Vec2::new(start.x, start.z), Vec2::new(goal.x, goal.z))
-    });
+    let barred = walls
+        .ramparts
+        .iter()
+        .any(|ring| ring.bars(Vec2::new(start.x, start.z), Vec2::new(goal.x, goal.z)));
     walk_it_out(
         terrain,
         walls,
@@ -1832,10 +1830,8 @@ mod tests {
         }
         // The fence a town of fourteen actually raises, with the gates the
         // game actually puts in it - invented geometry proves nothing.
-        let radius = crate::villager::rampart::ring_for(
-            crate::villager::rampart::RampartTier::Fence,
-            14,
-        );
+        let radius =
+            crate::villager::rampart::ring_for(crate::villager::rampart::RampartTier::Fence, 14);
         let ring = Rampart {
             at: Vec2::new(home.x, home.z),
             radius,
@@ -1879,10 +1875,8 @@ mod tests {
                 break;
             }
         }
-        let radius = crate::villager::rampart::ring_for(
-            crate::villager::rampart::RampartTier::Fence,
-            14,
-        );
+        let radius =
+            crate::villager::rampart::ring_for(crate::villager::rampart::RampartTier::Fence, 14);
         let walls = Walls {
             buildings: Vec::new(),
             ramparts: vec![Rampart {
@@ -1928,19 +1922,29 @@ mod tests {
         }
         let each = start.elapsed().as_secs_f64() * 1000.0 / runs as f64;
         println!("is_walkable: {each:.4}ms each ({walkable} of {runs} walkable)");
-        println!("  a 3000-cell search spends {:.1}ms just asking", each * 3000.0);
-        println!("  a 16000-cell search spends {:.1}ms just asking", each * 16000.0);
+        println!(
+            "  a 3000-cell search spends {:.1}ms just asking",
+            each * 3000.0
+        );
+        println!(
+            "  a 16000-cell search spends {:.1}ms just asking",
+            each * 16000.0
+        );
 
         // And the pieces it is made of.
         for (what, cost) in [
             ("height_at", {
                 let t = std::time::Instant::now();
-                for i in 0..runs { let _ = terrain.height_at((i % 400) as f32 * 2.5, (i / 400) as f32 * 2.5); }
+                for i in 0..runs {
+                    let _ = terrain.height_at((i % 400) as f32 * 2.5, (i / 400) as f32 * 2.5);
+                }
                 t.elapsed().as_secs_f64() * 1000.0 / runs as f64
             }),
             ("slope_at", {
                 let t = std::time::Instant::now();
-                for i in 0..runs { let _ = terrain.slope_at((i % 400) as f32 * 2.5, (i / 400) as f32 * 2.5); }
+                for i in 0..runs {
+                    let _ = terrain.slope_at((i % 400) as f32 * 2.5, (i / 400) as f32 * 2.5);
+                }
                 t.elapsed().as_secs_f64() * 1000.0 / runs as f64
             }),
         ] {
@@ -1960,15 +1964,16 @@ mod tests {
                 break;
             }
         }
-        let radius = crate::villager::rampart::ring_for(
-            crate::villager::rampart::RampartTier::Fence, 14);
+        let radius =
+            crate::villager::rampart::ring_for(crate::villager::rampart::RampartTier::Fence, 14);
         let walls = Walls {
             buildings: Vec::new(),
             ramparts: vec![Rampart {
                 at: Vec2::new(home.x, home.z),
                 radius,
                 gates: crate::villager::rampart::gates_for_tests(
-                    crate::villager::rampart::RampartTier::Fence),
+                    crate::villager::rampart::RampartTier::Fence,
+                ),
                 gate_half: gate_arc(radius, GATE_WIDTH),
             }],
         };
@@ -1976,11 +1981,20 @@ mod tests {
             let turn = std::f32::consts::TAU * step as f32 / 8.0;
             let (s, c) = turn.sin_cos();
             let (x, z) = (home.x + c * (radius + 40.0), home.z + s * (radius + 40.0));
-            if terrain.height_at(x, z) < crate::terrain::WATER_LEVEL + 1.0 { continue; }
+            if terrain.height_at(x, z) < crate::terrain::WATER_LEVEL + 1.0 {
+                continue;
+            }
             let out = Vec3::new(x, terrain.height_at(x, z), z);
             let stitched = through_the_gate(&terrain, &walls, out, home, DEFAULT_BUDGET);
-            println!("{:5.0} deg  gate route: {}", turn.to_degrees(),
-                if stitched.is_some() { "yes" } else { "NO - falls back to the long search" });
+            println!(
+                "{:5.0} deg  gate route: {}",
+                turn.to_degrees(),
+                if stitched.is_some() {
+                    "yes"
+                } else {
+                    "NO - falls back to the long search"
+                }
+            );
         }
     }
 }

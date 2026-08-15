@@ -28,6 +28,14 @@ pub struct Box3 {
     pub stage: String,
 }
 
+/// A visible piece supplied by an Opificium bake.
+///
+/// Phase drawings are snapshots, so these are deliberately marked apart from
+/// beds, doors, and other functional children of the same building. When a
+/// later phase replaces an earlier one, only the authored visual pieces leave.
+#[derive(Component)]
+struct BakedPiece;
+
 fn opaque() -> f32 {
     1.0
 }
@@ -924,22 +932,6 @@ fn prism(lengthwise: bool) -> Mesh {
     .with_inserted_indices(bevy::render::mesh::Indices::U32(indices))
 }
 
-/// Whether two boxes are the same piece of building.
-///
-/// Phases repeat everything that already stands, so telling "this is the
-/// wall I raised last step" from "this is a new wall in the same place"
-/// is what keeps a step from building the whole house again on top of
-/// itself. Compared on what it is and where, not on identity - two phases
-/// are two readings of the same file and share nothing else.
-fn same_piece(a: &Box3, b: &Box3) -> bool {
-    let near = |x: [f32; 3], y: [f32; 3]| {
-        x.iter()
-            .zip(y.iter())
-            .all(|(one, two)| (one - two).abs() < 0.0005)
-    };
-    near(a.at, b.at) && near(a.size, b.size) && a.form == b.form && a.rgb == b.rgb
-}
-
 /// Which of the game's three build stages a baked stage belongs to.
 fn stage_of(stage: &str, framed: bool) -> u8 {
     // A house drawn with no frame rises in three steps, not four, so its
@@ -1001,41 +993,27 @@ pub fn raise_baked(
     let framed = has_frame(work);
     // What this step raises.
     //
-    // A phase is a COMPLETE set - everything standing once the step is done
-    // - and the site keeps what earlier steps put there, so what goes up now
-    // is this phase less the one before it. A drawing with no phases is one
-    // from before the bench wrote them, and is still split by what its
-    // pieces ARE.
+    // A phase is a COMPLETE snapshot, not an additive list. That matters for
+    // temporary scaffolds and early, rough forms which the maker intentionally
+    // removes in the next stage. Clear only prior baked geometry, then place
+    // this phase whole; beds and other gameplay-bearing children stay put.
     let showing: Vec<&Box3> = match phases_of(work) {
         Some(phases) => {
-            let now = phases.get(stage as usize).or_else(|| phases.last());
-            let before = (stage > 0)
-                .then(|| phases.get(stage as usize - 1))
-                .flatten();
-            match (now, before) {
-                (Some(now), Some(before)) => {
-                    let had = |piece: &Box3| before.boxes.iter().any(|b| same_piece(b, piece));
-                    // A phase that DROPS a piece cannot be honoured by a site
-                    // that only ever adds - scaffolding coming down would need
-                    // taking down. Nothing does that yet; say so if it ever
-                    // starts, rather than quietly leaving it standing.
-                    let gone = before
-                        .boxes
-                        .iter()
-                        .filter(|b| !now.boxes.iter().any(|k| same_piece(k, b)))
-                        .count();
-                    if gone > 0 {
-                        warn!(
-                            "{}: phase {stage} takes away {gone} pieces, which a rising \
-                             building cannot do - they will stay standing",
-                            work.name,
-                        );
-                    }
-                    now.boxes.iter().filter(|piece| !had(piece)).collect()
+            let site = site;
+            commands.queue(move |world: &mut World| {
+                let old: Vec<Entity> = world
+                    .query_filtered::<(Entity, &ChildOf), With<BakedPiece>>()
+                    .iter(world)
+                    .filter_map(|(entity, parent)| (parent.0 == site).then_some(entity))
+                    .collect();
+                for entity in old {
+                    world.entity_mut(entity).despawn();
                 }
-                (Some(now), None) => now.boxes.iter().collect(),
-                _ => Vec::new(),
-            }
+            });
+            phases
+                .get(stage as usize)
+                .or_else(|| phases.last())
+                .map_or_else(Vec::new, |phase| phase.boxes.iter().collect())
         }
         None => work
             .boxes
@@ -1086,6 +1064,7 @@ pub fn raise_baked(
             _ => cube.clone(),
         };
         let mut raised = commands.spawn((
+            BakedPiece,
             Mesh3d(mesh),
             MeshMaterial3d(materials.add(StandardMaterial {
                 base_color: colour.with_alpha(piece.alpha),
@@ -1637,7 +1616,11 @@ mod tests {
         }"#;
         let work: super::Baked = serde_json::from_str(said).expect("format 2 must parse");
         assert_eq!(work.format, 2);
-        assert_eq!(work.boxes.len(), 1, "the base building is still the top level");
+        assert_eq!(
+            work.boxes.len(),
+            1,
+            "the base building is still the top level"
+        );
         assert_eq!(work.marks.len(), 1);
         assert!(
             super::turned_away(&work).is_none(),
@@ -1673,8 +1656,8 @@ mod tests {
         // The player's, beside their saves - the same folder the game
         // furnishes with the palette and the vocabulary, so a bake lands
         // inside the project it was drawn in.
-        let theirs = crate::carried::made_by_hand(super::BAKED_UNDER)
-            .expect("a player has a project too");
+        let theirs =
+            crate::carried::made_by_hand(super::BAKED_UNDER).expect("a player has a project too");
         assert!(
             theirs.ends_with("opificium/out/baked/buildings"),
             "{}",
@@ -1745,31 +1728,34 @@ mod tests {
         assert!(super::phases_of(&work).is_none(), "no phases to read");
     }
 
-    /// A later phase repeats what already stands, and the repeat is not
-    /// built twice.
+    /// A phase may remove a temporary piece from the stage before it.
     ///
-    /// Phases are COMPLETE sets, so phase two carries phase one's walls
-    /// again. A site that only ever adds would raise a second house inside
-    /// the first if it took a phase at face value.
+    /// Such a change is legal because phases are snapshots. The renderer
+    /// clears its prior baked geometry before it puts this list in place.
     #[test]
-    fn a_phase_does_not_build_what_is_already_standing() {
-        let a = super::Box3 {
-            at: [0.0, 1.0, 0.0],
-            size: [1.0, 2.0, 0.25],
-            turn: [0.0, 0.0, 0.0, 1.0],
-            rgb: [110, 92, 70],
-            alpha: 1.0,
-            form: "box".into(),
-            stage: "walls".into(),
+    fn a_later_phase_may_remove_an_earlier_piece() {
+        let piece = |x: f32| {
+            format!(
+                r#"{{"at":[{x},1.0,0.0],"size":[1,2,0.25],"turn":[0,0,0,1],
+                    "form":"box","rgb":[110,92,70],"alpha":1.0,"stage":"walls"}}"#
+            )
         };
-        let mut b = a.clone();
-        b.at = [1.0, 1.0, 0.0];
-        assert!(super::same_piece(&a, &a.clone()), "a piece is itself");
-        assert!(!super::same_piece(&a, &b), "and not the one beside it");
-        // Painted differently is a different piece: a repaint between
-        // phases is something the eye would see.
-        let mut repainted = a.clone();
-        repainted.rgb = [10, 10, 10];
-        assert!(!super::same_piece(&a, &repainted));
+        let work: super::Baked = serde_json::from_str(&format!(
+            r#"{{"format":2,"name":"scaffold","kind":"house","half_w":3,"half_d":3,"high":5,
+                 "boxes":[{a}],"marks":[],"levels":[{{"phases":[
+                    {{"boxes":[{a},{scaffold}]}},{{"boxes":[{a},{wall}]}}
+                 ]}}]}}"#,
+            a = piece(0.0),
+            scaffold = piece(1.0),
+            wall = piece(2.0),
+        ))
+        .expect("parses");
+        let phases = super::phases_of(&work).expect("phases");
+        assert_eq!(phases[0].boxes.len(), 2);
+        assert_eq!(phases[1].boxes.len(), 2);
+        assert!(
+            phases[1].boxes.iter().all(|piece| piece.at[0] != 1.0),
+            "the next snapshot need not retain its temporary scaffold"
+        );
     }
 }

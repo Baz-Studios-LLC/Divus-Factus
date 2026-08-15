@@ -37,15 +37,11 @@ const BERTH_ALONG: (f32, f32) = (1.5, 1.8);
 /// that must agree, which is why they are one.
 pub fn longhouse_half_d() -> (f32, f32) {
     let berths = crate::villager::home::LONGHOUSE_CAPACITY as f32;
-    (
-        berths * BERTH_ALONG.0 * 0.5,
-        berths * BERTH_ALONG.1 * 0.5,
-    )
+    (berths * BERTH_ALONG.0 * 0.5, berths * BERTH_ALONG.1 * 0.5)
 }
 
-pub const LONGHOUSE_TIMBER: f32 =
-    HOUSE_TIMBER / crate::villager::home::HOUSE_CAPACITY as f32
-        * crate::villager::home::LONGHOUSE_CAPACITY as f32;
+pub const LONGHOUSE_TIMBER: f32 = HOUSE_TIMBER / crate::villager::home::HOUSE_CAPACITY as f32
+    * crate::villager::home::LONGHOUSE_CAPACITY as f32;
 
 /// What a building is for. Shape, cost and effect all follow from it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -432,6 +428,10 @@ pub static CIVIC_CHOICE: std::sync::RwLock<String> = std::sync::RwLock::new(Stri
 pub struct RoofNeeds {
     /// The wed and the children: everyone with a claim on a family room.
     pub family_souls: usize,
+    /// Family souls temporarily sharing the longhouse. They are sheltered,
+    /// but a family under the common roof still gives the town a reason to
+    /// raise a home of its own.
+    pub family_in_longhouse: usize,
     /// Everyone else — in practice the grown and unmarried.
     pub single_souls: usize,
     pub houses: usize,
@@ -498,7 +498,9 @@ pub fn next_roof(needs: &RoofNeeds) -> Option<BuildingKind> {
     // shells than its hands can close in.
     let short = (needs.family_souls as i32 - (needs.houses * HOUSE_CAPACITY) as i32).max(0);
     let may_rise = (short as usize).div_ceil(HOUSE_CAPACITY).clamp(1, 3);
-    let want_house = family_slack < HOUSE_CAPACITY as i32 && needs.houses_rising < may_rise;
+    let family_waiting = needs.family_in_longhouse > 0;
+    let want_house =
+        (family_slack < HOUSE_CAPACITY as i32 || family_waiting) && needs.houses_rising < may_rise;
     // A longhouse is a big single commitment: eight beds' worth of timber in
     // one build. A hamlet puts what it has into family roofs first and
     // sleeps its handful of unwed by the fire until there are enough of them
@@ -513,7 +515,7 @@ pub fn next_roof(needs: &RoofNeeds) -> Option<BuildingKind> {
     // Whichever roof is further behind goes first, so neither queue starves
     // the other in a village that needs both.
     match (want_house, want_longhouse) {
-        (true, true) if family_slack <= single_slack => Some(BuildingKind::House),
+        (true, true) if family_waiting || family_slack <= single_slack => Some(BuildingKind::House),
         (true, true) => Some(BuildingKind::Longhouse),
         (true, false) => Some(BuildingKind::House),
         (false, true) => Some(BuildingKind::Longhouse),
@@ -1082,7 +1084,10 @@ impl Doorway {
 
     /// The same doorway with nothing hanging in it.
     pub fn open(self) -> Self {
-        Doorway { leaf: false, ..self }
+        Doorway {
+            leaf: false,
+            ..self
+        }
     }
 }
 
@@ -1507,6 +1512,12 @@ const HOMESTEAD_SPREAD: f32 = 95.0;
 /// How much clear ground a homestead keeps around itself. Far more than a
 /// street house: the whole point is the room.
 const HOMESTEAD_CLEARANCE: f32 = 38.0;
+/// A roof must stand decisively on one side of the rampart. This clears the
+/// wall itself, its lane, and a house's eaves from the line of posts.
+const RAMPART_BUILDING_BUFFER: f32 = 7.0;
+/// Outer homes grow along a gate road rather than appearing as isolated dots
+/// around the countryside.
+const GATE_SIDE_ARC: f32 = 0.34;
 
 /// Candidate plots for a homestead: scattered in a band beyond the town's
 /// rings, door turned back toward the square.
@@ -1514,12 +1525,25 @@ const HOMESTEAD_CLEARANCE: f32 = 38.0;
 /// A band rather than the ring pattern, because the rings ARE the town — a
 /// holding placed on one would just be another street house standing further
 /// out.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn homestead_slots(
     centre: Vec3,
     ring_reach: u32,
     rng: &mut Rng,
 ) -> Vec<(f32, f32, f32)> {
-    let inner = 14.0 + ring_reach as f32 * 9.0 + HOMESTEAD_STANDOFF;
+    homestead_slots_by_gate(centre, ring_reach, None, rng)
+}
+
+fn homestead_slots_by_gate(
+    centre: Vec3,
+    ring_reach: u32,
+    rampart: Option<&crate::villager::rampart::Rampart>,
+    rng: &mut Rng,
+) -> Vec<(f32, f32, f32)> {
+    let ring_edge = 14.0 + ring_reach as f32 * 9.0;
+    let inner = rampart.map_or(ring_edge + HOMESTEAD_STANDOFF, |wall| {
+        (wall.radius + HOMESTEAD_STANDOFF).max(ring_edge + HOMESTEAD_STANDOFF)
+    });
     // And never past a working walk: a holding whose people cannot reach the
     // square is not a holding, it is an abandonment. A town whose streets have
     // already grown out this far has no room left for new ones, and the caller
@@ -1530,7 +1554,10 @@ pub(crate) fn homestead_slots(
     }
     (0..90)
         .map(|_| {
-            let angle = rng.range(0.0, std::f32::consts::TAU);
+            let angle = match rampart.filter(|wall| !wall.gates.is_empty()) {
+                Some(wall) => *rng.pick(&wall.gates) + rng.range(-GATE_SIDE_ARC, GATE_SIDE_ARC),
+                None => rng.range(0.0, std::f32::consts::TAU),
+            };
             let reach = rng.range(inner, outer);
             let (sin, cos) = angle.sin_cos();
             let (x, z) = (centre.x + cos * reach, centre.z + sin * reach);
@@ -1539,6 +1566,29 @@ pub(crate) fn homestead_slots(
             (x, z, (-toward.z).atan2(toward.x))
         })
         .collect()
+}
+
+fn sits_lawfully_by_a_rampart(
+    at: Vec3,
+    centre: Vec3,
+    wall: &crate::villager::rampart::Rampart,
+    footprint: f32,
+) -> bool {
+    let outward = (at - centre).with_y(0.0);
+    let distance = outward.length();
+    let buffer = footprint + RAMPART_BUILDING_BUFFER;
+    if distance <= wall.radius - buffer {
+        return true;
+    }
+    if distance < wall.radius + buffer || wall.gates.is_empty() {
+        return false;
+    }
+    let angle = outward.z.atan2(outward.x);
+    wall.gates.iter().any(|gate| {
+        let apart = (angle - gate + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
+            - std::f32::consts::PI;
+        apart.abs() <= GATE_SIDE_ARC
+    })
 }
 
 /// The moment a dock finishes — fresh-built or restored from a save — its
@@ -3027,7 +3077,11 @@ pub(crate) fn plan_houses(
     time: Res<Time>,
     mut since_last: Local<f32>,
     terrain: Res<Terrain>,
-    towns: Query<(Entity, &crate::villager::SettlementGround)>,
+    towns: Query<(
+        Entity,
+        &crate::villager::SettlementGround,
+        Option<&crate::villager::rampart::Rampart>,
+    )>,
     mut turn: Local<usize>,
     mut rng: ResMut<SimRng>,
     mut stores: Query<&mut Stockpile>,
@@ -3071,7 +3125,7 @@ pub(crate) fn plan_houses(
     // plot queries belong together anyway — what stands, what is rising, and
     // what ground is already taken.
     plots: (
-        Query<(&Building, &crate::villager::MemberOf)>,
+        Query<(Entity, &Building, &crate::villager::MemberOf)>,
         Query<(&Blueprint, &ConstructionSite, &crate::villager::MemberOf)>,
         Query<&Transform, Or<(With<ConstructionSite>, With<Hut>, With<Building>)>>,
     ),
@@ -3087,14 +3141,20 @@ pub(crate) fn plan_houses(
     // not cheap, and running it once per town per tick would scale badly; the
     // cost is that a settlement breaks ground a little less often the more
     // towns there are, which is a fair trade.
-    let mut roster: Vec<(Entity, crate::villager::SettlementGround)> =
-        towns.iter().map(|(town, ground)| (town, *ground)).collect();
+    let mut roster: Vec<(
+        Entity,
+        crate::villager::SettlementGround,
+        Option<crate::villager::rampart::Rampart>,
+    )> = towns
+        .iter()
+        .map(|(town, ground, rampart)| (town, *ground, rampart.cloned()))
+        .collect();
     if roster.is_empty() {
         return;
     }
-    roster.sort_unstable_by_key(|(town, _)| town.to_bits());
+    roster.sort_unstable_by_key(|(town, _, _)| town.to_bits());
     *turn = (*turn).wrapping_add(1) % roster.len();
-    let (settlement, home_ground) = roster[*turn];
+    let (settlement, home_ground, rampart) = roster[*turn].clone();
     let site = crate::villager::SettlementSite {
         centre: home_ground.centre,
         radius: home_ground.radius,
@@ -3125,6 +3185,7 @@ pub(crate) fn plan_houses(
     // village with four spare house rooms and no longhouse bed is not
     // housed — it is two buildings away from housed.
     let mut family_souls = 0usize;
+    let mut family_in_longhouse = 0usize;
     let mut single_souls = 0usize;
     for (vocation, morale, home, faith, vitality, child, spouse, member, held, courting) in &souls {
         if member.map(|m| m.0) != Some(settlement) {
@@ -3138,10 +3199,22 @@ pub(crate) fn plan_houses(
             betrothed += 1;
         }
         spirits_sum += morale.spirits;
-        if crate::villager::home::wants_family_roof(spouse, child) {
+        let wants_family_roof = crate::villager::home::wants_family_roof(spouse, child);
+        if wants_family_roof {
             family_souls += 1;
         } else {
             single_souls += 1;
+        }
+        if wants_family_roof
+            && home.is_some_and(|home| {
+                civics.iter().any(|(roof, building, member)| {
+                    member.0 == settlement
+                        && building.kind == BuildingKind::Longhouse
+                        && home.0 == roof
+                })
+            })
+        {
+            family_in_longhouse += 1;
         }
         if home.is_none() && !child {
             roofless_adults += 1;
@@ -3177,13 +3250,13 @@ pub(crate) fn plan_houses(
     let peril = crate::witness::peril_of(remembered.iter().copied(), clock.day());
     let standing_longhouses = civics
         .iter()
-        .filter(|(b, member)| b.kind == BuildingKind::Longhouse && member.0 == settlement)
+        .filter(|(_, b, member)| b.kind == BuildingKind::Longhouse && member.0 == settlement)
         .count();
 
     let has_kind = |kind: BuildingKind| {
         civics
             .iter()
-            .any(|(b, member)| b.kind == kind && member.0 == settlement)
+            .any(|(_, b, member)| b.kind == kind && member.0 == settlement)
             || pending
                 .iter()
                 .any(|(b, _, member)| b.kind == kind && member.0 == settlement)
@@ -3353,11 +3426,12 @@ pub(crate) fn plan_houses(
         let standing = |kind: BuildingKind| {
             civics
                 .iter()
-                .filter(|(b, member)| b.kind == kind && member.0 == settlement)
+                .filter(|(_, b, member)| b.kind == kind && member.0 == settlement)
                 .count()
         };
         next_roof(&RoofNeeds {
             family_souls,
+            family_in_longhouse,
             single_souls,
             roofless: roofless_adults,
             houses: standing(BuildingKind::House),
@@ -3371,7 +3445,14 @@ pub(crate) fn plan_houses(
             halls: standing(BuildingKind::TownHall),
         })
     } {
-        (roof, "somebody has no roof")
+        (
+            roof,
+            if roof == BuildingKind::House && family_in_longhouse > 0 {
+                "a family needs a home of its own"
+            } else {
+                "somebody needs a roof"
+            },
+        )
     } else if roofless_adults > 0 {
         // Nobody builds and people sleep rough: the ceiling, named. A
         // silent planner here reads as a stall; the truth is the town is
@@ -3379,7 +3460,7 @@ pub(crate) fn plan_houses(
         let dwelling_count = |kind: BuildingKind| {
             civics
                 .iter()
-                .filter(|(b, member)| b.kind == kind && member.0 == settlement)
+                .filter(|(_, b, member)| b.kind == kind && member.0 == settlement)
                 .count()
         };
         let beds_now = crate::villager::home::shelter_capacity(
@@ -3637,7 +3718,7 @@ pub(crate) fn plan_houses(
         && population >= HOMESTEAD_MIN_POP
         && rng.0.chance(HOMESTEAD_CHANCE);
     let mut plots = if homestead {
-        homestead_slots(site.centre, ring_reach, &mut rng.0)
+        homestead_slots_by_gate(site.centre, ring_reach, rampart.as_ref(), &mut rng.0)
     } else {
         Vec::new()
     };
@@ -3734,6 +3815,13 @@ pub(crate) fn plan_houses(
             }
         }
         let at = Vec3::new(x, centre_height, z);
+        if dwelling
+            && rampart
+                .as_ref()
+                .is_some_and(|wall| !sits_lawfully_by_a_rampart(at, site.centre, wall, reach))
+        {
+            continue;
+        }
         for other in &roofs {
             if other.translation.distance(at) < clearance {
                 continue 'darts;
@@ -4099,6 +4187,7 @@ mod tests {
     /// A village whose roofs exactly fit its people, with nothing rising.
     fn snug(family: usize, single: usize) -> RoofNeeds {
         RoofNeeds {
+            family_in_longhouse: 0,
             family_souls: family,
             single_souls: single,
             houses: family.div_ceil(HOUSE_CAPACITY),
@@ -4157,6 +4246,7 @@ mod tests {
         // and the six wed could not take a longhouse bed anyway, so half
         // the village lay in the dirt waiting on family rooms.
         let founding = RoofNeeds {
+            family_in_longhouse: 0,
             family_souls: 6,
             single_souls: 6,
             houses: 0,
@@ -4314,6 +4404,56 @@ mod tests {
     }
 
     #[test]
+    fn a_rampart_keeps_homes_off_its_line_and_outside_homes_by_gates() {
+        use crate::villager::rampart::{Rampart, RampartTier};
+
+        let wall = Rampart {
+            tier: RampartTier::Fence,
+            radius: 80.0,
+            gates: vec![0.0, std::f32::consts::PI],
+            standing: true,
+        };
+        // A footprint near the ring is neither honestly in town nor out of
+        // it, so the planner must refuse it.
+        assert!(!sits_lawfully_by_a_rampart(
+            Vec3::new(80.0, 0.0, 0.0),
+            Vec3::ZERO,
+            &wall,
+            3.2,
+        ));
+        assert!(sits_lawfully_by_a_rampart(
+            Vec3::new(50.0, 0.0, 0.0),
+            Vec3::ZERO,
+            &wall,
+            3.2,
+        ));
+        assert!(sits_lawfully_by_a_rampart(
+            Vec3::new(118.0, 0.0, 0.0),
+            Vec3::ZERO,
+            &wall,
+            3.2,
+        ));
+        assert!(!sits_lawfully_by_a_rampart(
+            Vec3::new(0.0, 0.0, 118.0),
+            Vec3::ZERO,
+            &wall,
+            3.2,
+        ));
+
+        let mut rng = crate::rng::Rng::new(23);
+        for (x, z, _) in homestead_slots_by_gate(Vec3::ZERO, 6, Some(&wall), &mut rng) {
+            let outward = Vec2::new(x, z);
+            assert!(outward.length() > wall.radius + RAMPART_BUILDING_BUFFER);
+            let angle = outward.y.atan2(outward.x);
+            assert!(wall.gates.iter().any(|gate| {
+                let apart = (angle - gate + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
+                    - std::f32::consts::PI;
+                apart.abs() <= GATE_SIDE_ARC
+            }));
+        }
+    }
+
+    #[test]
     fn most_families_still_want_the_square() {
         // Some, not all: a town where everyone moved out is not a town.
         assert!(HOMESTEAD_CHANCE > 0.0 && HOMESTEAD_CHANCE < 0.5);
@@ -4349,6 +4489,21 @@ mod tests {
             ..default()
         };
         assert_eq!(next_roof(&needs), Some(BuildingKind::Longhouse));
+    }
+
+    #[test]
+    fn a_family_waiting_in_the_longhouse_calls_for_a_home_of_its_own() {
+        // They are technically sheltered, and ordinary bed arithmetic says
+        // the town has room to spare. The common roof is still temporary for
+        // a family, so it must be enough to break ground on a house.
+        let needs = RoofNeeds {
+            houses: 2,
+            longhouses: 1,
+            population: 8,
+            family_in_longhouse: 3,
+            ..default()
+        };
+        assert_eq!(next_roof(&needs), Some(BuildingKind::House));
     }
 
     #[test]
@@ -4551,10 +4706,7 @@ mod tests {
                 plan.half_w > 0.0 && plan.half_d > 0.0,
                 "{kind:?} rolls no footprint to stand on",
             );
-            assert!(
-                plan.wall_h > 0.0,
-                "{kind:?} rolls no walls",
-            );
+            assert!(plan.wall_h > 0.0, "{kind:?} rolls no walls",);
             assert!(
                 kind.timber_cost() > 0.0,
                 "{kind:?} costs nothing to build, so nobody ever will",
@@ -4570,10 +4722,7 @@ mod tests {
     #[test]
     fn the_roofs_that_sleep_people_sleep_what_they_say() {
         for kind in [BuildingKind::House, BuildingKind::Longhouse] {
-            assert!(
-                kind.sleeps() > 0,
-                "{kind:?} promises beds and has none",
-            );
+            assert!(kind.sleeps() > 0, "{kind:?} promises beds and has none",);
         }
         assert!(
             BuildingKind::Longhouse.sleeps() > BuildingKind::House.sleeps(),
@@ -4601,9 +4750,15 @@ mod tests {
         };
         // A wall panel: thin, tall, and three metres of it - centred on
         // the doorway, which is what put it first in the running.
-        let wall = (Entity::from_raw_u32(1).unwrap(), piece(3.0, 1.2, 0.0, 0.2, 2.4, 3.0));
+        let wall = (
+            Entity::from_raw_u32(1).unwrap(),
+            piece(3.0, 1.2, 0.0, 0.2, 2.4, 3.0),
+        );
         // And a real leaf: thin, tall, a door's width.
-        let leaf = (Entity::from_raw_u32(2).unwrap(), piece(3.0, 1.1, 0.0, 0.14, 2.0, 1.1));
+        let leaf = (
+            Entity::from_raw_u32(2).unwrap(),
+            piece(3.0, 1.1, 0.0, 0.14, 2.0, 1.1),
+        );
 
         let only_wall = the_makers_own_panel(&door, &[wall]);
         assert!(
@@ -4614,7 +4769,10 @@ mod tests {
         let both = the_makers_own_panel(&door, &[wall, leaf]);
         let hung: Vec<Entity> = both.iter().map(|(entity, _)| *entity).collect();
         assert!(hung.contains(&leaf.0), "the real leaf must be the one hung");
-        assert!(!hung.contains(&wall.0), "and the wall must stay where it is");
+        assert!(
+            !hung.contains(&wall.0),
+            "and the wall must stay where it is"
+        );
     }
 
     /// The hall the village raises itself is an opening, and nothing swings.

@@ -32,6 +32,7 @@ pub(crate) mod portrait;
 pub(crate) mod spellbook;
 pub(crate) mod timings;
 pub(crate) mod village;
+mod villager_profile;
 mod world;
 
 pub(crate) use capture::*;
@@ -67,6 +68,7 @@ impl Plugin for DebugPlugin {
             .init_resource::<SelectedPerson>()
             .init_resource::<RosterSort>()
             .init_resource::<people::RosterFilter>()
+            .init_resource::<villager_profile::VillagerProfile>()
             .init_resource::<portrait::Portraits>()
             .init_resource::<ChronicleView>()
             .init_resource::<ChronicleStars>()
@@ -77,6 +79,7 @@ impl Plugin for DebugPlugin {
                     spawn_hud,
                     spawn_world_panel.after(spawn_village_panel),
                     spawn_people_panel.after(spawn_village_panel),
+                    villager_profile::spawn_villager_profile.after(spawn_people_panel),
                     spawn_chronicle_page.after(spawn_village_panel),
                     spawn_village_panel,
                     spawn_god_panel.after(spawn_village_panel),
@@ -207,6 +210,10 @@ impl Plugin for DebugPlugin {
             )
             .add_systems(
                 Update,
+                villager_profile::update_villager_profile.in_set(DebugSet::Rebuild),
+            )
+            .add_systems(
+                Update,
                 (
                     update_dossier,
                     update_god_panel,
@@ -241,7 +248,9 @@ impl Plugin for DebugPlugin {
             .add_systems(
                 Update,
                 report_frames.run_if(|| std::env::var("DIVUS_FACTUS_FRAMES").is_ok()),
-            );
+            )
+            .add_systems(PostUpdate, villager_profile::open_villager_profile)
+            .add_observer(villager_profile::close_villager_profile);
 
         // The parallel court's own inspector: DIVUS_FACTUS_AMBIGUITY=1
         // makes the scheduler list every unordered pair that shares
@@ -613,5 +622,4 @@ fn toggle_the_sea(
             "The sea plane is off - F12 brings it back".to_string()
         }));
     }
-
 }

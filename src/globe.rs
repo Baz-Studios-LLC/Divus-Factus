@@ -88,9 +88,11 @@ const MAX_LEVEL: u8 = 8;
 const SPLIT_PX: f32 = 7.0;
 
 /// How far under `SPLIT_PX` the error must fall before ground already drawn at
-/// a finer level is allowed to coarsen again. Pure hysteresis; see the cut in
-/// `tend_the_tree`.
-const MERGE_HYSTERESIS: f32 = 0.75;
+/// a finer level is allowed to coarsen again. This intentionally leaves a
+/// broad overlap with the chunk handoff: a small pull on the zoom must not
+/// replace the country beneath the player with a visibly coarser planet.
+/// See the cut in `tend_the_tree`.
+const MERGE_HYSTERESIS: f32 = 0.45;
 
 /// How far the planet's water sits below true level: enough to keep out of the
 /// chunks' own sea, and no more than that.
@@ -843,14 +845,13 @@ fn plant_the_tree(
             ..default()
         },
         extension: VeilExtension {
-            // Nine parts in ten, the weight the cloths stack to at play
-            // height; the tenth that shows through keeps a coast reading as a
-            // coast under the shroud.
+            // Unknown ground is solid at play height, and the far planet uses
+            // the same rule so climbing cannot make the shroud transparent.
             tint: Vec4::new(
                 crate::fog::VEIL_TINT[0],
                 crate::fog::VEIL_TINT[1],
                 crate::fog::VEIL_TINT[2],
-                0.9,
+                1.0,
             ),
         },
     })));

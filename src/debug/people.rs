@@ -203,7 +203,7 @@ pub(crate) const DOLL_LAYER: usize = 4;
 
 /// The offscreen texture the paperdoll camera draws to.
 #[derive(Resource)]
-pub(crate) struct PaperdollTarget(#[allow(dead_code)] Handle<Image>);
+pub(crate) struct PaperdollTarget(pub(crate) Handle<Image>);
 
 /// Whose dossier the people window shows.
 #[derive(Resource, Default)]

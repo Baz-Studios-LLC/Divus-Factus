@@ -6,6 +6,7 @@ use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::prelude::*;
 
 use super::*;
+use crate::palette;
 use crate::terrain::LoadedChunks;
 use crate::ui;
 
@@ -172,6 +173,56 @@ pub(crate) fn spawn_hud(mut commands: Commands, mouse: Res<crate::keymap::MouseS
     commands.entity(subtitle).insert(ChildOf(inspector.root));
     let detail = commands.spawn((InspectorDetail, ui::body(""))).id();
     commands.entity(detail).insert(ChildOf(inspector.root));
+
+    // A dwelling's card has its own quiet hierarchy: facts in aligned rows,
+    // people in a small living line, and a concern that only exists when the
+    // simulation has something real to put there.
+    let house_block = |entity: Entity, commands: &mut Commands| {
+        commands.entity(entity).insert(InspectorHouseBlock);
+    };
+    let home_header = ui::section_header(&mut commands, inspector.root, "THE HOME");
+    house_block(home_header, &mut commands);
+    for (value, label) in [
+        (InspectorHouseValue::Beds, "beds"),
+        (InspectorHouseValue::Stores, "stores"),
+    ] {
+        let row = ui::stat_row(&mut commands, inspector.root, label, None);
+        house_block(row.row, &mut commands);
+        commands
+            .entity(row.value)
+            .insert((InspectorHouseBlock, value));
+    }
+    let household_header = ui::section_header(&mut commands, inspector.root, "HOUSEHOLD");
+    house_block(household_header, &mut commands);
+    for (value, label) in [
+        (InspectorHouseValue::Mood, "mood"),
+        (InspectorHouseValue::Faith, "faith"),
+    ] {
+        let row = ui::stat_row(&mut commands, inspector.root, label, None);
+        house_block(row.row, &mut commands);
+        commands
+            .entity(row.value)
+            .insert((InspectorHouseBlock, value));
+    }
+    let life = commands
+        .spawn((InspectorHouseValue::Life, ui::body("")))
+        .id();
+    commands
+        .entity(life)
+        .insert((ChildOf(inspector.root), InspectorHouseBlock));
+    let concern_header = ui::section_header(&mut commands, inspector.root, "CONCERN");
+    commands
+        .entity(concern_header)
+        .insert((InspectorHouseBlock, InspectorHouseConcern));
+    let concern = commands
+        .spawn((InspectorHouseValue::Concern, ui::body("")))
+        .id();
+    commands.entity(concern).insert((
+        ChildOf(inspector.root),
+        InspectorHouseBlock,
+        InspectorHouseConcern,
+        TextColor(palette::shade(&palette::CLOTH_PINK, 0.92)),
+    ));
 
     let person_rows = [
         (InspectorValue::State, "state"),

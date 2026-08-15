@@ -1399,8 +1399,7 @@ mod tests {
         // life left when the errand is dropped: from here to the hunger
         // that starts killing takes minutes, and the longest road home a
         // village has takes about two.
-        let seconds_of_life_left =
-            (0.99 - DESPERATE_HUNGER) * crate::villager::SECONDS_TO_STARVE;
+        let seconds_of_life_left = (0.99 - DESPERATE_HUNGER) * crate::villager::SECONDS_TO_STARVE;
         let strides_home = 259.0;
         let walking = 2.4;
         assert!(

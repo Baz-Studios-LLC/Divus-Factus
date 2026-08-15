@@ -553,6 +553,17 @@ fn locomotion(
         &mut creatures
     {
         let mut speed = 0.0;
+        // A kneeling pose is rooted to the ground. Prayer clears its current
+        // destination, but a path can still be carrying old waypoints from
+        // the walk that preceded it; following those made villagers slide
+        // across the field on their knees. Locomotion owns routes, so it is
+        // the one place that can reliably stop both kinds of movement.
+        if motion.kneeling {
+            target.0 = None;
+            route.clear();
+            motion.speed = 0.0;
+            continue;
+        }
         // The dying walk like the dying.
         let vigor = vitality.map_or(1.0, |v| 1.0 - v.harm * 0.55);
 

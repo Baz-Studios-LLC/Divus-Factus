@@ -63,7 +63,10 @@ pub const CHUNK_CEILING: f32 = 700.0;
 /// [`crate::debug::layers::scenery_dissolved`]) so the two eases overlap: the
 /// forests begin thinning first, the ground they stand on follows, and by the
 /// ceiling there is nothing left to take away.
-const CHUNK_DISSOLVE: f32 = 450.0;
+// The planet patches already carry a faithful low-poly ground picture by this
+// height. Begin handing off before individual streamed chunks become broad,
+// differently shaded tiles against that picture.
+const CHUNK_DISSOLVE: f32 = 360.0;
 
 /// How far to stream for a given camera distance.
 ///
@@ -217,7 +220,16 @@ pub struct TerrainPlugin;
 impl Plugin for TerrainPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_terrain)
-            .add_systems(Update, stream_chunks.in_set(TerrainSet));
+            // Parking/unparking changes visibility and must land before the
+            // fog system (ordered after `TerrainSet`) decides which chunk
+            // hierarchy may be revealed. Without this barrier, fog sees the
+            // old state and revives cached chunk squares for one whole frame.
+            .add_systems(
+                Update,
+                (stream_chunks, bevy::ecs::schedule::ApplyDeferred)
+                    .chain()
+                    .in_set(TerrainSet),
+            );
     }
 }
 
@@ -1220,6 +1232,10 @@ pub struct LoadedChunks {
     held: i32,
     /// Seconds since the view last wanted the width it is holding.
     let_go: f32,
+    /// The founding ground gets one complete maximum-zoom cache before the
+    /// player can pull back. It remains parked until the camera genuinely
+    /// leaves that area, so the first survey never visibly builds the world.
+    first_zoom_cache: Option<IVec2>,
 }
 
 /// How long a ring outlives the view that asked for it, in seconds.
@@ -1227,9 +1243,22 @@ pub struct LoadedChunks {
 /// Long enough that leaning back and in again — which takes a beat of the
 /// wheel — costs nothing, short enough that a zoom-out does not follow the god
 /// around for the rest of the session.
-const HELD_FOR: f32 = 0.5;
+const HELD_FOR: f32 = 6.0;
+
+/// A streamed chunk retained for a quick return from globe view. Its full
+/// hierarchy stays alive, but the renderer must not draw it while the planet
+/// patch beneath is the active representation.
+#[derive(Component)]
+pub(crate) struct ParkedChunk;
 
 impl LoadedChunks {
+    /// Start quietly preparing every chunk the initial settlement can reveal
+    /// through the normal play zoom range.
+    pub fn prime_first_zoom(&mut self, centre: IVec2) {
+        self.first_zoom_cache = Some(centre);
+        self.held = self.held.max(VIEW_CHUNKS);
+    }
+
     pub fn count(&self) -> usize {
         self.entities.len()
     }
@@ -1971,6 +2000,7 @@ fn stream_chunks(
     assets: Res<TerrainAssets>,
     mut loaded: ResMut<LoadedChunks>,
     cameras: Query<&crate::camera::CameraRig>,
+    parked: Query<Has<ParkedChunk>>,
     state: Res<State<crate::GameState>>,
     time: Res<Time<Real>>,
     watch: Res<crate::debug::timings::Timings>,
@@ -1980,6 +2010,16 @@ fn stream_chunks(
         return;
     };
     let centre = terrain.chunk_of(rig.focus.x, rig.focus.z);
+
+    // The founding cache is useful while the god is still looking at the
+    // founding country. Once they travel a few chunks away it would become an
+    // invisible memory tax, so ordinary streaming takes over.
+    if loaded
+        .first_zoom_cache
+        .is_some_and(|home| (centre - home).abs().max_element() > 2)
+    {
+        loaded.first_zoom_cache = None;
+    }
 
     let radius = stream_radius(rig.distance);
     loaded.radius = radius;
@@ -2003,13 +2043,36 @@ fn stream_chunks(
     }
     let wanted = chunks_in_view(centre, radius);
     let wanted_set: HashSet<IVec2> = wanted.iter().copied().collect();
-    let kept: HashSet<IVec2> = if loaded.held > radius {
+    let mut kept: HashSet<IVec2> = if loaded.held > radius {
         chunks_in_view(centre, loaded.held).into_iter().collect()
     } else {
         wanted_set.clone()
     };
+    let first_zoom = loaded
+        .first_zoom_cache
+        .map(|home| chunks_in_view(home, VIEW_CHUNKS));
+    if let Some(cache) = &first_zoom {
+        kept.extend(cache.iter().copied());
+    }
 
-    // Unload first, so memory is released before more is claimed.
+    // Keep a recently seen chunk hierarchy parked rather than rebuilding its
+    // terrain, trees, props, and veil after a quick trip to globe view. Parked
+    // chunks are invisible; `fog::drape_the_veil` restores them only when this
+    // view wants them again.
+    for (coord, entity) in &loaded.entities {
+        if wanted_set.contains(coord) {
+            if parked.get(*entity).unwrap_or(false) {
+                commands.entity(*entity).remove::<ParkedChunk>();
+            }
+        } else if kept.contains(coord) && !parked.get(*entity).unwrap_or(false) {
+            commands
+                .entity(*entity)
+                .insert((ParkedChunk, Visibility::Hidden));
+        }
+    }
+
+    // Unload only after a cached ring has genuinely expired or the god has
+    // travelled far enough that it belongs to a different region.
     loaded.entities.retain(|coord, entity| {
         if kept.contains(coord) {
             true
@@ -2027,15 +2090,33 @@ fn stream_chunks(
     // hide the seams, and three a frame stopped hiding anything the moment
     // a thousand chunks came due at once.
     let missing = wanted_set.len().saturating_sub(loaded.entities.len());
-    let budget = if *state.get() == crate::GameState::Loading {
+    let cache_missing = first_zoom.as_ref().map_or(0, |cache| {
+        cache
+            .iter()
+            .filter(|coord| !loaded.entities.contains_key(coord))
+            .count()
+    });
+    let budget = if *state.get() == crate::GameState::Loading || cache_missing > 0 {
         CHUNKS_PER_LOADING_FRAME
     } else {
         (CHUNKS_PER_FRAME + missing / 24).min(CHUNKS_PER_HURRIED_FRAME)
     };
 
+    // The active view always comes first. The founding cache follows it, and
+    // its off-screen chunks enter the world parked rather than flashing into
+    // the player's current view while their meshes are prepared.
+    let mut build_order = wanted;
+    if let Some(cache) = first_zoom {
+        build_order.extend(
+            cache
+                .into_iter()
+                .filter(|coord| !wanted_set.contains(coord)),
+        );
+    }
+
     // Load a bounded number per frame, nearest first.
     let mut built = 0;
-    for coord in wanted {
+    for coord in build_order {
         if built >= budget {
             break;
         }
@@ -2043,7 +2124,7 @@ fn stream_chunks(
             continue;
         }
 
-        spawn_chunk(
+        let entity = spawn_chunk(
             &mut commands,
             &mut meshes,
             &assets,
@@ -2051,6 +2132,11 @@ fn stream_chunks(
             &mut loaded,
             coord,
         );
+        if !wanted_set.contains(&coord) {
+            commands
+                .entity(entity)
+                .insert((ParkedChunk, Visibility::Hidden));
+        }
         built += 1;
     }
 }
@@ -3602,9 +3688,13 @@ mod terracing {
             }
         }
         let height = terrain.height_at(x, z);
-        let before: Vec<f32> = (-30..=30).map(|d| terrain.height_at(x + d as f32, z)).collect();
+        let before: Vec<f32> = (-30..=30)
+            .map(|d| terrain.height_at(x + d as f32, z))
+            .collect();
         terrain.terrace(x, z, 3.0, 12.0, 0.0, 2.5, 2.4, height);
-        let after: Vec<f32> = (-30..=30).map(|d| terrain.height_at(x + d as f32, z)).collect();
+        let after: Vec<f32> = (-30..=30)
+            .map(|d| terrain.height_at(x + d as f32, z))
+            .collect();
         let mut furthest = 0;
         for (i, d) in (-30_i32..=30).enumerate() {
             if (after[i] - before[i]).abs() > 0.05 {

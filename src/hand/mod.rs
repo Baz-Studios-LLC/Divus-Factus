@@ -377,7 +377,6 @@ impl Plugin for HandPlugin {
                     update_hand_ray,
                     update_hover,
                     outline_the_hovered,
-                    toggle_follow,
                     knock_on_roofs,
                     handle_grab_and_release,
                     carry_held_object,
@@ -699,84 +698,11 @@ fn update_hover(
     hand.hovered = pick_object(ray, &candidates, 600.0);
 }
 
-/// A clean right-click on a creature pins the camera to them; on the same
-/// creature again, drops to their shoulder; once more — or on empty ground —
-/// lets go.
-///
-/// The right button is the Action button, so it does both: hold it and you are
-/// carrying somebody, tap it and you are choosing whom to watch. They tell each
-/// other apart by whether the hand MOVED — the same six pixels a click has
-/// always been allowed. The orbit that used to live on a right-drag has gone to
-/// the middle button, where Black and White keeps it.
-fn toggle_follow(
-    buttons: Res<ButtonInput<MouseButton>>,
-    mouse: Res<crate::keymap::MouseScheme>,
-    windows: Query<&Window, With<PrimaryWindow>>,
-    pointer: Res<PointerContext>,
-    hand: Res<DivineHand>,
-    creatures: Query<(), With<crate::creature::Creature>>,
-    rigs: Query<&crate::camera::CameraRig>,
-    mut follow: ResMut<crate::camera::FollowTarget>,
-    mut press_at: Local<Option<Vec2>>,
-) {
-    use crate::camera::FollowStyle;
-
-    // A worn body is not a follow the player may click out of. This cycle
-    // releases the pin on any clean right-click that lands on nothing new —
-    // sensible when the pin is a choice about whom to watch, ruinous when it
-    // is a possession, and the mouse is locked away and every stray click
-    // lands on nothing. It let go of the body while the god was still inside
-    // it: nothing pinned the camera any more, so it kept the eye height it
-    // had and the movement keys flew it through hillsides. The ride is ended
-    // by the miracle or by Escape, not by a click.
-    if rigs.single().is_ok_and(|rig| rig.in_a_body) {
-        return;
-    }
-
-    let Ok(window) = windows.single() else {
-        return;
-    };
-    if buttons.just_pressed(mouse.action()) {
-        *press_at = window.cursor_position();
-    }
-    if !buttons.just_released(mouse.action()) {
-        return;
-    }
-    let (Some(down), Some(up)) = (press_at.take(), window.cursor_position()) else {
-        return;
-    };
-    if down.distance(up) > 6.0 || pointer.over_ui {
-        return;
-    }
-
-    let hovered_creature = hand.hovered.filter(|e| creatures.get(*e).is_ok());
-    match (follow.entity, hovered_creature) {
-        // (The same clean tap on a DWELLING is a knock — `knock_on_roofs`
-        // watches beside this system with the same six-pixel rule.)
-        // A different creature: switch the follow to them.
-        (Some(current), Some(other)) if other != current => {
-            follow.entity = Some(other);
-            follow.style = FollowStyle::Overhead;
-        }
-        // Already following: any clean right-click on nothing new lets go.
-        (Some(_), _) => {
-            follow.entity = None;
-            follow.style = FollowStyle::Overhead;
-        }
-        // Not following and clicked someone: begin.
-        (None, Some(creature)) => {
-            follow.entity = Some(creature);
-            follow.style = FollowStyle::Overhead;
-        }
-        (None, None) => {}
-    }
-}
-
 /// A clean action-tap on a dwelling knocks on the roof.
 ///
 /// Black and White's wake-up call: the household inside is turned out of
 /// bed. Detected here, where the pointer lives, with the same six-pixel
-/// cleanness rule as `toggle_follow`; answered in `villager::home`, where
+/// cleanness rule as every other clean tap; answered in `villager::home`, where
 /// the sleep machinery lives.
 #[allow(clippy::type_complexity)]
 fn knock_on_roofs(
@@ -866,10 +792,10 @@ fn handle_grab_and_release(
         // What the ground loses when this is lifted: a boulder is gone for
         // good, a bush grows back like a tree. Rides in the satchel because
         // the system is at Bevy's sixteen parameters.
-        Query<(
-            Has<crate::matter::Boulder>,
-            Has<crate::scatter::FoodSource>,
-        )>,
+        Query<(Has<crate::matter::Boulder>, Has<crate::scatter::FoodSource>)>,
+        // Villagers answer a tap with their dossier, never with a generic
+        // pickup. Their miracles keep their own explicit paths.
+        Query<(), With<crate::villager::Villager>>,
     ),
     pointer: Res<PointerContext>,
     armed: Res<crate::miracles::SelectedMiracle>,
@@ -1121,6 +1047,7 @@ fn handle_grab_and_release(
         && armed.0.is_none()
         && hand.held.is_none()
         && let Some(entity) = hand.hovered
+        && matters.9.get(entity).is_err()
         && rooted.get(entity).is_err()
         && let Ok(transform) = transforms.get(entity)
     {
@@ -2189,10 +2116,10 @@ mod tests {
         };
         // Every axis of every shape, held against the standoff itself.
         for size in [
-            Vec3::new(0.25, 2.5, 0.25),  // a corner post
-            Vec3::new(6.0, 0.2, 0.2),    // a long beam
-            Vec3::new(4.0, 2.5, 0.25),   // a wall panel
-            Vec3::splat(1.0),            // a cube
+            Vec3::new(0.25, 2.5, 0.25), // a corner post
+            Vec3::new(6.0, 0.2, 0.2),   // a long beam
+            Vec3::new(4.0, 2.5, 0.25),  // a wall panel
+            Vec3::splat(1.0),           // a cube
         ] {
             let off = stands_off(size);
             for axis in [off.x, off.y, off.z] {

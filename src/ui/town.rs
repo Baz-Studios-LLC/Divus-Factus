@@ -12,9 +12,7 @@
 //! cannot see.
 
 use bevy::prelude::*;
-use bevy::ui::{
-    FlexDirection, GlobalZIndex, JustifyContent, Node, PositionType, Val::Px as px,
-};
+use bevy::ui::{FlexDirection, GlobalZIndex, JustifyContent, Node, PositionType, Val::Px as px};
 
 use super::theme;
 
@@ -98,13 +96,10 @@ pub(crate) fn spawn_town_strip(mut commands: Commands) {
     // is a duplicate component, and Bevy refuses those at spawn - so the
     // gap between the cells is set on the row it already has.
     let row = commands.spawn((ordo::row(), ChildOf(strip))).id();
-    commands
-        .entity(row)
-        .entry::<Node>()
-        .and_modify(|mut node| {
-            node.justify_content = JustifyContent::Center;
-            node.column_gap = px(4.0);
-        });
+    commands.entity(row).entry::<Node>().and_modify(|mut node| {
+        node.justify_content = JustifyContent::Center;
+        node.column_gap = px(4.0);
+    });
 
     for reading in [
         TownReading::Souls,
@@ -115,9 +110,7 @@ pub(crate) fn spawn_town_strip(mut commands: Commands) {
         // One width for all four, the way the bench cuts its mode
         // buttons: readings that step in and out as the eye runs along
         // them read as four unrelated things.
-        let cell = commands
-            .spawn((ordo::readout(72.0), ChildOf(row)))
-            .id();
+        let cell = commands.spawn((ordo::readout(72.0), ChildOf(row))).id();
         let tint = theme::accent().with_alpha(0.85);
         match reading {
             TownReading::Souls => crate::debug::village::person_glyph(&mut commands, cell, tint),
@@ -152,7 +145,13 @@ pub(crate) fn update_town_strip(
         ),
     >,
     books: Query<&Visibility, With<crate::debug::village::VillagePanel>>,
-    mut strip: Query<&mut Visibility, (With<TownStrip>, Without<crate::debug::village::VillagePanel>)>,
+    mut strip: Query<
+        &mut Visibility,
+        (
+            With<TownStrip>,
+            Without<crate::debug::village::VillagePanel>,
+        ),
+    >,
     mut name: Query<&mut Text, (With<TownStripName>, Without<TownReading>)>,
     mut readings: Query<(&TownReading, &mut Text)>,
 ) {

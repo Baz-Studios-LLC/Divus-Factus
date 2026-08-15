@@ -17,13 +17,31 @@ use bevy::prelude::*;
 
 use super::regard::Regard;
 use super::work::{Building, BuildingKind, Stockpile, Vocation};
-use super::{Chronicle, MemberOf, Person, Settlement, SettlementGround, Villager};
-use crate::creature::Corpse;
+use super::{Activity, Chronicle, MemberOf, Person, Settlement, SettlementGround, Villager};
 use crate::creature::genome::{Age, CreatureGenome};
+use crate::creature::{Corpse, Held, MoveTarget};
 
 /// The chain of office, worn by one soul per town.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Mayor(pub Entity);
+
+/// A short public moment at the town hall. The ballot is still the regard
+/// graph; this only gives the decision a place, witnesses, and a body in the
+/// world so becoming a town does not happen in an invisible system tick.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct CivicAssembly {
+    pub mayor: Entity,
+    pub hall: Vec3,
+    pub until: f64,
+    pub spoken: bool,
+}
+
+/// A townsperson temporarily called to a civic assembly. Keeping this marker
+/// separate from `Activity` lets the gathering dissolve cleanly.
+#[derive(Component, Debug, Clone, Copy)]
+pub(super) struct CivicGuest;
+
+const ASSEMBLY_DURATION: f64 = 32.0;
 
 /// The fewest grown souls a town holds an election with. Below this a
 /// hamlet needs every hand more than it needs a chairman.
@@ -63,6 +81,16 @@ impl Lean {
             Lean::Stone => "calls for stone",
             Lean::Homes => "calls for roofs raised",
             Lean::Faith => "calls the town to the shrine",
+        }
+    }
+
+    fn address(self) -> &'static str {
+        match self {
+            Lean::Larder => "We will fill the larder first.",
+            Lean::Timber => "We need timber. Put hands to the woods.",
+            Lean::Stone => "We need stone for the work ahead.",
+            Lean::Homes => "We will raise roofs for those without one.",
+            Lean::Faith => "We will gather at the shrine.",
         }
     }
 }
@@ -124,7 +152,7 @@ pub(super) fn hold_elections(
     mut proclaim: ResMut<ordo::Proclamations>,
     mut sounds: MessageWriter<crate::sfx::PlaySfx>,
     towns: Query<(Entity, &Settlement), With<SettlementGround>>,
-    halls: Query<(&Building, &MemberOf)>,
+    halls: Query<(&Building, &MemberOf, &Transform)>,
     mayors: Query<(Entity, &Mayor)>,
     mut chronicles: Query<&mut Chronicle>,
     folk: Query<
@@ -144,12 +172,13 @@ pub(super) fn hold_elections(
     let day = clock.day();
 
     for (town, settlement) in &towns {
-        if !halls
+        let Some(hall) = halls
             .iter()
-            .any(|(b, m)| b.kind == BuildingKind::TownHall && m.0 == town)
-        {
+            .find(|(b, m, _)| b.kind == BuildingKind::TownHall && m.0 == town)
+            .map(|(_, _, at)| at.translation)
+        else {
             continue;
-        }
+        };
         let adults: Vec<_> = folk
             .iter()
             .filter(|(_, m, _, genome, ..)| m.0 == town && genome.age == Age::Adult)
@@ -248,6 +277,12 @@ pub(super) fn hold_elections(
             }
         }
         commands.entity(chosen).insert(Mayor(town));
+        commands.entity(town).insert(CivicAssembly {
+            mayor: chosen,
+            hall,
+            until: clock.elapsed + ASSEMBLY_DURATION,
+            spoken: false,
+        });
         if let Ok(mut story) = chronicles.get_mut(chosen) {
             story.record(day, format!("was chosen mayor of {}", settlement.name));
         }
@@ -267,6 +302,93 @@ pub(super) fn hold_elections(
             kind: crate::sfx::SfxKind::ProclaimGold,
             at: None,
         });
+    }
+}
+
+/// Makes an election visible: the mayor comes to the hall and nearby idle
+/// adults form a small, loose crowd. Work continues for everyone else.
+#[allow(clippy::type_complexity)]
+pub(super) fn stage_civic_assemblies(
+    mut commands: Commands,
+    clock: Res<crate::calendar::WorldClock>,
+    mut say: MessageWriter<crate::ui::Say>,
+    mut assemblies: Query<(Entity, &mut CivicAssembly, Option<&CivicPriority>)>,
+    grounds: Query<&SettlementGround>,
+    ramparts: Query<&super::rampart::Rampart>,
+    mut folk: Query<
+        (
+            Entity,
+            &MemberOf,
+            &Transform,
+            &mut Activity,
+            &mut MoveTarget,
+            Option<&CivicGuest>,
+        ),
+        (With<Villager>, Without<Corpse>, Without<Held>),
+    >,
+) {
+    for (town, mut assembly, priority) in &mut assemblies {
+        if clock.elapsed >= assembly.until {
+            commands.entity(town).remove::<CivicAssembly>();
+            for (who, member, _, mut activity, mut target, guest) in &mut folk {
+                if member.0 != town || guest.is_none() {
+                    continue;
+                }
+                commands.entity(who).remove::<CivicGuest>();
+                if *activity == Activity::Chatting {
+                    *activity = Activity::Idle;
+                    target.0 = None;
+                }
+            }
+            continue;
+        }
+
+        let mut mayor_at = None;
+        let inside_radius = ramparts.get(town).map_or_else(
+            |_| grounds.get(town).map_or(36.0, |ground| ground.radius),
+            |wall| wall.radius,
+        );
+        let centre = grounds
+            .get(town)
+            .map_or(assembly.hall, |ground| ground.centre);
+        for (who, member, at, mut activity, mut target, guest) in &mut folk {
+            if member.0 != town {
+                continue;
+            }
+            if who == assembly.mayor {
+                *activity = Activity::Chatting;
+                target.0 = Some(assembly.hall);
+                mayor_at = Some(at.translation);
+                continue;
+            }
+            // The whole town hears the call, but a person already beyond the
+            // wall stays on the road. An election does not pull a hunter or
+            // explorer back across the countryside just to make a crowd.
+            if guest.is_some() || at.translation.distance(centre) > inside_radius {
+                continue;
+            }
+            let turn = who.index().index() as f32 * 2.399_963;
+            let radius = 4.0 + (who.index().index() % 3) as f32 * 1.3;
+            target.0 =
+                Some(assembly.hall + Vec3::new(turn.cos() * radius, 0.0, turn.sin() * radius));
+            *activity = Activity::Chatting;
+            commands
+                .entity(who)
+                .remove::<super::home::Abed>()
+                .insert(CivicGuest);
+        }
+        if !assembly.spoken
+            && mayor_at.is_some_and(|at| at.distance(assembly.hall) < 4.0)
+            && let Some(priority) = priority
+        {
+            say.write(crate::ui::Say {
+                speaker: assembly.mayor,
+                text: priority.lean.address().to_string(),
+                thought: false,
+                prayer: false,
+            });
+            assembly.spoken = true;
+        }
     }
 }
 
@@ -401,6 +523,24 @@ mod tests {
         assert_eq!(choose_lean(0.0, 0, 8.0, 20.0, 0.1, 0.9), Lean::Stone);
     }
 
+    #[test]
+    fn civic_systems_initialise_without_query_conflicts() {
+        use bevy::ecs::system::RunSystemOnce;
+
+        let mut app = App::new();
+        app.init_resource::<crate::calendar::WorldClock>();
+        app.init_resource::<ordo::Proclamations>();
+        app.add_message::<crate::ui::Notice>();
+        app.add_message::<crate::ui::Say>();
+        app.add_message::<crate::sfx::PlaySfx>();
+
+        app.world_mut().run_system_once(hold_elections).unwrap();
+        app.world_mut().run_system_once(set_the_agenda).unwrap();
+        app.world_mut()
+            .run_system_once(stage_civic_assemblies)
+            .unwrap();
+    }
+
     /// The ballot crowns whoever the town holds warmest — the regard
     /// graph reading itself out loud.
     #[test]
@@ -434,6 +574,7 @@ mod tests {
                 kind: BuildingKind::TownHall,
             },
             MemberOf(town),
+            Transform::default(),
         ));
 
         let mut rng = crate::rng::Rng::new(11);

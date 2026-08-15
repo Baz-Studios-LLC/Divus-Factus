@@ -165,7 +165,7 @@ impl Vocation {
         match self {
             Vocation::Gatherer => "took up the gathering basket",
             Vocation::Fisher => "took up the net",
-            Vocation::Hunter => "took up the spear",
+            Vocation::Hunter => "took up the bow",
             Vocation::Miner => "took up the pick",
             Vocation::Forester => "took up the axe",
             Vocation::Builder => "took up the hammer",

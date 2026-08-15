@@ -67,13 +67,102 @@ const DOWN_TOOLS_HUNGER: f32 = HUNGRY_THRESHOLD + 0.1;
 /// What one hunt's kill is worth in stored food.
 const CARCASS_FOOD: f32 = 3.0;
 
-/// How close a hunter must be to strike. Longer than the bench-worker's
-/// arm on purpose: prey drifts a few steps at a time while it grazes,
-/// and a hunter held to the ordinary two-and-a-bit strides spent whole
-/// mornings arriving at where a deer had just been - patience ran out,
-/// the deer was shunned, and a village with prey nineteen strides from
-/// the square brought home no meat at all.
-const SPEAR_REACH: f32 = 4.2;
+/// Hunters stop well outside a quarry's reach. The last few steps are for
+/// gathering the body, not fighting it with a bow held at arm's length.
+const BOW_RANGE: f32 = 16.0;
+
+/// A visible arrow between a hunter and the quarry. Damage is applied on
+/// contact, never at the moment the hunter releases it.
+#[derive(Component)]
+pub(super) struct HuntingArrow {
+    target: Entity,
+    damage: f32,
+}
+
+const ARROW_SPEED: f32 = 28.0;
+
+fn loose_arrow(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    from: Vec3,
+    target: Entity,
+) {
+    let shaft = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+    let wood = materials.add(StandardMaterial {
+        base_color: crate::palette::shade(&crate::palette::WOOD, 0.48),
+        perceptual_roughness: 0.9,
+        ..default()
+    });
+    let stone = materials.add(StandardMaterial {
+        base_color: crate::palette::shade(&crate::palette::STONE, 0.65),
+        perceptual_roughness: 0.95,
+        ..default()
+    });
+    let arrow = commands
+        .spawn((
+            Name::new("Hunter's Arrow"),
+            HuntingArrow {
+                target,
+                damage: 0.55,
+            },
+            Mesh3d(shaft.clone()),
+            MeshMaterial3d(wood),
+            Transform::from_translation(from).with_scale(Vec3::new(0.035, 0.035, 0.72)),
+        ))
+        .id();
+    commands.spawn((
+        Name::new("Arrowhead"),
+        Mesh3d(shaft),
+        MeshMaterial3d(stone),
+        Transform::from_xyz(0.0, 0.0, -0.42).with_scale(Vec3::new(0.10, 0.10, 0.20)),
+        ChildOf(arrow),
+    ));
+}
+
+/// Carries arrows through the world to their quarry. A missed or obsolete shot
+/// simply leaves with its target instead of persisting as scenery forever.
+pub(super) fn advance_hunting_arrows(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut arrows: Query<(Entity, &mut Transform, &HuntingArrow), Without<Creature>>,
+    mut quarry: Query<
+        (
+            &Transform,
+            &mut Vitality,
+            Option<&mut CreatureMotion>,
+            Has<Corpse>,
+        ),
+        (With<Creature>, Without<Villager>),
+    >,
+) {
+    for (arrow, mut at, shot) in &mut arrows {
+        let Ok((quarry_at, mut vitality, motion, dead)) = quarry.get_mut(shot.target) else {
+            commands.entity(arrow).despawn();
+            continue;
+        };
+        if dead {
+            commands.entity(arrow).despawn();
+            continue;
+        }
+        let aim = quarry_at.translation + Vec3::Y * 0.55;
+        let toward = aim - at.translation;
+        let distance = toward.length();
+        if distance <= 0.65 {
+            vitality.harm += shot.damage;
+            vitality.violent = true;
+            vitality.undoing = crate::creature::Undoing::Blow;
+            if let Some(mut motion) = motion {
+                motion.flail = 1.0;
+            }
+            commands.entity(arrow).despawn();
+            continue;
+        }
+        let direction = toward / distance;
+        at.translation += direction * (ARROW_SPEED * time.delta_secs()).min(distance);
+        at.rotation = crate::creature::facing_rotation(direction);
+    }
+}
 
 /// Carriers walk their wood to the pile and put it down.
 pub(super) fn haul_wood(
@@ -816,6 +905,28 @@ fn plan_kind_is_home(
         .is_ok_and(|(_, plan)| matches!(plan.kind, BuildingKind::House | BuildingKind::Longhouse))
 }
 
+/// A worker has reached something their hands should face.
+///
+/// Work reads every villager's position, including patients a healer may be
+/// treating. Turning happens in its own system so the work pass never needs a
+/// mutable Transform query that overlaps the healing pass.
+#[derive(Component)]
+pub(super) struct WorkFacing(Vec3);
+
+/// Applies one requested work-facing turn after the work pass has chosen it.
+pub(super) fn apply_work_facing(
+    mut commands: Commands,
+    mut workers: Query<(Entity, &mut Transform, &WorkFacing)>,
+) {
+    for (entity, mut transform, facing) in &mut workers {
+        let toward = facing.0 - transform.translation;
+        if toward.length_squared() > 0.01 {
+            transform.rotation = crate::creature::facing_rotation(toward);
+        }
+        commands.entity(entity).remove::<WorkFacing>();
+    }
+}
+
 /// Work gets done: walk there, do the thing, and the stockpile grows.
 pub(super) fn do_work(
     mut commands: Commands,
@@ -891,7 +1002,14 @@ pub(super) fn do_work(
         // mutably. Bevy reasons on component sets, not on what can actually
         // co-occur, so a build site and a boulder must be told apart
         // explicitly even though no entity is ever both.
-        Query<&Transform, (With<Blueprint>, Without<crate::matter::Boulder>)>,
+        Query<
+            &Transform,
+            (
+                With<Blueprint>,
+                Without<crate::matter::Boulder>,
+                Without<Villager>,
+            ),
+        >,
     ),
     ground: (
         Res<Terrain>,
@@ -1254,6 +1372,11 @@ pub(super) fn do_work(
             // At the frame, hammering - and a carpenter with no roof of
             // their own drives nails like it is personal, because it is.
             target.0 = None;
+            let worksite = build_at
+                .get(house)
+                .map(|at| at.translation)
+                .unwrap_or(job.site);
+            commands.entity(entity).insert(WorkFacing(worksite));
             motion.flail = motion.flail.max(0.3);
             let stake = if plan_kind_is_home(&build_sites, house) && home.is_none() {
                 1.4
@@ -1462,6 +1585,11 @@ pub(super) fn do_work(
             }
             // Lay the block.
             target.0 = None;
+            let worksite = build_at
+                .get(site_entity)
+                .map(|at| at.translation)
+                .unwrap_or(job.site);
+            commands.entity(entity).insert(WorkFacing(worksite));
             motion.flail = motion.flail.max(0.3);
             job.progress += dt;
             if job.progress < 3.0 {
@@ -1531,11 +1659,13 @@ pub(super) fn do_work(
             continue;
         }
 
-        // Hunters follow the prey; everyone else's worksite stands still.
+        // Hunters follow live quarry but close in on a carcass to gather it.
+        let mut hunting_carcass = false;
         if *vocation == Vocation::Hunter {
             match job.focus.and_then(|prey| prey_query.get(prey).ok()) {
-                Some((prey_transform, _, _, _, _)) => {
+                Some((prey_transform, _, _, is_corpse, _)) => {
                     job.site = prey_transform.translation;
+                    hunting_carcass = is_corpse;
                 }
                 None => {
                     if hunt_probe {
@@ -1586,7 +1716,11 @@ pub(super) fn do_work(
 
         let distance = transform.translation.distance(job.site);
         let reach = if *vocation == Vocation::Hunter {
-            SPEAR_REACH
+            if hunting_carcass {
+                WORK_RANGE
+            } else {
+                BOW_RANGE
+            }
         } else {
             WORK_RANGE
         };
@@ -1610,6 +1744,12 @@ pub(super) fn do_work(
             continue;
         }
         target.0 = None;
+        let worksite = job
+            .focus
+            .and_then(|focus| build_at.get(focus).ok())
+            .map(|at| at.translation)
+            .unwrap_or(job.site);
+        commands.entity(entity).insert(WorkFacing(worksite));
 
         // At the worksite. The arms move: work is something you can *see*.
         motion.flail = motion.flail.max(0.3);
@@ -2018,8 +2158,7 @@ pub(super) fn do_work(
                 let Some(prey) = job.focus else {
                     continue;
                 };
-                let Ok((_, mut vitality, prey_motion, is_corpse, genome)) =
-                    prey_query.get_mut(prey)
+                let Ok((_, _vitality, _prey_motion, is_corpse, genome)) = prey_query.get_mut(prey)
                 else {
                     continue;
                 };
@@ -2043,21 +2182,19 @@ pub(super) fn do_work(
                     continue;
                 }
 
-                // A strike. Two or three land a kill; the succumb system does
-                // the dying, the same as for every other creature.
-                vitality.harm += 0.55;
-                vitality.violent = true;
-                vitality.undoing = crate::creature::Undoing::Blow;
-                if let Some(mut prey_motion) = prey_motion {
-                    prey_motion.flail = 1.0;
-                }
-                motion.flail = motion.flail.max(0.4);
+                // Loose the arrow. The projectile owns the hit, so the prey
+                // reacts when the shaft actually reaches it rather than when
+                // a number changes on the other side of the clearing.
+                let from = transform.translation + Vec3::Y * 1.05;
+                loose_arrow(&mut commands, &mut meshes, &mut materials, from, prey);
+                motion.flail = motion.flail.max(0.7);
                 if hunt_probe {
-                    info!(
-                        "hunt probe: {} struck, the quarry's harm stands at {:.2}",
-                        person.name, vitality.harm
-                    );
+                    info!("hunt probe: {} loosed an arrow", person.name);
                 }
+                // Keep this job through the kill. Once the prey falls, the
+                // next pass changes its reach to walking distance and gathers
+                // the carcass rather than firing at it from the clearing.
+                continue;
             }
         }
 
@@ -2559,5 +2696,44 @@ mod tests {
         assert!(is_corpse, "the harvest arm keys off this flag");
         assert!(motion.is_none(), "death took the motion, as it should");
         assert_eq!(genome.species, Species::Deer);
+    }
+
+    #[test]
+    fn an_arrow_hurts_only_when_it_reaches_its_quarry() {
+        use bevy::ecs::system::RunSystemOnce;
+
+        let mut app = App::new();
+        app.init_resource::<Time>();
+        let quarry = app
+            .world_mut()
+            .spawn((Creature, Transform::default(), Vitality::default()))
+            .id();
+        let arrow = app
+            .world_mut()
+            .spawn((
+                HuntingArrow {
+                    target: quarry,
+                    damage: 0.55,
+                },
+                Transform::from_xyz(0.0, 0.55, 0.40),
+            ))
+            .id();
+
+        app.world_mut()
+            .run_system_once(advance_hunting_arrows)
+            .unwrap();
+
+        assert!(
+            app.world().get::<Vitality>(quarry).unwrap().harm >= 0.55,
+            "the hit belongs to the projectile, not to the bow release"
+        );
+        assert!(
+            app.world().get_entity(arrow).is_err(),
+            "the arrow is spent on impact"
+        );
+        assert!(
+            BOW_RANGE > WORK_RANGE,
+            "a hunter should shoot before gathering"
+        );
     }
 }
