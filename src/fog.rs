@@ -5,11 +5,18 @@
 //! looked for - a forester will not go to woods nobody has found - but it
 //! was invisible, and a rule you cannot see is a rule you cannot judge.
 //!
-//! The veil is drawn on a COPY of each terrain chunk's own mesh, lifted a
-//! hand's breadth above it. A flat plane would be cut open by every hill;
-//! the terrain's own shape is already the right shape. Nothing is stored
-//! and nothing is painted: the shader measures each pixel against the
-//! handful of circles the village actually knows.
+//! THE VEIL IS A COLOUR, NOT A THING. Unknown ground is painted the veil's
+//! tint - and so is every tree, boulder, bush, ore seam and river standing on
+//! it - by `GroundVeil`, an extension on the material all of them already
+//! wore. Nothing is stored and nothing is hidden: the shader measures each
+//! pixel against the handful of circles the village actually knows, and mixes
+//! the tint in after the lighting so the answer is one colour under every sky.
+//!
+//! It used to be an occluder: a copy of each chunk's mesh lifted into a bank
+//! tall enough to bury a wood. That is gone, along with everything that
+//! existed to manage its height, its taper and its edges. A bank is an object
+//! standing in the world, and an object can be seen under, seen past, and
+//! disagreed with about where the ground is; a colour cannot.
 
 use bevy::pbr::MaterialPlugin;
 use bevy::prelude::*;
@@ -26,6 +33,21 @@ const GROUND_SHADER_PATH: &str = "shaders/ground_veil.wgsl";
 /// As many pockets as the shader's uniform holds. Explorers bring back far
 /// fewer than this; the oldest simply stop being drawn if they ever do not.
 const MAX_POCKETS: usize = 128;
+
+/// How heavily the veil paints, given the three things that decide whether
+/// there is one at all.
+///
+/// The cloths answered this by not existing - they were hung only while the
+/// fog was up over a world with a village in it. Paint has no such luxury: the
+/// material is on every acre from the first frame, so the answer has to be
+/// written down, every frame, in the one number the shader multiplies by.
+fn veil_weight(fog_on: bool, playing: bool, a_village_exists: bool) -> f32 {
+    if fog_on && playing && a_village_exists {
+        1.0
+    } else {
+        0.0
+    }
+}
 
 /// How many metres the painted veil takes to come on at the edge of what the
 /// village knows.
@@ -55,10 +77,6 @@ impl Plugin for FogPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(MaterialPlugin::<GroundMaterial>::default())
             .init_resource::<FogMode>()
-            // Only over a world that has a village in it. While the god
-            // is still choosing where to plant the flag there is nothing
-            // known and nothing to hide - and a player cannot pick
-            // ground they are not allowed to look at.
             .init_resource::<VeilRising>()
             .add_systems(OnEnter(crate::GameState::Playing), the_veil_is_down)
             .add_systems(
@@ -72,18 +90,21 @@ impl Plugin for FogPlugin {
                     // to hide — it is the only thing standing between the
                     // player and an empty world.
                     drape_the_veil,
-                    follow_the_known.run_if(in_state(crate::GameState::Playing)),
+                    // NOT state-gated either, and for the same reason as the
+                    // line above: this is what tells the ground whether there
+                    // is a veil at all. Gated on `Playing` it simply never ran
+                    // before a flag went in, and the ground went on painting
+                    // itself from a default uniform nobody had corrected.
+                    follow_the_known,
                     raise_the_veil.run_if(in_state(crate::GameState::Playing)),
                 )
                     .chain()
-                    // AFTER the ground streams, or the veil is always one
-                    // frame behind it. Twenty chunks arrive in a frame while
-                    // the god is moving, and dressing them next frame meant
-                    // twenty tiles of unveiled world in every frame of a pan
-                    // or a zoom - not a flicker, a permanent scattering of
-                    // bright squares for as long as the view kept changing.
-                    // Ordered after the spawn, the veil and the ground it
-                    // hides reach the renderer in the same frame.
+                    // AFTER the ground streams. This mattered enormously when
+                    // a chunk needed a cloth hung on it and would otherwise
+                    // spend a frame bare - twenty bright squares in every
+                    // frame of a pan. A painted chunk is born wearing its
+                    // veil, so the ordering is now only about the cull below
+                    // seeing this frame's chunks rather than last frame's.
                     .after(crate::terrain::TerrainSet),
             );
     }
@@ -293,35 +314,81 @@ fn raise_the_veil(_time: Res<Time>, mut rising: ResMut<VeilRising>) {
 /// Keeps the veil's holes where the village's knowledge actually is.
 fn follow_the_known(
     mode: Res<FogMode>,
+    state: Res<State<crate::GameState>>,
     known: Option<Res<KnownWorld>>,
     mut ground: ResMut<Assets<GroundMaterial>>,
 ) {
-    if !mode.0 {
-        return;
-    }
-    let Some(known) = known else {
-        return;
-    };
-    // The knowledge changes when an expedition comes home, which is rare -
-    // but the toggle can come up at any time, so the first frame after it
-    // does has to write the uniform whatever the resource says.
-    if !known.is_changed() && !mode.is_changed() {
-        return;
-    }
-    let live = known.pockets.len().min(MAX_POCKETS);
+    // IS THERE A VEIL AT ALL. The cloths answered this by not existing: they
+    // were only ever hung while the fog was up over a world with a village in
+    // it. A painted veil has no such luxury - the material is on every acre of
+    // ground from the first frame, and if nobody tells it otherwise it paints
+    // from whatever the uniform happens to hold. Which, before a village
+    // exists, is `FogParams::default()`: a home circle of a hundred and
+    // seventy metres at the WORLD ORIGIN. Brett, looking at a continent gone
+    // slate blue around one lit patch of nowhere: "I havent even placed the
+    // flag yet."
+    //
+    // So the weight is the switch, and it is written every frame whatever the
+    // state. While the god is still choosing ground there is nothing known and
+    // nothing to hide, and a player cannot pick somewhere they are not allowed
+    // to look at.
+    let weight = veil_weight(
+        mode.0,
+        *state.get() == crate::GameState::Playing,
+        known.is_some(),
+    );
+    let live = known.as_ref().map_or(0, |k| k.pockets.len().min(MAX_POCKETS));
     let tell = |params: &mut FogParams| {
-        params.home = known.centre.extend(known.radius);
-        params.planet = crate::globe::planet_centre().extend(crate::terrain::PLANET_RADIUS);
-        params.dials.x = live as f32;
-        for (slot, pocket) in known.pockets.iter().take(live).enumerate() {
-            params.pockets[slot] = pocket.at.extend(pocket.radius);
+        params.tint.w = weight;
+        if let Some(known) = known.as_ref() {
+            params.home = known.centre.extend(known.radius);
+            params.planet = crate::globe::planet_centre().extend(crate::terrain::PLANET_RADIUS);
+            params.dials.x = live as f32;
+            for (slot, pocket) in known.pockets.iter().take(live).enumerate() {
+                params.pockets[slot] = pocket.at.extend(pocket.radius);
+            }
         }
     };
-    // And the ground itself, which wears the same fog rather than standing
-    // under it. Told in the same breath as the cloths, from the same
-    // knowledge, so the painted veil and any remaining sheet can never
-    // disagree about where the village has walked.
     for (_, material) in ground.iter_mut() {
         tell(&mut material.extension.params);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// No village, no veil.
+    ///
+    /// The cloths enforced this by not existing - nothing was hung until the
+    /// fog was up over a founded world. Paint is on every acre from the first
+    /// frame instead, so the rule has to be stated, and when it was not the
+    /// whole continent went slate blue around one lit circle of nowhere: the
+    /// uniform still held `FogParams::default()`, whose home is a hundred and
+    /// seventy metres at the WORLD ORIGIN. Brett: "I havent even placed the
+    /// flag yet."
+    #[test]
+    fn there_is_no_veil_before_there_is_a_village() {
+        assert_eq!(
+            veil_weight(true, true, true),
+            1.0,
+            "a founded world under a raised fog is veiled",
+        );
+        assert_eq!(
+            veil_weight(true, true, false),
+            0.0,
+            "no village means nothing is known and nothing is hidden - this is \
+             the god choosing ground, and they may look wherever they like",
+        );
+        assert_eq!(
+            veil_weight(true, false, true),
+            0.0,
+            "and not while the world is still being made or chosen over",
+        );
+        assert_eq!(
+            veil_weight(false, true, true),
+            0.0,
+            "DIVUS_FACTUS_FOG=0 lifts it entirely, for photographing the world",
+        );
     }
 }

@@ -1989,10 +1989,10 @@ pub struct TerrainAssets {
     /// a brown channel — Brett's "rivers were never good". Reading the depth
     /// over a couple of units instead gives a river a surface while leaving the
     /// sea's shallows exactly as they were.
-    pub river_material: Handle<StandardMaterial>,
+    pub river_material: Handle<crate::fog::GroundMaterial>,
     /// The sea's own, shared with the planet's patches so the ocean at
     /// altitude and the ocean underfoot are the same water lit the same way.
-    pub sea_material: Handle<StandardMaterial>,
+    pub sea_material: Handle<crate::fog::GroundMaterial>,
 }
 
 fn setup_terrain(
@@ -2055,8 +2055,18 @@ fn setup_terrain(
         ..default()
     };
     still_water.base_color.set_alpha(1.0);
-    let water_material = materials.add(still_water.clone());
-    let river_material = materials.add(still_water);
+    // THE WATER WEARS THE VEIL TOO. Rivers and the sea are the last things
+    // standing on unwalked ground with their own colours - Brett: "just some
+    // water like rivers and stuff poking through" - because they are the one
+    // part of the landscape that never came out of the ground material. A
+    // river is as much a feature of country nobody has walked as the wood
+    // beside it.
+    let veiled_water = |base: StandardMaterial| crate::fog::GroundMaterial {
+        base,
+        extension: crate::fog::GroundVeil::default(),
+    };
+    let water_material = ground_materials.add(veiled_water(still_water.clone()));
+    let river_material = ground_materials.add(veiled_water(still_water));
 
     // No sheet any more. The sea used to be ONE square quad, sized to the
     // streamed ground and dragged along under the camera, and every problem it
@@ -2453,8 +2463,14 @@ mod tests {
             base: StandardMaterial::default(),
             extension: crate::fog::GroundVeil::default(),
         });
-        let river_material = materials.add(StandardMaterial::default());
-        let sea_material = materials.add(StandardMaterial::default());
+        let river_material = ground_materials.add(crate::fog::GroundMaterial {
+            base: StandardMaterial::default(),
+            extension: crate::fog::GroundVeil::default(),
+        });
+        let sea_material = ground_materials.add(crate::fog::GroundMaterial {
+            base: StandardMaterial::default(),
+            extension: crate::fog::GroundVeil::default(),
+        });
         let _ = &mut meshes;
         app.insert_resource(meshes)
             .insert_resource(materials)
