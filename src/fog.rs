@@ -222,6 +222,7 @@ fn drape_the_veil(
     mut materials: ResMut<Assets<FogMaterial>>,
     mut cloth: Local<Option<Handle<FogMaterial>>>,
     rising: Res<VeilRising>,
+    known: Option<Res<crate::villager::explore::KnownWorld>>,
     chunks: Query<
         (
             Entity,
@@ -230,6 +231,7 @@ fn drape_the_veil(
             Has<WaterPlane>,
             &Visibility,
             Has<crate::terrain::ParkedChunk>,
+            Option<&TerrainChunk>,
         ),
         Or<(With<TerrainChunk>, With<WaterPlane>)>,
     >,
@@ -257,7 +259,7 @@ fn drape_the_veil(
                 commands.entity(veil).try_despawn();
             }
         }
-        for (chunk, _, _, _, showing, parked) in &chunks {
+        for (chunk, _, _, _, showing, parked, _) in &chunks {
             if parked {
                 continue;
             }
@@ -297,8 +299,40 @@ fn drape_the_veil(
             stuff.params.tint.w = full * rising.risen;
         }
     }
-    for (chunk, mesh, children, sea, showing, parked) in &chunks {
+    for (chunk, mesh, children, sea, showing, parked, ground) in &chunks {
         if parked {
+            continue;
+        }
+        // A CHUNK NOBODY HAS SEEN ANY PART OF IS NOT DRAWN AT ALL.
+        //
+        // Brett: "The fully rendered area is higher then the LOD and it makes
+        // it so you can see under the veil at a distance." Chunks and patches
+        // ask the same height function but not at the same resolution - a
+        // patch interpolates thirty-two cells across ground the chunk renders
+        // in full - so the fine surface rides above the coarse one, and from a
+        // low angle you look straight under the raised edge of a chunk that is
+        // wholly unknown anyway. They were slabs of daylight ground floating
+        // over the veiled planet.
+        //
+        // Nothing is lost by dropping them: the planet's own patch is standing
+        // under every one, wearing the same veil in the same colour, so the
+        // ground still reads as hidden country. It is also the cull Brett
+        // asked for - "we sholod still try to cull trees and whatnot if under
+        // the veil to save resouces" - done at the one granularity that takes
+        // the trees, the grass, the boulders and the terrain together, since
+        // every one of them is a child of this entity.
+        if let (Some(known), Some(ground)) = (known.as_ref(), ground)
+            && !known.knows_flat(
+                (ground.coord.x as f32 + 0.5) * crate::terrain::CHUNK_SIZE,
+                (ground.coord.y as f32 + 0.5) * crate::terrain::CHUNK_SIZE,
+                // Half the chunk's diagonal: ANY corner being known keeps the
+                // whole chunk, so this never hides ground somebody can see.
+                crate::terrain::CHUNK_SIZE * std::f32::consts::SQRT_2 * 0.5,
+            )
+        {
+            if *showing != Visibility::Hidden {
+                commands.entity(chunk).try_insert(Visibility::Hidden);
+            }
             continue;
         }
         let dressed = children.map_or(0, |kids| {
