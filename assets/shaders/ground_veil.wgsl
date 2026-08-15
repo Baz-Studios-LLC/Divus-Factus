@@ -50,11 +50,50 @@ struct FogParams {
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(100) var<uniform> fog: FogParams;
 
-/// A soft maximum, so two overlapping pockets merge into one bay instead of
-/// meeting in a crease. The same one the cloths used.
+/// How many metres two neighbouring pockets melt into one another.
+///
+/// Generous on purpose. Knowledge is STORED as circles because that makes
+/// exploration cheap to compute and easy to inspect, but a circle is not a
+/// thing anybody has ever seen at the edge of a wood. Blend them hard enough
+/// and a line of footsteps reads as one coastline rather than a row of coins.
+const EDGE_MELT: f32 = 26.0;
+
+/// A smooth union, so two overlapping pockets merge into one bay instead of
+/// meeting in a crease.
 fn smax(a: f32, b: f32, softness: f32) -> f32 {
     let h = clamp(0.5 + 0.5 * (b - a) / softness, 0.0, 1.0);
     return mix(a, b, h) + softness * h * (1.0 - h);
+}
+
+/// How far a circle's edge wanders in and out as you walk around it, as a
+/// FRACTION of that circle's own radius.
+///
+/// Three harmonics, seeded from the circle's centre so the same ground always
+/// wavers the same way - it must not shimmer as the camera moves, and it must
+/// survive a save. Proportional rather than absolute so a scout's little
+/// pocket and a town's whole home circle wear the same kind of coastline at
+/// their own scale; a fixed amplitude turned small pockets inside out.
+///
+/// Brett: "Can we have the border of the veil smooth better instead of looking
+/// like punched circles?" This was in the shader all along as
+/// `frontier_wobble`, defined and never called - the fork left the function
+/// standing and stopped using it, so the edge went back to being a compass
+/// line.
+fn frontier_wobble(centre: vec2<f32>, angle: f32) -> f32 {
+    let tau = 6.28318530718;
+    let first = sin(centre.x * 0.013 + centre.y * 0.021) * tau;
+    let second = sin(centre.x * 0.029 - centre.y * 0.011) * tau;
+    let third = sin(centre.x * 0.007 + centre.y * 0.037) * tau;
+    return sin(angle * 2.0 + first) * 0.15
+        + sin(angle * 5.0 + second) * 0.07
+        + sin(angle * 9.0 + third) * 0.035;
+}
+
+/// One circle's reach at this bearing: its radius, wandered.
+fn frontier(centre: vec2<f32>, radius: f32, ground: vec2<f32>) -> f32 {
+    let delta = ground - centre;
+    let angle = atan2(delta.y, delta.x);
+    return radius * (1.0 + frontier_wobble(centre, angle)) - length(delta);
 }
 
 /// The FLAT ground this pixel stands on, which is not where it is drawn.
@@ -76,14 +115,11 @@ fn flat_ground(world_position: vec3<f32>) -> vec2<f32> {
 
 // Positive is inside knowledge, negative is in the unknown.
 fn known_at(ground: vec2<f32>) -> f32 {
-    let home_delta = ground - fog.home.xz;
-    var known = fog.home.w - length(home_delta);
+    var known = frontier(fog.home.xz, fog.home.w, ground);
     let live = i32(fog.dials.x);
     for (var i = 0; i < live; i = i + 1) {
         let pocket = fog.pockets[i];
-        let delta = ground - pocket.xz;
-        let pocket_known = pocket.w - length(delta);
-        known = smax(known, pocket_known, 8.0);
+        known = smax(known, frontier(pocket.xz, pocket.w, ground), EDGE_MELT);
     }
     return known;
 }
