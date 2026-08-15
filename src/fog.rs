@@ -32,7 +32,25 @@ const MAX_POCKETS: usize = 128;
 /// The tallest current tree is a shade over eight metres; sixteen gives the
 /// shroud headroom for roofs and future scenery without letting silhouettes
 /// poke through its top.
-const VEIL_HIGH: f32 = 0.0;
+///
+/// It was set to ZERO, and this comment was left standing over it. A bank of
+/// no height is a skin painted on the terrain, which every tree and roof
+/// stands clean on top of - and once it could not occlude anything, hiding
+/// the scenery became a second, separate job done by testing each mesh's
+/// anchor point against the known circle, which is how whole groves came to
+/// float in the dark. One mechanism, restored: the veil is tall enough to
+/// bury a wood, and `VEIL_TAPER` is what keeps its edge from showing.
+const VEIL_HIGH: f32 = 16.0;
+
+/// How many metres the bank takes to climb from the ground to its full
+/// height, going outward from the edge of what is known.
+///
+/// Brett: "keep it at 16m but taper it to the ground, that way it covers
+/// everything but looks seamless because it would taper down and slightly
+/// clip through the ground." Long enough to read as a slope rather than a
+/// wall; short enough that the wood a step beyond the boundary is already
+/// buried.
+const VEIL_TAPER: f32 = 30.0;
 
 /// Whether the veil is up. It is, from the first frame: the world a
 /// village has actually walked is the world the game is about, and the
@@ -132,8 +150,10 @@ impl Default for FogParams {
             // dithered discovery edge, not translucency through the world.
             tint: Vec4::new(VEIL_TINT[0], VEIL_TINT[1], VEIL_TINT[2], 1.0),
             home: Vec4::new(0.0, 0.0, 0.0, 170.0),
-            // z is the bank's physical height above its terrain mesh.
-            dials: Vec4::new(0.0, 9.0, VEIL_HIGH, 0.0),
+            // z is the bank's physical height above its terrain mesh, and w
+            // is how far it takes to climb to it - the taper that keeps the
+            // inner edge under the ground instead of standing on it.
+            dials: Vec4::new(0.0, 9.0, VEIL_HIGH, VEIL_TAPER),
             planet: crate::globe::planet_centre().extend(crate::terrain::PLANET_RADIUS),
             pockets: [Vec4::ZERO; MAX_POCKETS],
         }

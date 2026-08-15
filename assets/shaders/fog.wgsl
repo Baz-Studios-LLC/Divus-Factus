@@ -83,6 +83,13 @@ fn flat_ground(world_position: vec3<f32>) -> vec2<f32> {
     return vec2<f32>(lon * fog.planet.w, -lat * fog.planet.w);
 }
 
+/// How far the bank's inner end sinks beneath the terrain it copies.
+///
+/// The join has to happen somewhere, and under the ground is the one place
+/// it cannot be seen. Small: any deeper and the bank starts its climb from
+/// too far down to reach full height inside the taper.
+const VEIL_SINK: f32 = 0.6;
+
 // Positive is inside knowledge, negative is in the unknown.
 fn known_at(ground: vec2<f32>) -> f32 {
     let home_delta = ground - fog.home.xz;
@@ -108,8 +115,31 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     );
 
     let radial = normalize(ground_position.xyz - fog.planet.xyz);
+
+    // THE BANK STANDS UP, AND LIES DOWN AT ITS INNER EDGE.
+    //
+    // Brett's shape: "keep it at 16m but taper it to the ground, that way it
+    // covers everything but looks seamless because it would taper down and
+    // slightly clip through the ground." Height and seam are two jobs, and
+    // they were being asked of one number - the bank was flattened to zero
+    // so that its edge would not show, which left it a skin painted on the
+    // terrain that every tree, rock and roof stood clean on top of.
+    //
+    // So: full height out in the unknown, tapering to nothing at the
+    // boundary and finishing BELOW the ground, where the terrain hides the
+    // join. `flat_ground` normalises the direction from the planet's centre,
+    // so a purely radial lift does not move the flat coordinate by a
+    // millimetre - the fragment's `known` is the same number whether it is
+    // asked before this lift or after it, and the taper therefore lines up
+    // exactly with the discard.
+    let beyond = max(0.0, -known_at(flat_ground(ground_position.xyz)));
+    let climb = clamp(beyond / max(fog.dials.w, 0.001), 0.0, 1.0);
+    // Smoothstep, so the bank leaves the ground and reaches its ceiling
+    // without a crease at either end.
+    let eased = climb * climb * (3.0 - 2.0 * climb);
+    let lift = fog.dials.z * eased - VEIL_SINK;
     let world_position = vec4(
-        ground_position.xyz + radial * 0.05,
+        ground_position.xyz + radial * lift,
         1.0,
     );
 

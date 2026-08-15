@@ -4018,6 +4018,50 @@ mod tests {
     }
 
     #[test]
+    fn probe_what_country_the_founders_pick() {
+        let mut coastal = 0;
+        let mut inland = 0;
+        let mut flats = 0.0;
+        const WORLDS: u32 = 24;
+        for seed in 0..WORLDS {
+            let terrain = Terrain::new(seed);
+            let mut rng = Rng::stream(seed as u64, "settlement");
+            let at = choose_settlement_site(&terrain, &mut rng);
+            // How much sea sits in the working ring, the same band the score
+            // measures its shoreline over.
+            let mut water = 0;
+            let mut samples = 0;
+            for step in 0..12 {
+                let angle = step as f32 / 12.0 * std::f32::consts::TAU;
+                for distance in [42.0, 50.0, 58.0] {
+                    samples += 1;
+                    if terrain.is_submerged(at.x + angle.cos() * distance, at.z + angle.sin() * distance) {
+                        water += 1;
+                    }
+                }
+            }
+            let fraction = water as f32 / samples as f32;
+            let slope = terrain.slope_at(at.x, at.z);
+            flats += slope;
+            if fraction > 0.05 {
+                coastal += 1;
+            } else {
+                inland += 1;
+            }
+            println!(
+                "PROBE seed {seed:3}: water {:.0}%  slope {:.3}  height {:6.1}",
+                fraction * 100.0,
+                slope,
+                at.y
+            );
+        }
+        println!(
+            "PROBE TOTAL: {coastal} coastal / {inland} inland, mean slope {:.3}",
+            flats / WORLDS as f32
+        );
+    }
+
+    #[test]
     fn settlement_site_is_not_a_sandbar() {
         // Regression: scoring water proximity without requiring land put the
         // settlement on an islet a few metres across, with the whole population

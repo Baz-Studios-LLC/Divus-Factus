@@ -1756,9 +1756,19 @@ fn cull_veiled_scatter(
     let Some(known) = known else {
         return;
     };
+    let mut shown = 0;
+    let mut hidden = 0;
+    let mut furthest_shown = 0.0_f32;
     for (transform, mut visibility) in &mut scatter {
         let pos = transform.translation;
         let should_show = !veil_active || known.knows_flat(pos.x, pos.z, 0.0);
+        if should_show {
+            shown += 1;
+            furthest_shown =
+                furthest_shown.max(pos.xz().distance(known.centre.xz()));
+        } else {
+            hidden += 1;
+        }
         let wanted = if should_show {
             Visibility::Inherited
         } else {
@@ -1767,6 +1777,16 @@ fn cull_veiled_scatter(
         if *visibility != wanted {
             *visibility = wanted;
         }
+    }
+    if std::env::var("DIVUS_FACTUS_VEIL_PROBE").is_ok() {
+        info!(
+            "VEIL PROBE: active {veil_active}, known radius {:.0} at {:.0},{:.0} + {} pockets \
+             | scatter shown {shown} hidden {hidden}, furthest shown {furthest_shown:.0}",
+            known.radius,
+            known.centre.x,
+            known.centre.z,
+            known.pockets.len(),
+        );
     }
 }
 
