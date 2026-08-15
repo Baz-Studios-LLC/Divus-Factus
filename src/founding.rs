@@ -109,6 +109,7 @@ fn survey_the_land(
     mut commands: Commands,
     terrain: Option<Res<Terrain>>,
     seed: Option<Res<crate::WorldSeed>>,
+    mut chunks: Option<ResMut<crate::terrain::LoadedChunks>>,
     mut rigs: Query<&mut crate::camera::CameraRig>,
 ) {
     let (Some(terrain), Some(seed)) = (terrain, seed) else {
@@ -121,6 +122,16 @@ fn survey_the_land(
         at.x, at.z
     );
     commands.insert_resource(OpeningVantage(at));
+
+    // Start building the ground the opening descent lands on, NOW - which is
+    // during the splash, while the studio mark is still fading and the title
+    // has not been drawn. It costs nothing anybody can see: from out here the
+    // view wants no chunks of its own, so the cache has the whole streaming
+    // budget to itself and is finished long before a hand reaches the menu.
+    // This is what makes Begin a dive rather than a loading screen.
+    if let Some(chunks) = chunks.as_mut() {
+        chunks.prime_first_zoom(terrain.chunk_of(at.x, at.z));
+    }
 
     // And the title drifts over THAT ground, not over the world origin.
     // The opening framing used to be a PostStartup pass aimed at the

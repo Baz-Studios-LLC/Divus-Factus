@@ -1236,6 +1236,12 @@ pub struct LoadedChunks {
     /// player can pull back. It remains parked until the camera genuinely
     /// leaves that area, so the first survey never visibly builds the world.
     first_zoom_cache: Option<IVec2>,
+    /// How many chunks of that cache are still unbuilt.
+    ///
+    /// The title needs this and `is_complete` cannot answer it: from the
+    /// title vantage the view wants NO chunks at all, so `wanted` is zero and
+    /// "is the world built" reads as false forever. See `landing_is_ready`.
+    first_zoom_missing: usize,
 }
 
 /// How long a ring outlives the view that asked for it, in seconds.
@@ -1255,8 +1261,27 @@ impl LoadedChunks {
     /// Start quietly preparing every chunk the initial settlement can reveal
     /// through the normal play zoom range.
     pub fn prime_first_zoom(&mut self, centre: IVec2) {
+        if self.first_zoom_cache == Some(centre) {
+            return;
+        }
         self.first_zoom_cache = Some(centre);
+        // Unbuilt until counted, so a fresh prime never reads as ready on the
+        // frame it is asked for - which would let the title dive onto ground
+        // that does not exist yet.
+        self.first_zoom_missing = usize::MAX;
         self.held = self.held.max(VIEW_CHUNKS);
+    }
+
+    /// Whether the ground the opening descent lands on has been built.
+    ///
+    /// THE QUESTION THE TITLE HAS TO ASK. `is_complete` reports on the view
+    /// the camera currently wants, and from the title vantage - far enough
+    /// out for the whole planet - it wants none: `wanted` is 0, the `wanted
+    /// > 0` guard fails, and every press of Begin fell through to the loading
+    /// screen no matter how long the world had been sitting there finished.
+    /// The honest question is about the landing, not the vantage.
+    pub fn landing_is_ready(&self) -> bool {
+        self.first_zoom_cache.is_some() && self.first_zoom_missing == 0
     }
 
     pub fn count(&self) -> usize {
@@ -2014,11 +2039,21 @@ fn stream_chunks(
     // The founding cache is useful while the god is still looking at the
     // founding country. Once they travel a few chunks away it would become an
     // invisible memory tax, so ordinary streaming takes over.
-    if loaded
-        .first_zoom_cache
-        .is_some_and(|home| (centre - home).abs().max_element() > 2)
+    //
+    // ONLY once the world is the player's. The title drifts its focus a lap
+    // round the planet, which crosses two chunks in the first moments and
+    // threw the founding cache away before it had built a single chunk of it
+    // - so the ground under the opening dive was never prepared, and Begin
+    // always fell through to the loading screen.
+    if matches!(
+        state.get(),
+        crate::GameState::Choosing | crate::GameState::Playing
+    ) && loaded
+            .first_zoom_cache
+            .is_some_and(|home| (centre - home).abs().max_element() > 2)
     {
         loaded.first_zoom_cache = None;
+        loaded.first_zoom_missing = 0;
     }
 
     let radius = stream_radius(rig.distance);
@@ -2100,6 +2135,9 @@ fn stream_chunks(
             .filter(|coord| !loaded.entities.contains_key(coord))
             .count()
     });
+    // Published, so the title can ask whether the ground it is about to dive
+    // onto exists yet.
+    loaded.first_zoom_missing = cache_missing;
     let budget = if *state.get() == crate::GameState::Loading || cache_missing > 0 {
         CHUNKS_PER_LOADING_FRAME
     } else {
@@ -2277,6 +2315,65 @@ pub(crate) fn rebuild_chunks_near(
 mod tests {
     use super::*;
     use bevy::mesh::VertexAttributeValues;
+
+    /// The title asks whether the ground it is about to dive onto is built,
+    /// and that is NOT the same question as whether the current view is
+    /// complete.
+    ///
+    /// This is the whole of the loading-screen bug. From the title vantage
+    /// the camera is far enough out to hold the planet, so it wants no
+    /// chunks: `wanted` is 0, and `is_complete`'s `wanted > 0` guard makes it
+    /// false forever. Begin asked that question, and so every new world got a
+    /// loading screen however long the world had been standing finished
+    /// behind the menu. The test fails on the old question and passes on the
+    /// new one.
+    #[test]
+    fn the_landing_is_ready_even_when_the_view_wants_nothing() {
+        let mut chunks = LoadedChunks::default();
+        assert!(
+            !chunks.landing_is_ready(),
+            "nothing has been primed, so there is no landing to be ready",
+        );
+
+        chunks.prime_first_zoom(IVec2::new(4, -7));
+        assert!(
+            !chunks.landing_is_ready(),
+            "a landing primed this frame has not been built yet - saying \
+             otherwise dives onto ground that does not exist",
+        );
+
+        // What the streamer publishes once it has built the cache. `wanted`
+        // stays 0 throughout, because the title's own view wants nothing.
+        chunks.first_zoom_missing = 0;
+        assert!(
+            chunks.landing_is_ready(),
+            "the ground under the dive is built, so Begin must not load",
+        );
+        assert!(
+            !chunks.is_complete(),
+            "and the OLD question still reads false in exactly this state - \
+             which is why it could never let anyone through",
+        );
+    }
+
+    /// Priming the same ground twice must not re-arm the unbuilt count, or a
+    /// system that primes every frame would hold the title shut forever.
+    #[test]
+    fn priming_the_same_landing_twice_keeps_what_was_built() {
+        let mut chunks = LoadedChunks::default();
+        chunks.prime_first_zoom(IVec2::new(1, 1));
+        chunks.first_zoom_missing = 0;
+        chunks.prime_first_zoom(IVec2::new(1, 1));
+        assert!(
+            chunks.landing_is_ready(),
+            "the same landing, primed again, is still the built one",
+        );
+        chunks.prime_first_zoom(IVec2::new(9, 9));
+        assert!(
+            !chunks.landing_is_ready(),
+            "but a DIFFERENT landing is unbuilt until it is counted",
+        );
+    }
 
     /// A little world with real chunk machinery, for tests that need to spawn
     /// and rebuild ground rather than only ask it questions.

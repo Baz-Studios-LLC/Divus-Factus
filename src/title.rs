@@ -1055,13 +1055,24 @@ fn begin_descent(
         .map(|site| site.centre)
         .or(vantage.map(|vantage| vantage.0))
         .unwrap_or(Vec3::ZERO);
-    if chunks.is_some_and(|c| c.is_complete()) {
+    // Is the ground DOWN THERE built - not "does the view up here want
+    // anything", which is what this used to ask and which is answerable only
+    // "no" from a vantage that wants no chunks at all. That one wrong
+    // question put a loading screen in front of every new world, on every
+    // machine, however long the world had been standing ready. Brett: "we can
+    // not have a loading screen when you press begin. The seemless
+    // trasition is importnat."
+    if chunks.is_some_and(|c| c.landing_is_ready()) {
+        info!("begin: the ground is built - diving, no loading screen");
         next.set(if site.is_some() {
             GameState::Playing
         } else {
             GameState::Choosing
         });
     } else {
+        // Says so out loud, because this is the path that should not happen
+        // and used to be the only one taken. A silent fallback is how it hid.
+        warn!("begin: the landing was not built in time - the loading screen stands");
         next.set(GameState::Loading);
     }
     commands.insert_resource(crate::camera::CameraDive::descend_to(landing));
