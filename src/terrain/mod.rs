@@ -1974,7 +1974,11 @@ fn build_water_mesh(terrain: &Terrain, coord: IVec2, sea: bool) -> Option<Mesh> 
 /// Shared handles for terrain rendering.
 #[derive(Resource)]
 pub struct TerrainAssets {
-    pub ground_material: Handle<StandardMaterial>,
+    /// Worn by the terrain and by everything growing on it, and it carries the
+    /// fog of war itself - see `fog::GroundVeil`. Unknown country and the wood
+    /// standing on it are painted one colour together, which is what retired
+    /// the cloths that used to be hung over them.
+    pub ground_material: Handle<crate::fog::GroundMaterial>,
     /// The same shader as the sea, so rivers and ocean are plainly the same
     /// substance — but its own settings, because they are not the same water.
     ///
@@ -1995,14 +1999,18 @@ fn setup_terrain(
     mut commands: Commands,
     _meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut ground_materials: ResMut<Assets<crate::fog::GroundMaterial>>,
     world_seed: Res<crate::WorldSeed>,
 ) {
     // Vertex colours carry all the surface variation, so the material is plain white.
-    let ground_material = materials.add(StandardMaterial {
-        base_color: Color::WHITE,
-        perceptual_roughness: 0.95,
-        reflectance: 0.02,
-        ..default()
+    let ground_material = ground_materials.add(crate::fog::GroundMaterial {
+        base: StandardMaterial {
+            base_color: Color::WHITE,
+            perceptual_roughness: 0.95,
+            reflectance: 0.02,
+            ..default()
+        },
+        extension: crate::fog::GroundVeil::default(),
     });
 
     // Water is one quad that follows the camera, drawing the sea INSIDE the
@@ -2440,12 +2448,17 @@ mod tests {
         let mut app = bevy::app::App::new();
         let mut meshes = Assets::<Mesh>::default();
         let mut materials = Assets::<StandardMaterial>::default();
-        let ground_material = materials.add(StandardMaterial::default());
+        let mut ground_materials = Assets::<crate::fog::GroundMaterial>::default();
+        let ground_material = ground_materials.add(crate::fog::GroundMaterial {
+            base: StandardMaterial::default(),
+            extension: crate::fog::GroundVeil::default(),
+        });
         let river_material = materials.add(StandardMaterial::default());
         let sea_material = materials.add(StandardMaterial::default());
         let _ = &mut meshes;
         app.insert_resource(meshes)
             .insert_resource(materials)
+            .insert_resource(ground_materials)
             .insert_resource(Terrain::new(4242))
             .insert_resource(LoadedChunks::default())
             .insert_resource(TerrainAssets {

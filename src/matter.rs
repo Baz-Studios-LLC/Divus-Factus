@@ -861,12 +861,21 @@ pub struct Deposit {
 pub(crate) fn spawn_deposit(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<StandardMaterial>,
+    materials: &mut Assets<crate::fog::GroundMaterial>,
     at: Vec3,
     kind: DepositKind,
     amount: f32,
 ) -> Entity {
     use crate::palette as pal;
+    // A seam of ore is scenery on the ground like any boulder, so it wears the
+    // material that carries the veil - otherwise an unwalked hillside came back
+    // hidden except for a bright vein of iron lying across it.
+    let mut veiled = |base: StandardMaterial| {
+        materials.add(crate::fog::GroundMaterial {
+            base,
+            extension: crate::fog::GroundVeil::default(),
+        })
+    };
     let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
     let root = commands
         .spawn((
@@ -881,12 +890,12 @@ pub(crate) fn spawn_deposit(
         .id();
     match kind {
         DepositKind::Iron => {
-            let dark = materials.add(StandardMaterial {
+            let dark = veiled(StandardMaterial {
                 base_color: pal::shade(&pal::STONE, 0.28),
                 perceptual_roughness: 1.0,
                 ..default()
             });
-            let rust = materials.add(StandardMaterial {
+            let rust = veiled(StandardMaterial {
                 base_color: Color::srgb(0.48, 0.26, 0.14),
                 perceptual_roughness: 1.0,
                 ..default()
@@ -909,7 +918,7 @@ pub(crate) fn spawn_deposit(
             }
         }
         DepositKind::Clay => {
-            let clay = materials.add(StandardMaterial {
+            let clay = veiled(StandardMaterial {
                 base_color: Color::srgb(0.62, 0.36, 0.24),
                 perceptual_roughness: 1.0,
                 ..default()
@@ -941,12 +950,12 @@ pub(crate) fn spawn_deposit(
         // against it. The contrast is the whole story — the eye reads the
         // straight edges as somebody's work precisely because the rest is not.
         DepositKind::Stone => {
-            let rock = materials.add(StandardMaterial {
+            let rock = veiled(StandardMaterial {
                 base_color: pal::shade(&pal::STONE, 0.45),
                 perceptual_roughness: 1.0,
                 ..default()
             });
-            let cut = materials.add(StandardMaterial {
+            let cut = veiled(StandardMaterial {
                 base_color: pal::shade(&pal::STONE, 0.80),
                 perceptual_roughness: 0.9,
                 ..default()

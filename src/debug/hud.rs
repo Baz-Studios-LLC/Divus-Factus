@@ -640,7 +640,6 @@ pub(crate) fn report_frames(
     chunks: Option<Res<LoadedChunks>>,
     meshes: Query<(), With<Mesh3d>>,
     lit: Query<(), (With<Mesh3d>, Without<bevy::light::NotShadowCaster>)>,
-    veils: Query<&MeshMaterial3d<crate::fog::FogMaterial>>,
     folk: Query<(), With<crate::villager::Villager>>,
     // Shown against standing, because those two are a different question from
     // all of the above. A patch that is resident but hidden costs memory; one
@@ -660,7 +659,7 @@ pub(crate) fn report_frames(
     let distance = rigs.iter().next().map_or(0.0, |rig| rig.distance);
     info!(
         "frames: avg {:.1}ms, worst {:.1}ms over {} frames | zoom {:.0} chunks {} meshes {} \
-         casters {} veils {} patches {}/{} folk {}",
+         casters {} patches {}/{} folk {}",
         window.0 / window.1 as f32,
         window.2,
         window.1,
@@ -668,7 +667,6 @@ pub(crate) fn report_frames(
         chunks.as_ref().map_or(0, |c| c.count()),
         meshes.iter().count(),
         lit.iter().count(),
-        veils.iter().count(),
         detail.shown,
         detail.built,
         folk.iter().count(),

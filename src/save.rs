@@ -1427,12 +1427,18 @@ fn apply(world: &mut World, save: SaveGame) {
         bushes: save.bushes.clone(),
     });
     world.resource_scope(|world, mut meshes: Mut<Assets<Mesh>>| {
-        world.resource_scope(|world, mut materials: Mut<Assets<StandardMaterial>>| {
+        world.resource_scope(|world, mut materials: Mut<Assets<crate::fog::GroundMaterial>>| {
             world.resource_scope(|world, mut rng: Mut<crate::villager::SimRng>| {
-                let material = materials.add(StandardMaterial {
-                    base_color: crate::palette::shade(&crate::palette::STONE, 0.45),
-                    perceptual_roughness: 1.0,
-                    ..default()
+                // A restored boulder is ordinary scenery and wears the ground's
+                // own veil-carrying material, so a save loaded into unwalked
+                // country comes back veiled like everything around it.
+                let material = materials.add(crate::fog::GroundMaterial {
+                    base: StandardMaterial {
+                        base_color: crate::palette::shade(&crate::palette::STONE, 0.45),
+                        perceptual_roughness: 1.0,
+                        ..default()
+                    },
+                    extension: crate::fog::GroundVeil::default(),
                 });
                 let mut commands = world.commands();
                 for (pos, scale) in &save.boulders {

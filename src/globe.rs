@@ -727,9 +727,8 @@ fn bend_the_world(
             Without<DirectionalLight>,
             Without<CameraRig>,
             // Geometry already seated on the sphere by its own vertices:
-            // chunks, their rivers, and the veil sheets that copy them.
+            // chunks and their rivers.
             Without<crate::terrain::TerrainChunk>,
-            Without<crate::fog::Veil>,
             // The god's hand places itself in seated space already - it has
             // to, because as the UI pointer it floats a few units in front of
             // the camera, and there is no flat position that bends to "just

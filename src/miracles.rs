@@ -1295,7 +1295,14 @@ fn cast(
     mut fired: MessageReader<FireMiracle>,
     hotbar: Res<Hotbar>,
     slots: Query<(Entity, &MiracleSlot)>,
-    mut visuals: (ResMut<Assets<Mesh>>, ResMut<Assets<StandardMaterial>>),
+    mut visuals: (
+        ResMut<Assets<Mesh>>,
+        ResMut<Assets<StandardMaterial>>,
+        // The stone a miracle drops is ordinary scenery once it lands, so it
+        // wears the ground's own veil-carrying material like every other
+        // boulder in the world.
+        ResMut<Assets<crate::fog::GroundMaterial>>,
+    ),
     mut bushes: Query<(&GlobalTransform, &mut FoodSource)>,
     mut told: (MessageWriter<crate::ui::Notice>, MessageWriter<DivineEvent>),
     mut victims: Query<
@@ -1353,6 +1360,7 @@ fn cast(
             &mut world_q,
             &mut visuals.0,
             &mut visuals.1,
+            &mut visuals.2,
             &mut bushes,
             &mut told.0,
             &mut told.1,
@@ -1392,6 +1400,7 @@ fn perform(
     ),
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
+    ground_materials: &mut Assets<crate::fog::GroundMaterial>,
     bushes: &mut Query<(&GlobalTransform, &mut FoodSource)>,
     notices: &mut MessageWriter<crate::ui::Notice>,
     witnessed: &mut MessageWriter<DivineEvent>,
@@ -1687,7 +1696,7 @@ fn perform(
 
         Miracle::StoneFromSky => {
             let (_, _, _, rng) = world_q;
-            drop_the_stone(commands, meshes, materials, at, now, &mut rng.0);
+            drop_the_stone(commands, meshes, ground_materials, at, now, &mut rng.0);
             info!("{god} pulled a stone out of the sky");
             notices.write(crate::ui::Notice::fanfare(format!(
                 "{god} calls a stone out of the empty sky"
@@ -1933,7 +1942,7 @@ fn raise_ward(
 fn drop_the_stone(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<StandardMaterial>,
+    materials: &mut Assets<crate::fog::GroundMaterial>,
     at: Vec3,
     now: f64,
     rng: &mut crate::rng::Rng,
@@ -1942,10 +1951,13 @@ fn drop_the_stone(
     let stone = crate::scatter::spawn_boulder(
         commands,
         meshes,
-        materials.add(StandardMaterial {
-            base_color: crate::palette::shade(&crate::palette::STONE, 0.5),
-            perceptual_roughness: 0.95,
-            ..default()
+        materials.add(crate::fog::GroundMaterial {
+            base: StandardMaterial {
+                base_color: crate::palette::shade(&crate::palette::STONE, 0.5),
+                perceptual_roughness: 0.95,
+                ..default()
+            },
+            extension: crate::fog::GroundVeil::default(),
         }),
         at + Vec3::Y * 60.0,
         rng,

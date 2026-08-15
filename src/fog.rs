@@ -11,8 +11,7 @@
 //! and nothing is painted: the shader measures each pixel against the
 //! handful of circles the village actually knows.
 
-use bevy::light::{NotShadowCaster, NotShadowReceiver};
-use bevy::pbr::{Material, MaterialPlugin};
+use bevy::pbr::MaterialPlugin;
 use bevy::prelude::*;
 use bevy::reflect::TypePath;
 use bevy::render::render_resource::{AsBindGroup, ShaderType};
@@ -21,36 +20,20 @@ use bevy::shader::ShaderRef;
 use crate::terrain::{TerrainChunk, WaterPlane};
 use crate::villager::explore::KnownWorld;
 
-const SHADER_PATH: &str = "shaders/fog.wgsl";
+/// The ground's own veil, worn by the terrain and everything growing on it.
+const GROUND_SHADER_PATH: &str = "shaders/ground_veil.wgsl";
 
 /// As many pockets as the shader's uniform holds. Explorers bring back far
 /// fewer than this; the oldest simply stop being drawn if they ever do not.
 const MAX_POCKETS: usize = 128;
 
-/// How high the veil's bank of mist stands.
+/// How many metres the painted veil takes to come on at the edge of what the
+/// village knows.
 ///
-/// The tallest current tree is a shade over eight metres; sixteen gives the
-/// shroud headroom for roofs and future scenery without letting silhouettes
-/// poke through its top.
-///
-/// It was set to ZERO, and this comment was left standing over it. A bank of
-/// no height is a skin painted on the terrain, which every tree and roof
-/// stands clean on top of - and once it could not occlude anything, hiding
-/// the scenery became a second, separate job done by testing each mesh's
-/// anchor point against the known circle, which is how whole groves came to
-/// float in the dark. One mechanism, restored: the veil is tall enough to
-/// bury a wood, and `VEIL_TAPER` is what keeps its edge from showing.
-const VEIL_HIGH: f32 = 16.0;
-
-/// How many metres the bank takes to climb from the ground to its full
-/// height, going outward from the edge of what is known.
-///
-/// Brett: "keep it at 16m but taper it to the ground, that way it covers
-/// everything but looks seamless because it would taper down and slightly
-/// clip through the ground." Long enough to read as a slope rather than a
-/// wall; short enough that the wood a step beyond the boundary is already
-/// buried.
-const VEIL_TAPER: f32 = 30.0;
+/// A shore rather than a cut line. This is the ONLY dial the veil has left:
+/// there was a bank height and a taper and a settle distance, and all three
+/// belonged to an occluder that no longer exists.
+const VEIL_EDGE: f32 = 9.0;
 
 /// Whether the veil is up. It is, from the first frame: the world a
 /// village has actually walked is the world the game is about, and the
@@ -66,15 +49,11 @@ impl Default for FogMode {
     }
 }
 
-/// The veil laid over one terrain chunk.
-#[derive(Component)]
-pub struct Veil;
-
 pub struct FogPlugin;
 
 impl Plugin for FogPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(MaterialPlugin::<FogMaterial>::default())
+        app.add_plugins(MaterialPlugin::<GroundMaterial>::default())
             .init_resource::<FogMode>()
             // Only over a world that has a village in it. While the god
             // is still choosing where to plant the flag there is nothing
@@ -150,42 +129,39 @@ impl Default for FogParams {
             // dithered discovery edge, not translucency through the world.
             tint: Vec4::new(VEIL_TINT[0], VEIL_TINT[1], VEIL_TINT[2], 1.0),
             home: Vec4::new(0.0, 0.0, 0.0, 170.0),
-            // z is the bank's physical height above its terrain mesh, and w
-            // is how far it takes to climb to it - the taper that keeps the
-            // inner edge under the ground instead of standing on it.
-            dials: Vec4::new(0.0, 9.0, VEIL_HIGH, VEIL_TAPER),
+            // x is how many pockets are live, y how far the edge fades.
+            // z and w carried the old bank's height and taper and are
+            // spare now that nothing is lifted off the ground.
+            dials: Vec4::new(0.0, VEIL_EDGE, 0.0, 0.0),
             planet: crate::globe::planet_centre().extend(crate::terrain::PLANET_RADIUS),
             pockets: [Vec4::ZERO; MAX_POCKETS],
         }
     }
 }
 
-#[derive(Asset, TypePath, AsBindGroup, Clone, Default)]
-pub struct FogMaterial {
-    #[uniform(0)]
+/// The ground's own veil, and the veil of everything standing on it.
+///
+/// The same fog, mixed into the LIT surface instead of draped over it in a
+/// sheet. Worn by the terrain, the groves, the loose trees, the scenery, the
+/// boulders and the bushes - everything that comes out of `TerrainAssets`'s
+/// ground material - so that unknown country and the wood growing on it are
+/// one colour together, with nothing standing proud of anything.
+///
+/// See `ground_veil.wgsl` for why this is a per-pixel read of the fog uniform
+/// rather than the planet's baked vertex mark.
+#[derive(Asset, AsBindGroup, TypePath, Clone, Default)]
+pub struct GroundVeil {
+    /// 100, not 0: the base `StandardMaterial` owns the low bindings.
+    #[uniform(100)]
     pub params: FogParams,
 }
 
-impl Material for FogMaterial {
-    fn vertex_shader() -> ShaderRef {
-        SHADER_PATH.into()
-    }
+/// Ordinary ground, plus the fog of war mixed in after the lighting.
+pub type GroundMaterial = bevy::pbr::ExtendedMaterial<StandardMaterial, GroundVeil>;
 
+impl bevy::pbr::MaterialExtension for GroundVeil {
     fn fragment_shader() -> ShaderRef {
-        SHADER_PATH.into()
-    }
-
-    fn alpha_mode(&self) -> AlphaMode {
-        // The shader supplies full alpha for unknown ground, so this still
-        // hides everything behind the shroud. Keeping it in the transparent
-        // pass matters at god-height: the opaque pass turned the planet into a
-        // pale solid disc instead of letting the sky's finishing pass treat the
-        // veil like the atmosphere it is.
-        AlphaMode::Blend
-    }
-
-    fn depth_bias(&self) -> f32 {
-        0.0
+        GROUND_SHADER_PATH.into()
     }
 }
 
@@ -207,42 +183,49 @@ fn toggle_fog(
     }));
 }
 
-/// Gives every loaded chunk a veil while the fog is up, and takes them all
-/// away when it comes down. A veil is a CHILD of its chunk, so a chunk
-/// rebuilt by a levelled plot takes its veil with it and this puts a fresh
-/// one on the replacement.
+/// Hides whole chunks that nobody has seen any part of.
 ///
-/// The sea gets one too. The lakebed's sheets hang UNDER the water, which
-/// is drawn straight over them - so an unexplored lake sat there in plain
-/// daylight with the fog stacked politely on the mud beneath it.
+/// THIS USED TO HANG CLOTHS. The veil was an occluder: a copy of every chunk's
+/// terrain, lifted into a bank tall enough to bury a wood, hiding what stood
+/// under it. A bank is a solid object in the world, and a solid object has a
+/// side and an edge - so it floated over ground the planet drew at a coarser
+/// height, ended in a cliff where the chunks ran out, let trees stand clean on
+/// top of it, and left the ground beneath it wearing full daylight so the
+/// shroud read as a sheet laid over a readable world.
+///
+/// Brett cut the knot: "What if we got rid of the veil on the rendered bits
+/// entirely and just kept the veil on the LOD and we just painted the veiled
+/// rendered chunks?" So unknown ground is PAINTED the veil's colour - by
+/// `fog::GroundVeil`, worn by the terrain and by every tree, boulder and bush
+/// standing on it - and the planet's patches go on carrying the same colour in
+/// their vertices. Nothing is hidden, so there is nothing to see under, no edge
+/// to meet the paint at, and no height for the two halves to disagree about:
+/// the veil is now exactly as tall as the world it covers.
+///
+/// What is left is a saving. A chunk nobody has seen any part of is painted
+/// flat veil colour from edge to edge, and the planet patch beneath it is
+/// painted the same - so drawing the chunk, its groves, its grass and its
+/// boulders buys nothing at all. It is not drawn.
 fn drape_the_veil(
     mut commands: Commands,
     mode: Res<FogMode>,
     state: Res<State<crate::GameState>>,
-    mut materials: ResMut<Assets<FogMaterial>>,
-    mut cloth: Local<Option<Handle<FogMaterial>>>,
-    rising: Res<VeilRising>,
     known: Option<Res<crate::villager::explore::KnownWorld>>,
     chunks: Query<
         (
             Entity,
-            &Mesh3d,
-            Option<&Children>,
-            Has<WaterPlane>,
             &Visibility,
             Has<crate::terrain::ParkedChunk>,
             Option<&TerrainChunk>,
         ),
         Or<(With<TerrainChunk>, With<WaterPlane>)>,
     >,
-    veils: Query<(Entity, &Visibility), With<Veil>>,
     watch: Res<crate::debug::timings::Timings>,
 ) {
     let _t = watch.watch("fog: drape_the_veil");
-    // Chunks are born hidden so that no unveiled ground is ever seen. Whoever
-    // decides they may be seen has to be whoever knows the veil is on them —
-    // which is this system, and, when there is no veil to wait for, this
-    // branch. Without it a lifted fog would leave a world of hidden chunks.
+    // Chunks are born hidden so that no unpainted ground is ever seen before
+    // the material knows where the village has walked. Whoever decides they
+    // may be seen is this system.
     let reveal = |commands: &mut Commands, chunk: Entity, showing: &Visibility| {
         if *showing == Visibility::Hidden {
             // try_insert: the Title click tears chunks down mid-frame, and
@@ -251,159 +234,30 @@ fn drape_the_veil(
         }
     };
 
-    // No veil wanted — the key is off, or there is no village yet to have a
-    // knowledge to draw. Take any cloths down and let the world be seen.
-    if !mode.0 || *state.get() != crate::GameState::Playing {
-        if !veils.is_empty() {
-            for (veil, _) in &veils {
-                commands.entity(veil).try_despawn();
-            }
-        }
-        for (chunk, _, _, _, showing, parked, _) in &chunks {
-            if parked {
-                continue;
-            }
-            reveal(&mut commands, chunk, showing);
-        }
-        return;
-    }
-    // ONE cloth, at the top of the bank, whatever the zoom. There used to be
-    // two - a sheer one stacked six deep over the land, and a full-weight one
-    // for the sea and for the lid a zoomed-out world wore - plus the machinery
-    // to swap between them without a bare frame showing. All of it is gone.
-    // The stack existed to give the veil's edge some depth, and it did, but
-    // looked along from a low camera you could COUNT the sheets: six pale
-    // contour lines lying across the distance. The flat world's distance fog
-    // used to dissolve them before they could be resolved; the round world does
-    // not have that fog and does not want it.
-    //
-    // So the sheet is the top of a slab now, and the shader takes its weight
-    // from how far the ray travels through that slab - squarely from above, a
-    // long way at a graze. The far edge thickens into a wall by itself, which
-    // is what the stack was faking, and it costs one draw per chunk instead of
-    // six.
-    let cloth = cloth.get_or_insert_with(|| materials.add(FogMaterial::default()));
-    {
-        // The veil does NOT thin with altitude. It used to, back when the
-        // planet's own patches painted no veil at all: carried aloft the
-        // cloths stopped being information and became scenery, a translucent
-        // slate quadrilateral lying over an otherwise open world with the
-        // loaded ring's own straight edge for a border. Now the patches wear
-        // the same fog in the same colour (`globe::PlanetMaterial`), so the
-        // cloth over the near ground and the paint beyond it are one
-        // continuous shroud, and fading either of them would put the seam
-        // back. What the village has not walked is hidden from every height.
-        let full = FogParams::default().tint.w;
-        let cloth = cloth.clone();
-        if let Some(mut stuff) = materials.get_mut(&cloth) {
-            stuff.params.tint.w = full * rising.risen;
-        }
-    }
-    for (chunk, mesh, children, sea, showing, parked, ground) in &chunks {
+    let veiled = mode.0 && *state.get() == crate::GameState::Playing;
+    for (chunk, showing, parked, ground) in &chunks {
         if parked {
             continue;
         }
-        // A CHUNK NOBODY HAS SEEN ANY PART OF IS NOT DRAWN AT ALL.
-        //
-        // Brett: "The fully rendered area is higher then the LOD and it makes
-        // it so you can see under the veil at a distance." Chunks and patches
-        // ask the same height function but not at the same resolution - a
-        // patch interpolates thirty-two cells across ground the chunk renders
-        // in full - so the fine surface rides above the coarse one, and from a
-        // low angle you look straight under the raised edge of a chunk that is
-        // wholly unknown anyway. They were slabs of daylight ground floating
-        // over the veiled planet.
-        //
-        // Nothing is lost by dropping them: the planet's own patch is standing
-        // under every one, wearing the same veil in the same colour, so the
-        // ground still reads as hidden country. It is also the cull Brett
-        // asked for - "we sholod still try to cull trees and whatnot if under
-        // the veil to save resouces" - done at the one granularity that takes
-        // the trees, the grass, the boulders and the terrain together, since
-        // every one of them is a child of this entity.
-        // NOT WHILE THE VEIL IS STILL COMING UP. The fog rises over the first
-        // moments of a founding rather than snapping on, and during that rise
-        // the bank is too thin to draw at all - so culling then does not hide
-        // a chunk UNDER something, it just takes a bite out of an open world.
-        // The founding shot came out as a ragged island with chunk corners
-        // for a coastline. A chunk may only vanish once the thing that would
-        // have covered it is actually standing.
-        if rising.risen >= 0.999
-            && let (Some(known), Some(ground)) = (known.as_ref(), ground)
-            && !known.knows_flat(
-                (ground.coord.x as f32 + 0.5) * crate::terrain::CHUNK_SIZE,
-                (ground.coord.y as f32 + 0.5) * crate::terrain::CHUNK_SIZE,
-                // Half the chunk's diagonal: ANY corner being known keeps the
-                // whole chunk, so this never hides ground somebody can see.
-                crate::terrain::CHUNK_SIZE * std::f32::consts::SQRT_2 * 0.5,
-            )
-        {
+        // Whole chunks only, and only where every corner is unknown - the test
+        // carries half the chunk's diagonal as its margin, so this can never
+        // hide ground somebody is looking at. A chunk with one known corner
+        // stays, and its unknown acres are simply painted.
+        let unseen = veiled
+            && known.as_ref().zip(ground).is_some_and(|(known, ground)| {
+                !known.knows_flat(
+                    (ground.coord.x as f32 + 0.5) * crate::terrain::CHUNK_SIZE,
+                    (ground.coord.y as f32 + 0.5) * crate::terrain::CHUNK_SIZE,
+                    crate::terrain::CHUNK_SIZE * std::f32::consts::SQRT_2 * 0.5,
+                )
+            });
+        if unseen {
             if *showing != Visibility::Hidden {
                 commands.entity(chunk).try_insert(Visibility::Hidden);
             }
-            // BUT ITS VEIL STAYS UP. Brett: "What if the veil renders farther
-            // out then the land by a chunk or two, then the rendered veil will
-            // over lap the non rendered veil." Hiding the chunk would take its
-            // veil down with it - the cloth is a child of the ground it hides -
-            // and the bank would stop dead at the frontier, exactly where it is
-            // most needed. `Visibility::Visible` shows a child whatever its
-            // parent is doing, so the land goes and the shroud over it stays,
-            // running on across every loaded chunk until it settles onto the
-            // patches' own painted veil. The two overlap instead of meeting.
-            if let Some(kids) = children {
-                for kid in kids.iter() {
-                    if let Ok((veil, showing)) = veils.get(kid)
-                        && *showing != Visibility::Visible
-                    {
-                        commands.entity(veil).try_insert(Visibility::Visible);
-                    }
-                }
-            }
             continue;
         }
-        let dressed = children.map_or(0, |kids| {
-            kids.iter().filter(|kid| veils.contains(*kid)).count()
-        });
-        // Decent, and may be seen.
-        if dressed > 0 {
-            reveal(&mut commands, chunk, showing);
-            // And its cloth goes back under the chunk's own command. A veil
-            // forced `Visible` while its ground was culled would otherwise
-            // stay forced for the rest of the world's life, outliving the
-            // reason - and would hang there alone the next time this chunk
-            // was parked for a trip to globe view.
-            if let Some(kids) = children {
-                for kid in kids.iter() {
-                    if let Ok((veil, showing)) = veils.get(kid)
-                        && *showing == Visibility::Visible
-                    {
-                        commands.entity(veil).try_insert(Visibility::Inherited);
-                    }
-                }
-            }
-            continue;
-        }
-        {
-            let _ = sea;
-            commands.spawn((
-                Veil,
-                Mesh3d(mesh.0.clone()),
-                MeshMaterial3d(cloth.clone()),
-                // The vertex shader lifts this exact terrain copy according
-                // to its explored-state distance field. Known ground stays at
-                // ground level, the frontier rises smoothly, and unknown land
-                // reaches the full bank height - one uninterrupted surface.
-                Transform::IDENTITY,
-                // The veil is not a THING. Six sheets hanging over the
-                // world threw six sheets of shadow onto the ground they
-                // were meant to be hiding, and the known island - the one
-                // place the veil never covers - went darkest of all,
-                // because it lay under all six.
-                NotShadowCaster,
-                NotShadowReceiver,
-                ChildOf(chunk),
-            ));
-        }
+        reveal(&mut commands, chunk, showing);
     }
 }
 
@@ -440,7 +294,7 @@ fn raise_the_veil(_time: Res<Time>, mut rising: ResMut<VeilRising>) {
 fn follow_the_known(
     mode: Res<FogMode>,
     known: Option<Res<KnownWorld>>,
-    mut materials: ResMut<Assets<FogMaterial>>,
+    mut ground: ResMut<Assets<GroundMaterial>>,
 ) {
     if !mode.0 {
         return;
@@ -455,13 +309,19 @@ fn follow_the_known(
         return;
     }
     let live = known.pockets.len().min(MAX_POCKETS);
-    for (_, material) in materials.iter_mut() {
-        material.params.home = known.centre.extend(known.radius);
-        material.params.planet =
-            crate::globe::planet_centre().extend(crate::terrain::PLANET_RADIUS);
-        material.params.dials.x = live as f32;
+    let tell = |params: &mut FogParams| {
+        params.home = known.centre.extend(known.radius);
+        params.planet = crate::globe::planet_centre().extend(crate::terrain::PLANET_RADIUS);
+        params.dials.x = live as f32;
         for (slot, pocket) in known.pockets.iter().take(live).enumerate() {
-            material.params.pockets[slot] = pocket.at.extend(pocket.radius);
+            params.pockets[slot] = pocket.at.extend(pocket.radius);
         }
+    };
+    // And the ground itself, which wears the same fog rather than standing
+    // under it. Told in the same breath as the cloths, from the same
+    // knowledge, so the painted veil and any remaining sheet can never
+    // disagree about where the village has walked.
+    for (_, material) in ground.iter_mut() {
+        tell(&mut material.extension.params);
     }
 }

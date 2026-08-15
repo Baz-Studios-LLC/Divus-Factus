@@ -309,7 +309,7 @@ impl FoodSource {
 fn spawn_bush(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
-    material: Handle<StandardMaterial>,
+    material: Handle<crate::fog::GroundMaterial>,
     position: Vec3,
     rng: &mut Rng,
 ) -> Entity {
@@ -1322,7 +1322,7 @@ pub(crate) fn collect_groves(
 pub fn stand_alone(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
-    material: Handle<StandardMaterial>,
+    material: Handle<crate::fog::GroundMaterial>,
     tree: Entity,
     body: &TreeBody,
     home: &InGrove,
@@ -1466,7 +1466,7 @@ pub struct SacredFlora {
 fn spawn_sacred(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
-    material: Handle<StandardMaterial>,
+    material: Handle<crate::fog::GroundMaterial>,
     position: Vec3,
     kind: SacredKind,
     rng: &mut Rng,
@@ -1613,7 +1613,7 @@ pub(crate) fn roll_rock(rng: &mut Rng) -> RockRoll {
 pub(crate) fn spawn_boulder(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
-    material: Handle<StandardMaterial>,
+    material: Handle<crate::fog::GroundMaterial>,
     local: Vec3,
     rng: &mut Rng,
     roll: RockRoll,

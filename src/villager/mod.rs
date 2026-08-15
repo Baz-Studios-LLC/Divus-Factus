@@ -1791,6 +1791,9 @@ pub(crate) fn spawn_settlement(
     clock: Res<crate::calendar::WorldClock>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    // Deposits are ground scenery and wear the veil-carrying material; the
+    // buildings and the glory above them do not.
+    mut ground_materials: ResMut<Assets<crate::fog::GroundMaterial>>,
     mut notices: MessageWriter<crate::ui::Notice>,
     restoring: Option<Res<RestoringSeed>>,
     chosen: Res<ChosenGround>,
@@ -1867,7 +1870,7 @@ pub(crate) fn spawn_settlement(
                 crate::matter::spawn_deposit(
                     &mut commands,
                     &mut meshes,
-                    &mut materials,
+                    &mut ground_materials,
                     Vec3::new(x, height, z),
                     crate::matter::DepositKind::Iron,
                     rng.range(16.0, 26.0),
@@ -1905,7 +1908,7 @@ pub(crate) fn spawn_settlement(
             crate::matter::spawn_deposit(
                 &mut commands,
                 &mut meshes,
-                &mut materials,
+                &mut ground_materials,
                 at,
                 crate::matter::DepositKind::Clay,
                 rng.range(24.0, 40.0),
@@ -1940,7 +1943,7 @@ pub(crate) fn spawn_settlement(
             crate::matter::spawn_deposit(
                 &mut commands,
                 &mut meshes,
-                &mut materials,
+                &mut ground_materials,
                 Vec3::new(at.x, floor, at.z),
                 crate::matter::DepositKind::Stone,
                 // Deeper, because there are half as many. A village's whole
