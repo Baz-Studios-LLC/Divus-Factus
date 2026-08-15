@@ -1,69 +1,65 @@
-## The town under your eye
+## The village keeps its families together
 
-**A strip at the top of the screen names the settlement you are looking at
-and how it is doing** — souls, timber, stone and food, with a glyph beside
-each. It hangs from the top edge like a tab, follows whichever town is
-nearest the middle of your view, and goes when you climb too high for a
-town to be a town or when the place leaves the screen. It never sits over
-an open book.
+- **A child is never left alone in a house.** One could end up the sole
+  resident of an unrelated empty home while a living parent had a spare bed
+  — technically housed, and in every other sense abandoned. Children now
+  join a parent wherever that parent sleeps, the longhouse included, and
+  they wait rather than founding a household of their own.
+- **A family camping in the longhouse asks for a real home.** They were
+  sheltered for the night, so the planner considered them housed and never
+  built for them.
 
-## The hall, and why a village builds what it builds
+## Hands that are doing something
 
-**A town of fourteen with the stone for it now builds its town hall.** It
-would not before, and the reason was not the one it looked like: a village
-asks six questions in order and only the last of them is the scored list
-of wants. A trade with nowhere to work — a priest with no shrine, a
-forester with no sawmill — answered the third question first, and a town of
-fifteen almost always has one, so the hall was never reached at all. It
-now has its own place in that order, above the works and below shelter.
+- **Every trade carries its tools** — the basket, the rod, the pick, the
+  axe, the hammer, the hoe, the ladle, the censer, the staff — and works
+  with them. Choppers swing, masons tap, farmers hoe, fishers cast, cooks
+  stir, priests sway a censer.
+- **Hunters draw a bow.** They stop at range, loose an arrow that actually
+  travels, and go to collect what falls.
+- **Workers face the job they are doing** instead of whatever direction
+  they arrived from.
+- **Kneeling stops the feet.** Prayer cleared a villager's destination but
+  left the road they were walking, so people slid across the field on their
+  knees.
 
-- **A need that is met stops being a need.** Wants were measured as raw
-  stock against a constant, so a town with 245 timber "wanted" a storehouse
-  more the richer it got, and that one number drowned everything else. A
-  want is now the shortfall against what the town can actually keep, and it
-  stops climbing once the shortfall is answered.
-- **The dev overlay says what the village is thinking** — the top wants
-  with their scores, and which rule chose what it broke ground on.
+## Looking closely
 
-## Walking
+- **Shift-click a villager to open their dossier** — Overview, Needs,
+  Regard and Routine, with Follow, Centre, Bless and Inspire. Holding shift
+  stops the hand grabbing them, so reading about someone no longer picks
+  them up.
+- **Hovering a house tells you about the household**: who lives there, beds
+  free, stores, mood, faith, what two of them are doing, and one concern —
+  only when something is actually wrong.
+- **Everything else under the hand says something real too.** Trees say
+  whether they are worth felling, boulders how much stone they hold, the
+  fire whether it is lit and who tends it, bushes how many meals are left.
+  The old "beneath your hand", which told you only where the cursor was, is
+  gone.
+- **A building's bill is numbers and nothing else.**
 
-- **Hunger interrupts an errand wherever the errand has gone.** Only idle
-  and wandering villagers ever decided to eat, so anyone carrying timber
-  across the map walked until they dropped. People on the road also eat
-  from a bush at hand rather than starving beside one on the way to a full
-  larder.
-- **The ground is learnt once instead of measured over and over.** Working
-  out whether a step is walkable was most of the cost of finding a path,
-  and it was being asked the same questions thousands of times a search.
-  Long journeys cost about a quarter what they did.
-- **A wall is walked through its gate.** A walled town used to be searched
-  around blindly until the budget ran out; a journey that crosses a rampart
-  now routes to a gate, and is given the room to find it.
+## The veil
 
-## The book
-
-- **The codex is dressed on the frame it is built**, so pages stop
-  flashing raw default text as they open. The prayer cards on the left had
-  the same flicker and the same fix.
-- **The roll reads by surname**, and a page with no prayers on it no longer
-  leaves a stray line of text behind.
-- **The souls panel counts adults**, separately from children.
-- **A family that runs to two lines stops shoving the column about.**
-- **The building bill names the footing and the walls apart**, so a
-  longhouse no longer looks like it costs nineteen stone and nothing else.
-- **A village with a full granary stops praying for food** — unless it
-  truly cannot reach it.
-
-## Talk
-
-- **The villagers call you by your name**, not "the god".
-- **Speech stops being drawn above 100 up**, where it was already
-  unreadable.
+- **It reaches the horizon now.** Fog of war stopped at chunk level, so
+  climbing high brought the unexplored world back as ordinary lit ground.
+  It survives the whole climb to orbit.
+- **Nothing grows behind it.** Trees, rocks, bushes and grass were being
+  raised on ground nobody had seen and then hidden — foliage poking through
+  the bank, and a mesh bill for country you had never visited.
+- **The join no longer opens up** when you tilt the camera.
+- **A building site clears its own ground**, so the veil stops cutting
+  through a roof somebody is standing on.
 
 ## Elsewhere
 
-- **Grass keeps still.** It was shaking because the wind ran on the world's
-  clock, which the camera also does not — and grass no longer grows through
-  a worn trail.
-- **Loading a game works from both doors** — from the title screen and from
-  inside a game.
+- **The town gathers when a mayor is chosen.** Everyone inside the wall
+  comes to the hall, hears the new mayor's first real priority, and goes
+  back to work. Anyone out on the road stays on their errand.
+- **Houses no longer straddle the rampart** — a home sits clearly inside or
+  clearly outside, and an outside home sits by a gate.
+- **The sun throws shafts** through the world.
+- **A maker's drawings come up evenly.** With two houses baked, the first
+  was being built two-thirds of the time; with three it would have been
+  half.
+- **Mothers nurse for half a season** rather than most of one.
