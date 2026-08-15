@@ -1615,6 +1615,13 @@ pub fn ground_color_at(terrain: &Terrain, world_x: f32, world_z: f32) -> [f32; 4
     [color.red, color.green, color.blue, 1.0]
 }
 
+/// How far a chunk's skirt hangs below its edge.
+///
+/// It has to cover the worst disagreement between a chunk's own surface and
+/// the coarse planet patch beneath it, which on broken ground is a few metres
+/// - and it is never seen except edge-on, so generous costs nothing.
+const SKIRT_DROP: f32 = 24.0;
+
 pub fn build_chunk_mesh(terrain: &Terrain, coord: IVec2) -> Mesh {
     let cell = CHUNK_SIZE / CHUNK_CELLS as f32;
     let origin = Vec2::new(coord.x as f32 * CHUNK_SIZE, coord.y as f32 * CHUNK_SIZE);
@@ -1714,6 +1721,58 @@ pub fn build_chunk_mesh(terrain: &Terrain, coord: IVec2) -> Mesh {
                 indices.extend_from_slice(&[top_right, bottom_left, bottom_right]);
             }
         }
+    }
+
+    // THE SKIRT: a curtain hung from every edge, dropped toward the planet's
+    // centre.
+    //
+    // A chunk is the world at full detail; the planet patch under it is the
+    // same ground read thirty-two cells at a time. They ask the same height
+    // function but not at the same resolution, so the fine surface rides above
+    // the coarse one - and at the outer edge of the loaded ring that left a
+    // slab standing in the air with its underside and the sky showing beneath.
+    // Brett, at five hundred feet: "The fully rendered area is higher then the
+    // LOD and it makes it so you can see under the veil at a distance."
+    //
+    // The planet's own patches have solved this since they were written: hang
+    // a twin of every edge vertex below it, wearing the edge's own colour, and
+    // the crack shows ground instead of sky (see `globe::build_patch`). The
+    // chunks never got one. Interior seams are covered by the neighbour that
+    // shares them, so only the outermost ring's curtain is ever seen, and a
+    // skirt's worth of overdraw is nothing.
+    let ground_level = positions.len() as u32;
+    let edge: Vec<usize> = {
+        let mut ring = Vec::new();
+        for ix in 0..stride {
+            ring.push(ix); // north
+        }
+        for iz in 1..stride {
+            ring.push(iz * stride + (stride - 1)); // east
+        }
+        for ix in (0..stride - 1).rev() {
+            ring.push((stride - 1) * stride + ix); // south
+        }
+        for iz in (1..stride - 1).rev() {
+            ring.push(iz * stride); // west
+        }
+        ring
+    };
+    for &index in &edge {
+        let seat = Vec3::from(positions[index]);
+        // Toward the planet's centre, which on this world IS down - and the
+        // one direction that stays down for a chunk on the far side of it.
+        let down = (seat - crate::globe::planet_centre()).normalize_or(Vec3::Y);
+        positions.push((seat - down * SKIRT_DROP).to_array());
+        normals.push(normals[index]);
+        colors.push(colors[index]);
+    }
+    for step in 0..edge.len() {
+        let here = edge[step] as u32;
+        let next = edge[(step + 1) % edge.len()] as u32;
+        let below_here = ground_level + step as u32;
+        let below_next = ground_level + ((step + 1) % edge.len()) as u32;
+        indices.extend_from_slice(&[here, below_here, below_next]);
+        indices.extend_from_slice(&[here, below_next, next]);
     }
 
     Mesh::new(
@@ -3258,14 +3317,63 @@ mod tests {
         }
     }
 
+    /// The grid, and the skirt hung off its rim.
+    ///
+    /// The skirt is not decoration: a chunk is the world at full detail and
+    /// the planet patch beneath it is the same ground read thirty-two cells at
+    /// a time, so the fine surface rides above the coarse one and the outer
+    /// ring of loaded chunks stood in the air with the sky under it. The
+    /// counts are asserted rather than the picture, because a curtain that
+    /// quietly stopped being built would look like nothing at all until
+    /// somebody flew out to the edge of the world and looked back.
     #[test]
     fn chunk_meshes_are_well_formed() {
         let t = Terrain::new(8);
         let mesh = build_chunk_mesh(&t, IVec2::new(2, -1));
-        assert_eq!(mesh.count_vertices(), (CHUNK_CELLS + 1) * (CHUNK_CELLS + 1));
+        let grid = (CHUNK_CELLS + 1) * (CHUNK_CELLS + 1);
+        // One twin per vertex around the rim: 4 * CHUNK_CELLS of them, the
+        // corners counted once each.
+        let hem = 4 * CHUNK_CELLS;
+        assert_eq!(mesh.count_vertices(), grid + hem, "grid plus its skirt");
         assert_eq!(
             mesh.indices().map(|i| i.len()),
-            Some(CHUNK_CELLS * CHUNK_CELLS * 6),
+            Some(CHUNK_CELLS * CHUNK_CELLS * 6 + hem * 6),
+            "two triangles per skirt segment, all the way round",
+        );
+    }
+
+    /// The skirt hangs DOWN - toward the planet's centre - from every edge.
+    ///
+    /// On a round world "down" is not -Y once you are any distance from the
+    /// tangent point, and a curtain hung along the wrong axis would stand out
+    /// sideways into the neighbouring chunk on the far side of the globe.
+    #[test]
+    fn the_chunk_skirt_hangs_toward_the_planet() {
+        let t = Terrain::new(8);
+        // A chunk well away from the origin, where "down" and -Y have visibly
+        // parted company.
+        let mesh = build_chunk_mesh(&t, IVec2::new(60, -45));
+        let Some(VertexAttributeValues::Float32x3(points)) =
+            mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+        else {
+            panic!("a chunk mesh has positions");
+        };
+        let grid = (CHUNK_CELLS + 1) * (CHUNK_CELLS + 1);
+        let centre = crate::globe::planet_centre();
+        for hem in &points[grid..] {
+            let skirt = Vec3::from(*hem);
+            assert!(
+                skirt.distance(centre) < crate::terrain::PLANET_RADIUS + 400.0,
+                "a skirt vertex must hang below the ground it is hemming",
+            );
+        }
+        // And it is genuinely lower than the rim it hangs from, by the drop.
+        let rim = Vec3::from(points[0]);
+        let below = Vec3::from(points[grid]);
+        let dropped = rim.distance(centre) - below.distance(centre);
+        assert!(
+            (dropped - SKIRT_DROP).abs() < 0.5,
+            "the skirt should hang {SKIRT_DROP} below its rim, not {dropped}",
         );
     }
 
