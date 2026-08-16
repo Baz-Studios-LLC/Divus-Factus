@@ -789,13 +789,15 @@ pub(crate) fn walk_the_ground_by_hand(
     if !keys.pressed(KeyCode::ShiftLeft) && !keys.pressed(KeyCode::ShiftRight) {
         return;
     }
-    let (Some(terrain), Some(mut known), Some(seat)) = (terrain, known, hand.cursor_world) else {
+    let (Some(terrain), Some(mut known), Some(flat)) = (terrain, known, hand.cursor_world) else {
         return;
     };
-    // The cursor meets the ground in DRAWN space, on the bent world; knowledge
-    // is written in the flat coordinates the simulation runs in. Unbend it, or
-    // clicking anywhere but the tangent point learns somewhere else entirely.
-    let flat = crate::globe::unbend(seat);
+    // `cursor_world` is ALREADY FLAT. The hand does its own unbending before it
+    // publishes this, which is why `founding` can hand the same value straight
+    // to `will_take_a_village` as ground coordinates. Unbending it a second
+    // time here sent every click somewhere else on the world - Brett: "I
+    // clicked where the hand is and the ground cleared way over in the
+    // distance."
     let coord = terrain.chunk_of(flat.x, flat.z);
     let centre = Vec3::new(
         (coord.x as f32 + 0.5) * crate::terrain::CHUNK_SIZE,
