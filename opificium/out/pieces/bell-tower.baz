@@ -1,0 +1,262 @@
+{
+  "format": 1,
+  "kind": "piece",
+  "name": "bell-tower",
+  "parts": [
+    {
+      "part": "beam-1.25x0x0",
+      "at": [
+        -0.96875,
+        4.1250005,
+        -2.3841858e-7
+      ],
+      "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false,
+      "material": "",
+      "group": 1,
+      "loose": false
+    },
+    {
+      "part": "wall-2x2.5xf",
+      "at": [
+        -0.15625,
+        0.0,
+        -1.125
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "walls",
+      "flip": false,
+      "material": "",
+      "group": 1,
+      "loose": false
+    },
+    {
+      "part": "wall-2x2.5xf",
+      "at": [
+        0.96875,
+        0.0,
+        5.9604645e-8
+      ],
+      "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "walls",
+      "flip": false,
+      "material": "",
+      "group": 1,
+      "loose": false
+    },
+    {
+      "part": "wall-2x2.5xf",
+      "at": [
+        -0.15625,
+        0.0,
+        1.125
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "walls",
+      "flip": false,
+      "material": "",
+      "group": 1,
+      "loose": false
+    },
+    {
+      "part": "beam-1.25x0x0",
+      "at": [
+        0.65625,
+        4.125,
+        2.3841858e-7
+      ],
+      "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false,
+      "material": "",
+      "group": 1,
+      "loose": false
+    },
+    {
+      "part": "pole-2",
+      "at": [
+        -0.96875,
+        2.5000005,
+        -0.8125
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false,
+      "material": "",
+      "group": 1,
+      "loose": false
+    },
+    {
+      "part": "pole-2",
+      "at": [
+        0.65625,
+        2.5,
+        -0.8125
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false,
+      "material": "",
+      "group": 1,
+      "loose": false
+    },
+    {
+      "part": "pole-2",
+      "at": [
+        -0.96875,
+        2.5,
+        0.8125
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false,
+      "material": "",
+      "group": 1,
+      "loose": false
+    },
+    {
+      "part": "pole-2",
+      "at": [
+        0.65625,
+        2.5,
+        0.8125
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false,
+      "material": "",
+      "group": 1,
+      "loose": false
+    },
+    {
+      "part": "beam-1.25x0x0",
+      "at": [
+        -0.15625,
+        2.5625,
+        -0.8125
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false,
+      "material": "",
+      "group": 1,
+      "loose": false
+    },
+    {
+      "part": "beam-1.25x0x0",
+      "at": [
+        -0.15625,
+        2.5625,
+        0.8125
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false,
+      "material": "",
+      "group": 1,
+      "loose": false
+    },
+    {
+      "part": "beam-1.25x0x0",
+      "at": [
+        0.65625,
+        2.625,
+        0.0
+      ],
+      "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false,
+      "material": "",
+      "group": 1,
+      "loose": false
+    },
+    {
+      "part": "beam-1.25x0x0",
+      "at": [
+        -0.96875,
+        2.5625,
+        0.0
+      ],
+      "yaw": 1.5707964,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false,
+      "material": "",
+      "group": 1,
+      "loose": false
+    },
+    {
+      "part": "beam-1.25x0x0",
+      "at": [
+        -0.15625,
+        4.1250005,
+        -0.8125
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false,
+      "material": "",
+      "group": 1,
+      "loose": false
+    },
+    {
+      "part": "beam-1.25x0x0",
+      "at": [
+        -0.15625,
+        4.125,
+        0.8125
+      ],
+      "yaw": 0.0,
+      "tilt": 0.0,
+      "ramp": null,
+      "shade": 0.7,
+      "stage": "frame",
+      "flip": false,
+      "material": "",
+      "group": 1,
+      "loose": false
+    }
+  ]
+}

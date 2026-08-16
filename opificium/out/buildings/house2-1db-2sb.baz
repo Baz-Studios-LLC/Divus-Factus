@@ -1,0 +1,1171 @@
+{
+  "format": 2,
+  "name": "house2-1db-2sb",
+  "levels": [
+    {
+      "name": "",
+      "phases": [
+        [
+          {
+            "part": "stairs-0.75x1.625xswx0.875",
+            "at": [
+              0.75,
+              0.0,
+              0.875
+            ],
+            "yaw": 4.712389,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "footing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "foundation-6x4x0.75",
+            "at": [
+              -2.0,
+              0.0,
+              -2.0
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "footing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "foundation-4x4x0.75",
+            "at": [
+              -2.0,
+              0.0,
+              2.0
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "footing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:woodpile",
+            "at": [
+              2.0,
+              0.0,
+              -1.0
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:woodpile",
+            "at": [
+              2.0,
+              0.0,
+              -2.0
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:woodpile",
+            "at": [
+              2.0,
+              0.0,
+              -3.0
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          }
+        ],
+        [
+          {
+            "part": "stairs-0.75x1.625xswx0.875",
+            "at": [
+              0.75,
+              0.0,
+              0.875
+            ],
+            "yaw": 4.712389,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "footing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "foundation-6x4x0.75",
+            "at": [
+              -2.0,
+              0.0,
+              -2.0
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "footing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "foundation-4x4x0.75",
+            "at": [
+              -2.0,
+              0.0,
+              2.0
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "footing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:pole",
+            "at": [
+              0.875,
+              0.75,
+              -3.8125
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "frame",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:pole",
+            "at": [
+              -4.8125,
+              0.75,
+              -3.8125
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "frame",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:pole",
+            "at": [
+              -4.8125,
+              0.75,
+              -0.1875
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "frame",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:pole",
+            "at": [
+              -3.8125,
+              0.75,
+              3.8125
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "frame",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:pole",
+            "at": [
+              -0.1875,
+              0.75,
+              3.8125
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "frame",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:pole",
+            "at": [
+              0.8125,
+              0.75,
+              -0.1875
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "frame",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:ladder",
+            "at": [
+              1.0625,
+              0.0,
+              -0.8125
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:woodpile",
+            "at": [
+              2.0,
+              0.0,
+              -2.0
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:woodpile",
+            "at": [
+              2.0,
+              0.0,
+              -3.0
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          }
+        ],
+        [
+          {
+            "part": "widget:door",
+            "at": [
+              -0.125,
+              0.75,
+              0.8750001
+            ],
+            "yaw": -0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "widget",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "foundation-6x4x0.75",
+            "at": [
+              -2.0,
+              0.0,
+              -2.0
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "footing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-4x2.5xw-0",
+            "at": [
+              0.875,
+              0.75,
+              -2.0
+            ],
+            "yaw": 4.712389,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-1.25x2.5",
+            "at": [
+              0.375,
+              0.75,
+              -0.12500003
+            ],
+            "yaw": 3.1415927,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-4.125x2.5xd1.0625",
+            "at": [
+              -0.125,
+              0.75,
+              1.9375
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-4x2.5xw-0",
+            "at": [
+              -2.0,
+              0.75,
+              3.875
+            ],
+            "yaw": 9.424778,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:door-leaf",
+            "at": [
+              -0.125,
+              0.75,
+              0.8750001
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "foundation-4x4x0.75",
+            "at": [
+              -2.0,
+              0.0,
+              2.0
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "footing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-1.25x2.5",
+            "at": [
+              -4.375,
+              0.75,
+              -0.12499991
+            ],
+            "yaw": 3.1415927,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-4x2.5",
+            "at": [
+              -4.875,
+              0.75,
+              -2.0
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-4.25x2.5",
+            "at": [
+              -3.875,
+              0.75,
+              1.875
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "stairs-0.75x1.625xswx0.875",
+            "at": [
+              0.75,
+              0.0,
+              0.875
+            ],
+            "yaw": 4.712389,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "footing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-6x2.5xw-0.375",
+            "at": [
+              -2.0,
+              0.75,
+              -3.8749995
+            ],
+            "yaw": 6.2831855,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:ladder",
+            "at": [
+              0.062499996,
+              0.0,
+              3.0
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:ladder",
+            "at": [
+              1.0625,
+              0.0,
+              -3.0
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:ladder",
+            "at": [
+              -3.375,
+              0.0625,
+              -4.0625
+            ],
+            "yaw": 3.1415927,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:ladder",
+            "at": [
+              -4.0625,
+              0.125,
+              1.4375
+            ],
+            "yaw": 4.712389,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:woodpile",
+            "at": [
+              2.0,
+              0.0,
+              -2.0
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          }
+        ],
+        [
+          {
+            "part": "widget:sleep",
+            "at": [
+              -0.24999982,
+              1.28125,
+              -1.5
+            ],
+            "yaw": 6.2831855,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "widget",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "gable-3.8125x32.5",
+            "at": [
+              0.81250024,
+              3.25,
+              -2.09375
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.0,
+            "ramp": "bone",
+            "shade": 1.0,
+            "stage": "roof",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-4x2.5xw-0",
+            "at": [
+              0.875,
+              0.75,
+              -2.0
+            ],
+            "yaw": 4.712389,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-1.25x2.5",
+            "at": [
+              0.375,
+              0.75,
+              -0.12500003
+            ],
+            "yaw": 3.1415927,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "widget:sleep",
+            "at": [
+              -3.625,
+              1.28125,
+              -2.6875
+            ],
+            "yaw": 3.1415925,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "widget",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-4x2.5xw-0",
+            "at": [
+              -2.0,
+              0.75,
+              3.875
+            ],
+            "yaw": 9.424778,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "widget:sleep",
+            "at": [
+              -0.25000018,
+              1.28125,
+              -2.5
+            ],
+            "yaw": 6.2831855,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "widget",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "foundation-4x4x0.75",
+            "at": [
+              -2.0,
+              0.0,
+              2.0
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "footing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:table",
+            "at": [
+              -2.0,
+              0.75,
+              2.375
+            ],
+            "yaw": 4.712389,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:chair",
+            "at": [
+              -2.75,
+              0.75,
+              1.875
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "widget:sit",
+            "at": [
+              -2.75,
+              0.75,
+              1.875
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "widget",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:chair",
+            "at": [
+              -2.75,
+              0.75,
+              2.75
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "widget:sit",
+            "at": [
+              -2.75,
+              0.75,
+              2.75
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "widget",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:chair",
+            "at": [
+              -1.25,
+              0.75,
+              2.75
+            ],
+            "yaw": 4.712389,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "widget:sit",
+            "at": [
+              -1.25,
+              0.75,
+              2.75
+            ],
+            "yaw": 3.1415925,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "widget",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:chair",
+            "at": [
+              -1.25,
+              0.75,
+              1.875
+            ],
+            "yaw": 4.712389,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "widget:sit",
+            "at": [
+              -1.25,
+              0.75,
+              1.875
+            ],
+            "yaw": 3.1415925,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "widget",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:bed-double",
+            "at": [
+              -0.25,
+              0.75,
+              -2.0
+            ],
+            "yaw": 7.853982,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-6x2.5xw-0.375",
+            "at": [
+              -2.0,
+              0.75,
+              -3.8749995
+            ],
+            "yaw": 6.2831855,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-4x2.5",
+            "at": [
+              -4.875,
+              0.75,
+              -2.0
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-4.25x2.5",
+            "at": [
+              -3.875,
+              0.75,
+              1.875
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-1.25x2.5",
+            "at": [
+              -4.375,
+              0.75,
+              -0.12499991
+            ],
+            "yaw": 3.1415927,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:bed",
+            "at": [
+              -3.625,
+              0.75,
+              -1.1875
+            ],
+            "yaw": 4.712389,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "widget:sleep",
+            "at": [
+              -3.625,
+              1.28125,
+              -1.1875
+            ],
+            "yaw": 3.1415925,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "widget",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:bed",
+            "at": [
+              -3.625,
+              0.75,
+              -2.6875
+            ],
+            "yaw": 4.712389,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "furnishing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "framed-4.125x2.5xd1.0625",
+            "at": [
+              -0.125,
+              0.75,
+              1.9375
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "prop:door-leaf",
+            "at": [
+              -0.125,
+              0.75,
+              0.8750001
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "walls",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "widget:door",
+            "at": [
+              -0.125,
+              0.75,
+              0.8750001
+            ],
+            "yaw": -0.0,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "widget",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "stairs-0.75x1.625xswx0.875",
+            "at": [
+              0.75,
+              0.0,
+              0.875
+            ],
+            "yaw": 4.712389,
+            "tilt": 0.0,
+            "ramp": null,
+            "shade": 0.7,
+            "stage": "footing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "gable-3.9375x30",
+            "at": [
+              -1.96875,
+              3.25,
+              3.8124998
+            ],
+            "yaw": 3.1415927,
+            "tilt": 0.0,
+            "ramp": "bone",
+            "shade": 1.0,
+            "stage": "roof",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "roof-6.875x2.6977198",
+            "at": [
+              -1.9999998,
+              3.7494612,
+              -3.1977856
+            ],
+            "yaw": 0.0,
+            "tilt": -0.567232,
+            "ramp": "cloth-sable",
+            "shade": 0.25,
+            "stage": "roof",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "roof-6.875x2.6977198",
+            "at": [
+              -1.9999998,
+              3.7494614,
+              -0.9897144
+            ],
+            "yaw": 0.0,
+            "tilt": 0.567232,
+            "ramp": "cloth-sable",
+            "shade": 0.25,
+            "stage": "roof",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "gable-3.8125x32.5",
+            "at": [
+              -4.8125,
+              3.25,
+              -2.09375
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.0,
+            "ramp": "bone",
+            "shade": 1.0,
+            "stage": "roof",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "roof-6.6875x2.7108166",
+            "at": [
+              -0.826182,
+              3.7173276,
+              1.0937498
+            ],
+            "yaw": 1.5707964,
+            "tilt": 0.5235988,
+            "ramp": "cloth-sable",
+            "shade": 0.25,
+            "stage": "roof",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "roof-6.6875x2.7108166",
+            "at": [
+              -3.111318,
+              3.7173276,
+              1.0937498
+            ],
+            "yaw": 1.5707964,
+            "tilt": -0.5235988,
+            "ramp": "cloth-sable",
+            "shade": 0.25,
+            "stage": "roof",
+            "flip": false,
+            "group": null,
+            "loose": false
+          },
+          {
+            "part": "foundation-6x4x0.75",
+            "at": [
+              -2.0,
+              0.0,
+              -2.0
+            ],
+            "yaw": 0.0,
+            "tilt": 0.0,
+            "ramp": "stone",
+            "shade": 0.75,
+            "stage": "footing",
+            "flip": false,
+            "group": null,
+            "loose": false
+          }
+        ]
+      ]
+    }
+  ]
+}

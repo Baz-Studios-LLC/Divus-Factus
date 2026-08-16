@@ -218,7 +218,7 @@ impl Plugin for VillagerPlugin {
                 Update,
                 (tools::equip_work_tools, tools::animate_work_tools).chain(),
             )
-            .add_systems(Update, work::advance_hunting_arrows)
+            .add_systems(Update, (work::advance_hunting_arrows, work::baked::tell_the_hour))
             // Civic life: the ballot and the decree, neither ordered
             // against anything - a mayor chosen a frame late is chosen.
             .add_systems(

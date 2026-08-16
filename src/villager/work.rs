@@ -1470,7 +1470,14 @@ pub(super) fn do_work(
                 // holds, the doors it opens, the table its people gather
                 // at, all read from the marks the bench wrote.
                 if let Some(work) = drawn {
-                    baked::furnish_baked(&mut commands, house, work, plan.mirrored);
+                    baked::furnish_baked(
+                        &mut commands,
+                        &mut meshes,
+                        &mut materials,
+                        house,
+                        work,
+                        plan.mirrored,
+                    );
                 }
                 // A holding comes with its ground broken: a plot turned beside
                 // the house, waiting for whoever lives there to work it. Left

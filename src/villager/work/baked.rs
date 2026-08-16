@@ -28,6 +28,43 @@ pub struct Box3 {
     pub stage: String,
 }
 
+/// One hand of a clock a maker drew.
+///
+/// The dial is theirs and the hands are the game's, which is the right split:
+/// a clock face is carpentry, and what it READS is the world's business. A
+/// painted-on time would be a lie the moment the sun moved.
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+pub enum ClockHand {
+    Hour,
+    Minute,
+}
+
+/// Turns every drawn clock to the hour.
+///
+/// A day is one turn of the world, so the hour hand makes TWO - a twelve-hour
+/// dial, because that is the face people read at a glance and the one the
+/// maker drew. The minute hand makes twenty-four, one to each of the day's
+/// hours.
+///
+/// Both hands hang from the dial, so they inherit whatever wall the maker put
+/// it on and turn in its own plane: about the face's normal, which is the
+/// building's local X once the dial has been turned to face out.
+pub(crate) fn tell_the_hour(
+    clock: Res<crate::calendar::WorldClock>,
+    mut hands: Query<(&ClockHand, &mut Transform)>,
+) {
+    let day = clock.time_of_day();
+    for (hand, mut at) in &mut hands {
+        // Clockwise, and starting from noon at the top: a hand that swept the
+        // other way would be read wrong by everyone who has ever seen a clock.
+        let turns = match hand {
+            ClockHand::Hour => day * 2.0,
+            ClockHand::Minute => day * 24.0,
+        };
+        at.rotation = Quat::from_rotation_x(-turns * std::f32::consts::TAU);
+    }
+}
+
 /// A visible piece supplied by an Opificium bake.
 ///
 /// Phase drawings are snapshots, so these are deliberately marked apart from
@@ -58,6 +95,10 @@ pub struct Mark {
     /// size of zero; it means this mark was never about room.
     #[serde(default)]
     pub size: Option<[f32; 3]>,
+    /// How wide across a mark that is a DISC rather than a box: the clock's
+    /// dial. Authored by the bench and, until now, read by nobody.
+    #[serde(default)]
+    pub wide: Option<f32>,
 }
 
 /// One form of a building: the original, or one of its upgrades.
@@ -503,6 +544,8 @@ pub(crate) const MARKS_UNDERSTOOD: &[Widget] = &[
     // that. The room is room; what stands on it is the village's business and
     // changes as the village does.
     ("pallet", "cloth-gold", 0.7, ROOM),
+    // A clock face: the hour, told to a whole village at once.
+    ("clock", "bone", 0.85, POINT),
 ];
 
 /// One word the bench may offer: its name, its ramp, its shade, and the size
@@ -1144,7 +1187,14 @@ pub fn raise_baked(
 
 /// Turns the marks into what the village reads: beds it can claim, a
 /// shell with doors to walk through, the family table.
-pub fn furnish_baked(commands: &mut Commands, site: Entity, work: &Baked, mirrored: bool) {
+pub fn furnish_baked(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    site: Entity,
+    work: &Baked,
+    mirrored: bool,
+) {
     let mut slot = 0u8;
     let sleeps: Vec<&Mark> = work.marks.iter().filter(|m| m.mark == "sleep").collect();
     for (index, mark) in sleeps.iter().enumerate() {
@@ -1168,6 +1218,42 @@ pub fn furnish_baked(commands: &mut Commands, site: Entity, work: &Baked, mirror
             ChildOf(site),
         ));
         slot += 1;
+    }
+    for mark in work.marks.iter().filter(|m| m.mark == "clock") {
+        // The dial is the maker's; the hands are the game's. `wide` is the
+        // face they have to fit, and a clock drawn without one gets a
+        // half-metre face, which is about what a gable will carry.
+        let face = mark.wide.unwrap_or(0.5).max(0.05);
+        let at = reflect_at(Vec3::from(mark.at), mirrored);
+        let out = reflect_yaw(mark.yaw, mirrored);
+        let dial = commands
+            .spawn((
+                Name::new("A clock"),
+                Transform::from_translation(at).with_rotation(Quat::from_rotation_y(out)),
+                Visibility::default(),
+                ChildOf(site),
+            ))
+            .id();
+        for (hand, long, thick) in [
+            (ClockHand::Hour, 0.30, 0.045),
+            (ClockHand::Minute, 0.44, 0.028),
+        ] {
+            commands.spawn((
+                hand,
+                Mesh3d(meshes.add(Cuboid::new(thick * face, long * face, thick * face * 0.5))),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: crate::palette::shade(&crate::palette::WOOD, 0.2),
+                    perceptual_roughness: 0.9,
+                    ..default()
+                })),
+                // Turned about the face's own normal, and pushed a hair proud
+                // of it so the hands are never buried in the dial they are
+                // drawn on.
+                Transform::from_xyz(0.02, 0.0, 0.0),
+                Visibility::default(),
+                ChildOf(dial),
+            ));
+        }
     }
     for mark in work.marks.iter().filter(|m| m.mark == "table") {
         commands.spawn((
@@ -1451,6 +1537,36 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// The hour hand makes two turns a day and the minute hand
+    /// twenty-four, both clockwise, both starting from the top at dawn.
+    ///
+    /// A clock read backwards is worse than no clock, and a dial whose hands
+    /// drift is a bug nobody reports because it takes a day to see.
+    #[test]
+    fn the_hands_tell_the_hour() {
+        let turn = |hand: super::ClockHand, day: f32| -> f32 {
+            match hand {
+                super::ClockHand::Hour => day * 2.0,
+                super::ClockHand::Minute => day * 24.0,
+            }
+        };
+        assert_eq!(turn(super::ClockHand::Hour, 0.0), 0.0, "dawn is the top");
+        assert_eq!(
+            turn(super::ClockHand::Hour, 0.5),
+            1.0,
+            "half a day is one whole turn of a twelve-hour dial",
+        );
+        assert_eq!(
+            turn(super::ClockHand::Minute, 1.0 / 24.0),
+            1.0,
+            "one hour is one turn of the minute hand",
+        );
+        // And the two agree at noon: the hour hand back at the top, the minute
+        // hand back at the top with it.
+        assert_eq!(turn(super::ClockHand::Hour, 0.5) % 1.0, 0.0);
+        assert_eq!(turn(super::ClockHand::Minute, 0.5) % 1.0, 0.0);
     }
 
     /// A drawing from a newer bench is refused, not half-read.

@@ -4,6 +4,7 @@
     { "mark": "door", "ramp": "cloth-green", "shade": 0.6 },
     { "mark": "sleep", "ramp": "cloth-blue", "shade": 0.7 },
     { "mark": "table", "ramp": "wood", "shade": 0.6 },
-    { "mark": "pallet", "ramp": "cloth-gold", "shade": 0.7, "size": [1.0, 1.0, 1.0] }
+    { "mark": "pallet", "ramp": "cloth-gold", "shade": 0.7, "size": [1.0, 1.0, 1.0] },
+    { "mark": "clock", "ramp": "bone", "shade": 0.85 }
   ]
 }

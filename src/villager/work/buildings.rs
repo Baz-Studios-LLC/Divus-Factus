@@ -587,6 +587,32 @@ pub struct Blueprint {
 impl Blueprint {
     pub fn roll(kind: BuildingKind, rng: &mut Rng) -> Blueprint {
         let mut plan = Self::rolled(kind, rng);
+
+        // A CARRIED-IN BUILDING BRINGS ITS OWN FOOTPRINT, whatever its kind.
+        //
+        // The arms below each carry a footprint of their own, from the days
+        // when the village drew its own buildings out of boxes - and only the
+        // HOUSE arm ever asked the drawing. So a storehouse authored 6.4 by
+        // 10.6 was placed, terraced and cleared as though it were 2.8 by 1.6:
+        // the pad was a fifth of the building, one end of a twenty-metre shed
+        // hung in the air while the other buried itself in the hill, and the
+        // trees were cleared to a radius that did not reach its porches.
+        // Brett: "The store house didn't clear its own foot print correctly"
+        // and "One side is burried and the other side is floating".
+        //
+        // Asked HERE, once, rather than in each of eighteen arms - so a kind
+        // added tomorrow gets it for nothing, and a maker who bakes a bigger
+        // drawing gets a bigger pad without anybody editing a constant. Brett:
+        // "Couldnt the clearing and leveling size be pulled form the bake
+        // itself so that when I put a new bake in it just works?"
+        //
+        // The arms' own numbers stay as the answer for a kind nobody has
+        // drawn yet, which is most of them.
+        if let Some(carried) = super::baked::drawing_at(kind, plan.plan) {
+            plan.half_w = carried.half_w;
+            plan.half_d = carried.half_d;
+        }
+
         // A coin for which way round it stands, thrown for every kind so the
         // dice fall the same way whatever is being built - and thrown last, so
         // that adding it did not move any of the rolls that came before.
@@ -1987,7 +2013,9 @@ pub(crate) fn raise_the_founding_hall(
     }
     // And its beds, its table, its doors - out of the maker's own marks.
     match super::baked::drawing_of(BuildingKind::Longhouse, plan.plan, &plan.drawing) {
-        Some(work) => super::baked::furnish_baked(commands, hall, work, plan.mirrored),
+        Some(work) => {
+            super::baked::furnish_baked(commands, meshes, materials, hall, work, plan.mirrored)
+        }
         None => {
             commands.entity(hall).insert(Shell {
                 half_w: plan.half_w,
@@ -4796,6 +4824,36 @@ mod tests {
     /// something unrelated to come along and redraw it. The mine's reach was
     /// guessed at the call site while its crown stands past three times the
     /// guess.
+    /// A carried-in building is placed at the size it was DRAWN, whatever
+    /// its kind.
+    ///
+    /// The pad and the tree-clearing are both sized from the blueprint, and
+    /// every arm but the house's carried a footprint from the days the village
+    /// drew its own buildings. An authored storehouse of 6.4 by 10.6 was
+    /// terraced as 2.8 by 1.6 - a fifth of the building - so one end of it hung
+    /// in the air and the other buried itself. This fails the moment a kind
+    /// stops asking the drawing.
+    #[test]
+    fn a_drawn_building_is_placed_at_the_size_it_was_drawn() {
+        for kind in BuildingKind::every() {
+            let Some(drawn) = super::super::baked::drawing_at(*kind, 0) else {
+                // Nobody has drawn this kind; its own numbers stand.
+                continue;
+            };
+            let mut rng = crate::rng::Rng::new(9);
+            let plan = Blueprint::roll(*kind, &mut rng);
+            assert!(
+                (plan.half_w - drawn.half_w).abs() < 1e-4
+                    && (plan.half_d - drawn.half_d).abs() < 1e-4,
+                "a {kind:?} is drawn {} by {} and would be built {} by {}",
+                drawn.half_w,
+                drawn.half_d,
+                plan.half_w,
+                plan.half_d,
+            );
+        }
+    }
+
     #[test]
     fn a_mine_redraws_every_metre_it_moves() {
         let land = Terrain::new(31);
