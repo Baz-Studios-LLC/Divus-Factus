@@ -42,7 +42,6 @@ impl Plugin for UiPlugin {
                 (
                     spawn_toast_shelf,
                     spawn_prayer_shelf,
-                    spawn_frost_glass,
                     load_fonts,
                     spawn_date_card,
                 ),
@@ -62,7 +61,7 @@ impl Plugin for UiPlugin {
                     // The frosted glass and the standing-down shelves: one
                     // subject - the book owning the screen. The glass
                     // follows the god's own stance after the frost decides.
-                    (frost_the_world, frost_glass_follows, hud_stands_down).chain(),
+                    (frost_the_world, hud_stands_down).chain(),
                     age_toasts,
                     style_buttons,
                     drag_windows,
@@ -2828,177 +2827,68 @@ mod tests {
     }
 }
 
-/// The frosted glass: while the book is open, the world behind it blurs
-/// heavily — alive in motion, unreadable in detail, so nothing fights the
-/// text. Brett: "can we apply a heavy blur to the game world when the menu
-/// is open?" Done with the renderer's own depth of field, focus pulled to
-/// the god's nose and the aperture thrown wide.
-/// The pane of frosted glass the book lies on: a fullscreen picture of
-/// the small live painting the frost camera makes.
-#[derive(Component)]
-pub(crate) struct FrostPane;
-
-/// The little camera that paints the world onto the glass while the book
-/// is open.
-#[derive(Component)]
-pub(crate) struct FrostCamera;
-
 /// Marks the god camera while its own eyes are closed for reading.
 #[derive(Component)]
 pub(crate) struct Frosted;
 
-/// The glass's grain: the world is painted this small and stretched over
-/// the whole window, so the frost is enormous and costs almost nothing.
-const FROST_FACE: (u32, u32) = (480, 270);
-
-/// Raises the frost rig once: the glass texture, the sleeping camera that
-/// paints it, and the fullscreen pane that shows it under the book.
-pub(crate) fn spawn_frost_glass(
-    mut commands: Commands,
-    mut images: ResMut<Assets<Image>>,
-    look: Res<crate::render::LookSettings>,
-) {
-    let glass = images.add(bevy::image::Image::new_target_texture(
-        FROST_FACE.0,
-        FROST_FACE.1,
-        bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
-        None,
-    ));
-    commands.spawn((
-        Name::new("Frost Camera"),
-        FrostCamera,
-        Camera3d::default(),
-        Camera {
-            order: -5,
-            is_active: false,
-            ..default()
-        },
-        bevy::camera::RenderTarget::Image(glass.clone().into()),
-        // The glass wears the god camera's own look - HDR, the same
-        // tonemapper, the depth prepass the water reads - or its noon
-        // comes out as someone else's dusk. The grading is mirrored live
-        // in frost_glass_follows, since F8/F9 can retune it mid-game.
-        bevy::camera::Hdr,
-        bevy::core_pipeline::tonemapping::Tonemapping::TonyMcMapface,
-        bevy::core_pipeline::prepass::DepthPrepass,
-        bevy::render::view::ColorGrading::default(),
-        // At 270 rows this small blur is a huge one on the stretched
-        // glass, for a few dozen taps per tiny pixel.
-        bevy::post_process::dof::DepthOfField {
-            mode: bevy::post_process::dof::DepthOfFieldMode::Gaussian,
-            focal_distance: 0.05,
-            sensor_height: 0.01866,
-            aperture_f_stops: 0.008,
-            max_circle_of_confusion_diameter: look.frost,
-            max_depth: f32::INFINITY,
-        },
-        Transform::default(),
-        bevy::camera::visibility::RenderLayers::from_layers(&[0, crate::globe::GLOBE_LAYER]),
-    ));
-    commands.spawn((
-        FrostPane,
-        Name::new("Frost Pane"),
-        bevy::ui::widget::ImageNode::new(glass).with_mode(bevy::ui::widget::NodeImageMode::Stretch),
-        Node {
-            position_type: PositionType::Absolute,
-            left: px(0),
-            top: px(0),
-            width: percent(100),
-            height: percent(100),
-            display: Display::None,
-            ..default()
-        },
-        GlobalZIndex(-2),
-    ));
-}
-
-/// While the book is open the world goes behind frosted glass — and not
-/// by squinting: the god camera's own eyes close (its layers strip, so
-/// the window pass carries only the book), the frost camera paints the
-/// live world onto a palm-sized glass, and the pane stretches that glass
-/// across the window. Painted small, blurred wide, stretched huge: the
-/// world is colour and motion and nothing legible, at a fraction of the
-/// old full-resolution blur's price. Brett: "I want it super blurry" —
-/// "maybe we need to use another method?" This is that method.
+/// While the book is open the world behind it goes to frosted glass.
+///
+/// ASPECTUS DOES THIS NOW, in a pass of ours over the frame already drawn -
+/// see `render::aspectus`. What stood here before woke a second `Camera3d`
+/// that rendered the entire world again into a 480x270 image with a Gaussian
+/// depth-of-field, and stretched that image back over the window with a
+/// fullscreen UI quad. Painted small, blurred wide, stretched huge: a clever
+/// way to buy an enormous blur, whose cost was never the pixels - it was
+/// submitting every chunk, tree and villager to the GPU a second time for as
+/// long as the book stayed open. A second camera also had to be kept in step
+/// with the first, which is why it was adopted as its child and had its lens
+/// and grading copied by hand every frame.
+///
+/// Sixteen texture reads over the finished frame cost no geometry at all,
+/// nothing has to be kept in step with anything, and it blurs the real screen
+/// rather than a thumbnail of it.
 pub(crate) fn frost_the_world(
     mut commands: Commands,
     books: Query<&Visibility, With<crate::debug::village::VillagePanel>>,
+    look: Res<crate::render::LookSettings>,
+    windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
     gods: Query<(Entity, Has<Frosted>), With<crate::camera::GodCamera>>,
-    mut frost: Query<&mut Camera, With<FrostCamera>>,
-    mut panes: Query<&mut Node, With<FrostPane>>,
 ) {
     // DIVUS_FACTUS_FROST forces the glass on from boot, so the frost can
     // be photographed and judged without a hand to open the book.
     //
-    // The god camera keeps rendering the world UNDER the pane while the
-    // book is open. Its layers must never be stripped: the streamer and
-    // every other camera-keyed governor follow what the window's camera
-    // sees, and blinding it unloaded the world out from under the frost
-    // camera too — the glass showed nothing but clouds over the void.
+    // The god camera keeps rendering the world under the book while it is
+    // open. Its layers must never be stripped: the streamer and every other
+    // camera-keyed governor follow what the window's camera sees.
     let reading = books.iter().any(|v| *v != Visibility::Hidden)
         || std::env::var("DIVUS_FACTUS_FROST").is_ok();
+    let window = windows.iter().next();
+    let width = window.map_or(1920.0, |w| w.width().max(1.0));
+    let aspect = window.map_or(16.0 / 9.0, |w| w.width().max(1.0) / w.height().max(1.0));
     for (camera, frosted) in &gods {
-        if reading && !frosted {
-            commands.entity(camera).insert(Frosted);
-            for mut lens in &mut frost {
-                lens.is_active = true;
-            }
-            for mut pane in &mut panes {
-                pane.display = Display::Flex;
-            }
-        } else if !reading && frosted {
-            commands.entity(camera).remove::<Frosted>();
-            for mut lens in &mut frost {
-                lens.is_active = false;
-            }
-            for mut pane in &mut panes {
-                pane.display = Display::None;
-            }
-        }
-    }
-}
-
-/// The frost camera RIDES the god camera: adopted as its child with an
-/// identity transform, so propagation itself guarantees the two share an
-/// eye every frame. A hand-rolled position sync froze mid-flight once —
-/// the glass stared at the sea floor from under the world while the god
-/// flew on — and a child cannot be left behind. The lens is still copied
-/// by hand: projections do not inherit.
-pub(crate) fn frost_glass_follows(
-    mut commands: Commands,
-    gods: Query<
-        (
-            Entity,
-            &Projection,
-            Option<&bevy::render::view::ColorGrading>,
-        ),
-        (With<crate::camera::GodCamera>, Without<FrostCamera>),
-    >,
-    mut frost: Query<
-        (
-            Entity,
-            &mut Projection,
-            Option<&mut bevy::render::view::ColorGrading>,
-            Has<ChildOf>,
-        ),
-        (With<FrostCamera>, Without<crate::camera::GodCamera>),
-    >,
-) {
-    let Ok((god, lens, grading)) = gods.single() else {
-        return;
-    };
-    for (glass, mut glass_lens, glass_grading, adopted) in &mut frost {
-        if !adopted {
+        if reading {
+            // The look's own frost dial is in pixels (F6/F7); the pass wants a
+            // fraction of the screen's width, so one number means one smear
+            // whatever the window is doing.
             commands
-                .entity(glass)
-                .insert((ChildOf(god), Transform::IDENTITY));
-        }
-        *glass_lens = lens.clone();
-        // The god's grading carries the look's exposure and saturation;
-        // the glass wears the same or reads darker than the world it
-        // reflects.
-        if let (Some(grading), Some(mut glass_grading)) = (grading, glass_grading) {
-            *glass_grading = grading.clone();
+                .entity(camera)
+                .insert(crate::render::aspectus::Frost {
+                    strength: 1.0,
+                    radius: look.frost / width,
+                    aspect,
+                    _pad: 0.0,
+                });
+            if !frosted {
+                commands.entity(camera).insert(Frosted);
+            }
+        } else if frosted {
+            commands
+                .entity(camera)
+                .remove::<Frosted>()
+                // Taken off rather than left at zero strength: the pass runs
+                // whenever the component is there, and a shut book should not
+                // pay for a blur of nothing.
+                .remove::<crate::render::aspectus::Frost>();
         }
     }
 }

@@ -27,6 +27,8 @@ use bevy::render::render_resource::TextureFormat;
 use bevy::render::view::{ColorGrading, ColorGradingGlobal};
 use bevy::window::PrimaryWindow;
 
+pub mod aspectus;
+
 use crate::GameState;
 use crate::camera::{CameraRig, CameraStartupSet, GodCamera};
 use crate::palette;
@@ -35,7 +37,8 @@ pub struct RenderPlugin;
 
 impl Plugin for RenderPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<TitleLens>()
+        app.add_plugins(aspectus::AspectusPlugin)
+            .init_resource::<TitleLens>()
             .init_resource::<LookSettings>()
             .add_systems(Startup, setup_pipeline.after(CameraStartupSet))
             .add_systems(
@@ -428,12 +431,10 @@ fn apply_look_settings(
         With<GodCamera>,
     >,
     mut existing: Query<&mut DepthOfField, With<GodCamera>>,
-    mut glass: Query<&mut DepthOfField, (With<crate::ui::FrostCamera>, Without<GodCamera>)>,
 ) {
-    // The reading frost rides the same dials as the rest of the look.
-    for mut frost in &mut glass {
-        frost.max_circle_of_confusion_diameter = look.frost;
-    }
+    // `look.frost` still drives the reading blur, but it is Aspectus's pass
+    // that reads it now (`ui::frost_the_world`), not a second camera's depth
+    // of field - so there is nothing to set here.
     for (entity, rig, mut bloom, mut vignette, mut color_grading) in &mut effects {
         bloom.intensity = look.bloom;
         vignette.intensity = look.vignette;
