@@ -45,8 +45,19 @@ fn opaque() -> f32 {
 #[derive(serde::Deserialize, Clone)]
 pub struct Mark {
     pub mark: String,
+    /// The middle of its FOOT, not its centre - a stack grows upward off a
+    /// floor, so the floor is the part worth pinning.
     pub at: [f32; 3],
     pub yaw: f32,
+    /// Long, high and deep, for a mark that means a VOLUME rather than a
+    /// point: the room a maker has set aside for goods to stack in.
+    ///
+    /// Absent on every mark that means a place - a bed, a door, a table - and
+    /// absent on every drawing baked before Opificium could author one, which
+    /// is why it is optional rather than defaulted. A missing size is not a
+    /// size of zero; it means this mark was never about room.
+    #[serde(default)]
+    pub size: Option<[f32; 3]>,
 }
 
 /// One form of a building: the original, or one of its upgrades.
@@ -289,8 +300,20 @@ pub fn kinds_as_json() -> String {
 pub fn widgets_as_json() -> String {
     let marks: Vec<String> = MARKS_UNDERSTOOD
         .iter()
-        .map(|(mark, ramp, shade)| {
-            format!("    {{ \"mark\": \"{mark}\", \"ramp\": \"{ramp}\", \"shade\": {shade} }}")
+        .map(|(mark, ramp, shade, size)| {
+            // A size is written only where there is one. A mark that means a
+            // place must not arrive at the bench carrying a box for the maker
+            // to drag, and `"size": null` is not the same word as no word.
+            // `{:?}` rather than `{}` on the numbers: Rust prints an f32 of
+            // one as "1", and the contract is written as `[1.0, 1.0, 1.0]`.
+            // Both parse the same, and a file that differs from the agreement
+            // for no reason is a file somebody has to stop and think about.
+            let room = size.map_or(String::new(), |[long, high, deep]| {
+                format!(", \"size\": [{long:?}, {high:?}, {deep:?}]")
+            });
+            format!(
+                "    {{ \"mark\": \"{mark}\", \"ramp\": \"{ramp}\", \"shade\": {shade}{room} }}"
+            )
         })
         .collect();
     format!(
@@ -461,14 +484,41 @@ fn turned_away(work: &Baked) -> Option<String> {
 /// widgets file, the same way the palette is exported. Add a mark here, teach
 /// the reader below to act on it, re-run the export, and the bench offers it.
 /// That is the whole ceremony, and it cannot drift.
-pub(crate) const MARKS_UNDERSTOOD: &[(&str, &str, f32)] = &[
+pub(crate) const MARKS_UNDERSTOOD: &[Widget] = &[
     // A doorway: where a wall may be walked through.
-    ("door", "cloth-green", 0.6),
+    ("door", "cloth-green", 0.6, POINT),
     // A bed: one villager sleeps here, and a house holds as many as it has.
-    ("sleep", "cloth-blue", 0.7),
+    ("sleep", "cloth-blue", 0.7, POINT),
     // A table: where the household eats.
-    ("table", "wood", 0.6),
+    ("table", "wood", 0.6, POINT),
+    // A pallet: room set aside for goods to stack in, wherever the maker
+    // wants them under this roof.
+    //
+    // ONE WORD, NOT FIVE. Five - `pallet-timber`, `pallet-stone` and so on -
+    // was the first answer here, on the reasoning that a maker who has just
+    // drawn a doorway knows which corner the heavy things belong in. Brett's
+    // own example is what killed it: "if I have 6 pallets in a sotre house,
+    // maybe 2 food / 2 timber / 2 stone, but after the grainery is built it
+    // would be 3 timber and 3 stone". A pallet nailed to a word cannot do
+    // that. The room is room; what stands on it is the village's business and
+    // changes as the village does.
+    ("pallet", "cloth-gold", 0.7, ROOM),
 ];
+
+/// One word the bench may offer: its name, its ramp, its shade, and the size
+/// it is born at if it means a volume.
+pub(crate) type Widget = (&'static str, &'static str, f32, Option<[f32; 3]>);
+
+/// A mark that means a place. The bench draws it as a point.
+const POINT: Option<[f32; 3]> = None;
+
+/// A mark that means room to stack in, born a metre cubed.
+///
+/// A metre is the size of the piles the game already raises by hand: the
+/// stockpile columns in `raise_town_fixtures` stand about 0.88m square and up
+/// to 1.17m tall, the woodpile 1.3m. So a maker dragging one of these starts
+/// from something the eye already knows the size of, and sizes up from there.
+const ROOM: Option<[f32; 3]> = Some([1.0, 1.0, 1.0]);
 
 /// Says so when a drawing carries a word this game does not know.
 ///
@@ -1381,7 +1431,7 @@ mod tests {
     /// marks come out the wrong colour for reasons nobody can see.
     #[test]
     fn every_mark_paints_from_a_real_ramp() {
-        for (mark, ramp, shade) in super::MARKS_UNDERSTOOD {
+        for (mark, ramp, shade, size) in super::MARKS_UNDERSTOOD {
             assert!(
                 crate::palette::ramp_named(ramp).is_some(),
                 "the mark \"{mark}\" paints from \"{ramp}\", which is not a ramp the game has",
@@ -1390,6 +1440,16 @@ mod tests {
                 (0.0..=1.0).contains(shade),
                 "the mark \"{mark}\" asks for shade {shade}, outside the ramp",
             );
+            // A mark that means ROOM must be born with some. A size of zero
+            // would arrive at the bench as a box the maker cannot see or grab,
+            // and a size of nothing means "this is a place, not a volume" -
+            // two different words that must not be confused for one another.
+            if let Some([long, high, deep]) = size {
+                assert!(
+                    *long > 0.0 && *high > 0.0 && *deep > 0.0,
+                    "the mark \"{mark}\" means a volume but is born {long}x{high}x{deep}",
+                );
+            }
         }
     }
 

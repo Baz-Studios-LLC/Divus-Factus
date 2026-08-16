@@ -259,6 +259,28 @@ pub enum PileKind {
     Ore,
 }
 
+impl PileKind {
+    /// Every kind of goods a village stacks.
+    ///
+    /// ONE LIST, AND THE COMPILER GUARDS IT. Add a variant above and
+    /// `held_of` stops compiling until it is told how much of the new thing
+    /// the village has - and this list sits beside it so the two are updated
+    /// in one sitting. Everything downstream then works untouched: the
+    /// pallets are dealt among whichever kinds are actually held, so a new
+    /// kind simply joins the deal the first day somebody brings one home.
+    /// Brett: "Even if we add something new, the pallets should just work.
+    /// Minus the graphic that shows what they have of course."
+    pub const fn every() -> &'static [PileKind] {
+        &[
+            PileKind::Food,
+            PileKind::Timber,
+            PileKind::Stone,
+            PileKind::Clay,
+            PileKind::Ore,
+        ]
+    }
+}
+
 /// Marks a pile in the square as an inspectable face of the stockpile.
 #[derive(Component)]
 pub struct StorePile(pub PileKind);
@@ -391,21 +413,173 @@ pub(crate) fn shoulder_sack(
     commands.entity(carrier).insert(crate::creature::Laden);
 }
 
-/// Where a pile stands under the storehouse roof, and how many armloads
-/// carry it there. `None` for a kind this roof does not take.
-fn storehouse_seat(kind: PileKind, store: &Stockpile, granary_stands: bool) -> Option<(Vec3, u8)> {
+/// How many armloads of one kind stand in a cubic metre of authored room.
+///
+/// Not one number for all five: a cubic metre of firewood is more armloads
+/// than a cubic metre of ore, and the caps the game has always used already
+/// said so. These are exactly those caps read as densities - so a pallet drawn
+/// a metre cubed holds precisely what the hardcoded corner held, and anything
+/// larger holds proportionally more. The old numbers survive as the unit
+/// rather than being replaced by a guess.
+fn armloads_per_cubic_metre(kind: PileKind) -> f32 {
+    match kind {
+        PileKind::Timber => 24.0,
+        PileKind::Stone => 12.0,
+        PileKind::Clay => 8.0,
+        PileKind::Ore => 8.0,
+        // Food stacks two to an armload, hence half of the twenty-four.
+        PileKind::Food => 12.0,
+    }
+}
+
+/// Every pallet a drawing sets aside, in a settled order.
+///
+/// Sorted by where they stand rather than by the order they happen to sit in
+/// the file, so which goods land on which pallet cannot quietly change when a
+/// maker moves a mark up their list. The same drawing must furnish the same
+/// storehouse twice.
+fn pallets_of(drawn: Option<&super::baked::Baked>) -> Vec<(Vec3, f32)> {
+    let mut room: Vec<(Vec3, f32)> = drawn
+        .map(|work| {
+            work.marks
+                .iter()
+                .filter(|m| m.mark == "pallet")
+                .filter_map(|m| {
+                    let [long, high, deep] = m.size?;
+                    Some((Vec3::from(m.at), (long * high * deep).max(0.0)))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    room.sort_by(|a, b| a.0.x.total_cmp(&b.0.x).then(a.0.z.total_cmp(&b.0.z)));
+    room
+}
+
+fn held_of(kind: PileKind, store: &Stockpile) -> f32 {
+    match kind {
+        PileKind::Timber => store.timber,
+        PileKind::Stone => store.stone,
+        PileKind::Clay => store.clay,
+        PileKind::Ore => store.ore,
+        PileKind::Food => store.food(),
+    }
+}
+
+/// Which goods this roof is holding for the village right now.
+///
+/// The kinds with something in the pile - a pallet dealt to a kind the village
+/// has none of stands empty while the timber overflows beside it. Brett: "the
+/// pallets need to be flexible enough to except whatever the villagers put in
+/// them, like clay for example." So the answer is asked fresh every time the
+/// stores are rehoused: the day the miners bring back the first clay, clay is
+/// one of the kinds and the pallets are dealt again to include it.
+///
+/// Food only until a granary stands, and then never again.
+fn kinds_under_this_roof(store: &Stockpile, granary_stands: bool) -> Vec<PileKind> {
+    PileKind::every()
+        .iter()
+        .copied()
+        .filter(|kind| !(*kind == PileKind::Food && granary_stands))
+        .filter(|kind| held_of(*kind, store) > 0.0)
+        .collect()
+}
+
+/// The pallets this kind has been dealt, out of all the drawing offers.
+///
+/// Dealt round the table rather than sliced into blocks, so that when the
+/// number of kinds changes, every kind's share changes with it and no pallet
+/// is left standing empty. Brett: "if I have 6 pallets in a sotre house, maybe
+/// 2 food / 2 timber / 2 stone, but after the grainery is built it would be 3
+/// timber and 3 stone." Six pallets and three kinds deal two each; the granary
+/// takes the food away, and the same six deal three each to the two that
+/// remain. Any number of pallets works, and any number of kinds.
+fn dealt_to(kind: PileKind, kinds: &[PileKind], pallets: &[(Vec3, f32)]) -> Vec<(Vec3, f32)> {
+    let Some(seat) = kinds.iter().position(|k| *k == kind) else {
+        return Vec::new();
+    };
+    pallets
+        .iter()
+        .skip(seat)
+        .step_by(kinds.len().max(1))
+        .copied()
+        .collect()
+}
+
+/// Where a pile stands under the storehouse roof, and how many armloads carry
+/// it there. `None` for a kind this roof does not take.
+///
+/// THE MAKER'S ANSWER FIRST. Opificium can author `pallet` marks as VOLUMES -
+/// boxes dragged out to the room the drawing sets aside - and where a drawing
+/// offers any, both answers come from them: the seat from the pallet's foot,
+/// and the cap from how much room this kind was dealt. A storehouse drawn with
+/// more room holds more because it was drawn that way, not because a constant
+/// somewhere was raised.
+///
+/// Failing that, the four corners the game has always used. A drawing need
+/// place no pallets at all, and a village must not stop working because a
+/// drawing was incomplete.
+fn storehouse_seat(
+    kind: PileKind,
+    store: &Stockpile,
+    granary_stands: bool,
+    drawn: Option<&super::baked::Baked>,
+) -> Option<(Vec3, u8)> {
+    if kind == PileKind::Food && granary_stands {
+        return None;
+    }
+    let held = held_of(kind, store);
+    let pallets = pallets_of(drawn);
+    if !pallets.is_empty() {
+        let kinds = kinds_under_this_roof(store, granary_stands);
+        let mine = dealt_to(kind, &kinds, &pallets);
+        if let Some((seat, _)) = mine.first() {
+            // Every pallet dealt to this kind counts toward what it holds,
+            // though the stack stands on the first of them: the room is the
+            // room, whether it is one big pallet or three small ones.
+            let room: f32 = mine.iter().map(|(_, volume)| volume).sum();
+            let cap = room * armloads_per_cubic_metre(kind);
+            // A mark's `at` is the middle of its FOOT, which is where a stack
+            // starts, so it is the seat exactly as authored.
+            return Some((*seat, (held.min(cap).max(0.0) as u8).max(1)));
+        }
+    }
+
     Some(match kind {
         PileKind::Timber => (Vec3::new(-0.9, 0.0, 0.5), store.timber.min(24.0) as u8),
         PileKind::Stone => (Vec3::new(0.9, 0.0, -0.5), store.stone.min(12.0) as u8),
         PileKind::Clay => (Vec3::new(-0.9, 0.0, -0.5), store.clay.min(8.0) as u8),
         PileKind::Ore => (Vec3::new(0.9, 0.0, 0.5), store.ore.min(8.0) as u8),
         // Food shelters here too, until a granary stands.
-        PileKind::Food if !granary_stands => (
+        PileKind::Food => (
             Vec3::new(0.0, 0.0, 0.9),
             ((store.food().min(24.0) / 2.0).ceil() as u8).max(1),
         ),
-        PileKind::Food => return None,
     })
+}
+
+/// Where the food sits under the granary roof, and how many sacks carry it.
+///
+/// FOOD HAS TWO HOMES. It shelters in the storehouse until a granary stands
+/// and moves the day one does - so both buildings may offer pallets, and both
+/// are asked the same way. A granary holds one thing, so every pallet it
+/// offers is the food's.
+fn granary_seat(store: &Stockpile, drawn: Option<&super::baked::Baked>) -> (Vec3, u8) {
+    let pallets = pallets_of(drawn);
+    if let Some((seat, _)) = pallets.first() {
+        let room: f32 = pallets.iter().map(|(_, volume)| volume).sum();
+        let cap = room * armloads_per_cubic_metre(PileKind::Food);
+        return (*seat, (store.food().min(cap).max(0.0) as u8).max(1));
+    }
+    (
+        Vec3::new(0.0, 0.0, 0.4),
+        ((store.food().min(24.0) / 2.0).ceil() as u8).max(1),
+    )
+}
+
+/// The drawing a standing building follows, for reading its marks.
+fn drawing_for(kind: BuildingKind, plan: Option<&super::buildings::Blueprint>) -> Option<&'static super::baked::Baked> {
+    let plan = plan?;
+    super::baked::drawing_of(kind, plan.plan, &plan.drawing)
 }
 
 /// When the storehouse rises, the village carries its piles in under the
@@ -423,8 +597,21 @@ pub(crate) fn stores_move_indoors(
     mut commands: Commands,
     stores: Query<&Stockpile>,
     mut notices: MessageWriter<crate::ui::Notice>,
-    new_buildings: Query<(&Transform, &Building, &crate::villager::MemberOf), Added<Building>>,
-    standing: Query<(&Transform, &Building, &crate::villager::MemberOf)>,
+    new_buildings: Query<
+        (
+            &Transform,
+            &Building,
+            &crate::villager::MemberOf,
+            Option<&super::buildings::Blueprint>,
+        ),
+        Added<Building>,
+    >,
+    standing: Query<(
+        &Transform,
+        &Building,
+        &crate::villager::MemberOf,
+        Option<&super::buildings::Blueprint>,
+    )>,
     piles: Query<(Entity, &StorePile, &crate::villager::MemberOf), Without<Rehouse>>,
     late_piles: Query<
         (Entity, &StorePile, &crate::villager::MemberOf),
@@ -439,18 +626,23 @@ pub(crate) fn stores_move_indoors(
         };
         let granary_stands = standing
             .iter()
-            .any(|(_, b, m)| b.kind == BuildingKind::Granary && m.0 == town);
+            .any(|(_, b, m, _)| b.kind == BuildingKind::Granary && m.0 == town);
         let shelter = if kind.0 == PileKind::Food && granary_stands {
             standing
                 .iter()
-                .find(|(_, b, m)| b.kind == BuildingKind::Granary && m.0 == town)
-                .map(|(at, ..)| (*at, Vec3::new(0.0, 0.0, 0.4), 1u8))
+                .find(|(_, b, m, _)| b.kind == BuildingKind::Granary && m.0 == town)
+                .map(|(at, _, _, plan)| {
+                    let (local, goal) =
+                        granary_seat(store, drawing_for(BuildingKind::Granary, plan));
+                    (*at, local, goal)
+                })
         } else {
             standing
                 .iter()
-                .find(|(_, b, m)| b.kind == BuildingKind::Storehouse && m.0 == town)
-                .and_then(|(at, ..)| {
-                    storehouse_seat(kind.0, store, granary_stands)
+                .find(|(_, b, m, _)| b.kind == BuildingKind::Storehouse && m.0 == town)
+                .and_then(|(at, _, _, plan)| {
+                    let drawn = drawing_for(BuildingKind::Storehouse, plan);
+                    storehouse_seat(kind.0, store, granary_stands, drawn)
                         .map(|(local, goal)| (*at, local, goal))
                 })
         };
@@ -464,7 +656,7 @@ pub(crate) fn stores_move_indoors(
         }
     }
 
-    for (at, building, owner) in &new_buildings {
+    for (at, building, owner, plan) in &new_buildings {
         // A storehouse shelters its OWN town's piles. Without this, the first
         // colony to raise one would have reorganised the mother town's square
         // from across the map.
@@ -476,12 +668,15 @@ pub(crate) fn stores_move_indoors(
             BuildingKind::Storehouse => {
                 let granary_stands = standing
                     .iter()
-                    .any(|(_, b, m)| b.kind == BuildingKind::Granary && m.0 == town);
+                    .any(|(_, b, m, _)| b.kind == BuildingKind::Granary && m.0 == town);
+                let drawn = drawing_for(BuildingKind::Storehouse, plan);
                 for (pile, kind, pile_owner) in &piles {
                     if pile_owner.0 != town {
                         continue;
                     }
-                    let Some((local, goal)) = storehouse_seat(kind.0, store, granary_stands) else {
+                    let Some((local, goal)) =
+                        storehouse_seat(kind.0, store, granary_stands, drawn)
+                    else {
                         continue;
                     };
                     commands.entity(pile).insert(Rehouse {
@@ -496,15 +691,18 @@ pub(crate) fn stores_move_indoors(
                 ));
             }
             BuildingKind::Granary => {
+                let (local, goal) = granary_seat(store, drawing_for(BuildingKind::Granary, plan));
                 for (pile, kind, pile_owner) in &piles {
                     if pile_owner.0 != town || kind.0 != PileKind::Food {
                         continue;
                     }
+                    // The food leaves whatever storehouse pallet it was on and
+                    // walks to the granary's - the same haul, to a new seat.
                     commands.entity(pile).insert(Rehouse {
-                        to: at.translation + at.rotation * Vec3::new(0.0, 0.0, 0.4),
+                        to: at.translation + at.rotation * local,
                         to_rot: at.rotation,
                         hauled: 0,
-                        goal: ((store.food().min(24.0) / 2.0).ceil() as u8).max(1),
+                        goal: goal.max(1),
                     });
                 }
                 notices.write(crate::ui::Notice::new(
@@ -1204,6 +1402,83 @@ pub(crate) fn log_stores(
 
 #[cfg(test)]
 mod tests {
+
+    /// Six pallets and three kinds deal two each; take the food away and the
+    /// same six deal three each to the two that remain.
+    ///
+    /// Brett's own scenario, and the reason a pallet carries no kind in its
+    /// name: "if I have 6 pallets in a sotre house, maybe 2 food / 2 timber /
+    /// 2 stone, but after the grainery is built it would be 3 timber and 3
+    /// stone." A pallet nailed to a word by its name could not do this.
+    #[test]
+    fn pallets_are_dealt_again_when_the_granary_takes_the_food() {
+        let pallets: Vec<(Vec3, f32)> = (0..6)
+            .map(|i| (Vec3::new(i as f32, 0.0, 0.0), 1.0))
+            .collect();
+
+        let with_food = vec![PileKind::Timber, PileKind::Stone, PileKind::Food];
+        for kind in &with_food {
+            assert_eq!(
+                dealt_to(*kind, &with_food, &pallets).len(),
+                2,
+                "three kinds share six pallets two apiece",
+            );
+        }
+
+        let after = vec![PileKind::Timber, PileKind::Stone];
+        for kind in &after {
+            assert_eq!(
+                dealt_to(*kind, &after, &pallets).len(),
+                3,
+                "the granary takes the food, and the same six pallets deal three each",
+            );
+        }
+    }
+
+    /// A kind nobody has any of is dealt nothing, so its pallets go to the
+    /// goods that exist. The day the first clay comes home it joins the deal.
+    #[test]
+    fn a_kind_joins_the_deal_the_day_the_village_has_any() {
+        let mut store = Stockpile::default();
+        store.timber = 10.0;
+        assert_eq!(
+            kinds_under_this_roof(&store, false),
+            vec![PileKind::Timber],
+            "only what the village actually holds gets room",
+        );
+        store.clay = 3.0;
+        let kinds = kinds_under_this_roof(&store, false);
+        assert!(
+            kinds.contains(&PileKind::Clay),
+            "the first clay home earns the clay a pallet, with nothing changed to allow it",
+        );
+    }
+
+    /// A drawing with no pallets keeps the corners the game has always used.
+    /// A half-furnished storehouse must still store things.
+    #[test]
+    fn a_storehouse_with_no_pallets_drawn_still_stores() {
+        let mut store = Stockpile::default();
+        store.timber = 10.0;
+        let (seat, goal) =
+            storehouse_seat(PileKind::Timber, &store, false, None).expect("timber has a seat");
+        assert_eq!(seat, Vec3::new(-0.9, 0.0, 0.5));
+        assert_eq!(goal, 10, "ten timber, ten armloads");
+    }
+
+    /// Every kind of goods is in `PileKind::every()`. The list is what the
+    /// pallets are dealt among, so a kind missing from it would be a kind that
+    /// silently never gets room - and `held_of`'s match is what makes the
+    /// compiler insist the two are updated together.
+    #[test]
+    fn every_kind_of_goods_can_be_held() {
+        let store = Stockpile::default();
+        for kind in PileKind::every() {
+            let _ = held_of(*kind, &store);
+        }
+        assert_eq!(PileKind::every().len(), 5);
+    }
+
     use super::*;
     use bevy::ecs::system::RunSystemOnce;
 

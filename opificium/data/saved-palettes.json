@@ -1,0 +1,22 @@
+{
+  "format": 1,
+  "palettes": [
+    {
+      "name": "set-1",
+      "colours": [
+        {
+          "ramp": "bone",
+          "shade": 1.0
+        },
+        {
+          "ramp": "cloth-sable",
+          "shade": 0.25
+        },
+        {
+          "ramp": "stone",
+          "shade": 0.75
+        }
+      ]
+    }
+  ]
+}
