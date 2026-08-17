@@ -2239,16 +2239,17 @@ pub(crate) fn spawn_settlement(
     let mut wildlife_rng = Rng::stream(world_seed.0 as u64, "wildlife");
     let flocks = if restoring.is_some() { 0 } else { 18 };
     for flock in 0..flocks {
-        let species = *wildlife_rng.pick(&[
-            Species::Deer,
-            Species::Deer,
-            Species::Deer,
-            Species::Deer,
-            Species::Boar,
-            Species::Boar,
-            Species::Wolf,
-        ]);
-        let (nearest, reach) = founding_flock_range(species, flock);
+        // WHICH BEASTS THESE ARE IS THE COUNTRY'S BUSINESS. The ground is
+        // found first and the animal chosen from what lives there, rather
+        // than the other way about - so a flock that lands in conifer forest
+        // is a northern one and a flock in the reeds is boar. One list for
+        // the whole planet put the same herd on the ice cap and in the
+        // desert. See `wildlife::beasts_of`.
+        //
+        // The range is asked for with a placeholder species and the real one
+        // chosen after, because the range is about how far a FLOCK sits from
+        // a new village, not about what it is.
+        let (nearest, reach) = founding_flock_range(Species::Deer, flock);
         let Some(position) = crate::creature::random_walkable_ring(
             &terrain,
             &mut wildlife_rng,
@@ -2258,6 +2259,9 @@ pub(crate) fn spawn_settlement(
         ) else {
             continue;
         };
+        let species = *wildlife_rng.pick(crate::creature::wildlife::beasts_of(
+            terrain.biome_at(position.x, position.z),
+        ));
         let genome = CreatureGenome::random(species, &mut wildlife_rng);
         let entity = spawn_creature(
             &mut commands,

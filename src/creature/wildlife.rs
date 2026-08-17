@@ -12,6 +12,41 @@
 //! hunt near the settlement becomes the hunters' quarry in turn; a famine
 //! year for deer is a famine year for everyone.
 
+/// Which beasts belong in a country, as weighted choices.
+///
+/// The wilderness used to be one list for the whole planet - four deer, two
+/// boar and a wolf, dealt out around the founding site whatever the country
+/// was. So the same animals grazed the ice cap and the desert, and a biome
+/// was a color of ground with the same herd standing on it. Brett: "I would
+/// like the biomes to feel more like biomes. Bespoke fauna and scatter."
+///
+/// Weighted rather than exclusive, and every biome keeps SOMETHING to hunt:
+/// a village founded anywhere must be able to eat, so the arid country is
+/// thin rather than empty. See [`crate::villager`]'s founding flocks.
+///
+/// Repeats are the weight - a slice with three deer in it is a country three
+/// times as likely to turn up deer as one with a single entry.
+pub fn beasts_of(biome: crate::terrain::Biome) -> &'static [crate::creature::genome::Species] {
+    use crate::creature::genome::Species::*;
+    use crate::terrain::Biome;
+    match biome {
+        // Mixed woodland: the full company, and the one country where the
+        // wolf is at home rather than passing through.
+        Biome::Temperate => &[Deer, Deer, Deer, Boar, Boar, Wolf],
+        // Cold conifer: wolves keep the north, and the deer that winter there
+        // are worth the trouble. No boar - they root, and the ground is iron.
+        Biome::Boreal => &[Deer, Deer, Wolf, Wolf],
+        // Dry scrub: thin country. Something to hunt, but a village founded
+        // here will feel it.
+        Biome::Arid => &[Deer, Boar],
+        // Damp and dense: boar country, where the rooting is good and the
+        // cover is thick.
+        Biome::Wetland => &[Boar, Boar, Boar, Deer, Wolf],
+        // Above the treeline there is little to graze, so little to hunt it.
+        Biome::Alpine => &[Deer, Wolf],
+    }
+}
+
 use bevy::prelude::*;
 
 use super::anim::CreatureMotion;
@@ -606,6 +641,62 @@ pub(super) fn wolves_stalk(
             }
         }
         wild.hunger = (wild.hunger - dt * 0.1).max(0.0);
+    }
+}
+
+#[cfg(test)]
+mod biome_tests {
+    use super::beasts_of;
+    use crate::creature::genome::Species;
+    use crate::terrain::Biome;
+
+    const EVERY: [Biome; 5] = [
+        Biome::Temperate,
+        Biome::Boreal,
+        Biome::Arid,
+        Biome::Wetland,
+        Biome::Alpine,
+    ];
+
+    /// Every country has something to hunt.
+    ///
+    /// A village may be founded anywhere, and a village that cannot eat is a
+    /// bug rather than a difficulty - so thin country is thin, never empty.
+    #[test]
+    fn every_country_keeps_something_to_hunt() {
+        for biome in EVERY {
+            let beasts = beasts_of(biome);
+            assert!(!beasts.is_empty(), "{biome:?} has no living thing in it");
+            assert!(
+                beasts.iter().any(|s| matches!(s, Species::Deer | Species::Boar)),
+                "{biome:?} has predators and nothing for them or a hunter to \
+                 take - a village founded there would starve",
+            );
+        }
+    }
+
+    /// And no country is only predators, or only one animal everywhere.
+    #[test]
+    fn the_countries_are_not_all_the_same_wilderness() {
+        let mut seen: Vec<Vec<Species>> = Vec::new();
+        for biome in EVERY {
+            let mut kinds: Vec<Species> = beasts_of(biome).to_vec();
+            kinds.sort_by_key(|s| format!("{s:?}"));
+            kinds.dedup();
+            seen.push(kinds);
+        }
+        assert!(
+            seen.iter().any(|a| seen.iter().any(|b| a != b)),
+            "every biome draws from the same animals, which is the thing this \
+             replaced",
+        );
+        // Wetland is boar country and boreal is not: the one distinction the
+        // table exists to make.
+        assert!(
+            beasts_of(Biome::Wetland).iter().filter(|s| **s == Species::Boar).count()
+                > beasts_of(Biome::Boreal).iter().filter(|s| **s == Species::Boar).count(),
+            "the reeds should root with more boar than the frozen north",
+        );
     }
 }
 
