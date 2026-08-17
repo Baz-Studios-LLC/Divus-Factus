@@ -281,6 +281,74 @@ impl PileKind {
     }
 }
 
+/// The pallets a housed pile was dealt, as offsets from the pile's own seat.
+///
+/// A pile stands on the FIRST pallet it was dealt and spills onto the rest as
+/// it grows. Brett: "Its okay if it fills more than one wood pallet or more
+/// than one stone pallet." The offsets are local to the pile, because the pile
+/// itself is moved to the first seat and its pieces are its children.
+#[derive(Component, Clone, Default)]
+pub struct Stacked {
+    /// Offset from the pile's seat, and the room that pallet holds.
+    pub seats: Vec<(Vec3, Vec3)>,
+}
+
+/// How the pieces of one kind stack: the size of a piece, and how it is laid.
+///
+/// A log lies along the pallet and a block sits square on it, so the two fill
+/// a box differently. Read off the meshes the piles are built from.
+fn piece_of(kind: PileKind) -> Vec3 {
+    match kind {
+        PileKind::Timber => Vec3::new(1.3, 0.21, 0.26),
+        PileKind::Stone => Vec3::new(0.46, 0.35, 0.46),
+        PileKind::Clay => Vec3::new(0.46, 0.24, 0.32),
+        PileKind::Ore => Vec3::new(0.42, 0.3, 0.42),
+        PileKind::Food => Vec3::new(0.44, 0.36, 0.44),
+    }
+}
+
+/// Where the nth piece of a kind stands, given the pallets it was dealt.
+///
+/// Fills one pallet before starting the next, in rows across and then layers
+/// up, so a stack grows the way a person would build it: a floor's worth
+/// first, then another on top, then the next pallet along.
+pub fn piece_seat(kind: PileKind, index: u16, stacked: &Stacked) -> Option<(Vec3, bool)> {
+    let piece = piece_of(kind);
+    let mut left = index as u32;
+    for (offset, room) in &stacked.seats {
+        // How many fit this pallet, by its drawn box rather than by any
+        // number written here: the maker sized the room, and the room says
+        // how much stands in it.
+        let across = (room.x / piece.x).floor().max(1.0) as u32;
+        let deep = (room.z / piece.z).floor().max(1.0) as u32;
+        let high = (room.y / piece.y).floor().max(1.0) as u32;
+        let per_layer = across * deep;
+        let holds = per_layer * high;
+        if left >= holds {
+            left -= holds;
+            continue;
+        }
+        let layer = left / per_layer;
+        let within = left % per_layer;
+        let (col, row) = (within % across, within / across);
+        // Alternate the lie of each layer, the way a woodpile is actually
+        // built - it is what stops a tall stack reading as a solid brick.
+        let turned = layer % 2 == 1;
+        let (step_x, step_z) = if turned {
+            (piece.z, piece.x)
+        } else {
+            (piece.x, piece.z)
+        };
+        let spread = Vec3::new(
+            (col as f32 + 0.5) * step_x - room.x * 0.5,
+            (layer as f32 + 0.5) * piece.y,
+            (row as f32 + 0.5) * step_z - room.z * 0.5,
+        );
+        return Some((*offset + spread, turned));
+    }
+    None
+}
+
 /// Marks a pile in the square as an inspectable face of the stockpile.
 #[derive(Component)]
 pub struct StorePile(pub PileKind);
@@ -523,6 +591,7 @@ fn storehouse_seat(
     store: &Stockpile,
     granary_stands: bool,
     drawn: Option<&super::baked::Baked>,
+    dealt: &mut Stacked,
 ) -> Option<(Vec3, u8)> {
     if kind == PileKind::Food && granary_stands {
         return None;
@@ -533,6 +602,20 @@ fn storehouse_seat(
         let kinds = kinds_under_this_roof(store, granary_stands);
         let mine = dealt_to(kind, &kinds, &pallets);
         if let Some((seat, _)) = mine.first() {
+            // Kept for the stacking: the pile stands on the first pallet and
+            // spills onto the rest, so it has to know where the rest are.
+            *dealt = Stacked {
+                seats: mine
+                    .iter()
+                    .map(|(at, volume)| {
+                        // A cube of that volume is the box the maker drew,
+                        // near enough for stacking - the bake gives the room
+                        // and the room is what fills.
+                        let side = volume.max(0.001).cbrt();
+                        (*at - *seat, Vec3::splat(side))
+                    })
+                    .collect(),
+            };
             // Every pallet dealt to this kind counts toward what it holds,
             // though the stack stands on the first of them: the room is the
             // room, whether it is one big pallet or three small ones.
@@ -627,6 +710,7 @@ pub(crate) fn stores_move_indoors(
         let granary_stands = standing
             .iter()
             .any(|(_, b, m, _)| b.kind == BuildingKind::Granary && m.0 == town);
+        let mut dealt = Stacked::default();
         let shelter = if kind.0 == PileKind::Food && granary_stands {
             standing
                 .iter()
@@ -642,11 +726,12 @@ pub(crate) fn stores_move_indoors(
                 .find(|(_, b, m, _)| b.kind == BuildingKind::Storehouse && m.0 == town)
                 .and_then(|(at, _, _, plan)| {
                     let drawn = drawing_for(BuildingKind::Storehouse, plan);
-                    storehouse_seat(kind.0, store, granary_stands, drawn)
+                    storehouse_seat(kind.0, store, granary_stands, drawn, &mut dealt)
                         .map(|(local, goal)| (*at, local, goal))
                 })
         };
         if let Some((at, local, goal)) = shelter {
+            commands.entity(pile).insert(dealt.clone());
             commands.entity(pile).insert(Rehouse {
                 to: at.translation + at.rotation * local,
                 to_rot: at.rotation,
@@ -674,11 +759,13 @@ pub(crate) fn stores_move_indoors(
                     if pile_owner.0 != town {
                         continue;
                     }
+                    let mut dealt = Stacked::default();
                     let Some((local, goal)) =
-                        storehouse_seat(kind.0, store, granary_stands, drawn)
+                        storehouse_seat(kind.0, store, granary_stands, drawn, &mut dealt)
                     else {
                         continue;
                     };
+                    commands.entity(pile).insert(dealt);
                     commands.entity(pile).insert(Rehouse {
                         to: at.translation + at.rotation * local,
                         to_rot: at.rotation,
@@ -812,6 +899,67 @@ pub(crate) fn rehouse_stores(
                     commands.entity(carrier).insert(RehouseHauler(pile));
                     break;
                 }
+            }
+        }
+    }
+}
+
+/// Lays a housed pile's pieces out across the pallets it was dealt.
+///
+/// In the square a pile is a heap the village built itself, with its own
+/// hand-set arrangement. Under a roof the maker has drawn where the goods go
+/// and how much room they have, so the pieces stand where the drawing says -
+/// filling one pallet before starting the next, in rows and then layers.
+/// Brett: "Its okay if it fills more than one wood pallet or more than one
+/// stone pallet."
+///
+/// Runs only when the pallets change, which is when a pile is first housed
+/// and again whenever the deal changes under it - the day a granary takes the
+/// food away and its pallets are shared out afresh.
+#[allow(clippy::type_complexity)]
+pub(crate) fn stack_on_the_pallets(
+    piles: Query<(Entity, &StorePile, &Stacked), Changed<Stacked>>,
+    children: Query<&Children>,
+    mut pieces: Query<&mut Transform>,
+    logs: Query<&WoodpileLog>,
+    blocks: Query<&StonePileBlock>,
+    sacks: Query<&FoodSack>,
+    bricks: Query<&ClayPileBrick>,
+    chunks: Query<&OrePileChunk>,
+) {
+    for (pile, kind, stacked) in &piles {
+        if stacked.seats.is_empty() {
+            continue;
+        }
+        let Ok(kids) = children.get(pile) else {
+            continue;
+        };
+        for kid in kids.iter() {
+            // Whichever kind of piece this pile is made of, its index is what
+            // decides where it stands.
+            let index = logs
+                .get(kid)
+                .map(|p| p.0 as u16)
+                .or_else(|_| blocks.get(kid).map(|p| p.0 as u16))
+                .or_else(|_| sacks.get(kid).map(|p| p.0 as u16))
+                .or_else(|_| bricks.get(kid).map(|p| p.0 as u16))
+                .or_else(|_| chunks.get(kid).map(|p| p.0 as u16));
+            let Ok(index) = index else {
+                continue;
+            };
+            let Some((at, turned)) = piece_seat(kind.0, index, stacked) else {
+                // More pieces than the drawing has room for. They stay where
+                // they were and their own system keeps them hidden, because
+                // the goods that fit are the goods that show.
+                continue;
+            };
+            if let Ok(mut spot) = pieces.get_mut(kid) {
+                spot.translation = at;
+                spot.rotation = if turned {
+                    Quat::from_rotation_y(std::f32::consts::FRAC_PI_2)
+                } else {
+                    Quat::IDENTITY
+                };
             }
         }
     }
@@ -1403,6 +1551,69 @@ pub(crate) fn log_stores(
 #[cfg(test)]
 mod tests {
 
+    /// Goods fill one pallet before they start the next.
+    ///
+    /// Brett: "Its okay if it fills more than one wood pallet or more than one
+    /// stone pallet." A pallet holds what its DRAWN BOX holds - so how many
+    /// pieces spill onto the second pallet is a fact about the drawing, not a
+    /// number written here.
+    #[test]
+    fn a_pile_fills_one_pallet_before_it_starts_the_next() {
+        let stacked = Stacked {
+            seats: vec![
+                (Vec3::ZERO, Vec3::splat(1.0)),
+                (Vec3::new(3.0, 0.0, 0.0), Vec3::splat(1.0)),
+            ],
+        };
+        let (first, _) = piece_seat(PileKind::Stone, 0, &stacked).expect("a first block");
+        assert!(
+            first.x.abs() < 3.0,
+            "the first block stands on the first pallet",
+        );
+
+        // Walk up the indices until one lands on the second pallet, and check
+        // nothing skipped ahead to it before the first was full.
+        let mut moved_at = None;
+        for index in 0..200u16 {
+            let Some((at, _)) = piece_seat(PileKind::Stone, index, &stacked) else {
+                break;
+            };
+            if at.x > 1.5 && moved_at.is_none() {
+                moved_at = Some(index);
+            }
+            if let Some(when) = moved_at {
+                assert!(
+                    index >= when,
+                    "pieces must not go back to the first pallet once the second is started",
+                );
+            }
+        }
+        assert!(
+            moved_at.is_some(),
+            "enough blocks must eventually spill onto the second pallet",
+        );
+    }
+
+    /// A pallet holds what fits in it, and a bigger pallet holds more.
+    #[test]
+    fn a_bigger_pallet_holds_more() {
+        let small = Stacked {
+            seats: vec![(Vec3::ZERO, Vec3::splat(1.0))],
+        };
+        let large = Stacked {
+            seats: vec![(Vec3::ZERO, Vec3::splat(2.0))],
+        };
+        let holds = |stacked: &Stacked| {
+            (0..500u16)
+                .take_while(|i| piece_seat(PileKind::Stone, *i, stacked).is_some())
+                .count()
+        };
+        assert!(
+            holds(&large) > holds(&small),
+            "two metres cubed must hold more than one",
+        );
+    }
+
     /// Six pallets and three kinds deal two each; take the food away and the
     /// same six deal three each to the two that remain.
     ///
@@ -1461,7 +1672,8 @@ mod tests {
         let mut store = Stockpile::default();
         store.timber = 10.0;
         let (seat, goal) =
-            storehouse_seat(PileKind::Timber, &store, false, None).expect("timber has a seat");
+            storehouse_seat(PileKind::Timber, &store, false, None, &mut Stacked::default())
+                .expect("timber has a seat");
         assert_eq!(seat, Vec3::new(-0.9, 0.0, 0.5));
         assert_eq!(goal, 10, "ten timber, ten armloads");
     }
