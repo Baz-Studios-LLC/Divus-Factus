@@ -1,38 +1,56 @@
-## The goblins keep camps
+## The dead stay dead, and the village has to deal with them
 
-They were a band of green figures standing near each other, which from any
-distance reads as scattered wildlife. Now they keep a place:
+A body used to quietly rot away where it fell, like a deer. It does not any
+more — and it turns out the village already knew what to do about it. Mourners
+gather, a bearer shoulders the body, and it is carried out past the fields to
+a resting ground where a headstone keeps the name and the whole life that
+ended under it.
 
-- **A fire**, built from the ground up — a ring of stones, ash, and logs leaning
-  into the middle. It burns, so a camp is worth spotting from a ridge after dark.
-- **A hut or two**, hide stretched over crossed poles.
-- **A lookout tower**, and it is the piece that says what a camp is for. A fire
-  says somebody lives here; a tower says they are watching for you.
+**All of that was written long ago and had never once run.** It was waiting on
+a body that was both a corpse and a villager at the same time, which is a thing
+this game cannot produce. So funerals are new to you even though the code is
+old.
 
-Nothing in a camp is plumb. The village builds square, so every leaning post is
-saying *these are not villagers* without a word of it being written down.
+## People have a grain now, and it passes to their children
 
-## And the village notices
+Every villager carries five things about who they are: how bold they are, how
+sharp, how warm toward other people, how badly they want their god to notice
+them — and what they are capable of when it costs somebody else.
 
-Seeing goblins frightens people, and a frightened village builds differently.
+- **Children inherit it.** They sit between their parents with a little wander,
+  so a family stays recognisably itself down the generations — and once in a
+  while a child is nothing like either of them.
+- **They inherit the grain, not the scars.** A man hardened by two bad winters
+  fathers the gentle boy he once was.
+- **And a life bends a person.** What you do to your people changes them — but
+  only so far. A gentle soul ground down by a terrible god ends up hard, never
+  monstrous. The monstrous have to be born, and they are rare.
 
-- **A scout who lays eyes on a camp brings the fright home**, and it spreads the
-  way every other story does — so a camp nobody has found frightens nobody, and
-  one bad ridge changes the whole season's work.
-- **The armory**: a new building, stone and dear, that only a village properly
-  frightened will raise. An ordinary wolf year never gets near it.
-- **And an armory changes the muster.** A watchtower means somebody watches — one
-  spear, and the fright is handled. An armory means the village has decided the
-  thing out there is not going away, and it keeps dealing spears for as long as
-  people are still afraid.
+## Whether a village holds together is about the god it has seen
 
-A wolf is a bad week. A camp of goblins is a war, and the village works out the
-difference on its own: one mauling frightens the one it happened to, and a camp
-frightens everybody who has seen it.
+A starving village with a body in front of it faces a question, and the answer
+is not the same in every village.
 
-## Goblins dress themselves
+- **A god who has healed and provided** is a reason to hold, and they hold —
+  even starving.
+- **A god who has smitten and thrown people** has taught them something else,
+  and they break earlier, and without much agony about it.
+- **A god who has never done anything at all** is the worst of the three.
+  Nothing has been demonstrated, so nothing is forbidden, and hunger is the
+  only argument in the room.
 
-Three cuts instead of one, because a camp in identical dress reads as one goblin
-printed four times: the loincloth, a hide slung over one shoulder, and a briefer
-cut worn by the males. The ears tilt differently on each of them too — some
-pricked up, some level, some drooping.
+Most people would never, whatever is done to them, and that is the point —
+what a village does in its worst winter is the doing of a very few. Except for
+one case: **somebody simple and devout, under a violent god, may do a terrible
+thing believing it is what their god wants.** They are not wicked. They are
+agreeing.
+
+## Elsewhere
+
+- **Guards fight anything hostile**, not only wolves — they would previously
+  watch a goblin drag somebody off.
+- **The village tells you what it did, and who saw**: "Greifei ate Pramel,
+  6 people saw her do it." A deed nobody witnessed says so, because that is a
+  different event.
+- Goblin sightings now reach the notices too, instead of the first news of a
+  camp being an armory going up.
