@@ -1588,10 +1588,27 @@ pub(crate) fn surface_color(
     let toward_the_pole = polarity.clamp(0.0, 1.0).powf(1.6);
     let snowline = EQUATOR_SNOW + (POLE_SNOW - EQUATOR_SNOW) * toward_the_pole + variation * 38.0;
     let snow = ((height - WATER_LEVEL - snowline) / 62.0).clamp(0.0, 1.0);
+
+    // AND SNOW LIES IN THE NORTH WHATEVER THE HEIGHT. The snowline is a rule
+    // about altitude, softened by latitude - which leaves conifer country
+    // below it looking like temperate woodland in a colder green. Brett:
+    // "boreal needs bespoke pine trees too. And snow."
+    //
+    // Patchy on purpose, and thickest where snow actually survives: lying in
+    // the flat and the hollows, thin on the steep faces where it slides and
+    // the sun reaches. A uniform white wash would read as a painted biome;
+    // this reads as ground with snow on it.
+    let cold_country = if biome == Biome::Boreal {
+        let lying = ((patch - 0.30) / 0.45).clamp(0.0, 1.0);
+        let shed = 1.0 - (slope / 0.35).clamp(0.0, 1.0);
+        (0.28 + lying * 0.55) * shed
+    } else {
+        0.0
+    };
     let composed = blend(
         with_rock,
         palette::shade_smooth(&palette::SNOW, 0.5 + shade_t * 0.5),
-        snow,
+        snow.max(cold_country),
     );
 
     // Banks last, over everything: bare earth at the water's edge, kept muted so
@@ -2481,6 +2498,47 @@ mod tests {
             }
         }
         println!("PROBE closest pair: {closest:.3}");
+
+        // And through the WHOLE surface, which is where the snow goes on.
+        println!("PROBE --- as actually drawn, ordinary flat ground:");
+        let mut drawn: Vec<(String, [f32; 3])> = Vec::new();
+        for (name, biome) in [
+            ("temperate", Biome::Temperate),
+            ("boreal", Biome::Boreal),
+            ("arid", Biome::Arid),
+            ("wetland", Biome::Wetland),
+            ("alpine", Biome::Alpine),
+        ] {
+            let c = surface_color(
+                WATER_LEVEL + 20.0,
+                0.06,
+                0.5,
+                0.5,
+                biome,
+                0.5,
+                0.55,
+                None,
+                0.5,
+            )
+            .to_linear();
+            drawn.push((name.to_string(), [c.red, c.green, c.blue]));
+            println!("PROBE {name:10} rgb {:.3} {:.3} {:.3}", c.red, c.green, c.blue);
+        }
+        let mut nearest = f32::MAX;
+        for i in 0..drawn.len() {
+            for j in (i + 1)..drawn.len() {
+                let (a, b) = (&drawn[i], &drawn[j]);
+                let d = ((a.1[0] - b.1[0]).powi(2)
+                    + (a.1[1] - b.1[1]).powi(2)
+                    + (a.1[2] - b.1[2]).powi(2))
+                .sqrt();
+                if d < 0.09 {
+                    println!("PROBE close: {:10} vs {:10} {d:.3}", a.0, b.0);
+                }
+                nearest = nearest.min(d);
+            }
+        }
+        println!("PROBE closest as drawn: {nearest:.3}");
     }
 
     #[test]

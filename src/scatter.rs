@@ -80,6 +80,8 @@ pub enum TreeKind {
     Palm,
     /// Dead: a bare trunk and a few broken branches.
     Snag,
+    /// Tall, narrow and dark, with snow lying on its branches. Boreal.
+    Pine,
     /// A column with an arm or two, green and ribbed. Desert only.
     Cactus,
     /// Low dry brush: a knot of sticks near the ground, going nowhere.
@@ -106,7 +108,12 @@ impl TreeKind {
         use TreeKind::*;
         match biome {
             Biome::Temperate => &[Broadleaf, Broadleaf, Conifer, Birch],
-            Biome::Boreal => &[Conifer, Conifer, Conifer, Snag],
+            // The north is pines, and they are its own tree rather than the
+            // conifer that also grows in temperate woodland - taller, narrower
+            // and carrying snow. Brett: "boreal needs bespoke pine trees too.
+            // And snow." A few plain conifers and a snag keep the stand from
+            // reading as a printed pattern.
+            Biome::Boreal => &[Pine, Pine, Pine, Pine, Conifer, Snag],
             // The desert is the one country whose plants are its own. Brett:
             // "deserts difnitly need cacti and brush though." Mostly brush,
             // because dry country is mostly low scrub and a cactus you can
@@ -135,6 +142,12 @@ fn bake_tree(builder: &mut MeshBuilder, position: Vec3, kind: TreeKind, rng: &mu
         TreeKind::Snag => Tone {
             ramp: palette::RAMP_WOOD,
             step: rng.range_i(0, 1) as usize,
+        },
+        // A pine's trunk is darker and redder than a broadleaf's, and mostly
+        // hidden anyway - the silhouette does the work.
+        TreeKind::Pine => Tone {
+            ramp: palette::RAMP_WOOD,
+            step: rng.range_i(0, 2) as usize,
         },
         // A cactus has no bark: it is green all the way down, which is most
         // of what makes it read as a cactus and not a post.
@@ -247,6 +260,41 @@ fn bake_tree(builder: &mut MeshBuilder, position: Vec3, kind: TreeKind, rng: &mu
                         length,
                     )),
                     palette::color_at(leaf.palette_index()),
+                );
+            }
+        }
+
+        // A SPIRE, NOT A CONE. Where the plain conifer is a stack of wide
+        // slabs, a pine is tall and narrow with its branches shortening fast
+        // toward the top - and the top ones carry snow, which is the thing
+        // that makes a stand of them read as the north at a glance rather
+        // than as darker woodland.
+        TreeKind::Pine => {
+            let tall = height * rng.range(1.05, 1.35);
+            let spread = tall * rng.range(0.22, 0.30);
+            trunk(builder, tall * rng.range(0.05, 0.07), tall * 0.55);
+
+            let layers = rng.range_i(4, 6);
+            // Snow lies on the upper branches, where nothing shades them.
+            let laden = rng.range_i(1, 2) as usize;
+            for layer in 0..layers {
+                let t = layer as f32 / layers as f32;
+                // Narrows fast: a pine is a wedge, not a Christmas tree.
+                let w = spread * (1.0 - t * 0.78);
+                let capped = (layers - layer) as usize <= laden;
+                let coat = if capped {
+                    Tone {
+                        ramp: palette::RAMP_SNOW,
+                        step: rng.range_i(3, 4) as usize,
+                    }
+                } else {
+                    leaf.shifted(-(layer % 2))
+                };
+                builder.push_box(
+                    Transform::from_translation(position + Vec3::Y * tall * (0.34 + t * 0.62))
+                        .with_rotation(Quat::from_rotation_y(yaw + t * 0.5))
+                        .with_scale(Vec3::new(w, tall * 0.18, w)),
+                    palette::color_at(coat.palette_index()),
                 );
             }
         }
@@ -2241,6 +2289,26 @@ mod tests {
         let mut builder = MeshBuilder::default();
         bake_rock(&mut builder, Vec3::ZERO, &mut rng);
         assert!(!builder.is_empty(), "a rock baked to nothing");
+    }
+
+    /// The north grows pines, and they are its own tree.
+    #[test]
+    fn the_north_grows_its_own_tree() {
+        use super::TreeKind::*;
+        let boreal = TreeKind::for_biome(Biome::Boreal);
+        assert!(
+            boreal.iter().filter(|k| **k == Pine).count() >= 3,
+            "the north should be mostly pine, and is {boreal:?}",
+        );
+        for biome in [Biome::Temperate, Biome::Arid, Biome::Wetland] {
+            assert!(
+                !TreeKind::for_biome(biome).contains(&Pine),
+                "{biome:?} is growing the north's own tree",
+            );
+        }
+        // A pine is lumber, unlike the desert's plants: the north is where a
+        // village goes FOR timber.
+        assert!(Pine.yields_timber());
     }
 
     /// The desert grows its own plants, and nobody chops them for lumber.
