@@ -108,6 +108,7 @@ fn doing_word(activity: &Activity, talk: Option<&Conversing>) -> &'static str {
         Activity::Marvelling => "on their knees at what they saw",
         Activity::Sheltering => "sheltering",
         Activity::TendingFire => "tending the fire",
+        Activity::Alarming => "running for the bell",
         // Most of a conversation is the walk to it: two people who have
         // agreed to speak can be a dozen strides apart and still be
         // Chatting. Saying "talking" over both of them is a lie the label

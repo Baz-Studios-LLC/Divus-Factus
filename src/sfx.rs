@@ -35,6 +35,8 @@ pub enum SfxKind {
     Smite,
     /// The prayer bell — the pink channel's voice.
     Chime,
+    /// The warning bell: three low strikes, the village called to look up.
+    Alarm,
     /// Two warm strikes rising: a village remembering a good day.
     Fanfare,
     /// The gold trumpet: works of the village — a hall raised, a town founded.
@@ -48,7 +50,7 @@ pub enum SfxKind {
 }
 
 impl SfxKind {
-    pub const ALL: [SfxKind; 12] = [
+    pub const ALL: [SfxKind; 13] = [
         SfxKind::Knock,
         SfxKind::Splash,
         SfxKind::Thud,
@@ -56,6 +58,7 @@ impl SfxKind {
         SfxKind::Whoosh,
         SfxKind::Smite,
         SfxKind::Chime,
+        SfxKind::Alarm,
         SfxKind::Fanfare,
         SfxKind::Plant,
         SfxKind::ProclaimGold,
@@ -72,6 +75,7 @@ impl SfxKind {
             SfxKind::Whoosh => "audio/sfx/whoosh.wav",
             SfxKind::Smite => "audio/sfx/smite.wav",
             SfxKind::Chime => "audio/sfx/chime.wav",
+            SfxKind::Alarm => "audio/sfx/alarm.wav",
             SfxKind::Fanfare => "audio/sfx/fanfare.wav",
             SfxKind::Plant => "audio/sfx/plant.wav",
             SfxKind::ProclaimGold => "audio/sfx/proclaim_gold.wav",
@@ -89,6 +93,9 @@ impl SfxKind {
             SfxKind::Splash | SfxKind::Whoosh => 0.7,
             SfxKind::Grab => 0.55,
             SfxKind::Chime | SfxKind::Fanfare => 0.6,
+            // A warning bell that the god can talk over is not a warning.
+            // Just under the thunder, and above every proclamation.
+            SfxKind::Alarm => 0.95,
             // The trumpets: a proclamation is the loudest thing the
             // interface ever says, just under the weather itself.
             SfxKind::ProclaimGold | SfxKind::ProclaimLife | SfxKind::ProclaimFaith => 0.9,
@@ -108,7 +115,7 @@ pub struct PlaySfx {
 /// The loaded kit.
 #[derive(Resource)]
 struct SfxBank {
-    handles: [Handle<bevy::audio::AudioSource>; 12],
+    handles: [Handle<bevy::audio::AudioSource>; SfxKind::ALL.len()],
 }
 
 /// The player's effects loudness, kept beside the music's own dial.

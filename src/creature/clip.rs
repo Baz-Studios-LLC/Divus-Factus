@@ -265,6 +265,9 @@ pub fn clips_follow_the_day(
             crate::villager::Activity::TendingFire => "tending-fire",
             crate::villager::Activity::Hauling => "hauling",
             crate::villager::Activity::Mourning => "mourning",
+            // No run clip yet; hauling is the closest thing to somebody
+            // moving with a purpose.
+            crate::villager::Activity::Alarming => "hauling",
             crate::villager::Activity::Chatting => "chatting",
             crate::villager::Activity::Sheltering => "sheltering",
             crate::villager::Activity::Bearing => "bearing",

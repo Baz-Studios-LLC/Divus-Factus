@@ -100,6 +100,7 @@ chime = mix(chime, tone(880 * 2.76, 0.9, 5.5, 0.22))
 chime = mix(chime, tone(880 * 0.5, 1.5, 2.4, 0.3))
 write("chime.wav", chime)
 
+
 # The fanfare: two warm strikes rising - a village remembering a good day.
 fan = tone(660, 0.9, 3.4, 0.5)
 fan = mix(fan, tone(660 * 1.5, 1.1, 3.0, 0.45), 0.16)
@@ -149,3 +150,24 @@ faith = mix(faith, bell(659, 0.5, 5.2, 0.75), 0.11)  # E5
 faith = mix(faith, bell(784, 0.6, 4.4, 0.8), 0.22)   # G5
 faith = mix(faith, bell(1047, 1.4, 2.2, 0.9), 0.33)  # C6, held
 write("proclaim_faith.wav", faith)
+
+# The alarm: the warning bell. LAST IN THE FILE ON PURPOSE - the seed at the
+# top makes this script reproducible, and any new sound that draws noise
+# shifts the stream for every sound written after it. Two untouched wavs
+# changed the first time this was written in the middle.
+#
+# The alarm: the warning bell. Everything the prayer chime is not - low
+# where the chime is high, struck three times where the chime rings once,
+# and hard enough to carry over a field. The partials are the same kind of
+# inharmonic stack, because it is the same bell; it is just being hit like
+# somebody means it.
+STRIKE = 0.34
+alarm = silence(STRIKE * 2 + 1.6)
+for i in range(3):
+    hit = tone(196, 1.7, 2.1, 0.55)
+    hit = mix(hit, tone(196 * 2.74, 0.8, 6.0, 0.30))
+    hit = mix(hit, tone(196 * 5.4, 0.35, 11.0, 0.13))
+    # The clapper itself - a short woody knock under the ring.
+    hit = mix(hit, noise(0.05, 60.0, 0.35))
+    alarm = mix(alarm, hit, STRIKE * i)
+write("alarm.wav", alarm)

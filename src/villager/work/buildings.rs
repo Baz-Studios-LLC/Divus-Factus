@@ -449,7 +449,7 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
             // a camp is seen and retold until half the village holds it. Five
             // is above anything the woods produce and well under what a
             // sighting spreads.
-            Armory => (needs.peril - 5.0).max(0.0) * 1.35,
+            Armory => (needs.peril - crate::witness::ARMORY_IS_WANTED).max(0.0) * 1.35,
             // THE DEAD ASK FOR IT. Brett: "when a person dies it should
             // increase a need for a cemetary to be built."
             //
@@ -3396,6 +3396,12 @@ pub(crate) fn plan_houses(
     // What the village is carrying of the teeth, and who is standing
     // watch because of it.
     let peril = crate::witness::peril_of(remembered.iter().copied(), clock.day());
+    // Parked where the card and the bell can read it. Same number, one place
+    // - a village whose panel disagreed with its own builders would be worse
+    // than no panel at all.
+    commands
+        .entity(settlement)
+        .insert(crate::witness::Peril(peril));
     let standing_longhouses = civics
         .iter()
         .filter(|(_, b, member)| b.kind == BuildingKind::Longhouse && member.0 == settlement)
@@ -3556,7 +3562,7 @@ pub(crate) fn plan_houses(
     // will not hunt in its shadow. A guard is not civic ambition. It is
     // somebody frightened doing something about it.
     } else if guards > 0
-        && peril >= 1.5
+        && peril >= crate::witness::TOWER_JUMPS_THE_QUEUE
         && !has_kind(BuildingKind::Watchtower)
         && store_now.timber >= 2.0
         // But never before the first hall. Ten beds under one roof is

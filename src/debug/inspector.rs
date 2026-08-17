@@ -173,6 +173,7 @@ pub(crate) struct TownSight<'w, 's> {
         (
             &'static Settlement,
             &'static crate::villager::work::Stockpile,
+            Option<&'static crate::witness::Peril>,
         ),
     >,
     huts: Query<
@@ -449,7 +450,7 @@ pub(crate) fn update_inspector(
             .site
             .as_ref()
             .and_then(|site| settlement_info.get(site.settlement).ok())
-            .map(|(_, store)| store);
+            .map(|(_, store, _)| store);
         let (title, amount) = match (pile.0, store) {
             (PileKind::Food, Some(s)) => ("The food store", s.larder.total()),
             (PileKind::Timber, Some(s)) => ("The woodpile", s.timber),
@@ -510,7 +511,7 @@ pub(crate) fn update_inspector(
                 .site
                 .as_ref()
                 .and_then(|site| settlement_info.get(site.settlement).ok())
-                .map(|(_, store)| store);
+                .map(|(_, store, _)| store);
             if let Ok(mut name) = texts.p0().single_mut() {
                 *name = Text::new(building.kind.name());
             }
@@ -809,7 +810,8 @@ pub(crate) fn update_inspector(
                 .filter(|(member, _)| member.0 == town)
                 .count()
         });
-        let store = household_town.and_then(|town| settlement_info.get(town).ok().map(|(_, s)| s));
+        let store =
+            household_town.and_then(|town| settlement_info.get(town).ok().map(|(_, s, _)| s));
         let average_spirits = household
             .iter()
             .filter_map(|(_, _, _, _, _, morale, ..)| morale.map(|morale| morale.spirits))
@@ -985,7 +987,7 @@ pub(crate) fn update_inspector(
             .map(|(name, have, needs)| format!("{name} {have:.0}/{needs:.0}"))
             .collect();
         (format!("{}, rising", plan.kind.name()), lines.join("\n"))
-    } else if let Ok((settlement, store)) = settlement_info.get(entity) {
+    } else if let Ok((settlement, store, peril)) = settlement_info.get(entity) {
         // The banner: the settlement's own dossier.
         let mut grown = 0;
         let mut children = 0;
@@ -1037,10 +1039,23 @@ pub(crate) fn update_inspector(
                 counted(free, "bed free", "beds free")
             ),
         };
+        // HOW FRIGHTENED THEY ARE, which decided what this town built and
+        // was written down nowhere. A village will drop a bakery to raise a
+        // watchtower and the player had no way at all to see why.
+        //
+        // Absent until the planner has taken this town's turn, which on a
+        // founding morning is a frame or two.
+        let fear = match peril {
+            Some(peril) => {
+                let alarm = crate::witness::Alarm::of(peril.0);
+                format!("The village is {} - {}", alarm.name(), alarm.tells())
+            }
+            None => "The village is at ease".to_string(),
+        };
         (
             settlement.name.clone(),
             format!(
-                "Founded {}\n{population}\n{shelter}\nFood: {:.0} ({})\n{stores}",
+                "Founded {}\n{population}\n{shelter}\nFood: {:.0} ({})\n{stores}\n{fear}",
                 crate::calendar::date_of_day(settlement.founded),
                 store.food(),
                 food_horizon(store.food(), mouths),

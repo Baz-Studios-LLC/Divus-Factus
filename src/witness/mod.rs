@@ -299,9 +299,9 @@ impl DivineEventKind {
             | DivineEventKind::Quaked
             | DivineEventKind::Thrown
             | DivineEventKind::Impact => -0.06,
-            DivineEventKind::Perished
-            | DivineEventKind::Mauled
-            | DivineEventKind::GoblinsSeen => 0.03,
+            DivineEventKind::Perished | DivineEventKind::Mauled | DivineEventKind::GoblinsSeen => {
+                0.03
+            }
             // It costs the village its spirits more than anything else can.
             DivineEventKind::AteTheDead => -0.22,
             DivineEventKind::Uprooted
@@ -1077,6 +1077,100 @@ pub fn peril_of<'a>(village: impl Iterator<Item = &'a Witnessed>, today: u32) ->
     village.map(|held| held.peril(today)).sum()
 }
 
+/// A settlement's fear, parked on the settlement itself.
+///
+/// WRITTEN BY THE PLANNER, which already sums it to decide what to build —
+/// so this is not a second opinion about how frightened a village is, it is
+/// the same number, kept where anything can read it. That matters more than
+/// it sounds: fear drove the guard rota, the watchtower and the armory while
+/// appearing in no panel, no card and no notice anywhere in the game. A
+/// village would stop building a tavern and start building an armory and the
+/// player had nothing to read it off.
+///
+/// Refreshed on the settlement's turn through the planner's round-robin, so
+/// it is a few frames stale on a busy map. Nothing here is decided in
+/// frames.
+#[derive(Component, Debug, Clone, Copy, Default)]
+pub struct Peril(pub f32);
+
+/// A village's fear, in the words a person would use.
+///
+/// THE THRESHOLDS ARE NOT DECORATIVE. Each one is a place where the village
+/// actually starts doing something it was not doing before, so a player who
+/// reads the card twice has learned the system:
+///
+/// - `Uneasy` — one spear gets posted. Any fear at all does this.
+/// - `Afraid` — the watchtower jumps the whole civic queue.
+/// - `Besieged` — the armory becomes worth wanting and the ceiling comes off
+///   the muster.
+///
+/// Keep these in step with the numbers in [`crate::villager::work`]; the test
+/// below holds them to it.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
+pub enum Alarm {
+    #[default]
+    AtEase,
+    Uneasy,
+    Afraid,
+    Besieged,
+}
+
+/// Below this a village is simply calm. Not zero, because a memory fading out
+/// over a fortnight leaves a thousandth of itself behind on the last day and
+/// a town should not read as uneasy over that.
+const AT_EASE: f32 = 0.05;
+
+/// Where the watchtower stops waiting its turn on the civic ladder.
+pub const TOWER_JUMPS_THE_QUEUE: f32 = 1.5;
+
+/// Where an armory becomes a thing a village would rather have than a bakery.
+pub const ARMORY_IS_WANTED: f32 = 5.0;
+
+impl Alarm {
+    pub fn of(peril: f32) -> Self {
+        if peril < AT_EASE {
+            Alarm::AtEase
+        } else if peril < TOWER_JUMPS_THE_QUEUE {
+            Alarm::Uneasy
+        } else if peril < ARMORY_IS_WANTED {
+            Alarm::Afraid
+        } else {
+            Alarm::Besieged
+        }
+    }
+
+    /// How the village would describe itself.
+    pub fn name(self) -> &'static str {
+        match self {
+            Alarm::AtEase => "at ease",
+            Alarm::Uneasy => "uneasy",
+            Alarm::Afraid => "afraid",
+            Alarm::Besieged => "expecting an attack",
+        }
+    }
+
+    /// What the fear is making them do, which is the half a bare word leaves
+    /// out. A player who reads "afraid" learns nothing; a player who reads
+    /// that a tower is going up ahead of everything else has been told how
+    /// the village works.
+    pub fn tells(self) -> &'static str {
+        match self {
+            Alarm::AtEase => "nobody is watching the trees",
+            Alarm::Uneasy => "a spear walks the treeline",
+            Alarm::Afraid => "a watchtower comes before everything else",
+            Alarm::Besieged => "arming comes before comfort",
+        }
+    }
+
+    /// Whether this is worth waking the village over — the bell is rung on
+    /// the way up into these, and `Uneasy` is deliberately not one of them.
+    /// One person coming home frightened is a Tuesday. The bell is for when
+    /// the village has agreed something is out there.
+    pub fn worth_the_bell(self) -> bool {
+        matches!(self, Alarm::Afraid | Alarm::Besieged)
+    }
+}
+
 /// Chooses how a villager responds to something they just saw.
 ///
 /// Distance weighs as heavily as temperament: the same act is a curiosity from across
@@ -1717,10 +1811,7 @@ mod tests {
             boldness: v,
             ..Nature::default()
         };
-        let mut line = (
-            Temperament::of(bold(0.9)),
-            Temperament::of(bold(0.85)),
-        );
+        let mut line = (Temperament::of(bold(0.9)), Temperament::of(bold(0.85)));
         for _ in 0..4 {
             let child = Temperament::child(&line.0, &line.1, &mut rng);
             let mate = Temperament::of(bold(rng.trait_value(0.6, 0.95)));
@@ -1733,10 +1824,7 @@ mod tests {
         );
 
         let mut timid_rng = Rng::new(4);
-        let mut timid = (
-            Temperament::of(bold(0.1)),
-            Temperament::of(bold(0.15)),
-        );
+        let mut timid = (Temperament::of(bold(0.1)), Temperament::of(bold(0.15)));
         for _ in 0..4 {
             let child = Temperament::child(&timid.0, &timid.1, &mut timid_rng);
             let mate = Temperament::of(bold(timid_rng.trait_value(0.05, 0.4)));

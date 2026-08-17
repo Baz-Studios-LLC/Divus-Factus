@@ -6,11 +6,12 @@
 //! state machine later would mean rewriting every behavior. Adding a need here
 //! means adding a scorer, not editing a branch.
 
+pub mod alarm;
 pub mod attire;
 pub mod belief;
 pub mod civic;
-pub mod doctrine;
 pub mod colony;
+pub mod doctrine;
 pub mod explore;
 pub mod home;
 pub mod names;
@@ -278,6 +279,11 @@ impl Plugin for VillagerPlugin {
                     rites::mark_the_dead,
                     rites::mourn,
                     rites::burials,
+                    alarm::somebody_runs_for_the_bell,
+                    alarm::ring_the_bell,
+                    alarm::swing_the_bell,
+                    alarm::take_fright,
+                    alarm::probe_the_alarm,
                     seek_company,
                     speech::muse_the_watched,
                     speech::remember_what_was_said,
@@ -897,6 +903,8 @@ pub enum Activity {
     Hauling,
     /// Standing with the dead.
     Mourning,
+    /// Running for the bell, to tell the village what they just saw.
+    Alarming,
     /// Stopped face to face with a neighbor, trading news.
     Chatting,
     /// Indoors, waiting out the weather.
@@ -1427,6 +1435,81 @@ pub(crate) fn raise_town_fixtures(
         // Whose hearth it is. Each town tends its own fire from its own
         // woodpile, so the fire has to know which town that is.
         commands.entity(fire).insert(MemberOf(settlement));
+    }
+
+    // THE WARNING BELL, on the far side of the square from the fire.
+    //
+    // A real thing standing in the world rather than a sound the game
+    // makes, because ringing it is an ERRAND. Brett: "if a goblin comes
+    // inside the wall, a person should have to see the goblin and run to
+    // the bell to ring it. It shouldnt just auto ring." So somebody has to
+    // get here, and how long that takes depends on where they were standing
+    // - which is the whole difference between an alarm and a notification.
+    //
+    // Two uprights and a headstock, with the bell hung in gold: the same
+    // trim the banner's finial and the town hall's ridge wear, which is the
+    // bell the hall already had.
+    {
+        let (sin, cos) = (fire_angle + std::f32::consts::PI * 1.35).sin_cos();
+        let (bx, bz) = (center.x + cos * 5.5, center.z + sin * 5.5);
+        let at = Vec3::new(bx, terrain.height_at(bx, bz), bz);
+        let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
+        let wood = materials.add(StandardMaterial {
+            base_color: palette::shade(&palette::WOOD, 0.5),
+            perceptual_roughness: 0.92,
+            ..default()
+        });
+        let brass = materials.add(StandardMaterial {
+            base_color: palette::shade(&palette::CLOTH_GOLD, 0.75),
+            perceptual_roughness: 0.35,
+            metallic: 0.6,
+            ..default()
+        });
+        let post = commands
+            .spawn((
+                Name::new("The warning bell"),
+                crate::globe::RigidlySeated,
+                alarm::BellPost,
+                MemberOf(settlement),
+                Transform::from_translation(at),
+                Visibility::default(),
+                crate::hand::PickRadius(1.4),
+                crate::hand::Rooted,
+            ))
+            .id();
+        let mut part = |offset: Vec3, size: Vec3, material: &Handle<StandardMaterial>| {
+            commands.spawn((
+                Mesh3d(cube.clone()),
+                MeshMaterial3d(material.clone()),
+                Transform::from_translation(offset).with_scale(size),
+                ChildOf(post),
+            ));
+        };
+        // Two legs and the headstock they carry.
+        part(Vec3::new(-0.5, 1.0, 0.0), Vec3::new(0.14, 2.0, 0.14), &wood);
+        part(Vec3::new(0.5, 1.0, 0.0), Vec3::new(0.14, 2.0, 0.14), &wood);
+        part(Vec3::new(0.0, 2.02, 0.0), Vec3::new(1.3, 0.16, 0.16), &wood);
+        // The bell: a waist and a wider mouth, hung just under the beam.
+        // Its own entity, so it can be swung when it is struck.
+        let bell = commands
+            .spawn((
+                alarm::TheBell,
+                Transform::from_translation(Vec3::new(0.0, 1.9, 0.0)),
+                Visibility::default(),
+                ChildOf(post),
+            ))
+            .id();
+        for (offset, size) in [
+            (Vec3::new(0.0, -0.10, 0.0), Vec3::new(0.34, 0.30, 0.34)),
+            (Vec3::new(0.0, -0.30, 0.0), Vec3::new(0.46, 0.16, 0.46)),
+        ] {
+            commands.spawn((
+                Mesh3d(cube.clone()),
+                MeshMaterial3d(brass.clone()),
+                Transform::from_translation(offset).with_scale(size),
+                ChildOf(bell),
+            ));
+        }
     }
 
     // The woodpile, across the square from the fire: every log the village
@@ -2977,7 +3060,9 @@ fn chronicle_divine_touch(
             crate::witness::DivineEventKind::Mended => "was made whole by the hand of god",
             crate::witness::DivineEventKind::Quaked => "was thrown down when the earth buckled",
             crate::witness::DivineEventKind::Mauled => "was set upon by a wolf, and got home",
-            crate::witness::DivineEventKind::GoblinsSeen => "came back saying there are goblins out there",
+            crate::witness::DivineEventKind::GoblinsSeen => {
+                "came back saying there are goblins out there"
+            }
             crate::witness::DivineEventKind::AteTheDead => "watched one of their own eat the dead",
             // The worldly turns write their own chronicle lines at their own
             // sites (the death, the birth, the harvest); nothing to add here
@@ -3317,11 +3402,9 @@ fn births(
             }
             // A child with one parent to hand takes after them, still with
             // drift; with neither, the world decides.
-            (Some(only), None) | (None, Some(only)) => crate::witness::Temperament::child(
-                only,
-                only,
-                &mut rng.0,
-            ),
+            (Some(only), None) | (None, Some(only)) => {
+                crate::witness::Temperament::child(only, only, &mut rng.0)
+            }
             (None, None) => crate::witness::Temperament::random(&mut rng.0),
         },
         crate::witness::Witnessed::default(),
@@ -3608,7 +3691,7 @@ fn pursue_activity(
                 }
             }
 
-            // The work, home, rites and witness systems steer these
+            // The work, home, rites, alarm and witness systems steer these
             // themselves.
             Activity::Working
             | Activity::VisitingStore
@@ -3619,6 +3702,7 @@ fn pursue_activity(
             | Activity::Sleeping
             | Activity::Mourning
             | Activity::Bearing
+            | Activity::Alarming
             | Activity::Chatting
             | Activity::Sheltering => {}
         }
@@ -4222,7 +4306,9 @@ mod tests {
                 let angle = step as f32 / 12.0 * std::f32::consts::TAU;
                 for distance in [42.0, 50.0, 58.0] {
                     samples += 1;
-                    if terrain.is_submerged(at.x + angle.cos() * distance, at.z + angle.sin() * distance) {
+                    if terrain
+                        .is_submerged(at.x + angle.cos() * distance, at.z + angle.sin() * distance)
+                    {
                         water += 1;
                     }
                 }

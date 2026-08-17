@@ -466,6 +466,7 @@ fn state_phrase(activity: Option<&Activity>, reaction: Option<&Reaction>) -> &'s
         Some(Activity::Marvelling) => "on their knees at what they saw",
         Some(Activity::Sleeping) => "asleep",
         Some(Activity::Mourning) => "mourning",
+        Some(Activity::Alarming) => "running for the bell",
         Some(Activity::Chatting) => "deep in conversation",
         Some(Activity::Sheltering) => "waiting out the rain",
         Some(Activity::Bearing) => "bearing the dead",
