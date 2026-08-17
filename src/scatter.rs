@@ -80,9 +80,24 @@ pub enum TreeKind {
     Palm,
     /// Dead: a bare trunk and a few broken branches.
     Snag,
+    /// A column with an arm or two, green and ribbed. Desert only.
+    Cactus,
+    /// Low dry brush: a knot of sticks near the ground, going nowhere.
+    Brush,
 }
 
 impl TreeKind {
+    /// Whether a forester can take timber from this.
+    ///
+    /// A cactus is not lumber and a knot of dry sticks is not lumber, and
+    /// without saying so they both were: everything the scatterer plants is
+    /// spawned with `FellableTree`, so the moment the desert grew its own
+    /// plants a forester would have walked out and chopped one down for
+    /// building wood. Scenery is allowed to be only scenery.
+    pub fn yields_timber(self) -> bool {
+        !matches!(self, TreeKind::Cactus | TreeKind::Brush)
+    }
+
     /// Which trees grow in a biome, as weighted choices.
     ///
     /// Returning a slice rather than a single kind keeps forests mixed — a stand of
@@ -92,7 +107,12 @@ impl TreeKind {
         match biome {
             Biome::Temperate => &[Broadleaf, Broadleaf, Conifer, Birch],
             Biome::Boreal => &[Conifer, Conifer, Conifer, Snag],
-            Biome::Arid => &[Palm, Snag, Snag],
+            // The desert is the one country whose plants are its own. Brett:
+            // "deserts difnitly need cacti and brush though." Mostly brush,
+            // because dry country is mostly low scrub and a cactus you can
+            // see from anywhere is worth more than a forest of them - and a
+            // palm still turns up where there is water enough to hold one.
+            Biome::Arid => &[Brush, Brush, Brush, Cactus, Cactus, Snag, Palm],
             Biome::Wetland => &[Broadleaf, Broadleaf, Palm, Conifer],
             Biome::Alpine => &[Conifer, Snag],
         }
@@ -115,6 +135,16 @@ fn bake_tree(builder: &mut MeshBuilder, position: Vec3, kind: TreeKind, rng: &mu
         TreeKind::Snag => Tone {
             ramp: palette::RAMP_WOOD,
             step: rng.range_i(0, 1) as usize,
+        },
+        // A cactus has no bark: it is green all the way down, which is most
+        // of what makes it read as a cactus and not a post.
+        TreeKind::Cactus => Tone {
+            ramp: palette::RAMP_FOLIAGE,
+            step: rng.range_i(2, 3) as usize,
+        },
+        TreeKind::Brush => Tone {
+            ramp: palette::RAMP_SCRUB,
+            step: rng.range_i(1, 3) as usize,
         },
         _ => Tone {
             ramp: palette::RAMP_WOOD,
@@ -217,6 +247,73 @@ fn bake_tree(builder: &mut MeshBuilder, position: Vec3, kind: TreeKind, rng: &mu
                         length,
                     )),
                     palette::color_at(leaf.palette_index()),
+                );
+            }
+        }
+
+        // A COLUMN AND ITS ARMS. The silhouette is the whole of it: one
+        // upright, one or two arms that go up before they go out, and the
+        // proportions kept narrow - a cactus as wide as a tree reads as a
+        // shrub. Short, too, against the trees around it, so a desert looks
+        // like low country rather than a forest painted green.
+        TreeKind::Cactus => {
+            let tall = height * rng.range(0.34, 0.52);
+            let thick = tall * rng.range(0.16, 0.22);
+            trunk(builder, thick, tall);
+
+            for _ in 0..rng.range_i(0, 2) {
+                let angle = rng.range(0.0, std::f32::consts::TAU);
+                let elbow = tall * rng.range(0.42, 0.66);
+                let reach = thick * rng.range(1.6, 2.6);
+                let arm = tall * rng.range(0.24, 0.40);
+                let (sin, cos) = angle.sin_cos();
+                // Out from the trunk...
+                builder.push_box(
+                    Transform::from_translation(
+                        position + Vec3::new(cos * reach * 0.5, elbow, sin * reach * 0.5),
+                    )
+                    .with_rotation(Quat::from_rotation_y(-angle))
+                    .with_scale(Vec3::new(reach, thick * 0.8, thick * 0.8)),
+                    palette::color_at(bark.palette_index()),
+                );
+                // ...and then up, which is the shape everyone draws.
+                builder.push_box(
+                    Transform::from_translation(
+                        position
+                            + Vec3::new(cos * reach, elbow + arm * 0.5, sin * reach),
+                    )
+                    .with_rotation(Quat::from_rotation_y(-angle))
+                    .with_scale(Vec3::new(thick * 0.8, arm, thick * 0.8)),
+                    palette::color_at(bark.shifted(1).palette_index()),
+                );
+            }
+        }
+
+        // A KNOT OF STICKS. No trunk worth the name: three or four short
+        // pieces leaning out of one spot, low enough to walk past. It is
+        // scenery for dry ground rather than anything a forester would look
+        // twice at.
+        TreeKind::Brush => {
+            let span = height * rng.range(0.10, 0.18);
+            for _ in 0..rng.range_i(3, 5) {
+                let angle = rng.range(0.0, std::f32::consts::TAU);
+                let lean = rng.range(0.5, 1.1);
+                let length = span * rng.range(1.4, 2.4);
+                let (sin, cos) = angle.sin_cos();
+                builder.push_box(
+                    Transform::from_translation(
+                        position
+                            + Vec3::new(
+                                cos * span * 0.3,
+                                length * 0.35,
+                                sin * span * 0.3,
+                            ),
+                    )
+                    .with_rotation(
+                        Quat::from_rotation_y(-angle) * Quat::from_rotation_x(lean),
+                    )
+                    .with_scale(Vec3::new(span * 0.16, length, span * 0.16)),
+                    palette::color_at(bark.shifted(rng.range_i(-1, 1)).palette_index()),
                 );
             }
         }
@@ -728,11 +825,12 @@ fn populate_chunks(
             let body = TreeBody::at(kind, local.x, local.z);
             let young = commands
                 .spawn((
-                    Name::new("A young tree"),
+                    Name::new(if kind.yields_timber() {
+                        "A young tree"
+                    } else {
+                        "Desert growth"
+                    }),
                     ScatterEntity,
-                    FellableTree {
-                        maturity: growth.maturity(),
-                    },
                     body,
                     Mesh3d(body.bake(&mut meshes)),
                     MeshMaterial3d(terrain_assets.ground_material.clone()),
@@ -742,6 +840,15 @@ fn populate_chunks(
                 ))
                 .id();
             commands.entity(young).insert(ChildOf(entity));
+            // A regrowing TREE carries its maturity, because that is what the
+            // seasons advance and what a forester refuses to cut. A cactus is
+            // not on that clock: it is scenery, and scenery is not felled, so
+            // it never needed to come back either.
+            if kind.yields_timber() {
+                commands.entity(young).insert(FellableTree {
+                    maturity: growth.maturity(),
+                });
+            }
         }
         for (local, kind, _) in stands {
             let cell = IVec2::new(
@@ -780,16 +887,23 @@ fn populate_chunks(
                 ))
                 .id();
             for (local, body) in bodies {
-                commands.spawn((
-                    Name::new("A tree"),
-                    FellableTree { maturity: 1.0 },
+                let stem = commands.spawn((
+                    Name::new(if body.kind.yields_timber() {
+                        "A tree"
+                    } else {
+                        "Desert growth"
+                    }),
                     body,
                     InGrove(grove),
                     Transform::from_translation(local),
                     Visibility::default(),
                     crate::hand::PickRadius(1.6),
                     ChildOf(entity),
-                ));
+                )).id();
+                // Only what a forester could actually take is timber.
+                if body.kind.yields_timber() {
+                    commands.entity(stem).insert(FellableTree { maturity: 1.0 });
+                }
             }
         }
 
@@ -2127,6 +2241,36 @@ mod tests {
         let mut builder = MeshBuilder::default();
         bake_rock(&mut builder, Vec3::ZERO, &mut rng);
         assert!(!builder.is_empty(), "a rock baked to nothing");
+    }
+
+    /// The desert grows its own plants, and nobody chops them for lumber.
+    ///
+    /// Brett: "deserts difnitly need cacti and brush though." They are the
+    /// first scatter this game has that is scenery ONLY - everything the
+    /// scatterer plants used to be spawned fellable, so the day the desert
+    /// grew a cactus a forester would have walked out and cut it down for
+    /// building wood.
+    #[test]
+    fn the_desert_grows_what_only_the_desert_grows() {
+        use super::TreeKind::*;
+        let arid = TreeKind::for_biome(Biome::Arid);
+        assert!(
+            arid.contains(&Cactus) && arid.contains(&Brush),
+            "dry country should grow cactus and brush, and grows {arid:?}",
+        );
+        for biome in [Biome::Temperate, Biome::Boreal, Biome::Wetland, Biome::Alpine] {
+            let kinds = TreeKind::for_biome(biome);
+            assert!(
+                !kinds.contains(&Cactus),
+                "{biome:?} is growing cactus, which is the whole thing this \
+                 table exists to prevent",
+            );
+        }
+        assert!(!Cactus.yields_timber(), "a cactus is not lumber");
+        assert!(!Brush.yields_timber(), "a knot of sticks is not lumber");
+        for kind in [Conifer, Broadleaf, Birch, Palm, Snag] {
+            assert!(kind.yields_timber(), "{kind:?} is a tree and should be");
+        }
     }
 
     #[test]

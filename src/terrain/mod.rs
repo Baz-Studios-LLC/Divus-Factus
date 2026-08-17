@@ -2436,13 +2436,53 @@ mod tests {
     use super::*;
     use bevy::mesh::VertexAttributeValues;
 
-    /// A planet with a sun over it is hot at the middle and cold at the ends.
+    /// What color each country actually comes out, and how far apart those
+    /// colors are. A hand-run diagnostic for biome work rather than a check:
+    /// `cargo test probe_how_different -- --ignored --nocapture`.
     ///
-    /// Temperature used to be fbm noise minus altitude and nothing else, so it
-    /// had no idea where on the world it was: a survey of one planet found
-    /// conifer forest at the pole AND at the equator, and temperature RISING
-    /// from equator to pole before falling again. Averaged across longitudes
-    /// so the weather cannot outvote the climate.
+    /// Reads through `shade_blend`, which is the path the terrain itself
+    /// uses. Measured through `shade` instead - which SNAPS to five steps -
+    /// it reported two biomes as exactly identical when they are not, and I
+    /// nearly went and fixed a bug that did not exist.
+    #[test]
+    #[ignore = "a hand-run diagnostic, not a check"]
+    fn probe_how_different_the_biomes_look() {
+        // Through the REAL path this time: `shade_blend` over the biome's own
+        // ramp and its companion, which interpolates - not `shade`, which
+        // snaps to five steps and made two biomes look identical when they
+        // are not.
+        let mut swatches: Vec<(String, [f32; 3])> = Vec::new();
+        for (name, biome) in [
+            ("temperate", Biome::Temperate),
+            ("boreal", Biome::Boreal),
+            ("arid", Biome::Arid),
+            ("wetland", Biome::Wetland),
+            ("alpine", Biome::Alpine),
+        ] {
+            let (ramp, shift) = biome.ground();
+            let companion = biome.companion();
+            // A representative middling slope of ordinary ground.
+            let c = crate::palette::shade_blend(ramp, companion, 0.11, (0.5 + shift).clamp(0.0, 1.0))
+                .to_linear();
+            swatches.push((name.to_string(), [c.red, c.green, c.blue]));
+            println!("PROBE {name:10} rgb {:.3} {:.3} {:.3}", c.red, c.green, c.blue);
+        }
+        println!("PROBE --- distance between pairs:");
+        let mut closest = f32::MAX;
+        for i in 0..swatches.len() {
+            for j in (i + 1)..swatches.len() {
+                let (a, b) = (&swatches[i], &swatches[j]);
+                let d = ((a.1[0] - b.1[0]).powi(2)
+                    + (a.1[1] - b.1[1]).powi(2)
+                    + (a.1[2] - b.1[2]).powi(2))
+                .sqrt();
+                closest = closest.min(d);
+                println!("PROBE {:10} vs {:10} {d:.3}", a.0, b.0);
+            }
+        }
+        println!("PROBE closest pair: {closest:.3}");
+    }
+
     #[test]
     fn the_planet_is_hot_at_its_middle_and_cold_at_its_ends() {
         let land = Terrain::new(7);
