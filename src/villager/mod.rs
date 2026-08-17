@@ -3066,6 +3066,8 @@ fn births(
         ),
         (With<Villager>, Without<crate::creature::Corpse>),
     >,
+    // The parents' grain, for the child's. See `Nature::inherit`.
+    grains: Query<&crate::witness::Temperament>,
     watch: Res<crate::debug::timings::Timings>,
 ) {
     let _t = watch.watch("villager: births");
@@ -3303,7 +3305,25 @@ fn births(
             remaining: SECONDS_TO_COME_OF_AGE,
         },
         chronicle,
-        crate::witness::Temperament::random(&mut rng.0),
+        // INHERITED, not rolled fresh. Children were being given a random
+        // temperament, which meant no family ever resembled itself and a
+        // village's grain never went anywhere over generations - the one thing
+        // a heritable personality is FOR. Averaged from both parents with a
+        // little drift, and off their BORN natures rather than the people two
+        // hard winters have made of them.
+        match (grains.get(*mother).ok(), grains.get(father).ok()) {
+            (Some(mother_grain), Some(father_grain)) => {
+                crate::witness::Temperament::child(mother_grain, father_grain, &mut rng.0)
+            }
+            // A child with one parent to hand takes after them, still with
+            // drift; with neither, the world decides.
+            (Some(only), None) | (None, Some(only)) => crate::witness::Temperament::child(
+                only,
+                only,
+                &mut rng.0,
+            ),
+            (None, None) => crate::witness::Temperament::random(&mut rng.0),
+        },
         crate::witness::Witnessed::default(),
         speech::RecentlySaid::default(),
         Needs {

@@ -33,7 +33,13 @@ use crate::villager::{
     Activity, Chronicle, MemberOf, Morale, Needs, Parentage, Person, Prime, RestoringSeed,
     Settlement, SettlementSite, Spouse, Villager, rites,
 };
-use crate::witness::{Temperament, Witnessed};
+use crate::witness::{Nature, Temperament, Witnessed};
+
+/// What somebody from a save older than temperaments loads as: the middle of
+/// every axis, which is a person nobody would remark on.
+fn an_ordinary_soul() -> Temperament {
+    Temperament::of(Nature::default())
+}
 
 pub struct SavePlugin;
 
@@ -70,14 +76,16 @@ struct PersonSave {
     genome: CreatureGenome,
     needs: Needs,
     morale: Morale,
-    temperament_boldness: f32,
-    /// Written since darkness existed; a save from before it loads as zero,
-    /// which reads as "could never" and is the safe way to be wrong.
-    #[serde(default)]
-    temperament_darkness: f32,
-    /// Old saves load sharp enough to know better - see `sharp_enough`.
-    #[serde(default = "crate::witness::sharp_enough_save")]
-    temperament_wits: f32,
+    /// THE WHOLE TEMPERAMENT, as one field.
+    ///
+    /// It used to be `temperament_boldness: f32` and grew a sibling every time
+    /// an axis was added - each of which meant a new slot in the raw tuple, a
+    /// new line in two destructures and a new argument order to get wrong.
+    /// `Temperament` serializes itself and carries its own `serde(default)`s
+    /// for anything a older save has not heard of, so the next axis costs
+    /// nothing here at all.
+    #[serde(default = "an_ordinary_soul")]
+    temperament: Temperament,
     witnessed: Witnessed,
     faith: Option<Faith>,
     traits: Option<Traits>,
@@ -522,10 +530,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         CreatureGenome,
         Needs,
         Morale,
-        // The axes of a temperament: boldness, darkness, wits.
-        f32,
-        f32,
-        f32,
+        Temperament,
         Witnessed,
         Option<Faith>,
         Option<Traits>,
@@ -591,9 +596,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
             Morale {
                 spirits: morale.spirits,
             },
-            temperament.boldness,
-            temperament.darkness,
-            temperament.wits,
+            *temperament,
             witnessed.clone(),
             faith.cloned(),
             traits.map(|t| Traits(t.0.clone())),
@@ -626,9 +629,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                 genome,
                 needs,
                 morale,
-                temperament_boldness,
-                temperament_darkness,
-                temperament_wits,
+                temperament,
                 witnessed,
                 faith,
                 traits,
@@ -646,9 +647,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                     genome,
                     needs,
                     morale,
-                    temperament_boldness,
-                    temperament_darkness,
-                    temperament_wits,
+                    temperament,
                     witnessed,
                     faith,
                     traits,
@@ -1266,11 +1265,7 @@ fn apply(world: &mut World, save: SaveGame) {
                 Morale {
                     spirits: p.morale.spirits,
                 },
-                Temperament {
-                    boldness: p.temperament_boldness,
-                    darkness: p.temperament_darkness,
-                    wits: p.temperament_wits,
-                },
+                p.temperament,
                 p.witnessed.clone(),
                 Activity::Idle,
                 MemberOf(settlement_entity),

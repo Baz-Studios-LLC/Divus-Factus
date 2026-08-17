@@ -477,6 +477,112 @@ impl DivineEventKind {
 ///
 /// Rolled once and fixed for life. Two people seeing the same thing should not do
 /// the same thing about it.
+/// The grain a person is BORN with: five axes, all 0 to 1, all inherited.
+///
+/// Kept apart from the person they have since become - see [`Temperament`] -
+/// because a child inherits its parents' NATURE and not their scars. A man
+/// hardened by two famines and a smiting fathers the gentle boy he himself
+/// once was, and then has to watch what the world does to him too. That split
+/// is the whole reason this type exists.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct Nature {
+    /// 0 bolts at anything, 1 walks toward it.
+    pub boldness: f32,
+    /// What they are capable of when it costs somebody else. 0 could never.
+    pub darkness: f32,
+    /// How well they reason about what they have seen. 0 simple, 1 sharp.
+    pub wits: f32,
+    /// How heavily another person's suffering sits on them. 0 unmoved.
+    pub warmth: f32,
+    /// HOW BADLY THEY NEED THE GOD TO NOTICE THEM.
+    ///
+    /// The axis that belongs to this game and to no other. Every other line in
+    /// this struct would be at home in any village simulation; this one only
+    /// means anything because there is a god in the world and a player behind
+    /// it. Fervor is what makes somebody pray when nothing is wrong, walk
+    /// toward a pillar of light, read a sighting as a sign - and, with a low
+    /// enough wit or a dark enough grain, propose that somebody be given up
+    /// for it.
+    pub fervor: f32,
+}
+
+impl Default for Nature {
+    fn default() -> Self {
+        Nature {
+            boldness: 0.5,
+            darkness: 0.0,
+            wits: sharp_enough(),
+            warmth: 0.6,
+            fervor: 0.4,
+        }
+    }
+}
+
+impl Nature {
+    pub fn random(rng: &mut Rng) -> Self {
+        Nature {
+            boldness: rng.trait_value(0.15, 0.95),
+            // THE LEAST OF THREE, which is what makes the darkest of them rare
+            // rather than merely uncommon. A flat roll puts a fifth of any
+            // village at the top of the scale; three rolls and keep the lowest
+            // puts them in the low single figures.
+            darkness: rng
+                .trait_value(0.0, 1.0)
+                .min(rng.trait_value(0.0, 1.0))
+                .min(rng.trait_value(0.0, 1.0)),
+            wits: rng.trait_value(0.08, 0.95),
+            // Most people are moved by other people, so this leans the
+            // opposite way from darkness: the unmoved are the uncommon ones.
+            warmth: rng.trait_value(0.0, 1.0).max(rng.trait_value(0.0, 1.0)),
+            fervor: rng.trait_value(0.05, 0.95),
+        }
+    }
+
+    /// A child of these two.
+    ///
+    /// AVERAGE PLUS DRIFT, not a coin flip per axis. Brett's first instinct
+    /// was fifty-fifty from each parent, and the trouble with it is that it
+    /// destroys a line in two generations: every axis is a fresh coin, so
+    /// nothing accumulates and no family ever visibly resembles itself.
+    ///
+    /// Sitting the child between its parents and letting it wander gives the
+    /// thing worth having - a bloodline you can SEE, bold people begetting
+    /// bold people over four generations. And rarely a real jump, because a
+    /// dark child in a gentle house is a story no amount of averaging would
+    /// ever produce.
+    pub fn inherit(mother: &Nature, father: &Nature, rng: &mut Rng) -> Self {
+        let mut blend = |a: f32, b: f32| {
+            let middle = (a + b) * 0.5;
+            // About one axis in seven throws properly rather than drifting.
+            let wander = if rng.chance(0.14) {
+                rng.range(-0.42, 0.42)
+            } else {
+                rng.range(-0.11, 0.11)
+            };
+            (middle + wander).clamp(0.0, 1.0)
+        };
+        Nature {
+            boldness: blend(mother.boldness, father.boldness),
+            darkness: blend(mother.darkness, father.darkness),
+            wits: blend(mother.wits, father.wits),
+            warmth: blend(mother.warmth, father.warmth),
+            fervor: blend(mother.fervor, father.fervor),
+        }
+    }
+}
+
+/// Who a person is now, and who they were born as.
+///
+/// THE ONE PLACE THIS GAME SHOULD NOT FOLLOW DWARF FORTRESS. A dwarf's facets
+/// are fixed for life; the wiki is explicit that argument can shift a dwarf's
+/// VALUES and never their facets. Which is right for a game with no god in it.
+///
+/// Here there is a god, and it is the player, so the interesting claim is the
+/// opposite one: WHAT YOU DO TO PEOPLE CHANGES THEM. A village that watches
+/// its god throw men down hillsides does not merely come to permit dark things
+/// - it comes to be full of harder people. And their children begin from where
+/// those people STARTED rather than where they ended, which is why the two
+/// halves below are kept apart.
 #[derive(Component, Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Temperament {
     /// 0 bolts at anything, 1 walks toward it.
@@ -484,50 +590,36 @@ pub struct Temperament {
     /// What this person is capable of when it costs somebody else.
     ///
     /// 0 could never, whatever it took; 1 is capable of nearly anything.
-    /// Brett: "not only should it be rare, but some people would never, it
-    /// should be personality based and only the darkest of personalities would
-    /// do something like that" - and then, plainly: "perceptability to evil
-    /// proclivities needs to be tracked doesnt it?" It does, and nothing
-    /// tracked it. The trait list is five virtues and five flaws about WORK
-    /// AND MOOD - diligent, slothful, cheerful, gloomy, a glutton - and
-    /// `Temperament` had exactly one axis, boldness. There was no moral grain
-    /// in a person at all, so "only the darkest would" had nothing to hang on.
-    ///
-    /// ROLLED LOW ON PURPOSE, and hard-gated below: most people are simply not
-    /// capable, and no famine, no cruel god and no precedent moves them. That
-    /// is not a balance dial, it is the point - a village where everyone would
-    /// eventually eat their dead is a village of monsters, and the story worth
-    /// watching is the one where most of them starve instead.
-    ///
-    /// It will carry far more than this in time: who volunteers to fight, who
-    /// takes revenge, who proposes a sacrifice.
-    #[serde(default)]
+    /// Brett: "some people would never... only the darkest of personalities
+    /// would do something like that", and then, plainly: "perceptability to
+    /// evil proclivities needs to be tracked doesnt it?" It does, and until
+    /// this nothing did.
     pub darkness: f32,
     /// How well this person reasons about what they have seen.
     ///
-    /// 0 is simple, 1 is sharp. It is NOT a competence stat - nothing works
-    /// faster for being clever. It is about READING THE WORLD, and it exists
-    /// because of a mechanism Brett named that darkness cannot cover:
-    /// "Sometimes unintelligent may do dark deeds because they think it is the
-    /// right thing to do... they may feel they are being good when they
-    /// arent."
-    ///
-    /// Which is a second and entirely separate road to a terrible act:
-    ///
-    /// - THE DARK know it is wrong and do it anyway. Hunger against
-    ///   conscience, and conscience loses.
-    /// - THE SIMPLE do not know it is wrong at all. They watched their god
-    ///   throw a man down a hillside and drew the obvious conclusion about
-    ///   what it wants, and now they are trying to please it.
-    ///
-    /// And the inversion at the heart of it: FAITH MAKES THE SIMPLE WORSE.
-    /// For anyone who can reason, trusting the god is the thing that holds
-    /// them - they have something to answer to. For someone who cannot,
-    /// trusting a cruel god is the argument FOR. The devout simpleton is the
-    /// most dangerous person in a village with a violent god, and he is doing
-    /// his sincere best the whole time.
+    /// 0 is simple, 1 is sharp. NOT a competence stat - nothing works faster
+    /// for being clever. It is about READING THE WORLD, and it exists for a
+    /// mechanism darkness cannot cover. Brett: "sometimes unintelligent may do
+    /// dark deeds because they think it is the right thing to do... they may
+    /// feel they are being good when they arent."
     #[serde(default = "sharp_enough")]
     pub wits: f32,
+    /// How heavily another person's suffering sits on this one.
+    ///
+    /// Nothing reads it yet, and it is here anyway - Brett: "its okay to ad a
+    /// trait or something that we know may get used down the road... Variables
+    /// don't really cost anything but they could ad some flavor at a minimum."
+    /// It is the axis the regard system will want first: who grieves, who
+    /// helps, and who walks past.
+    #[serde(default = "half")]
+    pub warmth: f32,
+    /// How badly this person needs the god to notice them. See [`Nature`].
+    #[serde(default = "half")]
+    pub fervor: f32,
+    /// The grain they were born with. Weathering never touches it, and it is
+    /// what their children inherit.
+    #[serde(default)]
+    pub born: Nature,
 }
 
 /// What a person loaded from a save before wits existed is worth.
@@ -539,10 +631,22 @@ fn sharp_enough() -> f32 {
     0.7
 }
 
+fn half() -> f32 {
+    0.5
+}
+
 /// The same, for the save file's own default.
 pub fn sharp_enough_save() -> f32 {
     sharp_enough()
 }
+
+/// The most a whole life can move any one axis from the grain it started with.
+///
+/// Bounded on purpose. A person can be hardened, frightened or made devout by
+/// what happens to them; they cannot be turned into somebody else. A gentle man
+/// ground down by a terrible god ends up hard, never monstrous - the monstrous
+/// have to be BORN, which keeps them rare and keeps the roll meaningful.
+pub const MOST_A_LIFE_MOVES: f32 = 0.28;
 
 /// Below this nobody is capable of anything the doctrine weighs, ever.
 ///
@@ -559,28 +663,51 @@ pub const SIMPLE: f32 = 0.3;
 
 impl Temperament {
     pub fn random(rng: &mut Rng) -> Self {
+        Temperament::of(Nature::random(rng))
+    }
+
+    /// Somebody who has lived no life yet: they are exactly their grain.
+    pub fn of(born: Nature) -> Self {
         Temperament {
-            boldness: rng.trait_value(0.15, 0.95),
-            // THE LEAST OF THREE, which is what makes the darkest of them
-            // rare rather than merely uncommon. A flat roll puts a fifth of
-            // any village at the top of the scale; three rolls and keep the
-            // lowest puts them in the low single figures, which is about how
-            // often somebody is capable of the thing this measures.
-            darkness: rng
-                .trait_value(0.0, 1.0)
-                .min(rng.trait_value(0.0, 1.0))
-                .min(rng.trait_value(0.0, 1.0)),
-            // A whole spread, and no bias: most people are somewhere in the
-            // middle and a village has its sharp ones and its simple ones.
-            wits: rng.trait_value(0.08, 0.95),
+            boldness: born.boldness,
+            darkness: born.darkness,
+            wits: born.wits,
+            warmth: born.warmth,
+            fervor: born.fervor,
+            born,
         }
+    }
+
+    /// A child of these two parents.
+    pub fn child(mother: &Temperament, father: &Temperament, rng: &mut Rng) -> Self {
+        // FROM THE GRAIN, NOT THE PERSON. What the parents have been through is
+        // theirs to carry; what they were born as is the child's to start from.
+        Temperament::of(Nature::inherit(&mother.born, &father.born, rng))
+    }
+
+    /// Bends one axis by what has happened to them, within what a life can do.
+    ///
+    /// The bound is always measured from the GRAIN, so a person weathered hard
+    /// in one direction cannot then be weathered indefinitely in the other.
+    pub fn weather(&mut self, axis: Axis, by: f32) {
+        let (now, born) = match axis {
+            Axis::Boldness => (&mut self.boldness, self.born.boldness),
+            Axis::Darkness => (&mut self.darkness, self.born.darkness),
+            Axis::Wits => (&mut self.wits, self.born.wits),
+            Axis::Warmth => (&mut self.warmth, self.born.warmth),
+            Axis::Fervor => (&mut self.fervor, self.born.fervor),
+        };
+        *now = (*now + by).clamp(
+            (born - MOST_A_LIFE_MOVES).max(0.0),
+            (born + MOST_A_LIFE_MOVES).min(1.0),
+        );
     }
 
     /// Whether this person could ever do a thing that costs somebody else,
     /// under any pressure at all.
     ///
-    /// The hard gate, and it is deliberately a gate rather than a slope. Most
-    /// of a village answers no here and is never asked another question.
+    /// The hard gate, and deliberately a gate rather than a slope. Most of a
+    /// village answers no here and is never asked a second question.
     pub fn could_ever(&self) -> bool {
         self.darkness > COULD_NEVER
     }
@@ -588,31 +715,12 @@ impl Temperament {
     /// Whether this person could talk themselves into a terrible act by
     /// mistaking it for a good one.
     ///
-    /// `example` is how cruel their god has been to them, `trust` how much
-    /// they believe in it. Simple, devout, and shown violence: they are not
-    /// wicked, they are agreeing - and nothing about them will ever suggest
-    /// otherwise, because from the inside this is piety.
+    /// FAITH RUNS BACKWARDS HERE, which is the whole point of it. For anyone
+    /// who can reason, trusting the god is what holds them - they have
+    /// something to answer to. For someone who cannot, trust in a cruel god is
+    /// the argument FOR, and they are doing their sincere best throughout.
     pub fn misreads_the_god(&self, example: f32, trust: f32) -> bool {
         self.wits < SIMPLE && example > 0.55 && trust > 0.55
-    }
-
-    pub fn describe_wits(&self) -> &'static str {
-        match self.wits {
-            w if w < SIMPLE => "simple",
-            w if w < 0.6 => "plain",
-            w if w < 0.85 => "quick",
-            _ => "sharp",
-        }
-    }
-
-    /// A word for the grain of them, for the inspector.
-    pub fn describe_darkness(&self) -> &'static str {
-        match self.darkness {
-            d if d <= COULD_NEVER => "could never",
-            d if d < 0.72 => "hard",
-            d if d < 0.88 => "cold",
-            _ => "capable of anything",
-        }
     }
 
     /// A word for this temperament, for the inspector.
@@ -625,6 +733,70 @@ impl Temperament {
             _ => "fearless",
         }
     }
+
+    pub fn describe_wits(&self) -> &'static str {
+        match self.wits {
+            w if w < SIMPLE => "simple",
+            w if w < 0.6 => "plain",
+            w if w < 0.85 => "quick",
+            _ => "sharp",
+        }
+    }
+
+    pub fn describe_darkness(&self) -> &'static str {
+        match self.darkness {
+            d if d <= COULD_NEVER => "could never",
+            d if d < 0.72 => "hard",
+            d if d < 0.88 => "cold",
+            _ => "capable of anything",
+        }
+    }
+
+    /// THE WHOLE PERSON, IN ONE SENTENCE - and this is a rule the axes answer
+    /// to rather than a nicety.
+    ///
+    /// Dwarf Fortress can afford forty-six facets because its entire interface
+    /// is a text readout. The test that keeps depth from turning into noise is
+    /// whether a number can be SAID about somebody: an axis the inspector
+    /// cannot put in this sentence is not earning its place yet, however many
+    /// systems read it.
+    ///
+    /// ONLY THE REMARKABLE ENDS ARE SPOKEN, which is the one thing about DF's
+    /// presentation worth taking outright - a dwarf reads as a person because
+    /// you are shown the two or three ways they are unusual, never the forty
+    /// that sit in the middle of their range.
+    pub fn say_the_grain(&self) -> String {
+        let mut said: Vec<&str> = vec![self.describe()];
+        if self.wits < SIMPLE {
+            said.push("simple");
+        } else if self.wits > 0.85 {
+            said.push("sharp");
+        }
+        if self.warmth > 0.82 {
+            said.push("tender-hearted");
+        } else if self.warmth < 0.2 {
+            said.push("unmoved by others");
+        }
+        if self.fervor > 0.85 {
+            said.push("hungry for the god's eye");
+        } else if self.fervor < 0.12 {
+            said.push("indifferent to the god");
+        }
+        if self.could_ever() {
+            said.push(self.describe_darkness());
+        }
+        said.join(", ")
+    }
+}
+
+/// One axis of a temperament, for [`Temperament::weather`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Axis {
+    Boldness,
+    Darkness,
+    Wits,
+    Warmth,
+    Fervor,
 }
 
 /// What a villager is currently doing about something they saw.
@@ -1500,6 +1672,125 @@ mod tests {
         let round: Witnessed =
             serde_json::from_str(&serde_json::to_string(&fresh).unwrap()).unwrap();
         assert_eq!(round.recent, fresh.recent);
+    }
+
+    /// A BLOODLINE YOU CAN SEE. Average-plus-drift over four generations must
+    /// keep a family recognisably itself - which a coin flip per axis cannot,
+    /// and which is the entire reason for choosing this over Brett's first
+    /// instinct of fifty-fifty.
+    #[test]
+    fn a_family_resembles_itself_down_the_generations() {
+        let mut rng = Rng::new(4);
+        let bold = |v: f32| Nature {
+            boldness: v,
+            ..Nature::default()
+        };
+        let mut line = (
+            Temperament::of(bold(0.9)),
+            Temperament::of(bold(0.85)),
+        );
+        for _ in 0..4 {
+            let child = Temperament::child(&line.0, &line.1, &mut rng);
+            let mate = Temperament::of(bold(rng.trait_value(0.6, 0.95)));
+            line = (child, mate);
+        }
+        assert!(
+            line.0.boldness > 0.55,
+            "four generations of bold people must still be bold: {}",
+            line.0.boldness,
+        );
+
+        let mut timid_rng = Rng::new(4);
+        let mut timid = (
+            Temperament::of(bold(0.1)),
+            Temperament::of(bold(0.15)),
+        );
+        for _ in 0..4 {
+            let child = Temperament::child(&timid.0, &timid.1, &mut timid_rng);
+            let mate = Temperament::of(bold(timid_rng.trait_value(0.05, 0.4)));
+            timid = (child, mate);
+        }
+        assert!(
+            timid.0.boldness < line.0.boldness,
+            "and a timid line must still be the timid one: {} against {}",
+            timid.0.boldness,
+            line.0.boldness,
+        );
+    }
+
+    /// But a house is not a sentence. Sometimes a child is nothing like either
+    /// parent, which is the story no amount of averaging would ever tell.
+    #[test]
+    fn a_dark_child_can_be_born_in_a_gentle_house() {
+        let mut rng = Rng::new(31);
+        let gentle = Temperament::of(Nature {
+            darkness: 0.22,
+            ..Nature::default()
+        });
+        let jumps = (0..400)
+            .map(|_| Temperament::child(&gentle, &gentle, &mut rng))
+            .filter(|child| child.darkness > gentle.darkness + 0.25)
+            .count();
+        assert!(
+            jumps > 0,
+            "in four hundred children of one gentle house, at least one throws",
+        );
+        assert!(
+            jumps < 120,
+            "but it must stay a surprise rather than a habit: {jumps} of 400",
+        );
+    }
+
+    /// A LIFE BENDS A PERSON, AND NEVER REMAKES THEM. The bound is what keeps
+    /// the monstrous something you are born as rather than something a bad
+    /// enough god can manufacture out of anybody.
+    #[test]
+    fn weathering_is_bounded_by_the_grain() {
+        let mut soul = Temperament::of(Nature {
+            darkness: 0.1,
+            ..Nature::default()
+        });
+        for _ in 0..500 {
+            soul.weather(Axis::Darkness, 0.2);
+        }
+        assert!(
+            soul.darkness <= 0.1 + MOST_A_LIFE_MOVES + 1e-5,
+            "a whole life of horrors moves them this far and no further: {}",
+            soul.darkness,
+        );
+        assert!(
+            !soul.could_ever(),
+            "and a gentle soul ground down ends up hard, never monstrous",
+        );
+        assert_eq!(
+            soul.born.darkness, 0.1,
+            "the grain underneath is untouched, and it is what their children get",
+        );
+    }
+
+    /// Only the remarkable ends get spoken, which is what keeps a person from
+    /// reading as a stat block.
+    #[test]
+    fn the_unremarkable_are_described_briefly() {
+        let ordinary = Temperament::of(Nature::default());
+        assert_eq!(
+            ordinary.say_the_grain().split(", ").count(),
+            1,
+            "somebody with nothing unusual about them gets one word: {}",
+            ordinary.say_the_grain(),
+        );
+        let notable = Temperament::of(Nature {
+            boldness: 0.95,
+            darkness: 0.9,
+            wits: 0.1,
+            warmth: 0.05,
+            fervor: 0.95,
+        });
+        let said = notable.say_the_grain();
+        assert!(
+            said.split(", ").count() >= 4,
+            "and somebody remarkable gets a real sentence: {said}",
+        );
     }
 
     #[test]

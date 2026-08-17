@@ -227,38 +227,42 @@ mod tests {
 
     /// Somebody who could, if pushed far enough. A rare person.
     fn one_of_the_few() -> crate::witness::Temperament {
-        crate::witness::Temperament {
+        crate::witness::Temperament::of(crate::witness::Nature {
             boldness: 0.5,
             darkness: 0.8,
             wits: 0.7,
-        }
+            ..Default::default()
+        })
     }
 
     /// Simple, and devout. Not wicked at all - and that is the danger.
     fn a_devout_simpleton() -> crate::witness::Temperament {
-        crate::witness::Temperament {
+        crate::witness::Temperament::of(crate::witness::Nature {
             boldness: 0.5,
             darkness: 0.05,
             wits: 0.15,
-        }
+            ..Default::default()
+        })
     }
 
     /// Just over the line, which is where most of the capable few sit.
     fn barely_capable() -> crate::witness::Temperament {
-        crate::witness::Temperament {
+        crate::witness::Temperament::of(crate::witness::Nature {
             boldness: 0.5,
             darkness: 0.6,
             wits: 0.7,
-        }
+            ..Default::default()
+        })
     }
 
     /// And the ordinary sort, who could not, ever.
     fn most_people() -> crate::witness::Temperament {
-        crate::witness::Temperament {
+        crate::witness::Temperament::of(crate::witness::Nature {
             boldness: 0.5,
             darkness: 0.2,
             wits: 0.7,
-        }
+            ..Default::default()
+        })
     }
 
     fn who_saw(kinds: &[DivineEventKind]) -> Witnessed {
@@ -402,11 +406,12 @@ mod tests {
         );
 
         // And a simple man who does not believe has no theology to misread.
-        let faithless = crate::witness::Temperament {
+        let faithless = crate::witness::Temperament::of(crate::witness::Nature {
             wits: 0.15,
             darkness: 0.05,
             boldness: 0.5,
-        };
+            ..Default::default()
+        });
         assert!(
             !village.permits(Tenet::EatTheDead, 0.9, cruel, 0.1, &faithless),
             "without faith there is no lesson to take wrongly",
