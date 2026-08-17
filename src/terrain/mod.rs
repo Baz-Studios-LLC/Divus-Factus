@@ -1063,13 +1063,32 @@ impl Terrain {
 
     /// Dampness in `[0, 1]`, driving surface color and scatter density.
     pub fn moisture_at(&self, x: f32, z: f32) -> f32 {
-        fbm_3d(
-            direction_at(x, z) * spherical(0.0045) + Vec3::new(17.0, -9.0, 5.0),
+        let dir = direction_at(x, z);
+        let weather = fbm_3d(
+            dir * spherical(0.0045) + Vec3::new(17.0, -9.0, 5.0),
             self.seed ^ 0x5eed,
             3,
             2.0,
             0.5,
-        )
+        );
+
+        // AND THE RAIN HAS ITS OWN LATITUDES. Warm wet air rises at the
+        // equator and drops what it carries there; it comes back down about
+        // thirty degrees out, dry, and takes what little is left with it.
+        // Which is why the deserts of a real world are not on its equator but
+        // in two belts either side of it, and why the rainforest is on it.
+        //
+        // Noise alone gave neither: deserts turned up wherever the field
+        // happened to dip, which on a planet with a sun over it reads as no
+        // reason at all. Three bands - wet, dry, wet - and the noise stays as
+        // the weather that keeps them from being stripes.
+        let from_equator = dir.y.abs().clamp(0.0, 1.0);
+        // Peaks at the equator, troughs near thirty degrees, and recovers
+        // toward the temperate latitudes before the cold caps dry out again.
+        let cells = (from_equator * std::f32::consts::TAU * 0.75).cos();
+        let banded = 0.5 + cells * 0.28;
+
+        (banded * 0.68 + weather * 0.42).clamp(0.0, 1.0)
     }
 
     /// Forest density in `[0, 1]` — the same field the scatterer seeds trees
@@ -1127,15 +1146,37 @@ impl Terrain {
     /// already in hand, for the same bulk-sampling reason as
     /// [`biome_for`](Self::biome_for) — the planet asks this once per vertex.
     pub fn temperature_for(&self, x: f32, z: f32, height: f32) -> f32 {
+        let dir = direction_at(x, z);
+
+        // THE SUN DECIDES THE CLIMATE, and until now nothing did. Temperature
+        // was fbm noise minus altitude, with no notion of where on the planet
+        // a place was - so a survey of one world found conifer forest at the
+        // pole AND at the equator, temperature RISING from equator to pole
+        // before falling again, and deserts almost nowhere. Weather-shaped
+        // static, on a world with a real orbiting sun over it.
+        //
+        // `dir.y` is the sine of the latitude, straight off the sphere, and it
+        // folds over the poles correctly for free - which a `z` read as a
+        // distance would not. Squared, it gives broad tropics and sharp cold
+        // caps rather than a linear ramp, which is roughly how insolation
+        // actually falls off and reads far better from orbit: a green belt, two
+        // temperate bands, two white crowns.
+        let from_equator = dir.y.abs().clamp(0.0, 1.0);
+        let sunlit = 1.0 - from_equator * from_equator;
+
+        // The noise stays, as WEATHER over the climate rather than instead of
+        // it: it is what keeps the bands from reading as painted stripes, and
+        // what lets a warm valley sit inside a cold latitude.
         let base = fbm_3d(
-            direction_at(x, z) * spherical(0.00042) + Vec3::new(-400.0, 250.0, 90.0),
+            dir * spherical(0.00042) + Vec3::new(-400.0, 250.0, 90.0),
             self.seed ^ 0x7e11,
             3,
             2.0,
             0.5,
         );
+
         let altitude = ((height - WATER_LEVEL) / 120.0).clamp(0.0, 1.0);
-        (base - altitude * 0.55).clamp(0.0, 1.0)
+        (0.15 + sunlit * 0.7 + (base - 0.5) * 0.3 - altitude * 0.55).clamp(0.0, 1.0)
     }
 
     /// Which biome a position falls in.
@@ -2395,17 +2436,138 @@ mod tests {
     use super::*;
     use bevy::mesh::VertexAttributeValues;
 
-    /// The title asks whether the ground it is about to dive onto is built,
-    /// and that is NOT the same question as whether the current view is
-    /// complete.
+    /// A planet with a sun over it is hot at the middle and cold at the ends.
     ///
-    /// This is the whole of the loading-screen bug. From the title vantage
-    /// the camera is far enough out to hold the planet, so it wants no
-    /// chunks: `wanted` is 0, and `is_complete`'s `wanted > 0` guard makes it
-    /// false forever. Begin asked that question, and so every new world got a
-    /// loading screen however long the world had been standing finished
-    /// behind the menu. The test fails on the old question and passes on the
-    /// new one.
+    /// Temperature used to be fbm noise minus altitude and nothing else, so it
+    /// had no idea where on the world it was: a survey of one planet found
+    /// conifer forest at the pole AND at the equator, and temperature RISING
+    /// from equator to pole before falling again. Averaged across longitudes
+    /// so the weather cannot outvote the climate.
+    #[test]
+    fn the_planet_is_hot_at_its_middle_and_cold_at_its_ends() {
+        let land = Terrain::new(7);
+        let quarter = crate::terrain::planet_circumference() * 0.25;
+        let mean_at = |share: f32| {
+            let z = share * quarter;
+            let mut total = 0.0;
+            const LOOKS: usize = 240;
+            for i in 0..LOOKS {
+                let x = (i as f32 / LOOKS as f32 - 0.5) * crate::terrain::planet_circumference();
+                total += land.temperature_for(x, z, WATER_LEVEL + 1.0);
+            }
+            total / LOOKS as f32
+        };
+        let equator = mean_at(0.0);
+        let middling = mean_at(0.5);
+        let pole = mean_at(1.0);
+        assert!(
+            equator > middling && middling > pole,
+            "temperature must fall from the equator to the pole, and it goes \
+             {equator:.2} -> {middling:.2} -> {pole:.2}",
+        );
+        assert!(
+            equator - pole > 0.4,
+            "and it must fall FAR enough to be a climate rather than a lean: \
+             {equator:.2} at the equator against {pole:.2} at the pole",
+        );
+    }
+
+    /// The deserts of a real world are not on its equator but in two belts
+    /// either side of it, because that is where the air that rose at the
+    /// equator comes back down with nothing left in it.
+    ///
+    /// Noise alone put them wherever the field happened to dip, which on a
+    /// planet with a sun over it reads as no reason at all.
+    #[test]
+    fn the_deserts_lie_off_the_equator() {
+        // Two worlds, because one seed agreeing is a coincidence.
+        for seed in [7u32, 4242] {
+            let land = Terrain::new(seed);
+            let quarter = crate::terrain::planet_circumference() * 0.25;
+            let arid_share = |share: f32| {
+                let z = share * quarter;
+                let (mut arid, mut land_seen) = (0.0f32, 0.0f32);
+                const LOOKS: usize = 400;
+                for i in 0..LOOKS {
+                    let x =
+                        (i as f32 / LOOKS as f32 - 0.5) * crate::terrain::planet_circumference();
+                    let h = land.height_at(x, z);
+                    if h <= WATER_LEVEL {
+                        continue;
+                    }
+                    land_seen += 1.0;
+                    if land.biome_for(x, z, h) == Biome::Arid {
+                        arid += 1.0;
+                    }
+                }
+                if land_seen == 0.0 { 0.0 } else { arid / land_seen }
+            };
+            let equator = arid_share(0.0);
+            let subtropics = (arid_share(0.25) + arid_share(-0.25)) * 0.5;
+            assert!(
+                subtropics > equator,
+                "world {seed}: the dry belts belong off the equator, and the \
+                 equator has {:.0}% arid against the subtropics' {:.0}%",
+                equator * 100.0,
+                subtropics * 100.0,
+            );
+        }
+    }
+
+    /// The rain falls on the equator and not at thirty degrees.
+    ///
+    /// A companion to the deserts test above, which does NOT prove this: with
+    /// temperature banded and moisture left as noise, the dry belts still land
+    /// off the equator, because the equator is simply too wet-or-cold-adjacent
+    /// to qualify. That test passes either way. This one asks the moisture
+    /// field itself, which is the only thing that can tell the two apart.
+    #[test]
+    fn the_rain_falls_on_the_equator_and_not_at_thirty_degrees() {
+        let land = Terrain::new(7);
+        let quarter = crate::terrain::planet_circumference() * 0.25;
+        let mean_at = |share: f32| {
+            let z = share * quarter;
+            let mut total = 0.0;
+            const LOOKS: usize = 240;
+            for i in 0..LOOKS {
+                let x = (i as f32 / LOOKS as f32 - 0.5) * crate::terrain::planet_circumference();
+                total += land.moisture_at(x, z);
+            }
+            total / LOOKS as f32
+        };
+        let equator = mean_at(0.0);
+        let subtropics = (mean_at(0.28) + mean_at(-0.28)) * 0.5;
+        assert!(
+            equator > subtropics + 0.08,
+            "the wet belt belongs on the equator: {equator:.2} there against \
+             {subtropics:.2} in the dry latitudes",
+        );
+    }
+
+    /// And the caps are cold: no desert at the pole, whatever the noise says.
+    #[test]
+    fn the_poles_are_never_desert() {
+        for seed in [7u32, 4242, 11] {
+            let land = Terrain::new(seed);
+            let quarter = crate::terrain::planet_circumference() * 0.25;
+            for share in [-1.0f32, 1.0] {
+                let z = share * quarter;
+                for i in 0..200 {
+                    let x = (i as f32 / 200.0 - 0.5) * crate::terrain::planet_circumference();
+                    let h = land.height_at(x, z);
+                    if h <= WATER_LEVEL {
+                        continue;
+                    }
+                    assert_ne!(
+                        land.biome_for(x, z, h),
+                        Biome::Arid,
+                        "world {seed} has dry scrub at its pole",
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn the_landing_is_ready_even_when_the_view_wants_nothing() {
         let mut chunks = LoadedChunks::default();
