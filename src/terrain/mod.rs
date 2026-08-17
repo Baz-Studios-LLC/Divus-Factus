@@ -263,7 +263,11 @@ impl Biome {
             Biome::Temperate => &palette::SCRUB,
             Biome::Boreal => &palette::GRASS,
             Biome::Arid => &palette::EARTH,
-            Biome::Wetland => &palette::GRASS,
+            // Mud, not more grass. Wet country drifting toward grass in its
+            // pale patches is just temperate woodland twice over - and those
+            // two were the closest pair left in the game, 0.037 apart and
+            // both plain green.
+            Biome::Wetland => &palette::EARTH,
             Biome::Alpine => &palette::EARTH,
         }
     }
@@ -274,7 +278,7 @@ impl Biome {
             Biome::Temperate => (&palette::GRASS, 0.06),
             Biome::Boreal => (&palette::FOLIAGE, -0.12),
             Biome::Arid => (&palette::SCRUB, 0.05),
-            Biome::Wetland => (&palette::FOLIAGE, 0.10),
+            Biome::Wetland => (&palette::FOLIAGE, -0.06),
             Biome::Alpine => (&palette::STONE, 0.12),
         }
     }
@@ -1610,6 +1614,24 @@ pub(crate) fn surface_color(
         palette::shade_smooth(&palette::SNOW, 0.5 + shade_t * 0.5),
         snow.max(cold_country),
     );
+
+    // STANDING WATER ON THE FLAT. A marsh is not damp lawn; it is ground with
+    // water lying on it, and the water is what the eye reads. Only where it
+    // could actually stand - the flat and the hollows, never a slope - and
+    // patchy, so it comes out as pools between the reeds rather than a green
+    // wash. It goes on before the banks, which still get the last word at a
+    // river's edge.
+    let composed = if biome == Biome::Wetland {
+        let lying = ((patch - 0.42) / 0.40).clamp(0.0, 1.0);
+        let flat = 1.0 - (slope / 0.16).clamp(0.0, 1.0);
+        blend(
+            composed,
+            palette::shade_blend(&palette::WATER, &palette::FOLIAGE, 0.35, 0.35 + shade_t * 0.3),
+            lying * flat * 0.62,
+        )
+    } else {
+        composed
+    };
 
     // Banks last, over everything: bare earth at the water's edge, kept muted so
     // it reads as damp soil rather than an orange highlight.

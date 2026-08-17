@@ -82,6 +82,8 @@ pub enum TreeKind {
     Snag,
     /// Tall, narrow and dark, with snow lying on its branches. Boreal.
     Pine,
+    /// A clump of tall thin blades standing in wet ground. Wetland.
+    Reed,
     /// A column with an arm or two, green and ribbed. Desert only.
     Cactus,
     /// Low dry brush: a knot of sticks near the ground, going nowhere.
@@ -97,7 +99,7 @@ impl TreeKind {
     /// plants a forester would have walked out and chopped one down for
     /// building wood. Scenery is allowed to be only scenery.
     pub fn yields_timber(self) -> bool {
-        !matches!(self, TreeKind::Cactus | TreeKind::Brush)
+        !matches!(self, TreeKind::Cactus | TreeKind::Brush | TreeKind::Reed)
     }
 
     /// Which trees grow in a biome, as weighted choices.
@@ -120,7 +122,10 @@ impl TreeKind {
             // see from anywhere is worth more than a forest of them - and a
             // palm still turns up where there is water enough to hold one.
             Biome::Arid => &[Brush, Brush, Brush, Cactus, Cactus, Snag, Palm],
-            Biome::Wetland => &[Broadleaf, Broadleaf, Palm, Conifer],
+            // The reeds are what makes wet country read as wet country: a
+            // stand of them between the trees, thick enough that the eye sees
+            // them first. The broadleaves are still there, standing in it.
+            Biome::Wetland => &[Reed, Reed, Reed, Reed, Broadleaf, Broadleaf, Palm],
             Biome::Alpine => &[Conifer, Snag],
         }
     }
@@ -142,6 +147,12 @@ fn bake_tree(builder: &mut MeshBuilder, position: Vec3, kind: TreeKind, rng: &mu
         TreeKind::Snag => Tone {
             ramp: palette::RAMP_WOOD,
             step: rng.range_i(0, 1) as usize,
+        },
+        // Reeds are not wood at all: pale and dry-tipped, closer to straw
+        // than to bark.
+        TreeKind::Reed => Tone {
+            ramp: palette::RAMP_SCRUB,
+            step: rng.range_i(2, 4) as usize,
         },
         // A pine's trunk is darker and redder than a broadleaf's, and mostly
         // hidden anyway - the silhouette does the work.
@@ -260,6 +271,32 @@ fn bake_tree(builder: &mut MeshBuilder, position: Vec3, kind: TreeKind, rng: &mu
                         length,
                     )),
                     palette::color_at(leaf.palette_index()),
+                );
+            }
+        }
+
+        // A CLUMP OF BLADES. No trunk, no canopy: six or eight thin uprights
+        // out of one wet spot, each leaning its own way, tall enough to hide
+        // a duck and thin enough to see through. It is the plant that makes
+        // wet ground read as wet ground.
+        TreeKind::Reed => {
+            let tall = height * rng.range(0.22, 0.38);
+            let span = tall * rng.range(0.18, 0.30);
+            for _ in 0..rng.range_i(6, 9) {
+                let angle = rng.range(0.0, std::f32::consts::TAU);
+                let out = span * rng.range(0.1, 1.0);
+                let lean = rng.range(0.05, 0.28);
+                let blade = tall * rng.range(0.7, 1.15);
+                let (sin, cos) = angle.sin_cos();
+                builder.push_box(
+                    Transform::from_translation(
+                        position + Vec3::new(cos * out, blade * 0.5, sin * out),
+                    )
+                    .with_rotation(
+                        Quat::from_rotation_y(-angle) * Quat::from_rotation_z(lean),
+                    )
+                    .with_scale(Vec3::new(tall * 0.035, blade, tall * 0.035)),
+                    palette::color_at(bark.shifted(rng.range_i(-1, 1)).palette_index()),
                 );
             }
         }
