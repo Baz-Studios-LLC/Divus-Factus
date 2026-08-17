@@ -46,6 +46,12 @@ const FACES: [([usize; 4], Vec3); 6] = [
 ];
 
 impl MeshBuilder {
+    /// Every corner pushed so far. For looking at what was built - the
+    /// ignored drawing tests read this to print a shape as text.
+    pub fn corners(&self) -> &[[f32; 3]] {
+        &self.positions
+    }
+
     pub fn is_empty(&self) -> bool {
         self.indices.is_empty()
     }

@@ -165,6 +165,21 @@ impl TreeKind {
     }
 }
 
+/// Whether reeds could stand at this spot: close enough to still water, or
+/// on a river's bank.
+///
+/// Six meters of freeboard is about a bank, and five channel-widths out from
+/// a river covers the flat ground a river actually wets. Beyond either, the
+/// ground is simply damp country, and damp country grows trees.
+fn reeds_could_stand(terrain: &crate::terrain::Terrain, x: f32, z: f32, height: f32) -> bool {
+    if height < WATER_LEVEL + 6.0 {
+        return true;
+    }
+    terrain
+        .river_influence_at(x, z)
+        .is_some_and(|(_, d, w)| d < crate::terrain::rivers::CHANNEL_HALF_WIDTH * w * 5.0)
+}
+
 /// Bakes a tree of the given kind into `builder`.
 fn bake_tree(builder: &mut MeshBuilder, position: Vec3, kind: TreeKind, rng: &mut Rng) {
     // Half again the old stand: trees used to read stubby beside the houses.
@@ -313,23 +328,68 @@ fn bake_tree(builder: &mut MeshBuilder, position: Vec3, kind: TreeKind, rng: &mu
         // out of one wet spot, each leaning its own way, tall enough to hide
         // a duck and thin enough to see through. It is the plant that makes
         // wet ground read as wet ground.
+        // A STAND OF CATTAILS. Brett, looking at eight of them: "it looks
+        // like a pile of sticks lol", then: "maybe we can give them cat tail
+        // tips or something and have them going straight up, some with the
+        // cat tail tips and some not with all different heights."
+        //
+        // It was a pile of sticks - six to nine stalks, each a thirtieth of
+        // its own height thick, leaning off in every direction, which is a
+        // description of firewood stacked upright. What makes a reed bed read
+        // as one is the opposite of all three: MANY stalks, THIN, and STRAIGHT
+        // UP. A cattail does not lean; it stands until something knocks it
+        // over. And the heights are what keeps it from being a comb - not the
+        // angles.
         TreeKind::Reed => {
             let tall = height * rng.range(0.22, 0.38);
-            let span = tall * rng.range(0.18, 0.30);
-            for _ in 0..rng.range_i(6, 9) {
+            let span = tall * rng.range(0.34, 0.55);
+            for _ in 0..rng.range_i(20, 32) {
                 let angle = rng.range(0.0, std::f32::consts::TAU);
-                let out = span * rng.range(0.1, 1.0);
-                let lean = rng.range(0.05, 0.28);
-                let blade = tall * rng.range(0.7, 1.15);
+                // Square-rooted so the stand fills its circle instead of
+                // crowding the middle, which is where a bundle comes from.
+                let out = span * rng.range(0.05, 1.0).sqrt();
+                // Upright, with only enough tilt that they are not a printed
+                // pattern. This was a shared wind of a fifth of a radian and
+                // it made the bed look combed over.
+                let tilt = rng.range(-0.05, 0.05);
+                let blade = tall * rng.range(0.35, 1.3);
                 let (sin, cos) = angle.sin_cos();
+                let stalk = tall * rng.range(0.010, 0.017);
+                let stands = Quat::from_rotation_y(-angle) * Quat::from_rotation_z(tilt);
                 builder.push_box(
                     Transform::from_translation(
                         position + Vec3::new(cos * out, blade * 0.5, sin * out),
                     )
-                    .with_rotation(Quat::from_rotation_y(-angle) * Quat::from_rotation_z(lean))
-                    .with_scale(Vec3::new(tall * 0.035, blade, tall * 0.035)),
+                    .with_rotation(stands)
+                    .with_scale(Vec3::new(stalk, blade, stalk)),
                     palette::color_at(bark.shifted(rng.range_i(-1, 1)).palette_index()),
                 );
+                // THE CATTAIL: a dark brown sausage at the top, three times
+                // the width of the stalk under it. Only some of them carry
+                // one - a bed where every stalk had a head would read as a
+                // pattern, and half of what a real one looks like is the bare
+                // stalks standing between the heads.
+                if rng.chance(0.45) {
+                    let head = blade * rng.range(0.12, 0.18);
+                    builder.push_box(
+                        Transform::from_translation(
+                            position + Vec3::new(cos * out, blade + head * 0.35, sin * out),
+                        )
+                        .with_rotation(stands)
+                        .with_scale(Vec3::new(
+                            stalk * 3.0,
+                            head,
+                            stalk * 3.0,
+                        )),
+                        palette::color_at(
+                            Tone {
+                                ramp: palette::RAMP_WOOD,
+                                step: rng.range_i(0, 1) as usize,
+                            }
+                            .palette_index(),
+                        ),
+                    );
+                }
             }
         }
 
@@ -797,7 +857,28 @@ fn populate_chunks(
                         stripped.growth_at(x, z, today)
                     };
                     if rng.chance(tree_chance * (0.55 + density)) {
-                        let kind = *rng.pick(TreeKind::for_biome(biome));
+                        let mut kind = *rng.pick(TreeKind::for_biome(biome));
+                        // REEDS GROW AT THE WATER, and nowhere else. Brett:
+                        // "these things are EVERYWHERE!!! There are way to
+                        // manny, plus I am not even really sure what they
+                        // are."
+                        //
+                        // They were four sevenths of everything wet country
+                        // grew, over the whole biome - and wet country is not
+                        // a swamp from edge to edge, it is ordinary ground
+                        // with water in it. So a stand of reeds stood on dry
+                        // hillsides half a kilometer from the nearest puddle,
+                        // which is both wrong and the reason there were so
+                        // many. Now they need a shore or a bank, and anywhere
+                        // else the spot grows whatever else the country has.
+                        if kind == TreeKind::Reed && !reeds_could_stand(&terrain, x, z, height) {
+                            let dry: Vec<TreeKind> = TreeKind::for_biome(biome)
+                                .iter()
+                                .copied()
+                                .filter(|k| *k != TreeKind::Reed)
+                                .collect();
+                            kind = *rng.pick(&dry);
+                        }
                         if !matches!(growth, Growth::Cleared | Growth::Empty) {
                             stands.push((local, kind, growth));
                         }
@@ -1008,6 +1089,25 @@ fn populate_chunks(
                 // Only what a forester could actually take is timber.
                 if body.kind.yields_timber() {
                     commands.entity(stem).insert(FellableTree { maturity: 1.0 });
+                } else {
+                    // AND WHAT IS NOT TIMBER CANNOT BE LIFTED EITHER. Brett,
+                    // on the reeds: "when you pick one up the ghost and
+                    // pickup is broken."
+                    //
+                    // It was. The hand's tree path needs `FellableTree`, and
+                    // a reed is not lumber - so a grab on one fell through to
+                    // the generic pickup and lifted THIS ENTITY, which is a
+                    // bare pick handle with no mesh on it at all: the plant's
+                    // geometry is baked into the grove and stays there. The
+                    // god came away holding nothing, and the reeds never
+                    // moved.
+                    //
+                    // `Rooted` is the existing answer to exactly this - hover
+                    // it, inspect it, but never close a hand on it. Which is
+                    // right for reeds, brush and cactus alike: none of them
+                    // is a resource, and a fistful of reeds is not a thing
+                    // the god has any use for.
+                    commands.entity(stem).insert(crate::hand::Rooted);
                 }
             }
         }
@@ -2452,6 +2552,40 @@ mod tests {
 
             let distinct: std::collections::HashSet<_> = kinds.iter().collect();
             assert!(distinct.len() >= 2, "{biome:?} grows only one kind of tree");
+        }
+    }
+}
+
+#[cfg(test)]
+mod reed_look {
+    use super::*;
+
+    /// Prints a reed bed from the side, for a human to judge. Ignored: this
+    /// is a look at the thing, not a check on it.
+    #[test]
+    #[ignore]
+    fn draw_a_reed_bed() {
+        let mut builder = MeshBuilder::default();
+        bake_tree(&mut builder, Vec3::ZERO, TreeKind::Reed, &mut Rng::new(7));
+        let points = builder.corners();
+        let high = points.iter().map(|p| p[1]).fold(0.0f32, f32::max);
+        let wide = points
+            .iter()
+            .map(|p| p[0].abs().max(p[2].abs()))
+            .fold(0.0f32, f32::max);
+        let mut grid = [[b' '; 101]; 34];
+        for tri in points.chunks(3) {
+            for p in tri {
+                let col = ((p[0] / wide.max(0.001) * 0.5 + 0.5) * 100.0).round() as i32;
+                let row = (33.0 - p[1] / high.max(0.001) * 33.0).round() as i32;
+                if (0..101).contains(&col) && (0..34).contains(&row) {
+                    grid[row as usize][col as usize] = b'#';
+                }
+            }
+        }
+        println!("--- a reed bed, {high:.1}m tall, {wide:.1}m across ---");
+        for row in grid {
+            println!("{}", String::from_utf8_lossy(&row).trim_end());
         }
     }
 }

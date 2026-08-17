@@ -363,7 +363,13 @@ const BONE: Vec3 = Vec3::new(0.86, 0.83, 0.76);
 
 /// How thick the mist gets at its very thickest, before the hour and the
 /// altitude take their share.
-const STRENGTH: f32 = 0.06;
+///
+/// Cut a fifth on 2026-08-17 - Brett: "reduce the fog thickness by about 20%
+/// across the board." Note that this and `THICKEST` are BOTH cut by the same
+/// fifth, and that this is what makes the cut uniform: thin air is governed
+/// by this one and the heaviest valley by the ceiling, so scaling only one of
+/// them would have thinned half the world and left the other half alone.
+const STRENGTH: f32 = 0.048;
 
 /// The most the mist may ever hide.
 ///
@@ -373,7 +379,9 @@ const STRENGTH: f32 = 0.06;
 /// a misty valley that has lost its faceting has stopped looking like this
 /// game. Depth still stacks up to here; it simply never gets to erase the
 /// drawing.
-const THICKEST: f32 = 0.62;
+///
+/// Cut by the same fifth as `STRENGTH`, for the reason given there.
+const THICKEST: f32 = 0.5;
 
 /// How far down the ray the march looks, in meters.
 ///
