@@ -3,6 +3,7 @@
 
 mod attention;
 mod avatar;
+mod blood;
 mod calendar;
 mod camera;
 mod camp;
@@ -30,6 +31,7 @@ mod palette;
 mod place;
 mod planet;
 mod proclaim;
+mod raid;
 mod render;
 mod rng;
 mod save;
@@ -261,6 +263,7 @@ fn main() {
             founding::FoundingPlugin,
             fog::FogPlugin,
             mist::MistPlugin,
+            blood::BloodPlugin,
             globe::GlobePlugin,
             debug::timings::TimingsPlugin,
             debug::ordo_trial::OrdoTrialPlugin,

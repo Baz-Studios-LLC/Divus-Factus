@@ -438,6 +438,7 @@ pub(super) fn take_shelter(
             &Needs,
             &mut Activity,
             &mut MoveTarget,
+            Option<&crate::raid::TakingCover>,
         ),
         (
             With<Villager>,
@@ -458,7 +459,8 @@ pub(super) fn take_shelter(
     let pouring = weather.intensity > 0.6;
     let fire_pos = fires.iter().next().map(|f| f.translation);
 
-    for (transform, home, needs, mut activity, mut target) in &mut villagers {
+    for (transform, home, needs, mut activity, mut target, taking_cover) in &mut villagers {
+        let taking_cover = taking_cover.is_some();
         // The starving do not wait out the rain: wet and fed beats dry
         // and dead, and the food systems own them until they have eaten.
         if needs.hunger > 0.7 {
@@ -466,6 +468,14 @@ pub(super) fn take_shelter(
                 *activity = Activity::Idle;
                 target.0 = None;
             }
+            continue;
+        }
+        // The rain does not get to send a village back outdoors mid-raid.
+        // `raid::take_cover` owns anybody wearing `TakingCover`, and this
+        // system's first act on a dry day is to put every shelterer back to
+        // Idle - which would have marched the whole village out into the
+        // goblins the moment it stopped raining.
+        if taking_cover {
             continue;
         }
         if !pouring {

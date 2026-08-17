@@ -279,11 +279,26 @@ impl Plugin for VillagerPlugin {
                     rites::mark_the_dead,
                     rites::mourn,
                     rites::burials,
-                    alarm::somebody_runs_for_the_bell,
-                    alarm::ring_the_bell,
-                    alarm::swing_the_bell,
-                    alarm::take_fright,
-                    alarm::probe_the_alarm,
+                    // Nested, because this tuple sits at Bevy's chain
+                    // ceiling: past it the error is a trait bound on a tuple
+                    // of two dozen underscores that names no limit at all.
+                    // The alarm and the raid are one story anyway - a band
+                    // arrives, somebody sees it, somebody runs.
+                    (
+                        alarm::somebody_runs_for_the_bell,
+                        alarm::ring_the_bell,
+                        alarm::swing_the_bell,
+                        alarm::take_fright,
+                        alarm::probe_the_alarm,
+                        crate::raid::camps_remember,
+                        crate::raid::muster_a_warband,
+                        crate::raid::the_warband_marches,
+                        crate::raid::the_alarm_is_raised,
+                        crate::raid::take_cover,
+                        crate::raid::probe_the_raid,
+                        aim_at_a_worker,
+                    )
+                        .chain(),
                     seek_company,
                     speech::muse_the_watched,
                     speech::remember_what_was_said,
@@ -2435,6 +2450,22 @@ pub(crate) fn spawn_settlement(
                 fire,
                 &mut wildlife_rng,
             );
+            // AND THE CAMP AS A THING THAT WANTS. Separate from the props,
+            // because what a band is hungry for and what it is owed outlives
+            // any particular hut - and because a goblin needs somewhere to
+            // belong that is not just a coordinate it walks back to.
+            let camp_of = commands
+                .spawn((
+                    Name::new("A goblin camp"),
+                    crate::raid::Camp {
+                        fire,
+                        grudge: 0.0,
+                        pressed: 0.0,
+                        weighed: 0.0,
+                        last_raid: None,
+                    },
+                ))
+                .id();
 
             let band = 4 + (camp as u32 % 4);
             for _ in 0..band {
@@ -2459,6 +2490,7 @@ pub(crate) fn spawn_settlement(
                 );
                 commands.entity(entity).insert((
                     Activity::Idle,
+                    crate::raid::OfCamp(camp_of),
                     crate::creature::wildlife::Wild {
                         hunger: wildlife_rng.range(0.0, 0.5),
                         busy: 0.0,
@@ -2586,6 +2618,51 @@ fn stretch_settlement(
             }
         }
     }
+}
+
+/// Capture tooling: `DIVUS_FACTUS_AIM_WORKER` keeps the unattended camera on
+/// somebody who is actually at work, close enough to read what is in their
+/// hands.
+///
+/// The other `AIM_*` switches run once, at the founding, which is fine for a
+/// river or a goblin camp - both are there from the first frame. A villager
+/// who is WORKING is not: they are dealt a calling, walk to a site, and only
+/// then pick anything up, so a one-shot aim photographs an empty square.
+///
+/// Worth keeping. Every pass over how a tool or a weapon is held needs this
+/// exact shot, and the alternative is running the game and hoping somebody
+/// wanders through frame with an axe.
+fn aim_at_a_worker(
+    at_work: Query<(&Transform, &Activity), (With<Villager>, Without<crate::creature::Corpse>)>,
+    mut rigs: Query<&mut crate::camera::CameraRig>,
+) {
+    if crate::capture_path().is_none() || std::env::var("DIVUS_FACTUS_AIM_WORKER").is_err() {
+        return;
+    }
+    let Ok(mut rig) = rigs.single_mut() else {
+        return;
+    };
+    let Some(at) = at_work
+        .iter()
+        .find(|(_, activity)| **activity == Activity::Working)
+        .map(|(at, _)| at.translation)
+    else {
+        return;
+    };
+    rig.focus = at;
+    rig.target_focus = at;
+    // Close: this is a photograph of a pair of hands, not of a village.
+    let close = std::env::var("DIVUS_FACTUS_DISTANCE")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+        .unwrap_or(7.0);
+    rig.distance = close;
+    rig.target_distance = close;
+    rig.pitch = std::env::var("DIVUS_FACTUS_PITCH")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+        .unwrap_or(0.15);
+    rig.target_pitch = rig.pitch;
 }
 
 fn point_camera_at_settlement(

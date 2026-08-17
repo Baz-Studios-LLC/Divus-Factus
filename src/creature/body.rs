@@ -61,6 +61,15 @@ pub struct Limb {
     pub phase: f32,
     /// Arms swing counter to legs and at reduced amplitude.
     pub is_arm: bool,
+    /// Where the hand is, in the LOWER joint's own space.
+    ///
+    /// So that anything held can hang off the forearm and follow the arm for
+    /// free. Tools used to be parented to the creature's root and placed each
+    /// frame at a hardcoded offset from the body - which meant the arm swung
+    /// and the axe did not, and nothing was ever actually in anybody's grip.
+    /// Brett: "we need to make sure weapons and tools properly connect to
+    /// their hands and are held right."
+    pub grip: Vec3,
 }
 
 /// Entity references the animator needs. Built once, at spawn.
@@ -138,7 +147,7 @@ fn spawn_limb(
     lower_tone: Tone,
     name: &'static str,
     lower_name: &'static str,
-) -> (Entity, Entity) {
+) -> (Entity, Entity, Vec3) {
     let tuck = thickness * HINGE_TUCK;
     let upper_len = length * split;
     let lower_len = length - upper_len + tuck;
@@ -165,7 +174,10 @@ fn spawn_limb(
         lower_tone,
         lower_name,
     );
-    (upper, lower)
+    // The far end of the lower segment, drawn back a little so a haft sits in
+    // the fist rather than past the fingertips.
+    let hand = Vec3::new(0.0, -lower_len * 0.88, 0.0);
+    (upper, lower, hand)
 }
 
 /// Shoulder width of a biped's torso.
@@ -682,7 +694,7 @@ fn build_biped(
         genome.skin.shifted(-1)
     };
     for (i, side) in [-1.0f32, 1.0].into_iter().enumerate() {
-        let (entity, lower) = spawn_limb(
+        let (entity, lower, grip) = spawn_limb(
             commands,
             assets,
             body,
@@ -700,13 +712,14 @@ fn build_biped(
             lower,
             phase: i as f32 * std::f32::consts::PI,
             is_arm: false,
+            grip,
         });
     }
 
     // Arms, counter-phased against the leg on the same side.
     let shoulder_y = leg_len + torso_len - th * 0.4;
     for (i, side) in [-1.0f32, 1.0].into_iter().enumerate() {
-        let (entity, lower) = spawn_limb(
+        let (entity, lower, grip) = spawn_limb(
             commands,
             assets,
             body,
@@ -724,6 +737,7 @@ fn build_biped(
             lower,
             phase: (i as f32 + 1.0) * std::f32::consts::PI,
             is_arm: true,
+            grip,
         });
     }
 
@@ -861,7 +875,7 @@ fn build_quadruped(
         (-1.0, leg_z, pi),
         (1.0, leg_z, 0.0),
     ] {
-        let (entity, lower) = spawn_limb(
+        let (entity, lower, grip) = spawn_limb(
             commands,
             assets,
             body,
@@ -879,6 +893,7 @@ fn build_quadruped(
             lower,
             phase,
             is_arm: false,
+            grip,
         });
     }
 

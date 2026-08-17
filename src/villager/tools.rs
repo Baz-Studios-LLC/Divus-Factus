@@ -18,6 +18,10 @@ use crate::palette;
 #[derive(Component, Debug, Clone, Copy)]
 pub struct WorkTool {
     pivot: Entity,
+    /// The forearm it hangs from. Kept so the pivot can act as a WRIST — see
+    /// [`animate_work_tools`] — rather than being re-found through the rig
+    /// every frame.
+    forearm: Entity,
 }
 
 const WOOD: Tone = Tone {
@@ -112,15 +116,24 @@ fn rotated_block(
 fn spawn_tool(
     commands: &mut Commands,
     assets: &CreatureAssets,
-    root: Entity,
+    hand: Entity,
+    grip: Vec3,
     vocation: Vocation,
 ) -> Entity {
+    // HUNG OFF THE FOREARM, at the hand, so it goes where the arm goes.
+    //
+    // This used to hang off the creature's ROOT and be dragged to a fixed
+    // point near the hip every frame - which is why nothing was ever held.
+    // The arm swung, the walk cycle carried it, the clips moved it, and the
+    // axe stayed exactly where it was. Parenting it to the joint makes the
+    // grip correct by construction rather than by a number that has to be
+    // re-tuned for every animation anybody ever adds.
     let pivot = commands
         .spawn((
             Name::new(tool_label(vocation)),
-            Transform::default(),
+            Transform::from_translation(grip),
             Visibility::Hidden,
-            ChildOf(root),
+            ChildOf(hand),
         ))
         .id();
 
@@ -388,15 +401,43 @@ fn spawn_tool(
 pub fn equip_work_tools(
     mut commands: Commands,
     assets: Option<Res<CreatureAssets>>,
-    workers: Query<(Entity, &Vocation), (With<Villager>, Without<WorkTool>, Without<Corpse>)>,
+    // THE RIG IS REQUIRED NOW, because the tool hangs off a joint in it. A
+    // villager whose body has not been built yet simply waits a frame, which
+    // is what already happens to everything else that reads the rig.
+    workers: Query<
+        (Entity, &Vocation, &CreatureRig),
+        (With<Villager>, Without<WorkTool>, Without<Corpse>),
+    >,
 ) {
     let Some(assets) = assets else {
         return;
     };
-    for (entity, vocation) in &workers {
-        let pivot = spawn_tool(&mut commands, &assets, entity, *vocation);
-        commands.entity(entity).insert(WorkTool { pivot });
+    for (entity, vocation, rig) in &workers {
+        // The right arm, by the order the body builds them. A person who
+        // somehow has no arms carries nothing, rather than carrying it at
+        // their feet.
+        let Some(arm) = rig.limbs.iter().filter(|limb| limb.is_arm).next_back() else {
+            continue;
+        };
+        let pivot = spawn_tool(&mut commands, &assets, arm.lower, arm.grip, *vocation);
+        commands.entity(entity).insert(WorkTool {
+            pivot,
+            forearm: arm.lower,
+        });
     }
+}
+
+/// Whether this trade's implement is CARRIED rather than SWUNG.
+///
+/// A carried tool is held steady against whatever the arm is doing; a swung
+/// one rides the arm, because the arm's own motion is the work. Getting this
+/// backwards is the difference between a guard shouldering a spear and a
+/// guard plowing the ground with one.
+fn steadied(vocation: Vocation) -> bool {
+    matches!(
+        vocation,
+        Vocation::Guard | Vocation::Explorer | Vocation::Hunter | Vocation::Priest
+    )
 }
 
 /// Places an implement at the hand only while its owner is visibly working.
@@ -407,30 +448,27 @@ pub fn animate_work_tools(
         (
             &Vocation,
             &Activity,
-            &CreatureRig,
             &CreatureMotion,
             Option<&Held>,
             &WorkTool,
         ),
         (With<Villager>, Without<Corpse>),
     >,
-    mut pivots: Query<(&mut Transform, &mut Visibility)>,
+    // ONE PARAM SET, because both halves want `Transform` and Bevy will not
+    // hand out a read and a write over the same component in one system
+    // however disjoint the entities happen to be (B0001). So: read every
+    // forearm first, then write every pivot.
+    mut transforms: ParamSet<(Query<(&mut Transform, &mut Visibility)>, Query<&Transform>)>,
 ) {
     let time = time.elapsed_secs();
-    for (vocation, activity, rig, motion, held, tool) in &workers {
-        let Ok((mut at, mut visible)) = pivots.get_mut(tool.pivot) else {
-            continue;
-        };
+    let mut settled: Vec<(Entity, Option<Quat>, Visibility)> = Vec::new();
+    for (vocation, activity, motion, held, tool) in &workers {
         let active = *activity == Activity::Working && motion.speed < 0.25 && held.is_none();
         let carried = matches!(vocation, Vocation::Guard | Vocation::Explorer)
             && *activity == Activity::Working
             && held.is_none();
-        *visible = if active || carried {
-            Visibility::Inherited
-        } else {
-            Visibility::Hidden
-        };
         if !(active || carried) {
+            settled.push((tool.pivot, None, Visibility::Hidden));
             continue;
         }
 
@@ -445,8 +483,8 @@ pub fn animate_work_tools(
                 Vocation::Cook | Vocation::Healer | Vocation::Priest => 2.8,
                 Vocation::Explorer => 1.6,
             } + motion.idle_offset;
-        let h = rig.height;
-        let hand = Vec3::new(h * 0.28, h * 0.69, -h * 0.12);
+        // ONLY THE ANGLE NOW. Where the tool is, is settled by the joint it
+        // hangs from; what is left here is how it is HELD.
         let (lean, roll) = match vocation {
             Vocation::Forester | Vocation::Miner => (-0.70 + beat.sin() * 0.95, 0.18),
             Vocation::Builder => (-0.32 + beat.sin().max(0.0) * 0.72, 0.08),
@@ -459,8 +497,41 @@ pub fn animate_work_tools(
             Vocation::Healer => (-0.15 + beat.sin() * 0.14, 0.12),
             Vocation::Priest => (0.08, beat.sin() * 0.22),
         };
-        at.translation = hand;
-        at.rotation = Quat::from_rotation_z(roll) * Quat::from_rotation_x(lean);
+        // THE PIVOT IS A WRIST, and that is the whole trick.
+        //
+        // A tool parented to the forearm inherits everything the forearm
+        // does, and a working elbow bends the better part of sixty degrees.
+        // For a SWUNG tool that is exactly right - the axe follows the arm,
+        // and the arm's own strike is the chop. For a CARRIED one it is not:
+        // a guard walking his rounds does not let a spear rotate to wherever
+        // his forearm happens to be pointing, he keeps it up, because that is
+        // what a wrist is for. The first cut of this had them dragging their
+        // spears through the grass ahead of their own feet.
+        //
+        // So a carried tool cancels the forearm's bend before applying its
+        // own angle; a swung one simply rides along.
+        let wrist = if steadied(*vocation) {
+            transforms
+                .p1()
+                .get(tool.forearm)
+                .map(|arm| arm.rotation.inverse())
+                .unwrap_or(Quat::IDENTITY)
+        } else {
+            Quat::IDENTITY
+        };
+        let held_at = wrist * Quat::from_rotation_z(roll) * Quat::from_rotation_x(lean);
+        settled.push((tool.pivot, Some(held_at), Visibility::Inherited));
+    }
+
+    let mut pivots = transforms.p0();
+    for (pivot, held_at, visible) in settled {
+        let Ok((mut at, mut showing)) = pivots.get_mut(pivot) else {
+            continue;
+        };
+        *showing = visible;
+        if let Some(held_at) = held_at {
+            at.rotation = held_at;
+        }
     }
 }
 

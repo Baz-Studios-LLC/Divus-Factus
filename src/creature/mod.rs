@@ -705,7 +705,12 @@ fn hurt_flashes(
     mut materials: ResMut<Assets<StandardMaterial>>,
     children: Query<&Children>,
     parts: Query<&MeshMaterial3d<StandardMaterial>>,
-    mut hurt: Query<(Entity, &mut Vitality, Option<&mut HurtFlash>), With<Creature>>,
+    mut hurt: Query<(Entity, &Transform, &mut Vitality, Option<&mut HurtFlash>), With<Creature>>,
+    // A fresh wound is announced rather than left for anybody else to
+    // recompute: the comparison below CONSUMES `last_harm`, so a second
+    // system reading the same two fields would see whatever was left after
+    // whichever of the two happened to run first.
+    mut wounded: MessageWriter<crate::blood::Wounded>,
 ) {
     let red = match flash_material {
         Some(handle) => handle.0.clone(),
@@ -722,9 +727,16 @@ fn hurt_flashes(
     };
 
     let dt = time.delta_secs();
-    for (entity, mut vitality, flash) in &mut hurt {
+    for (entity, at, mut vitality, flash) in &mut hurt {
         let harm = vitality.harm;
         let fresh = harm > vitality.last_harm + 0.01;
+        if fresh {
+            wounded.write(crate::blood::Wounded {
+                who: entity,
+                at: at.translation,
+                severity: (harm - vitality.last_harm).clamp(0.0, 1.0),
+            });
+        }
         vitality.last_harm = harm;
         match flash {
             Some(mut flash) => {

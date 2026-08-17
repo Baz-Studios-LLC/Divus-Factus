@@ -257,6 +257,8 @@ pub(super) fn wolves_hunt(
             Without<Corpse>,
             Without<Held>,
             Without<Airborne>,
+            // A band on the march does not stop to chase a deer.
+            Without<crate::raid::Raider>,
         ),
     >,
     mut quarry: Query<
@@ -570,6 +572,10 @@ pub(super) fn wolves_stalk(
         Option<Res<crate::attention::Attention>>,
     ),
     mut rng: ResMut<crate::villager::SimRng>,
+    // NOT the raiders. A band walking on the square is steered by
+    // `crate::raid`, and the rules below are the opposite of a raid in every
+    // particular: they pick somebody alone, far from the square, out of a
+    // tower's shadow, and never a guard.
     mut wolves: Query<
         (&Transform, &mut Wild, &mut MoveTarget),
         (
@@ -577,6 +583,7 @@ pub(super) fn wolves_stalk(
             Without<Corpse>,
             Without<Held>,
             Without<Villager>,
+            Without<crate::raid::Raider>,
         ),
     >,
     mut walkers: Query<
