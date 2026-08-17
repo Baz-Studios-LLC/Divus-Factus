@@ -591,7 +591,23 @@ fn spawn_camera(mut commands: Commands) {
     let rig = CameraRig::default();
     commands.spawn((
         Name::new("God Camera"),
-        Camera3d::default(),
+        Camera3d {
+            // BORN READABLE. Bevy allocates the depth buffer as a render
+            // attachment and nothing more, so binding it in a pass of ours
+            // fails validation - and Bevy QUITS THE APPLICATION on a
+            // validation error rather than skipping the pass. Setting the flag
+            // later does not help: by the time anything asks, the texture
+            // exists without it, and the first bind group built against it
+            // kills the game. Asked for at birth, there is no moment to miss.
+            //
+            // Which passes need it: anything that has to know WHERE a pixel is
+            // rather than only what color it came out - ground fog, the veil,
+            // outlines, a tilt-shift keyed to depth. See `render::aspectus`.
+            depth_texture_usages: (bevy::render::render_resource::TextureUsages::RENDER_ATTACHMENT
+                | bevy::render::render_resource::TextureUsages::TEXTURE_BINDING)
+                .into(),
+            ..default()
+        },
         Projection::Perspective(PerspectiveProjection {
             // A slightly long lens flattens the scene, which reinforces the
             // look-at-a-model feeling the tilt-shift pass will build on.
