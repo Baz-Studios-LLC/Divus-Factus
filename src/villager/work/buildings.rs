@@ -85,6 +85,9 @@ pub enum BuildingKind {
     /// A timbered adit driven into rising ground: miners bring out stone
     /// by the cartload instead of chipping boulders where they lie.
     Mine,
+    /// Racked spears and a bell. Where a village that has seen goblins puts
+    /// what it means to do about them.
+    Armory,
 }
 
 impl BuildingKind {
@@ -128,6 +131,10 @@ impl BuildingKind {
             BuildingKind::Watchtower => 10.0,
             BuildingKind::Dock => 5.0,
             BuildingKind::Mine => 6.0,
+            // Dear, and meant to be: an armory is the most a frightened
+            // village can commit to, and a fright that passes should not
+            // leave one half-built in the square.
+            BuildingKind::Armory => 14.0,
         }
     }
 
@@ -154,6 +161,7 @@ impl BuildingKind {
             BuildingKind::Dock => 0.0,
             // The mountain provides its own stone; the timber shores it up.
             BuildingKind::Mine => 0.0,
+            BuildingKind::Armory => 8.0,
         }
     }
 
@@ -162,7 +170,7 @@ impl BuildingKind {
         use BuildingKind::*;
         &[
             House, Longhouse, Sawmill, Blacksmith, Tavern, TownHall, Storehouse, Granary, Well,
-            Smokehouse, Mill, Bakery, Weaver, Herbalist, Watchtower, Shrine, Dock, Mine,
+            Smokehouse, Mill, Bakery, Weaver, Herbalist, Watchtower, Shrine, Dock, Mine, Armory,
         ]
     }
 
@@ -183,6 +191,7 @@ impl BuildingKind {
             BuildingKind::Weaver => "The weaver's cottage",
             BuildingKind::Herbalist => "The herbalist's hut",
             BuildingKind::Watchtower => "The watchtower",
+            BuildingKind::Armory => "The armory",
             BuildingKind::Shrine => "The shrine",
             BuildingKind::Dock => "The dock",
             BuildingKind::Mine => "The mine",
@@ -277,6 +286,10 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
         Mill | Shrine => 12,
         Bakery => 14,
         TownHall => 14,
+        // A hamlet does not raise an armory however frightened it is - it
+        // runs, or it hides, and either way it has no hands to spare for
+        // one. Fear that arrives earlier than this builds the watchtower.
+        Armory => 12,
         // Shelter is not civic ambition: both roofs are planned by need in
         // `plan_houses`, never by this ladder.
         House | Longhouse => 0,
@@ -381,6 +394,18 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
             // between them is what puts a watch on the treeline.
             Shrine => needs.believers as f32 * 0.12 + needs.betrothed as f32 * 0.5,
             Watchtower => needs.peril * 0.4,
+            // AND FEAR OF SOMETHING THAT BUILDS ITS OWN TOWERS RAISES AN
+            // ARMORY. Brett: "seeing goblins should massively increase the
+            // want for soldiers and a blacksmith and an armory."
+            //
+            // Steeper than the watchtower's, and off a floor: a wolf year
+            // puts a watch on the treeline and nothing more, while the kind
+            // of fright a camp of goblins spreads through a whole village
+            // outruns every other want on the ladder. `peril_of` sums over
+            // PEOPLE, so this rises with how many souls carry the fear rather
+            // than with how many goblins there are - which is the difference
+            // between a village that has seen them and a village that has not.
+            Armory => (needs.peril - 1.2).max(0.0) * 1.35,
             // Measured from FOUR BELOW its own minimum, so the number
             // that says when a town has earned a hall is the number that
             // gives it one: a town standing exactly at the threshold
@@ -908,6 +933,24 @@ impl Blueprint {
                 roof: pal::shade(&pal::WOOD, 0.4),
                 shed_roof: false,
                 stuff: BuildStuff::Timber,
+            },
+            // Low, long and heavy: stone to the eaves, a shallow roof, and
+            // wide enough that the racks inside are not a story anybody has
+            // to be told. It reads as the one building in the village that
+            // was put up in a hurry and meant to last anyway.
+            BuildingKind::Armory => Blueprint {
+                kind,
+                plan,
+                drawing: drawing.clone(),
+                // Set below, once for every kind.
+                mirrored: false,
+                half_w: 3.4,
+                half_d: 2.6,
+                wall_h: 3.2,
+                walls: pal::shade(&pal::STONE, 0.45),
+                roof: pal::shade(&pal::WOOD, 0.28),
+                shed_roof: false,
+                stuff: BuildStuff::Stone,
             },
             // A portal driven into the hillside: the frame is all that
             // shows, the works are in the dark. half_d points into the rise.

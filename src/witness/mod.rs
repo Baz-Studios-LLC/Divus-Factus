@@ -153,6 +153,16 @@ pub enum DivineEventKind {
     Fell,
     /// A shadow crossed every heart at once, and nobody can say why.
     DoubtSown,
+    /// Goblins, seen. Not an attack - a sighting, and that is the whole of
+    /// what makes it frightening: something out there keeps a camp, and it is
+    /// not one of ours.
+    ///
+    /// The village does not sort its fears by author (see [`Mauled`]), and it
+    /// does not need to be bitten to start wanting a wall. This is the memory
+    /// an armory gets built out of.
+    ///
+    /// [`Mauled`]: DivineEventKind::Mauled
+    GoblinsSeen,
 }
 
 impl DivineEventKind {
@@ -178,6 +188,10 @@ impl DivineEventKind {
             // these are known only because the one it happened to walked
             // home and said so.
             DivineEventKind::Mauled => 28.0,
+            // Seen, not heard, and from whatever ground the seer was standing
+            // on - which is why it carries further than the scream above. One
+            // scout on a ridge brings the whole village a fright.
+            DivineEventKind::GoblinsSeen => 70.0,
             // Rain is only remarked on when the crops answer it.
             DivineEventKind::Rained => 22.0,
             // A pillar of light is visible from every field.
@@ -204,6 +218,9 @@ impl DivineEventKind {
             DivineEventKind::Delivered => 0.04,
             DivineEventKind::Flourished => 0.03,
             DivineEventKind::Mauled => 0.85,
+            // Under a mauling - nobody is bleeding - but well over anything
+            // else, and it is the kind of fright that travels.
+            DivineEventKind::GoblinsSeen => 0.62,
             DivineEventKind::Rained => 0.04,
             DivineEventKind::Beckoned => 0.1,
             DivineEventKind::Fell => 0.92,
@@ -236,6 +253,9 @@ impl DivineEventKind {
             // and they are the ones who will say the woods were owed
             // something.
             DivineEventKind::Mauled => 0.05,
+            // A goblin is a goblin. Nobody reads a god into one, and a village
+            // that thought its god had sent them would be a different game.
+            DivineEventKind::GoblinsSeen => 0.02,
             // Rain is weather; a stone from a clear sky is not.
             DivineEventKind::Rained => 0.18,
             DivineEventKind::Beckoned => 0.88,
@@ -263,7 +283,9 @@ impl DivineEventKind {
             | DivineEventKind::Quaked
             | DivineEventKind::Thrown
             | DivineEventKind::Impact => -0.06,
-            DivineEventKind::Perished | DivineEventKind::Mauled => 0.03,
+            DivineEventKind::Perished
+            | DivineEventKind::Mauled
+            | DivineEventKind::GoblinsSeen => 0.03,
             DivineEventKind::Uprooted
             | DivineEventKind::Rained
             | DivineEventKind::Beckoned
@@ -304,6 +326,7 @@ impl DivineEventKind {
             DivineEventKind::Delivered => "saw a child come safe into the world",
             DivineEventKind::Flourished => "saw the fields come in heavy",
             DivineEventKind::Mauled => "saw a wolf set upon one of their own",
+            DivineEventKind::GoblinsSeen => "saw goblins out past the fields",
             DivineEventKind::Rained => "stood in rain that came when it was called",
             DivineEventKind::Beckoned => "saw a pillar of light stand on the ground",
             DivineEventKind::Fell => "saw a stone fall out of the empty sky",
@@ -388,6 +411,13 @@ impl DivineEventKind {
                 "the harvest filled every basket we had",
                 "the rows came in heavier than we hoped",
                 "a good harvest, better than last year",
+            ],
+            DivineEventKind::GoblinsSeen => &[
+                "there are goblins out past the fields, and they have a fire",
+                "I saw green ones. They have built something out there",
+                "they were watching us from a tower they made themselves",
+                "goblins. A camp of them, and not far enough away",
+                "somebody should tell the mayor what is out in those woods",
             ],
             DivineEventKind::Mauled => &[
                 "a wolf took one of ours out past the trees",
@@ -679,12 +709,23 @@ impl Witnessed {
     /// exactly like one seen, which is the point — a story frightens the
     /// people it reaches, not only the person it happened to.
     pub fn peril(&self, today: u32) -> f32 {
+        // TWO FEARS, and the worse of them is what this person carries.
+        //
+        // A mauling counts full: somebody bled. A sighting counts for rather
+        // less on its own - nobody was hurt - but it reaches far more people,
+        // and `peril_of` sums over the village, so a camp seen by a dozen
+        // souls outweighs one wolf that took one of them. Which is right:
+        // a wolf is a bad week and a camp of goblins is a war.
         self.recent
             .iter()
-            .filter(|memory| memory.kind == DivineEventKind::Mauled)
-            .map(|memory| {
+            .filter_map(|memory| {
+                let weight = match memory.kind {
+                    DivineEventKind::Mauled => 1.0,
+                    DivineEventKind::GoblinsSeen => 0.55,
+                    _ => return None,
+                };
                 let age = today.saturating_sub(memory.day) as f32;
-                (1.0 - age / PERIL_FADES).clamp(0.0, 1.0)
+                Some((1.0 - age / PERIL_FADES).clamp(0.0, 1.0) * weight)
             })
             .fold(0.0f32, f32::max)
     }
@@ -1097,6 +1138,79 @@ mod tests {
         assert!(bitten.peril(17) < 1.0, "but less so");
         assert_eq!(bitten.peril(10 + PERIL_FADES as u32), 0.0, "and then gone");
         assert_eq!(bitten.peril(400), 0.0, "and it stays gone");
+    }
+
+    /// Goblins frighten a village WITHOUT biting anybody, and the fright
+    /// spreads further than a wolf's because it is seen rather than heard.
+    #[test]
+    fn a_sighting_frightens_the_village_too() {
+        let mut scout = Witnessed::default();
+        scout.record(
+            DivineEventKind::GoblinsSeen,
+            None,
+            false,
+            10,
+            SubjectClass::Person,
+        );
+        assert!(
+            scout.peril(10) > 0.0,
+            "somebody who has seen goblins is frightened, though nobody bled",
+        );
+
+        let mut bitten = Witnessed::default();
+        bitten.record(
+            DivineEventKind::Mauled,
+            None,
+            false,
+            10,
+            SubjectClass::Person,
+        );
+        assert!(
+            scout.peril(10) < bitten.peril(10),
+            "one sighting must weigh less than one mauling: {} against {}",
+            scout.peril(10),
+            bitten.peril(10),
+        );
+
+        // BUT IT REACHES FURTHER, and that is the whole of why a camp is worse
+        // than a wolf. `peril_of` sums over people, so a dozen souls who have
+        // seen the camp outweigh the one survivor of a mauling.
+        let village: Vec<Witnessed> = (0..12)
+            .map(|_| {
+                let mut held = Witnessed::default();
+                held.record(
+                    DivineEventKind::GoblinsSeen,
+                    None,
+                    false,
+                    10,
+                    SubjectClass::Person,
+                );
+                held
+            })
+            .collect();
+        assert!(
+            peril_of(village.iter(), 10) > peril_of(std::iter::once(&bitten), 10) * 4.0,
+            "a camp the whole village has seen must outweigh one mauling by a lot",
+        );
+    }
+
+    /// And a sighting fades like every other fright.
+    #[test]
+    fn a_sighting_fades_too() {
+        let mut scout = Witnessed::default();
+        scout.record(
+            DivineEventKind::GoblinsSeen,
+            None,
+            false,
+            3,
+            SubjectClass::Person,
+        );
+        assert!(scout.peril(3) > scout.peril(9), "it eases with the days");
+        assert_eq!(
+            scout.peril(3 + PERIL_FADES as u32),
+            0.0,
+            "and a quiet fortnight takes it away",
+        );
     }
 
     #[test]

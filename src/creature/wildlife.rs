@@ -951,3 +951,70 @@ mod tests {
         );
     }
 }
+
+/// How near a villager has to be to a goblin to notice it, in meters.
+///
+/// Generous, because a camp is a thing you see from a ridge rather than
+/// something you walk into. The event itself carries further still - see
+/// `DivineEventKind::GoblinsSeen`.
+const GOBLINS_NOTICED_AT: f32 = 62.0;
+
+/// How long the same village goes without raising the alarm again, in seconds
+/// of world time.
+///
+/// A villager who can see a camp can see it every frame, and an alarm per frame
+/// would fill the chronicle with one long scream and pin the peril at its
+/// ceiling by lunchtime. One telling every so often is what a rumor actually
+/// looks like.
+const ALARM_AGAIN_AFTER: f64 = 45.0;
+
+/// Somebody sees the goblins, and tells everyone.
+///
+/// THE FEAR HAS TO BE WITNESSED. It would be far easier to count live goblins
+/// within some radius of the square and feed that straight to the civic
+/// planner - and that is exactly the mistake `witness::peril_of` was written to
+/// undo, in its own words: a village that "feared wolves nobody had ever laid
+/// eyes on, and shrugged at a child who came home torn open." So a camp nobody
+/// has found frightens nobody, and the first scout back from a bad ridge is
+/// what starts the village wanting walls.
+pub(super) fn goblins_are_sighted(
+    clock: Res<crate::calendar::WorldClock>,
+    mut last_alarm: Local<f64>,
+    mut alarms: MessageWriter<crate::witness::DivineEvent>,
+    goblins: Query<&Transform, (With<CreatureGenome>, Without<Villager>, Without<Corpse>)>,
+    kinds: Query<&CreatureGenome>,
+    folk: Query<(Entity, &Transform), (With<Villager>, Without<Corpse>)>,
+) {
+    if clock.elapsed - *last_alarm < ALARM_AGAIN_AFTER {
+        return;
+    }
+    let camps: Vec<Vec3> = goblins
+        .iter()
+        .zip(kinds.iter())
+        .filter(|(_, genome)| genome.species == Species::Goblin)
+        .map(|(transform, _)| transform.translation)
+        .collect();
+    if camps.is_empty() {
+        return;
+    }
+    for (who, at) in &folk {
+        let Some(seen) = camps
+            .iter()
+            .find(|green| green.distance(at.translation) < GOBLINS_NOTICED_AT)
+        else {
+            continue;
+        };
+        *last_alarm = clock.elapsed;
+        alarms.write(crate::witness::DivineEvent {
+            kind: crate::witness::DivineEventKind::GoblinsSeen,
+            // Raised where the WATCHER stands, not at the camp: this is the
+            // moment somebody came back and said so, and it has to reach the
+            // village rather than the woods.
+            position: at.translation,
+            subject: Some(who),
+            intensity: 0.85,
+        });
+        let _ = seen;
+        return;
+    }
+}

@@ -2973,6 +2973,7 @@ fn chronicle_divine_touch(
             crate::witness::DivineEventKind::Mended => "was made whole by the hand of god",
             crate::witness::DivineEventKind::Quaked => "was thrown down when the earth buckled",
             crate::witness::DivineEventKind::Mauled => "was set upon by a wolf, and got home",
+            crate::witness::DivineEventKind::GoblinsSeen => "came back saying there are goblins out there",
             // The worldly turns write their own chronicle lines at their own
             // sites (the death, the birth, the harvest); nothing to add here
             // - and the placeless wonders (rain, the beacon, the falling

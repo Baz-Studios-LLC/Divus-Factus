@@ -62,6 +62,7 @@ impl Plugin for CreaturePlugin {
                     wildlife::graze_and_flee,
                     wildlife::wolves_hunt,
                     wildlife::wolves_stalk,
+                    wildlife::goblins_are_sighted,
                     wildlife::flee_to_safety,
                     wildlife::wild_breeding,
                     wildlife::wild_growth,

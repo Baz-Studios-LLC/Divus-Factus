@@ -434,7 +434,20 @@ pub(crate) fn morning_muster(
         .iter()
         .filter(|courting| courting.ripe(clock.day()))
         .count();
-    let guards = if has(BuildingKind::Watchtower) {
+    // AN ARMORY IS A STANDING ANSWER, and it changes what the muster is for.
+    //
+    // A watchtower means somebody watches: one spear, and the fright is
+    // handled. An armory means the village decided the thing out there is not
+    // going away - so the ceiling comes off, and the spears go on being dealt
+    // in proportion to how many souls are still carrying the fear. Brett:
+    // "seeing goblins should massively increase the want for soldiers."
+    //
+    // Still off `peril`, which is counted in PEOPLE and not in enemies, so
+    // this rises with how widely the fright has spread rather than with a
+    // census of goblins nobody has met.
+    let guards = if has(BuildingKind::Armory) {
+        (peril / 2.0).ceil().max(2.0).min(6.0)
+    } else if has(BuildingKind::Watchtower) {
         1.0
     } else {
         // One spear per three frightened souls. A single survivor is
