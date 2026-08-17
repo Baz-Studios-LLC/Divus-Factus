@@ -481,12 +481,137 @@ impl DivineEventKind {
 pub struct Temperament {
     /// 0 bolts at anything, 1 walks toward it.
     pub boldness: f32,
+    /// What this person is capable of when it costs somebody else.
+    ///
+    /// 0 could never, whatever it took; 1 is capable of nearly anything.
+    /// Brett: "not only should it be rare, but some people would never, it
+    /// should be personality based and only the darkest of personalities would
+    /// do something like that" - and then, plainly: "perceptability to evil
+    /// proclivities needs to be tracked doesnt it?" It does, and nothing
+    /// tracked it. The trait list is five virtues and five flaws about WORK
+    /// AND MOOD - diligent, slothful, cheerful, gloomy, a glutton - and
+    /// `Temperament` had exactly one axis, boldness. There was no moral grain
+    /// in a person at all, so "only the darkest would" had nothing to hang on.
+    ///
+    /// ROLLED LOW ON PURPOSE, and hard-gated below: most people are simply not
+    /// capable, and no famine, no cruel god and no precedent moves them. That
+    /// is not a balance dial, it is the point - a village where everyone would
+    /// eventually eat their dead is a village of monsters, and the story worth
+    /// watching is the one where most of them starve instead.
+    ///
+    /// It will carry far more than this in time: who volunteers to fight, who
+    /// takes revenge, who proposes a sacrifice.
+    #[serde(default)]
+    pub darkness: f32,
+    /// How well this person reasons about what they have seen.
+    ///
+    /// 0 is simple, 1 is sharp. It is NOT a competence stat - nothing works
+    /// faster for being clever. It is about READING THE WORLD, and it exists
+    /// because of a mechanism Brett named that darkness cannot cover:
+    /// "Sometimes unintelligent may do dark deeds because they think it is the
+    /// right thing to do... they may feel they are being good when they
+    /// arent."
+    ///
+    /// Which is a second and entirely separate road to a terrible act:
+    ///
+    /// - THE DARK know it is wrong and do it anyway. Hunger against
+    ///   conscience, and conscience loses.
+    /// - THE SIMPLE do not know it is wrong at all. They watched their god
+    ///   throw a man down a hillside and drew the obvious conclusion about
+    ///   what it wants, and now they are trying to please it.
+    ///
+    /// And the inversion at the heart of it: FAITH MAKES THE SIMPLE WORSE.
+    /// For anyone who can reason, trusting the god is the thing that holds
+    /// them - they have something to answer to. For someone who cannot,
+    /// trusting a cruel god is the argument FOR. The devout simpleton is the
+    /// most dangerous person in a village with a violent god, and he is doing
+    /// his sincere best the whole time.
+    #[serde(default = "sharp_enough")]
+    pub wits: f32,
 }
+
+/// What a person loaded from a save before wits existed is worth.
+///
+/// Sharp enough to know better, which is the safe way to be wrong about
+/// somebody: an old save cannot suddenly fill with people who misread their
+/// god.
+fn sharp_enough() -> f32 {
+    0.7
+}
+
+/// The same, for the save file's own default.
+pub fn sharp_enough_save() -> f32 {
+    sharp_enough()
+}
+
+/// Below this nobody is capable of anything the doctrine weighs, ever.
+///
+/// High, and it must stay high: with the roll above it leaves a handful of
+/// souls in a village of thirty who could even be asked.
+pub const COULD_NEVER: f32 = 0.55;
+
+/// Below this a person does not reliably work out what a thing means.
+///
+/// A quarter or so of a village, which is about right: enough that a violent
+/// god always has somebody who has taken the wrong lesson, never so many that
+/// the village reads as stupid.
+pub const SIMPLE: f32 = 0.3;
 
 impl Temperament {
     pub fn random(rng: &mut Rng) -> Self {
         Temperament {
             boldness: rng.trait_value(0.15, 0.95),
+            // THE LEAST OF THREE, which is what makes the darkest of them
+            // rare rather than merely uncommon. A flat roll puts a fifth of
+            // any village at the top of the scale; three rolls and keep the
+            // lowest puts them in the low single figures, which is about how
+            // often somebody is capable of the thing this measures.
+            darkness: rng
+                .trait_value(0.0, 1.0)
+                .min(rng.trait_value(0.0, 1.0))
+                .min(rng.trait_value(0.0, 1.0)),
+            // A whole spread, and no bias: most people are somewhere in the
+            // middle and a village has its sharp ones and its simple ones.
+            wits: rng.trait_value(0.08, 0.95),
+        }
+    }
+
+    /// Whether this person could ever do a thing that costs somebody else,
+    /// under any pressure at all.
+    ///
+    /// The hard gate, and it is deliberately a gate rather than a slope. Most
+    /// of a village answers no here and is never asked another question.
+    pub fn could_ever(&self) -> bool {
+        self.darkness > COULD_NEVER
+    }
+
+    /// Whether this person could talk themselves into a terrible act by
+    /// mistaking it for a good one.
+    ///
+    /// `example` is how cruel their god has been to them, `trust` how much
+    /// they believe in it. Simple, devout, and shown violence: they are not
+    /// wicked, they are agreeing - and nothing about them will ever suggest
+    /// otherwise, because from the inside this is piety.
+    pub fn misreads_the_god(&self, example: f32, trust: f32) -> bool {
+        self.wits < SIMPLE && example > 0.55 && trust > 0.55
+    }
+
+    pub fn describe_wits(&self) -> &'static str {
+        match self.wits {
+            w if w < SIMPLE => "simple",
+            w if w < 0.6 => "plain",
+            w if w < 0.85 => "quick",
+            _ => "sharp",
+        }
+    }
+
+    /// A word for the grain of them, for the inspector.
+    pub fn describe_darkness(&self) -> &'static str {
+        match self.darkness {
+            d if d <= COULD_NEVER => "could never",
+            d if d < 0.72 => "hard",
+            d if d < 0.88 => "cold",
+            _ => "capable of anything",
         }
     }
 

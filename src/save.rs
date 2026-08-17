@@ -71,6 +71,13 @@ struct PersonSave {
     needs: Needs,
     morale: Morale,
     temperament_boldness: f32,
+    /// Written since darkness existed; a save from before it loads as zero,
+    /// which reads as "could never" and is the safe way to be wrong.
+    #[serde(default)]
+    temperament_darkness: f32,
+    /// Old saves load sharp enough to know better - see `sharp_enough`.
+    #[serde(default = "crate::witness::sharp_enough_save")]
+    temperament_wits: f32,
     witnessed: Witnessed,
     faith: Option<Faith>,
     traits: Option<Traits>,
@@ -515,6 +522,9 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         CreatureGenome,
         Needs,
         Morale,
+        // The axes of a temperament: boldness, darkness, wits.
+        f32,
+        f32,
         f32,
         Witnessed,
         Option<Faith>,
@@ -582,6 +592,8 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                 spirits: morale.spirits,
             },
             temperament.boldness,
+            temperament.darkness,
+            temperament.wits,
             witnessed.clone(),
             faith.cloned(),
             traits.map(|t| Traits(t.0.clone())),
@@ -615,6 +627,8 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                 needs,
                 morale,
                 temperament_boldness,
+                temperament_darkness,
+                temperament_wits,
                 witnessed,
                 faith,
                 traits,
@@ -633,6 +647,8 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                     needs,
                     morale,
                     temperament_boldness,
+                    temperament_darkness,
+                    temperament_wits,
                     witnessed,
                     faith,
                     traits,
@@ -1252,6 +1268,8 @@ fn apply(world: &mut World, save: SaveGame) {
                 },
                 Temperament {
                     boldness: p.temperament_boldness,
+                    darkness: p.temperament_darkness,
+                    wits: p.temperament_wits,
                 },
                 p.witnessed.clone(),
                 Activity::Idle,

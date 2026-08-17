@@ -779,7 +779,20 @@ fn carrion_fades(
         (
             With<Corpse>,
             With<Creature>,
-            Without<crate::villager::Villager>,
+            // WITHOUT A NAME, which is what actually marks an animal.
+            //
+            // This read `Without<Villager>` and had done since it was written,
+            // and it was DEAD CODE the whole time: `succumb` strips `Villager`
+            // off a body on its way to being a corpse, so every villager who
+            // ever died matched this filter and quietly rotted like a deer.
+            // The line above says "Villagers are never carrion - their dead
+            // get rites", and it has not been true for as long as it has been
+            // written down. Brett: "when someone dies their corpse should
+            // remain. The town should have to deal with that."
+            //
+            // A `Person` is one of ours, alive or dead. `succumb` leaves it on,
+            // because the grave keeps the name.
+            Without<crate::villager::Person>,
             Without<Carrion>,
         ),
     >,
@@ -1062,6 +1075,36 @@ pub fn facing_rotation(direction: Vec3) -> Quat {
 /// loses everything that made it *do* — and lies down. The dead stay in the world,
 /// because a death nobody can see is a stat, and this game is about what people
 /// make of what they see.
+/// The same system the game runs, reachable from a test.
+///
+/// Exposed because what `succumb` TAKES OFF a body is load-bearing for the
+/// whole of `rites` - and a test that built its own corpse by hand certified
+/// a funeral pipeline that could never run. See
+/// `rites::the_dead_keep_their_name_and_nothing_else`.
+#[cfg(test)]
+pub(crate) fn succumb_for_tests(
+    commands: Commands,
+    died: MessageWriter<CreatureDied>,
+    creatures: Query<
+        (
+            Entity,
+            &mut Transform,
+            &Vitality,
+            Option<&crate::villager::Person>,
+            Option<&body::CreatureRig>,
+        ),
+        (
+            With<Creature>,
+            Without<Corpse>,
+            Without<Held>,
+            Without<Airborne>,
+        ),
+    >,
+    parts: Query<&mut Transform, Without<Creature>>,
+) {
+    succumb(commands, died, creatures, parts)
+}
+
 fn succumb(
     mut commands: Commands,
     mut died: MessageWriter<CreatureDied>,

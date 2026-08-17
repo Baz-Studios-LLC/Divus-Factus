@@ -72,7 +72,9 @@ pub(super) fn mark_the_dead(
     ),
     fallen: Query<
         (Entity, &Transform, &Person, Option<&Parentage>),
-        (Added<Corpse>, With<Villager>),
+        // `Person`, NOT `Villager` - see the note in `burials`. This whole
+        // module has never run a single funeral because of it.
+        (Added<Corpse>, With<Person>),
     >,
     // Death closes the asking: a corpse that kept its prayer held a
     // place in the town's chorus and a card's worth of count on the
@@ -219,7 +221,21 @@ pub(super) fn burials(
         ),
         (
             With<Corpse>,
-            With<Villager>,
+            // A DEAD VILLAGER IS NOT A `Villager`.
+            //
+            // `succumb` strips `Villager`, `Needs` and `Activity` off a body on
+            // its way to being a corpse - so `With<Corpse> + With<Villager>` is
+            // a pair that can never both be true, and every query in this file
+            // asked for exactly that. The mourning, the bearers, the
+            // procession, the graves: written, tested by eye once presumably,
+            // and silently never run since. The dead simply rotted where they
+            // fell like deer, which is the one thing the file above swears they
+            // do not do.
+            //
+            // What marks the village's own dead is that they still have a NAME.
+            // Brett found it from the other end: "when someone dies their
+            // corpse should remain. The town should have to deal with that."
+            With<Person>,
             Without<Held>,
             Without<crate::avatar::Ridden>,
             Without<Airborne>,
@@ -460,8 +476,15 @@ mod tests {
         app.init_resource::<crate::calendar::WorldClock>();
         app.add_message::<crate::ui::Say>();
 
+        // THE DEAD ARE SPAWNED THE WAY `succumb` LEAVES THEM: a corpse with a
+        // name and NO `Villager`. This test used to hand itself a body that was
+        // both a `Corpse` and a `Villager` at once - a pair the running game
+        // cannot produce, because `succumb` strips the second when it adds the
+        // first. So it passed for as long as it has existed while not one
+        // funeral ever happened in a real village, and it would have gone on
+        // passing after the bug was fixed OR unfixed. A fixture that cannot
+        // fail is worse than no fixture.
         app.world_mut().spawn((
-            Villager,
             Corpse,
             Person::born("Odo".into(), "Gravely".into()),
             Transform::from_xyz(0.0, 0.0, 0.0),
@@ -492,6 +515,46 @@ mod tests {
         assert!(
             world.get::<Morale>(neighbor).unwrap().spirits < 0.8,
             "grief costs something",
+        );
+    }
+
+    /// The guard on the fixture above: if anybody ever writes a corpse query
+    /// against `Villager` again, this says why it will never match.
+    #[test]
+    fn the_dead_keep_their_name_and_nothing_else() {
+        let mut app = App::new();
+        app.add_message::<crate::creature::CreatureDied>();
+        let dead = app
+            .world_mut()
+            .spawn((
+                Villager,
+                crate::creature::Creature,
+                Person::born("Odo".into(), "Gravely".into()),
+                crate::creature::Vitality {
+                    harm: 1.0,
+                    ..Default::default()
+                },
+                Transform::default(),
+                crate::creature::anim::CreatureMotion::new(0.0),
+                MoveTarget::default(),
+            ))
+            .id();
+        app.world_mut()
+            .run_system_once(crate::creature::succumb_for_tests)
+            .unwrap();
+        let world = app.world();
+        assert!(
+            world.get::<Corpse>(dead).is_some(),
+            "the dead are a corpse",
+        );
+        assert!(
+            world.get::<Person>(dead).is_some(),
+            "and they keep their name, which is what the rites find them by",
+        );
+        assert!(
+            world.get::<Villager>(dead).is_none(),
+            "but they are no longer a Villager - every corpse query in this \
+             file was written against that and matched nothing for months",
         );
     }
 }

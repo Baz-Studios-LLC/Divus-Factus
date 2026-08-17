@@ -68,7 +68,7 @@ impl Tenet {
     /// decision.
     pub fn gravity(self) -> f32 {
         match self {
-            Tenet::EatTheDead => 0.85,
+            Tenet::EatTheDead => 0.88,
         }
     }
 }
@@ -117,12 +117,52 @@ impl Doctrine {
     /// before they stop caring. Which is how the same famine in the same
     /// village produces one man who eats and one who will not - and the second
     /// is the more interesting of the two.
-    pub fn permits(&self, tenet: Tenet, desperation: f32, example: f32, trust: f32) -> bool {
+    pub fn permits(
+        &self,
+        tenet: Tenet,
+        desperation: f32,
+        example: f32,
+        trust: f32,
+        grain: &crate::witness::Temperament,
+    ) -> bool {
+        // MOST PEOPLE SIMPLY COULD NOT, and that is checked before anything
+        // else because nothing else can overturn it. Brett: "some people would
+        // never... only the darkest of personalities would do something like
+        // this." No famine, no cruel god and no precedent moves somebody who
+        // is not capable of it - they starve instead, which is the version of
+        // this story worth watching.
+        // TWO DOORS, and only the first is wickedness.
+        //
+        // The dark know it is wrong. The simple do not: they watched their god
+        // throw a man down a hillside, drew the obvious conclusion about what
+        // it wants, and are now trying to please it. Brett: "sometimes
+        // unintelligent may do dark deeds because they think it is the right
+        // thing to do... they may feel they are being good when they arent."
+        //
+        // Note which way faith runs in each. Below, `trust` RAISES the bar - a
+        // believer has something to answer to. In `misreads_the_god` it is a
+        // requirement: a devout simpleton under a violent god is the most
+        // dangerous person in the village, and is doing his sincere best
+        // throughout.
+        let mistaken = grain.misreads_the_god(example, trust);
+        if !grain.could_ever() && !mistaken {
+            return false;
+        }
+        if mistaken {
+            // They are not fighting a conscience about it, so all that stands
+            // between them and the act is how hungry they are. Still a real
+            // bar - this is a famine, not a whim - but nothing about who they
+            // are argues against it.
+            return desperation > MISTAKEN_BAR;
+        }
+
         // Faith raises the bar; the god's own example can lower it further
         // than faith raises it, which is the point of the whole design.
+        // And among the few who could, the darkest need the least pushing.
         let bar = (tenet.gravity() + trust * 0.35
             - example * 0.55
-            - self.precedent_for(tenet) * 0.45)
+            - self.precedent_for(tenet) * 0.45
+            - (grain.darkness - crate::witness::COULD_NEVER) * 0.5)
             // A FLOOR, and it is the difference between this and a mechanic
             // that fires whenever the numbers line up. However cruel the god,
             // however faithless the man, however many winters this village has
@@ -185,6 +225,42 @@ mod tests {
     use super::*;
     use crate::witness::SubjectClass;
 
+    /// Somebody who could, if pushed far enough. A rare person.
+    fn one_of_the_few() -> crate::witness::Temperament {
+        crate::witness::Temperament {
+            boldness: 0.5,
+            darkness: 0.8,
+            wits: 0.7,
+        }
+    }
+
+    /// Simple, and devout. Not wicked at all - and that is the danger.
+    fn a_devout_simpleton() -> crate::witness::Temperament {
+        crate::witness::Temperament {
+            boldness: 0.5,
+            darkness: 0.05,
+            wits: 0.15,
+        }
+    }
+
+    /// Just over the line, which is where most of the capable few sit.
+    fn barely_capable() -> crate::witness::Temperament {
+        crate::witness::Temperament {
+            boldness: 0.5,
+            darkness: 0.6,
+            wits: 0.7,
+        }
+    }
+
+    /// And the ordinary sort, who could not, ever.
+    fn most_people() -> crate::witness::Temperament {
+        crate::witness::Temperament {
+            boldness: 0.5,
+            darkness: 0.2,
+            wits: 0.7,
+        }
+    }
+
     fn who_saw(kinds: &[DivineEventKind]) -> Witnessed {
         let mut held = Witnessed::default();
         for kind in kinds {
@@ -219,12 +295,14 @@ mod tests {
         let village = Doctrine::default();
         let starving = 0.95;
         let trust = 0.35;
+        // Asked of somebody who COULD - just - so that what decides it is the
+        // god and not the grain of the person.
         assert!(
-            village.permits(Tenet::EatTheDead, starving, cruel, trust),
+            village.permits(Tenet::EatTheDead, starving, cruel, trust, &barely_capable()),
             "a village whose god has only ever punished them breaks",
         );
         assert!(
-            !village.permits(Tenet::EatTheDead, starving, merciful, trust),
+            !village.permits(Tenet::EatTheDead, starving, merciful, trust, &barely_capable()),
             "a village whose god has been merciful holds, even starving",
         );
     }
@@ -236,8 +314,8 @@ mod tests {
         let village = Doctrine::default();
         let godless = example(&who_saw(&[]));
         let hungry = 0.8;
-        let faithless = village.permits(Tenet::EatTheDead, hungry, godless, 0.05);
-        let devout = village.permits(Tenet::EatTheDead, hungry, godless, 0.95);
+        let faithless = village.permits(Tenet::EatTheDead, hungry, godless, 0.05, &one_of_the_few());
+        let devout = village.permits(Tenet::EatTheDead, hungry, godless, 0.95, &one_of_the_few());
         assert!(
             faithless && !devout,
             "at the same hunger the faithless break first: {faithless} / {devout}",
@@ -252,12 +330,12 @@ mod tests {
         let mut village = Doctrine::default();
         let bearable = 0.62;
         assert!(
-            !village.permits(Tenet::EatTheDead, bearable, godless, 0.35),
+            !village.permits(Tenet::EatTheDead, bearable, godless, 0.35, &one_of_the_few()),
             "the first winter, this hunger is not enough",
         );
         village.set_precedent(Tenet::EatTheDead, 0.7);
         assert!(
-            village.permits(Tenet::EatTheDead, bearable, godless, 0.35),
+            village.permits(Tenet::EatTheDead, bearable, godless, 0.35, &one_of_the_few()),
             "the second winter, the same hunger is",
         );
 
@@ -269,6 +347,91 @@ mod tests {
         );
     }
 
+    /// MOST PEOPLE NEVER WOULD, whatever is done to them. The gate that says
+    /// so is checked before every other consideration, so this is the one
+    /// assertion in the file that no amount of famine, cruelty or precedent
+    /// is allowed to overturn.
+    #[test]
+    fn most_people_could_never() {
+        let godless = example(&who_saw(&[]));
+        let mut village = Doctrine::default();
+        village.set_precedent(Tenet::EatTheDead, 1.0);
+        let ordinary = most_people();
+        // Starving to death, a cruel god, no faith, and a village that has
+        // done it every winter for years.
+        assert!(
+            !village.permits(Tenet::EatTheDead, 1.0, 1.0, 0.0, &ordinary),
+            "an ordinary person must refuse under every pressure the game has",
+        );
+        assert!(
+            village.permits(Tenet::EatTheDead, 1.0, godless, 0.0, &one_of_the_few()),
+            "and one of the few, under the same, does not",
+        );
+    }
+
+    /// THE SECOND DOOR, and the inversion at the heart of it: for anyone who
+    /// can reason, faith is what holds them back; for someone who cannot, faith
+    /// in a cruel god is the argument FOR.
+    #[test]
+    fn the_simple_and_devout_take_the_wrong_lesson() {
+        let village = Doctrine::default();
+        let cruel = example(&who_saw(&[
+            DivineEventKind::Smote,
+            DivineEventKind::Smote,
+            DivineEventKind::Thrown,
+        ]));
+        let simpleton = a_devout_simpleton();
+        assert!(
+            !simpleton.could_ever(),
+            "he is not a wicked man - that is the whole point of him",
+        );
+        assert!(
+            village.permits(Tenet::EatTheDead, 0.9, cruel, 0.9, &simpleton),
+            "and he does it anyway, believing it is what his god wants",
+        );
+
+        // The same man under a god who has only ever been kind draws the
+        // opposite lesson and holds.
+        let merciful = example(&who_saw(&[
+            DivineEventKind::Mended,
+            DivineEventKind::Provided,
+        ]));
+        assert!(
+            !village.permits(Tenet::EatTheDead, 0.9, merciful, 0.9, &simpleton),
+            "a gentle god teaches him gentleness just as plainly",
+        );
+
+        // And a simple man who does not believe has no theology to misread.
+        let faithless = crate::witness::Temperament {
+            wits: 0.15,
+            darkness: 0.05,
+            boldness: 0.5,
+        };
+        assert!(
+            !village.permits(Tenet::EatTheDead, 0.9, cruel, 0.1, &faithless),
+            "without faith there is no lesson to take wrongly",
+        );
+    }
+
+    /// The darkest are rolled RARE. Three rolls and keep the lowest, so a
+    /// village of thirty has a couple who could even be asked.
+    #[test]
+    fn the_capable_are_few() {
+        use crate::rng::Rng;
+        let mut rng = Rng::new(9);
+        let village: Vec<crate::witness::Temperament> = (0..600)
+            .map(|_| crate::witness::Temperament::random(&mut rng))
+            .collect();
+        let capable = village.iter().filter(|t| t.could_ever()).count();
+        let share = capable as f32 / village.len() as f32;
+        assert!(
+            share > 0.005 && share < 0.15,
+            "the capable must be a rare few and never nobody: {:.1}% of six \
+             hundred",
+            share * 100.0,
+        );
+    }
+
     /// Nobody eats their dead over an ordinary bad afternoon. The floor has to
     /// be high enough that this is a famine and not a mood.
     #[test]
@@ -277,12 +440,19 @@ mod tests {
         let cruel = example(&who_saw(&[DivineEventKind::Smote, DivineEventKind::Smote]));
         for hunger in [0.0, 0.2, 0.4] {
             assert!(
-                !village.permits(Tenet::EatTheDead, hunger, cruel, 0.0),
+                !village.permits(Tenet::EatTheDead, hunger, cruel, 0.0, &one_of_the_few()),
                 "hunger of {hunger} must never be enough, under any god",
             );
         }
     }
 }
+
+/// How far gone somebody who thinks they are doing right has to be.
+///
+/// Lower than the reasoned bar, because none of the forces that hold anybody
+/// else back are acting on them - but not low, because they still have to be
+/// starving. A simpleton who is merely peckish does not do this.
+const MISTAKEN_BAR: f32 = 0.72;
 
 /// How near a body somebody has to be to do it, in meters.
 ///
@@ -410,6 +580,7 @@ pub(super) fn the_starving_and_the_dead(
             &mut Needs,
             &super::Person,
             &Witnessed,
+            &crate::witness::Temperament,
             Option<&crate::villager::belief::Faith>,
             Option<&mut super::Chronicle>,
             &mut crate::creature::MoveTarget,
@@ -430,7 +601,7 @@ pub(super) fn the_starving_and_the_dead(
         return;
     }
 
-    for (at, mut needs, person, held, faith, mut chronicle, mut target, eater, genome) in
+    for (at, mut needs, person, held, grain, faith, mut chronicle, mut target, eater, genome) in
         &mut starving
     {
         // Desperation is hunger and nothing else for now. When thirst and cold
@@ -451,7 +622,7 @@ pub(super) fn the_starving_and_the_dead(
             continue;
         };
         let trust = faith.map_or(0.35, |faith| faith.trust);
-        if !doctrine.permits(Tenet::EatTheDead, desperation, example(held), trust) {
+        if !doctrine.permits(Tenet::EatTheDead, desperation, example(held), trust, grain) {
             // THE ONES WHO REFUSE ARE THE POINT. Somebody stood over a body
             // hungry enough to think about it and did not - and the only
             // difference between them and the one who did is what they have
