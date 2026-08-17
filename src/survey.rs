@@ -227,6 +227,7 @@ fn refresh_survey(
         .collect();
 
     let mut positions: Vec<[f32; 3]> = Vec::new();
+    let mut normals: Vec<[f32; 3]> = Vec::new();
     let mut colors: Vec<[f32; 4]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
 
@@ -306,7 +307,24 @@ fn refresh_survey(
                 let wx = origin_x + i as f32 * CELL + cx;
                 let wz = origin_z + j as f32 * CELL + cz;
                 let y = terrain.height_at(wx, wz).max(WATER_LEVEL) + 0.45;
-                positions.push([wx, y, wz]);
+                // BENT ONTO THE PLANET, like the ground it lies on.
+                //
+                // These went in as flat sim coordinates with a flat up-normal,
+                // which was right when the world was flat and has been wrong
+                // since the day it went round: the sheet stayed a plane in sim
+                // space while the ground curved away under it, so the chart hung
+                // in the air at the edges and sank through the hill in the
+                // middle. The rivers hit this and the boulders hit this; the
+                // survey was simply never converted. Brett: "the resource
+                // heatmap from pressing R never was fixed after the world went
+                // from flat to round."
+                //
+                // Bent per VERTEX rather than seating the whole sheet, because
+                // it is four hundred meters across - far too wide for one
+                // seat's flat approximation to hold at its corners.
+                let (seat, turn) = crate::globe::bend_frame(Vec3::new(wx, y, wz));
+                positions.push(seat.to_array());
+                normals.push((turn * Vec3::Y).to_array());
                 colors.push(color);
             }
             indices.extend([base, base + 2, base + 1, base, base + 3, base + 2]);
@@ -322,10 +340,9 @@ fn refresh_survey(
     );
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
-    mesh.insert_attribute(
-        Mesh::ATTRIBUTE_NORMAL,
-        vec![[0.0, 1.0, 0.0]; colors_len(&mesh)],
-    );
+    // Each corner's own up, off the sphere. A single flat normal lit the whole
+    // chart as though it faced straight up wherever it was standing.
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     mesh.insert_indices(Indices::U32(indices));
 
     commands.spawn((
@@ -342,10 +359,4 @@ fn refresh_survey(
         NotShadowCaster,
         NotShadowReceiver,
     ));
-}
-
-/// Vertex count after positions are inserted — for sizing the normals.
-fn colors_len(mesh: &Mesh) -> usize {
-    mesh.attribute(Mesh::ATTRIBUTE_POSITION)
-        .map_or(0, |a| a.len())
 }

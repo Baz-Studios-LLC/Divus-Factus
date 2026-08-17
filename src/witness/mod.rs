@@ -635,11 +635,6 @@ fn half() -> f32 {
     0.5
 }
 
-/// The same, for the save file's own default.
-pub fn sharp_enough_save() -> f32 {
-    sharp_enough()
-}
-
 /// The most a whole life can move any one axis from the grain it started with.
 ///
 /// Bounded on purpose. A person can be hardened, frightened or made devout by
@@ -734,6 +729,9 @@ impl Temperament {
         }
     }
 
+    /// Kept for the dossier, which will want to say it plainly rather than
+    /// only as part of a sentence.
+    #[allow(dead_code)]
     pub fn describe_wits(&self) -> &'static str {
         match self.wits {
             w if w < SIMPLE => "simple",
@@ -790,7 +788,13 @@ impl Temperament {
 }
 
 /// One axis of a temperament, for [`Temperament::weather`].
+///
+/// Only darkness and warmth are weathered by anything so far. The other three
+/// are named because the enum is the vocabulary of the thing and a partial one
+/// would have to be widened by whoever first needs boldness to move - which,
+/// given that a mauling ought to make somebody warier, will not be long.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum Axis {
     Boldness,
     Darkness,
@@ -1098,7 +1102,7 @@ fn perceive_events(
         (
             Entity,
             &Transform,
-            &Temperament,
+            &mut Temperament,
             &mut Witnessed,
             &mut CreatureMotion,
         ),
@@ -1145,7 +1149,7 @@ fn perceive_events(
                 .and_then(|(person, ..)| person.map(|p| p.name.clone()))
         });
 
-        for (entity, transform, temperament, mut witnessed, mut motion) in &mut villagers {
+        for (entity, transform, mut temperament, mut witnessed, mut motion) in &mut villagers {
             // The subject of an act is usually not a witness to it: they are
             // the one it happened to, already reacting by being thrown. The
             // exception is the one the whole social machine turns on — see
@@ -1207,6 +1211,34 @@ fn perceive_events(
                 _ => SubjectClass::Thing,
             };
             witnessed.record(event.kind, whom, divine, today, of);
+
+            // AND IT LEAVES A MARK. This is the claim the whole `Nature` /
+            // `Temperament` split exists to make: a god does not merely change
+            // what its village permits, it changes the people. Seeing cruelty
+            // hardens somebody a little and costs them a little of what they
+            // feel for other people; seeing mercy gives some of it back.
+            //
+            // Tiny per act, bounded by `MOST_A_LIFE_MOVES`, and off the GRAIN
+            // they were born with - so a lifetime under a terrible god ends in
+            // a hard man and never a monster, and their children still start
+            // from where their parents began.
+            let (harden, chill) = match event.kind {
+                DivineEventKind::Smote | DivineEventKind::Quaked | DivineEventKind::Fell => {
+                    (0.010, -0.008)
+                }
+                DivineEventKind::Thrown | DivineEventKind::Impact => (0.006, -0.005),
+                DivineEventKind::Mended | DivineEventKind::Provided => (-0.008, 0.008),
+                DivineEventKind::SetDown | DivineEventKind::Rained => (-0.004, 0.004),
+                // Watching one of your own eat the dead is the single most
+                // hardening thing that can happen in a village, and it is not
+                // the god's doing at all.
+                DivineEventKind::AteTheDead => (0.030, -0.030),
+                _ => (0.0, 0.0),
+            };
+            if harden != 0.0 {
+                temperament.weather(Axis::Darkness, harden);
+                temperament.weather(Axis::Warmth, chill);
+            }
 
             // The one it happened to is already flailing and running from
             // the thing itself. Turning them to WATCH it would stop them

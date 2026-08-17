@@ -664,7 +664,12 @@ pub(crate) fn update_inspector(
                 InspectorValue::Spirits => morale
                     .map_or("steady", |m| spirits_word(m.spirits))
                     .to_string(),
-                InspectorValue::Heart => temperament.describe().to_string(),
+                // THE WHOLE GRAIN, not just how bold they are. `say_the_grain`
+                // speaks only the ends a person is remarkable at, so an
+                // ordinary villager still reads as one word and somebody
+                // strange reads as a sentence - which is the rule the axes
+                // answer to. An axis nothing can SAY is not earning its place.
+                InspectorValue::Heart => temperament.say_the_grain(),
                 InspectorValue::Manner => {
                     manner.map_or("unremarkable".to_string(), |m| m.describe())
                 }
