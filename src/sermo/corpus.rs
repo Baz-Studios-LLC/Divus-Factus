@@ -437,21 +437,15 @@ mod tests {
         }
     }
 
-    /// The village speaks one English, and it is AMERICAN.
+    /// Every British spelling this game refuses, and what it says instead.
     ///
-    /// It was British for most of this game's life, on the reasoning that
-    /// the game's own labels were - a chronicle reading "nursed a neighbor
-    /// back to health" beside a bubble saying "neighbor" is a seam the
-    /// player can see. The seam was real; the choice was not, and nobody
-    /// ever decided it. Brett: "I am not even sure how the britishg rule
-    /// started, its been bugging me so i figured now is a good time to fix
-    /// it." So the whole game moved - the corpus, the labels, the code's own
-    /// prose and its identifiers - and this gate turned round with it.
-    ///
-    /// The seam is still what it guards. One English, whichever one.
-    #[test]
-    fn the_village_speaks_one_english() {
-        // THE FORBIDDEN HALF IS BUILT, NOT WRITTEN.
+    /// THE FORBIDDEN HALF IS BUILT, NOT WRITTEN. Spelled out in full, this
+    /// table would contain the very words it forbids - and the day the whole
+    /// game was swept from British to American, the sweep did exactly that:
+    /// every pair collapsed to ("gray", "gray"), and the gate began failing
+    /// the corpus for using the spelling it exists to require. Assembled from
+    /// stems, a sweep has nothing to catch hold of.
+    fn british_forms() -> Vec<(String, String)> {
         //
         // This table used to spell both halves of every pair out in full -
         // which meant it contained the very words it forbids, and the day the
@@ -509,7 +503,24 @@ mod tests {
                  spelling it exists to require",
             );
         }
-        let drift_pairs = drift;
+        drift
+    }
+
+    /// The village speaks one English, and it is AMERICAN.
+    ///
+    /// It was British for most of this game's life, on the reasoning that
+    /// the game's own labels were - a chronicle reading "nursed a neighbor
+    /// back to health" beside a bubble saying "neighbor" is a seam the
+    /// player can see. The seam was real; the choice was not, and nobody
+    /// ever decided it. Brett: "I am not even sure how the britishg rule
+    /// started, its been bugging me so i figured now is a good time to fix
+    /// it." So the whole game moved - the corpus, the labels, the code's own
+    /// prose and its identifiers - and this gate turned round with it.
+    ///
+    /// The seam is still what it guards. One English, whichever one.
+    #[test]
+    fn the_village_speaks_one_english() {
+        let drift_pairs = british_forms();
         let voice = Corpus::load();
         for line in voice.lines() {
             let said = line.t.to_lowercase();
@@ -529,6 +540,65 @@ mod tests {
         }
     }
 
+
+    /// AND THE GAME'S OWN WORDS, not only the villagers'.
+    ///
+    /// The corpus gate above has guarded the lines people SAY for a long
+    /// time, and nothing guarded anything else - so the labels, the notices,
+    /// the chronicle and every comment in the source were free to drift, and
+    /// did. The seam this is all about is between a bubble and a label, so
+    /// gating one side of it was always half a job.
+    ///
+    /// Walks the source itself. That is unusual for a test and right here:
+    /// the rule is about the words this game is written in, and the source is
+    /// where they are. It also covers the identifiers, because half the code
+    /// saying `colour` while the other half says `color` is the same seam one
+    /// level down.
+    #[test]
+    fn the_game_speaks_one_english() {
+        let drift = british_forms();
+        let mut wrong: Vec<String> = Vec::new();
+        let mut walk = vec![std::path::PathBuf::from("src")];
+        while let Some(dir) = walk.pop() {
+            let Ok(entries) = std::fs::read_dir(&dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk.push(path);
+                    continue;
+                }
+                if path.extension().is_none_or(|e| e != "rs") {
+                    continue;
+                }
+                // This file, and only this file, may name the words it
+                // forbids: a gate that cannot explain itself in its own
+                // comments is a gate nobody will understand well enough to
+                // keep. Every other file has no reason to write them.
+                if path.ends_with("sermo/corpus.rs") {
+                    continue;
+                }
+                let Ok(text) = std::fs::read_to_string(&path) else {
+                    continue;
+                };
+                let said = text.to_lowercase();
+                for (theirs, ours) in &drift {
+                    // Substring, not whole words: `water_colour` and
+                    // `coloured` are both this game writing an English it
+                    // does not speak, and neither is a word on its own.
+                    if said.contains(theirs.as_str()) {
+                        wrong.push(format!("{}: {theirs:?} should be {ours:?}", path.display()));
+                    }
+                }
+            }
+        }
+        assert!(
+            wrong.is_empty(),
+            "the game drifts into another English:\n{}",
+            wrong.join("\n"),
+        );
+    }
 
     /// The register wall between subjects, pinned against the real corpus.
     /// The bug this guards: a berry bush moved by the hand once came out

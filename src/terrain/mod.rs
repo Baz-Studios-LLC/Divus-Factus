@@ -378,7 +378,7 @@ pub struct Terrain {
     /// Built decks over water — walkable planks the ground itself answers
     /// for, so navigation needs no special cases. Registered when docks rise.
     boardwalks: Arc<RwLock<Vec<Boardwalk>>>,
-    /// What the pathfinder has already learnt about the ground.
+    /// What the pathfinder has already learned about the ground.
     ///
     /// Asking whether one cell can be walked costs about six terrain
     /// evaluations - a height, four more for the slope, and a river - and
@@ -502,7 +502,7 @@ impl Terrain {
         self.forget_the_ground();
     }
 
-    /// Throws away what the pathfinder had learnt.
+    /// Throws away what the pathfinder had learned.
     ///
     /// Called wherever the ground itself changes. Everything, rather than
     /// the worked circle alone: a pad's bank reaches further than its

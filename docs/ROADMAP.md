@@ -494,7 +494,7 @@ become a STATE things pass through, not a deletion with drama:
 - *Engineering:* the grove system is ready — stand_alone() already
   detaches single trees; burning = that + a fire state; spread is a
   neighbor query groves can answer. Care: concurrency caps (a forest
-  alight is a spectacle, not a slideshow) and a burnt-registry like
+  alight is a spectacle, not a slideshow) and a burned-registry like
   StrippedGround but with a regrowth clock.
 
 **The legibility track runs in parallel (it's UI, not sim):**

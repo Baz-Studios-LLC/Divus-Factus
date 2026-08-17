@@ -196,7 +196,7 @@ pub const CLOTH_TEAL: Ramp = [
     [0x49, 0x8f, 0x86],
 ];
 
-/// Rust: burnt orange, warmer and redder than the earth.
+/// Rust: burned orange, warmer and redder than the earth.
 pub const CLOTH_RUST: Ramp = [
     [0x2e, 0x14, 0x0a],
     [0x4c, 0x20, 0x0e],

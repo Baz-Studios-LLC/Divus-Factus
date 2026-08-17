@@ -125,7 +125,7 @@ god was listening. I know the neighbors were."
 
 The doubting register is the likely cause. Scepticism was written as
 courtroom reasoning - evidence, counts, testimony, claims - when a
-sceptical villager is more often blunt or tired than forensic. "Food does
+skeptical villager is more often blunt or tired than forensic. "Food does
 not fall out of the sky" is doubt. "The evidence will survive a proper
 count" is a lawyer. Please rewrite batch 07 at batch 06's register, and
 keep the abstract-noun rate near 12%: concrete nouns, short words,

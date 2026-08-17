@@ -1,7 +1,7 @@
 //! Buildings carried in from Opificium.
 //!
 //! The bench and the game share no code: the bench resolves its own
-//! catalogue and palette and hands over plain boxes with colors, plus
+//! catalog and palette and hands over plain boxes with colors, plus
 //! the marks that say what a place is FOR. This module reads those
 //! files, raises the boxes stage by stage, and turns the marks into the
 //! components the village already knows - beds, a shell with doors, the
@@ -1120,7 +1120,7 @@ pub fn raise_baked(
         // The village used to re-dye each house's dominant wall and roof cloth
         // with a color rolled from its plan, so a street of one blueprint was
         // still a street of different houses. That was the right answer while a
-        // drawing arrived in whatever colors the catalogue happened to hold and
+        // drawing arrived in whatever colors the catalog happened to hold and
         // nobody had chosen them. There is a brush on the bench now, and Brett
         // used it - "we can remove the old painting system now that I can paint
         // in atelier" - so the roll had become a thing that painted OVER the

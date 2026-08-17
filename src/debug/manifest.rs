@@ -42,7 +42,7 @@ const MOST_SHARDS: usize = 13;
 /// The roll of aspects: the lights a world's god may wear, two tints to
 /// each so the color is never still - the apparition shimmers from the
 /// first to the second and back. Bright and strange on purpose: the gods
-/// are not jewellery. Named for the chronicle's tongue, should the
+/// are not jewelry. Named for the chronicle's tongue, should the
 /// stories ever speak of the light itself.
 const ASPECTS: &[(&str, Vec3, Vec3)] = &[
     (
