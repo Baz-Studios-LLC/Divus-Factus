@@ -91,6 +91,40 @@ pub enum TreeKind {
 }
 
 impl TreeKind {
+    /// What this is, in the words somebody would use pointing at it.
+    ///
+    /// EVERY NON-TIMBER PLANT USED TO BE CALLED "Desert growth", which is how
+    /// a reed standing in a marsh came to be labelled desert. Brett: "Desert
+    /// Growth is appearing in non desert biomes as well" - and it was, but
+    /// only ever as the NAME. The scatter picks its plants per point from the
+    /// biome under them and always did; what was wrong was that
+    /// `yields_timber()` was standing in for "is it a cactus", and it means
+    /// nothing of the sort - a reed and a knot of brush are not lumber either.
+    pub fn called(self) -> &'static str {
+        match self {
+            TreeKind::Conifer | TreeKind::Broadleaf | TreeKind::Birch | TreeKind::Pine => "A tree",
+            TreeKind::Palm => "A palm",
+            TreeKind::Snag => "A dead tree",
+            TreeKind::Reed => "Reeds",
+            TreeKind::Cactus => "A cactus",
+            TreeKind::Brush => "Dry brush",
+        }
+    }
+
+    /// The same, for something not yet grown.
+    pub fn called_young(self) -> &'static str {
+        match self {
+            TreeKind::Conifer | TreeKind::Broadleaf | TreeKind::Birch | TreeKind::Pine => {
+                "A young tree"
+            }
+            TreeKind::Palm => "A young palm",
+            TreeKind::Snag => "A dead tree",
+            TreeKind::Reed => "Young reeds",
+            TreeKind::Cactus => "A young cactus",
+            TreeKind::Brush => "Dry brush",
+        }
+    }
+
     /// Whether a forester can take timber from this.
     ///
     /// A cactus is not lumber and a knot of dry sticks is not lumber, and
@@ -910,11 +944,7 @@ fn populate_chunks(
             let body = TreeBody::at(kind, local.x, local.z);
             let young = commands
                 .spawn((
-                    Name::new(if kind.yields_timber() {
-                        "A young tree"
-                    } else {
-                        "Desert growth"
-                    }),
+                    Name::new(kind.called_young()),
                     ScatterEntity,
                     body,
                     Mesh3d(body.bake(&mut meshes)),
@@ -973,11 +1003,7 @@ fn populate_chunks(
                 .id();
             for (local, body) in bodies {
                 let stem = commands.spawn((
-                    Name::new(if body.kind.yields_timber() {
-                        "A tree"
-                    } else {
-                        "Desert growth"
-                    }),
+                    Name::new(body.kind.called()),
                     body,
                     InGrove(grove),
                     Transform::from_translation(local),
@@ -2371,6 +2397,40 @@ mod tests {
                  table exists to prevent",
             );
         }
+    }
+
+    /// NOTHING IS CALLED DESERT UNLESS IT IS. Every plant that was not lumber
+    /// used to answer to "Desert growth", so a reed in a marsh and a young
+    /// birch on a hillside both read as desert - which is what Brett saw:
+    /// "Desert Growth is appearing in non desert biomes as well." The scatter
+    /// was placing them correctly the whole time; only the label was wrong.
+    #[test]
+    fn a_plant_is_called_what_it_is() {
+        use TreeKind::*;
+        use crate::terrain::Biome;
+        for biome in [
+            Biome::Temperate,
+            Biome::Boreal,
+            Biome::Wetland,
+            Biome::Alpine,
+        ] {
+            for kind in TreeKind::for_biome(biome) {
+                for said in [kind.called(), kind.called_young()] {
+                    assert!(
+                        !said.to_lowercase().contains("desert"),
+                        "{kind:?} grows in {biome:?} and is called {said:?}",
+                    );
+                }
+            }
+        }
+        assert_eq!(Cactus.called(), "A cactus");
+        assert_eq!(Reed.called(), "Reeds", "a reed is not desert growth");
+        assert_eq!(Brush.called_young(), "Dry brush");
+    }
+
+    #[test]
+    fn timber_is_only_what_a_forester_could_take() {
+        use TreeKind::*;
         assert!(!Cactus.yields_timber(), "a cactus is not lumber");
         assert!(!Brush.yields_timber(), "a knot of sticks is not lumber");
         for kind in [Conifer, Broadleaf, Birch, Palm, Snag] {

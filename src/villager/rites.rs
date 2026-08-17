@@ -26,6 +26,12 @@ const MOURNING_SECONDS: f64 = 35.0;
 /// How long a body lies in state before a bearer comes for it.
 const BURIAL_DELAY: f64 = 45.0;
 
+/// Where a body rides on the bearer, above their feet.
+const SHOULDER_HEIGHT: f32 = 1.28;
+
+/// Half the length of a laid-out body, for centering it on the shoulders.
+const HALF_A_BODY: f32 = 0.85;
+
 /// A villager's corpse, waiting on its rites. The clock starts at death.
 #[derive(Component)]
 pub struct Passing {
@@ -375,13 +381,43 @@ pub(super) fn burials(
             continue;
         }
 
-        // On the shoulder: the body rides flat, above the bearer's own head.
-        body_transform.translation = at.translation + Vec3::Y * 1.5;
-        body_transform.rotation = at.rotation * Quat::from_rotation_z(std::f32::consts::FRAC_PI_2);
+        // ACROSS THE SHOULDERS, and the offset is the whole of it.
+        //
+        // A corpse's own origin is at its FEET, and laying it flat by rotating
+        // ninety degrees about Z swings it out along the bearer's -X. Pinned at
+        // the bearer's own position it therefore hung entirely off one side and
+        // through the bearer's face - which is exactly what it did, for as long
+        // as this code has existed, unseen because no funeral had ever run.
+        // Brett, on the first one he watched: "the corpse carrying position
+        // needs to be fixed."
+        //
+        // Shifted back along that same axis by half a body, the load sits
+        // centered on the shoulders. Lowered too: 1.5 above the feet is over the
+        // head of a villager who is 1.75 tall.
+        let laid_flat = at.rotation * Quat::from_rotation_z(std::f32::consts::FRAC_PI_2);
+        body_transform.translation =
+            at.translation + Vec3::Y * SHOULDER_HEIGHT + at.rotation * Vec3::X * HALF_A_BODY;
+        body_transform.rotation = laid_flat;
 
         // The graveyard of whichever town lies nearest the bearer.
-        let Some(resting) = resting_for(at.translation) else {
-            continue;
+        //
+        // AND IF THERE IS NO GRAVEYARD, ONE IS MADE HERE. This used to
+        // `continue`, which means a bearer who could not be told where to go
+        // stood holding the body for ever - Brett watched exactly that: "I
+        // killed someone and another psron walked up and picked him up and just
+        // stood there for days on end holding him." A resting ground is only
+        // chosen if the ring search finds walkable dry land in a town's outer
+        // rings, and when it does not, nothing ever chose one and nothing ever
+        // would.
+        //
+        // Better a grave on the spot than a man carrying his neighbor until
+        // one of them starves.
+        let resting = match resting_for(at.translation) {
+            Some(spot) => spot,
+            None => {
+                let here = at.translation;
+                Vec3::new(here.x, terrain.height_at(here.x, here.z), here.z)
+            }
         };
         // Graves stand in rows, filled in the order the village filled them.
         let index = graves.iter().count() as f32;
