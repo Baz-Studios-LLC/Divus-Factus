@@ -153,6 +153,15 @@ pub enum DivineEventKind {
     Fell,
     /// A shadow crossed every heart at once, and nobody can say why.
     DoubtSown,
+    /// Somebody ate the village's own dead.
+    ///
+    /// The village's doing, not the god's - like [`Mauled`], and it matters
+    /// for the same reason: the people who saw it are changed by it whether or
+    /// not anything divine was involved. This is the memory a village's
+    /// morality is actually made of.
+    ///
+    /// [`Mauled`]: DivineEventKind::Mauled
+    AteTheDead,
     /// Goblins, seen. Not an attack - a sighting, and that is the whole of
     /// what makes it frightening: something out there keeps a camp, and it is
     /// not one of ours.
@@ -192,6 +201,9 @@ impl DivineEventKind {
             // on - which is why it carries further than the scream above. One
             // scout on a ridge brings the whole village a fright.
             DivineEventKind::GoblinsSeen => 70.0,
+            // Seen close, and told everywhere. It carries as far as the worst
+            // news a village has ever had to pass on.
+            DivineEventKind::AteTheDead => 40.0,
             // Rain is only remarked on when the crops answer it.
             DivineEventKind::Rained => 22.0,
             // A pillar of light is visible from every field.
@@ -221,6 +233,8 @@ impl DivineEventKind {
             // Under a mauling - nobody is bleeding - but well over anything
             // else, and it is the kind of fright that travels.
             DivineEventKind::GoblinsSeen => 0.62,
+            // The most alarming thing in the game, and it is not a monster.
+            DivineEventKind::AteTheDead => 0.95,
             DivineEventKind::Rained => 0.04,
             DivineEventKind::Beckoned => 0.1,
             DivineEventKind::Fell => 0.92,
@@ -256,6 +270,8 @@ impl DivineEventKind {
             // A goblin is a goblin. Nobody reads a god into one, and a village
             // that thought its god had sent them would be a different game.
             DivineEventKind::GoblinsSeen => 0.02,
+            // Nobody mistakes this for a god's work. It is entirely ours.
+            DivineEventKind::AteTheDead => 0.01,
             // Rain is weather; a stone from a clear sky is not.
             DivineEventKind::Rained => 0.18,
             DivineEventKind::Beckoned => 0.88,
@@ -286,6 +302,8 @@ impl DivineEventKind {
             DivineEventKind::Perished
             | DivineEventKind::Mauled
             | DivineEventKind::GoblinsSeen => 0.03,
+            // It costs the village its spirits more than anything else can.
+            DivineEventKind::AteTheDead => -0.22,
             DivineEventKind::Uprooted
             | DivineEventKind::Rained
             | DivineEventKind::Beckoned
@@ -327,6 +345,7 @@ impl DivineEventKind {
             DivineEventKind::Flourished => "saw the fields come in heavy",
             DivineEventKind::Mauled => "saw a wolf set upon one of their own",
             DivineEventKind::GoblinsSeen => "saw goblins out past the fields",
+            DivineEventKind::AteTheDead => "saw one of their own eat the dead",
             DivineEventKind::Rained => "stood in rain that came when it was called",
             DivineEventKind::Beckoned => "saw a pillar of light stand on the ground",
             DivineEventKind::Fell => "saw a stone fall out of the empty sky",
@@ -411,6 +430,13 @@ impl DivineEventKind {
                 "the harvest filled every basket we had",
                 "the rows came in heavier than we hoped",
                 "a good harvest, better than last year",
+            ],
+            DivineEventKind::AteTheDead => &[
+                "I saw what they did to the body. I wish I had not",
+                "we are not what we were before the winter",
+                "nobody said anything. That is the part I cannot get past",
+                "there was a body and now there is not, and we all know why",
+                "I would not have. I tell myself I would not have",
             ],
             DivineEventKind::GoblinsSeen => &[
                 "there are goblins out past the fields, and they have a fire",
@@ -657,7 +683,7 @@ impl Witnessed {
     /// How many memories a villager keeps.
     pub const CAPACITY: usize = 8;
 
-    fn record(
+    pub(crate) fn record(
         &mut self,
         kind: DivineEventKind,
         whom: Option<Whom>,

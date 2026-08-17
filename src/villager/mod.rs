@@ -9,6 +9,7 @@
 pub mod attire;
 pub mod belief;
 pub mod civic;
+pub mod doctrine;
 pub mod colony;
 pub mod explore;
 pub mod home;
@@ -167,6 +168,7 @@ impl Plugin for VillagerPlugin {
             .init_resource::<rites::RestingGround>()
             .init_resource::<work::KitchenWarm>()
             .init_resource::<work::StoreTrends>()
+            .init_resource::<doctrine::Doctrine>()
             .init_resource::<belief::Belief>()
             .init_resource::<belief::FaithHistory>()
             .init_resource::<belief::Legend>()
@@ -359,6 +361,8 @@ impl Plugin for VillagerPlugin {
                     (
                         accumulate_hunger,
                         starvation_watch,
+                        doctrine::force_a_famine,
+                        doctrine::the_starving_and_the_dead,
                         grow_up,
                         grow_old,
                         form_bonds,
@@ -2974,6 +2978,7 @@ fn chronicle_divine_touch(
             crate::witness::DivineEventKind::Quaked => "was thrown down when the earth buckled",
             crate::witness::DivineEventKind::Mauled => "was set upon by a wolf, and got home",
             crate::witness::DivineEventKind::GoblinsSeen => "came back saying there are goblins out there",
+            crate::witness::DivineEventKind::AteTheDead => "watched one of their own eat the dead",
             // The worldly turns write their own chronicle lines at their own
             // sites (the death, the birth, the harvest); nothing to add here
             // - and the placeless wonders (rain, the beacon, the falling
