@@ -64,6 +64,34 @@ pub struct RestingGround(pub std::collections::HashMap<Entity, Vec3>);
 #[derive(Component)]
 pub struct Grave {
     pub day: u32,
+    /// What ended them.
+    ///
+    /// COPIED OFF THE BODY, because the body does not survive the burial: the
+    /// corpse carries `Vitality` and is despawned the moment the grave goes
+    /// up, so a stone that did not take this down could never say what
+    /// happened. The card had who and when and no answer at all to how.
+    /// Brett: "Hovering headstone should show who died and how at a minimum."
+    pub undoing: crate::creature::Undoing,
+    /// Whether it was violence rather than want, which is what decides
+    /// whether `undoing` is worth reading at all - everything that is not
+    /// violent starved, and `Undoing::Hunger` is its own answer.
+    pub violent: bool,
+}
+
+impl Grave {
+    /// What the stone says: how they went, then when they were laid down.
+    ///
+    /// Guarded the same way the death notice in `creature` is - `undoing`
+    /// only means anything when the death was violent, because a quiet death
+    /// leaves whatever the last harm was sitting in the field.
+    pub fn epitaph(&self) -> String {
+        let how = if self.violent {
+            self.undoing.how()
+        } else {
+            "starved"
+        };
+        format!("{how}, and was laid to rest on day {}", self.day)
+    }
 }
 
 /// Death is noticed: the family and the nearest neighbors put down what
@@ -224,6 +252,7 @@ pub(super) fn burials(
             Option<&Chronicle>,
             &Passing,
             Has<Borne>,
+            Option<&crate::creature::Vitality>,
         ),
         (
             With<Corpse>,
@@ -278,7 +307,7 @@ pub(super) fn burials(
     // resting ground, if it has never needed one before.
     let due: Vec<Entity> = bodies
         .iter()
-        .filter(|(_, _, _, _, passing, borne)| {
+        .filter(|(_, _, _, _, passing, borne, _)| {
             !borne && clock.elapsed - passing.since > BURIAL_DELAY
         })
         .map(|(body, ..)| body)
@@ -364,7 +393,7 @@ pub(super) fn burials(
             commands.entity(body).remove::<Borne>();
             continue;
         }
-        let Ok((_, mut body_transform, dead_person, dead_chronicle, _, borne)) =
+        let Ok((_, mut body_transform, dead_person, dead_chronicle, _, borne, end)) =
             bodies.get_mut(body)
         else {
             commands.entity(bearer).remove::<Bearing>();
@@ -447,7 +476,11 @@ pub(super) fn burials(
         let yaw = (-toward.z).atan2(toward.x);
         let grave = commands
             .spawn((
-                Grave { day },
+                Grave {
+                    day,
+                    undoing: end.map_or(crate::creature::Undoing::Hunger, |v| v.undoing),
+                    violent: end.is_some_and(|v| v.violent),
+                },
                 dead_person.clone(),
                 story,
                 Name::new(format!("The grave of {}", dead_person.name)),
@@ -504,6 +537,31 @@ pub(super) fn burials(
 mod tests {
     use super::*;
     use bevy::ecs::system::RunSystemOnce;
+
+    /// The stone names the cause. Both branches, because `undoing` is only
+    /// trustworthy on a violent death and a stone that read it anyway would
+    /// tell the player a starved villager was killed by a wolf.
+    #[test]
+    fn a_headstone_says_how_they_went() {
+        let killed = Grave {
+            day: 12,
+            undoing: crate::creature::Undoing::Teeth,
+            violent: true,
+        };
+        assert_eq!(
+            killed.epitaph(),
+            "was killed by a wolf, and was laid to rest on day 12"
+        );
+
+        // A quiet death carries whatever harm happened to be last on the
+        // body - here a wolf that bit them years ago and did not finish it.
+        let starved = Grave {
+            day: 40,
+            undoing: crate::creature::Undoing::Teeth,
+            violent: false,
+        };
+        assert_eq!(starved.epitaph(), "starved, and was laid to rest on day 40");
+    }
 
     #[test]
     fn a_death_gathers_mourners() {

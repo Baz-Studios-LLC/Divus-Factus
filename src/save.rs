@@ -176,7 +176,13 @@ struct SaveGame {
     people: Vec<PersonSave>,
     buildings: Vec<BuildingSave>,
     fields: Vec<(Vec3, Quat, f32, Option<usize>)>,
-    graves: Vec<(Vec3, Quat, u32, Person, Chronicle)>,
+    /// Position, facing, the day, who, their life - and what ended them.
+    ///
+    /// The last two slots arrived after graves did, so a save written before
+    /// them will not load: `serde` reads a five-element array into a
+    /// five-tuple and nothing else. Brett: "Dont worry about preserving
+    /// saves."
+    graves: Vec<(Vec3, Quat, u32, Person, Chronicle, crate::creature::Undoing, bool)>,
     wildlife: Vec<(Vec3, CreatureGenome, f32, Vec3)>,
     // --- version 2: the rest of everything ---
     #[serde(default)]
@@ -688,7 +694,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         })
         .collect();
 
-    let graves: Vec<(Vec3, Quat, u32, Person, Chronicle)> = world
+    let graves: Vec<(Vec3, Quat, u32, Person, Chronicle, crate::creature::Undoing, bool)> = world
         .query::<(&Transform, &rites::Grave, &Person, &Chronicle)>()
         .iter(world)
         .map(|(t, grave, person, story)| {
@@ -698,6 +704,8 @@ fn gather(world: &mut World) -> Option<SaveGame> {
                 grave.day,
                 person.clone(),
                 story.clone(),
+                grave.undoing,
+                grave.violent,
             )
         })
         .collect();
@@ -1369,13 +1377,17 @@ fn apply(world: &mut World, save: SaveGame) {
         });
         world.flush();
     }
-    for (pos, rot, day, person, story) in &save.graves {
+    for (pos, rot, day, person, story, undoing, violent) in &save.graves {
         world.resource_scope(|world, mut meshes: Mut<Assets<Mesh>>| {
             world.resource_scope(|world, mut materials: Mut<Assets<StandardMaterial>>| {
                 let mut commands = world.commands();
                 let grave = commands
                     .spawn((
-                        rites::Grave { day: *day },
+                        rites::Grave {
+                            day: *day,
+                            undoing: *undoing,
+                            violent: *violent,
+                        },
                         person.clone(),
                         story.clone(),
                         Name::new(format!("The grave of {}", person.name)),

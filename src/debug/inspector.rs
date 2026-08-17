@@ -594,7 +594,12 @@ pub(crate) fn update_inspector(
             *name = Text::new(format!("The grave of {}", person.full_name()));
         }
         if let Ok(mut subtitle) = texts.p1().single_mut() {
-            *subtitle = Text::new(format!("laid to rest on day {}", grave.day));
+            // WHO AND HOW, which is the least a headstone can say. Brett:
+            // "Hovering headstone should show who died and how at a minimum."
+            // This used to give the name and the day and leave the cause to
+            // be guessed at from the chronicle lines underneath, if the
+            // moment was even in there.
+            *subtitle = Text::new(grave.epitaph());
         }
         if let Ok((mut detail, mut detail_visibility)) = texts.p2().single_mut() {
             let tail = story.events.len().saturating_sub(6);
