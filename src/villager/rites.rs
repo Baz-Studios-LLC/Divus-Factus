@@ -84,13 +84,21 @@ impl Grave {
     /// Guarded the same way the death notice in `creature` is - `undoing`
     /// only means anything when the death was violent, because a quiet death
     /// leaves whatever the last harm was sitting in the field.
+    ///
+    /// The date is the WHOLE date, season and year, not the bare day number
+    /// the grave stores. Brett: "the date should have the entire date." A
+    /// stone is the one place a player reads a date cold, with no HUD beside
+    /// it to say which year "day 340" was.
     pub fn epitaph(&self) -> String {
         let how = if self.violent {
             self.undoing.how()
         } else {
             "starved"
         };
-        format!("{how}, and was laid to rest on day {}", self.day)
+        format!(
+            "{how}, and was laid to rest on {}",
+            crate::calendar::date_of_day(self.day)
+        )
     }
 }
 
@@ -550,7 +558,7 @@ mod tests {
         };
         assert_eq!(
             killed.epitaph(),
-            "was killed by a wolf, and was laid to rest on day 12"
+            "was killed by a wolf, and was laid to rest on spring 12, year 1"
         );
 
         // A quiet death carries whatever harm happened to be last on the
@@ -560,7 +568,10 @@ mod tests {
             undoing: crate::creature::Undoing::Teeth,
             violent: false,
         };
-        assert_eq!(starved.epitaph(), "starved, and was laid to rest on day 40");
+        assert_eq!(
+            starved.epitaph(),
+            "starved, and was laid to rest on summer 12, year 1"
+        );
     }
 
     #[test]

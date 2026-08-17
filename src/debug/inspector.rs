@@ -1040,8 +1040,8 @@ pub(crate) fn update_inspector(
         (
             settlement.name.clone(),
             format!(
-                "Founded on day {}\n{population}\n{shelter}\nFood: {:.0} ({})\n{stores}",
-                settlement.founded,
+                "Founded {}\n{population}\n{shelter}\nFood: {:.0} ({})\n{stores}",
+                crate::calendar::date_of_day(settlement.founded),
                 store.food(),
                 food_horizon(store.food(), mouths),
             ),
