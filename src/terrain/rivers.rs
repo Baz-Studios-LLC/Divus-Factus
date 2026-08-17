@@ -129,6 +129,20 @@ const LAKE_LEAST: f32 = 0.35;
 /// go on holding it without the world drawing water in it.
 const LAKE_LEAST_CELLS: usize = 6;
 
+/// And how many it must cover UP IN THE MOUNTAINS to be one.
+///
+/// Real ranges have tarns and they are rare - a handful in a whole massif,
+/// each one a proper rock basin somebody would walk a day to stand beside.
+/// What the fill gives instead, left to itself, is one in every crease of the
+/// ridged noise, because ridged noise is never negative and so rings every low
+/// patch it has with higher ground.
+///
+/// Seventy cells is about seventy thousand square meters: a real mountain
+/// lake, and few enough of them that finding one means something. Measured
+/// over three worlds, this and the mountains' new shape together take the
+/// drowned ground above a hundred and fifty meters down by half.
+const LAKE_LEAST_CELLS_HIGH: usize = 70;
+
 /// Spatial-hash bin size for segment lookup.
 const BIN: f32 = 32.0;
 
@@ -546,7 +560,31 @@ fn solve_region(inner: &mut Inner, terrain: &Terrain, region: IVec2) {
                 }
             }
         }
-        if body.len() >= LAKE_LEAST_CELLS {
+        // HOW BIG A BODY HAS TO BE DEPENDS ON HOW HIGH IT IS.
+        //
+        // Brett: "Currently they are flat on top, have lakes on top of them."
+        // The mountains' own shape answers most of that - see the crest and
+        // cone in `base_height_at` - but not all of it, because ridged noise
+        // is never negative, so a low patch of it is always ringed by higher
+        // ground, and a ring is a basin whatever the regional slope does.
+        // Measured over three worlds, that left four hundred-odd drowned cells
+        // above a hundred and fifty meters.
+        //
+        // So the rest is answered here, where lakes are actually decided, and
+        // by the same rule the real world uses: a tarn needs a proper rock
+        // basin, and there are not many of them. Six cells at the coast, where
+        // a pond is ordinary; twenty-five up in the ranges, where standing
+        // water should be worth walking to see. The hollow is still there and
+        // still holds its shape - it is simply dry, the way most hollows on a
+        // mountain are.
+        let top = body
+            .iter()
+            .map(|index| filled[*index])
+            .fold(f32::MIN, f32::max);
+        let up_high = ((top - crate::terrain::WATER_LEVEL - 30.0) / 80.0).clamp(0.0, 1.0);
+        let least = LAKE_LEAST_CELLS
+            + (up_high * (LAKE_LEAST_CELLS_HIGH - LAKE_LEAST_CELLS) as f32) as usize;
+        if body.len() >= least {
             for index in body {
                 lake[index] = true;
             }

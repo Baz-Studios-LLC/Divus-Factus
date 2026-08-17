@@ -967,8 +967,59 @@ impl Terrain {
             // there is always lower ground a step away and the water always
             // has somewhere to go. `mass` is unbounded on purpose; the curve
             // does the capping, at a ceiling nothing quite reaches.
-            let dome = mass * mass / (mass * mass + 0.35);
-            height += dome * 175.0 + peaks.powf(1.4) * dome * 100.0;
+            // THE CREST FIELD CARRIES THE MOUNTAIN, and the mass only says how
+            // big a mountain to carry. That is the way round it was not, and
+            // all three of Brett's complaints came out of the other way:
+            // "they are flat on top, have lakes on top of them and are pretty
+            // much untraversable."
+            //
+            // Measured before touching (`probe_the_crest_field`): the ridged
+            // field runs p01 0.19, p50 0.55, p99 0.87 - so `powf(1.4)` was
+            // pushing a median crest down to 0.42 and the whole field was
+            // paying for a range it never used. Remapped onto what it actually
+            // spans, so the crests reach the top of their allowance.
+            let crest = ((peaks - 0.19) / 0.68).clamp(0.0, 1.0);
+
+            // A POWER BELOW ONE, which is the opposite of what was here, and
+            // it is what drains the mountains. Ridged noise is never negative,
+            // so every low patch of it is RINGED by higher ground - a closed
+            // basin, which is exactly what a lake is, and squaring the field
+            // deepened every one of them. Below one the hollows lift toward
+            // their surroundings while the crests stay where they are: the
+            // ridgelines keep their edge and the water keeps its way out.
+            let ridges = crest.powf(0.75);
+
+            // A CONE, not a dome. `mass * mass / (mass * mass + 0.35)` runs
+            // 0.74 to 0.96 across the whole interior of a range - a hundred
+            // and seventy-five units of height that vary by thirty-eight,
+            // which is a table with a slight camber, and it is the flat top.
+            // Worse, a curve that flattens at the top has no gradient left
+            // there to carry water off, while the crest noise riding on it
+            // swings a hundred units over thirty meters. The noise wins, the
+            // hollow shuts, and the fill puts a tarn in it.
+            //
+            // This keeps climbing. The soft divisor only bends the curve; it
+            // never lays it down, so a flank has the same honest slope at the
+            // summit as at the foot.
+            let cone = mass / (1.0 + mass * 0.30);
+
+            // And most of the height now rides on the crest rather than under
+            // it, so a summit is where ridgelines MEET and the ground between
+            // them is a valley two hundred units lower - which is the same
+            // thing as a pass, and is what makes a range something you can get
+            // through rather than a wall.
+            // AND A LAST KICK RIGHT AT THE CREST, which is what turns a
+            // shoulder into a summit. `ridges` lifts the hollows to keep the
+            // water moving, and the same curve that does that also rounds the
+            // top - a broad massif came out as a table three kilometers across
+            // with a hundred meters of camber on it, which is the flat top
+            // Brett was looking at. This fires only in the top fifth of the
+            // crest field, so it sharpens every peak without deepening a
+            // single hollow, and squared so it arrives gently rather than as a
+            // step.
+            let spire = ((crest - 0.78) / 0.22).clamp(0.0, 1.0);
+
+            height += cone * 80.0 + ridges * cone * 140.0 + spire * spire * cone * 40.0;
         }
 
         height.clamp(0.0, TERRAIN_HEIGHT)
@@ -2516,6 +2567,223 @@ mod tests {
                  THICK(>0.5) {damp}  wetland-agreeing {cold}  mean weight {:.2}",
                 100.0 * misty as f32 / land_cells.max(1) as f32,
                 sum / land_cells.max(1) as f32,
+            );
+        }
+    }
+
+    /// A CROSS-SECTION THROUGH A SUMMIT, drawn.
+    /// `cargo test probe_mountain_profile -- --ignored --nocapture`
+    ///
+    /// The flat-top question cannot be settled by an average - a mean grade
+    /// says nothing about whether the top is a point or a table. This walks a
+    /// line through the highest ground in a world and draws it, so the shape
+    /// can be read directly. `~` marks standing water.
+    #[test]
+    #[ignore = "a hand-run diagnostic, not a check"]
+    fn probe_mountain_profile() {
+        for seed in [7u32, 19] {
+            let land = Terrain::new(seed);
+            // Find the summit.
+            let (span, side) = (14000.0f32, 200u32);
+            let step = span / side as f32;
+            let mut best = (0.0f32, 0.0f32, 0.0f32);
+            for iz in 0..side {
+                for ix in 0..side {
+                    let x = -span * 0.5 + ix as f32 * step;
+                    let z = -span * 0.5 + iz as f32 * step;
+                    let h = land.base_height_at(x, z);
+                    if h > best.0 {
+                        best = (h, x, z);
+                    }
+                }
+            }
+            let (peak, cx, cz) = best;
+            println!("\n  seed {seed}: summit {peak:.0}m at ({cx:.0}, {cz:.0}) - 3km cross-section:");
+            let reach = 1500.0f32;
+            let cols = 96;
+            let mut ground = Vec::new();
+            for c in 0..cols {
+                let t = c as f32 / (cols - 1) as f32 * 2.0 - 1.0;
+                let (g, w) = land.ground_and_water_at(cx + t * reach, cz);
+                ground.push((g, w));
+            }
+            let top = ground.iter().map(|(g, _)| *g).fold(0.0f32, f32::max);
+            let rows = 18;
+            for row in (0..rows).rev() {
+                let line: String = ground
+                    .iter()
+                    .map(|(g, w)| {
+                        let level = (row as f32 + 0.5) / rows as f32 * top;
+                        if *w > *g + 0.2 && level <= *w && level > *g {
+                            '~'
+                        } else if *g >= level {
+                            '#'
+                        } else {
+                            ' '
+                        }
+                    })
+                    .collect();
+                println!("  {:4.0}m |{line}", (row as f32 + 0.5) / rows as f32 * top);
+            }
+        }
+    }
+
+    /// Where is the nearest big mountain? `cargo test probe_find_a_mountain -- --ignored --nocapture`
+    /// Prints coordinates to point DIVUS_FACTUS_AUTOPLANT at, so a mountain can
+    /// be LOOKED AT rather than only measured.
+    #[test]
+    #[ignore = "a hand-run diagnostic, not a check"]
+    fn probe_find_a_mountain() {
+        for seed in [7u32, 19] {
+            let land = Terrain::new(seed);
+            let span = 14000.0f32;
+            let side = 200u32;
+            let step = span / side as f32;
+            let mut best = (0.0f32, 0.0f32, 0.0f32);
+            for iz in 0..side {
+                for ix in 0..side {
+                    let x = -span * 0.5 + ix as f32 * step;
+                    let z = -span * 0.5 + iz as f32 * step;
+                    let h = land.base_height_at(x, z);
+                    if h > best.0 {
+                        best = (h, x, z);
+                    }
+                }
+            }
+            // Stand off from the summit so the whole massif is in frame.
+            println!(
+                "  seed {seed}: summit {:.0}m at ({:.0}, {:.0})  -> AUTOPLANT={:.0},{:.0}",
+                best.0, best.1, best.2, best.1 + 700.0, best.2 + 700.0,
+            );
+        }
+    }
+
+    /// What range does the mountains' crest field ACTUALLY use?
+    /// `cargo test probe_the_crest_field -- --ignored --nocapture`
+    ///
+    /// The comments by the mountain code warn twice that ridged noise "rarely
+    /// approaches one", and both times the code went on to raise it to a power
+    /// anyway. Before remapping it, measure it.
+    #[test]
+    #[ignore = "a hand-run diagnostic, not a check"]
+    fn probe_the_crest_field() {
+        for seed in [7u32, 19] {
+            let land = Terrain::new(seed);
+            let mut inside = Vec::new();
+            let mut dome_of = Vec::new();
+            let span = 16000.0f32;
+            let side = 300u32;
+            let step = span / side as f32;
+            for iz in 0..side {
+                for ix in 0..side {
+                    let x = -span * 0.5 + ix as f32 * step;
+                    let z = -span * 0.5 + iz as f32 * step;
+                    let dir = direction_at(x, z);
+                    let continent = fbm_3d(dir * spherical(0.00055), land.seed, 3, 2.0, 0.28);
+                    let lv = ((continent - 0.549) / 0.284).clamp(-1.0, 1.0);
+                    let inland = (lv / 0.25).clamp(0.0, 1.0);
+                    let ridge_mask = inland * inland * (3.0 - 2.0 * inland);
+                    let belt = fbm_3d(
+                        dir * spherical(0.00055) + Vec3::new(300.0, -120.0, 60.0),
+                        land.seed ^ 0x3721,
+                        4,
+                        2.0,
+                        0.5,
+                    );
+                    let mass = ((belt - 0.56) / 0.16).max(0.0) * ridge_mask;
+                    if mass <= 0.0 {
+                        continue;
+                    }
+                    let peaks = ridged_3d(dir * spherical(0.0021), land.seed ^ 0x77aa, 5);
+                    inside.push(peaks);
+                    dome_of.push(mass * mass / (mass * mass + 0.35));
+                }
+            }
+            inside.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            dome_of.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            let at = |v: &Vec<f32>, p: f32| v[((v.len() - 1) as f32 * p) as usize];
+            println!(
+                "  seed {seed}: {} cells in a belt\n\
+                 \x20   CREST p01 {:.3} p10 {:.3} p50 {:.3} p90 {:.3} p99 {:.3} max {:.3}\n\
+                 \x20   DOME  p10 {:.3} p50 {:.3} p90 {:.3} max {:.3}  (1.0 is dead flat)",
+                inside.len(),
+                at(&inside, 0.01), at(&inside, 0.10), at(&inside, 0.50),
+                at(&inside, 0.90), at(&inside, 0.99), inside[inside.len() - 1],
+                at(&dome_of, 0.10), at(&dome_of, 0.50), at(&dome_of, 0.90),
+                dome_of[dome_of.len() - 1],
+            );
+        }
+    }
+
+    /// WHAT IS ACTUALLY WRONG WITH THE MOUNTAINS.
+    /// `cargo test probe_the_mountains -- --ignored --nocapture`
+    ///
+    /// Brett: "Mountains need some serious work. Currently they are flat on
+    /// top, have lakes on top of them and are pretty much untraversable."
+    /// Three complaints; this measures all three at once so a fix can be
+    /// judged rather than admired.
+    #[test]
+    #[ignore = "a hand-run diagnostic, not a check"]
+    fn probe_the_mountains() {
+        const HIGH: f32 = 150.0;
+        for seed in [7u32, 19, 88] {
+            let land = Terrain::new(seed);
+            let span = 16000.0f32;
+            let side = 260u32;
+            let step = span / side as f32;
+            let mut tallest = 0.0f32;
+            let mut at_cap = 0;
+            let mut high_cells = 0;
+            let mut flat_high = 0;
+            let mut steep_high = 0;
+            let mut walkable_high = 0;
+            let mut drowned_high = 0;
+            let mut sum_slope = 0.0f32;
+            for iz in 0..side {
+                for ix in 0..side {
+                    let x = -span * 0.5 + ix as f32 * step;
+                    let z = -span * 0.5 + iz as f32 * step;
+                    let (h, water) = land.ground_and_water_at(x, z);
+                    tallest = tallest.max(h);
+                    if h > TERRAIN_HEIGHT - 1.0 {
+                        at_cap += 1;
+                    }
+                    if h < HIGH {
+                        continue;
+                    }
+                    high_cells += 1;
+                    // Slope measured over a stride a walker would feel, not
+                    // over the noise's own smallest feature.
+                    let e = 16.0;
+                    let hl = land.height_at(x - e, z);
+                    let hr = land.height_at(x + e, z);
+                    let hd = land.height_at(x, z - e);
+                    let hu = land.height_at(x, z + e);
+                    if water > h + 0.2 { drowned_high += 1; }
+                    let grade = (((hr - hl) / (2.0 * e)).powi(2)
+                        + ((hu - hd) / (2.0 * e)).powi(2))
+                    .sqrt();
+                    sum_slope += grade;
+                    if grade < 0.06 {
+                        flat_high += 1;
+                    }
+                    if grade > 0.7 {
+                        steep_high += 1;
+                    }
+                    if land.slope_at(x, z) < 0.55 {
+                        walkable_high += 1;
+                    }
+                }
+            }
+            let hc = high_cells.max(1);
+            println!(
+                "  seed {seed}: tallest {tallest:.0}  at-cap {at_cap}  high(>{HIGH:.0}m) {high_cells}\n\
+                 \x20   FLAT tops {flat_high} ({:.0}%)  very steep {steep_high} ({:.0}%)  \
+                 WALKABLE {walkable_high} ({:.0}%)  mean grade {:.2}  LAKES-UP-HIGH {drowned_high}",
+                100.0 * flat_high as f32 / hc as f32,
+                100.0 * steep_high as f32 / hc as f32,
+                100.0 * walkable_high as f32 / hc as f32,
+                sum_slope / hc as f32,
             );
         }
     }
