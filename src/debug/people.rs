@@ -463,7 +463,7 @@ pub(crate) fn spawn_people_panel(
         Name::new("Paperdoll Fill"),
         DirectionalLight {
             // Near-neutral, and quiet: a blue fill painted the charcoal
-            // alcove's edges sky-coloured.
+            // alcove's edges sky-colored.
             color: Color::srgb(0.75, 0.78, 0.85),
             illuminance: 2_800.0,
             ..default()
@@ -768,7 +768,7 @@ pub(crate) fn spawn_people_panel(
                     width: percent(100),
                     flex_direction: FlexDirection::Row,
                     // Baseline, not Center: the dim label and the body value
-                    // wear different type sizes, and centring the boxes left
+                    // wear different type sizes, and centering the boxes left
                     // the value riding low against its label - "6 times" sat
                     // half a step under SEEN YOU. Baseline is the rule
                     // `ui::stat_row` already lives by; this grid keeps it.
@@ -1189,7 +1189,7 @@ pub(crate) fn update_people_panel(
             ))
             .id();
         // The face bleeds the card's full height at its left edge, ruled
-        // off from the words in the trade's own colour.
+        // off from the words in the trade's own color.
         let frame = commands
             .spawn((
                 Node {
@@ -1213,7 +1213,7 @@ pub(crate) fn update_people_panel(
             livery.with_alpha(0.9),
         );
         // Name over title, both a step brighter and larger than the old
-        // roster wore them - white ink for the name, the trade's colour
+        // roster wore them - white ink for the name, the trade's color
         // lifted toward bone for the title, since raw livery tones sank
         // into the card. Brett: "the text is a little hard to read."
         let words = commands
@@ -1613,7 +1613,7 @@ fn stat_chip(commands: &mut Commands, parent: Entity, which: InspectorValue) {
                 flex_shrink: 0.0,
                 // A circle has no baseline to sit on: in a baseline-aligned
                 // row it would stand on the text's feet and tower. It keeps
-                // its own centre instead, whatever rule the row runs.
+                // its own center instead, whatever rule the row runs.
                 align_self: AlignSelf::Center,
                 border: UiRect::all(px(1)),
                 border_radius: BorderRadius::all(px(999)),
@@ -1625,7 +1625,7 @@ fn stat_chip(commands: &mut Commands, parent: Entity, which: InspectorValue) {
         ))
         .id();
     let mut mark = |node: Node, turned: bool, bright: bool| {
-        let colour = if bright {
+        let color = if bright {
             crate::palette::shade(&crate::palette::BONE, 0.95)
         } else {
             ink
@@ -1634,11 +1634,11 @@ fn stat_chip(commands: &mut Commands, parent: Entity, which: InspectorValue) {
             commands.spawn((
                 node,
                 UiTransform::from_rotation(Rot2::degrees(45.0)),
-                BackgroundColor(colour),
+                BackgroundColor(color),
                 ChildOf(chip),
             ));
         } else {
-            commands.spawn((node, BackgroundColor(colour), ChildOf(chip)));
+            commands.spawn((node, BackgroundColor(color), ChildOf(chip)));
         }
     };
     let at = |left: f32, top: f32, w: f32, h: f32, round: f32| Node {
@@ -1826,7 +1826,7 @@ pub(crate) fn update_dossier(
     }
     *last = (Some(person), story_len);
 
-    // THE CRAFT: one bar per calling ever practised, deepest first.
+    // THE CRAFT: one bar per calling ever practiced, deepest first.
     for well in &craft_wells {
         commands.entity(well).despawn_related::<Children>();
         let mut crafts: Vec<(crate::villager::work::Vocation, f32)> =

@@ -1518,7 +1518,7 @@
     ]
   },
   {
-    "t": "I hope you're wrong, no offence",
+    "t": "I hope you're wrong, no offense",
     "tags": [
       "chat:end"
     ]
@@ -3666,7 +3666,7 @@
     ]
   },
   {
-    "t": "my hands are grey to the wrist",
+    "t": "my hands are gray to the wrist",
     "tags": [
       "chat:open",
       "trade:miner"
@@ -3876,7 +3876,7 @@
     ]
   },
   {
-    "t": "you've been favouring that leg all week",
+    "t": "you've been favoring that leg all week",
     "tags": [
       "chat:open",
       "trade:healer"
@@ -3911,7 +3911,7 @@
     ]
   },
   {
-    "t": "saw tracks I didn't recognise today",
+    "t": "saw tracks I didn't recognize today",
     "tags": [
       "chat:open",
       "trade:hunter"
@@ -4121,7 +4121,7 @@
     ]
   },
   {
-    "t": "give it a week and you won't recognise that corner",
+    "t": "give it a week and you won't recognize that corner",
     "tags": [
       "chat:open",
       "trade:builder"

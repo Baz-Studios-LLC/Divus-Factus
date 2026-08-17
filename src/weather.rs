@@ -5,7 +5,7 @@
 //! shift every few minutes toward a rolled target, so weather has moods
 //! rather than switches.
 //!
-//! The design's quiet centrepiece: a storm's lightning is *real* - it harms
+//! The design's quiet centerpiece: a storm's lightning is *real* - it harms
 //! what it hits and enters the witness pipeline as the same event a Smite
 //! does. The villagers cannot tell heaven's wrath from the sky's, and the
 //! legend they build from a bad storm is the player's to inherit. The god
@@ -33,7 +33,7 @@ impl WeatherKind {
     pub fn describe(self) -> &'static str {
         match self {
             WeatherKind::Clear => "clear skies",
-            WeatherKind::Overcast => "grey overcast",
+            WeatherKind::Overcast => "gray overcast",
             WeatherKind::Rain => "steady rain",
             WeatherKind::Storm => "a storm overhead",
         }
@@ -161,7 +161,7 @@ fn progress_fronts(
                 // land on the real ones, which is as close as a dice roll
                 // gets to a climate.
                 let roll = rng.f32();
-                // The grey band stops short of the rain line on purpose:
+                // The gray band stops short of the rain line on purpose:
                 // the season's thumb pushes it up, and a winter overcast
                 // should stay an overcast rather than tipping into a
                 // downpour because it is January.
@@ -174,7 +174,7 @@ fn progress_fronts(
                 } else {
                     rng.range(0.72, 1.0)
                 };
-                // The season's thumb on the dice: winters run grey and
+                // The season's thumb on the dice: winters run gray and
                 // stormy, summers clear.
                 (base + clock.season().gloom()).clamp(0.02, 1.0)
             }
@@ -237,7 +237,7 @@ fn rain_falls(
         return;
     }
 
-    let centre = rig.focus;
+    let center = rig.focus;
     let t = time.elapsed_secs();
     let shown = (weather.intensity.max(0.0) - 0.5).max(0.0) * 2.0;
     let slant = weather.wind * 8.0;
@@ -259,12 +259,12 @@ fn rain_falls(
         let phase = (t * 0.65 + drop.seed).fract();
         let column_x = ((drop.seed * 137.7).fract() - 0.5) * 110.0;
         let column_z = ((drop.seed * 291.3).fract() - 0.5) * 110.0;
-        let top = centre.y + 34.0;
+        let top = center.y + 34.0;
         let fall = phase * 46.0;
         transform.translation = Vec3::new(
-            centre.x + column_x + slant * phase,
+            center.x + column_x + slant * phase,
             top - fall,
-            centre.z + column_z,
+            center.z + column_z,
         );
         transform.rotation = Quat::from_rotation_z(weather.wind * 0.17);
     }
@@ -314,8 +314,8 @@ fn storm_strikes(
     let angle = rng.range(0.0, std::f32::consts::TAU);
     let reach = rng.range(8.0, 130.0);
     let (sin, cos) = angle.sin_cos();
-    let x = site.centre.x + cos * reach;
-    let z = site.centre.z + sin * reach;
+    let x = site.center.x + cos * reach;
+    let z = site.center.z + sin * reach;
     let at = Vec3::new(x, terrain.height_at(x, z), z);
 
     crate::miracles::lightning_bolt(&mut commands, &mut meshes, &mut materials, at);
@@ -367,7 +367,7 @@ fn storm_strikes(
 }
 
 /// A tree on fire. It burns down to nothing, and while it burns it can pass
-/// the flame to its neighbours - unless the rain gets there first.
+/// the flame to its neighbors - unless the rain gets there first.
 #[derive(Component)]
 pub struct Burning {
     pub remaining: f32,

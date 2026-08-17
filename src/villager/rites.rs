@@ -1,7 +1,7 @@
 //! Death rites: mourning, bearing, and burial.
 //!
 //! A death used to leave a body in the grass and nothing else. Now it leaves
-//! a hole in the village: family and neighbours gather and weep over the
+//! a hole in the village: family and neighbors gather and weep over the
 //! dead, spirits fall, chronicles record who was wept for — and then someone
 //! (the priest, when the village has one) shoulders the body and carries it
 //! to a resting ground on the outskirts, where a mound and a headstone stand
@@ -60,7 +60,7 @@ pub struct Grave {
     pub day: u32,
 }
 
-/// Death is noticed: the family and the nearest neighbours put down what
+/// Death is noticed: the family and the nearest neighbors put down what
 /// they are doing and gather over the body.
 #[allow(clippy::type_complexity)]
 pub(super) fn mark_the_dead(
@@ -269,7 +269,7 @@ pub(super) fn burials(
             if ground.0.contains_key(&town) {
                 continue;
             }
-            let spot = work::village_slots(home_ground.centre, 7..10, 12.0)
+            let spot = work::village_slots(home_ground.center, 7..10, 12.0)
                 .into_iter()
                 .map(|(x, z, _)| Vec3::new(x, terrain.height_at(x, z), z))
                 .find(|at| terrain.is_walkable(at.x, at.z) && at.y > WATER_LEVEL + 2.0);
@@ -388,7 +388,7 @@ pub(super) fn burials(
         story.record(day, "was laid to rest");
         let nearest_square = towns
             .iter()
-            .map(|(_, home_ground)| home_ground.centre)
+            .map(|(_, home_ground)| home_ground.center)
             .min_by(|a, b| a.distance(spot).total_cmp(&b.distance(spot)))
             .unwrap_or(spot + Vec3::X);
         let toward = (nearest_square - spot).with_y(0.0).normalize_or_zero();
@@ -466,7 +466,7 @@ mod tests {
             Person::born("Odo".into(), "Gravely".into()),
             Transform::from_xyz(0.0, 0.0, 0.0),
         ));
-        let neighbour = app
+        let neighbor = app
             .world_mut()
             .spawn((
                 Villager,
@@ -482,15 +482,15 @@ mod tests {
 
         let world = app.world();
         assert_eq!(
-            *world.get::<Activity>(neighbour).unwrap(),
+            *world.get::<Activity>(neighbor).unwrap(),
             Activity::Mourning,
-            "a neighbour drops everything for the dead",
+            "a neighbor drops everything for the dead",
         );
-        assert!(world.get::<Grieving>(neighbour).is_some());
-        let story = world.get::<Chronicle>(neighbour).unwrap();
+        assert!(world.get::<Grieving>(neighbor).is_some());
+        let story = world.get::<Chronicle>(neighbor).unwrap();
         assert!(story.events.iter().any(|e| e.text.contains("wept for Odo")));
         assert!(
-            world.get::<Morale>(neighbour).unwrap().spirits < 0.8,
+            world.get::<Morale>(neighbor).unwrap().spirits < 0.8,
             "grief costs something",
         );
     }

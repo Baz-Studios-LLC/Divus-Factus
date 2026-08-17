@@ -7,7 +7,7 @@
 //! The search is A* over a grid sampled from the terrain function on demand. There is
 //! no navmesh and no baked grid, because there is no bounded world to bake — the same
 //! property that makes the terrain streamable makes it queryable anywhere, so the
-//! search generates exactly the cells it visits and discards them afterwards.
+//! search generates exactly the cells it visits and discards them afterward.
 //!
 //! Every search is bounded by a node budget. An unreachable goal — across an ocean,
 //! or up a cliff — must fail quickly and cheaply rather than flood-filling a
@@ -86,8 +86,8 @@ fn watch_the_walls(
         // player asks. A stride that crosses a building the walker is
         // neither leaving nor entering is a search failure. A stride
         // that crosses the wall of their OWN destination is excused by
-        // the search on purpose - no path on a two-and-a-half metre grid
-        // can thread a one metre door - and is meant to be bent through
+        // the search on purpose - no path on a two-and-a-half meter grid
+        // can thread a one meter door - and is meant to be bent through
         // the doorway by `home::use_doors`. When that bending fails, what
         // you SEE is a person walking through their own wall, which is
         // what Brett is reporting.
@@ -180,7 +180,7 @@ pub struct Reachable {
     /// the two are told apart by `covers`.
     island: HashMap<Cell, u32>,
     /// The middle of the charted window, and how far it reaches in cells.
-    centre: Cell,
+    center: Cell,
     reach: i32,
     /// Cells still to visit in the fill being drawn, and what is known so far.
     frontier: Vec<(Cell, u32)>,
@@ -198,7 +198,7 @@ impl Reachable {
             return false;
         }
         let cell = to_cell(at);
-        let away = cell - self.centre;
+        let away = cell - self.center;
         away.x.abs() <= self.reach && away.y.abs() <= self.reach
     }
 
@@ -247,19 +247,19 @@ fn chart_the_ground(
     // Start a fresh chart when there is none, when the village has moved out
     // from under the old one, or when the standing one has gone stale.
     if chart.drawing.is_none() {
-        let centre = to_cell(site.centre);
+        let center = to_cell(site.center);
         let reach = (CHARTED_REACH / CELL) as i32;
-        let moved = (centre - chart.centre).abs().max_element() > reach / 3;
+        let moved = (center - chart.center).abs().max_element() > reach / 3;
         chart.age += time.delta_secs();
         if chart.reach != 0 && !moved && chart.age < REDRAW_AFTER {
             return;
         }
-        chart.drawing = Some((HashMap::default(), 0, centre, reach));
+        chart.drawing = Some((HashMap::default(), 0, center, reach));
         chart.frontier.clear();
         chart.swept = 0;
     }
 
-    let Some((mut found, mut islands, centre, reach)) = chart.drawing.take() else {
+    let Some((mut found, mut islands, center, reach)) = chart.drawing.take() else {
         return;
     };
     let mut frontier = std::mem::take(&mut chart.frontier);
@@ -276,7 +276,7 @@ fn chart_the_ground(
                         continue;
                     }
                     let next = cell + IVec2::new(dx, dz);
-                    let away = next - centre;
+                    let away = next - center;
                     if away.x.abs() > reach || away.y.abs() > reach {
                         continue;
                     }
@@ -312,7 +312,7 @@ fn chart_the_ground(
         if swept >= side * side {
             break;
         }
-        let cell = centre + IVec2::new(swept % side - reach, swept / side - reach);
+        let cell = center + IVec2::new(swept % side - reach, swept / side - reach);
         swept += 1;
         spent += 1;
         if found.contains_key(&cell) {
@@ -331,14 +331,14 @@ fn chart_the_ground(
         // Finished: the new chart takes over from the old one whole, so nobody
         // ever reads a half-drawn map and is told the village is an island.
         chart.island = found;
-        chart.centre = centre;
+        chart.center = center;
         chart.reach = reach;
         chart.age = 0.0;
         chart.drawing = None;
         chart.frontier.clear();
         chart.swept = 0;
     } else {
-        chart.drawing = Some((found, islands, centre, reach));
+        chart.drawing = Some((found, islands, center, reach));
         chart.frontier = frontier;
         chart.swept = swept;
     }
@@ -385,7 +385,7 @@ fn survey_the_walls(
     walls.ramparts.extend(
         towns
             .iter()
-            .map(|(ground, wall)| wall.as_barrier(ground.centre)),
+            .map(|(ground, wall)| wall.as_barrier(ground.center)),
     );
     walls.buildings.clear();
     walls.buildings.extend(shells.iter().map(|(at, shell)| {
@@ -451,7 +451,7 @@ impl Footprint {
         // three-thousand-node search steps eight ways from every node, so a
         // village of a few dozen halls is millions of these in one path — and
         // every one of them opened with a `sin_cos` before it could decide the
-        // building was two hundred metres away.
+        // building was two hundred meters away.
         //
         // The footprint's circumscribed circle against the segment's own. Both
         // are exact bounds whatever the yaw, so a rejection here is a rejection
@@ -507,28 +507,28 @@ impl Footprint {
 /// quadratic and a couple of angles. The art draws posts along the same
 /// circle; the maths never sees them.
 ///
-/// Gates are gaps in the circle, measured in radians about the centre. They
+/// Gates are gaps in the circle, measured in radians about the center. They
 /// must be WIDE - `home::use_doors` exists because no route on a
-/// two-and-a-half metre grid can thread a one metre door, and unlike a
+/// two-and-a-half meter grid can thread a one meter door, and unlike a
 /// door, a town gate carries the whole economy: every forester, hunter and
 /// gatherer walks out through one twice a day. A gate too narrow for the
-/// search to find is a village that starves inside its own defences.
+/// search to find is a village that starves inside its own defenses.
 #[derive(Clone, Debug)]
 pub struct Rampart {
     pub at: Vec2,
     pub radius: f32,
-    /// Where each gate stands, in radians about the centre.
+    /// Where each gate stands, in radians about the center.
     pub gates: Vec<f32>,
-    /// Half a gate's opening, in radians. Set from metres by `gate_arc`.
+    /// Half a gate's opening, in radians. Set from meters by `gate_arc`.
     pub gate_half: f32,
 }
 
-/// The half-angle a gate of `metres` subtends on a ring of `radius`.
-pub fn gate_arc(radius: f32, metres: f32) -> f32 {
-    (metres * 0.5 / radius.max(1.0)).atan()
+/// The half-angle a gate of `meters` subtends on a ring of `radius`.
+pub fn gate_arc(radius: f32, meters: f32) -> f32 {
+    (meters * 0.5 / radius.max(1.0)).atan()
 }
 
-/// How wide a town gate stands, in metres.
+/// How wide a town gate stands, in meters.
 ///
 /// Four cells of the search grid, and that is the whole reason for the
 /// number: a gap the search cannot see is a gap nobody can walk through.
@@ -600,8 +600,8 @@ impl Walls {
     /// cut through one you are merely passing.
     ///
     /// It has to be a rule about the journey rather than about the walker,
-    /// because the grid is two and a half metres to a cell and a door is one
-    /// metre wide: no search on this grid can thread a doorway, so a building
+    /// because the grid is two and a half meters to a cell and a door is one
+    /// meter wide: no search on this grid can thread a doorway, so a building
     /// blocked outright would be a building nobody could ever enter and no bed
     /// anyone could reach. The door itself is steered by `home::use_doors`, which
     /// is the right tool at that scale; this only has to stop people walking
@@ -665,7 +665,7 @@ fn to_cell(p: Vec3) -> Cell {
 /// three cells, nearest ring first, nearest cell within it winning. `None`
 /// only for a goal buried deeper than that, which is a true refusal.
 fn stand_beside(terrain: &Terrain, goal: Vec3) -> Option<Cell> {
-    let centre = to_cell(goal);
+    let center = to_cell(goal);
     for ring in 1i32..=3 {
         let mut best: Option<(f32, Cell)> = None;
         for dx in -ring..=ring {
@@ -673,7 +673,7 @@ fn stand_beside(terrain: &Terrain, goal: Vec3) -> Option<Cell> {
                 if dx.abs().max(dz.abs()) != ring {
                     continue;
                 }
-                let cell = centre + IVec2::new(dx, dz);
+                let cell = center + IVec2::new(dx, dz);
                 let (x, z) = (cell.x as f32 * CELL, cell.y as f32 * CELL);
                 if !terrain.is_walkable(x, z) {
                     continue;
@@ -833,7 +833,7 @@ fn through_the_gate(
     let ring = walls.ramparts.iter().find(|ring| ring.bars(from, to))?;
 
     // The gate to make for: the one nearest the way you are already
-    // travelling, measured from whichever side of the wall you are on.
+    // traveling, measured from whichever side of the wall you are on.
     let outside = if (from - ring.at).length() > ring.radius {
         from
     } else {
@@ -875,7 +875,7 @@ fn through_the_gate(
         Vec3::new(at.x, terrain.height_at(at.x, at.y), at.y)
     };
 
-    // Whichever side the traveller is on, they come round to the gate,
+    // Whichever side the traveler is on, they come round to the gate,
     // step through it, and walk on from the other side.
     let leaving = (from - ring.at).length() > ring.radius;
     let mut path = if leaving {
@@ -968,7 +968,7 @@ fn walk_it_out(
     // slab, a freshly terraced ledge — is not a refusal, it is an errand to
     // the nearest ground BESIDE it. Refusing it outright starved a village:
     // the square went unwalkable while the hall rose, every meal was aimed
-    // at the square's exact centre, and every path to a full larder failed
+    // at the square's exact center, and every path to a full larder failed
     // on this line. Six villagers died standing at the radius where their
     // routes were abandoned, and not one of them ever reached a meal.
     let goal_cell = if terrain.is_walkable(goal.x, goal.z) {
@@ -1029,8 +1029,8 @@ fn walk_it_out(
                 // Asking only about the destination lets a diagonal cut the
                 // corner off a building: two cells either side of a corner are
                 // both outside it, and the line between their middles is not.
-                // With cells at two and a half metres the bite taken out is
-                // most of a metre, and the whole point of `Walls` is that
+                // With cells at two and a half meters the bite taken out is
+                // most of a meter, and the whole point of `Walls` is that
                 // nobody walks through a hall they are only passing.
                 //
                 // It was invisible until the terrain was smoothed and a route
@@ -1142,17 +1142,17 @@ mod tests {
     ///
     /// The same fill, not a second implementation of it - a test that agreed
     /// with a copy of the code rather than with the code would prove nothing.
-    fn chart_around(terrain: &Terrain, centre: Vec3, reach_units: f32) -> Reachable {
+    fn chart_around(terrain: &Terrain, center: Vec3, reach_units: f32) -> Reachable {
         let mut chart = Reachable {
-            centre: to_cell(centre),
+            center: to_cell(center),
             reach: (reach_units / CELL) as i32,
             ..Default::default()
         };
-        let (centre_cell, reach) = (chart.centre, chart.reach);
+        let (center_cell, reach) = (chart.center, chart.reach);
         let side = reach * 2 + 1;
         let mut islands = 0;
         for step in 0..side * side {
-            let cell = centre_cell + IVec2::new(step % side - reach, step / side - reach);
+            let cell = center_cell + IVec2::new(step % side - reach, step / side - reach);
             if chart.island.contains_key(&cell) {
                 continue;
             }
@@ -1169,7 +1169,7 @@ mod tests {
                             continue;
                         }
                         let next = at + IVec2::new(dx, dz);
-                        let away = next - centre_cell;
+                        let away = next - center_cell;
                         if away.x.abs() > reach || away.y.abs() > reach {
                             continue;
                         }
@@ -1474,7 +1474,7 @@ mod tests {
 
     #[test]
     fn the_building_you_are_going_to_is_the_one_you_may_enter() {
-        // A door is one metre and a cell is two and a half, so a building
+        // A door is one meter and a cell is two and a half, so a building
         // blocked outright is a building with no way in and a bed nobody can
         // reach. The journey's own destination is always excused.
         let t = Terrain::new(77);
@@ -1722,10 +1722,10 @@ mod tests {
     /// can still send its people out to work, and the way out is the gate.
     ///
     /// The lesson this is built from cost a village its life this morning:
-    /// no route on a two-and-a-half metre grid can thread a one metre
+    /// no route on a two-and-a-half meter grid can thread a one meter
     /// door. A town gate carries every forester and hunter twice a day,
     /// so if the search cannot find it, the village starves inside its
-    /// own defences.
+    /// own defenses.
     #[test]
     fn a_walled_town_can_still_send_its_people_to_work() {
         let terrain = Terrain::new(4242);

@@ -59,7 +59,7 @@ const SHUN_RADIUS: f32 = 5.0;
 /// Five hundred killed a village outright. A gatherer will walk any
 /// distance you allow, food trades are exempt from carrying rations
 /// because they eat what they harvest, and nothing else was stopping
-/// them - so ten people spent their days walking half a kilometre for
+/// them - so ten people spent their days walking half a kilometer for
 /// one bush each and every one of them starved with food in the store.
 /// The walk has to be worth the load at the end of it.
 pub(crate) const RANGE_REACH: f32 = 330.0;
@@ -92,7 +92,7 @@ pub(crate) fn forget_shunned(
 
 /// Finds the nearest shoreline point: walk outward from the settlement until
 /// the ground dips under water, and stand on the last dry step.
-pub(crate) fn find_shore(terrain: &Terrain, centre: Vec3, rng: &mut Rng) -> Option<Vec3> {
+pub(crate) fn find_shore(terrain: &Terrain, center: Vec3, rng: &mut Rng) -> Option<Vec3> {
     let mut best: Option<(f32, Vec3)> = None;
     for _ in 0..24 {
         let angle = rng.range(0.0, std::f32::consts::TAU);
@@ -100,8 +100,8 @@ pub(crate) fn find_shore(terrain: &Terrain, centre: Vec3, rng: &mut Rng) -> Opti
         let mut last_dry: Option<Vec3> = None;
         let mut step = 4.0;
         while step < WORK_REACH {
-            let x = centre.x + cos * step;
-            let z = centre.z + sin * step;
+            let x = center.x + cos * step;
+            let z = center.z + sin * step;
             let height = terrain.height_at(x, z);
             if height <= WATER_LEVEL || terrain.river_surface_at(x, z).is_some() {
                 if let Some(dry) = last_dry
@@ -125,11 +125,11 @@ pub(crate) fn find_shore(terrain: &Terrain, centre: Vec3, rng: &mut Rng) -> Opti
 /// at the worksite, not on the road to it.
 pub(crate) fn find_ground(
     terrain: &Terrain,
-    centre: Vec3,
+    center: Vec3,
     rng: &mut Rng,
     wanted: impl Fn(&Terrain, f32, f32) -> bool,
 ) -> Option<Vec3> {
-    find_ground_in(terrain, centre, rng, 40, wanted)
+    find_ground_in(terrain, center, rng, 40, wanted)
 }
 
 /// [`find_ground`] with the number of darts thrown made explicit.
@@ -144,7 +144,7 @@ pub(crate) fn find_ground(
 /// search behind it cost.
 pub(crate) fn find_ground_in(
     terrain: &Terrain,
-    centre: Vec3,
+    center: Vec3,
     rng: &mut Rng,
     tries: usize,
     wanted: impl Fn(&Terrain, f32, f32) -> bool,
@@ -154,8 +154,8 @@ pub(crate) fn find_ground_in(
         let angle = rng.range(0.0, std::f32::consts::TAU);
         let distance = rng.range(10.0, WORK_REACH);
         let (sin, cos) = angle.sin_cos();
-        let x = centre.x + cos * distance;
-        let z = centre.z + sin * distance;
+        let x = center.x + cos * distance;
+        let z = center.z + sin * distance;
         if terrain.is_walkable(x, z)
             && wanted(terrain, x, z)
             && best.is_none_or(|(d, _)| distance < d)
@@ -299,9 +299,9 @@ pub(crate) fn take_up_work(
         let Ok(&crate::villager::MemberOf(home)) = members.get(entity) else {
             continue;
         };
-        let Some((centre, food, timber, stone, clay)) = towns.get(home).ok().map(|(g, store)| {
+        let Some((center, food, timber, stone, clay)) = towns.get(home).ok().map(|(g, store)| {
             (
-                g.centre,
+                g.center,
                 store.food(),
                 store.timber,
                 store.stone,
@@ -459,7 +459,7 @@ pub(crate) fn take_up_work(
                         Job::at(at, Some(dock), at.distance(transform.translation))
                     })
                     .or_else(|| {
-                        find_shore(&terrain, centre, &mut rng.0)
+                        find_shore(&terrain, center, &mut rng.0)
                             .filter(|at| permitted(*at))
                             .map(|at| Job::at(at, None, at.distance(transform.translation)))
                     })
@@ -519,7 +519,7 @@ pub(crate) fn take_up_work(
                         )
                     })
                     .or_else(|| {
-                        find_ground(&terrain, centre, &mut rng.0, |t, x, z| {
+                        find_ground(&terrain, center, &mut rng.0, |t, x, z| {
                             matches!(t.biome_at(x, z), Biome::Alpine)
                                 || t.height_at(x, z) > WATER_LEVEL + 40.0
                         })
@@ -692,8 +692,8 @@ pub(crate) fn take_up_work(
                             .iter()
                             .min_by(|a, b| {
                                 a.1.translation
-                                    .distance(centre)
-                                    .total_cmp(&b.1.translation.distance(centre))
+                                    .distance(center)
+                                    .total_cmp(&b.1.translation.distance(center))
                             })
                             .map(|(_, t, _)| (t.translation, t.rotation));
                         let gridded = anchor.and_then(|(origin, rotation)| {
@@ -718,7 +718,7 @@ pub(crate) fn take_up_work(
                         // falls back to the open ring slots.
                         gridded
                             .or_else(|| {
-                                village_slots(centre, 5..7, 12.0)
+                                village_slots(center, 5..7, 12.0)
                                     .into_iter()
                                     .map(|(x, z, _)| Vec3::new(x, terrain.height_at(x, z), z))
                                     .find(|at| {
@@ -804,7 +804,7 @@ pub(crate) fn take_up_work(
                     .unwrap_or_else(|| {
                         let angle = rng.0.range(0.0, std::f32::consts::TAU);
                         let (sin, cos) = angle.sin_cos();
-                        let (x, z) = (centre.x + cos * 22.0, centre.z + sin * 22.0);
+                        let (x, z) = (center.x + cos * 22.0, center.z + sin * 22.0);
                         Vec3::new(x, terrain.height_at(x, z), z)
                     });
                 Some(Job::at(post, None, post.distance(transform.translation)))
@@ -988,7 +988,7 @@ pub(crate) fn take_up_work(
         // half-starvation of travel, capped at three - and a village
         // too poor to provision the road keeps its people near home,
         // where the famine watch will say so out loud.
-        let round_trip = job.site.distance(transform.translation) + job.site.distance(centre);
+        let round_trip = job.site.distance(transform.translation) + job.site.distance(center);
         let meals = ((round_trip / 2.4) / (super::super::SECONDS_TO_STARVE * 0.5))
             .floor()
             .min(3.0);

@@ -55,7 +55,7 @@ pub enum BuildingKind {
     Sawmill,
     /// Tools for everyone: work cycles run faster.
     Blacksmith,
-    /// Evenings and rumours: spirits mend here, and stories change hands.
+    /// Evenings and rumors: spirits mend here, and stories change hands.
     Tavern,
     /// The village grown into a town: room for more people.
     TownHall,
@@ -292,7 +292,7 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
     // seat of government. Brett, twice: "Still not building a town hall".
     //
     // So a town that has earned its hall builds its hall, and goes back to
-    // wanting sheds afterwards. It is the one building here that marks an
+    // wanting sheds afterward. It is the one building here that marks an
     // occasion rather than answering a shortage.
     if !has(TownHall)
         && needs.population >= min_pop(TownHall)
@@ -545,7 +545,7 @@ impl BuildStuff {
     }
 }
 
-/// One building's rolled shape and colours. No two houses need look alike:
+/// One building's rolled shape and colors. No two houses need look alike:
 /// footprint, height, roof style and paint all vary within the kind.
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Blueprint {
@@ -594,7 +594,7 @@ impl Blueprint {
         // when the village drew its own buildings out of boxes - and only the
         // HOUSE arm ever asked the drawing. So a storehouse authored 6.4 by
         // 10.6 was placed, terraced and cleared as though it were 2.8 by 1.6:
-        // the pad was a fifth of the building, one end of a twenty-metre shed
+        // the pad was a fifth of the building, one end of a twenty-meter shed
         // hung in the air while the other buried itself in the hill, and the
         // trees were cleared to a radius that did not reach its porches.
         // Brett: "The store house didn't clear its own foot print correctly"
@@ -654,7 +654,7 @@ impl Blueprint {
                     .unwrap_or_else(|| rng.range(2.7, 3.4)),
                 wall_h: rng.range(2.2, 2.7),
                 // Timber homes mostly; some whitewashed, a few painted in a
-                // cloth colour — a street, not a barracks.
+                // cloth color — a street, not a barracks.
                 walls: if rng.chance(0.55) {
                     pal::shade(&pal::WOOD, rng.range(0.55, 0.85))
                 } else if rng.chance(0.6) {
@@ -680,7 +680,7 @@ impl Blueprint {
                 // Set below, once for every kind.
                 mirrored: false,
                 // As with a house: a carried-in hall brings its own
-                // footprint, and the plot, the levelled pad and the
+                // footprint, and the plot, the leveled pad and the
                 // walls are all cut to it. Leaving the rolled numbers
                 // here put a bench hall three times the size on a pad
                 // measured for the village's own.
@@ -893,7 +893,7 @@ impl Blueprint {
             },
             // A narrow stone finger with a platform at the top. Tall
             // enough to see over the canopy, which is the entire point of
-            // climbing one - at three and a half metres it was a shed
+            // climbing one - at three and a half meters it was a shed
             // with ambitions.
             BuildingKind::Watchtower => Blueprint {
                 kind,
@@ -995,7 +995,7 @@ impl ConstructionSite {
 /// they used to somehow build the mines underground."
 ///
 /// They did, and here is the arithmetic. The crown that banks the hill over
-/// the portal's back was centred `half_d * 1.2` — one and nine tenths of a
+/// the portal's back was centered `half_d * 1.2` — one and nine tenths of a
 /// unit — uphill of the mouth, with a FULL-HEIGHT radius of `half_w * 1.4`,
 /// about two and a tenth. Its flat top therefore reached back to two tenths of
 /// a unit BEHIND the mouth: it covered the doorway. It raised that ground to
@@ -1025,7 +1025,7 @@ impl ConstructionSite {
 /// which the caller needs, because ground is only redrawn where it is asked
 /// to be. The reach used to be a guess at the call site (`half_w + 9`)
 /// against a crown that stands past three times that, so the outermost
-/// metres of the cut changed height in chunks nobody rebuilt and stayed
+/// meters of the cut changed height in chunks nobody rebuilt and stayed
 /// standing at their old shape: a hard seam in the hillside, waiting for
 /// something unrelated to come along and redraw it.
 pub(crate) fn bank_the_mine(
@@ -1123,7 +1123,7 @@ impl Shell {
     ///
     /// A fixed step outward is not enough, and the bench longhouse is
     /// why: its door sits at x=3.65 while the shell reaches 9.65, so
-    /// "1.6 metres outside the door" was still six metres inside the
+    /// "1.6 meters outside the door" was still six meters inside the
     /// building. Every route out of it therefore ran from one indoor
     /// point to another, nobody ever crossed the wall, and ten founders
     /// starved in their beds with food in the store.
@@ -1281,7 +1281,7 @@ pub fn hang_the_door(
 /// most of a person tall, and standing in the opening.
 ///
 /// The jamb posts either side fail it on breadth (a hand's width along
-/// the wall against a panel's half-metre), the lintel and ridge on
+/// the wall against a panel's half-meter), the lintel and ridge on
 /// height, and the doorstep on both height and standing outside.
 fn the_makers_own_panel(door: &Doorway, parts: &[(Entity, Transform)]) -> Vec<(Entity, Transform)> {
     let out = door.out.normalize_or(Vec2::X);
@@ -1395,7 +1395,7 @@ pub(crate) fn hang_the_doors(
             // Twins share ONE aperture - the middle of the pair - so the
             // two leaves of a double door always read the same traffic
             // and move together. Measured at each leaf's own mark they
-            // stood a metre apart, and somebody could be inside one
+            // stood a meter apart, and somebody could be inside one
             // leaf's noticing and outside the other's.
             let aperture = twin.map_or(door.at, |(_, twin)| (door.at + twin.at) * 0.5);
             let adopt = the_makers_own_panel(door, &parts);
@@ -1514,7 +1514,7 @@ pub struct Longhouse;
 ///
 /// Still the town's: its people belong to the settlement, eat from its stores,
 /// carry timber to its woodpile and answer its famine watch. They simply do
-/// not live in the square. Not every family wants a neighbour through the
+/// not live in the square. Not every family wants a neighbor through the
 /// wall, and a town where nobody chose otherwise reads as a single clump
 /// rather than a place people settled.
 #[derive(Component)]
@@ -1553,15 +1553,15 @@ const GATE_SIDE_ARC: f32 = 0.34;
 /// out.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn homestead_slots(
-    centre: Vec3,
+    center: Vec3,
     ring_reach: u32,
     rng: &mut Rng,
 ) -> Vec<(f32, f32, f32)> {
-    homestead_slots_by_gate(centre, ring_reach, None, rng)
+    homestead_slots_by_gate(center, ring_reach, None, rng)
 }
 
 fn homestead_slots_by_gate(
-    centre: Vec3,
+    center: Vec3,
     ring_reach: u32,
     rampart: Option<&crate::villager::rampart::Rampart>,
     rng: &mut Rng,
@@ -1586,9 +1586,9 @@ fn homestead_slots_by_gate(
             };
             let reach = rng.range(inner, outer);
             let (sin, cos) = angle.sin_cos();
-            let (x, z) = (centre.x + cos * reach, centre.z + sin * reach);
+            let (x, z) = (center.x + cos * reach, center.z + sin * reach);
             // The door still faces home.
-            let toward = Vec3::new(centre.x - x, 0.0, centre.z - z).normalize_or_zero();
+            let toward = Vec3::new(center.x - x, 0.0, center.z - z).normalize_or_zero();
             (x, z, (-toward.z).atan2(toward.x))
         })
         .collect()
@@ -1596,11 +1596,11 @@ fn homestead_slots_by_gate(
 
 fn sits_lawfully_by_a_rampart(
     at: Vec3,
-    centre: Vec3,
+    center: Vec3,
     wall: &crate::villager::rampart::Rampart,
     footprint: f32,
 ) -> bool {
-    let outward = (at - centre).with_y(0.0);
+    let outward = (at - center).with_y(0.0);
     let distance = outward.length();
     let buffer = footprint + RAMPART_BUILDING_BUFFER;
     if distance <= wall.radius - buffer {
@@ -1800,11 +1800,11 @@ fn raise_gable(
     // length is the hypotenuse of that run, so the covered span is exact
     // whatever the pitch.
     let reach = span + GABLE_LAP;
-    let centre_x = (span - GABLE_LAP) * 0.5;
-    let centre_y = GABLE_SEAT + (span - centre_x) * tan + 0.06;
+    let center_x = (span - GABLE_LAP) * 0.5;
+    let center_y = GABLE_SEAT + (span - center_x) * tan + 0.06;
     for side in [-1.0_f32, 1.0] {
         part(
-            Vec3::new(side * centre_x, h + centre_y, 0.0),
+            Vec3::new(side * center_x, h + center_y, 0.0),
             Vec3::new(reach / cos, 0.12, d * 2.35),
             -side * GABLE_PITCH,
             roof,
@@ -1842,7 +1842,7 @@ fn raise_gable(
 }
 
 /// Raises the visible stage of a building under construction, shaped and
-/// coloured by its blueprint. Each stage spawns geometry as children of the
+/// colored by its blueprint. Each stage spawns geometry as children of the
 /// site, so the building accretes in place — and no two need look alike.
 /// Something the god is pulling up out of the ground, and how far it has
 /// come. Not saved: whatever was rising when the world was put down has
@@ -1907,7 +1907,7 @@ pub(crate) fn raise_the_founding_hall(
     grass: &mut crate::grass::GrassChunks,
     standing: &[(Entity, Vec3)],
     settlement: Entity,
-    centre: Vec3,
+    center: Vec3,
     rng: &mut Rng,
 ) -> Option<Vec3> {
     let plan = Blueprint::roll(BuildingKind::Longhouse, rng);
@@ -1922,7 +1922,7 @@ pub(crate) fn raise_the_founding_hall(
             let angle = i as f32 / 12.0 * std::f32::consts::TAU;
             let (sin, cos) = angle.sin_cos();
             let out = reach * 3.0 + 12.0;
-            let (x, z) = (centre.x + cos * out, centre.z + sin * out);
+            let (x, z) = (center.x + cos * out, center.z + sin * out);
             (Vec3::new(x, terrain.height_at(x, z), z), angle)
         })
         .filter(|(at, _)| terrain.is_walkable(at.x, at.z))
@@ -1939,15 +1939,15 @@ pub(crate) fn raise_the_founding_hall(
     // the z, which faced it a quarter of the way round the wrong way.
     let yaw = std::f32::consts::PI - angle;
 
-    // And the ground is LEVELLED for it, the way it is for every other
+    // And the ground is LEVELED for it, the way it is for every other
     // building. Skipping this on the grounds that the flag had already
     // vetted the site was wrong: ground level enough for a village is
-    // nowhere near level enough for a hall twenty-five metres long, and
+    // nowhere near level enough for a hall twenty-five meters long, and
     // the thing came up half buried.
     // The pad is the hall's own rectangle, turned the way the hall is, with a
     // pace of standing room around it. It used to be a circle wide enough to
     // hold the corners, which is nearly twice the ground and every bit of it
-    // levelled - fine while nothing grew there, and a plateau once it did.
+    // leveled - fine while nothing grew there, and a plateau once it did.
     let worked = terrain.terrace(at.x, at.z, plan.half_w, plan.half_d, yaw, 2.5, 2.4, at.y);
 
     // The clearing, BEFORE the chunks are swapped - a scattered tree is
@@ -2287,7 +2287,7 @@ pub(crate) fn raise_stage(
         walling.set(stage == 1);
         match stage {
             // The portal frame: two squared posts and a lintel proud of
-            // them both, braced like the first metre of a drift.
+            // them both, braced like the first meter of a drift.
             0 => {
                 for x in [-w * 0.55, w * 0.55] {
                     part(
@@ -2629,7 +2629,7 @@ pub(crate) fn raise_stage(
                     );
                 }
                 // The front wall, run as the segments BETWEEN the doors so
-                // the gaps land exactly on the bay centres however the
+                // the gaps land exactly on the bay centers however the
                 // length rolled.
                 let gap = 1.0;
                 let mut edge = -d;
@@ -3060,13 +3060,13 @@ pub(crate) fn pin_petitions(
 /// The village has a shape: concentric rings of building plots around the
 /// banner, each ring staggered against the last. Civic buildings take the
 /// inner ring and face the plaza; houses fill outward, doors toward the
-/// centre. Terrain still vetoes any plot, so the rings bend around rivers
+/// center. Terrain still vetoes any plot, so the rings bend around rivers
 /// and hills — planned, but not gridded.
 ///
 /// Returns (x, z, yaw) per plot, innermost first. Yaw turns the door
-/// (local +X) toward the centre.
+/// (local +X) toward the center.
 pub(crate) fn village_slots(
-    centre: Vec3,
+    center: Vec3,
     rings: std::ops::Range<u32>,
     span: f32,
 ) -> Vec<(f32, f32, f32)> {
@@ -3074,10 +3074,10 @@ pub(crate) fn village_slots(
     // a building's width apart, and slots along each ring the same. The
     // old fixed nine and twelve were measured for houses half this size,
     // and packed the new ones wall into wall.
-    // A neighbourhood, not a barracks. The world is enormous and the
+    // A neighborhood, not a barracks. The world is enormous and the
     // village is the only thing in it: gardens between the houses, a
     // lane wide enough to walk two abreast, and room for a roof to
-    // overhang without touching the neighbour's.
+    // overhang without touching the neighbor's.
     let apart = (span + 12.0).max(20.0);
     let mut slots = Vec::new();
     for ring in rings {
@@ -3088,9 +3088,9 @@ pub(crate) fn village_slots(
         for i in 0..count {
             let angle = offset + i as f32 / count as f32 * std::f32::consts::TAU;
             let (sin, cos) = angle.sin_cos();
-            let x = centre.x + cos * radius;
-            let z = centre.z + sin * radius;
-            let toward = Vec3::new(centre.x - x, 0.0, centre.z - z).normalize_or_zero();
+            let x = center.x + cos * radius;
+            let z = center.z + sin * radius;
+            let toward = Vec3::new(center.x - x, 0.0, center.z - z).normalize_or_zero();
             let yaw = (-toward.z).atan2(toward.x);
             slots.push((x, z, yaw));
         }
@@ -3184,7 +3184,7 @@ pub(crate) fn plan_houses(
     *turn = (*turn).wrapping_add(1) % roster.len();
     let (settlement, home_ground, rampart) = roster[*turn].clone();
     let site = crate::villager::SettlementSite {
-        centre: home_ground.centre,
+        center: home_ground.center,
         radius: home_ground.radius,
         woodpile: home_ground.woodpile,
         settlement,
@@ -3305,7 +3305,7 @@ pub(crate) fn plan_houses(
         return;
     }
 
-    let shore_near = find_shore(&terrain, site.centre, &mut rng.0).is_some();
+    let shore_near = find_shore(&terrain, site.center, &mut rng.0).is_some();
 
     // Ground fit for a mine mouth: walkable footing against a genuine
     // face — the ground a short walk uphill must stand well above the
@@ -3327,7 +3327,7 @@ pub(crate) fn plan_houses(
         if uphill == Vec3::ZERO {
             return false;
         }
-        // A drift wants a bank to cut into, not a cliff. Three metres of
+        // A drift wants a bank to cut into, not a cliff. Three meters of
         // rise over seven is a twenty-three degree slope, and a village on
         // merely rolling country never found any - so it never wanted a
         // mine, and its only stone was the loose boulders, which run out.
@@ -3336,7 +3336,7 @@ pub(crate) fn plan_houses(
     // Thrown wide, because this is the question the whole stone economy
     // turns on and a false negative here costs the village every building
     // that wants masonry.
-    let rock_near = find_ground_in(&terrain, site.centre, &mut rng.0, 200, minable).is_some();
+    let rock_near = find_ground_in(&terrain, site.center, &mut rng.0, 200, minable).is_some();
 
     // What the town would build if it were free to want something. Held
     // as a closure because two branches ask it now: the ordinary one,
@@ -3566,7 +3566,7 @@ pub(crate) fn plan_houses(
         // Thrown as wide as the question that decided to want one. Asking
         // with forty darts what was answered with two hundred is how a
         // village comes to want a mine it can never find a face for.
-        let Some(face) = find_ground_in(&terrain, site.centre, &mut rng.0, 200, minable) else {
+        let Some(face) = find_ground_in(&terrain, site.center, &mut rng.0, 200, minable) else {
             return;
         };
         // The portal faces uphill: sample the gradient and point local +Z
@@ -3647,10 +3647,10 @@ pub(crate) fn plan_houses(
     // A dock is sited by the water, not by the rings: the nearest walkable
     // shore takes the pilings, and the deck points out over the water.
     if kind == BuildingKind::Dock {
-        let Some(shore) = find_shore(&terrain, site.centre, &mut rng.0) else {
+        let Some(shore) = find_shore(&terrain, site.center, &mut rng.0) else {
             return;
         };
-        let toward = shore - site.centre;
+        let toward = shore - site.center;
         let yaw = toward.x.atan2(toward.z);
         let plan = Blueprint::roll(kind, &mut rng.0);
 
@@ -3722,7 +3722,7 @@ pub(crate) fn plan_houses(
         // A watch post belongs on the edge of the village's reach, not
         // in the middle of its square. Civic works take the inner ring
         // because that is where people go to use them; nobody visits a
-        // tower. Out here its shadow - the fifty-five metres wolves will
+        // tower. Out here its shadow - the fifty-five meters wolves will
         // not hunt inside of - falls across the ground where people are
         // actually taken, which in a soak was sixty to a hundred and
         // forty strides out. In the plaza it covered nothing but the
@@ -3734,11 +3734,11 @@ pub(crate) fn plan_houses(
         0..ring_reach.min(7)
     };
     // A longhouse is two and a half houses long, and the plot test runs on
-    // world axes while the building is turned to face the centre — so it is
+    // world axes while the building is turned to face the center — so it is
     // probed square, at its LONGEST extent, whichever way it ends up lying.
     // Conservative by construction: it turns down plots it could have used
     // rather than dropping one gable end into a hillside.
-    // Some families would rather have the room than the neighbours: now and
+    // Some families would rather have the room than the neighbors: now and
     // then a family house is raised out past the rings on its own ground,
     // with a plot beside it. Still the town's people — they walk in to the
     // square, the stores and the fire — they simply do not live in it.
@@ -3746,7 +3746,7 @@ pub(crate) fn plan_houses(
         && population >= HOMESTEAD_MIN_POP
         && rng.0.chance(HOMESTEAD_CHANCE);
     let mut plots = if homestead {
-        homestead_slots_by_gate(site.centre, ring_reach, rampart.as_ref(), &mut rng.0)
+        homestead_slots_by_gate(site.center, ring_reach, rampart.as_ref(), &mut rng.0)
     } else {
         Vec::new()
     };
@@ -3760,7 +3760,7 @@ pub(crate) fn plan_houses(
     // long as the village's own were, and the old numbers packed them
     // wall into wall. The probe reaches the building's LONGEST extent,
     // since the plot test runs on world axes while the house is turned
-    // to face the centre; the clearance is two of those and a lane.
+    // to face the center; the clearance is two of those and a lane.
     // The size this KIND will be, known before a plan is rolled: a
     // carried-in house brings its own footprint, and the rolled ones
     // stay within their own range.
@@ -3786,26 +3786,26 @@ pub(crate) fn plan_houses(
         (reach * 0.6, reach * 2.0 + 12.0)
     };
     if !homestead {
-        plots = village_slots(site.centre, rings, reach * 2.0);
+        plots = village_slots(site.center, rings, reach * 2.0);
     }
     // THE TOWN HALL TAKES THE SQUARE, not a ring plot. It is the flag's
     // own upgrade path: the banner was the civic seat from the founding
     // morning, and the hall is that seat grown a roof - raised just off
     // the plaza with its door facing the banner, so the flag ends up
     // standing before the hall it always promised. Candidates ring the
-    // centre starting opposite the woodpile; the ordinary vetting below
+    // center starting opposite the woodpile; the ordinary vetting below
     // still gets its veto on each.
     if kind == BuildingKind::TownHall {
         let breadth = reach + 5.5;
-        let away = (site.centre - site.woodpile).with_y(0.0);
+        let away = (site.center - site.woodpile).with_y(0.0);
         let start = away.z.atan2(away.x);
         plots = (0..8)
             .map(|step| {
                 let a = start + step as f32 * std::f32::consts::TAU / 8.0;
                 let (sin, cos) = a.sin_cos();
                 (
-                    site.centre.x + cos * breadth,
-                    site.centre.z + sin * breadth,
+                    site.center.x + cos * breadth,
+                    site.center.z + sin * breadth,
                     std::f32::consts::PI - a,
                 )
             })
@@ -3815,9 +3815,9 @@ pub(crate) fn plan_houses(
         if !terrain.is_walkable(x, z) {
             continue;
         }
-        let centre_height = terrain.height_at(x, z);
+        let center_height = terrain.height_at(x, z);
         // High and dry: nobody builds a home on the beach, however flat it is.
-        if centre_height < WATER_LEVEL + 2.5 {
+        if center_height < WATER_LEVEL + 2.5 {
             continue;
         }
         for (dx, dz) in [
@@ -3827,7 +3827,7 @@ pub(crate) fn plan_houses(
             (probe, probe),
         ] {
             let corner = terrain.height_at(x + dx, z + dz);
-            if !terrain.is_walkable(x + dx, z + dz) || (corner - centre_height).abs() > 0.9 {
+            if !terrain.is_walkable(x + dx, z + dz) || (corner - center_height).abs() > 0.9 {
                 continue 'darts;
             }
         }
@@ -3842,11 +3842,11 @@ pub(crate) fn plan_houses(
                 continue 'darts;
             }
         }
-        let at = Vec3::new(x, centre_height, z);
+        let at = Vec3::new(x, center_height, z);
         if dwelling
             && rampart
                 .as_ref()
-                .is_some_and(|wall| !sits_lawfully_by_a_rampart(at, site.centre, wall, reach))
+                .is_some_and(|wall| !sits_lawfully_by_a_rampart(at, site.center, wall, reach))
         {
             continue;
         }
@@ -3859,7 +3859,7 @@ pub(crate) fn plan_houses(
         let mut plan = Blueprint::roll(kind, &mut rng.0);
         if homestead {
             // A farmhouse is broader than a street house: it has work to
-            // shelter as well as people, and no neighbour to crowd.
+            // shelter as well as people, and no neighbor to crowd.
             plan.half_w *= 1.18;
             plan.half_d *= 1.12;
         }
@@ -3885,7 +3885,7 @@ pub(crate) fn plan_houses(
             // the ground actually gives.
             let trees_near = standing
                 .iter()
-                .filter(|(_, t, _)| t.translation().distance(site.centre) < 140.0)
+                .filter(|(_, t, _)| t.translation().distance(site.center) < 140.0)
                 .count();
             if trees_near < 6 && store_now.timber < 8.0 {
                 use crate::palette as pal;
@@ -3913,7 +3913,7 @@ pub(crate) fn plan_houses(
         //
         // The felling comes BEFORE the chunk swap. A scattered tree is a
         // child of its chunk, and a chunk despawn takes its children with
-        // it, so clearing afterwards was despawning entities that were
+        // it, so clearing afterward was despawning entities that were
         // already dead - dozens of ECS warnings per ground-breaking.
         let clearing = plan.half_w.max(plan.half_d) + 4.5;
         let mut cleared = 0.0;
@@ -3967,7 +3967,7 @@ pub(crate) fn plan_houses(
             commands.entity(building).insert(Homestead);
             info!(
                 "ground was broken for a holding {:.0} strides out of town",
-                site.centre.distance(at)
+                site.center.distance(at)
             );
         }
         raise_stage(
@@ -3993,7 +3993,7 @@ pub(crate) fn plan_houses(
 }
 
 /// Sermons: the priest at the shrine retells what they have seen, and the
-/// telling carries. Belief maintenance and rumour amplification in one — a
+/// telling carries. Belief maintenance and rumor amplification in one — a
 /// pulpit is a gossip engine with authority.
 pub(crate) fn sermons(
     time: Res<Time>,
@@ -4611,7 +4611,7 @@ mod tests {
     /// with their handles, the jamb posts either side, and the lintel
     /// over the top - every piece yawed a quarter turn, the way the
     /// bench writes them. The lintel is the one that bit: it stands a
-    /// metre above the panel's middle, well inside the leaf's own
+    /// meter above the panel's middle, well inside the leaf's own
     /// bounding box, and it swung out with the door until the riders
     /// had to be small enough to be furniture. Brett: "the top frame is
     /// moving with one of the doors. That shouldnt happen."
@@ -4762,7 +4762,7 @@ mod tests {
     ///
     /// What Brett was looking at: the village's own longhouse swinging a
     /// slab the size of its wall. The adoption asks for something thin,
-    /// door-height and at least a third of a metre across - all of which a
+    /// door-height and at least a third of a meter across - all of which a
     /// long wall panel answers, since a wall is thin too - and nothing said
     /// how WIDE a door may be. The nearest wall segment won, and the hall
     /// opened by swinging its side away.
@@ -4776,7 +4776,7 @@ mod tests {
         let piece = |x: f32, y: f32, z: f32, sx: f32, sy: f32, sz: f32| {
             Transform::from_translation(Vec3::new(x, y, z)).with_scale(Vec3::new(sx, sy, sz))
         };
-        // A wall panel: thin, tall, and three metres of it - centred on
+        // A wall panel: thin, tall, and three meters of it - centered on
         // the doorway, which is what put it first in the running.
         let wall = (
             Entity::from_raw_u32(1).unwrap(),
@@ -4791,7 +4791,7 @@ mod tests {
         let only_wall = the_makers_own_panel(&door, &[wall]);
         assert!(
             only_wall.is_empty(),
-            "a three-metre wall was adopted as a door leaf",
+            "a three-meter wall was adopted as a door leaf",
         );
 
         let both = the_makers_own_panel(&door, &[wall, leaf]);
@@ -4818,8 +4818,8 @@ mod tests {
 
     /// A working redraws all the ground it moves.
     ///
-    /// Ground is only redrawn where the site asks for it, so a levelling
-    /// that reaches further than the ask leaves its outermost metres
+    /// Ground is only redrawn where the site asks for it, so a leveling
+    /// that reaches further than the ask leaves its outermost meters
     /// standing at their old shape - a seam in the hillside that waits for
     /// something unrelated to come along and redraw it. The mine's reach was
     /// guessed at the call site while its crown stands past three times the
@@ -4855,7 +4855,7 @@ mod tests {
     }
 
     #[test]
-    fn a_mine_redraws_every_metre_it_moves() {
+    fn a_mine_redraws_every_meter_it_moves() {
         let land = Terrain::new(31);
         let face = Vec3::new(200.0, land.height_at(200.0, 40.0), 40.0);
         let uphill = Vec3::new(0.0, 0.0, 1.0);
@@ -4872,7 +4872,7 @@ mod tests {
         plan.half_d = 4.0;
         let (_, reach) = bank_the_mine(&land, face, uphill, &plan);
 
-        // Walk out past the reported reach and find the furthest metre the
+        // Walk out past the reported reach and find the furthest meter the
         // working actually moved.
         let untouched = Terrain::new(31);
         let before: Vec<f32> = (0..80)

@@ -1,7 +1,7 @@
 //! Buildings carried in from Opificium.
 //!
 //! The bench and the game share no code: the bench resolves its own
-//! catalogue and palette and hands over plain boxes with colours, plus
+//! catalogue and palette and hands over plain boxes with colors, plus
 //! the marks that say what a place is FOR. This module reads those
 //! files, raises the boxes stage by stage, and turns the marks into the
 //! components the village already knows - beds, a shell with doors, the
@@ -82,7 +82,7 @@ fn opaque() -> f32 {
 #[derive(serde::Deserialize, Clone)]
 pub struct Mark {
     pub mark: String,
-    /// The middle of its FOOT, not its centre - a stack grows upward off a
+    /// The middle of its FOOT, not its center - a stack grows upward off a
     /// floor, so the floor is the part worth pinning.
     pub at: [f32; 3],
     pub yaw: f32,
@@ -367,10 +367,10 @@ pub fn widgets_as_json() -> String {
 ///
 /// The point of the whole arrangement: somebody who has never seen this
 /// repository - who bought the game and downloaded the bench - opens Opificium,
-/// points it at this folder, and is drawing in the game's own colours with the
+/// points it at this folder, and is drawing in the game's own colors with the
 /// game's own vocabulary, for the game's own VERSION. Nothing to copy, nothing
 /// to keep in step, and no way to author a building against a contract the
-/// installed game does not honour.
+/// installed game does not honor.
 ///
 /// `install` points at the buildings folder the game already reads, so a bake
 /// lands where the next launch finds it. The bench writes its own README into
@@ -441,8 +441,8 @@ pub const BAKED_UNDER: &str = "opificium/out/baked/buildings";
 /// The newest baked format this game can read.
 ///
 /// A drawing from a NEWER bench is refused rather than half-read. Every field
-/// this game does not recognise is dropped in silence by the reader, so a
-/// format that moved something - marks into levels, a box's colour into a
+/// this game does not recognize is dropped in silence by the reader, so a
+/// format that moved something - marks into levels, a box's color into a
 /// reference - would arrive as a building with no doors and no beds rather
 /// than as an error. That is a fine way to lose an afternoon on your own work
 /// and an unacceptable one to treat a stranger's.
@@ -458,7 +458,7 @@ const NEWEST_FORMAT: u32 = 2;
 /// raised into a village where it becomes a frozen machine nobody can explain.
 const AT_MOST_BOXES: usize = 20_000;
 const AT_MOST_MARKS: usize = 2_000;
-/// Metres, half-extent. The largest thing anybody has drawn is a longhouse.
+/// Meters, half-extent. The largest thing anybody has drawn is a longhouse.
 const AT_MOST_ACROSS: f32 = 200.0;
 
 /// Whether this drawing can be let in at all.
@@ -506,7 +506,7 @@ fn turned_away(work: &Baked) -> Option<String> {
     None
 }
 
-/// Every mark this game acts on, and the colour the bench should draw it.
+/// Every mark this game acts on, and the color the bench should draw it.
 ///
 /// THE GAME IS THE AUTHORITY ON WHAT A WORD MEANS. Opificium offers only the
 /// marks listed in a project's `data/widgets.json`, passes the word through
@@ -555,9 +555,9 @@ pub(crate) type Widget = (&'static str, &'static str, f32, Option<[f32; 3]>);
 /// A mark that means a place. The bench draws it as a point.
 const POINT: Option<[f32; 3]> = None;
 
-/// A mark that means room to stack in, born a metre cubed.
+/// A mark that means room to stack in, born a meter cubed.
 ///
-/// A metre is the size of the piles the game already raises by hand: the
+/// A meter is the size of the piles the game already raises by hand: the
 /// stockpile columns in `raise_town_fixtures` stand about 0.88m square and up
 /// to 1.17m tall, the woodpile 1.3m. So a maker dragging one of these starts
 /// from something the eye already knows the size of, and sizes up from there.
@@ -864,7 +864,7 @@ fn cut_mesh(low: f32, high: f32) -> Mesh {
 
     // Normals from the corners themselves, and wound to face outward.
     //
-    // The shape is convex and centred on the origin, so a face's own middle
+    // The shape is convex and centered on the origin, so a face's own middle
     // points the way that face does - which settles both the normal's sign and
     // the winding without anyone having to reason about which end is cut. The
     // slanted ends are where doing it by hand goes wrong, and they are the
@@ -1115,17 +1115,17 @@ pub fn raise_baked(
             .collect(),
     };
     for piece in showing {
-        // Exactly the colour it was painted, everywhere, always.
+        // Exactly the color it was painted, everywhere, always.
         //
         // The village used to re-dye each house's dominant wall and roof cloth
-        // with a colour rolled from its plan, so a street of one blueprint was
+        // with a color rolled from its plan, so a street of one blueprint was
         // still a street of different houses. That was the right answer while a
-        // drawing arrived in whatever colours the catalogue happened to hold and
+        // drawing arrived in whatever colors the catalogue happened to hold and
         // nobody had chosen them. There is a brush on the bench now, and Brett
         // used it - "we can remove the old painting system now that I can paint
         // in atelier" - so the roll had become a thing that painted OVER the
         // maker, and on precisely the pieces they cared most about.
-        let colour = Color::srgb_u8(piece.rgb[0], piece.rgb[1], piece.rgb[2]);
+        let color = Color::srgb_u8(piece.rgb[0], piece.rgb[1], piece.rgb[2]);
         let clear = piece.alpha < 0.999;
         let mesh = match piece.form.as_str() {
             "wedge" => wedge.clone(),
@@ -1160,7 +1160,7 @@ pub fn raise_baked(
             BakedPiece,
             Mesh3d(mesh),
             MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: colour.with_alpha(piece.alpha),
+                base_color: color.with_alpha(piece.alpha),
                 perceptual_roughness: 0.95,
                 alpha_mode: if clear {
                     AlphaMode::Blend
@@ -1222,7 +1222,7 @@ pub fn furnish_baked(
     for mark in work.marks.iter().filter(|m| m.mark == "clock") {
         // The dial is the maker's; the hands are the game's. `wide` is the
         // face they have to fit, and a clock drawn without one gets a
-        // half-metre face, which is about what a gable will carry.
+        // half-meter face, which is about what a gable will carry.
         let face = mark.wide.unwrap_or(0.5).max(0.05);
         let at = reflect_at(Vec3::from(mark.at), mirrored);
         let out = reflect_yaw(mark.yaw, mirrored);
@@ -1266,7 +1266,7 @@ pub fn furnish_baked(
     let doors = doorways(work, mirrored);
     // The shell is the WALLS, not the whole building. The file's own
     // half-extents take in the roof, which on a house with eaves reaches
-    // most of a metre past the wall it shelters - and a doorway that
+    // most of a meter past the wall it shelters - and a doorway that
     // measures as INSIDE the shell is a doorway nobody can be routed
     // through. They walk at the wall beside it instead.
     let (mut half_w, mut half_d) = (0.0_f32, 0.0_f32);
@@ -1349,7 +1349,7 @@ mod tests {
                 )
             })
             .collect();
-        // A leaning, turned, off-centre piece: the case a sign flip gets wrong.
+        // A leaning, turned, off-center piece: the case a sign flip gets wrong.
         let at = Vec3::new(1.7, 2.3, -0.9);
         let size = Vec3::new(3.0, 0.25, 0.8);
         let turn = Quat::from_rotation_y(0.7) * Quat::from_rotation_x(-0.45);
@@ -1512,9 +1512,9 @@ mod tests {
         std::fs::write("opificium/data/widgets.json", super::widgets_as_json()).expect("widgets");
     }
 
-    /// Every colour the vocabulary asks the bench to paint with must be a ramp
+    /// Every color the vocabulary asks the bench to paint with must be a ramp
     /// the game actually exports, or the bench falls back to its own and the
-    /// marks come out the wrong colour for reasons nobody can see.
+    /// marks come out the wrong color for reasons nobody can see.
     #[test]
     fn every_mark_paints_from_a_real_ramp() {
         for (mark, ramp, shade, size) in super::MARKS_UNDERSTOOD {
@@ -1572,8 +1572,8 @@ mod tests {
     /// A drawing from a newer bench is refused, not half-read.
     ///
     /// This is the one that matters once buildings arrive from strangers.
-    /// Serde drops every field it does not recognise without a word, so a
-    /// format that MOVED something - marks into levels, colour into a
+    /// Serde drops every field it does not recognize without a word, so a
+    /// format that MOVED something - marks into levels, color into a
     /// reference - would be read as a building with no doors and no beds
     /// rather than as an error.
     #[test]

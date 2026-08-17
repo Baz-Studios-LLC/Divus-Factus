@@ -47,7 +47,7 @@ pub enum Layer {
     ///
     /// Off, the planet's own surface shows through underneath, which is the
     /// comparison worth having — the patches carry the same heights, the same
-    /// biome colour and the same veil, at a coarser grain.
+    /// biome color and the same veil, at a coarser grain.
     Chunks,
 }
 
@@ -212,7 +212,7 @@ pub struct ViewLayers {
 impl Default for ViewLayers {
     /// Every layer on, unless its dial says otherwise.
     ///
-    /// `DIVUS_FACTUS_SHADOWS=0` is honoured as well as the newer
+    /// `DIVUS_FACTUS_SHADOWS=0` is honored as well as the newer
     /// `DIVUS_FACTUS_LAYER_SHADOWS=0`, because the older spelling is written
     /// into a good deal of this project's measurement history and silently
     /// dropping it would make those numbers unreproducible.

@@ -330,7 +330,7 @@
     ]
   },
   {
-    "t": "The food was real. The claim about {god} came afterwards.",
+    "t": "The food was real. The claim about {god} came afterward.",
     "tags": [
       "tell",
       "event:provided",
@@ -579,7 +579,7 @@
     ]
   },
   {
-    "t": "{god} remembered people whose neighbours could not feed them.",
+    "t": "{god} remembered people whose neighbors could not feed them.",
     "tags": [
       "tell",
       "event:provided",
@@ -831,7 +831,7 @@
     ]
   },
   {
-    "t": "The claim travelled faster than anyone could examine the ground.",
+    "t": "The claim traveled faster than anyone could examine the ground.",
     "tags": [
       "tell",
       "event:provided",
@@ -856,7 +856,7 @@
     ]
   },
   {
-    "t": "Travellers brought an account of food arriving where the stores had failed.",
+    "t": "Travelers brought an account of food arriving where the stores had failed.",
     "tags": [
       "tell",
       "event:provided",
@@ -954,7 +954,7 @@
     ]
   },
   {
-    "t": "Travellers say {god} answered hunger far from our village.",
+    "t": "Travelers say {god} answered hunger far from our village.",
     "tags": [
       "tell",
       "event:provided",
@@ -990,7 +990,7 @@
     ]
   },
   {
-    "t": "The account travelled here because mercy is worth passing on.",
+    "t": "The account traveled here because mercy is worth passing on.",
     "tags": [
       "tell",
       "event:provided",
@@ -1017,7 +1017,7 @@
     ]
   },
   {
-    "t": "{god}'s gifts are becoming known wherever travellers stop.",
+    "t": "{god}'s gifts are becoming known wherever travelers stop.",
     "tags": [
       "tell",
       "event:provided",
@@ -1053,7 +1053,7 @@
     ]
   },
   {
-    "t": "The account has travelled far, but the witnesses still sound sincere.",
+    "t": "The account has traveled far, but the witnesses still sound sincere.",
     "tags": [
       "tell",
       "event:provided",
@@ -1071,7 +1071,7 @@
     ]
   },
   {
-    "t": "Travellers call it providence. Distance makes certainty difficult for me.",
+    "t": "Travelers call it providence. Distance makes certainty difficult for me.",
     "tags": [
       "tell",
       "event:provided",
@@ -1116,7 +1116,7 @@
     ]
   },
   {
-    "t": "Maybe mercy travelled farther than any of us knew.",
+    "t": "Maybe mercy traveled farther than any of us knew.",
     "tags": [
       "tell",
       "event:provided",
@@ -1161,7 +1161,7 @@
     ]
   },
   {
-    "t": "Travellers repeat the miracle, but none of them saw the provisions appear.",
+    "t": "Travelers repeat the miracle, but none of them saw the provisions appear.",
     "tags": [
       "tell",
       "event:provided",
@@ -1233,7 +1233,7 @@
     ]
   },
   {
-    "t": "The provisions may be real. The divine part has travelled much farther.",
+    "t": "The provisions may be real. The divine part has traveled much farther.",
     "tags": [
       "tell",
       "event:provided",

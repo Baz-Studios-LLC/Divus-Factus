@@ -319,7 +319,7 @@ impl Plugin for TimingsPlugin {
         // once with probes threaded between Bevy's PostUpdate sets, and
         // once more with a single edge-free system merely REGISTERED
         // there - and either way the registration re-sorted the
-        // neighbourhood where visibility and shadow-caster lists are
+        // neighborhood where visibility and shadow-caster lists are
         // built, and settled a bistable race: the world's shadows came
         // up flickering, or stuck off, depending on the sort. Spans
         // bracket OUR systems in OUR schedules; the engine's tail is

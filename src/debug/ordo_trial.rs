@@ -37,7 +37,7 @@ impl Plugin for OrdoTrialPlugin {
         // there dies asking for it. Ordo's own widgets do not care - they
         // carry a `Face` tag and the repaint pass finds the font whenever it
         // arrives - which is the first thing the port has said in Ordo's
-        // favour, and it said it by killing the hand-built twin.
+        // favor, and it said it by killing the hand-built twin.
         app.add_systems(
             Update,
             raise_the_pair
@@ -68,7 +68,7 @@ fn raise_the_pair(mut commands: Commands, fonts: Res<crate::ui::Fonts>) {
     // it with the cross, and clicking any part of it brings it to the front.
     //
     // Note what the caller writes: the body, and nothing else. The title bar
-    // and the close button are put on afterwards by a pass, the same way paint
+    // and the close button are put on afterward by a pass, the same way paint
     // is - which is what lets a window be an ordinary `children!` spawn like
     // every other widget here.
     commands.spawn((

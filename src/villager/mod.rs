@@ -3,7 +3,7 @@
 //! The decision layer is utility-based from the start even though there are only
 //! two options. That is deliberate — the shape it needs to grow into is a dozen
 //! competing needs scored against each other, and retrofitting scoring onto a
-//! state machine later would mean rewriting every behaviour. Adding a need here
+//! state machine later would mean rewriting every behavior. Adding a need here
 //! means adding a scorer, not editing a branch.
 
 pub mod attire;
@@ -468,7 +468,7 @@ impl Plugin for VillagerPlugin {
 #[derive(Component)]
 pub struct Villager;
 
-/// Adulthood, counting quietly down toward grey hair.
+/// Adulthood, counting quietly down toward gray hair.
 #[derive(Component, Debug)]
 pub struct Prime {
     pub remaining: f32,
@@ -572,7 +572,7 @@ impl Person {
     }
 
     /// The full name with the birth house noted where it differs: the form a
-    /// codex or a family tree wants, as against the form a neighbour shouts.
+    /// codex or a family tree wants, as against the form a neighbor shouts.
     #[cfg_attr(not(test), allow(dead_code))]
     pub fn name_with_house(&self) -> String {
         match self.maiden_house() {
@@ -769,7 +769,7 @@ impl Chronicle {
 /// decides which square you walk back to at dusk.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct SettlementGround {
-    pub centre: Vec3,
+    pub center: Vec3,
     pub radius: f32,
     /// Where the visible woodpile stands; where timber is delivered and drawn.
     pub woodpile: Vec3,
@@ -788,7 +788,7 @@ pub struct SettlementGround {
 /// convenience for the interface, and for the founding, and nothing more.
 #[derive(Resource, Debug, Clone, Copy)]
 pub struct SettlementSite {
-    pub centre: Vec3,
+    pub center: Vec3,
     pub radius: f32,
     /// Where the visible woodpile stands; where timber is delivered and drawn.
     pub woodpile: Vec3,
@@ -800,7 +800,7 @@ impl SettlementSite {
     /// The ground half of this, as it sits on the settlement entity.
     pub fn ground(&self) -> SettlementGround {
         SettlementGround {
-            centre: self.centre,
+            center: self.center,
             radius: self.radius,
             woodpile: self.woodpile,
             // Seeded beside the timber; `pile_points_follow` moves it onto
@@ -874,7 +874,7 @@ pub enum Activity {
     Hauling,
     /// Standing with the dead.
     Mourning,
-    /// Stopped face to face with a neighbour, trading news.
+    /// Stopped face to face with a neighbor, trading news.
     Chatting,
     /// Indoors, waiting out the weather.
     Sheltering,
@@ -898,7 +898,7 @@ pub enum Activity {
     Sleeping,
 }
 
-/// Shared generator for behaviour decisions.
+/// Shared generator for behavior decisions.
 #[derive(Resource)]
 pub struct SimRng(pub Rng);
 
@@ -1174,7 +1174,7 @@ pub(crate) fn choose_settlement_site(terrain: &Terrain, rng: &mut Rng) -> Vec3 {
         return site;
     }
 
-    // Nothing scored anywhere within fifteen kilometres, which on a world half
+    // Nothing scored anywhere within fifteen kilometers, which on a world half
     // dry should not happen. Take the highest ground found rather than the
     // origin: a poor village on a hill is recoverable, a village underwater is
     // not.
@@ -1200,7 +1200,7 @@ pub(crate) fn choose_settlement_site(terrain: &Terrain, rng: &mut Rng) -> Vec3 {
 /// wildlife spawn - the save file supplies the living.
 #[derive(Resource)]
 pub struct RestoringSeed {
-    pub centre: Vec3,
+    pub center: Vec3,
     pub name: String,
     pub god: String,
     pub founded: u32,
@@ -1218,7 +1218,7 @@ pub struct RestoringSeed {
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn spawn_town(
     commands: &mut Commands<'_, '_>,
-    centre: Vec3,
+    center: Vec3,
     settlement_name: &str,
     founded: u32,
     banner_ramp: usize,
@@ -1253,16 +1253,16 @@ pub(crate) fn spawn_town(
                 stone: 0.0,
                 ..default()
             },
-            Transform::from_translation(centre),
+            Transform::from_translation(center),
             Visibility::default(),
         ))
         .id();
 
     commands.entity(settlement).insert(SettlementGround {
-        centre,
+        center,
         radius: 36.0,
-        woodpile: centre,
-        foodpile: centre,
+        woodpile: center,
+        foodpile: center,
     });
     settlement
 }
@@ -1278,13 +1278,13 @@ pub(crate) fn raise_town_fixtures(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     terrain: &Terrain,
-    centre: Vec3,
+    center: Vec3,
     settlement: Entity,
     banner_ramp: usize,
     sigil: usize,
 ) -> Vec3 {
     // The banner that marks the town's heart — a pole, a crossarm, and a drop
-    // of cloth in the village's colour. This is where the stockpile lives and
+    // of cloth in the village's color. This is where the stockpile lives and
     // where the hungry come when the bushes are bare.
     {
         let cube = meshes.add(Cuboid::new(1.0, 1.0, 1.0));
@@ -1390,7 +1390,7 @@ pub(crate) fn raise_town_fixtures(
                 let (sin, cos) = angle.sin_cos();
                 [4.5_f32, 9.0, 14.0]
                     .iter()
-                    .map(|reach| terrain.height_at(centre.x + cos * reach, centre.z + sin * reach))
+                    .map(|reach| terrain.height_at(center.x + cos * reach, center.z + sin * reach))
                     .fold(f32::INFINITY, f32::min)
             };
             dryness(*a).total_cmp(&dryness(*b))
@@ -1398,7 +1398,7 @@ pub(crate) fn raise_town_fixtures(
         .unwrap_or(0.0);
     {
         let (sin, cos) = fire_angle.sin_cos();
-        let (fx, fz) = (centre.x + cos * 4.5, centre.z + sin * 4.5);
+        let (fx, fz) = (center.x + cos * 4.5, center.z + sin * 4.5);
         let fire_at = Vec3::new(fx, terrain.height_at(fx, fz), fz);
         let fire = home::spawn_bonfire(commands, meshes, materials, fire_at);
         // Whose hearth it is. Each town tends its own fire from its own
@@ -1410,7 +1410,7 @@ pub(crate) fn raise_town_fixtures(
     // owns, stacked and countable at a glance.
     let woodpile = {
         let (sin, cos) = (fire_angle + std::f32::consts::PI * 0.8).sin_cos();
-        let (wx, wz) = (centre.x + cos * 5.0, centre.z + sin * 5.0);
+        let (wx, wz) = (center.x + cos * 5.0, center.z + sin * 5.0);
         let at = Vec3::new(wx, terrain.height_at(wx, wz), wz);
 
         let log_mesh = meshes.add(Cuboid::new(1.3, 0.2, 0.2));
@@ -1457,7 +1457,7 @@ pub(crate) fn raise_town_fixtures(
     // larder of the village, standing in the square where it can be seen.
     {
         let (sin, cos) = (fire_angle + std::f32::consts::PI * 0.62).sin_cos();
-        let (px_, pz) = (centre.x + cos * 6.2, centre.z + sin * 6.2);
+        let (px_, pz) = (center.x + cos * 6.2, center.z + sin * 6.2);
         let at = Vec3::new(px_, terrain.height_at(px_, pz), pz);
         let block_mesh = meshes.add(Cuboid::new(0.42, 0.34, 0.42));
         let block_material = materials.add(StandardMaterial {
@@ -1498,7 +1498,7 @@ pub(crate) fn raise_town_fixtures(
     // haul home deserves to be countable at a glance like the others.
     {
         let (sin, cos) = (fire_angle + std::f32::consts::PI * 1.30).sin_cos();
-        let (px_, pz) = (centre.x + cos * 6.2, centre.z + sin * 6.2);
+        let (px_, pz) = (center.x + cos * 6.2, center.z + sin * 6.2);
         let at = Vec3::new(px_, terrain.height_at(px_, pz), pz);
         let brick_mesh = meshes.add(Cuboid::new(0.44, 0.22, 0.3));
         let brick_material = materials.add(StandardMaterial {
@@ -1537,7 +1537,7 @@ pub(crate) fn raise_town_fixtures(
     }
     {
         let (sin, cos) = (fire_angle + std::f32::consts::PI * 1.62).sin_cos();
-        let (px_, pz) = (centre.x + cos * 6.2, centre.z + sin * 6.2);
+        let (px_, pz) = (center.x + cos * 6.2, center.z + sin * 6.2);
         let at = Vec3::new(px_, terrain.height_at(px_, pz), pz);
         let chunk_mesh = meshes.add(Cuboid::new(0.36, 0.3, 0.36));
         let chunk_material = materials.add(StandardMaterial {
@@ -1586,7 +1586,7 @@ pub(crate) fn raise_town_fixtures(
     }
     {
         let (sin, cos) = (fire_angle + std::f32::consts::PI * 0.98).sin_cos();
-        let (px_, pz) = (centre.x + cos * 6.2, centre.z + sin * 6.2);
+        let (px_, pz) = (center.x + cos * 6.2, center.z + sin * 6.2);
         let at = Vec3::new(px_, terrain.height_at(px_, pz), pz);
         let sack_mesh = meshes.add(Cuboid::new(0.4, 0.34, 0.4));
         let sack_material = materials.add(StandardMaterial {
@@ -1644,25 +1644,25 @@ pub(crate) fn found_settlement(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     terrain: &Terrain,
-    centre: Vec3,
+    center: Vec3,
     name: &str,
     founded: u32,
     banner_ramp: usize,
     sigil: usize,
 ) -> (Entity, Vec3) {
-    let settlement = spawn_town(commands, centre, name, founded, banner_ramp, sigil);
+    let settlement = spawn_town(commands, center, name, founded, banner_ramp, sigil);
     let woodpile = raise_town_fixtures(
         commands,
         meshes,
         materials,
         terrain,
-        centre,
+        center,
         settlement,
         banner_ramp,
         sigil,
     );
     commands.entity(settlement).insert(SettlementGround {
-        centre,
+        center,
         radius: 36.0,
         woodpile,
         foodpile: woodpile,
@@ -1691,11 +1691,11 @@ const QUARRY_APART: f32 = 90.0;
 /// The pit a quarry cuts for itself: how deep, how wide, and how sharply the
 /// rim comes back to open ground.
 ///
-/// A quarry is a hole with a face. The first cut of this modelled one as
+/// A quarry is a hole with a face. The first cut of this modeled one as
 /// geometry standing ON the ground, and since the pieces sat at fixed heights
 /// around a single origin, any slope left half of them hanging in the air —
 /// Brett: "it looks weird lol". So the ground is worked first and the stone
-/// stands on a floor that has been levelled for it.
+/// stands on a floor that has been leveled for it.
 ///
 /// A tight falloff, deliberately, against the graded one a building pad uses.
 /// [`Terrain::terrace`] describes its own gentle grade as "graded earth rather
@@ -1746,7 +1746,7 @@ pub(crate) fn founding_flock_range(species: Species, flock: usize) -> (f32, f32)
     }
 }
 
-pub(crate) fn quarry_sites(terrain: &Terrain, centre: Vec3, rng: &mut Rng) -> Vec<Vec3> {
+pub(crate) fn quarry_sites(terrain: &Terrain, center: Vec3, rng: &mut Rng) -> Vec<Vec3> {
     let mut sites: Vec<Vec3> = Vec::new();
     for attempt in 0..QUARRY_TRIES {
         if sites.len() >= QUARRIES {
@@ -1755,7 +1755,7 @@ pub(crate) fn quarry_sites(terrain: &Terrain, centre: Vec3, rng: &mut Rng) -> Ve
         let angle = rng.range(0.0, std::f32::consts::TAU);
         let reach = rng.range(QUARRY_NEAREST, QUARRY_FURTHEST);
         let (sin, cos) = angle.sin_cos();
-        let (x, z) = (centre.x + cos * reach, centre.z + sin * reach);
+        let (x, z) = (center.x + cos * reach, center.z + sin * reach);
         if !terrain.is_walkable(x, z) {
             continue;
         }
@@ -1819,14 +1819,14 @@ pub(crate) fn spawn_settlement(
     // Where the god put the flag. A restored world keeps its own ground,
     // and a world that somehow arrived here unplanted falls back on the
     // old search rather than founding nothing.
-    let centre = restoring
+    let center = restoring
         .as_ref()
-        .map(|r| r.centre)
+        .map(|r| r.center)
         .or(chosen.0)
         .unwrap_or_else(|| choose_settlement_site(&ground.0, &mut rng));
     ground
         .1
-        .prime_first_zoom(ground.0.chunk_of(centre.x, centre.z));
+        .prime_first_zoom(ground.0.chunk_of(center.x, center.z));
 
     // The place is named in the same tongue as its people, because the people
     // named it.
@@ -1834,7 +1834,7 @@ pub(crate) fn spawn_settlement(
         .as_ref()
         .map(|r| r.name.clone())
         .unwrap_or_else(|| language.name(&mut rng));
-    // The town's arms: the cloth's colour and the sign upon it, rolled at
+    // The town's arms: the cloth's color and the sign upon it, rolled at
     // the founding and kept for the rest of its history.
     let (banner_ramp, sigil) = restoring
         .as_ref()
@@ -1847,7 +1847,7 @@ pub(crate) fn spawn_settlement(
         });
     let settlement = spawn_town(
         &mut commands,
-        centre,
+        center,
         &settlement_name,
         restoring.as_ref().map_or(clock.day(), |r| r.founded),
         banner_ramp,
@@ -1872,7 +1872,7 @@ pub(crate) fn spawn_settlement(
             let angle = rng.range(0.0, std::f32::consts::TAU);
             let reach = rng.range(140.0, 460.0);
             let (sin, cos) = angle.sin_cos();
-            let (x, z) = (centre.x + cos * reach, centre.z + sin * reach);
+            let (x, z) = (center.x + cos * reach, center.z + sin * reach);
             if !ground.0.is_walkable(x, z) {
                 continue;
             }
@@ -1902,7 +1902,7 @@ pub(crate) fn spawn_settlement(
             let angle = rng.range(0.0, std::f32::consts::TAU);
             let reach = rng.range(40.0, 700.0);
             let (sin, cos) = angle.sin_cos();
-            let (x, z) = (centre.x + cos * reach, centre.z + sin * reach);
+            let (x, z) = (center.x + cos * reach, center.z + sin * reach);
             if !ground.0.is_walkable(x, z) {
                 continue;
             }
@@ -1943,7 +1943,7 @@ pub(crate) fn spawn_settlement(
         // wants a genuine face and so never finds one in rolling or coastal
         // country. A village on a flat green shore gets its quarry regardless,
         // because the alternative is a village that cannot build.
-        let quarries = quarry_sites(&ground.0, centre, &mut rng);
+        let quarries = quarry_sites(&ground.0, center, &mut rng);
         for at in &quarries {
             // The pit first, then the stone standing in it. See `QUARRY_DEPTH`
             // for why the ground is worked rather than the model made taller.
@@ -2003,27 +2003,27 @@ pub(crate) fn spawn_settlement(
         &mut meshes,
         &mut materials,
         &ground.0,
-        centre,
+        center,
         settlement,
         banner_ramp,
         sigil,
     );
 
     let site = SettlementSite {
-        centre,
+        center,
         radius: 36.0,
         woodpile,
         settlement,
     };
     // The village knows the ground it stands on, and the veil lifts from THERE.
     //
-    // `KnownWorld::centre` was never written by anybody: it defaulted to the
+    // `KnownWorld::center` was never written by anybody: it defaulted to the
     // world's origin and stayed there, so the fog cleared over the middle of the
     // map however far away the flag was actually planted. Brett: "if you go to
     // the other side of the world to plant your flag it works but the fog of war
     // doesnt clear around the settlement." Near the origin the two happened to
     // be the same place, which is why it took a walk to the far side to see.
-    known.centre = centre;
+    known.center = center;
     // The same ground, on the town itself. One source of truth: the resource
     // says which town the player is looking at, the component says where that
     // town is — and every other town carries its own.
@@ -2049,12 +2049,12 @@ pub(crate) fn spawn_settlement(
             grass,
             &standing,
             settlement,
-            centre,
+            center,
             &mut rng,
         )
     });
     let doorstep = doorstep.flatten();
-    // The plot is levelled and cleared by now; everything below reads the
+    // The plot is leveled and cleared by now; everything below reads the
     // land as it finally stands.
     let terrain = &ground.0;
 
@@ -2066,7 +2066,7 @@ pub(crate) fn spawn_settlement(
             &mut commands,
             &mut meshes,
             &mut materials,
-            centre,
+            center,
             palette::shade(&palette::CLOTH_GOLD, 0.95),
             true,
         );
@@ -2089,8 +2089,8 @@ pub(crate) fn spawn_settlement(
                 let spot = step + out;
                 Vec3::new(spot.x, terrain.height_at(spot.x, spot.z), spot.z)
             }
-            None => random_walkable_point(&terrain, &mut rng, centre, site.radius * 0.6)
-                .unwrap_or(centre),
+            None => random_walkable_point(&terrain, &mut rng, center, site.radius * 0.6)
+                .unwrap_or(center),
         };
         // Five and five, all grown. A founding generation with children
         // in it is a founding generation that cannot work: a quarter of
@@ -2154,7 +2154,7 @@ pub(crate) fn spawn_settlement(
 
         // Founding children are part-grown: they come of age at staggered times
         // rather than as a single graduating class. Founding adults are at
-        // staggered points of their prime, so the village greys gradually.
+        // staggered points of their prime, so the village grays gradually.
         if is_child {
             commands.entity(entity).insert(Childhood {
                 remaining: rng.range(SECONDS_TO_COME_OF_AGE * 0.2, SECONDS_TO_COME_OF_AGE),
@@ -2252,7 +2252,7 @@ pub(crate) fn spawn_settlement(
         let Some(position) = crate::creature::random_walkable_ring(
             &terrain,
             &mut wildlife_rng,
-            centre,
+            center,
             nearest,
             reach,
         ) else {
@@ -2279,7 +2279,7 @@ pub(crate) fn spawn_settlement(
     }
 
     commands.insert_resource(explore::KnownWorld {
-        centre,
+        center,
         radius: 170.0,
         pockets: Vec::new(),
     });
@@ -2348,7 +2348,7 @@ pub(crate) fn name_the_god(
 /// that do not exist yet - and they are not the village's dice anyway,
 /// they are the world's.
 fn deal_the_dice(mut commands: Commands, world_seed: Res<crate::WorldSeed>) {
-    commands.insert_resource(SimRng(Rng::stream(world_seed.0 as u64, "behaviour")));
+    commands.insert_resource(SimRng(Rng::stream(world_seed.0 as u64, "behavior")));
 }
 
 /// Points the camera at the settlement once it has been placed.
@@ -2358,7 +2358,7 @@ fn deal_the_dice(mut commands: Commands, world_seed: Res<crate::WorldSeed>) {
 /// staring at an empty hillside with the entire population off-screen.
 /// The settlement's official radius follows its furthest roof: wandering,
 /// sheltering and the social range all read this, so a sprawling town
-/// LIVES sprawling instead of crowding its old centre.
+/// LIVES sprawling instead of crowding its old center.
 fn stretch_settlement(
     time: Res<Time>,
     mut since_last: Local<f32>,
@@ -2377,7 +2377,7 @@ fn stretch_settlement(
         let furthest = buildings
             .iter()
             .filter(|(_, member)| member.0 == town)
-            .map(|(at, _)| at.translation().distance(ground.centre))
+            .map(|(at, _)| at.translation().distance(ground.center))
             .fold(0.0f32, f32::max);
         let stretched = (furthest + 14.0).max(36.0);
         if (stretched - ground.radius).abs() > 1.0 {
@@ -2401,8 +2401,8 @@ fn point_camera_at_settlement(
         return;
     };
 
-    rig.focus = site.centre;
-    rig.target_focus = site.centre;
+    rig.focus = site.center;
+    rig.target_focus = site.center;
 
     // Close enough that individual villagers are legible, far enough to see the
     // ground they are working.
@@ -2539,7 +2539,7 @@ fn starvation_watch(
         }
         let from_home = site
             .as_ref()
-            .map_or(f32::NAN, |s| s.centre.distance(at.translation));
+            .map_or(f32::NAN, |s| s.center.distance(at.translation));
         // The banner is not the meal. Twice now a village has starved
         // beside a full larder because the SACKS were somewhere the
         // walk could not finish, so the watch reads out the table too:
@@ -2594,11 +2594,11 @@ fn can_grow_to(living: usize, average_hunger: f32, food_stored: f32, cap: usize)
 ///
 /// Parents are two living adults; the child mixes their genomes, which is what the
 /// heritability in [`CreatureGenome::child_of`] has been waiting for since the
-/// first day — a family you can recognise across the village green.
+/// first day — a family you can recognize across the village green.
 /// Children grow up.
 ///
 /// Coming of age rebuilds the body from the same genome at adult stage — the
-/// child and the adult are recognisably the same person because they *are* the
+/// child and the adult are recognizably the same person because they *are* the
 /// same numbers, just grown into.
 fn grow_up(
     mut commands: Commands,
@@ -2660,7 +2660,7 @@ fn grow_up(
     }
 }
 
-/// Age comes for everyone: the prime ends, the hair greys, the back bends.
+/// Age comes for everyone: the prime ends, the hair grays, the back bends.
 ///
 /// No one dies of it — yet. Growing old is a visible season of life, not a
 /// timer on it; death still has to arrive by hunger, violence or misadventure.
@@ -2702,7 +2702,7 @@ fn grow_old(
             person.name
         )));
         if let Some(mut chronicle) = chronicle {
-            chronicle.record(clock.day(), "grew old, and grey");
+            chronicle.record(clock.day(), "grew old, and gray");
         }
 
         commands.entity(entity).despawn_related::<Children>();
@@ -2747,7 +2747,7 @@ fn bereave(
                 .map_or(0.0, |s| s.food());
             let from_home = site
                 .as_ref()
-                .map_or(0.0, |s| at.translation.distance(s.centre));
+                .map_or(0.0, |s| at.translation.distance(s.center));
             let nearest_berries = bushes
                 .iter()
                 .filter(|(_, bush)| bush.amount > 0.2)
@@ -2955,7 +2955,7 @@ fn births(
         .map_or(0.0, |s| s.food());
 
     // Children come of marriages. A wife whose husband is alive and grown may
-    // bear a child; the couple with the least on their plate is not modelled —
+    // bear a child; the couple with the least on their plate is not modeled —
     // the pick among eligible mothers is even.
     //
     // Counted BEFORE the gates rather than after, so that a village which is
@@ -3345,7 +3345,7 @@ fn pursue_activity(
             // activity into somewhere to walk, and it has to EXCLUDE a worn
             // body rather than be overruled by one: `Wandering` with nowhere
             // to go rolls a fresh destination every frame, and one drawn
-            // around the settlement centre rather than the walker when the
+            // around the settlement center rather than the walker when the
             // walker is outside its radius. Possess a hunter in the woods and
             // the body sets off home at a stride, carrying the god with it.
             Without<crate::avatar::Ridden>,
@@ -3378,10 +3378,10 @@ fn pursue_activity(
                     let Some(home_ground) = home_ground else {
                         continue;
                     };
-                    let origin = if transform.translation.distance(home_ground.centre)
+                    let origin = if transform.translation.distance(home_ground.center)
                         > home_ground.radius
                     {
-                        home_ground.centre
+                        home_ground.center
                     } else {
                         transform.translation
                     };
@@ -3509,15 +3509,15 @@ mod tests {
             // not about one lucky spot on eight maps.
             for _ in 0..6 {
                 let here = terrain.somewhere_inland();
-                let centre = Vec3::new(here.x, terrain.height_at(here.x, here.y), here.y);
-                let sites = quarry_sites(&terrain, centre, &mut rng);
+                let center = Vec3::new(here.x, terrain.height_at(here.x, here.y), here.y);
+                let sites = quarry_sites(&terrain, center, &mut rng);
                 assert!(
                     !sites.is_empty(),
-                    "seed {seed} founds a village at {centre:?} with no quarry \
+                    "seed {seed} founds a village at {center:?} with no quarry \
                      in reach - it can never raise a footing"
                 );
                 for at in &sites {
-                    let reach = Vec2::new(at.x - centre.x, at.z - centre.z).length();
+                    let reach = Vec2::new(at.x - center.x, at.z - center.z).length();
                     assert!(
                         reach <= QUARRY_FURTHEST + 1.0,
                         "a quarry sits {reach} away, past the errand a miner will make"
@@ -3542,8 +3542,8 @@ mod tests {
         let terrain = Terrain::new(4242);
         let mut rng = Rng::stream(4242, "quarry spread");
         let here = terrain.somewhere_inland();
-        let centre = Vec3::new(here.x, terrain.height_at(here.x, here.y), here.y);
-        let sites = quarry_sites(&terrain, centre, &mut rng);
+        let center = Vec3::new(here.x, terrain.height_at(here.x, here.y), here.y);
+        let sites = quarry_sites(&terrain, center, &mut rng);
         for (i, a) in sites.iter().enumerate() {
             for b in &sites[i + 1..] {
                 assert!(
@@ -4016,7 +4016,7 @@ mod tests {
 
     #[test]
     fn settlement_site_has_room_around_it() {
-        // Villagers spawn in a radius around the centre; if almost none of that
+        // Villagers spawn in a radius around the center; if almost none of that
         // area is walkable the settlement will be stacked on one tile.
         let terrain = Terrain::new(2024);
         let mut rng = Rng::stream(2024, "settlement");
@@ -4078,7 +4078,7 @@ mod tests {
     #[test]
     fn settlement_site_is_not_a_sandbar() {
         // Regression: scoring water proximity without requiring land put the
-        // settlement on an islet a few metres across, with the whole population
+        // settlement on an islet a few meters across, with the whole population
         // packed onto it and nowhere to walk.
         for seed in [1u64, 2, 3, 7, 42, 2024, 20241101] {
             let terrain = Terrain::new(seed as u32);

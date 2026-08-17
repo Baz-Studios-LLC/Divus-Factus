@@ -9,11 +9,11 @@
 //! That map is exact, cheap, and invertible. What it is not is SAFE, because
 //! both sides of it are spelled `Vec3`. A flat position and a seated one are
 //! the same type, so mixing them compiles, and the mistake shows up hundreds
-//! of metres from the origin where nobody is looking. It has cost a fog of
+//! of meters from the origin where nobody is looking. It has cost a fog of
 //! war that would not lift, and a village that would not build because no
 //! tree was ever "known".
 //!
-//! A `Place` is the honest article: a direction from the planet's centre, and
+//! A `Place` is the honest article: a direction from the planet's center, and
 //! a height above the sea-level sphere. There is no second space for it to be
 //! confused with. Distance between two of them is the distance actually
 //! walked - along the ground, round the curve - and a step toward one is a
@@ -25,10 +25,10 @@
 
 use bevy::prelude::*;
 
-use crate::globe::{planet_centre, planet_stance};
+use crate::globe::{planet_center, planet_stance};
 use crate::terrain::{PLANET_RADIUS, direction_at};
 
-/// A point on the planet: which way from its centre, and how high.
+/// A point on the planet: which way from its center, and how high.
 ///
 /// `dir` is kept in PLANET space - the same space `direction_at` returns,
 /// before the stance that stands the globe up in the world. Every geodesic
@@ -80,14 +80,14 @@ impl Place {
         Vec3::new(lon * PLANET_RADIUS, self.high, -lat * PLANET_RADIUS)
     }
 
-    /// The direction from the planet's centre, in planet space.
+    /// The direction from the planet's center, in planet space.
     pub fn direction(&self) -> Vec3 {
         self.dir
     }
 
     /// Where this sits in the world the camera sees.
     pub fn seat(&self) -> Vec3 {
-        planet_centre() + (planet_stance() * self.dir) * (PLANET_RADIUS + self.high)
+        planet_center() + (planet_stance() * self.dir) * (PLANET_RADIUS + self.high)
     }
 
     /// The rotation that stands a thing upright here, facing east.
@@ -117,7 +117,7 @@ impl Place {
     ///
     /// A great circle at sea level, not a line through the planet. Over a
     /// settlement the two agree to within a whisker; over a continent the
-    /// chord is short by kilometres, and it is the walk that a villager pays
+    /// chord is short by kilometers, and it is the walk that a villager pays
     /// for.
     pub fn apart(&self, other: Place) -> f32 {
         PLANET_RADIUS * self.angle_to(other)

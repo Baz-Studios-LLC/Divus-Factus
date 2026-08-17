@@ -9,7 +9,7 @@
 //!
 //! One glance at a square should read as a roster — the sea-blue fisher,
 //! the hooded hunter, the purple priest — the same way the nameplates'
-//! faith colours read as a congregation.
+//! faith colors read as a congregation.
 
 use bevy::prelude::*;
 
@@ -35,13 +35,13 @@ fn tone(ramp: usize, step: usize) -> Tone {
 
 /// The wardrobe: one livery per calling, distinct at a glance.
 ///
-/// Cloth carries the trade's colour, headwear its silhouette, the cut its
+/// Cloth carries the trade's color, headwear its silhouette, the cut its
 /// station: tunics for the field trades, wraps for the crafts that work a
 /// sash of tools across the chest, robes for the callings of the soul.
 pub fn livery(vocation: Vocation) -> Livery {
     use Vocation::*;
     let (cloth, accent, headwear, garment) = match vocation {
-        // The field trades, in the colours of what they bring home.
+        // The field trades, in the colors of what they bring home.
         Gatherer => (
             tone(palette::RAMP_CLOTH_GREEN, 2),
             tone(palette::RAMP_EARTH, 2),

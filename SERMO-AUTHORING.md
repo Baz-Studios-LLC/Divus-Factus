@@ -15,7 +15,7 @@ shots, not a description of them.
 **Read the shots for TONE, not for punctuation.** They were written when
 this corpus ran lowercase, and it does not any more: Brett — "I think plain
 english and proper grammer is the way to go for everything." Sentence case,
-full stops, British spelling. The engine repairs the old lines as it says
+full stops, American spelling. The engine repairs the old lines as it says
 them, so the two live side by side in the files; write new ones properly.
 
 - "swept the whole floor today. it's a small thing. it's my small thing"
@@ -33,12 +33,17 @@ What always fails review: capital-P Poetry, sermons, modern idiom
 lines longer than ~2 short sentences, and any line that could not be said
 by a tired person leaning on a fence.
 
-**The village speaks British English**, because the game's own labels do —
-the chronicle reads "nursed a neighbour back to health". So: neighbour,
-colour, honour, favour, labour, rumour, behaviour, travelled, realise,
-recognise, apologise, grey, plough. The test
-`the_village_speaks_one_english` fails the build on the American spellings,
+**The village speaks American English**, because the game's own labels do —
+the chronicle reads "nursed a neighbor back to health". So: neighbor,
+color, honor, favor, labor, rumor, behavior, traveled, realize,
+recognize, apologize, gray, plow, center, toward, afterward. The test
+`the_village_speaks_one_english` fails the build on the British spellings,
 whole words only.
+
+It was the other way round for most of this game's life, and nobody had
+decided it - it simply set in. The rule that matters is that there is ONE
+English, because a chronicle and a speech bubble disagreeing about
+"neighbour" is a seam the player can see.
 
 ## The record shape
 

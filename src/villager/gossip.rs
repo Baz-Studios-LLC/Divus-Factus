@@ -1,7 +1,7 @@
 //! The social fabric: courtship, conversation, and the gossip mill.
 //!
 //! What a villager carries secondhand is counted apart from what they saw,
-//! because a faith built on rumour and a faith built on witness are
+//! because a faith built on rumor and a faith built on witness are
 //! different faiths - and the road between them is two people stopping to
 //! talk. This is the machine the shrine's sermons and the taverns' evenings
 //! plug into.
@@ -237,12 +237,12 @@ pub(crate) fn form_bonds(
     }
 }
 
-/// Talk: witnesses tell their neighbours what they saw, and the story spreads.
+/// Talk: witnesses tell their neighbors what they saw, and the story spreads.
 ///
 /// This is the game's central mechanism in embryo. Nobody needs to see a
 /// miracle for it to change them — they need to know someone who did. What a
 /// villager carries secondhand is counted apart from what they saw, because a
-/// faith built on rumour and a faith built on witness are different faiths,
+/// faith built on rumor and a faith built on witness are different faiths,
 /// When this person last finished a conversation.
 ///
 /// Talk has to be punctuation, not the day. Widening who may chat, and
@@ -501,7 +501,7 @@ const STALE_AFTER: u32 = 2;
 /// a passing god time to read a whole exchange without pausing.
 pub(crate) const A_CHAT_RUNS: f64 = 24.0;
 
-/// Whoever has news finds an idle neighbour and goes TO them: both stop,
+/// Whoever has news finds an idle neighbor and goes TO them: both stop,
 /// meet, and hold an actual conversation instead of talking over their
 /// shoulders mid-stride.
 #[allow(clippy::type_complexity)]
@@ -607,7 +607,7 @@ pub(crate) fn meet_to_talk(
         if !rng.0.chance(urge.min(0.95)) {
             continue;
         }
-        // The nearest idle neighbour becomes the audience.
+        // The nearest idle neighbor becomes the audience.
         // News is worth crossing a yard for; a word about the weather is
         // said to whoever is already beside you.
         let reach = if memory.is_some() {
@@ -1170,7 +1170,7 @@ pub(crate) fn hold_conversations(
         // The two later beats. Nothing changes hands here - the story
         // moved on the opener, and everything after it is the two of them
         // working out what to make of it. That split is the whole reason
-        // a four-beat conversation does not spread a rumour four times.
+        // a four-beat conversation does not spread a rumor four times.
         // A chat about the work or the weather has no story to hand over,
         // so it never enters the telling above - it opens here instead,
         // and runs the same four beats.

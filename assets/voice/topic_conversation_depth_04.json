@@ -84,7 +84,7 @@
     ]
   },
   {
-    "t": "The eastern path bends back towards the creek after the ridge.",
+    "t": "The eastern path bends back toward the creek after the ridge.",
     "tags": [
       "chat:followup",
       "topic:explorer"
@@ -642,7 +642,7 @@
     ]
   },
   {
-    "t": "Say more about the part that happened afterwards.",
+    "t": "Say more about the part that happened afterward.",
     "tags": [
       "chat:reply"
     ]

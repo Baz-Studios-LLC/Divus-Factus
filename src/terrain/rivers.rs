@@ -39,7 +39,7 @@
 //!    the same stream everywhere.
 //!
 //! Water level along a course is the filled surface, so it cannot rise going
-//! downstream — not as a rule enforced afterwards but because filling produces
+//! downstream — not as a rule enforced afterward but because filling produces
 //! a surface that never does. Across the channel it is one number belonging to
 //! the reach, so it cannot sag or step.
 //!
@@ -58,7 +58,7 @@ use super::{Terrain, WATER_LEVEL};
 /// Kept as the unit everything else is a multiple of, because the carve and the
 /// queries in `terrain` are written against it.
 pub const CHANNEL_HALF_WIDTH: f32 = 6.0;
-/// How far the bed dips below the water at the channel's centre, at that same
+/// How far the bed dips below the water at the channel's center, at that same
 /// smallest flow. Bigger rivers cut deeper in proportion.
 pub const CHANNEL_DEPTH: f32 = 3.2;
 
@@ -75,7 +75,7 @@ const CELL: f32 = 32.0;
 /// The margin is what lets a river leave home. Flow does not respect a region's
 /// edges, so the window is solved wide and only the courses that BEGIN in the
 /// region are kept — the same ownership rule the springs used, for the same
-/// reason: every region draws its own rivers exactly once, and neighbouring
+/// reason: every region draws its own rivers exactly once, and neighboring
 /// regions agree about the ones that cross between them.
 const REGION_CELLS: usize = 64;
 const MARGIN_CELLS: usize = 48;
@@ -84,7 +84,7 @@ const SIDE: usize = REGION_CELLS + 2 * MARGIN_CELLS;
 /// A region's span in world units.
 const REGION: f32 = REGION_CELLS as f32 * CELL;
 
-/// Regions built around a query, so courses from neighbours are always present.
+/// Regions built around a query, so courses from neighbors are always present.
 const REGION_REACH: i32 = 1;
 
 /// How many cells must drain through a point before it carries a river.
@@ -102,9 +102,9 @@ const WIDTH_AT: f32 = CHANNEL_START * 4.0;
 /// The widest a channel may get, in multiples of the smallest.
 ///
 /// Capped so a channel is always narrower than the grid the courses are routed
-/// on. Two neighbouring cells can carry two different rivers at two different
+/// on. Two neighboring cells can carry two different rivers at two different
 /// heights, and they are `CELL` apart; if a channel can grow wider than that,
-/// its own banks reach across and swallow its neighbour, and a query standing
+/// its own banks reach across and swallow its neighbor, and a query standing
 /// between them flips from one water surface to the other. That showed up as a
 /// river surface holding level for six units and then dropping two - not a
 /// slope, two rivers.
@@ -124,7 +124,7 @@ const LAKE_LEAST: f32 = 0.35;
 /// enclosed hollows between its creases, and every one of them came out as a
 /// tarn. Real mountains have tarns; they do not have one in every dip.
 ///
-/// Six cells is about six thousand square metres - a pond you could row across.
+/// Six cells is about six thousand square meters - a pond you could row across.
 /// Anything smaller is a puddle the ground happened to hold, and the ground can
 /// go on holding it without the world drawing water in it.
 const LAKE_LEAST_CELLS: usize = 6;
@@ -146,7 +146,7 @@ struct Segment {
 /// One region's standing water: the level of every cell the fill left under
 /// water, and nothing for the cells it did not.
 struct Still {
-    /// World position of the region's first cell centre.
+    /// World position of the region's first cell center.
     origin: Vec2,
     /// `REGION_CELLS * REGION_CELLS`, `f32::NAN` where the ground is dry.
     level: Vec<f32>,
@@ -156,10 +156,10 @@ struct Still {
 struct Inner {
     /// Regions whose own courses have been solved.
     built: HashSet<IVec2>,
-    /// Regions whose full neighbourhood is built, i.e. safe to query.
+    /// Regions whose full neighborhood is built, i.e. safe to query.
     covered: HashSet<IVec2>,
     /// Segments by spatial bin. Insertion inflates by the channel width, so a
-    /// point only ever needs to look in its own bin and its neighbours.
+    /// point only ever needs to look in its own bin and its neighbors.
     bins: HashMap<IVec2, Vec<Segment>>,
     /// Standing water, by region.
     still: HashMap<IVec2, Still>,
@@ -304,8 +304,8 @@ impl PartialOrd for Rising {
     }
 }
 
-/// The eight neighbours of a cell, as index offsets and their step lengths.
-fn neighbours(index: usize) -> impl Iterator<Item = (usize, f32)> {
+/// The eight neighbors of a cell, as index offsets and their step lengths.
+fn neighbors(index: usize) -> impl Iterator<Item = (usize, f32)> {
     let (x, z) = ((index % SIDE) as i32, (index / SIDE) as i32);
     (-1..=1)
         .flat_map(|dz| (-1..=1).map(move |dx| (dx, dz)))
@@ -371,7 +371,7 @@ fn solve_region(inner: &mut Inner, terrain: &Terrain, region: IVec2) {
         }
         rank[index] = popped;
         popped += 1;
-        for (next, _) in neighbours(index) {
+        for (next, _) in neighbors(index) {
             if rank[next] != usize::MAX || filled[next].is_finite() {
                 continue;
             }
@@ -394,7 +394,7 @@ fn solve_region(inner: &mut Inner, terrain: &Terrain, region: IVec2) {
         let mut best = usize::MAX;
         let mut earliest = rank[index];
         let mut flat = usize::MAX;
-        for (next, step) in neighbours(index) {
+        for (next, step) in neighbors(index) {
             if rank[next] == usize::MAX {
                 continue;
             }
@@ -539,7 +539,7 @@ fn solve_region(inner: &mut Inner, terrain: &Terrain, region: IVec2) {
         seen[start] = true;
         while let Some(index) = walk.pop() {
             body.push(index);
-            for (next, _) in neighbours(index) {
+            for (next, _) in neighbors(index) {
                 if drowned[next] && !seen[next] {
                     seen[next] = true;
                     walk.push(next);
@@ -584,7 +584,7 @@ fn width_of(flow: f32) -> f32 {
 
 /// Rounds the corners off a course walked on a grid.
 ///
-/// Flow routing can only step to one of eight neighbours, so a course comes out
+/// Flow routing can only step to one of eight neighbors, so a course comes out
 /// of it as a staircase of forty-five degree turns. Chaikin's corner cutting
 /// twice over turns that into something a river could have cut, and because
 /// every new point is a weighted average of two old ones, the level cannot rise
@@ -617,7 +617,7 @@ fn smoothed(course: &[(Vec2, f32, f32)]) -> Vec<(Vec2, f32, f32)> {
 }
 
 /// Inserts a segment into every bin its widened footprint touches, so queries
-/// only ever need their own bin and its neighbours.
+/// only ever need their own bin and its neighbors.
 fn file_segment(bins: &mut HashMap<IVec2, Vec<Segment>>, segment: Segment) {
     // Just past the widest channel, and no further. Every extra unit of this
     // files every segment into more bins, and a query walks every segment in
@@ -626,7 +626,7 @@ fn file_segment(bins: &mut HashMap<IVec2, Vec<Segment>>, segment: Segment) {
     // springs did, and at twice the widest channel this was the difference
     // between a two second world and a six second one.
     //
-    // Safe because a query reads its own bin AND its eight neighbours, which
+    // Safe because a query reads its own bin AND its eight neighbors, which
     // covers everything within a bin's width beyond this.
     let reach = CHANNEL_HALF_WIDTH * WIDEST * 1.25;
     let min = segment.a.min(segment.b) - Vec2::splat(reach);
@@ -707,7 +707,7 @@ mod tests {
     ///
     /// Measured across, not in some arbitrary direction, because a river is
     /// allowed to fall as fast as it likes ALONG its course - a headwater on a
-    /// mountainside genuinely drops most of a metre every few paces, and a test
+    /// mountainside genuinely drops most of a meter every few paces, and a test
     /// that forbids that forbids mountains. So the flow direction is found
     /// first, from the way the surface falls fastest, and the probe goes at
     /// right angles to it. That way is the one where the water has no business

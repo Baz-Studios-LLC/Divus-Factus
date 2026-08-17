@@ -10,7 +10,7 @@
 //! At night, people with homes walk to them and sleep inside; at dawn they
 //! step back out. A sleeping village is quiet, dark but for the fire, and
 //! plucking a sleeper out of their house is exactly the kind of thing a god
-//! can do and neighbours will talk about.
+//! can do and neighbors will talk about.
 
 use bevy::prelude::*;
 
@@ -233,7 +233,7 @@ pub(crate) fn use_doors(
         // covers will route somebody back and forth between two standing
         // places forever, and they will starve doing it - which is
         // exactly what the bench longhouse did, its shell reaching six
-        // metres past the doorway that is supposed to let you out of it.
+        // meters past the doorway that is supposed to let you out of it.
         // Whatever the geometry, a walk gets a bounded number of seconds
         // of being helped and then goes straight there.
         if bound.is_some_and(|bound| clock.elapsed - bound.0 > GIVE_UP_ON_DOORS) {
@@ -358,7 +358,7 @@ pub(super) fn assign_beds(
 const PILLOW_AHEAD: f32 = 0.625;
 
 /// Where to stand a body's ROOT so that its HEAD comes down on `ahead`
-/// metres in front of the place it was told to sleep.
+/// meters in front of the place it was told to sleep.
 ///
 /// A villager's root is between their feet: standing, all of them is
 /// above it, but tipped onto their back they reach OUT from it, head
@@ -507,7 +507,7 @@ pub(super) fn take_shelter(
                 }
                 // Off the clock, the fire circle is the next best thing — a
                 // spot in a loose RING around it, held as Sheltering. The
-                // first version left them Idle at the fire's exact centre,
+                // first version left them Idle at the fire's exact center,
                 // so the idle wander walked them ten feet off and this
                 // system marched them straight back, all day, forever.
                 if let Some(fire) = fire_pos {
@@ -1289,7 +1289,7 @@ pub(super) fn night_routine(
                 // dealt by the golden turn, so any number of sleepers
                 // space themselves without a plan, in two loose rows.
                 // The first cut walked everyone to a random spot in a
-                // box CENTRED ON THE FIRE and laid them down where they
+                // box CENTERD ON THE FIRE and laid them down where they
                 // stopped - a heap of sleepers with their hair in the
                 // coals, which a playtest photo made hard to deny.
                 let turn = entity.index().index() as f32 * 2.399963;
@@ -1468,7 +1468,7 @@ pub(super) fn answer_the_knock(
 ///
 /// Workers are released a few at a time (the chance staggers them, so the
 /// square fills like a square and not like a fire drill), drift to their
-/// town's centre, eat if they are hungry, and fall into the gossip mill by
+/// town's center, eat if they are hungry, and fall into the gossip mill by
 /// sheer proximity — which is the point of a midday meal.
 #[allow(clippy::type_complexity)]
 pub(super) fn midday_meal(
@@ -1500,12 +1500,12 @@ pub(super) fn midday_meal(
         if *activity != Activity::Working || !rng.0.chance(0.05) {
             continue;
         }
-        let Some(centre) = member.and_then(|m| grounds.get(m.0).ok()).map(|g| g.centre) else {
+        let Some(center) = member.and_then(|m| grounds.get(m.0).ok()).map(|g| g.center) else {
             continue;
         };
         commands.entity(entity).remove::<super::work::Job>();
         *activity = Activity::Wandering;
-        target.0 = Some(centre + Vec3::new(rng.0.range(-4.0, 4.0), 0.0, rng.0.range(-4.0, 4.0)));
+        target.0 = Some(center + Vec3::new(rng.0.range(-4.0, 4.0), 0.0, rng.0.range(-4.0, 4.0)));
         let _ = at;
     }
 }
@@ -1514,7 +1514,7 @@ pub(super) fn midday_meal(
 ///
 /// A house-dweller heads home at dusk and stays under their roof until the
 /// night hands them to bed — through the door, visibly, together. Ten
-/// seconds of theatre a day that makes a house a household. The unwed keep
+/// seconds of theater a day that makes a house a household. The unwed keep
 /// their evening: the tavern claims the low, the fire the rest.
 #[allow(clippy::type_complexity)]
 pub(super) fn family_supper(
@@ -1575,7 +1575,7 @@ pub(super) fn family_supper(
 /// Between the workday's end and sleep, anyone whose spirits could use it
 /// drifts to the tavern and lingers. The crowd this makes is not decoration:
 /// gossip runs on proximity, so the tavern becomes the place stories change
-/// hands — the village's rumour engine, built out of nothing but a building
+/// hands — the village's rumor engine, built out of nothing but a building
 /// and a schedule.
 pub(super) fn tavern_evenings(
     clock: Res<crate::calendar::WorldClock>,
@@ -2059,8 +2059,8 @@ mod tests {
         legs
     }
 
-    /// Steps allowed in a walk test. At the two-centimetre stride that is
-    /// twenty-four metres, three times the longest way out of the room
+    /// Steps allowed in a walk test. At the two-centimeter stride that is
+    /// twenty-four meters, three times the longest way out of the room
     /// below - a walk that does not finish inside it is stuck, not slow.
     const STEPS: usize = 1200;
 

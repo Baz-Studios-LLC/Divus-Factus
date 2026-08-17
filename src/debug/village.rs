@@ -428,7 +428,7 @@ pub(crate) fn banner_glyph(commands: &mut Commands, parent: Entity) {
         ))
         .id();
     // The arms arrive by system once the settlement exists: the cloth's
-    // true colour, and the sign the town rolled at its founding.
+    // true color, and the sign the town rolled at its founding.
     commands.entity(cloth).insert(LedgerBannerCloth);
     // The swallowtail: a turned square of the pane's own ground, cutting
     // the notch out of the cloth's foot - with two gold threads to hem it.
@@ -1110,7 +1110,7 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
 }
 
 /// Dresses the ledger's banner in the town's true arms: the cloth takes
-/// the founding roll's colour, and the sigil - the same rectangles the
+/// the founding roll's color, and the sigil - the same rectangles the
 /// world raises in gold on the real banner - is drawn upon it. Re-dresses
 /// itself when a different settlement stands (a new world, a loaded save).
 pub(crate) fn dress_ledger_banner(
@@ -1887,7 +1887,7 @@ pub(crate) fn update_prayer_board(
                 .id();
 
             // The head: the TRUE portrait in a frame of their trade's own
-            // colour, the name beside it, hope in the corner - ruled off
+            // color, the name beside it, hope in the corner - ruled off
             // beneath, so the header reads apart from the asking. The
             // studio's stand-in bust holds the frame until their sitting
             // comes up.
@@ -1971,7 +1971,7 @@ pub(crate) fn update_prayer_board(
                     .insert(TextColor(pink.with_alpha(0.8)));
             }
 
-            // The kind, sealed in its own colour at the card's foot.
+            // The kind, sealed in its own color at the card's foot.
             let (kind_word, kind_color) = match &prayer.kind {
                 crate::villager::belief::PrayerKind::Food => ("BREAD", ui::theme::accent()),
                 crate::villager::belief::PrayerKind::Dark { .. } => (
@@ -2076,7 +2076,7 @@ pub(crate) fn answer_the_board(
 /// The FAITH roster: rows are torn down only when someone joins or leaves
 /// the roll. When souls merely trade places in the ranking, the standing
 /// rows are reordered in place - despawning them cost a layout frame and
-/// jolted the scroll every time trust drifted past a neighbour. The
+/// jolted the scroll every time trust drifted past a neighbor. The
 /// drifting numbers and why-lines always update in place.
 #[allow(clippy::type_complexity)]
 pub(crate) fn update_faith_roster(
@@ -2373,7 +2373,7 @@ then the whole soul",
             Bind::Fixed(&["F6", "F7"], "thicken and thin the haze"),
             Bind::Fixed(&["F8", "F9"], "darken and brighten the light"),
             Bind::Fixed(&["F10"], "the miniature look, on and off"),
-            Bind::Fixed(&["F11", "shift F11"], "richer and paler colour"),
+            Bind::Fixed(&["F11", "shift F11"], "richer and paler color"),
             Bind::Fixed(&["F12"], "a photograph, saved beside the game"),
         ],
     ),
@@ -2398,14 +2398,14 @@ pub(crate) struct Rebinding(pub Option<Deed>);
 /// Lays out the settings page in the codex's own manner: a tab bar like the
 /// People page wears, and card wells like the ledger's grid. Keybinds stand
 /// first — the page a player actually comes here for — then the hand's
-/// colour, brought in from the title screen, then what little video and
+/// color, brought in from the title screen, then what little video and
 /// sound there is to speak of. The model picker is gone; the teller keeps
 /// its voice from the models folder without asking.
 /// Builds the settings, into whatever parent is handed to it.
 ///
 /// `pub(crate)` because there is ONE settings panel in this game and the title
 /// screen shows that one. It used to have a little settings screen of its own —
-/// hand colours and nothing else — which meant two places to add a setting to
+/// hand colors and nothing else — which meant two places to add a setting to
 /// and two chances to forget the second. This is the panel; the title just hosts
 /// it in a different frame.
 pub(crate) fn build_settings_page(commands: &mut Commands, page: Entity) {
@@ -2611,7 +2611,7 @@ pub(crate) fn build_settings_page(commands: &mut Commands, page: Entity) {
     let hand_row = row_of(commands, tabs[1]);
     let hand_card = ui::card_well(commands, hand_row, "THE HAND");
     commands.spawn((
-        ui::dim("the colour of the hand that works your will."),
+        ui::dim("the color of the hand that works your will."),
         ChildOf(hand_card),
     ));
     let swatches = commands

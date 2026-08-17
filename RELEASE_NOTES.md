@@ -23,10 +23,10 @@ already authored changes.
 
 ## Buildings stand at the size they were drawn
 
-**A carried-in building is placed, levelled and cleared at its own
+**A carried-in building is placed, leveled and cleared at its own
 footprint.** Only houses ever asked their drawing how big they were; every
 other kind used a size from the days the village drew its own buildings. So
-an authored storehouse of 6.4 by 10.6 metres was given a pad of 2.8 by 1.6 —
+an authored storehouse of 6.4 by 10.6 meters was given a pad of 2.8 by 1.6 —
 a fifth of the building. On a slope that is one end hanging in the air and
 the other buried, with trees left standing inside the porches. **Expect the
 ground around larger buildings to look different.**

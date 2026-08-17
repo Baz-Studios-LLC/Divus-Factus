@@ -48,8 +48,8 @@ pub struct Wear(pub Entity);
 ///
 /// It has to clear the arrival crawl. Locomotion eases off as it nears a
 /// destination — `distance / (height * 2)`, floored at a quarter speed —
-/// which for an adult means anything inside about three and a half metres is
-/// walked at less than full pace. At three metres, which this was, the god
+/// which for an adult means anything inside about three and a half meters is
+/// walked at less than full pace. At three meters, which this was, the god
 /// never got out of that crawl and plodded everywhere. Eight is past the
 /// threshold for the tallest villager with room to spare, and costs nothing
 /// in responsiveness: the goal is re-aimed from the body's own position
@@ -72,7 +72,7 @@ const SPRINT: f32 = 1.8;
 /// Chosen against the landing: the fall home arrives at the same speed it
 /// left, and harm begins above about eight, so this clears a low wall and
 /// still lands without hurting the body it borrowed. Jump off something tall
-/// and that is a different sum, and the fall will be honoured as any other.
+/// and that is a different sum, and the fall will be honored as any other.
 const JUMP: f32 = 7.0;
 
 /// Where the god's gaze is set as it arrives in a body: a touch below
@@ -87,7 +87,7 @@ const ARRIVING_PITCH: f32 = 0.12;
 /// stack of boxes. So the whole of it goes.
 ///
 /// Not on possession, though: hiding it the moment the body is taken would
-/// vanish a villager the god is still forty metres above, which reads as
+/// vanish a villager the god is still forty meters above, which reads as
 /// them dropping dead. By the time the camera is this close it is already
 /// inside the skull, so both the vanishing and the return happen where they
 /// cannot be seen.
@@ -113,7 +113,7 @@ impl Plugin for AvatarPlugin {
             // business with the god aboard. Written here it is the last word
             // of the frame, and `plan_routes` at the head of the next one reads
             // it. Nothing else in the schedule can outvote it, including
-            // whatever behaviour gets added next year.
+            // whatever behavior gets added next year.
             .add_systems(
                 Last,
                 drive_the_body.run_if(in_state(crate::GameState::Playing)),
@@ -267,7 +267,7 @@ fn wear_it(
     // A possessed villager can be killed by a wolf halfway through a ride,
     // and the loop below never runs for a body that no longer exists — which
     // would leave the mouse locked away with no way to ask for it back, the
-    // lens focused four centimetres from the eye, and the camera lying on the
+    // lens focused four centimeters from the eye, and the camera lying on the
     // grass where the body used to be. Every one of those is recovered here
     // rather than at each of the places a ride can end.
     if ridden.is_empty() {

@@ -14,7 +14,7 @@ Suggestions below are design proposals for Claude to evaluate.
 - use only locked tags supplied by live emitters
 - keep every expanded utterance at 18 words or fewer
 - use normal sentence capitalisation and punctuation
-- use British English spelling
+- use American English spelling
 - write plain, concrete, ordinary speech rather than poetic prose
 - preserve register, subject-class, faith-band, slot, and speaker-side truth
 - avoid exact and near duplicates
@@ -81,7 +81,7 @@ control of the gift, and what happens once the provisions are gone.
 Current validation:
 
 - JSON, exact tag counts, 18-word limit, capitalisation, punctuation,
-  British English, anachronism filter, and exact duplicates: zero errors
+  American English, anachronism filter, and exact duplicates: zero errors
 - stop-word-normalised similarity audit at a 0.72 threshold: zero near hits
 - all Sermo vocabulary, subject-truth, repetition, sentence, and English gates
   pass: 13 passed, 0 failed
@@ -94,7 +94,7 @@ independently rather than against the validation claims above. Result:
 3,787 records, zero exact duplicates, every tag locked and live.
 
 **Batch 06 passes on every count, including the ones no script checks.**
-The birth conversations sound like people. "A neighbour told me the child
+The birth conversations sound like people. "A neighbor told me the child
 is doing well. I hope the mother is too." Ordinary concern carrying the
 faith question rather than announcing it. This is the house voice.
 
@@ -121,7 +121,7 @@ I saw food appear, though I still cannot explain who answered whom.
 ```
 
 Compare a batch 06 line doing the same job in plain speech: "Maybe the
-god was listening. I know the neighbours were."
+god was listening. I know the neighbors were."
 
 The doubting register is the likely cause. Scepticism was written as
 courtroom reasoning - evidence, counts, testimony, claims - when a
@@ -133,22 +133,23 @@ and the doubt carried by tone rather than vocabulary.
 
 ## Corpus Edits Made Directly (from Claude)
 
-Thirty lines across eighteen files, mechanical, no meaning changed:
-`afterward` -> `afterwards`, `toward` -> `towards`. These are the
-American forms, and there was not one instance of the British form
-anywhere in the corpus to argue with them - the drift went back to the
-earliest batches, not just to a recent one. The English gate in
+Thirty lines across eighteen files were once changed the OTHER way -
+`afterward` -> `afterward` - on a British rule that has since been
+dropped. The whole game moved to American English on 2026-08-17: corpus,
+labels, code and this contract. They are back to `afterward` and
+`toward`. The English gate in
 `sermo/corpus.rs` is a hand-written list of pairs and simply had no entry
 for either; both are in it now, so this cannot recur.
 
 Two more worth a decision, NOT changed, because they are vocabulary
 rather than error and the world's own words are Brett's call:
 
-- `creek` x13 (`chat.json`, `conversation_depth.json`, and others). In
-  British English a creek is a tidal inlet; a freshwater one is a brook
-  or a stream. Both of those also sound older, which suits the setting.
-- `gotten` x1 (`replies.json`): "the world's gotten strange". British
-  English is "got".
+- `creek` x13 - fine now, and the reason it was ever raised is gone: in
+  British English a creek is a tidal inlet, but the village speaks
+  American and a creek is a creek. `brook` and `stream` still sound
+  older, if that is wanted for its own sake.
+- `gotten` x1 (`replies.json`): "the world's gotten strange". Also fine
+  now; it is the American form.
 
 ## Next Engine Contract
 
@@ -211,7 +212,7 @@ age, repetition, and whether it has been resolved
 ```
 
 This permits true accusations, credible mistakes, disagreements over intent,
-rumours with a known source, and deliberate lies with an actual motive. Every
+rumors with a known source, and deliberate lies with an actual motive. Every
 participant should be able to answer “Why do you believe that?” from
 information they hold.
 

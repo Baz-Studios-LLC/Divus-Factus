@@ -632,7 +632,7 @@
     ]
   },
   {
-    "t": "{whom} got mauled. that's not a rumour, that's real",
+    "t": "{whom} got mauled. that's not a rumor, that's real",
     "tags": [
       "tell",
       "event:mauled",

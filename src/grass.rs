@@ -32,7 +32,7 @@ const GRASS_RADIUS: i32 = 5;
 /// Chunks of grass built per frame.
 const BUILDS_PER_FRAME: usize = 2;
 
-/// Metres between blade sample points.
+/// Meters between blade sample points.
 const SPACING: f32 = 0.85;
 
 pub struct GrassPlugin;
@@ -202,7 +202,7 @@ pub fn build_grass_mesh(
     // two thirds of a unit, which on knee-high grass is a visible hover;
     // anchored at the middle the worst case is a sixth of a unit, under a
     // blade's own height.
-    let centre = origin + Vec2::splat(CHUNK_SIZE * 0.5);
+    let center = origin + Vec2::splat(CHUNK_SIZE * 0.5);
     let mut rng = Rng::new(
         (seed as u64) << 32
             ^ ((coord.x as u32 as u64) << 16)
@@ -223,7 +223,7 @@ pub fn build_grass_mesh(
                 continue;
             }
             // Tilled ground is bare: no blades through the furrows. Ground
-            // merely levelled - a house's terrace - keeps its grass, because a
+            // merely leveled - a house's terrace - keeps its grass, because a
             // bald ring around every house is worse than a blade under a floor
             // nobody can see. Brett: "every house has a foundation that is
             // taller than the grass", and he draws them that way.
@@ -259,15 +259,15 @@ pub fn build_grass_mesh(
             }
 
             // Patchiness: meadows have thick and thin places, and the same field
-            // that mottles the ground colour drives them, so lush grass sits on
-            // lush-coloured ground.
+            // that mottles the ground color drives them, so lush grass sits on
+            // lush-colored ground.
             let patch = terrain.ground_patch_at(x, z);
             let keep = density * (0.7 + patch * 0.6);
             if hash_2d_f32(ix + coord.x * 1024, iz + coord.y * 1024, seed ^ 0x9aa5) > keep {
                 continue;
             }
 
-            // Blade colour uses the *same* moisture blend as the ground beneath it,
+            // Blade color uses the *same* moisture blend as the ground beneath it,
             // one step brighter. Authoring blades on their own scale drifted pale
             // twice in a row — anchoring them to the soil's own formula is what
             // keeps a green field green instead of frosted sage.
@@ -284,9 +284,9 @@ pub fn build_grass_mesh(
             for _ in 0..3 {
                 builder.push_blade(
                     Vec3::new(
-                        x - centre.x + rng.range(-0.16, 0.16),
+                        x - center.x + rng.range(-0.16, 0.16),
                         height,
-                        z - centre.y + rng.range(-0.16, 0.16),
+                        z - center.y + rng.range(-0.16, 0.16),
                     ),
                     // Knee height at the tallest, judged against the people wading it.
                     rng.range(0.18, 0.4) * stature,
@@ -321,12 +321,12 @@ fn stream_grass(
     let (Some(terrain), Some(assets), Ok(rig)) = (terrain, assets, cameras.single()) else {
         return;
     };
-    let centre = terrain.chunk_of(rig.focus.x, rig.focus.z);
+    let center = terrain.chunk_of(rig.focus.x, rig.focus.z);
 
     // Hysteresis on unload so the boundary does not thrash as the camera drifts.
     let drop = (GRASS_RADIUS + 1) * (GRASS_RADIUS + 1);
     chunks.entities.retain(|coord, entity| {
-        let d = *coord - centre;
+        let d = *coord - center;
         if d.x * d.x + d.y * d.y > drop {
             commands.entity(*entity).despawn();
             false
@@ -342,14 +342,14 @@ fn stream_grass(
     for dz in -GRASS_RADIUS..=GRASS_RADIUS {
         for dx in -GRASS_RADIUS..=GRASS_RADIUS {
             if dx * dx + dz * dz <= GRASS_RADIUS * GRASS_RADIUS {
-                let coord = centre + IVec2::new(dx, dz);
+                let coord = center + IVec2::new(dx, dz);
                 if veil_active && let Some(known) = known.as_ref() {
                     let chunk_center = Vec2::new(
                         (coord.x as f32 + 0.5) * CHUNK_SIZE,
                         (coord.y as f32 + 0.5) * CHUNK_SIZE,
                     );
                     let reach = known.radius + 32.0;
-                    let near_home = chunk_center.distance(known.centre.xz()) < reach;
+                    let near_home = chunk_center.distance(known.center.xz()) < reach;
                     let near_pocket = known
                         .pockets
                         .iter()
@@ -363,7 +363,7 @@ fn stream_grass(
         }
     }
     wanted.sort_by_key(|c| {
-        let d = *c - centre;
+        let d = *c - center;
         d.x * d.x + d.y * d.y
     });
 

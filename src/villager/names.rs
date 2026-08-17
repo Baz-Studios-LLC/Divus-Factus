@@ -43,11 +43,11 @@ pub struct Language {
     coda_chance: f32,
     /// Chance of a third syllable.
     long_name_chance: f32,
-    /// The vowel feminine names favour ending on.
+    /// The vowel feminine names favor ending on.
     feminine_ending: String,
     /// The ending this people's family names take — their `-son`, `-escu`,
     /// `-opoulos`. Shared across every house in the settlement, so a surname
-    /// is recognisable *as* a surname, and so two towns' families sound like
+    /// is recognizable *as* a surname, and so two towns' families sound like
     /// they come from two different peoples.
     family_ending: String,
 }
@@ -450,7 +450,7 @@ impl Language {
 /// Kaeyyrtha - all legal in their languages, none of them a name a
 /// player can hold in their head or say out loud to a friend.
 ///
-/// Four to seven letters, centred on five and six. Nothing with three
+/// Four to seven letters, centered on five and six. Nothing with three
 /// consonants running, which is where the unsayable ones come from: it
 /// is not length alone that breaks a name, it is a wall of consonants
 /// in the middle of it. Applied ONLY to given names - a surname carries
@@ -796,7 +796,7 @@ mod tests {
 
     #[test]
     fn surnames_are_readable_and_share_a_house_ending() {
-        // A family name has one job: be recognisable at a glance, down the
+        // A family name has one job: be recognizable at a glance, down the
         // generations. So they take the same shape and the same ending
         // within a language, and never pile up consonants doing it.
         for seed in 0..60 {
@@ -898,7 +898,7 @@ mod tests {
     fn there_are_plenty_of_house_names_to_go_round() {
         // Deliberately a narrower space than given names: surnames are a
         // fixed two-syllable shape on a fixed ending, which is exactly what
-        // makes them recognisable as a class. Thousands is plenty — a town
+        // makes them recognizable as a class. Thousands is plenty — a town
         // founds a dozen houses, and a long world a few hundred.
         for seed in [5u64, 40, 77] {
             let language = Language::random(&mut Rng::new(seed));

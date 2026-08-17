@@ -120,7 +120,7 @@
     ]
   },
   {
-    "t": "That meal leaves us an obligation to remember our hungriest neighbours.",
+    "t": "That meal leaves us an obligation to remember our hungriest neighbors.",
     "tags": [
       "reply",
       "event:provided",
@@ -618,7 +618,7 @@
     ]
   },
   {
-    "t": "I wonder whether anyone counted the provisions afterwards.",
+    "t": "I wonder whether anyone counted the provisions afterward.",
     "tags": [
       "chat:followup",
       "event:provided"
@@ -688,7 +688,7 @@
     ]
   },
   {
-    "t": "Did people give thanks before eating or afterwards?",
+    "t": "Did people give thanks before eating or afterward?",
     "tags": [
       "chat:followup",
       "event:provided"
@@ -765,7 +765,7 @@
     ]
   },
   {
-    "t": "Did anyone recognise the food or its containers?",
+    "t": "Did anyone recognize the food or its containers?",
     "tags": [
       "chat:followup",
       "event:provided"

@@ -12,7 +12,7 @@
 //!
 //! The studio borrows the paperdoll's own floor lights: directional lights
 //! shine across their whole render layer regardless of position, so the
-//! two stages fifty metres apart are lit identically and NO NEW LIGHT is
+//! two stages fifty meters apart are lit identically and NO NEW LIGHT is
 //! ever added here. (A light on a shared layer once lit the entire world
 //! to studio noon — see the ledger of that in people.rs at DOLL_LAYER.)
 
@@ -24,7 +24,7 @@ use crate::creature::body::{CreatureAssets, biped_head_size, build_body};
 use crate::creature::genome::CreatureGenome;
 use crate::villager::Villager;
 
-/// Where the sitter stands: fifty metres below the paperdoll's stage, on
+/// Where the sitter stands: fifty meters below the paperdoll's stage, on
 /// the same private layer, out of both cameras' level gazes.
 pub(crate) const PORTRAIT_STAGE: Vec3 = Vec3::new(0.0, -650.0, 0.0);
 
@@ -106,7 +106,7 @@ pub(crate) fn set_the_face(
         hang(commands, frame, image);
         return;
     }
-    // The stand-in bust, centred whatever the frame's size.
+    // The stand-in bust, centered whatever the frame's size.
     let seat = commands
         .spawn((
             Node {
@@ -268,10 +268,10 @@ pub(crate) fn run_the_studio(
         let p = &genome.proportions;
         let high = genome.height();
         let head = biped_head_size(genome);
-        let head_centre =
+        let head_center =
             (p.leg_length + p.torso_length + p.neck_length) * high + head * (0.5 - 0.12);
-        let eye = PORTRAIT_STAGE + Vec3::new(0.0, head_centre + head * 0.12, head * 3.4);
-        let aim = PORTRAIT_STAGE + Vec3::new(0.0, head_centre - head * 0.08, 0.0);
+        let eye = PORTRAIT_STAGE + Vec3::new(0.0, head_center + head * 0.12, head * 3.4);
+        let aim = PORTRAIT_STAGE + Vec3::new(0.0, head_center - head * 0.08, 0.0);
         *stance = Transform::from_translation(eye).looking_at(aim, Vec3::Y);
 
         studio.sitting = Some(Sitting {

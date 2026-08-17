@@ -45,7 +45,7 @@ pub enum Vocation {
 }
 
 /// A working life's accumulated craft, one score per calling ever
-/// practised. Grown by doing the work, cycle by cycle; never lost —
+/// practiced. Grown by doing the work, cycle by cycle; never lost —
 /// a retrained mason still remembers the sea. 0 is first-day hands,
 /// 1 is mastery.
 #[derive(Component, Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
@@ -169,7 +169,7 @@ impl Vocation {
             Vocation::Miner => "took up the pick",
             Vocation::Forester => "took up the axe",
             Vocation::Builder => "took up the hammer",
-            Vocation::Farmer => "took up the plough",
+            Vocation::Farmer => "took up the plow",
             Vocation::Cook => "took up the ladle",
             Vocation::Healer => "took up the salves",
             Vocation::Priest => "took up the litany",
@@ -377,10 +377,10 @@ pub(crate) fn morning_muster(
     // none does, more foresters are useless - someone has to go find woods.
     //
     // In FLAT coordinates, which is the only space `KnownWorld` speaks: its
-    // centre is where the flag went in and its pockets are written from
+    // center is where the flag went in and its pockets are written from
     // villagers' own Transforms. A tree's GLOBAL transform is a point on the
     // bent globe, thousands of units from any of that, so this asked whether a
-    // tree on the planet's surface stood within a hundred and seventy metres of
+    // tree on the planet's surface stood within a hundred and seventy meters of
     // a spot in the flat sim - and the answer was always no.
     //
     // Which is why nobody was building. No tree was known, so the forester was
@@ -409,7 +409,7 @@ pub(crate) fn morning_muster(
             let (sin, cos) = angle.sin_cos();
             (1..=14).any(|step| {
                 let d = step as f32 * 4.0;
-                t.height_at(s.centre.x + cos * d, s.centre.z + sin * d) <= WATER_LEVEL
+                t.height_at(s.center.x + cos * d, s.center.z + sin * d) <= WATER_LEVEL
             })
         })
     });
@@ -417,7 +417,7 @@ pub(crate) fn morning_muster(
     // carry a fresh memory of the teeth - seen with their own eyes or
     // told by someone who did.
     //
-    // This was a count of live wolves within a hundred and thirty metres
+    // This was a count of live wolves within a hundred and thirty meters
     // of the square: a god's-eye census nobody in the village had access
     // to. It posted guards against wolves no one had ever seen and left
     // a child who limped home torn open to change nothing at all. A
@@ -488,13 +488,13 @@ pub(crate) fn morning_muster(
     // strides from the square. Ten founders fell to six before the
     // ledger said why. A trade the land cannot pay gets no hands, and
     // its share flows to the trades that can.
-    let centre = site.as_ref().map(|s| s.centre);
-    let berries_near = centre.is_none_or(|c| {
+    let center = site.as_ref().map(|s| s.center);
+    let berries_near = center.is_none_or(|c| {
         bushes
             .iter()
             .any(|(at, bush)| bush.amount > 0.3 && at.translation().distance(c) < WORK_REACH)
     });
-    let game_near = centre.is_none_or(|c| {
+    let game_near = center.is_none_or(|c| {
         game.iter().any(|(at, genome)| {
             matches!(
                 genome.species,
@@ -530,7 +530,7 @@ pub(crate) fn morning_muster(
 
     // What the village wants, counted in hands. A want of zero is a trade
     // nobody takes up - which is the whole point: a farmer is somebody who
-    // has a field, not somebody who once rolled a plough.
+    // has a field, not somebody who once rolled a plow.
     let food_hands = mouths as f32 * (0.2 + 0.4 * hungry) * still_wanted;
     let mut wanted: Vec<(Vocation, f32)> = vec![
         (Vocation::Gatherer, food_hands * gather_share),
@@ -547,7 +547,7 @@ pub(crate) fn morning_muster(
         // furrow, before any field exists. Without that a village in the
         // deep woods had no path to food at all: the basket and the
         // spear were dealt against a land that could not pay them, and
-        // nobody could ever be dealt the plough, because the plough was
+        // nobody could ever be dealt the plow, because the plow was
         // wanted only where a field already stood. Ten souls starved to
         // six in a forest, holding tools for work that was not there.
         (
@@ -674,9 +674,9 @@ pub(crate) fn morning_muster(
     // A basket is no work where nothing fruits and a spear is no work
     // where nothing grazes: spare hands used to be dealt both anyway,
     // and spent their days walking to a heath that had been picked bare
-    // a week ago. The plough is the other way about - it is standing
+    // a week ago. The plow is the other way about - it is standing
     // work only where the wild will NOT feed them, since a village
-    // beside a full berry patch should pick before it ploughs.
+    // beside a full berry patch should pick before it plows.
     let standing: Vec<Vocation> = [
         Vocation::Gatherer,
         Vocation::Forester,

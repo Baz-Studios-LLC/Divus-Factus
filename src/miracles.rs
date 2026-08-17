@@ -283,7 +283,7 @@ fn glory_test_harness(
             &mut commands,
             &mut meshes,
             &mut materials,
-            site.centre + Vec3::new(-7.0, 0.0, 0.0),
+            site.center + Vec3::new(-7.0, 0.0, 0.0),
             crate::palette::shade(&crate::palette::GRASS, 0.9),
             false,
         );
@@ -291,7 +291,7 @@ fn glory_test_harness(
             &mut commands,
             &mut meshes,
             &mut materials,
-            site.centre + Vec3::new(7.0, 0.0, 0.0),
+            site.center + Vec3::new(7.0, 0.0, 0.0),
             Color::srgb(1.0, 0.88, 0.55),
             true,
         );
@@ -1472,7 +1472,7 @@ fn perform(
                 commands,
                 meshes,
                 materials,
-                site.centre,
+                site.center,
                 crate::palette::shade(&crate::palette::GRASS, 0.85),
                 true,
             );
@@ -1490,7 +1490,7 @@ fn perform(
             // unreachable by the abundance miracle.
             witnessed.write(DivineEvent {
                 kind: DivineEventKind::Flourished,
-                position: site.centre,
+                position: site.center,
                 subject: None,
                 intensity: 0.9,
             });
@@ -2051,15 +2051,15 @@ pub(super) fn wards_hold(
             commands.entity(ring).despawn();
         }
     }
-    for (_, centre, ward) in &wards {
+    for (_, center, ward) in &wards {
         for (at, genome, mut target) in &mut prowlers {
             if genome.species != crate::creature::genome::Species::Wolf {
                 continue;
             }
-            let from_ring = at.translation.distance(centre.translation);
+            let from_ring = at.translation.distance(center.translation);
             if from_ring < ward.radius + 6.0 {
-                let out = (at.translation - centre.translation).normalize_or(Vec3::X);
-                target.0 = Some(centre.translation + out * (ward.radius * 2.2));
+                let out = (at.translation - center.translation).normalize_or(Vec3::X);
+                target.0 = Some(center.translation + out * (ward.radius * 2.2));
             }
         }
     }

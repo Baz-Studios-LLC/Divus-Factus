@@ -3,7 +3,7 @@
 //! A rampart is a RING: one circle about the banner, with gaps where its
 //! gates stand. The search sees exactly that — see [`crate::navigation::Rampart`]
 //! — and the art below draws posts along the same circle, skipping the
-//! ground nothing could walk anyway. A lake is part of the defences and
+//! ground nothing could walk anyway. A lake is part of the defenses and
 //! costs nothing to be one.
 //!
 //! Three tiers, and the same ring carries all of them: a timber fence, a
@@ -83,9 +83,9 @@ pub struct Rampart {
 
 impl Rampart {
     /// How this wall looks to the pathfinder.
-    pub fn as_barrier(&self, centre: Vec3) -> crate::navigation::Rampart {
+    pub fn as_barrier(&self, center: Vec3) -> crate::navigation::Rampart {
         crate::navigation::Rampart {
-            at: Vec2::new(centre.x, centre.z),
+            at: Vec2::new(center.x, center.z),
             radius: self.radius,
             gates: self.gates.clone(),
             gate_half: gate_arc(self.radius, GATE_WIDTH),
@@ -129,7 +129,7 @@ pub fn ring_for(tier: RampartTier, population: usize) -> f32 {
 /// Where the gates go: on the ways people actually walk.
 ///
 /// Four for a fence, at the compass points, turned so no gate opens onto
-/// the banner's own back. Roads are not modelled yet; when paths wear
+/// the banner's own back. Roads are not modeled yet; when paths wear
 /// into the ground the gates should be sited on the deepest of them,
 /// which is the whole reason paths and walls belong in the same season of
 /// work.
@@ -243,8 +243,8 @@ pub(crate) fn stand_the_posts(
             }
             let (sin, cos) = angle.sin_cos();
             let (x, z) = (
-                ground.centre.x + cos * wall.radius,
-                ground.centre.z + sin * wall.radius,
+                ground.center.x + cos * wall.radius,
+                ground.center.z + sin * wall.radius,
             );
             if !terrain.is_walkable(x, z) {
                 continue;
@@ -279,8 +279,8 @@ pub(crate) fn stand_the_posts(
         for angle in wall.gates.clone() {
             let (sin, cos) = angle.sin_cos();
             let (x, z) = (
-                ground.centre.x + cos * wall.radius,
-                ground.centre.z + sin * wall.radius,
+                ground.center.x + cos * wall.radius,
+                ground.center.z + sin * wall.radius,
             );
             if !terrain.is_walkable(x, z) {
                 continue;

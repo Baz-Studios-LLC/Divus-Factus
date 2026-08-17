@@ -40,7 +40,7 @@ const MOTES: usize = 96;
 const MOST_SHARDS: usize = 13;
 
 /// The roll of aspects: the lights a world's god may wear, two tints to
-/// each so the colour is never still - the apparition shimmers from the
+/// each so the color is never still - the apparition shimmers from the
 /// first to the second and back. Bright and strange on purpose: the gods
 /// are not jewellery. Named for the chronicle's tongue, should the
 /// stories ever speak of the light itself.
@@ -160,7 +160,7 @@ pub(crate) struct ManifestPiece;
 #[derive(Component)]
 pub(crate) struct ManifestHeart {
     seed: f32,
-    /// How far this gem stands from the centre - zero for a lone heart.
+    /// How far this gem stands from the center - zero for a lone heart.
     spread: f32,
     /// The gem's own size, split among the gems of the roll.
     girth: f32,
@@ -206,7 +206,7 @@ pub(crate) struct ManifestPaint {
     smoke: Handle<StandardMaterial>,
 }
 
-/// The manifestation's colour at a given lean: the world's own tint when
+/// The manifestation's color at a given lean: the world's own tint when
 /// undecided, burning toward white grace one way and ember dread the
 /// other.
 fn warmth(lean: f32, tint: Vec3) -> Vec3 {
@@ -326,7 +326,7 @@ pub(crate) fn rebuild_manifestation(
     });
 
     // The heart: one, two or three gems, splitting the same fire between
-    // them; the brighter core burns at the centre of whatever they make.
+    // them; the brighter core burns at the center of whatever they make.
     let gems = if rng.chance(0.5) {
         1
     } else {
@@ -362,7 +362,7 @@ pub(crate) fn rebuild_manifestation(
     ));
 
     // The rings: one to four, each on a rolled tilt, rate and precession,
-    // wheeling against their neighbours. Bars on a pivot, laid along the
+    // wheeling against their neighbors. Bars on a pivot, laid along the
     // circle's tangent so they join hands into a segmented ring.
     let ring_count = rng.range_i(1, 4) as usize;
     for ring in 0..ring_count {
@@ -616,7 +616,7 @@ pub(crate) fn animate_manifestation(
     let warm = warmth(lean, tint);
 
     // The hearts: each gem stood on its corner, turning, breathing,
-    // circling the common centre when the roll split the fire.
+    // circling the common center when the roll split the fire.
     let corner_up = Quat::from_rotation_x(std::f32::consts::FRAC_PI_4)
         * Quat::from_rotation_z(std::f32::consts::FRAC_PI_4);
     let bob = (t * 0.7).sin() * 0.05;
@@ -762,7 +762,7 @@ pub(crate) fn animate_manifestation(
         }
     }
 
-    // The light: the apparition's colour, breathing with it, bright as the
+    // The light: the apparition's color, breathing with it, bright as the
     // god is present, flaring with the bursts.
     for mut light in &mut lights {
         light.color = Color::srgb(warm.x, warm.y, warm.z);
@@ -841,7 +841,7 @@ mod tests {
                 let above = warmth(1e-4, tint);
                 assert!(
                     (below - above).length() < 1e-3,
-                    "the colour must cross neutral without a jump"
+                    "the color must cross neutral without a jump"
                 );
             }
         }

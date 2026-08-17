@@ -30,7 +30,7 @@ pub enum Tie {
     /// a nephew. The tree is not traced further than one hop yet, so the
     /// house name stands in for all of it.
     House,
-    Neighbour,
+    Neighbor,
 }
 
 impl Tie {
@@ -46,7 +46,7 @@ impl Tie {
             Tie::Sister => "your sister",
             Tie::Brother => "your brother",
             Tie::House => "of your own house",
-            Tie::Neighbour => "your neighbour",
+            Tie::Neighbor => "your neighbor",
         }
     }
 }
@@ -110,7 +110,7 @@ pub fn tie(speaker_entity: Entity, threads: Threads, subject_entity: Entity, of:
     if houses(&threads).any(|mine| houses(&of).any(|theirs| mine == theirs)) {
         return Tie::House;
     }
-    Tie::Neighbour
+    Tie::Neighbor
 }
 
 #[cfg(test)]
@@ -212,7 +212,7 @@ mod tests {
     }
 
     #[test]
-    fn strangers_are_neighbours_and_empty_houses_are_nobodys() {
+    fn strangers_are_neighbors_and_empty_houses_are_nobodys() {
         let one = Threads {
             sex: Some(Sex::Male),
             house: Some("Rohap"),
@@ -223,7 +223,7 @@ mod tests {
             house: Some("Kirap"),
             ..Default::default()
         };
-        assert_eq!(tie(person(1), one, person(2), other), Tie::Neighbour);
+        assert_eq!(tie(person(1), one, person(2), other), Tie::Neighbor);
 
         // Two villagers restored from a save older than family names both
         // carry "" — which must read as no house at all, not the same house.
@@ -234,7 +234,7 @@ mod tests {
         };
         assert_eq!(
             tie(person(1), nameless, person(2), nameless_too),
-            Tie::Neighbour
+            Tie::Neighbor
         );
     }
 }

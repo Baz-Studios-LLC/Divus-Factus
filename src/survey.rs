@@ -4,7 +4,7 @@
 //! the scatterer and the founding survey read, so what the overlay promises
 //! is what the villagers will actually find.
 //!
-//! The wash is one mesh of coloured quads floated just above the ground,
+//! The wash is one mesh of colored quads floated just above the ground,
 //! rebuilt around the camera as it roams. No terrain is touched: toggling
 //! it off simply removes the sheet.
 
@@ -36,11 +36,11 @@ impl Plugin for SurveyPlugin {
     }
 }
 
-/// The legend panel that names the wash's colours while the sight is open.
+/// The legend panel that names the wash's colors while the sight is open.
 #[derive(Component)]
 struct SurveyLegend;
 
-/// What each colour of the wash means, in reading order.
+/// What each color of the wash means, in reading order.
 const LEGEND: [([f32; 3], &str); 5] = [
     ([0.08, 0.68, 0.12], "woods - deeper is thicker"),
     ([0.50, 0.56, 0.70], "quarry rock"),
@@ -72,7 +72,7 @@ fn spawn_legend(mut commands: Commands) {
         ))
         .id();
     commands.spawn((crate::ui::dim("THE GOD'S SIGHT"), ChildOf(panel)));
-    for (colour, name) in LEGEND {
+    for (color, name) in LEGEND {
         let row = commands
             .spawn((
                 Node {
@@ -91,7 +91,7 @@ fn spawn_legend(mut commands: Commands) {
                 border_radius: BorderRadius::all(px(3)),
                 ..default()
             },
-            BackgroundColor(Color::srgb(colour[0], colour[1], colour[2])),
+            BackgroundColor(Color::srgb(color[0], color[1], color[2])),
             ChildOf(row),
         ));
         commands.spawn((crate::ui::label(name), ChildOf(row)));
@@ -240,7 +240,7 @@ fn refresh_survey(
                 continue;
             }
 
-            let colour = if veins.iter().any(|(v, k)| {
+            let color = if veins.iter().any(|(v, k)| {
                 *k == crate::matter::DepositKind::Iron && v.distance(Vec2::new(x, z)) < 9.0
             }) {
                 Some([0.70, 0.15, 0.08, 0.75])
@@ -277,19 +277,19 @@ fn refresh_survey(
             } else {
                 None
             };
-            let Some(colour) = colour else {
+            let Some(color) = color else {
                 continue;
             };
             // The translucency is baked, not blended: each cell's wash is
-            // mixed with the true ground colour beneath it and rendered
+            // mixed with the true ground color beneath it and rendered
             // opaque, because the transparent pass proved unwilling to
             // draw a ground-hugging sheet this large at all.
             let ground = crate::terrain::ground_color_at(&terrain, x, z);
-            let a = colour[3];
-            let colour = [
-                ground[0] * (1.0 - a) + colour[0] * a,
-                ground[1] * (1.0 - a) + colour[1] * a,
-                ground[2] * (1.0 - a) + colour[2] * a,
+            let a = color[3];
+            let color = [
+                ground[0] * (1.0 - a) + color[0] * a,
+                ground[1] * (1.0 - a) + color[1] * a,
+                ground[2] * (1.0 - a) + color[2] * a,
                 1.0,
             ];
 
@@ -307,7 +307,7 @@ fn refresh_survey(
                 let wz = origin_z + j as f32 * CELL + cz;
                 let y = terrain.height_at(wx, wz).max(WATER_LEVEL) + 0.45;
                 positions.push([wx, y, wz]);
-                colors.push(colour);
+                colors.push(color);
             }
             indices.extend([base, base + 2, base + 1, base, base + 3, base + 2]);
         }

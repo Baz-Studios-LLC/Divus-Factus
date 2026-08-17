@@ -2,7 +2,7 @@
 //!
 //! Terrain is streamed, so the world *could* simply assemble itself around the
 //! player. It looks bad: the opening seconds are chunks and forests popping into
-//! existence a few metres away. Building the first full view before handing over
+//! existence a few meters away. Building the first full view before handing over
 //! control costs a couple of seconds and means the first thing the player sees is a
 //! finished landscape.
 //!
@@ -75,7 +75,7 @@ fn spawn_loading_screen(mut commands: Commands, time: Res<Time<Real>>) {
                 ..default()
             },
             // The splash is the one screen with no world behind it, so it takes
-            // the panel colour at full opacity.
+            // the panel color at full opacity.
             BackgroundColor(theme::panel_bg().with_alpha(1.0)),
             // Above everything, including the debug HUD.
             GlobalZIndex(100),

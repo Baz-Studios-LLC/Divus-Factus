@@ -20,7 +20,7 @@ use body::{CreatureAssets, build_body, init_creature_assets};
 use genome::{CreatureGenome, Species};
 
 /// Gravity, in world units per second squared. Tuned for how a throw *reads*
-/// rather than for realism: real gravity makes tossed villagers land too fast to
+/// rather than for realizm: real gravity makes tossed villagers land too fast to
 /// follow at this camera distance.
 const GRAVITY: f32 = 19.6;
 
@@ -181,7 +181,7 @@ pub struct MoveTarget(pub Option<Vec3>);
 
 /// Waypoints toward the current move target.
 ///
-/// Held separately from `MoveTarget` so behaviour code keeps saying *where* it wants
+/// Held separately from `MoveTarget` so behavior code keeps saying *where* it wants
 /// to go and never has to think about *how* — the route is recomputed here whenever
 /// the destination changes.
 #[derive(Component, Default)]
@@ -218,7 +218,7 @@ pub struct Route {
 const GIVE_UP_FOR: f32 = 8.0;
 
 /// How near a destination has to be to a refused one to count as the same
-/// errand, squared. Two and a half metres — the navigation grid's own cell,
+/// errand, squared. Two and a half meters — the navigation grid's own cell,
 /// which is the finest distinction any of this can make anyway.
 const SAME_ERRAND: f32 = crate::navigation::CELL * crate::navigation::CELL;
 
@@ -267,7 +267,7 @@ pub struct Airborne {
 ///
 /// Only the god sprinting a body it is driving, for now. Kept here beside the
 /// walking rather than in the miracle, because the walking is what has to
-/// honour it — and because a villager who learns to run one day should find
+/// honor it — and because a villager who learns to run one day should find
 /// the mechanism already waiting.
 #[derive(Component)]
 pub struct Sprinting(pub f32);
@@ -292,7 +292,7 @@ pub fn spawn_creature(
     facing: f32,
     idle_offset: f32,
 ) -> Entity {
-    // Picking uses a sphere centred on the creature's midpoint rather than its feet,
+    // Picking uses a sphere centered on the creature's midpoint rather than its feet,
     // so the grab target is the body rather than the ground under it.
     let pick_radius = genome.height() * 0.45;
 
@@ -374,7 +374,7 @@ pub(crate) fn plan_routes(
         // doorway IS the journey, steers straight at it.
         //
         // The search cannot help here and quietly hurts: no path on a
-        // two-and-a-half metre grid can thread a one metre door, so a
+        // two-and-a-half meter grid can thread a one meter door, so a
         // building somebody is entering or leaving is EXCUSED from the
         // walls - and a route to the door is then free to cut out
         // through the side wall on its way there. Measured, that was
@@ -682,7 +682,7 @@ struct FlashMaterial(Handle<StandardMaterial>);
 
 /// Fresh harm turns the body itself red for a beat: every part's material
 /// swaps to the flash and swaps back. Corpses tick too - a killing blow
-/// still flashes, then lets the dead lie in their own colours.
+/// still flashes, then lets the dead lie in their own colors.
 #[allow(clippy::type_complexity)]
 fn hurt_flashes(
     mut commands: Commands,
@@ -925,7 +925,7 @@ fn keep_apart(
             let d = d2.sqrt();
             // Two bodies on the SAME SPOT have no honest direction apart,
             // and a direction recomputed from noise every frame is a
-            // violent vibration - Brett watched two neighbours buzz
+            // violent vibration - Brett watched two neighbors buzz
             // against each other like flies. The tie is broken by WHO
             // they are instead: stable across frames, so a stack slides
             // apart in one smooth motion.
@@ -1095,7 +1095,7 @@ fn succumb(
         // The animator stops with CreatureMotion gone, so whatever it last
         // wrote to the body node freezes in. Frozen limbs are the charm of a
         // death mid-stride; a frozen KNEEL SINK is a corpse lying a third of
-        // a metre from its own root, where the hand, the bearers and the
+        // a meter from its own root, where the hand, the bearers and the
         // grave all reach. The body node stands back up before the fall.
         if let Some(rig) = rig
             && let Ok(mut body) = parts.get_mut(rig.body)

@@ -146,14 +146,14 @@ pub struct FollowTarget {
     pub style: FollowStyle,
     /// A one-shot dive: the distance to close to as the follow begins.
     /// Taken (and cleared) on the first frame, so the god's own zoom is
-    /// never fought afterwards. The prayer cards use it — press to fly
+    /// never fought afterward. The prayer cards use it — press to fly
     /// lands at answering height instead of wherever the camera last was.
     pub close_to: Option<f32>,
 }
 
 /// How high the eyes sit above the feet, for a body built from `genome`.
 ///
-/// The head is a box centred a little way down into the torso; the eyes are
+/// The head is a box centered a little way down into the torso; the eyes are
 /// in its upper third, which is also where the face features are painted on.
 /// Kept here beside the camera that needs it rather than in the body module,
 /// since nothing else asks the question.
@@ -161,11 +161,11 @@ pub fn eye_height(genome: &crate::creature::genome::CreatureGenome) -> f32 {
     let p = &genome.proportions;
     let h = genome.height();
     let head = crate::creature::body::biped_head_size(genome);
-    let centre = (p.leg_length + p.torso_length + p.neck_length) * h - head * 0.12;
-    centre + head * 0.28
+    let center = (p.leg_length + p.torso_length + p.neck_length) * h - head * 0.12;
+    center + head * 0.28
 }
 
-/// How far forward of the head's centre the eyes sit, for a body built from
+/// How far forward of the head's center the eyes sit, for a body built from
 /// `genome`.
 ///
 /// Eyes are on the FACE. Put the camera at the middle of the skull instead —
@@ -227,7 +227,7 @@ fn apply_follow(
     if follow.style == FollowStyle::Eyes {
         // Behind the eyes: the focus rises to head height and the orbit
         // closes to nothing, so the rig's yaw and pitch become where
-        // this person is looking. `MIN_DISTANCE` is twelve metres and
+        // this person is looking. `MIN_DISTANCE` is twelve meters and
         // would hold the camera out in front of their own face, so the
         // eye distance is written straight past it, and the pitch is let
         // below the overhead floor - a person can look at their boots.
@@ -242,7 +242,7 @@ fn apply_follow(
         // ankles. The body is right here and can be measured.
         let eyes = bodies.get(entity).map_or(1.3, eye_height);
         rig.target_focus.y = at.y + eyes;
-        // And forward, onto the face. At the centre of the head, looking
+        // And forward, onto the face. At the center of the head, looking
         // down looked straight down the inside of the neck. The offset
         // follows the LOOK direction rather than the body's own facing, so
         // turning to look at something takes the eyes round with it the way
@@ -255,7 +255,7 @@ fn apply_follow(
         // The pitch is deliberately NOT touched here. Clamping it every
         // frame — which is what this did first — capped the downward look at
         // whatever the clamp was, so you could never find your own feet. It
-        // is levelled once, on possession, and after that it is yours.
+        // is leveled once, on possession, and after that it is yours.
     }
 }
 
@@ -276,14 +276,14 @@ pub struct CameraStartupSet;
 /// and with a near plane of half a unit against that, the depth buffer can
 /// only separate surfaces about a tenth of a unit apart at a thousand units
 /// away - which is precisely how high the fog veil's lowest sheet floats
-/// over the ground. The whole landscape came out streaked in grey where the
+/// over the ground. The whole landscape came out streaked in gray where the
 /// two fought for the same pixels.
 ///
 /// Nothing is ever nearer the camera than the ground it is looking at, so
 /// the near plane can ride the zoom: a twelfth of the orbit distance, which
 /// at village height is some twenty-five units and buys two orders of
 /// magnitude of precision. Behind a mortal's eyes it drops to four
-/// centimetres, because there the god's own chest is a hand away - and that
+/// centimeters, because there the god's own chest is a hand away - and that
 /// case owns the plane outright.
 fn aim_the_near_plane(
     rigs: Query<&CameraRig>,
@@ -310,15 +310,15 @@ fn aim_the_near_plane(
 
 /// The near plane for the god's ordinary view of the world.
 ///
-/// Half a metre: overhead the camera is never within twelve of anything, so
-/// the plane can sit far out and buy depth precision across a three-kilometre
+/// Half a meter: overhead the camera is never within twelve of anything, so
+/// the plane can sit far out and buy depth precision across a three-kilometer
 /// far plane.
 pub const WIDE_NEAR: f32 = 0.5;
 
 /// The near plane while the god is wearing a body.
 ///
 /// Their own chest is a hand's width below the eyes and their hands swing
-/// closer than that, so the plane has to come in to a few centimetres or the
+/// closer than that, so the plane has to come in to a few centimeters or the
 /// body is clipped away and looking down shows bare ground. The cost is
 /// depth precision out at the horizon, which is a fair trade for five
 /// minutes and is put back the moment the body is given up.
@@ -328,7 +328,7 @@ pub const CLOSE_NEAR: f32 = 0.04;
 /// rather than orbiting them, and several rules change: the pitch range
 /// opens both ways, the transform is pointed by yaw and pitch rather than at
 /// the focus, and the ground-clearance lift is skipped. Well under the
-/// twelve metres ordinary play is clamped to, so only Avatar reaches it.
+/// twelve meters ordinary play is clamped to, so only Avatar reaches it.
 /// The god camera's vertical field of view, in radians.
 ///
 /// Named because the title screen has to aim the planet at a place on the
@@ -340,7 +340,7 @@ pub const FIRST_PERSON: f32 = 0.5;
 
 /// Mouse travel in a single frame, in pixels, past which free look treats the
 /// motion as a pointer warp rather than a movement of somebody's hand. Locking
-/// the cursor reports the jump to the window centre as relative motion, and at
+/// the cursor reports the jump to the window center as relative motion, and at
 /// free-look sensitivity that is most of a full turn.
 const LOOK_JUMP: f32 = 160.0;
 
@@ -840,13 +840,13 @@ fn read_camera_input(
         rig.target_distance =
             (rig.target_distance * factor).clamp(MIN_DISTANCE, crate::globe::CEILING);
 
-        // Zoom toward whatever is under the cursor rather than the centre of the
+        // Zoom toward whatever is under the cursor rather than the center of the
         // screen, so zooming doubles as aiming: you can drop onto one villager
         // without panning there first.
         // The ground under the cursor when there IS loaded ground under it,
         // and the planet's own surface when there is not. Zoomed out at the
         // globe the terrain raycast has nothing to hit, so the anchor came
-        // back None and the zoom fell to the centre of the screen - which is
+        // back None and the zoom fell to the center of the screen - which is
         // precisely the altitude at which aiming the zoom matters most.
         let focus = rig.focus;
         rig.zoom_anchor =
@@ -935,7 +935,7 @@ fn canonical_near(was: Vec3, direction: Vec3) -> Vec3 {
 }
 
 /// Where the cursor's ray meets the planet's sea-level sphere, as a unit
-/// direction from the planet's centre — the handle the world-grab holds.
+/// direction from the planet's center — the handle the world-grab holds.
 /// `None` when the cursor is off the ball entirely.
 /// The most the world may turn from one reading, in radians.
 const MOST_TURN_IN_A_FRAME: f32 = 0.35;
@@ -959,11 +959,11 @@ fn cursor_sphere_direction(
     let (camera, camera_transform) = cameras.single().ok()?;
     let cursor = window.cursor_position()?;
     let ray = camera.viewport_to_world(camera_transform, cursor).ok()?;
-    let centre = crate::globe::planet_centre();
+    let center = crate::globe::planet_center();
     let radius = crate::terrain::PLANET_RADIUS + WATER_LEVEL;
-    let to_centre = centre - ray.origin;
-    let along = to_centre.dot(*ray.direction);
-    let closest = ray.origin + *ray.direction * along - centre;
+    let to_center = center - ray.origin;
+    let along = to_center.dot(*ray.direction);
+    let closest = ray.origin + *ray.direction * along - center;
     let off_axis = closest.length_squared();
     if off_axis > radius * radius {
         return None;
@@ -973,7 +973,7 @@ fn cursor_sphere_direction(
         return None;
     }
     let hit = ray.origin + *ray.direction * (along - depth);
-    Some((hit - centre).normalize())
+    Some((hit - center).normalize())
 }
 
 /// Turns the carried frame by exactly as much as the ground beneath it turned.
@@ -1107,7 +1107,7 @@ fn follow_ground(
 /// REAL time, not the world's. The camera is the player's own eye, and
 /// pausing pauses the WORLD - not the ability to look at it. On the virtual
 /// clock every one of these deltas is zero while the game is paused, so the
-/// distance never travelled toward its target and the zoom simply did
+/// distance never traveled toward its target and the zoom simply did
 /// nothing until time started again. Brett: "I can't zoom while the speed is
 /// paused." Looking around a stopped world is most of what a pause is for.
 fn apply_camera_smoothing(time: Res<Time<Real>>, mut rigs: Query<&mut CameraRig>) {
@@ -1121,9 +1121,9 @@ fn apply_camera_smoothing(time: Res<Time<Real>>, mut rigs: Query<&mut CameraRig>
     let previous_distance = rig.distance;
     rig.distance += (rig.target_distance - rig.distance) * t;
 
-    // Re-pin the zoom anchor against the distance actually travelled this frame.
+    // Re-pin the zoom anchor against the distance actually traveled this frame.
     // Both the live focus and its target are moved by the same ratio, so the point
-    // under the cursor stays put while panning still works normally afterwards.
+    // under the cursor stays put while panning still works normally afterward.
     if let Some(anchor) = rig.zoom_anchor {
         let ratio = rig.distance / previous_distance.max(f32::EPSILON);
         rig.focus = zoom_focus(rig.focus, anchor, ratio);
@@ -1149,7 +1149,7 @@ fn apply_camera_smoothing(time: Res<Time<Real>>, mut rigs: Query<&mut CameraRig>
     rig.yaw += yaw_delta * t;
 }
 
-/// How far the eye keeps off the ground at full standoff, in metres. The
+/// How far the eye keeps off the ground at full standoff, in meters. The
 /// clearance tapers to nothing at the focus, which is ON the ground and is
 /// supposed to be.
 const EYE_CLEARANCE: f32 = 1.2;
@@ -1214,17 +1214,17 @@ mod tests {
             + pose.up().as_vec3() * ndc.y * half)
             .normalize();
 
-        let centre = crate::globe::planet_centre();
+        let center = crate::globe::planet_center();
         let radius = crate::terrain::PLANET_RADIUS + WATER_LEVEL;
-        let to_centre = centre - pose.translation;
-        let along = to_centre.dot(direction);
-        let closest = pose.translation + direction * along - centre;
+        let to_center = center - pose.translation;
+        let along = to_center.dot(direction);
+        let closest = pose.translation + direction * along - center;
         let off_axis = closest.length_squared();
         if off_axis > radius * radius {
             return None;
         }
         let depth = (radius * radius - off_axis).sqrt();
-        Some((pose.translation + direction * (along - depth) - centre).normalize())
+        Some((pose.translation + direction * (along - depth) - center).normalize())
     }
 
     #[test]
@@ -1339,10 +1339,10 @@ mod tests {
         // the rest down the far side. Asserted as a LENGTH and not merely as
         // "it moved", because the clamp this replaced moved it too — three
         // hundred units backwards, away from the pole it would not cross.
-        let travelled = (seat_after - seat_before).length();
+        let traveled = (seat_after - seat_before).length();
         assert!(
-            (travelled - 200.0).abs() < 40.0,
-            "the focus travelled {travelled} where the drag was 200"
+            (traveled - 200.0).abs() < 40.0,
+            "the focus traveled {traveled} where the drag was 200"
         );
         // And the signature of having crossed: every longitude meets at a
         // pole, so coming down the other side is half a world away in `x`.
@@ -1606,21 +1606,21 @@ mod tests {
             let p = &genome.proportions;
             let h = genome.height();
             let head = crate::creature::body::biped_head_size(&genome);
-            let centre = (p.leg_length + p.torso_length + p.neck_length) * h - head * 0.12;
+            let center = (p.leg_length + p.torso_length + p.neck_length) * h - head * 0.12;
             let eyes = eye_height(&genome);
             assert!(
-                eyes > centre - head * 0.5 && eyes < centre + head * 0.5,
-                "eyes at {eyes} are outside a head of {head} centred at {centre}"
+                eyes > center - head * 0.5 && eyes < center + head * 0.5,
+                "eyes at {eyes} are outside a head of {head} centered at {center}"
             );
             // And above the shoulders, so looking down finds a chest.
             assert!(eyes > (p.leg_length + p.torso_length) * h);
 
-            // Forward of the head's centre, but not out past the face. At
-            // the centre, looking down looks down the neck hole.
+            // Forward of the head's center, but not out past the face. At
+            // the center, looking down looks down the neck hole.
             let ahead = eye_forward(&genome);
             assert!(
                 ahead > head * 0.25 && ahead < head * 0.5,
-                "eyes {ahead} forward of centre in a head of {head}"
+                "eyes {ahead} forward of center in a head of {head}"
             );
         }
     }

@@ -1,12 +1,12 @@
 //! The sky dome.
 //!
-//! Until now the sky was one flat colour — the fog colour, stretched over
+//! Until now the sky was one flat color — the fog color, stretched over
 //! everything, which read as permanent overcast. This dome puts an actual sky
 //! behind the fog: blue overhead, procedural clouds adrift, the sun's glow —
 //! all shaded in `sky.wgsl` from the same [`crate::calendar::Sky`] state that
 //! drives the lights, so dusk gilds the clouds and night blacks them out.
 //!
-//! The one hard rule is inherited from the fog work: the dome's colour *at the
+//! The one hard rule is inherited from the fog work: the dome's color *at the
 //! horizon* must be exactly `Sky::horizon`, or fully-fogged terrain stops
 //! matching the sky behind it and the seam draws itself.
 //!
@@ -38,9 +38,9 @@ impl Plugin for SkyPlugin {
         // The dome is not raised. It was built in the fog's era with a radius
         // of 2,700 and a rule — "only ever seen through full fog" — that the
         // fog's removal quietly broke: a camera-riding sphere painted the
-        // sky's colour occludes everything past its radius, and once the
-        // planet stood behind the world, the dome blanketed it grey by day
-        // and navy by night. Every altitude where the world "turned grey"
+        // sky's color occludes everything past its radius, and once the
+        // planet stood behind the world, the dome blanketed it gray by day
+        // and navy by night. Every altitude where the world "turned gray"
         // was exactly where the visible ground crossed 2,700 units. Removed
         // to prove the diagnosis on screen; if the sky wants a dome again it
         // must grow with altitude so the planet's limb always fits inside.

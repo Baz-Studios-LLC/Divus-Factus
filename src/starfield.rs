@@ -24,7 +24,7 @@ use crate::camera::{CameraRig, GodCamera};
 use crate::palette;
 use crate::rng::hash_2d_f32;
 
-/// The three shells, in units from the planet's centre.
+/// The three shells, in units from the planet's center.
 ///
 /// All inside the camera's seventy-thousand far plane, and spread widely enough
 /// that the nearest sweeps visibly against the furthest. Bring them closer
@@ -79,7 +79,7 @@ fn hang_the_stars(
         ..default()
     });
 
-    let centre = crate::globe::planet_centre();
+    let center = crate::globe::planet_center();
     info!(
         "the stars are hung: {} of them over three shells",
         COUNT.iter().sum::<usize>()
@@ -95,13 +95,13 @@ fn hang_the_stars(
             Starfield,
             Mesh3d(meshes.add(mesh)),
             MeshMaterial3d(material.clone()),
-            Transform::from_translation(centre),
+            Transform::from_translation(center),
             // Seen from the ground and from orbit both.
             RenderLayers::from_layers(&[0, crate::globe::GLOBE_LAYER]),
             NotShadowCaster,
             NotShadowReceiver,
             // Its vertices are already world-space offsets from the planet's
-            // centre; the bend must leave the shell where it stands.
+            // center; the bend must leave the shell where it stands.
             crate::globe::BentInPlace,
         ));
     }
@@ -145,7 +145,7 @@ fn build_a_shell(radius: f32, count: usize, seed: u32) -> Mesh {
         // And a few of them are warm or cold rather than white. Kept subtle:
         // this is a palette-disciplined world and a rainbow sky would shout.
         let tint = hash_2d_f32(i, 4, seed);
-        let colour = if tint > 0.86 {
+        let color = if tint > 0.86 {
             palette::shade(&palette::CLOTH_GOLD, 0.9).to_linear()
         } else if tint < 0.14 {
             palette::shade(&palette::SKY, 1.0).to_linear()
@@ -158,9 +158,9 @@ fn build_a_shell(radius: f32, count: usize, seed: u32) -> Mesh {
             positions.push((at + across * (u * size) + down * (v * size)).to_array());
             normals.push((-direction).to_array());
             colors.push([
-                colour.red * brightness,
-                colour.green * brightness,
-                colour.blue * brightness,
+                color.red * brightness,
+                color.green * brightness,
+                color.blue * brightness,
                 1.0,
             ]);
         }

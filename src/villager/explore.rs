@@ -35,7 +35,7 @@ pub struct Pocket {
 /// pockets its explorers have brought back.
 #[derive(Resource, serde::Serialize, serde::Deserialize)]
 pub struct KnownWorld {
-    pub centre: Vec3,
+    pub center: Vec3,
     pub radius: f32,
     pub pockets: Vec<Pocket>,
 }
@@ -43,7 +43,7 @@ pub struct KnownWorld {
 impl Default for KnownWorld {
     fn default() -> Self {
         KnownWorld {
-            centre: Vec3::ZERO,
+            center: Vec3::ZERO,
             radius: 170.0,
             pockets: Vec::new(),
         }
@@ -53,7 +53,7 @@ impl Default for KnownWorld {
 impl KnownWorld {
     /// Whether the village knows this ground.
     pub fn knows(&self, at: Vec3) -> bool {
-        if at.distance(self.centre) < self.radius {
+        if at.distance(self.center) < self.radius {
             return true;
         }
         self.pockets
@@ -64,7 +64,7 @@ impl KnownWorld {
     /// Whether the village knows flat coordinate (x, z) within margin.
     pub fn knows_flat(&self, x: f32, z: f32, margin: f32) -> bool {
         let p = Vec2::new(x, z);
-        if p.distance(self.centre.xz()) < self.radius + margin {
+        if p.distance(self.center.xz()) < self.radius + margin {
             return true;
         }
         self.pockets
@@ -76,7 +76,7 @@ impl KnownWorld {
     /// budget by tidying rather than by forgetting.
     ///
     /// The old rule was a silent cap: at 128 pockets the map simply
-    /// stopped recording, and everything walked afterwards stayed under
+    /// stopped recording, and everything walked afterward stayed under
     /// fog forever — Brett found a black hole of unknown sitting over a
     /// quarry his miners worked every day. Ground once walked is NEVER
     /// given back to the dark: when the list runs full, the two closest
@@ -88,9 +88,9 @@ impl KnownWorld {
 
     fn tidy(&mut self) {
         // Pockets the home circle has grown over are redundant.
-        let (centre, reach) = (self.centre, self.radius);
+        let (center, reach) = (self.center, self.radius);
         self.pockets
-            .retain(|pocket| pocket.at.distance(centre) + pocket.radius > reach);
+            .retain(|pocket| pocket.at.distance(center) + pocket.radius > reach);
         // Pockets lying wholly inside a bigger sibling likewise.
         let mut index = 0;
         while index < self.pockets.len() {
@@ -109,7 +109,7 @@ impl KnownWorld {
             }
         }
         // Still full: merge the two closest pockets into the circle that
-        // holds them both. Slivers of unknown between near neighbours get
+        // holds them both. Slivers of unknown between near neighbors get
         // claimed in the bargain, which is the honest price of a bounded
         // map that never un-knows a walked road.
         while self.pockets.len() > MOST_POCKETS {
@@ -151,7 +151,7 @@ pub struct Cairn;
 #[derive(Component)]
 pub(super) struct WorksiteKnown;
 
-/// A building site is proof that villagers have travelled there, surveyed the
+/// A building site is proof that villagers have traveled there, surveyed the
 /// ground, and are now returning with materials. Reveal the whole work area at
 /// once so the veil's slope always begins beyond the construction, rather than
 /// cutting through a roof or a foundation.
@@ -243,8 +243,8 @@ pub(super) fn the_road_feeds_who_walks_it(
             .get(who)
             .ok()
             .and_then(|member| grounds.get(member.0).ok())
-            .map(|ground| ground.centre);
-        if home.is_none_or(|centre| at.translation.distance(centre) < AWAY_FROM_HOME) {
+            .map(|ground| ground.center);
+        if home.is_none_or(|center| at.translation.distance(center) < AWAY_FROM_HOME) {
             continue;
         }
         // A beast already down, close enough to be worth the walk.
@@ -289,7 +289,7 @@ pub struct Expedition {
 }
 
 /// A guard walking with someone whose road runs past the cairns.
-/// Company is armour: the wolves do not test a pair.
+/// Company is armor: the wolves do not test a pair.
 #[derive(Component)]
 pub struct Escorting {
     pub ward: Entity,
@@ -365,7 +365,7 @@ pub(super) fn forage_tick(
 const FOOTFALL: f32 = 34.0;
 /// The grid those footfalls are rounded onto, so ten thousand steps
 /// across the same meadow leave ONE pocket rather than ten thousand. The
-/// cell's diagonal is twice the reach, so neighbouring cells just touch
+/// cell's diagonal is twice the reach, so neighboring cells just touch
 /// and a walked road opens as a continuous corridor.
 const FOOTFALL_GRID: f32 = 48.0;
 /// As many pockets as the veil's shader can be handed at once.
@@ -568,7 +568,7 @@ pub(super) fn expeditions(
                     .get(entity)
                     .ok()
                     .and_then(|member| grounds.get(member.0).ok())
-                    .map_or(site.centre, |ground| ground.centre);
+                    .map_or(site.center, |ground| ground.center);
                 if at.translation.distance(square) > 6.0 {
                     target.0 = Some(square);
                 } else {
@@ -612,9 +612,9 @@ pub(super) fn expeditions(
                 .next();
             // Ground fit for a town is the find the whole village is
             // waiting on, when the muster has raised the order for it.
-            let town_centres: Vec<Vec3> = grounds.iter().map(|g| g.centre).collect();
+            let town_centers: Vec<Vec3> = grounds.iter().map(|g| g.center).collect();
             let good_town_ground = wanted
-                && super::colony::clear_of_towns(spot, &town_centres)
+                && super::colony::clear_of_towns(spot, &town_centers)
                 && super::score_town_ground(&terrain, spot.x, spot.z, 0.7).is_some();
             let (what, radius) = if good_town_ground {
                 ("a wide vale fit for a new village", 60.0)
@@ -696,8 +696,8 @@ pub(super) fn expeditions(
                 .filter(|(at, tree)| tree.harvestable() && !known.knows(*at))
                 .map(|(at, _)| at)
                 .min_by(|a, b| {
-                    a.distance(known.centre)
-                        .total_cmp(&b.distance(known.centre))
+                    a.distance(known.center)
+                        .total_cmp(&b.distance(known.center))
                 })
                 .map(|at| Vec3::new(at.x, terrain.height_at(at.x, at.z), at.z));
         }
@@ -708,8 +708,8 @@ pub(super) fn expeditions(
                 .filter(|(at, bush)| bush.amount > 0.5 && !known.knows(*at))
                 .map(|(at, _)| at)
                 .min_by(|a, b| {
-                    a.distance(known.centre)
-                        .total_cmp(&b.distance(known.centre))
+                    a.distance(known.center)
+                        .total_cmp(&b.distance(known.center))
                 })
                 .map(|at| Vec3::new(at.x, terrain.height_at(at.x, at.z), at.z));
         }
@@ -727,8 +727,8 @@ pub(super) fn expeditions(
                 known.radius + rng.0.range(STRIDE * 0.4, STRIDE)
             };
             let (sin, cos) = angle.sin_cos();
-            let x = known.centre.x + cos * reach;
-            let z = known.centre.z + sin * reach;
+            let x = known.center.x + cos * reach;
+            let z = known.center.z + sin * reach;
             if terrain.is_walkable(x, z) && terrain.height_at(x, z) > WATER_LEVEL + 1.5 {
                 found = Some(Vec3::new(x, terrain.height_at(x, z), z));
                 break;
@@ -862,8 +862,8 @@ pub(super) fn raise_cairns(
     for i in 0..count {
         let angle = i as f32 / count as f32 * std::f32::consts::TAU;
         let (sin, cos) = angle.sin_cos();
-        let x = known.centre.x + cos * known.radius;
-        let z = known.centre.z + sin * known.radius;
+        let x = known.center.x + cos * known.radius;
+        let z = known.center.z + sin * known.radius;
         if !terrain.is_walkable(x, z) || terrain.height_at(x, z) < WATER_LEVEL + 1.0 {
             continue;
         }
@@ -901,7 +901,7 @@ mod tests {
     #[test]
     fn the_world_is_known_in_circles() {
         let mut known = KnownWorld {
-            centre: Vec3::ZERO,
+            center: Vec3::ZERO,
             radius: 100.0,
             pockets: Vec::new(),
         };
@@ -989,7 +989,7 @@ mod tests {
     /// The old silent cap left a black hole of fog over a quarry the
     /// miners worked daily: at 128 pockets the map went blind, forever.
     /// Now the list tidies itself — and every spot ever learned must
-    /// still be known afterwards, however hard the merging squeezed.
+    /// still be known afterward, however hard the merging squeezed.
     #[test]
     fn the_map_never_stops_learning() {
         let mut known = KnownWorld::default();

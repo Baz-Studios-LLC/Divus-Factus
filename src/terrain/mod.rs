@@ -11,7 +11,7 @@
 //!
 //! Shape comes from three layers:
 //!
-//! - **Continents** — very low frequency, deciding sea from land over kilometres.
+//! - **Continents** — very low frequency, deciding sea from land over kilometers.
 //! - **Hills** — mid frequency, domain-warped so the ground does not look like soap
 //!   bubbles.
 //! - **Ridges** — folded noise, faded in only on high ground, for rocky spines.
@@ -109,7 +109,7 @@ pub fn stream_radius(camera_distance: f32) -> i32 {
     // And now the one that matters most, because it is inside the play zoom
     // rather than above it: the plate and the patches draw the SAME ground,
     // and between them they were drawing it twice at full detail over a disc a
-    // kilometre wide. See [`CHUNK_CEILING`].
+    // kilometer wide. See [`CHUNK_CEILING`].
     let receding =
         ((camera_distance - CHUNK_DISSOLVE) / (CHUNK_CEILING - CHUNK_DISSOLVE)).clamp(0.0, 1.0);
     let ceiling = VIEW_CHUNKS as f32 * (1.0 - receding);
@@ -137,7 +137,7 @@ const CHUNKS_PER_LOADING_FRAME: usize = 48;
 pub const WATER_LEVEL: f32 = 20.0;
 /// The world is a sphere, and this is how big it is.
 ///
-/// Six thousand units of radius: thirty-eight kilometres around and, at the
+/// Six thousand units of radius: thirty-eight kilometers around and, at the
 /// continent wavelength below, about six continent-scale landmasses. Small
 /// enough that the whole world hangs in the frame at a fifth of the old
 /// orbital zoom and the ground's curve can be FELT from play height - the
@@ -152,8 +152,8 @@ pub const WATER_LEVEL: f32 = 20.0;
 /// horizon drops by a hundredth of a unit across the whole frame, and even at
 /// full zoom-out only about seven, against terrain three hundred and twenty
 /// units tall. And small enough that a surface point sits fifteen thousand
-/// units from the centre, where an `f32` still resolves to under two
-/// millimetres - so none of this needs double precision or a moving world
+/// units from the center, where an `f32` still resolves to under two
+/// millimeters - so none of this needs double precision or a moving world
 /// origin, which is what makes planet renderers miserable. An Earth-sized world
 /// would resolve to three quarters of a unit and everything would jitter.
 pub const PLANET_RADIUS: f32 = 6_000.0;
@@ -163,7 +163,7 @@ pub fn planet_circumference() -> f32 {
     std::f32::consts::TAU * PLANET_RADIUS
 }
 
-/// The direction from the planet's centre to the ground at local `(x, z)`.
+/// The direction from the planet's center to the ground at local `(x, z)`.
 ///
 /// This is the scaffold that lets a flat simulation stand on a round world. The
 /// game speaks `(x, z)` in a hundred and nine places, and it goes on doing so:
@@ -238,7 +238,7 @@ impl Plugin for TerrainPlugin {
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TerrainSet;
 
-/// Broad climate regions. Drives ground colour and which trees grow.
+/// Broad climate regions. Drives ground color and which trees grow.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Biome {
     /// Mixed grass and woodland.
@@ -365,7 +365,7 @@ fn yes() -> bool {
 }
 
 /// The terrain function. Holds a seed, the memoised rivers, and the spots
-/// the villagers have levelled.
+/// the villagers have leveled.
 #[derive(Resource, Clone)]
 pub struct Terrain {
     /// Public so the globe can remember which world its planet was carved
@@ -405,7 +405,7 @@ struct Boardwalk {
     /// The walkable span along that direction, in world units from the origin.
     from: f32,
     to: f32,
-    /// Walkable half-width either side of the centreline.
+    /// Walkable half-width either side of the centerline.
     half_w: f32,
     /// World height of the deck top.
     deck: f32,
@@ -541,7 +541,7 @@ impl Terrain {
     /// enough to walk down.
     ///
     /// This is for ground people live on. A short fixed falloff left a
-    /// house on a slope standing on a mesa with a metre of cliff at its
+    /// house on a slope standing on a mesa with a meter of cliff at its
     /// downhill edge - fine for a mine mouth, which wants to look cut, and
     /// wrong for everywhere anyone walks.
     pub fn terrace(
@@ -578,7 +578,7 @@ impl Terrain {
             );
             let rim = self.height_at(rim_x, rim_z);
             cut = cut.max((rim - height).abs());
-            // Four metres further out along the same ray: the natural fall of
+            // Four meters further out along the same ray: the natural fall of
             // the ground the skirt has to lie down into.
             let out = Vec2::new(rim_x - x, rim_z - z).normalize_or_zero() * 4.0;
             let beyond = self.height_at(rim_x + out.x, rim_z + out.y);
@@ -586,11 +586,11 @@ impl Terrain {
         }
         // How far the skirt takes to come back to the land.
         //
-        // One in four for the earth actually moved - a bank a metre high takes
-        // four metres - but that alone left gentle country looking dug. On the
+        // One in four for the earth actually moved - a bank a meter high takes
+        // four meters - but that alone left gentle country looking dug. On the
         // rolling ground a village actually sits on, a hall's pad is fifteen
-        // metres of dead flat with a bank of forty centimetres around it, and
-        // forty centimetres over the old two-and-a-half-metre floor is a lip
+        // meters of dead flat with a bank of forty centimeters around it, and
+        // forty centimeters over the old two-and-a-half-meter floor is a lip
         // you can see from the air: a big flat shelf with an edge, which is
         // exactly what reads as a divot rather than as a terrace.
         //
@@ -604,8 +604,8 @@ impl Terrain {
         // a wide plate of flat with a visible edge. That wants room, so the
         // floor under the skirt follows the building's own size.
         //
-        // On a hillside the earth moved is metres, and the fault is a CRATER:
-        // feathering a three-metre cut across twelve turns a bank into a
+        // On a hillside the earth moved is meters, and the fault is a CRATER:
+        // feathering a three-meter cut across twelve turns a bank into a
         // scoop dug out of the hill, with a matching apron pushed out below
         // it. Brett: "on smaller hills it flattens the ground in a littel
         // crater instead of cleanly smoothing the land around it." That wants
@@ -623,12 +623,12 @@ impl Terrain {
         // transitions about one and seven tenths to two and a fifth times
         // steeper than the land itself, and that ratio is fixed: as the skirt
         // widens, the height it has to make up widens exactly in step. Five
-        // metres or a hundred and twenty, the steepest point is identical.
+        // meters or a hundred and twenty, the steepest point is identical.
         // Moving the pad up or down does not help either - it only trades the
         // uphill bank against the downhill one.
         //
-        // What width does buy is CURVATURE. Over two and a half metres the
-        // slope changes by 0.37 per metre; over thirty, by 0.03 - twelve
+        // What width does buy is CURVATURE. Over two and a half meters the
+        // slope changes by 0.37 per meter; over thirty, by 0.03 - twelve
         // times gentler, on the same bank at the same angle. A crease is a
         // fast change of slope, so that is the number the eye was objecting
         // to all along. Brett: "its that middle trasistion that needs to be
@@ -716,7 +716,7 @@ impl Terrain {
 
     /// Whether this ground has been worked BARE: turned earth, a quarried
     /// face, a mine's mouth. Grass grows on everything else that has been
-    /// levelled, a house's terrace included.
+    /// leveled, a house's terrace included.
     pub fn is_bare(&self, x: f32, z: f32) -> bool {
         let Ok(worked) = self.worked.read() else {
             return false;
@@ -774,7 +774,7 @@ impl Terrain {
         if distance >= half_width {
             // OUTSIDE the channel, but still within the river's influence -
             // and this returned raw ground, skipping the worked pads
-            // entirely. Every levelled thing near a watercourse was levelled
+            // entirely. Every leveled thing near a watercourse was leveled
             // only where the river had nothing to say: a building's pad came
             // out flat in the middle and untouched in patches, which is
             // precisely the "unnatural divits" Brett was looking at. Villages
@@ -821,7 +821,7 @@ impl Terrain {
         // applied to this field leaves the coastline exactly where it was, so
         // the only levers are the wavelength, the octave count and the gain.
         // Eighteen combinations were sampled over nine thousand directions and
-        // scored on how much of the land is INTERIOR — land with every neighbour
+        // scored on how much of the land is INTERIOR — land with every neighbor
         // a few hundred units out also on land. The old spectrum scored 56%: two
         // thirds of all land within sight of water, which is exactly the
         // scattered look Brett called out. This one scores about 73%.
@@ -907,7 +907,7 @@ impl Terrain {
         // spawn at 61 units) and overshot: the threshold landed BELOW the belt
         // field's own median over land (p50 0.498, measured over the whole
         // sphere), so a third of all land stood above the mountain line and
-        // the globe from orbit was grey. Brett: "Mountains everywhere lol."
+        // the globe from orbit was gray. Brett: "Mountains everywhere lol."
         // At 0.56 the mountain fraction of land comes down to about an eighth,
         // which reads as ranges a world HAS rather than ranges a world IS.
         //
@@ -933,7 +933,7 @@ impl Terrain {
             // NOT squared. The comment above this warns that ridged noise
             // rarely approaches one and that every extra power crushes what
             // little there is - and then the code squared it anyway, which is
-            // what made a range read as a grey plateau with dimples rather than
+            // what made a range read as a gray plateau with dimples rather than
             // as mountains. Ridged noise draws connected CREST LINES; squaring
             // pushes everything that is not already at the top down to nothing,
             // so the lines broke into separate bumps with flat hollows between
@@ -1031,7 +1031,7 @@ impl Terrain {
     /// between. And it drew the ground BEFORE the world had been worked on it:
     /// no channel cut under any river, and no terrace under any village. The
     /// planet wore a river as a blue ribbon painted flat across unbroken
-    /// hillside, and a settlement's levelled ground came back as raw slope.
+    /// hillside, and a settlement's leveled ground came back as raw slope.
     ///
     /// That never mattered while the chunks covered every acre anyone could
     /// look at. It matters now the chunks end at [`CHUNK_CEILING`], because
@@ -1061,7 +1061,7 @@ impl Terrain {
         (distance < rivers::CHANNEL_HALF_WIDTH * width * 1.6).then_some((level, distance, width))
     }
 
-    /// Dampness in `[0, 1]`, driving surface colour and scatter density.
+    /// Dampness in `[0, 1]`, driving surface color and scatter density.
     pub fn moisture_at(&self, x: f32, z: f32) -> f32 {
         fbm_3d(
             direction_at(x, z) * spherical(0.0045) + Vec3::new(17.0, -9.0, 5.0),
@@ -1085,10 +1085,10 @@ impl Terrain {
         )
     }
 
-    /// Ground mottling in `[0, 1]`, at a scale of tens of metres.
+    /// Ground mottling in `[0, 1]`, at a scale of tens of meters.
     ///
-    /// Ground colour otherwise varies only with moisture and altitude, which change
-    /// over kilometres — this is what stops a hillside being one flat green.
+    /// Ground color otherwise varies only with moisture and altitude, which change
+    /// over kilometers — this is what stops a hillside being one flat green.
     pub fn ground_patch_at(&self, x: f32, z: f32) -> f32 {
         let dir = direction_at(x, z);
         let broad = fbm_3d(
@@ -1225,7 +1225,7 @@ pub struct LoadedChunks {
     ///
     /// For a MOMENT. It used to be for ever, and that turned one zoom-out into
     /// a permanent tax: the widest ring the session ever asked for stayed
-    /// anchored to the camera, and every pan afterwards dragged it along. In
+    /// anchored to the camera, and every pan afterward dragged it along. In
     /// the frame that started this work it was the difference between the nine
     /// hundred chunks the view wanted and the twelve hundred that were
     /// standing. See `HELD_FOR`.
@@ -1260,11 +1260,11 @@ pub(crate) struct ParkedChunk;
 impl LoadedChunks {
     /// Start quietly preparing every chunk the initial settlement can reveal
     /// through the normal play zoom range.
-    pub fn prime_first_zoom(&mut self, centre: IVec2) {
-        if self.first_zoom_cache == Some(centre) {
+    pub fn prime_first_zoom(&mut self, center: IVec2) {
+        if self.first_zoom_cache == Some(center) {
             return;
         }
-        self.first_zoom_cache = Some(centre);
+        self.first_zoom_cache = Some(center);
         // Unbuilt until counted, so a fresh prime never reads as ready on the
         // frame it is asked for - which would let the title dive onto ground
         // that does not exist yet.
@@ -1307,21 +1307,21 @@ impl LoadedChunks {
     }
 }
 
-/// Chunk coordinates within `VIEW_CHUNKS` of `centre`, nearest first.
+/// Chunk coordinates within `VIEW_CHUNKS` of `center`, nearest first.
 ///
 /// Ordering matters: ground under the player has to appear before the horizon does,
 /// or streaming reads as the world assembling itself from the outside in.
-fn chunks_in_view(centre: IVec2, radius: i32) -> Vec<IVec2> {
+fn chunks_in_view(center: IVec2, radius: i32) -> Vec<IVec2> {
     let mut coords = Vec::new();
     for dz in -radius..=radius {
         for dx in -radius..=radius {
             if dx * dx + dz * dz <= radius * radius {
-                coords.push(centre + IVec2::new(dx, dz));
+                coords.push(center + IVec2::new(dx, dz));
             }
         }
     }
     coords.sort_by_key(|c| {
-        let d = *c - centre;
+        let d = *c - center;
         d.x * d.x + d.y * d.y
     });
     coords
@@ -1335,7 +1335,7 @@ pub fn raycast(terrain: &Terrain, ray: Ray3d) -> Option<Vec3> {
     // The ray lives in the BENT world - the picture the player clicks is on
     // the sphere - and the answer comes back in FLAT coordinates, the only
     // language the simulation speaks. Altitude is distance from the planet's
-    // centre less the radius; the ground under a point is found by turning
+    // center less the radius; the ground under a point is found by turning
     // its direction back into the scaffold's (x, z).
     // Far enough to cross the whole planet from the highest the god can climb.
     // It used to stop at four thousand, which is not even as high as the wheel
@@ -1346,10 +1346,10 @@ pub fn raycast(terrain: &Terrain, ray: Ray3d) -> Option<Vec3> {
     /// The finest step, used in the last stretch above the ground.
     const STEP: f32 = 1.5;
 
-    let centre = crate::globe::planet_centre();
+    let center = crate::globe::planet_center();
     let stance_back = crate::globe::planet_stance().inverse();
     let flat_of = |p: Vec3| -> (f32, f32, f32) {
-        let v = p - centre;
+        let v = p - center;
         let r = v.length().max(1.0);
         let (x, z) = crate::globe::ground_coordinates(stance_back * (v / r));
         (x, z, r - PLANET_RADIUS)
@@ -1368,18 +1368,18 @@ pub fn raycast(terrain: &Terrain, ray: Ray3d) -> Option<Vec3> {
     // A ray climbing away from the planet, already above everything, will
     // never come down.
     {
-        let v = origin - centre;
+        let v = origin - center;
         let outward = direction.dot(v.normalize_or(Vec3::Y));
         if outward >= 0.0 && v.length() - PLANET_RADIUS > TERRAIN_HEIGHT {
             return None;
         }
     }
 
-    let mut travelled = 0.0;
+    let mut traveled = 0.0;
     let mut previous = origin;
     let mut previous_above = clearance(origin) > 0.0;
 
-    while travelled < MAX_DISTANCE {
+    while traveled < MAX_DISTANCE {
         // A stride the height of the ground below, halved: high above the
         // world it covers ground in leagues, and closing on the surface it
         // shortens to the old fixed step. Sixty thousand units at a step and
@@ -1388,8 +1388,8 @@ pub fn raycast(terrain: &Terrain, ray: Ray3d) -> Option<Vec3> {
         // matters, because the stride is never longer than the room there is
         // to fall.
         let gap = clearance(previous).abs();
-        travelled += (gap * 0.5).clamp(STEP, 2_000.0);
-        let current = origin + direction * travelled;
+        traveled += (gap * 0.5).clamp(STEP, 2_000.0);
+        let current = origin + direction * traveled;
         let above = clearance(current) > 0.0;
 
         if previous_above && !above {
@@ -1415,7 +1415,7 @@ pub fn raycast(terrain: &Terrain, ray: Ray3d) -> Option<Vec3> {
     None
 }
 
-/// Chooses a surface colour from height, steepness and moisture.
+/// Chooses a surface color from height, steepness and moisture.
 ///
 /// `pub(crate)` because the globe paints its planet with this exact function —
 /// the world seen from orbit must be the world the chunks paint up close.
@@ -1459,7 +1459,7 @@ pub(crate) fn surface_color(
 
         // A *ribbon* of bare earth. The first version faded over the whole
         // influence radius, and on flat ground — where height barely constrains
-        // anything — that painted a ten-metre brown floodplain either side. The
+        // anything — that painted a ten-meter brown floodplain either side. The
         // band is normalised to the channel wall instead: full just past the
         // waterline, gone within a third of a half-width beyond it. The patch
         // field jitters the boundary so it breaks up organically at vertex
@@ -1507,7 +1507,7 @@ pub(crate) fn surface_color(
     // Mottling. The patch field pushes the shade up and down within the ramp, and
     // drifts toward the biome's companion ramp at the extremes — dry grass in the
     // pale patches, deeper growth in the dark ones. Without it a hillside is one
-    // flat colour however good the lighting is.
+    // flat color however good the lighting is.
     let patch_shade = (patch - 0.5) * 0.22;
     let companion = biome.companion();
     let companion_mix = ((patch - 0.62) / 0.30).clamp(0.0, 1.0) * 0.55;
@@ -1536,10 +1536,10 @@ pub(crate) fn surface_color(
     // snowline is a fact about latitude before it is one about height. Fixed at a
     // hundred and fifty-eight units, it whitened every continental interior in
     // the world the moment those interiors got their proper relief: an ice planet
-    // with tropics. On Earth the line runs near five thousand metres at the
+    // with tropics. On Earth the line runs near five thousand meters at the
     // equator and meets the sea in the far north; that is the shape of it here.
     //
-    // Green lowland, grey rock, white summit still gives the eye three bands to
+    // Green lowland, gray rock, white summit still gives the eye three bands to
     // read altitude from, and the line wanders for the same reason the treeline
     // does.
     const EQUATOR_SNOW: f32 = 300.0;
@@ -1562,7 +1562,7 @@ pub(crate) fn surface_color(
     )
 }
 
-/// Linear-space blend between two colours.
+/// Linear-space blend between two colors.
 fn blend(a: Color, b: Color, t: f32) -> Color {
     let a = a.to_linear();
     let b = b.to_linear();
@@ -1577,16 +1577,16 @@ fn blend(a: Color, b: Color, t: f32) -> Color {
 
 /// Builds one chunk as a smooth-shaded, indexed grid.
 ///
-/// Positions are chunk-local; the entity's transform places it. Normals and colours
-/// derive from *world* position, so neighbouring chunks agree exactly along their
+/// Positions are chunk-local; the entity's transform places it. Normals and colors
+/// derive from *world* position, so neighboring chunks agree exactly along their
 /// shared edge and no seam appears.
 ///
 /// Heights are sampled once into a local grid with a one-cell skirt, and normals are
 /// taken from that grid rather than by re-evaluating the terrain function four more
 /// times per vertex — the difference between one noise evaluation per vertex and five.
-/// The ground's own colour at a point, exactly as [`build_chunk_mesh`]
+/// The ground's own color at a point, exactly as [`build_chunk_mesh`]
 /// would paint the vertex there. Kept in step with the loop below so the
-/// trail painter can restore a faded path to the true ground colour.
+/// trail painter can restore a faded path to the true ground color.
 pub fn ground_color_at(terrain: &Terrain, world_x: f32, world_z: f32) -> [f32; 4] {
     let cell = CHUNK_SIZE / CHUNK_CELLS as f32;
     let y = terrain.height_at(world_x, world_z);
@@ -1618,7 +1618,7 @@ pub fn ground_color_at(terrain: &Terrain, world_x: f32, world_z: f32) -> [f32; 4
 /// How far a chunk's skirt hangs below its edge.
 ///
 /// It has to cover the worst disagreement between a chunk's own surface and
-/// the coarse planet patch beneath it, which on broken ground is a few metres
+/// the coarse planet patch beneath it, which on broken ground is a few meters
 /// - and it is never seen except edge-on, so generous costs nothing.
 const SKIRT_DROP: f32 = 24.0;
 
@@ -1686,7 +1686,7 @@ pub fn build_chunk_mesh(terrain: &Terrain, coord: IVec2) -> Mesh {
             // Bent HERE, per vertex, in world space. Seating a whole chunk
             // rigidly on its tangent point was the first plan and it is not
             // good enough: a sixty-four unit chunk seated at its origin bows
-            // two thirds of a unit at its far corner, and neighbours seated
+            // two thirds of a unit at its far corner, and neighbors seated
             // by their own origins disagree at every shared edge - a step
             // at every chunk seam across the whole world. Bending the
             // vertices costs nothing (the mesh is built once) and the chunks
@@ -1724,7 +1724,7 @@ pub fn build_chunk_mesh(terrain: &Terrain, coord: IVec2) -> Mesh {
     }
 
     // THE SKIRT: a curtain hung from every edge, dropped toward the planet's
-    // centre.
+    // center.
     //
     // A chunk is the world at full detail; the planet patch under it is the
     // same ground read thirty-two cells at a time. They ask the same height
@@ -1735,9 +1735,9 @@ pub fn build_chunk_mesh(terrain: &Terrain, coord: IVec2) -> Mesh {
     // LOD and it makes it so you can see under the veil at a distance."
     //
     // The planet's own patches have solved this since they were written: hang
-    // a twin of every edge vertex below it, wearing the edge's own colour, and
+    // a twin of every edge vertex below it, wearing the edge's own color, and
     // the crack shows ground instead of sky (see `globe::build_patch`). The
-    // chunks never got one. Interior seams are covered by the neighbour that
+    // chunks never got one. Interior seams are covered by the neighbor that
     // shares them, so only the outermost ring's curtain is ever seen, and a
     // skirt's worth of overdraw is nothing.
     let ground_level = positions.len() as u32;
@@ -1759,9 +1759,9 @@ pub fn build_chunk_mesh(terrain: &Terrain, coord: IVec2) -> Mesh {
     };
     for &index in &edge {
         let seat = Vec3::from(positions[index]);
-        // Toward the planet's centre, which on this world IS down - and the
+        // Toward the planet's center, which on this world IS down - and the
         // one direction that stays down for a chunk on the far side of it.
-        let down = (seat - crate::globe::planet_centre()).normalize_or(Vec3::Y);
+        let down = (seat - crate::globe::planet_center()).normalize_or(Vec3::Y);
         positions.push((seat - down * SKIRT_DROP).to_array());
         normals.push(normals[index]);
         colors.push(colors[index]);
@@ -1795,18 +1795,18 @@ pub fn build_chunk_mesh(terrain: &Terrain, coord: IVec2) -> Mesh {
 /// own polygon edge falls on ground where it is already invisible.
 const SHORE_REACH: f32 = 1.5;
 
-/// Depth at which water has reached its full colour and is fully opaque.
+/// Depth at which water has reached its full color and is fully opaque.
 const DEEP_BY: f32 = 7.0;
 
-/// The colour of water this deep, as a vertex colour.
+/// The color of water this deep, as a vertex color.
 ///
 /// Everything the old shader worked out per fragment, known here for nothing:
 /// the mesh is built from the terrain, so the depth at a vertex is simply the
-/// water's level less the bed under it. Shallow water keeps the bed's colour by
+/// water's level less the bed under it. Shallow water keeps the bed's color by
 /// being nearly clear; deep water hides it by being nearly opaque; and at the
 /// waterline the alpha reaches zero, which is what lets the sheet run up onto
 /// the beach and vanish instead of stopping on an edge.
-pub fn water_colour(depth: f32) -> [f32; 4] {
+pub fn water_color(depth: f32) -> [f32; 4] {
     let t = (depth / DEEP_BY).clamp(0.0, 1.0);
     let shallow = palette::shade(&palette::WATER, SEA_SHALLOW).to_linear();
     let deep = palette::shade(&palette::WATER, SEA_DEEP).to_linear();
@@ -1819,11 +1819,11 @@ pub fn water_colour(depth: f32) -> [f32; 4] {
     ]
 }
 
-/// Where on the water ramp the sea's two colours are taken from.
+/// Where on the water ramp the sea's two colors are taken from.
 ///
 /// Shared, because two different things draw the same ocean: the chunks'
 /// own sea and the planet's patches. They used to choose their own shades and
-/// the join between them was a square of differently coloured sea.
+/// the join between them was a square of differently colored sea.
 pub const SEA_SHALLOW: f32 = 1.0;
 pub const SEA_DEEP: f32 = 0.62;
 
@@ -1870,9 +1870,9 @@ fn build_water_mesh(terrain: &Terrain, coord: IVec2, sea: bool) -> Option<Mesh> 
                 } else {
                     heights[index] = h;
                     // A step of dry land past the waterline still counts as
-                    // shore. The sheet is cut on the chunk's own two-metre
+                    // shore. The sheet is cut on the chunk's own two-meter
                     // grid, so ending it at the last WET corner left the
-                    // coastline as a row of two-metre teeth - the polygon
+                    // coastline as a row of two-meter teeth - the polygon
                     // edge, in plain view. Carried a little way up the beach
                     // the edge lands on ground the depth fade has already
                     // taken to nothing, and there is no hard line left to see.
@@ -1947,7 +1947,7 @@ fn build_water_mesh(terrain: &Terrain, coord: IVec2, sea: bool) -> Option<Mesh> 
                 // The bed under this corner, which is the ground height where
                 // the corner is dry and the carved channel where it is not.
                 let bed = terrain.height_at(origin.x + x0 + dx, origin.y + z0 + dz);
-                colors.push(water_colour(y - bed));
+                colors.push(water_color(y - bed));
             }
 
             indices.extend_from_slice(&[base, base + 2, base + 3, base, base + 3, base + 1]);
@@ -1976,7 +1976,7 @@ fn build_water_mesh(terrain: &Terrain, coord: IVec2, sea: bool) -> Option<Mesh> 
 pub struct TerrainAssets {
     /// Worn by the terrain and by everything growing on it, and it carries the
     /// fog of war itself - see `fog::GroundVeil`. Unknown country and the wood
-    /// standing on it are painted one colour together, which is what retired
+    /// standing on it are painted one color together, which is what retired
     /// the cloths that used to be hung over them.
     pub ground_material: Handle<crate::fog::GroundMaterial>,
     /// The same shader as the sea, so rivers and ocean are plainly the same
@@ -2004,7 +2004,7 @@ fn setup_terrain(
     mut ground_materials: ResMut<Assets<crate::fog::GroundMaterial>>,
     world_seed: Res<crate::WorldSeed>,
 ) {
-    // Vertex colours carry all the surface variation, so the material is plain white.
+    // Vertex colors carry all the surface variation, so the material is plain white.
     let ground_material = ground_materials.add(crate::fog::GroundMaterial {
         base: StandardMaterial {
             base_color: Color::WHITE,
@@ -2022,9 +2022,9 @@ fn setup_terrain(
     // this — "far past the furthest the fog can ever reach", in the fog's
     // era, when whatever the quad covered was hidden anyway. With the fog
     // gone and the planet drawn beneath the world, that oversize lay across
-    // the planet like a twenty-kilometre grey tarp: every acre of the world
+    // the planet like a twenty-kilometer gray tarp: every acre of the world
     // lower than sea level plus the curvature drop vanished under it, and
-    // from any height the god saw a loaded island in a dead grey sea of
+    // from any height the god saw a loaded island in a dead gray sea of
     // nothing. Past this quad's edge, the planet paints its own ocean.
 
     // Water is a plain lit surface now, and everything that made it read as
@@ -2037,16 +2037,16 @@ fn setup_terrain(
     // screen, and every water fault of the last day was one of those pieces
     // beating against the pixel grid at a distance where it could not be seen.
     //
-    // None of it was needed, because the meshes are ours. `water_colour` knows
+    // None of it was needed, because the meshes are ours. `water_color` knows
     // the exact depth at every vertex - the terrain told it - so shallow
-    // against deep, and the fade to nothing at the shore, are vertex colours.
+    // against deep, and the fade to nothing at the shore, are vertex colors.
     // A flat-shaded low-poly world wanted that anyway; a physically detailed sea
     // in the middle of it always looked borrowed.
     let mut still_water = StandardMaterial {
         base_color: Color::WHITE,
         alpha_mode: AlphaMode::Blend,
         // Smooth enough to catch the sun as a broad soft sheen, which is the
-        // one thing the old shader did that the colour cannot.
+        // one thing the old shader did that the color cannot.
         perceptual_roughness: 0.22,
         reflectance: 0.35,
         // Water casting a shadow onto its own bed puts a dark band under every
@@ -2058,7 +2058,7 @@ fn setup_terrain(
     };
     still_water.base_color.set_alpha(1.0);
     // THE WATER WEARS THE VEIL TOO. Rivers and the sea are the last things
-    // standing on unwalked ground with their own colours - Brett: "just some
+    // standing on unwalked ground with their own colors - Brett: "just some
     // water like rivers and stuff poking through" - because they are the one
     // part of the landscape that never came out of the ground material. A
     // river is as much a feature of country nobody has walked as the wood
@@ -2113,7 +2113,7 @@ fn stream_chunks(
     let Ok(rig) = cameras.single() else {
         return;
     };
-    let centre = terrain.chunk_of(rig.focus.x, rig.focus.z);
+    let center = terrain.chunk_of(rig.focus.x, rig.focus.z);
 
     // The founding cache is useful while the god is still looking at the
     // founding country. Once they travel a few chunks away it would become an
@@ -2129,7 +2129,7 @@ fn stream_chunks(
         crate::GameState::Choosing | crate::GameState::Playing
     ) && loaded
             .first_zoom_cache
-            .is_some_and(|home| (centre - home).abs().max_element() > 2)
+            .is_some_and(|home| (center - home).abs().max_element() > 2)
     {
         loaded.first_zoom_cache = None;
         loaded.first_zoom_missing = 0;
@@ -2158,11 +2158,11 @@ fn stream_chunks(
     let wanted = if radius <= 0 {
         Vec::new()
     } else {
-        chunks_in_view(centre, radius)
+        chunks_in_view(center, radius)
     };
     let wanted_set: HashSet<IVec2> = wanted.iter().copied().collect();
     let mut kept: HashSet<IVec2> = if loaded.held > 0 && loaded.held > radius {
-        chunks_in_view(centre, loaded.held).into_iter().collect()
+        chunks_in_view(center, loaded.held).into_iter().collect()
     } else {
         wanted_set.clone()
     };
@@ -2190,7 +2190,7 @@ fn stream_chunks(
     }
 
     // Unload only after a cached ring has genuinely expired or the god has
-    // travelled far enough that it belongs to a different region.
+    // traveled far enough that it belongs to a different region.
     loaded.entities.retain(|coord, entity| {
         if kept.contains(coord) {
             true
@@ -2292,7 +2292,7 @@ pub(crate) fn spawn_chunk(
             // shrouded world. Nothing is lost by waiting a frame; the
             // planet's own patch surface lies under every chunk, already
             // wearing the same veil, so an undressed chunk shows the right
-            // colour anyway.
+            // color anyway.
             Visibility::Hidden,
         ))
         .id();
@@ -2575,7 +2575,7 @@ mod tests {
     }
 
     /// A house's pad is the house's own rectangle. The circle it used to be
-    /// levelled the ground off the ends of a long building as flat as the floor
+    /// leveled the ground off the ends of a long building as flat as the floor
     /// itself, which is a plateau reaching out past every wall - and half again
     /// as much moved earth as the building needed.
     #[test]
@@ -2618,7 +2618,7 @@ mod tests {
             let untouched = Terrain::new(31).height_at(wx, wz);
             assert!(
                 (land.height_at(wx, wz) - untouched).abs() < 1e-3,
-                "ground {corner:.1}m off the front wall was levelled with the floor"
+                "ground {corner:.1}m off the front wall was leveled with the floor"
             );
         }
     }
@@ -2810,10 +2810,10 @@ mod tests {
         // hillside straight back the moment the chunks bowed out.
         let site = t.somewhere_inland();
         t.flatten(site.x, site.y, 30.0, 12.0, 40.0);
-        let (levelled, _) = t.ground_and_water_at(site.x, site.y);
+        let (leveled, _) = t.ground_and_water_at(site.x, site.y);
         assert!(
-            (levelled - 40.0).abs() < 0.01,
-            "the terrace is at 40 and the planet draws {levelled}"
+            (leveled - 40.0).abs() < 0.01,
+            "the terrace is at 40 and the planet draws {leveled}"
         );
     }
 
@@ -3125,7 +3125,7 @@ mod tests {
         }
 
         // Closed hollows in the high country: a sample lower than all four
-        // neighbours has no way out, and the lake fill will oblige.
+        // neighbors has no way out, and the lake fill will oblige.
         let mut hollows = 0;
         for row in 1..rows - 1 {
             for col in 0..cols {
@@ -3373,11 +3373,11 @@ mod tests {
         );
     }
 
-    /// The skirt hangs DOWN - toward the planet's centre - from every edge.
+    /// The skirt hangs DOWN - toward the planet's center - from every edge.
     ///
     /// On a round world "down" is not -Y once you are any distance from the
     /// tangent point, and a curtain hung along the wrong axis would stand out
-    /// sideways into the neighbouring chunk on the far side of the globe.
+    /// sideways into the neighboring chunk on the far side of the globe.
     #[test]
     fn the_chunk_skirt_hangs_toward_the_planet() {
         let t = Terrain::new(8);
@@ -3390,18 +3390,18 @@ mod tests {
             panic!("a chunk mesh has positions");
         };
         let grid = (CHUNK_CELLS + 1) * (CHUNK_CELLS + 1);
-        let centre = crate::globe::planet_centre();
+        let center = crate::globe::planet_center();
         for hem in &points[grid..] {
             let skirt = Vec3::from(*hem);
             assert!(
-                skirt.distance(centre) < crate::terrain::PLANET_RADIUS + 400.0,
+                skirt.distance(center) < crate::terrain::PLANET_RADIUS + 400.0,
                 "a skirt vertex must hang below the ground it is hemming",
             );
         }
         // And it is genuinely lower than the rim it hangs from, by the drop.
         let rim = Vec3::from(points[0]);
         let below = Vec3::from(points[grid]);
-        let dropped = rim.distance(centre) - below.distance(centre);
+        let dropped = rim.distance(center) - below.distance(center);
         assert!(
             (dropped - SKIRT_DROP).abs() < 0.5,
             "the skirt should hang {SKIRT_DROP} below its rim, not {dropped}",
@@ -3409,7 +3409,7 @@ mod tests {
     }
 
     #[test]
-    fn neighbouring_chunks_share_their_edge_exactly() {
+    fn neighboring_chunks_share_their_edge_exactly() {
         // Smooth shading only stays seamless if the shared rim of two chunks carries
         // identical heights and normals. Any drift shows as a hard line across the
         // landscape — and with streaming it would appear and vanish as chunks load.
@@ -3441,15 +3441,15 @@ mod tests {
 
     #[test]
     fn the_view_is_a_disc_ordered_nearest_first() {
-        let centre = IVec2::new(5, -2);
+        let center = IVec2::new(5, -2);
         let radius = VIEW_CHUNKS;
-        let coords = chunks_in_view(centre, radius);
+        let coords = chunks_in_view(center, radius);
         assert!(!coords.is_empty());
-        assert_eq!(coords[0], centre, "centre chunk must come first");
+        assert_eq!(coords[0], center, "center chunk must come first");
 
         let mut previous = 0;
         for coord in &coords {
-            let d = *coord - centre;
+            let d = *coord - center;
             let distance = d.x * d.x + d.y * d.y;
             assert!(distance <= radius * radius, "outside the disc");
             assert!(distance >= previous, "not ordered nearest first");
@@ -3614,7 +3614,7 @@ mod tests {
         let mut wet = 0;
         let mut dry = 0;
         let mut highest: f32 = 0.0;
-        // A coarse sweep of a whole hemisphere, in strides of a kilometre.
+        // A coarse sweep of a whole hemisphere, in strides of a kilometer.
         for iz in -20..=20 {
             for ix in -40..=40 {
                 let h = t.base_height_at(ix as f32 * 1_000.0, iz as f32 * 1_000.0);
@@ -3669,7 +3669,7 @@ mod the_shape_of_the_world {
     /// land comes in continents or in crumbs.
     ///
     /// So this measures the shape directly. `interior` is the fraction of land
-    /// that has every neighbour a few hundred units out also on land — land you
+    /// that has every neighbor a few hundred units out also on land — land you
     /// can stand in the middle of without seeing the sea. The old spectrum scored
     /// 36%; this one scores about two thirds. If a change to the terrain drops it
     /// back, the world has quietly become islands again.
@@ -3764,7 +3764,7 @@ mod terracing {
     /// divits. We need to do a better job of making the terrian flat while
     /// blending naturally into the terrain."
     ///
-    /// Measured on real ground, that hall levelled fifteen metres of dead
+    /// Measured on real ground, that hall leveled fifteen meters of dead
     /// flat and then gave the land back over two and a half - a wide plate
     /// with a lip round it, which is what the eye reads as dug rather than
     /// as terraced. The bank is no taller now; it is just allowed the room
@@ -3820,7 +3820,7 @@ mod terracing {
 
         // And it gives the land back gently: the last stretch before the
         // untouched ground moves less than the first stretch outside the
-        // pad. A short skirt fails this - it is still moving half a metre
+        // pad. A short skirt fails this - it is still moving half a meter
         // when it stops, which is the lip.
         let moved = |d: usize| (worked[d] - natural[d]).abs();
         let far = (26..=30).map(moved).fold(0.0_f32, f32::max);
@@ -3836,7 +3836,7 @@ mod terracing {
     ///
     /// The bug behind the divots, and the reason they looked like BITES
     /// rather than like a bad grade: within a river's influence but outside
-    /// its channel, the ground was returned raw, and every levelled pad
+    /// its channel, the ground was returned raw, and every leveled pad
     /// simply stopped existing there. A building near water came out flat
     /// where the river had no opinion and untouched where it did. Villages
     /// are founded by water, so this was most of them.
@@ -3868,7 +3868,7 @@ mod terracing {
         terrain.flatten(x, z, 6.0, 4.0, height);
         assert!(
             (terrain.height_at(x, z) - height).abs() < 0.01,
-            "ground beside a river ignored the levelling: {} against {height}",
+            "ground beside a river ignored the leveling: {} against {height}",
             terrain.height_at(x, z),
         );
     }
@@ -3893,7 +3893,7 @@ mod terracing {
         let height = terrain.height_at(x, z);
         terrain.terrace(x, z, 5.0, 4.6, 0.0, 2.5, 2.4, height);
 
-        // The mesh only has vertices every `cell` metres and draws straight
+        // The mesh only has vertices every `cell` meters and draws straight
         // lines between them. How far does that stray from the true ground?
         let mut worst: f32 = 0.0;
         let mut worst_at = 0.0;
@@ -3911,7 +3911,7 @@ mod terracing {
             }
             d += 0.1;
         }
-        println!("cell {cell}m; worst mesh error {worst:.3}m at {worst_at:.1}m from centre");
+        println!("cell {cell}m; worst mesh error {worst:.3}m at {worst_at:.1}m from center");
     }
 
     #[test]
@@ -3948,7 +3948,7 @@ mod terracing {
         let deepest = (0..before.len())
             .map(|i| after[i] - before[i])
             .fold(0.0_f32, |w, m| if m.abs() > w.abs() { m } else { w });
-        // The steepest metre of the SKIRT - outside the flat pad, where the
+        // The steepest meter of the SKIRT - outside the flat pad, where the
         // worked ground is bending back to the land. This is the number the
         // eye reacts to.
         let mut steepest_before = 0.0_f32;
@@ -3963,7 +3963,7 @@ mod terracing {
         }
         println!(
             "hillside at ({x:.0},{z:.0}): earth moved out to {furthest}m, worst {deepest:+.2}m; \
-             steepest metre of skirt {steepest_after:.2}m (1:{:.1}), natural land {steepest_before:.2}m",
+             steepest meter of skirt {steepest_after:.2}m (1:{:.1}), natural land {steepest_before:.2}m",
             1.0 / steepest_after.max(0.0001),
         );
     }

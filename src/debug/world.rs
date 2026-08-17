@@ -24,7 +24,7 @@ pub(crate) struct WorldMap {
     /// open, so the +/- buttons swap pictures instead of repainting.
     /// Brett: "all three zoom levels too since they all load."
     pub sheets: [Handle<Image>; 3],
-    pub centre: Vec2,
+    pub center: Vec2,
     /// Rows painted so far, per sheet; the painter rests at full height.
     pub painted: [u32; 3],
     /// The sheets' pixel height. The width is always [`MAP_W`]; the
@@ -214,7 +214,7 @@ pub(crate) fn spawn_world_panel(
     let image = sheets[MapZoom::default().0].clone();
     commands.insert_resource(WorldMap {
         sheets,
-        centre: Vec2::ZERO,
+        center: Vec2::ZERO,
         painted: [0; 3],
         face_h: MAP_H,
     });
@@ -831,18 +831,18 @@ pub(crate) fn paint_world_map(
         *seen = charted;
         map.painted = [0; 3];
     }
-    // The map centres on the banner - and FOLLOWS it there if the flag
-    // is planted after the sheets were first painted. Centring only
+    // The map centers on the banner - and FOLLOWS it there if the flag
+    // is planted after the sheets were first painted. Centering only
     // while the sheets were untouched lost a race at the founding: the
     // knowledge moved to the banner at once, but the SettlementSite
     // arrives a frame later by command, so a repaint begun in that
-    // frame kept the world's origin at the centre and the whole known
+    // frame kept the world's origin at the center and the whole known
     // country off the sheet - a fogged empty ocean until an explorer
     // finally stepped past the cairns.
     if let Some(site) = site.as_ref() {
-        let banner = Vec2::new(site.centre.x, site.centre.z);
-        if map.centre != banner {
-            map.centre = banner;
+        let banner = Vec2::new(site.center.x, site.center.z);
+        if map.center != banner {
+            map.center = banner;
             map.painted = [0; 3];
         }
     }
@@ -861,8 +861,8 @@ pub(crate) fn paint_world_map(
 
     let radius = ZOOM_STEPS[sheet];
     let radius_z = radius * face_h as f32 / MAP_W as f32;
-    let centre = map.centre;
-    let known_centre = known.as_ref().map(|k| Vec2::new(k.centre.x, k.centre.z));
+    let center = map.center;
+    let known_center = known.as_ref().map(|k| Vec2::new(k.center.x, k.center.z));
     let known_radius = known.as_ref().map_or(0.0, |k| k.radius);
     let pockets: Vec<(Vec2, f32)> = known.as_ref().map_or_else(Vec::new, |k| {
         k.pockets
@@ -876,26 +876,26 @@ pub(crate) fn paint_world_map(
         for col in 0..MAP_W {
             let u = col as f32 / (MAP_W - 1) as f32;
             let v = row as f32 / (face_h - 1) as f32;
-            let x = centre.x + (u - 0.5) * 2.0 * radius;
-            let z = centre.y + (v - 0.5) * 2.0 * radius_z;
+            let x = center.x + (u - 0.5) * 2.0 * radius;
+            let z = center.y + (v - 0.5) * 2.0 * radius_z;
             let height = terrain.height_at(x, z);
 
-            let mut colour: [f32; 3];
+            let mut color: [f32; 3];
             if height < WATER_LEVEL {
                 // The sea, deeper is darker.
                 let depth = ((WATER_LEVEL - height) / 14.0).clamp(0.0, 1.0);
                 let shallow = [0.16, 0.34, 0.44];
                 let deep = [0.05, 0.13, 0.20];
-                colour = [
+                color = [
                     shallow[0] + (deep[0] - shallow[0]) * depth,
                     shallow[1] + (deep[1] - shallow[1]) * depth,
                     shallow[2] + (deep[2] - shallow[2]) * depth,
                 ];
             } else if terrain.river_surface_at(x, z).is_some() {
-                colour = [0.16, 0.36, 0.48];
+                color = [0.16, 0.36, 0.48];
             } else {
                 let ground = crate::terrain::ground_color_at(&terrain, x, z);
-                colour = [
+                color = [
                     ground[0].powf(1.0 / 2.2),
                     ground[1].powf(1.0 / 2.2),
                     ground[2].powf(1.0 / 2.2),
@@ -904,10 +904,10 @@ pub(crate) fn paint_world_map(
                 let forest = terrain.forest_at(x, z);
                 if forest > 0.45 {
                     let shade = ((forest - 0.45) * 1.6).clamp(0.0, 0.55);
-                    colour = [
-                        colour[0] * (1.0 - shade) + 0.05 * shade,
-                        colour[1] * (1.0 - shade) + 0.16 * shade,
-                        colour[2] * (1.0 - shade) + 0.05 * shade,
+                    color = [
+                        color[0] * (1.0 - shade) + 0.05 * shade,
+                        color[1] * (1.0 - shade) + 0.16 * shade,
+                        color[2] * (1.0 - shade) + 0.05 * shade,
                     ];
                 }
                 // Hillshade from the northwest, so relief reads as relief.
@@ -915,28 +915,28 @@ pub(crate) fn paint_world_map(
                 let lit = terrain.height_at(x - step, z - step);
                 let slope = ((height - lit) / step).clamp(-1.2, 1.2);
                 let shade = 1.0 + slope * 0.35;
-                colour = [colour[0] * shade, colour[1] * shade, colour[2] * shade];
+                color = [color[0] * shade, color[1] * shade, color[2] * shade];
             }
 
             // Beyond the cairns' ring - and outside every far place the
-            // explorers brought home - the land is rumour, drawn dark.
+            // explorers brought home - the land is rumor, drawn dark.
             let world = Vec2::new(x, z);
-            let known_here = known_centre.is_some_and(|c| world.distance(c) <= known_radius)
+            let known_here = known_center.is_some_and(|c| world.distance(c) <= known_radius)
                 || pockets
                     .iter()
                     .any(|(at, reach)| world.distance(*at) <= *reach);
             if !known_here {
-                colour = [
-                    colour[0] * 0.30 + 0.015,
-                    colour[1] * 0.30 + 0.018,
-                    colour[2] * 0.30 + 0.025,
+                color = [
+                    color[0] * 0.30 + 0.015,
+                    color[1] * 0.30 + 0.018,
+                    color[2] * 0.30 + 0.025,
                 ];
             }
 
             let offset = ((row * MAP_W + col) * 4) as usize;
-            data[offset] = (colour[0].clamp(0.0, 1.0) * 255.0) as u8;
-            data[offset + 1] = (colour[1].clamp(0.0, 1.0) * 255.0) as u8;
-            data[offset + 2] = (colour[2].clamp(0.0, 1.0) * 255.0) as u8;
+            data[offset] = (color[0].clamp(0.0, 1.0) * 255.0) as u8;
+            data[offset + 1] = (color[1].clamp(0.0, 1.0) * 255.0) as u8;
+            data[offset + 2] = (color[2].clamp(0.0, 1.0) * 255.0) as u8;
             data[offset + 3] = 255;
         }
     }
@@ -1013,7 +1013,7 @@ pub(crate) fn update_world_markers(
         use std::hash::{Hash, Hasher};
         let mut hasher = std::hash::DefaultHasher::new();
         (ZOOM_STEPS[zoom.0] as i32).hash(&mut hasher);
-        (map.centre.x as i32, map.centre.y as i32).hash(&mut hasher);
+        (map.center.x as i32, map.center.y as i32).hash(&mut hasher);
         villagers.iter().count().hash(&mut hasher);
         for cairn in &cairns {
             let at = cairn.translation();
@@ -1033,14 +1033,14 @@ pub(crate) fn update_world_markers(
     let radius = ZOOM_STEPS[zoom.0];
     let radius_z = radius * map.face_h as f32 / MAP_W as f32;
     let place = |world: Vec2| -> Option<(f32, f32)> {
-        let u = (world.x - map.centre.x) / (2.0 * radius) + 0.5;
-        let v = (world.y - map.centre.y) / (2.0 * radius_z) + 0.5;
+        let u = (world.x - map.center.x) / (2.0 * radius) + 0.5;
+        let v = (world.y - map.center.y) / (2.0 * radius_z) + 0.5;
         ((0.02..0.98).contains(&u) && (0.02..0.98).contains(&v)).then_some((u * 100.0, v * 100.0))
     };
 
     // The village, named, with its souls.
     if let Some(site) = site.as_ref()
-        && let Some((u, v)) = place(Vec2::new(site.centre.x, site.centre.z))
+        && let Some((u, v)) = place(Vec2::new(site.center.x, site.center.z))
     {
         let tag = commands
             .spawn((
@@ -1095,7 +1095,7 @@ pub(crate) fn update_world_markers(
         }
     }
 
-    // The known pockets: rings of rumour made ground.
+    // The known pockets: rings of rumor made ground.
     if let Some(known) = known.as_ref() {
         for pocket in &known.pockets {
             if let Some((u, v)) = place(Vec2::new(pocket.at.x, pocket.at.z)) {
@@ -1252,7 +1252,7 @@ pub(crate) fn update_world_panel(
         let fresh = match row.0 {
             0 => match (&terrain, &site) {
                 (Some(terrain), Some(site)) => {
-                    match terrain.biome_at(site.centre.x, site.centre.z) {
+                    match terrain.biome_at(site.center.x, site.center.z) {
                         crate::terrain::Biome::Temperate => "temperate country".to_string(),
                         crate::terrain::Biome::Boreal => "cold forest country".to_string(),
                         crate::terrain::Biome::Arid => "dry country".to_string(),
@@ -1278,8 +1278,8 @@ pub(crate) fn update_world_panel(
                     let mut sea: Option<&str> = None;
                     for (index, name) in names.iter().enumerate() {
                         let angle = index as f32 * std::f32::consts::TAU / 8.0;
-                        let x = site.centre.x + angle.sin() * 500.0;
-                        let z = site.centre.z - angle.cos() * 500.0;
+                        let x = site.center.x + angle.sin() * 500.0;
+                        let z = site.center.z - angle.cos() * 500.0;
                         if terrain.height_at(x, z) < WATER_LEVEL {
                             sea = Some(name);
                             break;

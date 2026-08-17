@@ -187,7 +187,7 @@ pub fn hair_inset(layer: u8) -> f32 {
     1.07 + layer as f32 * 0.06
 }
 
-/// Spawns a box as a child of `parent`, centred at `offset`.
+/// Spawns a box as a child of `parent`, centered at `offset`.
 ///
 /// Used for decoration that is not a joint — hair, clothing trim, packs.
 fn spawn_block(
@@ -934,7 +934,7 @@ mod bake {
             queue.apply(world);
 
             let named = joints_of(&rig, world);
-            // The colours come out first, as plain numbers. The walk wants the
+            // The colors come out first, as plain numbers. The walk wants the
             // world and the materials at once, and a raw pointer to dodge that
             // is a bargain nobody needs to strike for six files.
             let cloth: std::collections::HashMap<AssetId<StandardMaterial>, [u8; 3]> = world
@@ -1108,14 +1108,14 @@ mod tests {
         // its top clears the crown.
         let head_size = 1.0;
         for layer in 0..4u8 {
-            let centre = head_size * (0.92 + layer as f32 * 0.2);
+            let center = head_size * (0.92 + layer as f32 * 0.2);
             let half = head_size * 0.15;
             assert!(
-                centre + half > head_size,
+                center + half > head_size,
                 "layer {layer} top does not clear"
             );
             if layer == 0 {
-                assert!(centre - half < head_size, "layer 0 floats above the head");
+                assert!(center - half < head_size, "layer 0 floats above the head");
             }
         }
     }
@@ -1171,7 +1171,7 @@ mod tests {
             let (_world, rig) = build_in_test_world(species, 5);
             assert!(
                 rig.head_rest.angle_between(Quat::IDENTITY) > 0.1,
-                "{species:?} has no levelling rest pose",
+                "{species:?} has no leveling rest pose",
             );
         }
 

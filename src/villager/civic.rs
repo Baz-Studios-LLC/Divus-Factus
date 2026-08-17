@@ -3,7 +3,7 @@
 //! Brett: "The town hall should be the center of town, I would love for
 //! people to elect a mayor and then that mayor organize the town
 //! priorities." The regard graph runs the ballot — every adult votes for
-//! the neighbour they hold WARMEST, which means campaigns are lived, not
+//! the neighbor they hold WARMEST, which means campaigns are lived, not
 //! played: the soul who answered your knock, wed your daughter and hauled
 //! your timber has been running for office all along.
 //!
@@ -214,7 +214,7 @@ pub(super) fn hold_elections(
         }
         last_held.insert(town, day);
 
-        // The ballot: every adult names the neighbour they hold warmest.
+        // The ballot: every adult names the neighbor they hold warmest.
         // No hustings, no promises — the vote is the regard graph reading
         // itself out loud.
         let mut votes: std::collections::HashMap<Entity, (u32, f32)> =
@@ -348,9 +348,9 @@ pub(super) fn stage_civic_assemblies(
             |_| grounds.get(town).map_or(36.0, |ground| ground.radius),
             |wall| wall.radius,
         );
-        let centre = grounds
+        let center = grounds
             .get(town)
-            .map_or(assembly.hall, |ground| ground.centre);
+            .map_or(assembly.hall, |ground| ground.center);
         for (who, member, at, mut activity, mut target, guest) in &mut folk {
             if member.0 != town {
                 continue;
@@ -364,7 +364,7 @@ pub(super) fn stage_civic_assemblies(
             // The whole town hears the call, but a person already beyond the
             // wall stays on the road. An election does not pull a hunter or
             // explorer back across the countryside just to make a crowd.
-            if guest.is_some() || at.translation.distance(centre) > inside_radius {
+            if guest.is_some() || at.translation.distance(center) > inside_radius {
                 continue;
             }
             let turn = who.index().index() as f32 * 2.399_963;
@@ -562,7 +562,7 @@ mod tests {
                     sigil: 0,
                 },
                 SettlementGround {
-                    centre: Vec3::ZERO,
+                    center: Vec3::ZERO,
                     radius: 36.0,
                     woodpile: Vec3::ZERO,
                     foodpile: Vec3::ZERO,

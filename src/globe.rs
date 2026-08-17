@@ -40,7 +40,7 @@ use crate::terrain::{PLANET_RADIUS, Terrain, WATER_LEVEL};
 /// TWO. Layer 0 is the world, 1 the hand, 3 the deity alcove, 4 the paperdoll
 /// - which was on 2 first, and whose studio key relit the whole night sky when
 /// this constant moved in beside it. If a new layer is ever needed, count the
-/// neighbours first: a light on a layer the god camera renders lights
+/// neighbors first: a light on a layer the god camera renders lights
 /// EVERYTHING the god camera sees.
 pub const GLOBE_LAYER: usize = 2;
 
@@ -58,7 +58,7 @@ pub const CEILING: f32 = 42_000.0;
 ///
 /// The patches and the streamed chunks are now the same surface - both are
 /// the same height field seated on the same sphere - and coincident surfaces
-/// fight for every pixel. That fight was the grey striping across the whole
+/// fight for every pixel. That fight was the gray striping across the whole
 /// landscape: the chunks painted green, the patches beneath them painted
 /// with the fog of war's slate, trading places pixel by pixel down to the
 /// depth buffer's last bit. Before the world was bent the chunks lay on a
@@ -141,11 +141,11 @@ pub(crate) fn planet_stance() -> Quat {
     Quat::from_rotation_x(-FRAC_PI_2)
 }
 
-/// Where the planet's centre sits: the sea-level sphere tangent to the flat
+/// Where the planet's center sits: the sea-level sphere tangent to the flat
 /// world at the origin, sunk a few units so the two surfaces — the same
 /// field, so they agree exactly at the tangent point — never fight over the
 /// same pixels while both are drawn.
-pub(crate) fn planet_centre() -> Vec3 {
+pub(crate) fn planet_center() -> Vec3 {
     Vec3::new(0.0, -(PLANET_RADIUS + WATER_LEVEL) - 8.0, 0.0)
 }
 
@@ -191,7 +191,7 @@ impl PatchKey {
     }
 
     /// Unit direction, in the planet's own frame, to the middle of the patch.
-    fn centre_dir(self) -> Vec3 {
+    fn center_dir(self) -> Vec3 {
         let (u0, v0, side) = self.rect();
         let (outward, along_u, along_v) = face_axes(self.face);
         (outward + along_u * (u0 + side * 0.5) + along_v * (v0 + side * 0.5)).normalize()
@@ -205,7 +205,7 @@ impl PatchKey {
         quarter / (PATCH_CELLS as f32 * (1u32 << self.level) as f32)
     }
 
-    /// Half this patch's own angular reach, centre to corner, in radians.
+    /// Half this patch's own angular reach, center to corner, in radians.
     ///
     /// Generous on purpose. [`cell_arc`](Self::cell_arc) is an AVERAGE over a
     /// cube face and the projection is not even: a patch in the middle of a
@@ -249,7 +249,7 @@ impl PatchKey {
         // figures right where the answer decides the finest patches in the
         // world. The same lesson as `Place::angle_to`.
         let nadir = eye.normalize_or(Vec3::Y);
-        let here = self.centre_dir();
+        let here = self.center_dir();
         let away = here.cross(nadir).length().atan2(here.dot(nadir));
 
         // Its own half-span back off, so a patch STRADDLING the limb is kept.
@@ -295,7 +295,7 @@ pub(crate) struct PlanetTree {
 /// planet has - which GROUND would these paint differently?
 #[derive(PartialEq)]
 struct VeilSeen {
-    centre: Vec2,
+    center: Vec2,
     radius: f32,
     pockets: Vec<(Vec2, f32)>,
 }
@@ -303,7 +303,7 @@ struct VeilSeen {
 impl VeilSeen {
     fn of(known: &crate::villager::explore::KnownWorld) -> Self {
         VeilSeen {
-            centre: Vec2::new(known.centre.x, known.centre.z),
+            center: Vec2::new(known.center.x, known.center.z),
             radius: known.radius,
             pockets: known
                 .pockets
@@ -318,9 +318,9 @@ impl VeilSeen {
     /// the home moved or grew. Everywhere else, both paint alike.
     fn changed_discs(&self, fresh: &Self) -> Vec<(Vec2, f32)> {
         let mut discs = Vec::new();
-        if self.centre != fresh.centre || self.radius != fresh.radius {
-            discs.push((self.centre, self.radius));
-            discs.push((fresh.centre, fresh.radius));
+        if self.center != fresh.center || self.radius != fresh.radius {
+            discs.push((self.center, self.radius));
+            discs.push((fresh.center, fresh.radius));
         }
         // Set difference both ways: `tidy` merges and reorders pockets,
         // so positions are compared, never indices.
@@ -358,7 +358,7 @@ impl PlanetTree {
 /// pieces that must stay square to one another.
 ///
 /// The bend seats every entity individually by its own flat position, and
-/// near home the pieces of a house disagree by millimetres. Near the POLES
+/// near home the pieces of a house disagree by millimeters. Near the POLES
 /// they do not: the flat chart's longitude lines converge there, each part
 /// of one roof gets a visibly different frame, and a village founded on the
 /// far side of the world came out of the ground as cubism - Brett: "my
@@ -493,7 +493,7 @@ const KEPT_FOR: u64 = 1_800;
 /// anyway. Four is the grain the eye catches on the way out.
 const EVERGREEN: u8 = 4;
 
-/// The one material every patch wears; the colours ride the vertices.
+/// The one material every patch wears; the colors ride the vertices.
 #[derive(Resource)]
 struct PlanetSkin(Handle<PlanetMaterial>);
 
@@ -506,20 +506,20 @@ struct PlanetSeaSkin(Handle<PlanetMaterial>);
 ///
 /// The cloths that hide unknown ground at play height are unlit — their shader
 /// hands back its tint and that is the pixel. A patch is lit ground, so the
-/// same colour painted into its vertices came out somewhere else entirely: the
+/// same color painted into its vertices came out somewhere else entirely: the
 /// sun's diffuse and its specular sheen both add to it, and the veil read half
 /// again as far toward white, less blue, and lighter still at a grazing angle
 /// near the limb. Three shades of one fog in a single frame. Worse, any tuning
 /// of it would only hold for the light it was tuned under.
 ///
 /// So the mix happens in the fragment shader, past the lighting, and the answer
-/// is the cloth's colour under any sun at all.
+/// is the cloth's color under any sun at all.
 pub type PlanetMaterial = ExtendedMaterial<StandardMaterial, VeilExtension>;
 
-/// Which colour the veil is, and how much of it fully-veiled ground takes.
+/// Which color the veil is, and how much of it fully-veiled ground takes.
 #[derive(Asset, TypePath, AsBindGroup, Clone)]
 pub struct VeilExtension {
-    /// rgb the veil's colour; a the weight at full veil.
+    /// rgb the veil's color; a the weight at full veil.
     #[uniform(100)]
     pub tint: Vec4,
 }
@@ -587,9 +587,9 @@ impl Plugin for GlobePlugin {
 /// simulation lives on a flat plane - a hundred and nine call sites speak
 /// `(x, z)` and height, and none of them change. The PICTURE lives on the
 /// sphere: `x` and `z` become a direction, height becomes distance from the
-/// planet's centre, and the rotation turns "up" into the local outward
+/// planet's center, and the rotation turns "up" into the local outward
 /// radial, east into east along the curve. Applied rigidly to a whole chunk
-/// the error within its sixty-four units is eight centimetres, which is why
+/// the error within its sixty-four units is eight centimeters, which is why
 /// chunks can tile a planet without knowing they are doing it.
 pub(crate) fn bend_frame(flat: Vec3) -> (Vec3, Quat) {
     let stance = planet_stance();
@@ -600,7 +600,7 @@ pub(crate) fn bend_frame(flat: Vec3) -> (Vec3, Quat) {
     let east = (ahead - behind).normalize_or(Vec3::X);
     let east = (east - up * east.dot(up)).normalize_or(Vec3::X);
     let turn = Quat::from_mat3(&Mat3::from_cols(east, up, east.cross(up)));
-    let seat = planet_centre() + up * (PLANET_RADIUS + flat.y);
+    let seat = planet_center() + up * (PLANET_RADIUS + flat.y);
     (seat, turn)
 }
 
@@ -627,7 +627,7 @@ pub(crate) fn bent_camera_pose(rig: &CameraRig) -> Transform {
     // rig sitting above one point does not have that problem, because it is
     // one rigid thing over one place.
     let frame = rig.facing;
-    let focus_seat = planet_centre() + (frame * Vec3::Y) * (PLANET_RADIUS + rig.focus.y);
+    let focus_seat = planet_center() + (frame * Vec3::Y) * (PLANET_RADIUS + rig.focus.y);
     let eye_seat = focus_seat + (frame * rig.eye_offset());
     if rig.distance < crate::camera::FIRST_PERSON {
         // The ride, narrated: where the frame thinks up is against where up
@@ -640,8 +640,8 @@ pub(crate) fn bent_camera_pose(rig: &CameraRig) -> Transform {
             bevy::log::info!(
                 "avatar probe: focus {:?} seat_alt {:.1} up_err {up_err:.2}deg fwd_dot_up {:.2}",
                 rig.focus,
-                eye_seat.distance(planet_centre()) - PLANET_RADIUS,
-                (frame * rig.forward()).dot((eye_seat - planet_centre()).normalize()),
+                eye_seat.distance(planet_center()) - PLANET_RADIUS,
+                (frame * rig.forward()).dot((eye_seat - planet_center()).normalize()),
             );
         }
         // No separation to look along; carry the flat gaze into the seat.
@@ -693,9 +693,9 @@ pub(crate) fn bent_camera_pose(rig: &CameraRig) -> Transform {
 /// and would otherwise be bent a second time and thrown a quarter of a world
 /// away from the thing it was reaching for.
 pub(crate) fn unbend(seat: Vec3) -> Vec3 {
-    let from_centre = seat - planet_centre();
-    let radius = from_centre.length().max(1.0);
-    let dir = planet_stance().inverse() * (from_centre / radius);
+    let from_center = seat - planet_center();
+    let radius = from_center.length().max(1.0);
+    let dir = planet_stance().inverse() * (from_center / radius);
     let (x, z) = ground_coordinates(dir);
     Vec3::new(x, radius - PLANET_RADIUS, z)
 }
@@ -828,7 +828,7 @@ fn plant_the_tree(
         .spawn((
             Name::new("The Planet"),
             ThePlanet,
-            Transform::from_translation(planet_centre()).with_rotation(planet_stance()),
+            Transform::from_translation(planet_center()).with_rotation(planet_stance()),
             Visibility::Inherited,
         ))
         .id();
@@ -1051,7 +1051,7 @@ fn veil_of<'k>(
 
 /// Samples one patch of the world: heights and paint from the same fields
 /// the chunks are built from, and a skirt around the edge to curtain the
-/// hairline cracks where neighbouring patches meet at different depths.
+/// hairline cracks where neighboring patches meet at different depths.
 fn build_patch(
     terrain: &Terrain,
     veil: Option<&crate::villager::explore::KnownWorld>,
@@ -1078,7 +1078,7 @@ fn build_patch(
             let dir = (outward + along_u * u + along_v * v).normalize();
             let (x, z) = ground_coordinates(dir);
             // The ground as the world actually stands - channels cut, village
-            // ground levelled - and the water on it, asked once. See
+            // ground leveled - and the water on it, asked once. See
             // `Terrain::ground_and_water_at` for what asking twice cost.
             let (h, wet) = terrain.ground_and_water_at(x, z);
             grid.push(dir * drawn_radial(h));
@@ -1138,10 +1138,10 @@ fn build_patch(
     }
 
     // The skirt: every edge vertex gets a twin pulled toward the planet's
-    // centre, and a wall of triangles joins the two rows. Neighbouring
+    // center, and a wall of triangles joins the two rows. Neighboring
     // patches at different depths do not share vertices, so hairline cracks
     // open along their seams; the skirt stands behind every crack wearing
-    // the edge's own colour, and the crack shows skirt instead of sky. Both
+    // the edge's own color, and the crack shows skirt instead of sky. Both
     // windings are emitted — the wall must read from either side, and a
     // skirt's worth of overdraw is nothing.
     let drop = key.cell_arc() * 2.5;
@@ -1282,17 +1282,17 @@ fn repaint_patch_veil(
     let step = side / n as f32;
 
     // Fast reject if the whole patch is far from the known world:
-    let patch_centre = key.centre_dir();
+    let patch_center = key.center_dir();
     let patch_reach = key.cell_arc() * (n as f32) * 0.9;
-    let home_dir = chart_direction(known.centre.xz());
+    let home_dir = chart_direction(known.center.xz());
     let home_reach = (known.radius + 64.0) / PLANET_RADIUS;
-    let angle_to_home = patch_centre.dot(home_dir).clamp(-1.0, 1.0).acos();
+    let angle_to_home = patch_center.dot(home_dir).clamp(-1.0, 1.0).acos();
 
     let touches_home = angle_to_home <= (patch_reach + home_reach);
     let touches_any_pocket = known.pockets.iter().any(|pocket| {
         let p_dir = chart_direction(pocket.at.xz());
         let p_reach = (pocket.radius + 64.0) / PLANET_RADIUS;
-        let angle = patch_centre.dot(p_dir).clamp(-1.0, 1.0).acos();
+        let angle = patch_center.dot(p_dir).clamp(-1.0, 1.0).acos();
         angle <= (patch_reach + p_reach)
     });
 
@@ -1351,8 +1351,8 @@ pub(crate) fn ground_coordinates(dir: Vec3) -> (f32, f32) {
 /// blue, because there was nothing else to draw the sea with up here. That is
 /// what made the ocean a picture of water rather than water: the flat sheet
 /// over the loaded ground had the whole water shader - waves, sky reflection,
-/// fresnel, foam - and the planet had a coloured triangle, and where the two
-/// met you could see the join. They can be given the same colour and never the
+/// fresnel, foam - and the planet had a colored triangle, and where the two
+/// met you could see the join. They can be given the same color and never the
 /// same light.
 ///
 /// So the bed is drawn where the bed is, and `build_patch_water` lays the
@@ -1369,7 +1369,7 @@ fn drawn_radial(h: f32) -> f32 {
 ///
 /// Drawn at the water's own surface, with the sphere's own outward for a
 /// normal - a level surface on a ball IS the sphere, so there is nothing to
-/// derive. No skirt and no neighbour sampling either: the sheet is level, so
+/// derive. No skirt and no neighbor sampling either: the sheet is level, so
 /// two patches meeting at different depths still meet exactly.
 ///
 /// Sunk by `WATER_CLEARANCE` - just enough to keep out of the chunks' way,
@@ -1432,16 +1432,16 @@ fn build_patch_water(
             positions.push((dir * (PLANET_RADIUS + wet - WATER_CLEARANCE)).to_array());
             normals.push(dir.to_array());
             // Depth against the bed, exactly as the chunks' own sea reads it,
-            // so the two agree where they meet. See `terrain::water_colour`.
-            let mut colour = crate::terrain::water_colour(wet - h);
+            // so the two agree where they meet. See `terrain::water_color`.
+            let mut color = crate::terrain::water_color(wet - h);
             // And the veil is worn the way the land wears it: alpha zero is
             // the mark `paint_patch_colors` makes on unknown ground, and the
             // planet's skin reads that one mark for both. One veil, one
-            // colour - see `paint_patch_colors`.
+            // color - see `paint_patch_colors`.
             if veil.is_some_and(|known| !known.knows(Vec3::new(x, 0.0, z))) {
-                colour[3] = 0.0;
+                color[3] = 0.0;
             }
-            colors.push(colour);
+            colors.push(color);
         }
     }
     if !any {
@@ -1497,11 +1497,11 @@ fn build_patch_water(
     )
 }
 
-/// One vertex's colour: any standing water by depth in the water's own
+/// One vertex's color: any standing water by depth in the water's own
 /// ramp — the sea, and the lakes and rivers the courses know — the land by
 /// the chunk painter itself, darkened under deep woods the way the ground
 /// disappears under canopy from the air. The aim is that the planet at any
-/// height is recognisably the ground the game is played on.
+/// height is recognizably the ground the game is played on.
 fn paint(terrain: &Terrain, x: f32, z: f32, h: f32, wet: f32, slope: f32) -> [f32; 4] {
     if h < wet {
         let depth = ((wet - h) / 8.0).clamp(0.0, 1.0);
@@ -1587,7 +1587,7 @@ fn tend_the_tree(
         return;
     };
     // The camera, brought into the planet's own frame.
-    let cam_mesh = planet_stance().inverse() * (camera.translation() - planet_centre());
+    let cam_mesh = planet_stance().inverse() * (camera.translation() - planet_center());
     let px_per_radian = windows
         .single()
         .map(|w| w.resolution.height())
@@ -1611,9 +1611,9 @@ fn tend_the_tree(
         if key.over_the_limb(cam_mesh) {
             continue;
         }
-        let centre = key.centre_dir() * (PLANET_RADIUS + WATER_LEVEL);
+        let center = key.center_dir() * (PLANET_RADIUS + WATER_LEVEL);
         let reach = key.cell_arc() * PATCH_CELLS as f32 * 0.75;
-        let distance = (cam_mesh.distance(centre) - reach).max(REFINE_FLOOR);
+        let distance = (cam_mesh.distance(center) - reach).max(REFINE_FLOOR);
         let sharp_px = key.cell_arc() / distance * px_per_radian;
         // Once a patch HAS been split, the error must fall well under the
         // threshold before its children are given up again - otherwise an
@@ -1665,7 +1665,7 @@ fn tend_the_tree(
                 let paint_beat = tree.paint_beat;
                 for (key, patch) in tree.built.iter_mut() {
                     let reach = key.cell_arc() * PATCH_CELLS as f32 * 0.8;
-                    let dir = key.centre_dir();
+                    let dir = key.center_dir();
                     let touched = toward.iter().any(|(disc, arc)| {
                         let limit = (reach + arc).min(std::f32::consts::PI);
                         dir.dot(*disc) > limit.cos()
@@ -1713,8 +1713,8 @@ fn tend_the_tree(
         })
         .collect();
     missing.sort_by(|a, b| {
-        let da = cam_mesh.distance(a.centre_dir() * PLANET_RADIUS);
-        let db = cam_mesh.distance(b.centre_dir() * PLANET_RADIUS);
+        let da = cam_mesh.distance(a.center_dir() * PLANET_RADIUS);
+        let db = cam_mesh.distance(b.center_dir() * PLANET_RADIUS);
         da.total_cmp(&db)
     });
     // A big backlog earns a bigger budget.
@@ -1805,7 +1805,7 @@ fn tend_the_tree(
 
 /// Space is dark, and the climb to it starts before the chunks bow out.
 ///
-/// The sky painter writes the horizon colour into the clear colour every
+/// The sky painter writes the horizon color into the clear color every
 /// frame; this runs after it and takes the sky through what a climb should
 /// look like — blue first, black only with real altitude.
 fn dress_for_space(mut clear: ResMut<ClearColor>, cameras: Query<&CameraRig, With<GodCamera>>) {
@@ -1818,9 +1818,9 @@ fn dress_for_space(mut clear: ResMut<ClearColor>, cameras: Query<&CameraRig, Wit
         return;
     }
 
-    // The sky becomes a sky, and then becomes space. The horizon colour it
-    // starts from is a neutral grey from the era when terrain had to
-    // dissolve into it; above a genuinely curving horizon that grey read as
+    // The sky becomes a sky, and then becomes space. The horizon color it
+    // starts from is a neutral gray from the era when terrain had to
+    // dissolve into it; above a genuinely curving horizon that gray read as
     // a dead band lying on the world, so the climb takes it to blue first
     // and only then thins it out to black.
     let mix =
@@ -1833,7 +1833,7 @@ fn dress_for_space(mut clear: ResMut<ClearColor>, cameras: Query<&CameraRig, Wit
     let horizon = clear.0.to_linear();
     let sky_blue = palette::shade(&palette::SKY, 0.58).to_linear();
     let space = Color::srgb(0.004, 0.005, 0.012).to_linear();
-    // Grey to blue across the first stretch of the climb...
+    // Gray to blue across the first stretch of the climb...
     let bluing = ((height - ASCENT) / 4_000.0).clamp(0.0, 1.0);
     let skyed = mix(horizon, sky_blue, bluing);
     // ...then blue to black, and DONE by eleven thousand. It used to ramp to
@@ -1856,7 +1856,7 @@ mod tests {
     fn growth_changes_only_the_ground_it_touched() {
         use super::VeilSeen;
         let before = VeilSeen {
-            centre: Vec2::new(1000.0, 200.0),
+            center: Vec2::new(1000.0, 200.0),
             radius: 170.0,
             pockets: vec![(Vec2::new(1400.0, 250.0), 30.0)],
         };
@@ -1867,7 +1867,7 @@ mod tests {
                 (Vec2::new(1400.0, 250.0), 30.0),
             ],
             ..VeilSeen {
-                centre: before.centre,
+                center: before.center,
                 radius: before.radius,
                 pockets: Vec::new(),
             }
@@ -1878,8 +1878,8 @@ mod tests {
         // The home circle growing names both paintings of it.
         after.radius = 240.0;
         let discs = before.changed_discs(&after);
-        assert!(discs.contains(&(before.centre, 170.0)));
-        assert!(discs.contains(&(before.centre, 240.0)));
+        assert!(discs.contains(&(before.center, 170.0)));
+        assert!(discs.contains(&(before.center, 240.0)));
     }
 
     /// The staleness test lives on the sphere: a chart position must bend
@@ -1920,8 +1920,8 @@ mod tests {
         ] {
             let (seat, _) = bend_frame(flat);
             // What the shader does, in the same order.
-            let from_centre = seat - planet_centre();
-            let unturned = Vec3::new(from_centre.x, -from_centre.z, from_centre.y);
+            let from_center = seat - planet_center();
+            let unturned = Vec3::new(from_center.x, -from_center.z, from_center.y);
             let dir = unturned.normalize();
             let lat = dir.y.clamp(-1.0, 1.0).asin();
             let lon = dir.x.atan2(dir.z);
@@ -2106,10 +2106,10 @@ mod tests {
 
     /// Why chunk GEOMETRY is bent per vertex rather than each chunk being
     /// seated rigidly on its own tangent point — measured, because the rigid
-    /// version was tried first on the strength of an eight-centimetre
+    /// version was tried first on the strength of an eight-centimeter
     /// estimate that turned out to be for a bigger planet and a nearer point.
     /// At this radius a chunk's corner bows a fifth of a unit from its
-    /// centre's frame and two thirds from its ORIGIN's, so neighbours seated
+    /// center's frame and two thirds from its ORIGIN's, so neighbors seated
     /// by their own origins would disagree at every shared edge: a step at
     /// every seam in the world. Bent per vertex, a shared edge is the same
     /// world position for both chunks and gets the same seat, exactly.
@@ -2272,7 +2272,7 @@ mod tests {
         assert!(fine.cell_arc() < 3.0, "{}", fine.cell_arc());
     }
 
-    /// A patch mesh holds together: grid plus skirt, a colour for every
+    /// A patch mesh holds together: grid plus skirt, a color for every
     /// vertex.
     #[test]
     fn a_patch_stands_scrutiny() {
@@ -2295,7 +2295,7 @@ mod tests {
         assert_eq!(colors, positions);
     }
 
-    /// An eye that height above the ground under `face`'s centre.
+    /// An eye that height above the ground under `face`'s center.
     fn eye_over(face: u8, height: f32) -> Vec3 {
         let root = PatchKey {
             face,
@@ -2303,7 +2303,7 @@ mod tests {
             x: 0,
             y: 0,
         };
-        root.centre_dir() * (PLANET_RADIUS + height)
+        root.center_dir() * (PLANET_RADIUS + height)
     }
 
     #[test]
@@ -2357,7 +2357,7 @@ mod tests {
 
     #[test]
     fn nothing_with_a_corner_in_view_is_ever_culled() {
-        // What the half span is FOR. The cull reads a patch's centre, and a
+        // What the half span is FOR. The cull reads a patch's center, and a
         // patch whose middle is over the horizon can still have a near corner
         // in plain sight; culling by the middle alone walks a visible bite out
         // of the edge of the world.

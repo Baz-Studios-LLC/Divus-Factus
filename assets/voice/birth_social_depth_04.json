@@ -1,6 +1,6 @@
 [
   {
-    "t": "I heard the child breathe before I realised I had been holding my own breath.",
+    "t": "I heard the child breathe before I realized I had been holding my own breath.",
     "tags": [
       "tell",
       "event:delivered",
@@ -310,7 +310,7 @@
     ]
   },
   {
-    "t": "Maybe {god} answered. Maybe the healer did. I can honour both.",
+    "t": "Maybe {god} answered. Maybe the healer did. I can honor both.",
     "tags": [
       "reply",
       "event:delivered",
@@ -430,7 +430,7 @@
     ]
   },
   {
-    "t": "Was anyone listening when the mother spoke afterwards?",
+    "t": "Was anyone listening when the mother spoke afterward?",
     "tags": [
       "reply",
       "event:delivered",

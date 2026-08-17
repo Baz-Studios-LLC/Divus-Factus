@@ -1,7 +1,7 @@
 //! The world's clock: day and night, and the calendar that will hang off it.
 //!
 //! One resource ticks forward; everything temporal derives from it. The sun's
-//! path, the light's colour, the horizon, the date in the HUD — and eventually
+//! path, the light's color, the horizon, the date in the HUD — and eventually
 //! work schedules, seasons, festivals and weather — all read the same number,
 //! so none of them can drift apart.
 //!
@@ -116,7 +116,7 @@ impl Season {
         }
     }
 
-    /// The season's thumb on the weather dice: shifted toward grey and
+    /// The season's thumb on the weather dice: shifted toward gray and
     /// storm in the dark half of the year, toward clear skies in summer.
     pub fn gloom(self) -> f32 {
         match self {
@@ -208,7 +208,7 @@ impl WorldClock {
         }
     }
 
-    /// Where the sun actually IS, as a unit vector from the planet's centre.
+    /// Where the sun actually IS, as a unit vector from the planet's center.
     ///
     /// The world is a sphere, so the sun can stop being a lighting trick and
     /// become a body with a position. It travels one circuit of the planet a
@@ -344,12 +344,12 @@ fn tick(time: Res<Time>, mut clock: ResMut<WorldClock>) {
 /// consumed by the lights, the fog, the sky and the water.
 #[derive(Resource)]
 pub struct Sky {
-    /// Unit vector from the planet's centre toward the sun — where the sun
+    /// Unit vector from the planet's center toward the sun — where the sun
     /// actually is, and below the horizon for half of every day.
     pub sun_direction: Vec3,
     pub sun_color: Color,
     pub sun_illuminance: f32,
-    /// The colour of fog, empty sky and the water's reflection.
+    /// The color of fog, empty sky and the water's reflection.
     pub horizon: Color,
     pub ambient_color: Color,
     pub ambient_brightness: f32,
@@ -362,7 +362,7 @@ pub struct Sky {
     /// [`apply_sky_to_lights`].
     pub fill_direction: Vec3,
     /// How much daylight there is, 0 at night to 1 at noon. For anything that
-    /// needs to dim with the day — the water's body colour, for one.
+    /// needs to dim with the day — the water's body color, for one.
     pub daylight: f32,
 }
 
@@ -378,7 +378,7 @@ fn smoothstep(lo: f32, hi: f32, x: f32) -> f32 {
     t * t * (3.0 - 2.0 * t)
 }
 
-/// Linear blend between two colours, used by everything that follows the sun.
+/// Linear blend between two colors, used by everything that follows the sun.
 pub fn mix_colors(a: Color, b: Color, t: f32) -> Color {
     let (a, b) = (a.to_linear(), b.to_linear());
     Color::LinearRgba(LinearRgba {
@@ -394,7 +394,7 @@ pub fn mix_colors(a: Color, b: Color, t: f32) -> Color {
 ///
 /// Two arguments now, because on a round world those are two different things:
 /// the sun has one position, and every place on the planet sees it at its own
-/// height above its own horizon. The elevation shapes the light's colour and
+/// height above its own horizon. The elevation shapes the light's color and
 /// weight — dawn, noon, dusk — while the position aims it, and the far side of
 /// the world is dark for the honest reason that the sun is on the other side of
 /// it.
@@ -432,7 +432,7 @@ fn sky_toward(sun_direction: Vec3, elevation: f32) -> Sky {
     Sky {
         sun_direction,
         sun_color,
-        // Thirty-two: the day every colour in this game was measured against
+        // Thirty-two: the day every color in this game was measured against
         // was seventeen thousand of sun PLUS sixteen thousand of leaked
         // portrait key (see DOLL_LAYER). The leak is fixed; the sun carries
         // what it carried, so midday still looks like the game Brett built.
@@ -509,16 +509,16 @@ fn drive_sky(
         }
     }
     // Weather sits on top of the hour: the sun dims behind the deck and the
-    // horizon greys - and because fog reads the horizon, rain greys the
+    // horizon grays - and because fog reads the horizon, rain grays the
     // whole distance with it.
     if let Some(weather) = weather {
         let i = weather.intensity;
         sky.sun_illuminance *= 1.0 - i * 0.55;
         sky.fill_illuminance *= 1.0 - i * 0.3;
         sky.ambient_brightness *= 1.0 - i * 0.25;
-        let grey = Color::srgb(0.52, 0.55, 0.58);
-        sky.horizon = mix_colors(sky.horizon, grey, i * 0.45 * sky.daylight);
-        sky.sun_color = mix_colors(sky.sun_color, grey, i * 0.4);
+        let gray = Color::srgb(0.52, 0.55, 0.58);
+        sky.horizon = mix_colors(sky.horizon, gray, i * 0.45 * sky.daylight);
+        sky.sun_color = mix_colors(sky.sun_color, gray, i * 0.4);
     }
 }
 
@@ -636,7 +636,7 @@ fn apply_sky_to_lights(
         );
     }
 
-    let centre = crate::globe::planet_centre();
+    let center = crate::globe::planet_center();
     for (mut light, mut transform, _) in &mut suns {
         light.color = sky.sun_color;
         light.illuminance = sky.sun_illuminance.max(1.0);
@@ -646,7 +646,7 @@ fn apply_sky_to_lights(
         // And none when the switch is off: shadows are a layer like any other
         // now (see `debug::layers`), reachable from the settings and from
         // `DIVUS_FACTUS_LAYER_SHADOWS=0`, with the older `DIVUS_FACTUS_SHADOWS=0`
-        // still honoured so the numbers already recorded stay reproducible.
+        // still honored so the numbers already recorded stay reproducible.
         // And no shadows from too far back, where the cascades cannot reach
         // the ground anyway: 3.5ms for a frame that measures identical.
         let pulled_back = eyes.iter().next().map(|rig| rig.distance);
@@ -668,30 +668,30 @@ fn apply_sky_to_lights(
         // Probe: DIVUS_FACTUS_SUN_FREEZE=1 pins the sun where it stands, to
         // tell a flicker fed by the sun's own crawl from every other kind.
         if std::env::var("DIVUS_FACTUS_SUN_FREEZE").is_err() {
-            *transform = Transform::from_translation(centre + sky.sun_direction * SUN_ORBIT)
-                .looking_at(centre, Vec3::Y);
+            *transform = Transform::from_translation(center + sky.sun_direction * SUN_ORBIT)
+                .looking_at(center, Vec3::Y);
         }
     }
     for (mut light, mut transform) in &mut fills {
         light.illuminance = sky.fill_illuminance;
-        *transform = Transform::from_translation(centre + sky.fill_direction * 9_000.0)
-            .looking_at(centre, Vec3::Y);
+        *transform = Transform::from_translation(center + sky.fill_direction * 9_000.0)
+            .looking_at(center, Vec3::Y);
     }
 
     for (mut light, mut transform) in &mut moons {
         light.illuminance = sky.moon_illuminance;
-        *transform = Transform::from_translation(centre - sky.sun_direction * MOON_ORBIT)
-            .looking_at(centre, Vec3::Y);
+        *transform = Transform::from_translation(center - sky.sun_direction * MOON_ORBIT)
+            .looking_at(center, Vec3::Y);
     }
 }
 
 /// Carries the two bodies round with their light.
 fn carry_the_bodies(sky: Res<Sky>, mut bodies: Query<(&mut Transform, &Celestial)>) {
-    let centre = crate::globe::planet_centre();
+    let center = crate::globe::planet_center();
     for (mut transform, body) in &mut bodies {
         transform.translation = match body {
-            Celestial::Sun => centre + sky.sun_direction * SUN_ORBIT,
-            Celestial::Moon => centre - sky.sun_direction * MOON_ORBIT,
+            Celestial::Sun => center + sky.sun_direction * SUN_ORBIT,
+            Celestial::Moon => center - sky.sun_direction * MOON_ORBIT,
         };
     }
 }
@@ -735,7 +735,7 @@ fn hang_the_sky(
                 unlit: true,
                 ..default()
             })),
-            Transform::from_translation(crate::globe::planet_centre() + Vec3::Y * SUN_ORBIT),
+            Transform::from_translation(crate::globe::planet_center() + Vec3::Y * SUN_ORBIT),
             // Seen from the ground, from the air, and from orbit: the world's
             // layer and the planet's both.
             RenderLayers::from_layers(&[0, crate::globe::GLOBE_LAYER]),
@@ -829,7 +829,7 @@ mod tests {
     }
 
     /// The sun is a body with a place now, and its place is only ever a unit
-    /// vector from the planet's centre — including through the night, when it
+    /// vector from the planet's center — including through the night, when it
     /// is under the world and the direction has to stay usable.
     #[test]
     fn the_sun_direction_is_always_usable() {

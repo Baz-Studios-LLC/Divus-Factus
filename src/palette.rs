@@ -1,6 +1,6 @@
 //! The master palette.
 //!
-//! Every colour in the game comes from here. Procedurally generated art fails when
+//! Every color in the game comes from here. Procedurally generated art fails when
 //! it is merely *varied* — the result reads as noise. Cohesion comes from
 //! restriction, so terrain, creatures, cloth and particles all sample the same
 //! small set of ramps, and the post-process snaps the final image back onto it.
@@ -240,7 +240,7 @@ pub const ALL_RAMPS: &[Ramp] = &[
     CLOTH_SABLE,
 ];
 
-/// Indices into [`ALL_RAMPS`]. Meshes refer to colours by ramp index and step
+/// Indices into [`ALL_RAMPS`]. Meshes refer to colors by ramp index and step
 /// rather than by `Color`, which lets every creature in the world share one small
 /// set of cached materials.
 pub const RAMP_STONE: usize = 0;
@@ -299,7 +299,7 @@ pub const HAIR_RAMPS: &[usize] = &[RAMP_EARTH, RAMP_WOOD, RAMP_BONE, RAMP_STONE]
 /// Steps per ramp.
 pub const RAMP_STEPS: usize = 5;
 
-/// Total number of distinct colours in the palette.
+/// Total number of distinct colors in the palette.
 ///
 /// Derived from the ramp table rather than written out, so adding a ramp cannot
 /// leave the two out of step.
@@ -316,7 +316,7 @@ pub fn palette_index(ramp_id: usize, step: usize) -> usize {
     ramp_id.min(ALL_RAMPS.len() - 1) * RAMP_STEPS + step.min(RAMP_STEPS - 1)
 }
 
-/// The colour at a flat palette index.
+/// The color at a flat palette index.
 pub fn color_at(index: usize) -> Color {
     let index = index.min(PALETTE_LEN - 1);
     let [r, g, b] = ALL_RAMPS[index / RAMP_STEPS][index % RAMP_STEPS];
@@ -332,7 +332,7 @@ pub fn shade(ramp: &Ramp, t: f32) -> Color {
 
 /// Like [`shade`] but blends between adjacent steps instead of snapping.
 ///
-/// Used for terrain vertex colours, where hard steps would show up as banding
+/// Used for terrain vertex colors, where hard steps would show up as banding
 /// across large triangles. The quantiser re-imposes the steps at the end anyway.
 pub fn shade_smooth(ramp: &Ramp, t: f32) -> Color {
     let t = t.clamp(0.0, 1.0) * 4.0;
@@ -363,7 +363,7 @@ pub fn shade_blend(a: &Ramp, b: &Ramp, blend: f32, t: f32) -> Color {
 
 /// Every ramp that has a NAME, and the name it answers to.
 ///
-/// The word is the contract: authored work speaks colour as
+/// The word is the contract: authored work speaks color as
 /// `{"ramp": "wood", "shade": 0.7}` rather than as raw RGB, so a drawing made
 /// last year inherits this year's palette for free. Which means the names here
 /// are load-bearing in files outside this repository, and renaming one silently
@@ -405,7 +405,7 @@ pub const NAMED_RAMPS: &[(&str, &Ramp)] = &[
 ///
 /// Lifted out of the hand-run export that used to hold it, because the game
 /// writes this file itself now - see `baked::furnish_the_makers_bench` - and
-/// a player who never clones this repository still needs the true colours.
+/// a player who never clones this repository still needs the true colors.
 pub fn as_json() -> String {
     let ramps: Vec<String> = NAMED_RAMPS
         .iter()

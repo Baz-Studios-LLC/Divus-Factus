@@ -153,7 +153,7 @@
     ]
   },
   {
-    "t": "A neighbour told me the child is doing well. I hope the mother is too.",
+    "t": "A neighbor told me the child is doing well. I hope the mother is too.",
     "tags": [
       "tell",
       "event:delivered",
@@ -243,7 +243,7 @@
     ]
   },
   {
-    "t": "Someone told me the family prayed afterwards. Perhaps relief makes believers of us.",
+    "t": "Someone told me the family prayed afterward. Perhaps relief makes believers of us.",
     "tags": [
       "tell",
       "event:delivered",
@@ -536,7 +536,7 @@
     ]
   },
   {
-    "t": "Maybe {god} was listening. I know the neighbours were.",
+    "t": "Maybe {god} was listening. I know the neighbors were.",
     "tags": [
       "reply",
       "event:delivered",
@@ -1383,7 +1383,7 @@
     ]
   },
   {
-    "t": "The family needs neighbours more than opinions right now.",
+    "t": "The family needs neighbors more than opinions right now.",
     "tags": [
       "chat:end",
       "event:delivered",

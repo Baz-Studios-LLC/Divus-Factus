@@ -6,7 +6,7 @@
 //! low-resolution buffer cost sharpness without buying the authority of real pixel
 //! art. Sharp low-poly is its own look, and it suits these models better.
 //!
-//! The palette did not go away. It is still where every colour in the game is
+//! The palette did not go away. It is still where every color in the game is
 //! authored, which is what keeps procedurally generated art coherent. What went away
 //! is the post-process that re-quantised the finished image back onto it.
 //!
@@ -122,7 +122,7 @@ pub struct LookSettings {
     pub focus_bias: f32,
     /// Overall exposure, in stops.
     pub exposure: f32,
-    /// Colour saturation after tonemapping.
+    /// Color saturation after tonemapping.
     ///
     /// Slightly below 1 by default. The palette's greens are already saturated as
     /// authored, and pushing them further under a warm key light drives the whole
@@ -140,7 +140,7 @@ impl Default for LookSettings {
             bloom: 0.18,
             vignette: 0.3,
             // Shallow enough to read as a diorama, not so shallow that a villager a
-            // few metres off the focus point turns to mush.
+            // few meters off the focus point turns to mush.
             aperture: 12.0,
             focus_bias: 1.0,
             exposure: 0.05,
@@ -156,14 +156,14 @@ impl LookSettings {
     }
 }
 
-/// The colour of the daytime sky.
+/// The color of the daytime sky.
 ///
-/// It used to be a near-grey, and deliberately: it was the colour the DISTANCE
+/// It used to be a near-gray, and deliberately: it was the color the DISTANCE
 /// FOG faded the world into, and the two had to match exactly or the boundary
 /// between fogged ground and empty sky drew a hard line across the horizon. A
 /// blue that strong tinted every mid-distance hill blue rather than hazy, so it
 /// was pulled almost half way to bone white — which is why the sky has been
-/// grey ever since.
+/// gray ever since.
 ///
 /// There is no distance fog any more (a round world hides its own distance over
 /// the horizon, which is what fog was faking) and nothing left that has to
@@ -171,15 +171,15 @@ impl LookSettings {
 /// the edge off the palette's flat blue and reads as air rather than paint.
 /// The sky is a LIGHT and not a surface, so it is written to the buffer both
 /// brighter AND more saturated than the palette step it wants to end up as.
-/// The tonemapper pulls bright colours toward white — hand it the palette's own
-/// blue and it comes back (100, 123, 151), grey by the time anyone sees it, and
+/// The tonemapper pulls bright colors toward white — hand it the palette's own
+/// blue and it comes back (100, 123, 151), gray by the time anyone sees it, and
 /// simply brightening it makes that worse, not better. Pushed out from its own
 /// luminance first, it survives the trip.
 pub fn horizon_color() -> Color {
     let sky = palette::shade(&palette::SKY, 0.85).to_linear();
     // Solved rather than guessed, from two measured points through the
     // tonemapper: saturation alone gave a holiday-poster blue (62, 140, 201)
-    // and brightness alone gave grey, so these are the pair that land the
+    // and brightness alone gave gray, so these are the pair that land the
     // rendered pixel on an airy daylight sky.
     const SATURATE: f32 = 1.30;
     const GAIN: f32 = 2.44;
@@ -193,7 +193,7 @@ pub fn horizon_color() -> Color {
     })
 }
 
-/// Colour grading built from the current look settings.
+/// Color grading built from the current look settings.
 fn grading(look: &LookSettings) -> ColorGrading {
     ColorGrading {
         global: ColorGradingGlobal {
@@ -271,7 +271,7 @@ fn setup_pipeline(
     // transform by being its child and shares its projection, so the two views
     // are pixel-aligned. It runs *no* tonemapping: the image it composites onto
     // has already been through the main camera's TonyMcMapface pass, and running
-    // the curve a second time greys the whole world out. The hand is drawn raw
+    // the curve a second time grays the whole world out. The hand is drawn raw
     // on top, and skips the atmosphere — no fog, no depth of field. A cursor is
     // not part of the scenery.
     let overlay = commands
@@ -346,7 +346,7 @@ fn setup_pipeline(
 /// settings apply — and when each held its own copy of this rule they
 /// disagreed at the edges: a look change could re-insert the component with
 /// Bevy's DEFAULT focal distance, a few units, which blurs the entire world
-/// into a grey mush until the other system notices. Every grey in that
+/// into a gray mush until the other system notices. Every gray in that
 /// family answers to this one function now.
 pub(crate) fn lens_belongs(rig: &CameraRig) -> bool {
     !(rig.in_a_body
@@ -363,7 +363,7 @@ fn focus_depth_of_field(
         // Behind a mortal's eyes there is no diorama to photograph, and the
         // sum below is actively harmful there: the focal plane sits at the
         // camera's own orbit distance, and that distance is NOUGHT when the
-        // god is wearing a body. The plane fell to the ten-centimetre floor
+        // god is wearing a body. The plane fell to the ten-centimeter floor
         // and the whole world, the ground included, went to mush.
         //
         // The lens is taken off entirely, by REMOVING the component — not by
@@ -445,7 +445,7 @@ fn apply_look_settings(
         // And never inserted where the lens does not belong: this used to
         // re-add it on any look change regardless of height, with the
         // DEFAULT focal distance - a few units - and the whole world past
-        // arm's reach dissolved into featureless grey until it was hunted
+        // arm's reach dissolved into featureless gray until it was hunted
         // down by altitude, twice.
         if !look.depth_of_field_enabled() || !lens_belongs(rig) {
             commands.entity(entity).remove::<DepthOfField>();
@@ -456,7 +456,7 @@ fn apply_look_settings(
                 mode: DepthOfFieldMode::Bokeh,
                 aperture_f_stops: look.aperture,
                 // Aimed on arrival, not defaulted: the default focal
-                // distance is a few units, and one frame of it is a grey
+                // distance is a few units, and one frame of it is a gray
                 // flash across the whole world.
                 focal_distance: (rig.distance * look.focus_bias).max(0.1),
                 ..default()

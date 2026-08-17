@@ -3,7 +3,7 @@
 //! Nobody plans a road. Every walking villager leaves a little wear in the
 //! cell under their feet; wear accumulates where routes repeat — fire to
 //! shore, door to field, square to quarry — and fades where they don't.
-//! The path is painted straight into the terrain's vertex colours: grass
+//! The path is painted straight into the terrain's vertex colors: grass
 //! blends toward bare earth as wear builds and blends back as it fades,
 //! so a trail looks like ground that has been walked, not like tiles laid
 //! on top of it. Worn ground is faster underfoot, so the village's habits
@@ -91,8 +91,8 @@ impl Trails {
                 let Some(cell) = self.cells.get(&at) else {
                     continue;
                 };
-                let centre = Vec2::new((at.x as f32 + 0.5) * CELL, (at.y as f32 + 0.5) * CELL);
-                let reach = 1.0 - (centre.distance(Vec2::new(x, z)) / (CELL * 1.35)).min(1.0);
+                let center = Vec2::new((at.x as f32 + 0.5) * CELL, (at.y as f32 + 0.5) * CELL);
+                let reach = 1.0 - (center.distance(Vec2::new(x, z)) / (CELL * 1.35)).min(1.0);
                 strongest = strongest.max(cell.wear * reach);
             }
         }
@@ -151,8 +151,8 @@ fn tread(
 }
 
 /// The slow keeping of the ground: wear fades, and the terrain's own
-/// vertex colours are repainted — toward bare earth where feet insist,
-/// back toward the true ground colour where they have stopped.
+/// vertex colors are repainted — toward bare earth where feet insist,
+/// back toward the true ground color where they have stopped.
 fn paint(
     mut commands: Commands,
     time: Res<Time>,
@@ -198,14 +198,14 @@ fn paint(
     }
 
     // Which chunks those cells touch (with a margin: a cell near a chunk
-    // seam tints vertices in the neighbour too).
+    // seam tints vertices in the neighbor too).
     let mut dirty: Vec<IVec2> = fresh_coords;
     for at in &stale {
-        let centre = Vec2::new((at.x as f32 + 0.5) * CELL, (at.y as f32 + 0.5) * CELL);
+        let center = Vec2::new((at.x as f32 + 0.5) * CELL, (at.y as f32 + 0.5) * CELL);
         for (dx, dz) in [(0.0, 0.0), (-2.5, 0.0), (2.5, 0.0), (0.0, -2.5), (0.0, 2.5)] {
             let coord = IVec2::new(
-                ((centre.x + dx) / CHUNK_SIZE).floor() as i32,
-                ((centre.y + dz) / CHUNK_SIZE).floor() as i32,
+                ((center.x + dx) / CHUNK_SIZE).floor() as i32,
+                ((center.y + dz) / CHUNK_SIZE).floor() as i32,
             );
             if !dirty.contains(&coord) {
                 dirty.push(coord);
@@ -247,11 +247,11 @@ fn paint(
     // minute, not every chunk every frame.
     if let Some(grass) = grass.as_mut() {
         for coord in &dirty {
-            let centre = Vec2::new(
+            let center = Vec2::new(
                 (coord.x as f32 + 0.5) * CHUNK_SIZE,
                 (coord.y as f32 + 0.5) * CHUNK_SIZE,
             );
-            grass.invalidate_near(&mut commands, centre.x, centre.y, CHUNK_SIZE * 0.5);
+            grass.invalidate_near(&mut commands, center.x, center.y, CHUNK_SIZE * 0.5);
         }
     }
 

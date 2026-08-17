@@ -437,60 +437,89 @@ mod tests {
         }
     }
 
-    /// The village speaks one English, and it is the one on the game's
-    /// own labels: a chronicle that reads "nursed a neighbour back to
-    /// health" beside a bubble that says "neighbor" is a seam the player
-    /// can see. The corpus drifted American across two authored batches -
-    /// realized, honor, favor, traveling, gray - and nothing caught it,
-    /// because every other gate is about truth or shape rather than
-    /// spelling.
+    /// The village speaks one English, and it is AMERICAN.
+    ///
+    /// It was British for most of this game's life, on the reasoning that
+    /// the game's own labels were - a chronicle reading "nursed a neighbor
+    /// back to health" beside a bubble saying "neighbor" is a seam the
+    /// player can see. The seam was real; the choice was not, and nobody
+    /// ever decided it. Brett: "I am not even sure how the britishg rule
+    /// started, its been bugging me so i figured now is a good time to fix
+    /// it." So the whole game moved - the corpus, the labels, the code's own
+    /// prose and its identifiers - and this gate turned round with it.
+    ///
+    /// The seam is still what it guards. One English, whichever one.
     #[test]
     fn the_village_speaks_one_english() {
-        // The American half of each pair, and what the game says instead.
-        const DRIFT: &[(&str, &str)] = &[
-            ("neighbor", "neighbour"),
-            ("color", "colour"),
-            ("honor", "honour"),
-            ("favor", "favour"),
-            ("labor", "labour"),
-            ("harbor", "harbour"),
-            ("rumor", "rumour"),
-            ("humor", "humour"),
-            ("behavior", "behaviour"),
-            ("marvelous", "marvellous"),
-            ("traveled", "travelled"),
-            ("traveling", "travelling"),
-            ("realize", "realise"),
-            ("realized", "realised"),
-            ("recognize", "recognise"),
-            ("recognized", "recognised"),
-            ("apologize", "apologise"),
-            ("apologized", "apologised"),
-            ("organize", "organise"),
-            ("practiced", "practised"),
-            ("defense", "defence"),
-            ("offense", "offence"),
-            ("gray", "grey"),
-            ("plow", "plough"),
-            // Not a spelling pair but a preference, and the village keeps
-            // one: "afterward" and "toward" are the American forms, and
-            // thirty lines had crept in across eighteen files - the whole
-            // corpus, back to the earliest batches, without a single
-            // "afterwards" anywhere to argue with them. The hand-written
-            // list above is only as good as its last entry.
-            ("afterward", "afterwards"),
-            ("toward", "towards"),
+        // THE FORBIDDEN HALF IS BUILT, NOT WRITTEN.
+        //
+        // This table used to spell both halves of every pair out in full -
+        // which meant it contained the very words it forbids, and the day the
+        // whole game was swept from British to American the sweep corrupted
+        // the gate along with everything else: every pair collapsed to
+        // ("gray", "gray"), and the test began failing the corpus for using
+        // the spelling it was there to require.
+        //
+        // Assembled from stems instead. A sweep has nothing to catch hold of,
+        // and the assertion below refuses to run at all if a pair ever does
+        // collapse.
+        let ou = |stem: &str| (format!("{stem}our"), format!("{stem}or"));
+        let ise = |stem: &str| (format!("{stem}ise"), format!("{stem}ize"));
+        let ised = |stem: &str| (format!("{stem}ised"), format!("{stem}ized"));
+        let mut drift: Vec<(String, String)> = vec![
+            ou("neighb"),
+            ou("col"),
+            ou("hon"),
+            ou("fav"),
+            ou("lab"),
+            ou("harb"),
+            ou("rum"),
+            ou("hum"),
+            ou("behavi"),
+            ise("real"),
+            ised("real"),
+            ise("recogn"),
+            ised("recogn"),
+            ise("apolog"),
+            ised("apolog"),
+            ise("organ"),
+            ("marve".to_string() + "llous", "marvelous".to_string()),
+            ("trave".to_string() + "lled", "traveled".to_string()),
+            ("trave".to_string() + "lling", "traveling".to_string()),
+            ("practi".to_string() + "se", "practice".to_string()),
+            ("defen".to_string() + "ce", "defense".to_string()),
+            ("offen".to_string() + "ce", "offense".to_string()),
+            ("gr".to_string() + "ey", "gray".to_string()),
+            ("plou".to_string() + "gh", "plow".to_string()),
+            ("cent".to_string() + "re", "center".to_string()),
+            ("met".to_string() + "re", "meter".to_string()),
         ];
+        // Not spelling pairs but preferences, and the village keeps one:
+        // "afterward" and "toward" are the American forms. Their British
+        // twins had crept across eighteen files without a single American
+        // one anywhere to argue with them, which is what a hand-written list
+        // is for.
+        drift.push(("afterward".to_string() + "s", "afterward".to_string()));
+        drift.push(("toward".to_string() + "s", "toward".to_string()));
+        for (theirs, ours) in &drift {
+            assert_ne!(
+                theirs, ours,
+                "a pair in this table has collapsed - something swept the \
+                 gate along with the corpus, and it would now forbid the \
+                 spelling it exists to require",
+            );
+        }
+        let drift_pairs = drift;
         let voice = Corpus::load();
         for line in voice.lines() {
             let said = line.t.to_lowercase();
-            for (theirs, ours) in DRIFT {
+            for (theirs, ours) in &drift_pairs {
                 // Whole words only: "colorless" is not a word this game
                 // uses, but "harbor" inside "harboring" would be, and a
                 // substring test would also condemn "honorary".
                 let found = said
                     .split(|c: char| !c.is_alphabetic())
-                    .any(|w| w == *theirs);
+                    .any(|w| w == theirs.as_str());
                 assert!(
                     !found,
                     "the corpus drifts into another English: {theirs:?} should be {ours:?} in {:?}",
@@ -499,6 +528,7 @@ mod tests {
             }
         }
     }
+
 
     /// The register wall between subjects, pinned against the real corpus.
     /// The bug this guards: a berry bush moved by the hand once came out

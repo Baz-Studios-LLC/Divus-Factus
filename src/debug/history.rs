@@ -3,7 +3,7 @@
 //!
 //! The full record, not a tail — every notice since founding, newest first.
 //! Days are bands, not repeated text; each happening carries the glyph and
-//! colour of its shelf (lives, works, faith, the world); a run of identical
+//! color of its shelf (lives, works, faith, the world); a run of identical
 //! events folds into one line with a tally, so a stormy night reads as
 //! "lightning strikes from the storm ×7" instead of seven lines of the
 //! same sentence. This panel is the design language the other windows
@@ -79,8 +79,8 @@ impl Ledger {
         }
     }
 
-    /// The shelf's colour: its accent bar, its glyph, its tally pill.
-    pub(crate) fn colour(self) -> Color {
+    /// The shelf's color: its accent bar, its glyph, its tally pill.
+    pub(crate) fn color(self) -> Color {
         match self {
             Ledger::Lives => palette::shade(&palette::CLOTH_RED, 0.72),
             Ledger::Works => palette::shade(&palette::WOOD, 0.72),
@@ -104,7 +104,7 @@ pub(crate) fn spawn_glyph(commands: &mut Commands, parent: Entity, ledger: Ledge
             ChildOf(parent),
         ))
         .id();
-    let ink = ledger.colour();
+    let ink = ledger.color();
     match ledger {
         // A person: head above shoulders.
         Ledger::Lives => {
@@ -286,7 +286,7 @@ impl Importance {
         }
     }
 
-    pub(crate) fn colour(self) -> Color {
+    pub(crate) fn color(self) -> Color {
         match self {
             Importance::Majestic => palette::shade(&palette::CLOTH_GOLD, 1.0),
             Importance::Important => palette::shade(&palette::CLOTH_RED, 0.8),
@@ -829,7 +829,7 @@ pub(crate) fn update_chronicle(
         let active = view.importance == Some(tier);
         let row = rail_row(&mut commands, rail, tier.word(), count, active);
         commands.entity(row).insert(ImportanceRow(tier));
-        // The tier's bell, in its colour, ahead of the label.
+        // The tier's bell, in its color, ahead of the label.
         commands.entity(row).with_children(|row| {
             row.spawn((
                 Node {
@@ -841,7 +841,7 @@ pub(crate) fn update_chronicle(
                     border_radius: BorderRadius::all(px(5)),
                     ..default()
                 },
-                BackgroundColor(tier.colour()),
+                BackgroundColor(tier.color()),
             ));
         });
     }
@@ -953,7 +953,7 @@ pub(crate) fn update_chronicle(
                 border_radius: BorderRadius::all(px(7)),
                 ..default()
             },
-            BackgroundColor(importance.colour()),
+            BackgroundColor(importance.color()),
             ChildOf(hour_cell),
         ));
         commands.spawn((ui::dim(hour_of(&row.event.stamp)), ChildOf(hour_cell)));

@@ -2,9 +2,9 @@
 //!
 //! Every panel, label and readout in the game goes through here, for two reasons.
 //! The practical one: the HUD, the inspector, the coming prayer queue and doctrine
-//! panels all want the same frame, the same type, the same colours, and copying
+//! panels all want the same frame, the same type, the same colors, and copying
 //! that styling around means it drifts. The aesthetic one: the interface is part of
-//! the world's look, so its colours come from the same master palette as the
+//! the world's look, so its colors come from the same master palette as the
 //! terrain and the villagers' clothes — the UI is lit by the same art direction,
 //! even though it is flat.
 //!
@@ -500,7 +500,7 @@ fn speak(
             //
             // In a thread it hangs under the speaker's OWN side, the way
             // it does on a phone - a tail in the middle of a box that is
-            // itself pushed off-centre points at nobody. Brett: "the
+            // itself pushed off-center points at nobody. Brett: "the
             // bubbles need the tail to be on the correct side and not in
             // the middle."
             //
@@ -881,7 +881,7 @@ pub(crate) struct PrayerShelf;
 struct SetAside(bevy::platform::collections::HashSet<Entity>);
 
 /// The action button on a card sets it aside. Brett: "maybe we can make
-/// right click to dismiss and ignore the card?" Honours the mouse scheme,
+/// right click to dismiss and ignore the card?" Honors the mouse scheme,
 /// so swapped buttons swap here too.
 fn set_askings_aside(
     buttons: Res<ButtonInput<MouseButton>>,
@@ -914,7 +914,7 @@ fn spawn_prayer_shelf(mut commands: Commands) {
             Name::new("The prayers, pinned"),
             PrayerShelf,
             GameHud,
-            // Ordo's furniture: an edge-docked card stack, centred halfway
+            // Ordo's furniture: an edge-docked card stack, centered halfway
             // up the left wall. The kit owns WHERE a shelf stands and how
             // it stacks; the cards stay the game's.
             ordo::shelf(ordo::Anchor::Left),
@@ -988,7 +988,7 @@ fn keep_the_prayer_shelf(
     // voices, not a wall of cards. Brett, at nine food cards: "we should
     // probably clump multiple people praying for the same thing into one
     // prayer card to prevent getting swamped." Dark and road prayers
-    // never clump: each names a particular neighbour or a particular
+    // never clump: each names a particular neighbor or a particular
     // flag, and folding those together would hide who wants what.
     use crate::villager::belief::PrayerKind;
     #[derive(PartialEq)]
@@ -1093,7 +1093,7 @@ fn keep_the_prayer_shelf(
             ))
             .id();
         // The asker's own face beside their ask — the studio's true
-        // portrait, framed in the trade's colour (or the prayer's pink
+        // portrait, framed in the trade's color (or the prayer's pink
         // for souls without a calling yet).
         let livery = vocation
             .map(|trade| crate::villager::attire::livery(*trade).cloth)
@@ -1199,7 +1199,7 @@ fn spawn_toast_shelf(mut commands: Commands) {
         // bottom-right setting.
         ordo::shelf(ordo::Anchor::BottomRight),
     ));
-    // And centre stage, for the days that earn a trumpet.
+    // And center stage, for the days that earn a trumpet.
     commands.spawn((
         Name::new("The proclamation stage"),
         GameHud,
@@ -1322,7 +1322,7 @@ fn age_toasts(
 
 /// The game hands Ordo its own pigment.
 ///
-/// Ordo names roles and never ships colours, so the interface stays dyed from
+/// Ordo names roles and never ships colors, so the interface stays dyed from
 /// the very ramps the villagers' clothes are dyed from — which is the whole
 /// reason a kit that shipped its own palette would be no use here. Moved out
 /// of the trial the day Ordo stopped being a trial.
@@ -1339,9 +1339,9 @@ fn lend_ramps(mut ramps: ResMut<ordo::Ramps>) {
     });
 }
 
-/// Colours and metrics, all derived from the master palette.
+/// Colors and metrics, all derived from the master palette.
 ///
-/// Nothing in the interface picks its own colour; it picks a *role* — panel,
+/// Nothing in the interface picks its own color; it picks a *role* — panel,
 /// heading, body, dim, accent — and the role resolves here, once.
 pub mod theme {
     use super::*;
@@ -1404,7 +1404,7 @@ pub mod theme {
     /// who might marry, who is somebody's daughter, which way a family
     /// runs - is legible at a glance the moment the names carry it.
     ///
-    /// Cloth tones, not signal colours: this book is painted in rose and
+    /// Cloth tones, not signal colors: this book is painted in rose and
     /// slate, and a pair of highlighter inks would fight everything
     /// around them. Both are lifted well up their ramps so they stay
     /// READABLE as text first and a signal second.
@@ -1584,7 +1584,7 @@ pub struct WindowHandles {
 /// close button in its corner. Content goes in `body`, so callers can clear
 /// and rebuild it without touching the chrome.
 ///
-/// Windows open centred on the left side of the screen, then go wherever
+/// Windows open centered on the left side of the screen, then go wherever
 /// they are dragged. The full-screen strip only does the opening layout: it
 /// catches no pointer, and an absolutely-positioned (dragged) window ignores
 /// it entirely.
@@ -1592,7 +1592,7 @@ pub fn window(commands: &mut Commands, title: &str, min_width: f32) -> WindowHan
     window_impl(commands, title, min_width, false)
 }
 
-/// A window that opens dead centre — for the pages big enough to *be* the
+/// A window that opens dead center — for the pages big enough to *be* the
 /// screen for a moment, like the village ledger.
 pub fn big_window(commands: &mut Commands, title: &str, min_width: f32) -> WindowHandles {
     window_impl(commands, title, min_width, true)
@@ -1602,9 +1602,9 @@ fn window_impl(
     commands: &mut Commands,
     title: &str,
     min_width: f32,
-    centred: bool,
+    centered: bool,
 ) -> WindowHandles {
-    window_impl_titled(commands, title, None, min_width, centred)
+    window_impl_titled(commands, title, None, min_width, centered)
 }
 
 fn window_impl_titled(
@@ -1612,7 +1612,7 @@ fn window_impl_titled(
     title: &str,
     subtitle: Option<&str>,
     min_width: f32,
-    centred: bool,
+    centered: bool,
 ) -> WindowHandles {
     let strip = commands
         .spawn(Node {
@@ -1623,12 +1623,12 @@ fn window_impl_titled(
             bottom: px(0),
             flex_direction: FlexDirection::Column,
             justify_content: JustifyContent::Center,
-            align_items: if centred {
+            align_items: if centered {
                 AlignItems::Center
             } else {
                 AlignItems::FlexStart
             },
-            padding: if centred {
+            padding: if centered {
                 UiRect::default()
             } else {
                 UiRect::left(px(theme::MARGIN))
@@ -1862,9 +1862,9 @@ pub fn focus_windows(
             continue;
         }
         let scale = computed.inverse_scale_factor();
-        let centre = Vec2::new(transform.translation.x, transform.translation.y) * scale;
+        let center = Vec2::new(transform.translation.x, transform.translation.y) * scale;
         let half = computed.size() * scale * 0.5;
-        if (cursor.x - centre.x).abs() > half.x || (cursor.y - centre.y).abs() > half.y {
+        if (cursor.x - center.x).abs() > half.x || (cursor.y - center.y).abs() > half.y {
             continue;
         }
         let z = strips.get(strip.parent()).ok().flatten().map_or(0, |z| z.0);
@@ -1918,9 +1918,9 @@ pub fn scroll_regions(
             continue;
         }
         let scale = computed.inverse_scale_factor();
-        let centre = Vec2::new(transform.translation.x, transform.translation.y) * scale;
+        let center = Vec2::new(transform.translation.x, transform.translation.y) * scale;
         let half = computed.size() * scale * 0.5;
-        if (cursor.x - centre.x).abs() <= half.x && (cursor.y - centre.y).abs() <= half.y {
+        if (cursor.x - center.x).abs() <= half.x && (cursor.y - center.y).abs() <= half.y {
             scroll.0.y -= mouse_scroll.delta.y * 18.0;
         }
     }
@@ -1951,16 +1951,16 @@ impl HoverHint {
 // ---------------------------------------------------------------------------
 
 /// A titled, subtitled window shell with nothing inside, for callers
-/// building their own bands. `centred` opens it dead centre of the screen.
+/// building their own bands. `centered` opens it dead center of the screen.
 #[allow(dead_code)] // The codex outgrew it; other panels may yet want one.
 pub fn titled_window(
     commands: &mut Commands,
     title: &str,
     subtitle: Option<&str>,
     min_width: f32,
-    centred: bool,
+    centered: bool,
 ) -> WindowHandles {
-    window_impl_titled(commands, title, subtitle, min_width, centred)
+    window_impl_titled(commands, title, subtitle, min_width, centered)
 }
 
 /// A row splitting into an inset list rail and a framed detail pane — the
@@ -2032,7 +2032,7 @@ pub fn split_row(
     (list, detail)
 }
 
-/// A big-number stat plate: the label as a centred header across the top,
+/// A big-number stat plate: the label as a centered header across the top,
 /// the glyph's ring medallion and the figure side by side beneath it.
 /// The caller puts its glyph in the seat and marks
 /// the number for live updates.
@@ -2112,7 +2112,7 @@ pub fn stat_plate(
             },
             TextColor(theme::accent()),
             // One pixel of settlement, measured against the seat's own
-            // centre: Cinzel's line box and the flex centring land the
+            // center: Cinzel's line box and the flex centering land the
             // digits a hair high without it.
             Node {
                 margin: UiRect::top(px(3)).with_bottom(px(-3)),
@@ -2206,8 +2206,8 @@ pub fn drag_windows(
                 && let Ok((_, computed, transform)) = roots.get(handle.0)
             {
                 let scale = computed.inverse_scale_factor();
-                let centre = Vec2::new(transform.translation.x, transform.translation.y) * scale;
-                let top_left = centre - computed.size() * scale * 0.5;
+                let center = Vec2::new(transform.translation.x, transform.translation.y) * scale;
+                let top_left = center - computed.size() * scale * 0.5;
                 drag.active = Some((handle.0, cursor - top_left));
             }
         }
@@ -2629,7 +2629,7 @@ pub(crate) fn load_fonts(mut commands: Commands, assets: Res<AssetServer>) {
 
 /// Dresses every newly spawned display-face text in the display font.
 /// Spawn helpers build bundles through Commands and cannot reach assets;
-/// this system is the tailor that fits them afterwards.
+/// this system is the tailor that fits them afterward.
 pub(crate) fn dress_display_text(
     fonts: Option<Res<Fonts>>,
     mut fresh: Query<&mut TextFont, Added<DisplayFace>>,
@@ -2720,7 +2720,7 @@ pub fn dim(text: impl Into<String>) -> impl Bundle {
     )
 }
 
-/// A full-width, invisible strip that centres whatever is put in it. The
+/// A full-width, invisible strip that centers whatever is put in it. The
 /// strip itself never catches the pointer; only its contents do.
 pub fn centered_strip(commands: &mut Commands, top: Val, bottom: Val) -> Entity {
     commands
@@ -2744,7 +2744,7 @@ pub fn centered_strip(commands: &mut Commands, top: Val, bottom: Val) -> Entity 
 pub struct UiButton;
 
 /// Opts a button out of background restyling — for buttons whose face IS
-/// their meaning, like colour swatches. They keep hover feedback via borders.
+/// their meaning, like color swatches. They keep hover feedback via borders.
 #[derive(Component)]
 pub struct KeepFace;
 

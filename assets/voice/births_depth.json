@@ -40,7 +40,7 @@
     ]
   },
   {
-    "t": "I saw the little one bundled up afterwards. Small, red-faced, and doing fine.",
+    "t": "I saw the little one bundled up afterward. Small, red-faced, and doing fine.",
     "tags": [
       "tell",
       "event:delivered",
@@ -48,7 +48,7 @@
     ]
   },
   {
-    "t": "It took {most|half} of the night, but the baby came safely. Nobody wanted to leave afterwards.",
+    "t": "It took {most|half} of the night, but the baby came safely. Nobody wanted to leave afterward.",
     "tags": [
       "tell",
       "event:delivered",
@@ -88,7 +88,7 @@
     ]
   },
   {
-    "t": "I saw the family together afterwards. Tired faces all around, but happy ones.",
+    "t": "I saw the family together afterward. Tired faces all around, but happy ones.",
     "tags": [
       "tell",
       "event:delivered",

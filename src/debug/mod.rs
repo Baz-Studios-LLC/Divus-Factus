@@ -55,7 +55,7 @@ pub(crate) enum DebugSet {
     Input,
     /// Panels rebuild their content from that state.
     Rebuild,
-    /// Colours, visibility and text are touched up on what stands.
+    /// Colors, visibility and text are touched up on what stands.
     Dress,
 }
 
@@ -333,7 +333,7 @@ fn handle_toolbar(
     for interaction in &buttons {
         if *interaction == Interaction::Pressed {
             follow.entity = None;
-            rig.target_focus = site.centre;
+            rig.target_focus = site.center;
             rig.target_distance = 70.0;
             for mut visibility in &mut village_panels {
                 *visibility = Visibility::Hidden;
@@ -430,7 +430,7 @@ fn family_phrase(
     "of the first families".to_string()
 }
 
-/// What they are doing, favouring a reaction over routine: fear interrupts lunch.
+/// What they are doing, favoring a reaction over routine: fear interrupts lunch.
 fn state_phrase(activity: Option<&Activity>, reaction: Option<&Reaction>) -> &'static str {
     if let Some(reaction) = reaction {
         return reaction.kind.describe();
@@ -620,7 +620,7 @@ mod tests {
 }
 
 /// F9 pulls the flat sea plane out of the world and puts it back — the
-/// diagnostic Brett asked for while the sky was full of unexplained greys,
+/// diagnostic Brett asked for while the sky was full of unexplained grays,
 /// each of which turned out to be a different sheet. One key, flip it, and
 /// the argument about which layer is which settles itself on screen.
 fn toggle_the_sea(

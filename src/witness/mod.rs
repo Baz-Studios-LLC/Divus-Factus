@@ -311,7 +311,7 @@ impl DivineEventKind {
         }
     }
 
-    /// The same act, retold. A rumour is a witness account with the witness
+    /// The same act, retold. A rumor is a witness account with the witness
     /// removed — which is exactly how religions start.
     pub fn rumor(self) -> &'static str {
         self.rumors()[0]
@@ -481,13 +481,13 @@ impl ReactionKind {
 /// same way. Saves: entities are remapped on load, and a memory that pointed
 /// at one would dangle; the words survive as words. And truth: the tie is
 /// computed at the moment of seeing, from the witness's own threads — the same
-/// act is "your brother struck" to one onlooker and "a neighbour struck" to
+/// act is "your brother struck" to one onlooker and "a neighbor struck" to
 /// the one beside them, and that difference belongs IN the memory.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Whom {
     /// Their given name — the part a truth-checked retelling is allowed to say.
     pub name: String,
-    /// What they are to the witness: "your brother", "your neighbour".
+    /// What they are to the witness: "your brother", "your neighbor".
     pub tie: String,
     /// Who they ARE, for the gossip mill: hearing what befell somebody
     /// moves the listener's regard toward that somebody, and regard is
@@ -702,7 +702,7 @@ pub const PERIL_FADES: f32 = 14.0;
 ///
 /// This is the whole point of the thing. The want for a guard used to be
 /// read off a god's-eye census of live wolves within a hundred and thirty
-/// metres of the square — so a village feared wolves nobody had ever laid
+/// meters of the square — so a village feared wolves nobody had ever laid
 /// eyes on, and shrugged at a child who came home torn open. Fear belongs
 /// to the people who hold it.
 pub fn peril_of<'a>(village: impl Iterator<Item = &'a Witnessed>, today: u32) -> f32 {
@@ -800,7 +800,7 @@ fn perceive_events(
             let kind = choose_reaction(event.kind, temperament.boldness, closeness);
 
             // Who it happened to, as THIS witness holds it: the same act is
-            // "your brother struck" to one onlooker and "a neighbour struck"
+            // "your brother struck" to one onlooker and "a neighbor struck"
             // to the one beside them. Computed here, at the moment of seeing,
             // because this is the last place the subject is an entity — in
             // the memory they are a name and a tie.
@@ -1176,7 +1176,7 @@ mod tests {
             DivineEventKind::Thrown,
             Some(Whom {
                 name: "Feitreh".into(),
-                tie: "your neighbour".into(),
+                tie: "your neighbor".into(),
                 subject: None,
             }),
             true,
@@ -1186,14 +1186,14 @@ mod tests {
         assert_eq!(w.recent[0].kind, DivineEventKind::Thrown);
         assert_eq!(
             w.recent[0].whom.as_ref().map(|w| w.phrase()).as_deref(),
-            Some("Feitreh, your neighbour"),
+            Some("Feitreh, your neighbor"),
             "a memory keeps who it happened to",
         );
     }
 
     #[test]
     fn lightning_is_weather_to_almost_everyone() {
-        // The design's centre: the impossible compels, the natural excuses.
+        // The design's center: the impossible compels, the natural excuses.
         // A skeptic (conviction 0.5) attributes a bolt ~7% of the time; even
         // the devout (1.5) stay under a quarter. Nobody explains away a man
         // hanging in the empty air.

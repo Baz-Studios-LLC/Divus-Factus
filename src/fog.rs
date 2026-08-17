@@ -5,18 +5,18 @@
 //! looked for - a forester will not go to woods nobody has found - but it
 //! was invisible, and a rule you cannot see is a rule you cannot judge.
 //!
-//! THE VEIL IS A COLOUR, NOT A THING. Unknown ground is painted the veil's
+//! THE VEIL IS A COLOR, NOT A THING. Unknown ground is painted the veil's
 //! tint - and so is every tree, boulder, bush, ore seam and river standing on
 //! it - by `GroundVeil`, an extension on the material all of them already
 //! wore. Nothing is stored and nothing is hidden: the shader measures each
 //! pixel against the handful of circles the village actually knows, and mixes
-//! the tint in after the lighting so the answer is one colour under every sky.
+//! the tint in after the lighting so the answer is one color under every sky.
 //!
 //! It used to be an occluder: a copy of each chunk's mesh lifted into a bank
 //! tall enough to bury a wood. That is gone, along with everything that
 //! existed to manage its height, its taper and its edges. A bank is an object
 //! standing in the world, and an object can be seen under, seen past, and
-//! disagreed with about where the ground is; a colour cannot.
+//! disagreed with about where the ground is; a color cannot.
 
 use bevy::pbr::MaterialPlugin;
 use bevy::prelude::*;
@@ -49,7 +49,7 @@ fn veil_weight(fog_on: bool, playing: bool, a_village_exists: bool) -> f32 {
     }
 }
 
-/// How many metres the painted veil takes to come on at the edge of what the
+/// How many meters the painted veil takes to come on at the edge of what the
 /// village knows.
 ///
 /// A shore rather than a cut line. This is the ONLY dial the veil has left:
@@ -110,26 +110,26 @@ impl Plugin for FogPlugin {
     }
 }
 
-/// The veil's colour, in linear light: a cold slate blue rather than black,
+/// The veil's color, in linear light: a cold slate blue rather than black,
 /// because unknown ground should read as unlit distance and not as a hole cut
 /// in the world.
 ///
 /// Public because the PLANET wears the same fog of war — painted into its
 /// patches rather than draped in cloths, since from orbit there is no cloth
-/// small enough — and the two must be the same colour or the veil visibly
+/// small enough — and the two must be the same color or the veil visibly
 /// changes shade as the god climbs. One fact, one place.
 pub(crate) const VEIL_TINT: [f32; 3] = [0.05, 0.07, 0.11];
 
 /// Uniform block handed to the fog shader.
 #[derive(Clone, ShaderType, Debug)]
 pub struct FogParams {
-    /// The veil's colour; alpha is how heavy it gets at its thickest.
+    /// The veil's color; alpha is how heavy it gets at its thickest.
     pub tint: Vec4,
-    /// The home ground: xyz its centre, w its radius.
+    /// The home ground: xyz its center, w its radius.
     pub home: Vec4,
-    /// x how many pockets are live, y how many metres the edge takes.
+    /// x how many pockets are live, y how many meters the edge takes.
     pub dials: Vec4,
-    /// The planet: xyz its centre, w its radius.
+    /// The planet: xyz its center, w its radius.
     ///
     /// The veil is drawn on the BENT world, and what it knows is written in
     /// FLAT ground coordinates - so the shader has to undo the bend before it
@@ -139,7 +139,7 @@ pub struct FogParams {
     /// other side of the world to plant your flag it works but the fog of war
     /// doesnt clear around the settlement."
     pub planet: Vec4,
-    /// Each known pocket: xyz its centre, w its radius.
+    /// Each known pocket: xyz its center, w its radius.
     pub pockets: [Vec4; MAX_POCKETS],
 }
 
@@ -154,7 +154,7 @@ impl Default for FogParams {
             // z and w carried the old bank's height and taper and are
             // spare now that nothing is lifted off the ground.
             dials: Vec4::new(0.0, VEIL_EDGE, 0.0, 0.0),
-            planet: crate::globe::planet_centre().extend(crate::terrain::PLANET_RADIUS),
+            planet: crate::globe::planet_center().extend(crate::terrain::PLANET_RADIUS),
             pockets: [Vec4::ZERO; MAX_POCKETS],
         }
     }
@@ -166,7 +166,7 @@ impl Default for FogParams {
 /// sheet. Worn by the terrain, the groves, the loose trees, the scenery, the
 /// boulders and the bushes - everything that comes out of `TerrainAssets`'s
 /// ground material - so that unknown country and the wood growing on it are
-/// one colour together, with nothing standing proud of anything.
+/// one color together, with nothing standing proud of anything.
 ///
 /// See `ground_veil.wgsl` for why this is a per-pixel read of the fog uniform
 /// rather than the planet's baked vertex mark.
@@ -216,15 +216,15 @@ fn toggle_fog(
 ///
 /// Brett cut the knot: "What if we got rid of the veil on the rendered bits
 /// entirely and just kept the veil on the LOD and we just painted the veiled
-/// rendered chunks?" So unknown ground is PAINTED the veil's colour - by
+/// rendered chunks?" So unknown ground is PAINTED the veil's color - by
 /// `fog::GroundVeil`, worn by the terrain and by every tree, boulder and bush
-/// standing on it - and the planet's patches go on carrying the same colour in
+/// standing on it - and the planet's patches go on carrying the same color in
 /// their vertices. Nothing is hidden, so there is nothing to see under, no edge
 /// to meet the paint at, and no height for the two halves to disagree about:
 /// the veil is now exactly as tall as the world it covers.
 ///
 /// What is left is a saving. A chunk nobody has seen any part of is painted
-/// flat veil colour from edge to edge, and the planet patch beneath it is
+/// flat veil color from edge to edge, and the planet patch beneath it is
 /// painted the same - so drawing the chunk, its groves, its grass and its
 /// boulders buys nothing at all. It is not drawn.
 fn drape_the_veil(
@@ -324,7 +324,7 @@ fn follow_the_known(
     // ground from the first frame, and if nobody tells it otherwise it paints
     // from whatever the uniform happens to hold. Which, before a village
     // exists, is `FogParams::default()`: a home circle of a hundred and
-    // seventy metres at the WORLD ORIGIN. Brett, looking at a continent gone
+    // seventy meters at the WORLD ORIGIN. Brett, looking at a continent gone
     // slate blue around one lit patch of nowhere: "I havent even placed the
     // flag yet."
     //
@@ -341,8 +341,8 @@ fn follow_the_known(
     let tell = |params: &mut FogParams| {
         params.tint.w = weight;
         if let Some(known) = known.as_ref() {
-            params.home = known.centre.extend(known.radius);
-            params.planet = crate::globe::planet_centre().extend(crate::terrain::PLANET_RADIUS);
+            params.home = known.center.extend(known.radius);
+            params.planet = crate::globe::planet_center().extend(crate::terrain::PLANET_RADIUS);
             params.dials.x = live as f32;
             for (slot, pocket) in known.pockets.iter().take(live).enumerate() {
                 params.pockets[slot] = pocket.at.extend(pocket.radius);
@@ -365,7 +365,7 @@ mod tests {
     /// frame instead, so the rule has to be stated, and when it was not the
     /// whole continent went slate blue around one lit circle of nowhere: the
     /// uniform still held `FogParams::default()`, whose home is a hundred and
-    /// seventy metres at the WORLD ORIGIN. Brett: "I havent even placed the
+    /// seventy meters at the WORLD ORIGIN. Brett: "I havent even placed the
     /// flag yet."
     #[test]
     fn there_is_no_veil_before_there_is_a_village() {

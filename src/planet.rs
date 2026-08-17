@@ -174,7 +174,7 @@ fn jump_about(keys: Res<ButtonInput<KeyCode>>, mut rig: Query<&mut crate::camera
 /// use, the same point as a `Place`, and the gap between where the flat map
 /// says it is and where it actually seats. At the origin that gap is zero. If
 /// it is ever anything else, the two spaces have come apart, and this is where
-/// you find out - not four hundred metres into a soak.
+/// you find out - not four hundred meters into a soak.
 fn read_the_position(
     rig: Query<&crate::camera::CameraRig>,
     keys: Res<ButtonInput<KeyCode>>,
@@ -226,12 +226,12 @@ fn are_the_trees_upright(
         return;
     }
     *said = true;
-    let centre = crate::globe::planet_centre();
+    let center = crate::globe::planet_center();
     let mut counted = 0usize;
     let mut worst: f32 = 0.0;
     let mut total = 0.0;
     for at in &trees {
-        let outward = (at.translation() - centre).normalize_or(Vec3::Y);
+        let outward = (at.translation() - center).normalize_or(Vec3::Y);
         let mine = (at.rotation() * Vec3::Y).normalize_or(Vec3::Y);
         let off = mine.dot(outward).clamp(-1.0, 1.0).acos().to_degrees();
         worst = worst.max(off);

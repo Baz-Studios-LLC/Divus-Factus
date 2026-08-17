@@ -162,7 +162,7 @@ impl PrayerKind {
     /// asker. Brett: "clump multiple people praying for the same thing
     /// into one prayer card to prevent getting swamped with cards."
     /// Dark and road prayers never clump - each names a particular
-    /// neighbour or a particular flag - so those arms fall back to the
+    /// neighbor or a particular flag - so those arms fall back to the
     /// single voice.
     pub fn ask_line_many(&self, asker: &str, others: usize) -> String {
         let company = if others == 1 {
@@ -399,7 +399,7 @@ pub(super) fn kneel(
         let home = members.get(entity).ok().map(|member| member.0);
         let on_the_road = home
             .and_then(|town| grounds.get(town).ok())
-            .is_some_and(|ground| at.translation.distance(ground.centre) > 80.0);
+            .is_some_and(|ground| at.translation.distance(ground.center) > 80.0);
         // A FULL TOWN SILENCES THE PRAYER WHEREVER THE HUNGRY ARE STANDING.
         //
         // This used to be `!on_the_road && ...`, so anyone eighty strides
@@ -663,7 +663,7 @@ pub(super) fn show_prayer_bubbles(
 
 /// One floating mark of faith moving: a pink "+" rising off the newly
 /// convinced, an ash "-" off the doubting. The pin and the climb are
-/// Ordo's; the age, the fade and the colours are this game's.
+/// Ordo's; the age, the fade and the colors are this game's.
 #[derive(Component)]
 pub(super) struct FaithMark {
     left: f32,
@@ -1351,7 +1351,7 @@ pub(super) fn faith_of_witnesses(
                 DivineEventKind::Flourished => {
                     faith.shift(0.05 * conviction);
                     if let Some(mut chronicle) = chronicle {
-                        chronicle.record(clock.day(), "read the god's favour in the harvest");
+                        chronicle.record(clock.day(), "read the god's favor in the harvest");
                     }
                 }
                 _ => {}
@@ -1385,7 +1385,7 @@ pub(super) fn tally_belief(
 /// of credibility earned one answered prayer at a time.
 pub fn flourish(site: &SettlementSite, bushes: &mut Query<(&GlobalTransform, &mut FoodSource)>) {
     for (at, mut source) in bushes.iter_mut() {
-        if at.translation().distance(site.centre) < 160.0 {
+        if at.translation().distance(site.center) < 160.0 {
             source.amount = source.amount.max(3.0);
         }
     }
@@ -1551,7 +1551,7 @@ mod tests {
             .spawn(super::super::work::Stockpile::default())
             .id();
         app.insert_resource(SettlementSite {
-            centre: Vec3::ZERO,
+            center: Vec3::ZERO,
             radius: 24.0,
             woodpile: Vec3::ZERO,
             settlement,
@@ -1676,7 +1676,7 @@ mod tests {
         app.world_mut()
             .entity_mut(settlement)
             .insert(crate::villager::SettlementGround {
-                centre: Vec3::ZERO,
+                center: Vec3::ZERO,
                 radius: 36.0,
                 woodpile: Vec3::ZERO,
                 foodpile: Vec3::ZERO,

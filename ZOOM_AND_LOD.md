@@ -1,6 +1,6 @@
 # Continuous zoom from a longhouse to a planet
 
-How *Divus Factus* renders one world from two metres to orbit with no map screen,
+How *Divus Factus* renders one world from two meters to orbit with no map screen,
 no orbit mode and no loading threshold anywhere in the climb. Written for someone
 (or something) working on a different game and deciding what to borrow.
 
@@ -41,7 +41,7 @@ unbend(sphere_pos)   -> flat_xyz
 The flat point's distance from the world origin becomes an arc length on a sphere
 of radius `PLANET_RADIUS = 6000`; its height becomes radial displacement. The
 returned rotation stands the object up along the local surface normal, so a
-longhouse a kilometre away leans away from you by the right angle and its
+longhouse a kilometer away leans away from you by the right angle and its
 foundations stay in the ground.
 
 Consequences worth knowing before copying this:
@@ -56,7 +56,7 @@ Consequences worth knowing before copying this:
 - **Objects already seated on the sphere need a marker** (`BentInPlace`: "my
   vertices are already in world space, leave my transform alone").
 - **Writing `GlobalTransform` directly means bypassing change detection**, which
-  is fine, but it also means nothing downstream may re-propagate afterwards.
+  is fine, but it also means nothing downstream may re-propagate afterward.
 - **The plane's flatness is visible at scale.** A tangent plate 2,500 units wide
   on a 6,000-radius sphere lifts ~500 units off the curve at its edge — from orbit
   it reads as a square sticker jutting into space. This is the single biggest
@@ -138,7 +138,7 @@ cell_arc = (π/2 · PLANET_RADIUS) / (PATCH_CELLS · 2^level)
 
 ```rust
 let px_per_radian = window_height / fov;              // fov = 0.62 rad
-let distance      = (camera_to_patch_centre - reach).max(REFINE_FLOOR);
+let distance      = (camera_to_patch_center - reach).max(REFINE_FLOOR);
 let sharp_px      = key.cell_arc() / distance * px_per_radian;
 if sharp_px > SPLIT_PX && key.level < MAX_LEVEL { split }
 ```
@@ -243,12 +243,12 @@ veiled-ness is baked into patch **vertex alpha** and applied by the patch shader
 Three separate things had to be unified, and each was a visible defect until it
 was:
 
-1. **The same colour constant** (`VEIL_TINT`), read by both. Obvious.
-2. **Applied after lighting.** Painting the veil colour into a *lit* surface does
-   not give the veil colour — the sun's diffuse and specular both add to it, so
+1. **The same color constant** (`VEIL_TINT`), read by both. Obvious.
+2. **Applied after lighting.** Painting the veil color into a *lit* surface does
+   not give the veil color — the sun's diffuse and specular both add to it, so
    the planet's veil came out half again as far toward white and shifted with the
    time of day while the cloths never moved. The patch shader mixes to the tint
-   *after* `apply_pbr_lighting`, which makes it exactly the cloth's colour under
+   *after* `apply_pbr_lighting`, which makes it exactly the cloth's color under
    any sun.
 3. **The same law, not just the same density.** The cloths are a Beer-Lambert
    slab: looked at squarely a sheet takes its 0.9, and a grazing look travels
@@ -282,7 +282,7 @@ Stated plainly, because these are the parts a borrower needs to plan for.
   The screen-space threshold decides *when* to split correctly; it does nothing
   about making the transition smooth. Vertex morphing between parent and child
   heights is the standard answer and is not implemented here.
-- **Skirts, not stitching.** Neighbouring patches at different depths crack at the
+- **Skirts, not stitching.** Neighboring patches at different depths crack at the
   join; a downward skirt around each patch curtains the gap rather than the
   meshes agreeing. Cheap and effective, but it is a curtain.
 - **The tangent-plate lift** (§2) is a hard ceiling on how much flat ground can be

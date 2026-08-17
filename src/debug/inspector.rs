@@ -701,7 +701,7 @@ pub(crate) fn update_inspector(
                     .take(4)
                     .map(|memory| match &memory.whom {
                         // The memory knows who it befell: "saw someone hurled
-                        // across the ground — Feitreh, your neighbour".
+                        // across the ground — Feitreh, your neighbor".
                         Some(whom) => {
                             format!("- {} — {}", memory.kind.describe(), whom.phrase())
                         }

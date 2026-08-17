@@ -481,15 +481,15 @@ pub(crate) fn shoulder_sack(
     commands.entity(carrier).insert(crate::creature::Laden);
 }
 
-/// How many armloads of one kind stand in a cubic metre of authored room.
+/// How many armloads of one kind stand in a cubic meter of authored room.
 ///
-/// Not one number for all five: a cubic metre of firewood is more armloads
-/// than a cubic metre of ore, and the caps the game has always used already
+/// Not one number for all five: a cubic meter of firewood is more armloads
+/// than a cubic meter of ore, and the caps the game has always used already
 /// said so. These are exactly those caps read as densities - so a pallet drawn
-/// a metre cubed holds precisely what the hardcoded corner held, and anything
+/// a meter cubed holds precisely what the hardcoded corner held, and anything
 /// larger holds proportionally more. The old numbers survive as the unit
 /// rather than being replaced by a guess.
-fn armloads_per_cubic_metre(kind: PileKind) -> f32 {
+fn armloads_per_cubic_meter(kind: PileKind) -> f32 {
     match kind {
         PileKind::Timber => 24.0,
         PileKind::Stone => 12.0,
@@ -620,7 +620,7 @@ fn storehouse_seat(
             // though the stack stands on the first of them: the room is the
             // room, whether it is one big pallet or three small ones.
             let room: f32 = mine.iter().map(|(_, volume)| volume).sum();
-            let cap = room * armloads_per_cubic_metre(kind);
+            let cap = room * armloads_per_cubic_meter(kind);
             // A mark's `at` is the middle of its FOOT, which is where a stack
             // starts, so it is the seat exactly as authored.
             return Some((*seat, (held.min(cap).max(0.0) as u8).max(1)));
@@ -650,7 +650,7 @@ fn granary_seat(store: &Stockpile, drawn: Option<&super::baked::Baked>) -> (Vec3
     let pallets = pallets_of(drawn);
     if let Some((seat, _)) = pallets.first() {
         let room: f32 = pallets.iter().map(|(_, volume)| volume).sum();
-        let cap = room * armloads_per_cubic_metre(PileKind::Food);
+        let cap = room * armloads_per_cubic_meter(PileKind::Food);
         return (*seat, (store.food().min(cap).max(0.0) as u8).max(1));
     }
     (
@@ -743,7 +743,7 @@ pub(crate) fn stores_move_indoors(
 
     for (at, building, owner, plan) in &new_buildings {
         // A storehouse shelters its OWN town's piles. Without this, the first
-        // colony to raise one would have reorganised the mother town's square
+        // colony to raise one would have reorganized the mother town's square
         // from across the map.
         let town = owner.0;
         let Ok(store) = stores.get(town) else {
@@ -1143,13 +1143,13 @@ pub(crate) fn famine_watch(
         let fruiting_near = bushes
             .iter()
             .filter(|(at, bush)| {
-                bush.amount > 0.3 && at.translation().distance(ground.centre) < 170.0
+                bush.amount > 0.3 && at.translation().distance(ground.center) < 170.0
             })
             .count();
         let nearest_berries = bushes
             .iter()
             .filter(|(_, bush)| bush.amount > 0.3)
-            .map(|(at, _)| at.translation().distance(ground.centre) as u32)
+            .map(|(at, _)| at.translation().distance(ground.center) as u32)
             .min();
         let rate = trends.rate_per_minute(PileKind::Food);
 
@@ -1242,7 +1242,7 @@ pub(crate) fn dye_cloth(
         }
         store.dye -= 0.3;
         // Bright cloth on the backs of the people who wove it, and nobody
-        // else's: a neighbouring town's weaver does not dress this one.
+        // else's: a neighboring town's weaver does not dress this one.
         for (mut morale, member) in &mut wearers {
             if member.0 == town {
                 morale.spirits = (morale.spirits + 0.03).min(1.0);
@@ -1319,7 +1319,7 @@ pub(crate) fn eat_from_store(
         };
         // The table is wherever the food sacks stand — the square first,
         // the storehouse when one rises, the granary after that. Meals used
-        // to be eaten at the square's exact centre point, and the day that
+        // to be eaten at the square's exact center point, and the day that
         // point went unwalkable under the hall's terraces, every route to a
         // meal was refused and six villagers starved beside a full larder.
         let table = ground.foodpile;
@@ -1464,7 +1464,7 @@ pub(crate) fn pile_points_follow(
         // route is denied, the walk is abandoned, and the walker stands
         // at the wall until the starvation watch names them. Brett, live:
         // "People still starve in sight of a stocked larder." Third time
-        // this class of bug has drawn blood (the square's centre under
+        // this class of bug has drawn blood (the square's center under
         // the hall's terraces; the longhouse door that opened indoors),
         // so the rule is now absolute: everyone is sent to the DOORSTEP,
         // found through the shell the same way every route out is found.
@@ -1527,7 +1527,7 @@ pub(crate) fn log_stores(
         .and_then(|site| {
             wildlife
                 .iter()
-                .map(|(t, _)| t.translation.distance(site.centre))
+                .map(|(t, _)| t.translation.distance(site.center))
                 .min_by(f32::total_cmp)
         })
         .unwrap_or(0.0);
@@ -1610,7 +1610,7 @@ mod tests {
         };
         assert!(
             holds(&large) > holds(&small),
-            "two metres cubed must hold more than one",
+            "two meters cubed must hold more than one",
         );
     }
 
@@ -1702,7 +1702,7 @@ mod tests {
             .world_mut()
             .spawn((
                 crate::villager::SettlementGround {
-                    centre: Vec3::ZERO,
+                    center: Vec3::ZERO,
                     radius: 36.0,
                     woodpile: Vec3::ZERO,
                     foodpile,

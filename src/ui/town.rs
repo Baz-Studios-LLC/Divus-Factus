@@ -48,7 +48,7 @@ const TOO_HIGH_FOR_A_TOWN: f32 = 220.0;
 const EDGE_GRACE: f32 = 0.15;
 
 pub(crate) fn spawn_town_strip(mut commands: Commands) {
-    // The strip HANGS from the top edge, so it is centred by a full-width
+    // The strip HANGS from the top edge, so it is centered by a full-width
     // rail rather than by guessing at a left margin.
     let rail = commands
         .spawn((
@@ -77,7 +77,7 @@ pub(crate) fn spawn_town_strip(mut commands: Commands) {
         ))
         .id();
 
-    // The plate and its cells come from ORDO, not from colours picked
+    // The plate and its cells come from ORDO, not from colors picked
     // here. Brett: "Make sure you use ordo for this... add to ordo if it
     // is missing something" - and it was missing both of these, so they
     // were cut into the kit where the next game can wear them too.
@@ -248,7 +248,7 @@ fn the_town_under_the_eye(
             // The banner stands in the WORLD, and the world is bent onto
             // the globe - so it is asked for where it is drawn, not where
             // the simulation keeps it.
-            let (seat, _) = crate::globe::bend_frame(ground.centre);
+            let (seat, _) = crate::globe::bend_frame(ground.center);
             let at = camera.world_to_viewport(camera_at, seat).ok()?;
             let inside = at.x > -grace.x
                 && at.y > -grace.y

@@ -47,7 +47,7 @@ normals would flatten a million triangles into an undifferentiated wash.
 Every body part of every creature is the same unit cube, scaled by its `Transform` and
 tinted from a shared material cache indexed by palette entry. A hundred creatures cost one
 mesh and eighty materials. It also enforces the palette by construction: a creature
-*cannot* be coloured off-palette.
+*cannot* be colored off-palette.
 
 ### Limbs sit at their joints
 
@@ -75,7 +75,7 @@ master palette, chasing a pixel-art look. It was abandoned: the geometry is genu
 and forcing it through a low-resolution buffer cost sharpness without buying the authority
 of real pixel art. Sharp low-poly is its own look and suits these models better.
 
-The palette remains as the *authoring* source for every colour, which is what keeps
+The palette remains as the *authoring* source for every color, which is what keeps
 procedurally generated art coherent. What went away is the post-process that re-quantised
 the finished image back onto it.
 
@@ -95,7 +95,7 @@ what makes the world unbounded: chunks are a *view* of the terrain function, bui
 the camera and discarded when it leaves, and the simulation can ask `height_at` about a
 place no chunk has ever covered.
 
-Shape comes from three layers — continents (kilometre-scale, deciding sea from land),
+Shape comes from three layers — continents (kilometer-scale, deciding sea from land),
 domain-warped hills, and ridges faded in only on high ground so valleys stay walkable. The
 land curve is deliberately steepened either side of sea level; left linear, the band where
 height is barely above water spans hundreds of units and every shoreline reads as one vast
@@ -105,8 +105,8 @@ Streaming loads a disc of chunks around the camera, nearest first, a few per fra
 matters: ground under the player has to appear before the horizon, or the world visibly
 assembles itself from the outside in.
 
-Chunk meshes are smooth-shaded and indexed. Normals and colours derive from *world*
-position, never from anything chunk-local, so neighbours agree exactly along their shared
+Chunk meshes are smooth-shaded and indexed. Normals and colors derive from *world*
+position, never from anything chunk-local, so neighbors agree exactly along their shared
 edge and no seam appears — a test asserts this vertex by vertex. Heights are sampled once
 into a local grid with a one-cell skirt and normals taken from that, which is the
 difference between one noise evaluation per vertex and five.
@@ -153,14 +153,14 @@ Channels are carved into `height_at` as a parabolic bed under the course's water
 Deep flowing water is unwalkable, so pathfinding routes around rivers; the shallow edge is
 fordable. Known limits, documented rather than hidden: courses do not branch or merge, a
 basin ending is a crude pond, and the first query in a new region traces its whole
-neighbourhood at once — a one-off cost that can stutter.
+neighborhood at once — a one-off cost that can stutter.
 
 ### Grass is baked geometry with shader wind
 
 Blades are baked a few thousand at a time into one mesh per chunk — the same trade that
 fixed the 186k-entity scenery — and streamed in a tight radius, because a blade at three
 hundred units is smaller than a pixel. All motion lives in a vertex shader: each vertex
-carries its bend weight in `uv.x` (0 at the root, 1 at the tip), and two travelling gusts
+carries its bend weight in `uv.x` (0 at the root, 1 at the tip), and two traveling gusts
 plus a per-blade flutter bend the tips while roots stay pinned. The material is an
 *extension* of `StandardMaterial` overriding only the vertex stage, so lighting, shadows
 and fog stay stock.
@@ -187,9 +187,9 @@ frame and finding it wrong:
   any zoom.
 - **It has to start late.** Beginning a third of the way out puts most of the screen behind
   haze. The job is to hide the edge of the world, not to veil the world.
-- **The sky must be the same colour as the fog.** Geometry past the fog's end is drawn in
-  the fog colour; if the sky behind it differs, the boundary draws a hard line. That is what
-  made the square edge of the sea appear as a grey band with a visible corner across the
+- **The sky must be the same color as the fog.** Geometry past the fog's end is drawn in
+  the fog color; if the sky behind it differs, the boundary draws a hard line. That is what
+  made the square edge of the sea appear as a gray band with a visible corner across the
   horizon. `horizon_color` is the single source for both.
 
 The sea is sized well past the furthest the fog can reach, for the same reason: two
@@ -206,7 +206,7 @@ reads the same figure, so the two can never disagree.
 
 `villager` scores its options rather than switching on a state enum, even though there are
 currently only two. The shape it must grow into is a dozen competing needs, and retrofitting
-scoring onto a state machine later would mean rewriting every behaviour. Adding a need means
+scoring onto a state machine later would mean rewriting every behavior. Adding a need means
 adding a scorer.
 
 ### No physics engine
@@ -230,13 +230,13 @@ people's language, with `MemberOf` membership — built for the day there is mor
 than one. Every person carries a `Chronicle` of life events (birth always kept;
 the middle of a long life is dropped before its beginning), written to by
 births, weddings, coming of age, the god's touch, bereavement and death. Gossip
-spreads witness accounts to neighbours in earshot; hearing increments
-`Witnessed::secondhand`, never `total` — a faith built on rumour and a faith
+spreads witness accounts to neighbors in earshot; hearing increments
+`Witnessed::secondhand`, never `total` — a faith built on rumor and a faith
 built on witness are different faiths, and doctrine will care which one it
 inherited.
 
 All time derives from one `WorldClock` (600 s/day). The visual consequences are
-funnelled through a single `Sky` resource — sun bearing, light colours, horizon,
+funnelled through a single `Sky` resource — sun bearing, light colors, horizon,
 daylight fraction — and lights, fog, `ClearColor` and the water shader all read
 `Sky` rather than the clock. Seasons and weather, when they come, bend `Sky` in
 one place instead of touching every consumer. `DIVUS_FACTUS_CLOCK=0.85` starts the
@@ -245,7 +245,7 @@ game at any hour, which is how dusk gets art-directed without waiting for it.
 ### One interface kit, and the hand is the only cursor
 
 Every panel goes through `ui`: one panel builder (anchored frame, title strip), text
-*roles* rather than ad-hoc styles (`heading` / `body` / `dim`), and a theme whose colours
+*roles* rather than ad-hoc styles (`heading` / `body` / `dim`), and a theme whose colors
 are derived from the master palette — the interface is art-directed by the same ramps as
 the terrain. Feature modules decide what words go in a panel, never what a panel looks
 like. `PointerContext` is the boundary: one resource that knows whether the cursor is over
@@ -304,7 +304,7 @@ facing angle aimed +Z along travel instead of -Z. Each now has a regression test
 cargo run
 ```
 
-There are no asset files — every mesh, colour and animation is generated at runtime.
+There are no asset files — every mesh, color and animation is generated at runtime.
 
 Unattended screenshot (renders one frame to a file and exits):
 

@@ -41,7 +41,7 @@ pub struct Wild {
     pub hunger: f32,
     /// Seconds left in whatever it is doing (grazing, feeding).
     pub busy: f32,
-    /// The centre of this animal's territory. Herds keep to a range instead
+    /// The center of this animal's territory. Herds keep to a range instead
     /// of diffusing across the map, so the deer meadow stays a place.
     pub home: Vec3,
 }
@@ -186,7 +186,7 @@ pub(super) fn wolves_hunt(
     let _ = (&terrain, &rng);
 
     // Collect prey snapshot first; wolves are also in `quarry`'s archetype, so
-    // mutation happens through targeted lookups afterwards.
+    // mutation happens through targeted lookups afterward.
     struct Mark {
         entity: Entity,
         at: Vec3,
@@ -449,7 +449,7 @@ pub(super) fn flee_to_safety(
     };
     for (entity, at, until, mut target, mut activity) in &mut running {
         // Home, or near enough that there are people about.
-        let home = at.translation.distance(site.centre) < 26.0;
+        let home = at.translation.distance(site.center) < 26.0;
         if clock.elapsed > until.0 || home {
             commands.entity(entity).remove::<Fleeing>();
             target.0 = None;
@@ -460,13 +460,13 @@ pub(super) fn flee_to_safety(
         }
         // Whatever they were at, they are not at it now.
         *activity = crate::villager::Activity::Wandering;
-        target.0 = Some(site.centre);
+        target.0 = Some(site.center);
     }
 }
 
 /// Wolves test the roads. A villager alone and far from the square —
 /// a miner on the ore road, an explorer past the cairns — is prey the
-/// pack understands. Company is armour: anyone within a dozen strides
+/// pack understands. Company is armor: anyone within a dozen strides
 /// makes a walker no longer alone, which is the whole argument for
 /// guards walking with expeditions. Towers hold their old dread.
 #[allow(clippy::type_complexity)]
@@ -536,7 +536,7 @@ pub(super) fn wolves_stalk(
             .filter(|(who, spot, is_guard)| {
                 !is_guard
                     && spot.distance(at) < 42.0
-                    && spot.distance(site.centre) > 60.0
+                    && spot.distance(site.center) > 60.0
                     && posts.iter().all(|post| post.distance(*spot) > 55.0)
                     && !folk
                         .iter()
@@ -568,7 +568,7 @@ pub(super) fn wolves_stalk(
                 commands.entity(*quarry).insert(Torn(clock.elapsed));
                 info!(
                     "a wolf set upon one of the village, {:.0} strides out from the square",
-                    where_at.distance(site.centre)
+                    where_at.distance(site.center)
                 );
                 // They shout, and they run. A yell is speech with nobody
                 // to say it to, which is exactly what this is - and it

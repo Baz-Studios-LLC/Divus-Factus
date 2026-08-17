@@ -19,7 +19,7 @@ pub struct CropRow {
 }
 
 /// Raises a field's visible body - soil bed, furrow ridges, and stalks -
-/// and returns the field entity. Used by the plough and by the save loader.
+/// and returns the field entity. Used by the plow and by the save loader.
 #[allow(clippy::too_many_arguments)]
 pub fn raise_field(
     commands: &mut Commands,

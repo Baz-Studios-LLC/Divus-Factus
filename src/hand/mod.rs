@@ -43,7 +43,7 @@ const THROW_STRENGTH: f32 = 1.35;
 const THROW_THRESHOLD: f32 = 2.5;
 
 /// Inside this camera distance the hand is not drawn at all. Well below the
-/// twelve metres ordinary play is clamped to, so only a first-person view -
+/// twelve meters ordinary play is clamped to, so only a first-person view -
 /// Avatar - ever reaches it.
 const WITHDRAW_WITHIN: f32 = 6.0;
 
@@ -63,8 +63,8 @@ const HOLD_SPRING: f32 = 14.0;
 /// Which of the palette's ramps the hand is carved from.
 ///
 /// A setting, not a genome: the hand is the player's one embodied choice, so
-/// its colour is theirs to pick. Everything still comes off the master
-/// palette — a god is of this world's colours like everything else in it.
+/// its color is theirs to pick. Everything still comes off the master
+/// palette — a god is of this world's colors like everything else in it.
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HandStyle {
     pub ramp: &'static crate::palette::Ramp,
@@ -230,25 +230,25 @@ struct HoverGlow {
     coat: Handle<StandardMaterial>,
 }
 
-/// How far the outline stands off the thing it outlines, in METRES.
+/// How far the outline stands off the thing it outlines, in METERS.
 ///
 /// Not a percentage. It was 1.07 - seven per cent of each dimension - which
 /// is a constant standoff only on a cube, and almost nothing in a building
-/// is a cube. A six-metre beam wore twenty-one centimetres of gold past each
-/// end and seven millimetres along its sides, so every long piece speared
+/// is a cube. A six-meter beam wore twenty-one centimeters of gold past each
+/// end and seven millimeters along its sides, so every long piece speared
 /// out of the building at both ends, and a corner where posts and beams meet
 /// grew a cluster of crosses. Brett, with a picture of one: "why do the
 /// corners look like this?"
 ///
-/// Four centimetres reads at the distance a building is looked at without
+/// Four centimeters reads at the distance a building is looked at without
 /// swallowing the thin pieces.
 const OUTLINE: f32 = 0.04;
 
-/// The scale that puts a shell `OUTLINE` metres off a part of this size.
+/// The scale that puts a shell `OUTLINE` meters off a part of this size.
 ///
 /// Per axis, from the part's own scale, because the shell is its child and
 /// inherits it. A piece thinner than the standoff would balloon - a
-/// two-centimetre peg would wear a coat four times its own size - so the
+/// two-centimeter peg would wear a coat four times its own size - so the
 /// growth is capped, and a very thin thing simply wears a thinner rim.
 fn outline_scale(size: Vec3) -> Vec3 {
     Vec3::new(
@@ -269,7 +269,7 @@ fn brew_hover_glow(mut commands: Commands, mut materials: ResMut<Assets<Standard
             // tonemapper on the chin. Emissive is measured to survive it.
             base_color: Color::BLACK,
             // A SATURATED yellow at a moderate boost. At six and a half the
-            // gold clipped to cream - overdriven colours whiten as they blow
+            // gold clipped to cream - overdriven colors whiten as they blow
             // out - so the chroma does the work and the boost only feeds the
             // bloom. "It's kind of pale, can we make it more yellow?"
             emissive: LinearRgba::from(Color::srgb(1.0, 0.8, 0.08)) * 3.0,
@@ -345,7 +345,7 @@ fn outline_the_hovered(
             Mesh3d(body.bake(&mut meshes)),
             MeshMaterial3d(glow.coat.clone()),
             // A tree's baked body is already at its true size, so the shell
-            // takes the standoff against one metre.
+            // takes the standoff against one meter.
             Transform::from_scale(outline_scale(Vec3::ONE)),
             bevy::light::NotShadowCaster,
             ChildOf(entity),
@@ -594,21 +594,21 @@ fn pick_object(
     let mut best: Option<(f32, Entity)> = None;
 
     for (entity, transform, radius) in candidates.iter() {
-        let centre = transform.translation();
-        let to_centre = centre - ray.origin;
-        let along = to_centre.dot(*ray.direction);
+        let center = transform.translation();
+        let to_center = center - ray.origin;
+        let along = to_center.dot(*ray.direction);
 
         if along < 0.0 || along > max_distance {
             continue;
         }
 
-        // Perpendicular distance from the ray to the sphere centre.
+        // Perpendicular distance from the ray to the sphere center.
         let closest = ray.origin + *ray.direction * along;
-        let miss = closest.distance(centre);
+        let miss = closest.distance(center);
 
         // A little forgiveness for small targets, but not a magnet: the halo
         // used to be wide enough that pointing *between* two villagers was
-        // impossible. What wins is whatever the cursor is most centred on,
+        // impossible. What wins is whatever the cursor is most centered on,
         // not whatever is nearest the camera.
         let score = miss / radius.0;
         if score <= 1.15 && best.is_none_or(|(s, _)| score < s) {
@@ -815,7 +815,7 @@ fn handle_grab_and_release(
         return;
     };
 
-    // Grab — but never through a panel. Releases are still honoured over the
+    // Grab — but never through a panel. Releases are still honored over the
     // interface, so carrying a villager across the HUD cannot trap them in
     // the hand. The rooted cannot be grabbed at all.
     // A press on a PILE draws a parcel of the stores into the hand - the
@@ -1089,7 +1089,7 @@ fn handle_grab_and_release(
         // thousand from home - and the carry spring then hauls it up from
         // there in plain view. A chunk stands at identity, so a child's own
         // Transform already IS its flat world position; reasserting it wins
-        // over the engine's unparent behaviour, which preserves the WORLD
+        // over the engine's unparent behavior, which preserves the WORLD
         // (bent) position by default.
         if parents.get(entity).is_ok() {
             let flat = matters
@@ -1548,7 +1548,7 @@ fn ui_cursor_placement(camera: &Transform, ray: Ray3d, tap: f32) -> (Vec3, Quat)
     // From the EYE, not from `ray.origin`. A viewport ray starts on the NEAR
     // PLANE, and the near plane rides the zoom now (it has to: at a far plane
     // of seventy thousand a fixed near plane fights the depth buffer and the
-    // world tears into grey streaks). So `ray.origin` stands as much as ninety
+    // world tears into gray streaks). So `ray.origin` stands as much as ninety
     // units ahead of the god's eye, and five more put the cursor a hundred
     // units out while it was still scaled for five - a two-pixel speck at
     // altitude, which is precisely "I can't see the hand on the UI or the
@@ -1613,7 +1613,7 @@ fn animate_hand(
 
     let held = hand.held.is_some();
     // Un-bent. The hand is placed in FLAT coordinates and the world bend
-    // seats it on the sphere afterwards, like everything else - but a hovered
+    // seats it on the sphere afterward, like everything else - but a hovered
     // thing's `GlobalTransform` has already been through that bend, and
     // feeding it back in bent it twice: the hand flew off to a second seat
     // a quarter-world away from the villager it was reaching for.
@@ -1660,7 +1660,7 @@ fn animate_hand(
     // Behind a mortal's eyes the hand withdraws entirely — at that range it
     // would fill the whole frame, and a god wearing a body has no business
     // waving its own hand in front of the face. Ordinary play never comes
-    // closer than `MIN_DISTANCE`, twelve metres, so nothing but Avatar can
+    // closer than `MIN_DISTANCE`, twelve meters, so nothing but Avatar can
     // trip this. It fades away and back rather than popping.
     // Withdrawn only behind a mortal's eyes, where it would fill the frame.
     //
@@ -1692,7 +1692,7 @@ fn animate_hand(
         // Lifted to the cargo's scruff: the fist hollow lands near the TOP
         // of the thing, in world units of the thing's own size - a boulder's
         // crown, a villager's collar - and the body hangs below in view.
-        // A touch above centre, scaled by the thing's own size, so the fist
+        // A touch above center, scaled by the thing's own size, so the fist
         // closes on the WAIST and half the body rises out of the top of it -
         // "so half their body is coming out of the fist". The rest of the
         // lift is the hover above, sized to put the finger cage at that line.
@@ -1811,7 +1811,7 @@ fn animate_hand(
     // planet.
     let position = position + seated_camera.forward() * (rig.tap * blend * 0.7 * scale);
 
-    // Centre the fist's MASS on the cargo, not its root: the palm slab sits
+    // Center the fist's MASS on the cargo, not its root: the palm slab sits
     // at the root and the fingers reach off its leading edge, so a cargo
     // anchored at the root showed up pressed against the wrist. Slid back
     // along the hand's own heading BY YAW ALONE - the full rotation is the
@@ -1904,7 +1904,7 @@ fn animate_hand(
 
     // A fist holds things in its FINGERS, and the fingers are not at the
     // root. The hand's origin is the palm slab - the fingers hang off its
-    // leading edge and curl below it - so a carry centred on the root put the
+    // leading edge and curl below it - so a carry centered on the root put the
     // cargo at the wrist, spilling out of the back of the hand while the
     // curled fingers held air. Brett saw exactly that twice: first a villager
     // dangling under a fist a unit above them, then, with the hover taken
@@ -2111,9 +2111,9 @@ mod tests {
     /// The outline stands the same distance off everything.
     ///
     /// A hovered building is dozens of boxes of wildly different shapes -
-    /// a six-metre beam, a quarter-metre post, a wall panel - and a shell
-    /// scaled by a PERCENTAGE puts twenty-one centimetres of gold past a
-    /// beam's ends and seven millimetres along its sides. Every long piece
+    /// a six-meter beam, a quarter-meter post, a wall panel - and a shell
+    /// scaled by a PERCENTAGE puts twenty-one centimeters of gold past a
+    /// beam's ends and seven millimeters along its sides. Every long piece
     /// speared out of the building, and a corner grew a cluster of crosses.
     #[test]
     fn the_outline_stands_the_same_distance_off_everything() {
@@ -2147,7 +2147,7 @@ mod tests {
         let scale = super::outline_scale(peg);
         assert!(
             scale.max_element() <= 1.6,
-            "a two-centimetre peg grew {scale:?} times its own size",
+            "a two-centimeter peg grew {scale:?} times its own size",
         );
     }
 }

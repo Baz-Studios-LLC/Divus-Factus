@@ -161,7 +161,7 @@
     ]
   },
   {
-    "t": "Ground moves sometimes. Fear supplied the divine explanation afterwards.",
+    "t": "Ground moves sometimes. Fear supplied the divine explanation afterward.",
     "tags": [
       "tell",
       "event:quaked",
@@ -234,7 +234,7 @@
     ]
   },
   {
-    "t": "A wolf attacked someone, and frightened neighbours made it divine.",
+    "t": "A wolf attacked someone, and frightened neighbors made it divine.",
     "tags": [
       "tell",
       "event:mauled",
@@ -481,7 +481,7 @@
     ]
   },
   {
-    "t": "The travelling account says a person descended without bending a blade of grass.",
+    "t": "The traveling account says a person descended without bending a blade of grass.",
     "tags": [
       "tell",
       "event:setdown",
@@ -658,7 +658,7 @@
     ]
   },
   {
-    "t": "One tree may have moved. A travelling story has made it a forest.",
+    "t": "One tree may have moved. A traveling story has made it a forest.",
     "tags": [
       "tell",
       "event:uprooted",
@@ -946,7 +946,7 @@
     ]
   },
   {
-    "t": "A travelling account tells of a child born safely after a terrible night.",
+    "t": "A traveling account tells of a child born safely after a terrible night.",
     "tags": [
       "tell",
       "event:delivered",

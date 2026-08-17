@@ -2,12 +2,12 @@
 //!
 //! Off; the name alone; or the whole soul — trade and doing, faith, body,
 //! house. Dressed like the notice toasts and the codex rather than like a
-//! debug readout: the dark panel, a border in the faith's own colour, the
+//! debug readout: the dark panel, a border in the faith's own color, the
 //! name set in the game's display face. Brett: "something that looks like
 //! the notifications in the notification tray, or like a WoW tooltip.
 //! Colored border, black background, colored name at top."
 //!
-//! The colour IS the reading. A believer's name burns gold, a waverer's
+//! The color IS the reading. A believer's name burns gold, a waverer's
 //! sits in bone, a doubter's goes out to ash — the one question a god has
 //! about a crowd, answered before a single word is read.
 
@@ -219,9 +219,9 @@ fn tend_labels(
         if let Ok(mut border) = borders.get_mut(plate.card) {
             *border = BorderColor::all(ink.with_alpha(0.85));
         }
-        if let Ok((_, mut colour)) = texts.get_mut(plate.name) {
-            if colour.0 != ink {
-                *colour = TextColor(ink);
+        if let Ok((_, mut color)) = texts.get_mut(plate.name) {
+            if color.0 != ink {
+                *color = TextColor(ink);
             }
         }
         if !whole {
@@ -238,18 +238,18 @@ fn tend_labels(
             house_words(genome, person),
         ];
         for (index, (line, fresh)) in plate.lines.iter().zip(said).enumerate() {
-            if let Ok((mut text, mut colour)) = texts.get_mut(*line) {
+            if let Ok((mut text, mut color)) = texts.get_mut(*line) {
                 if text.0 != fresh {
                     *text = Text::new(fresh);
                 }
-                // Faith and trouble carry their own colours; the rest is quiet.
+                // Faith and trouble carry their own colors; the rest is quiet.
                 let wanted = match index {
                     1 => ink.with_alpha(0.88),
                     2 if body_words(needs).1 => crate::palette::shade(&crate::palette::BONE, 0.97),
                     _ => crate::ui::theme::text_dim(),
                 };
-                if colour.0 != wanted {
-                    *colour = TextColor(wanted);
+                if color.0 != wanted {
+                    *color = TextColor(wanted);
                 }
             }
         }

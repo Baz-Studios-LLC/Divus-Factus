@@ -167,7 +167,7 @@ impl ViewSwitch {
     }
 }
 
-/// A hand-colour swatch, holding its place in [`crate::hand::HAND_STYLES`].
+/// A hand-color swatch, holding its place in [`crate::hand::HAND_STYLES`].
 #[derive(Component)]
 struct HandSwatch(usize);
 
@@ -267,7 +267,7 @@ fn spawn_splash(
                 ..default()
             },
             // True black, not panel charcoal: a studio mark opens the way a
-            // theatre goes dark, and the title's own colour reads warmer for
+            // theater goes dark, and the title's own color reads warmer for
             // following it.
             BackgroundColor(Color::BLACK),
             GlobalZIndex(320),
@@ -291,7 +291,7 @@ fn spawn_splash(
     // The studio's line, at the foot of the dark, rising and leaving
     // with the mark above it.
     // Built by hand rather than through `ui::dim`: this line owns its
-    // own colour, and a bundle may not carry two.
+    // own color, and a bundle may not carry two.
     commands.spawn((
         SplashMark,
         Text::new(format!(
@@ -544,13 +544,13 @@ fn spawn_title(
         .spawn((
             Name::new("Title Menu"),
             Node {
-                // Anchored down the full height and centred within it, which is
-                // what "vertically centred" has to mean in a flex layout: a
+                // Anchored down the full height and centered within it, which is
+                // what "vertically centered" has to mean in a flex layout: a
                 // percentage `top` puts the column's TOP at the middle of the
                 // screen and hangs the rest below it.
-                // Centred between the foot of the logotype and the foot of the
+                // Centerd between the foot of the logotype and the foot of the
                 // screen, rather than in the screen as a whole: the top third
-                // belongs to the lettering, and a menu centred against the whole
+                // belongs to the lettering, and a menu centered against the whole
                 // frame sits up inside it.
                 position_type: PositionType::Absolute,
                 right: px(110),
@@ -752,7 +752,7 @@ fn drift_smoke(
     };
     let t = time.elapsed_secs();
     let blow = farewell.map_or(0.0, |f| f.t);
-    // Comes up with the lettering, and owns the whole of its own colour while
+    // Comes up with the lettering, and owns the whole of its own color while
     // doing it — one writer per value.
     let risen = welcome.map_or(1.0, |welcome| welcome.risen());
 
@@ -936,12 +936,12 @@ fn handle_pause_menu(
 /// screen for a world with no edge to see. This one has an edge, and the first
 /// thing the game should say is what the player is being handed.
 const DRIFT_DISTANCE: f32 = 31_000.0;
-/// Nearly straight down, which is what CENTRES the ball.
+/// Nearly straight down, which is what CENTERS the ball.
 ///
 /// The rig aims at a point on the ground, not at the planet's middle, and from
 /// a low pitch those are two very different directions: the first try looked at
 /// the village from off to one side and the planet hung off the bottom of the
-/// frame like a hill. Overhead, the aim runs almost through the centre and the
+/// frame like a hill. Overhead, the aim runs almost through the center and the
 /// whole sphere sits in the middle of the screen. It costs nothing in light —
 /// the sun is where the sun is, whatever the camera does — and the yaw drift
 /// becomes a globe turning on its own axis rather than a camera flying round a
@@ -961,7 +961,7 @@ const DRIFT_PITCH: f32 = 1.50;
 ///
 /// The FOCUS walks instead, east along its own line of latitude, and the eye
 /// goes with it because it stands radially out from wherever the focus is. The
-/// view stays pointed at the planet's centre the whole way round, so what the
+/// view stays pointed at the planet's center the whole way round, so what the
 /// eye sees is the world turning past it, edge on.
 const DRIFT_LAP: f32 = 300.0;
 
@@ -972,7 +972,7 @@ const DRIFT_LAP: f32 = 300.0;
 const DRIFT_AIM: f32 = -0.16;
 
 /// Where the menu column starts, as a fraction of the screen's height. It runs
-/// from there to the foot of the frame and centres its buttons in what is left,
+/// from there to the foot of the frame and centers its buttons in what is left,
 /// so its own middle is halfway between this and the bottom.
 const MENU_TOP: f32 = 0.24;
 
@@ -989,7 +989,7 @@ const MENU_TOP: f32 = 0.24;
 /// Turning the camera up moves the world down, so this is positive.
 fn menu_middle_aim() -> f32 {
     let middle = (MENU_TOP + 1.0) * 0.5;
-    // How far off the frame's centre that is, in half-heights.
+    // How far off the frame's center that is, in half-heights.
     let off = (middle - 0.5) * 2.0;
     (off * (crate::camera::FIELD_OF_VIEW * 0.5).tan()).atan()
 }
@@ -1013,7 +1013,7 @@ fn drift_title_camera(
     // player left is the ground that comes round. Only the latitude: the
     // longitude is what the drift is walking.
     if let Some(site) = site {
-        rig.target_focus.z = site.centre.z;
+        rig.target_focus.z = site.center.z;
     }
     rig.target_distance = DRIFT_DISTANCE;
     rig.target_pitch = DRIFT_PITCH;
@@ -1052,7 +1052,7 @@ fn begin_descent(
     // below and nothing left that would ever queue a dive. Now an absent
     // village is the ordinary case rather than a gap to wait out.
     let landing = site
-        .map(|site| site.centre)
+        .map(|site| site.center)
         .or(vantage.map(|vantage| vantage.0))
         .unwrap_or(Vec3::ZERO);
     // Is the ground DOWN THERE built - not "does the view up here want
@@ -1195,7 +1195,7 @@ fn play_welcome(
     welcome: Option<ResMut<TitleWelcome>>,
     screens: Query<Entity, With<TitleScreen>>,
     kin: Query<&Children>,
-    // NOT the smoke. Every puff sets its own colour every frame — a tint and an
+    // NOT the smoke. Every puff sets its own color every frame — a tint and an
     // alpha that breathe along its lane — and writing plain white over it from
     // here left the two systems trading the same value once a frame. Brett saw
     // it immediately: "the smoke flashes for a few seconds before stopping",
@@ -1370,7 +1370,7 @@ fn begin_farewell(
         commands.entity(screen).despawn();
     }
     for button in &buttons {
-        // Hidden, not despawned: yanking four buttons out of the centred
+        // Hidden, not despawned: yanking four buttons out of the centered
         // column would reflow it, and the lettering above them visibly
         // jumped. The slots stay; the buttons just stop being there to see
         // or to press.
@@ -1437,13 +1437,13 @@ fn sync_hud(state: Res<State<GameState>>, mut huds: Query<&mut Visibility, With<
     }
 }
 
-/// The settings overlay: for now, one setting — the colour of the hand.
+/// The settings overlay: for now, one setting — the color of the hand.
 /// The hand itself hangs over this screen in its pointing pose, so every
 /// swatch click is previewed on the actual instrument.
 /// The settings, on the title screen and in the pause menu.
 ///
 /// It shows the CODEX's settings panel, which is the only settings panel in this
-/// game. It used to have its own — hand colours and nothing else — so there were
+/// game. It used to have its own — hand colors and nothing else — so there were
 /// two places to add a setting to and two chances to forget the second, and the
 /// two had already drifted. Brett's call, and plainly right: one panel, hosted in
 /// whichever frame is on screen.

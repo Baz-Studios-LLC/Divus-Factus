@@ -8,7 +8,7 @@
 //!    boldest soul with a warm circle gathers their people and goes. This is
 //!    the common door: growth, not misery. A starving town does not bud, it
 //!    prays.
-//! 2. **Fracture.** A heart nursing real grudges — two or more neighbours
+//! 2. **Fracture.** A heart nursing real grudges — two or more neighbors
 //!    held in open hatred — walks out and takes whoever loves them along.
 //!    The rare door, and the dramatic one: the town that splits in anger
 //!    splits along the lines the regard graph already drew.
@@ -148,7 +148,7 @@ pub fn fractured(grudges: usize, boldness: f32) -> bool {
 pub fn clear_of_towns(at: Vec3, towns: &[Vec3]) -> bool {
     towns
         .iter()
-        .all(|centre| at.distance(*centre) >= COLONY_SPACING)
+        .all(|center| at.distance(*center) >= COLONY_SPACING)
 }
 
 /// Picks the ground a party would leave for: known, sound, and clear of every
@@ -356,9 +356,9 @@ pub(super) fn muster_colonists(
         return;
     }
 
-    let centres: Vec<Vec3> = towns
+    let centers: Vec<Vec3> = towns
         .iter()
-        .map(|(_, ground, _, _, _)| ground.centre)
+        .map(|(_, ground, _, _, _)| ground.center)
         .collect();
 
     for (town, ground, settlement, store, barred) in &towns {
@@ -413,7 +413,7 @@ pub(super) fn muster_colonists(
         // Somewhere to go. Asked after the doors because it is the
         // expensive half.
         let Some(destination) =
-            choose_colony_site(&terrain, &mut rng.0, ground.centre, &known, &centres)
+            choose_colony_site(&terrain, &mut rng.0, ground.center, &known, &centers)
         else {
             // Raise the order: the explorers push for colony ground until
             // somewhere legal is known and the asking can be made.
@@ -488,14 +488,14 @@ pub(super) fn muster_colonists(
         belief::raise_prayer_mote(&mut commands, &mut visuals.0, &mut visuals.1, leader);
 
         let door = if aggrieved.is_some() {
-            "bitter at their neighbours"
+            "bitter at their neighbors"
         } else {
             "the town grown past its beds"
         };
         info!(
             "a road prayer rises from {}: {name} would stand {:.0} strides out ({door})",
             settlement.name,
-            ground.centre.distance(destination),
+            ground.center.distance(destination),
         );
         notices.write(crate::ui::Notice::prayer(format!(
             "A blessing is asked for the road: {name} would be founded from {}",
@@ -684,7 +684,7 @@ pub(super) fn bless_or_bar_the_road(
             + 1;
         let road = grounds
             .get(*mother)
-            .map_or(300.0, |g| g.centre.distance(*destination))
+            .map_or(300.0, |g| g.center.distance(*destination))
             / TRAVEL_PACE;
         let satchels = adults as f32 * 2.0;
         let seed = (party.len() as f32 * 2.0 + road / 60.0).min(store.food() * 0.4 - satchels);

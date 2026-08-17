@@ -20,14 +20,14 @@ panel — because no amount of simulation depth rescues a god game whose hand fe
 - [x] Scatter: trees, rocks, berry bushes, wind sway
 - [x] One need (hunger) with utility scoring; villagers seek and eat
 - [x] Divine Hand: hover, grab, carry with spring lag, throw with ballistics
-- [x] Full-resolution render, FXAA, bloom, vignette, depth of field, colour grading
+- [x] Full-resolution render, FXAA, bloom, vignette, depth of field, color grading
 - [x] Live tuning HUD and screenshot capture
 - [x] Endless streamed terrain — chunks load and unload around the camera
 - [x] Mountain belts, five biomes, five tree shapes
 - [x] Baked chunk scenery (186k entities → 15k; 30 fps → 147)
 - [x] Distance fog derived from the live stream radius, tracking zoom
 - [x] Mountain belts with rock and snow bands
-- [x] Five biomes driving ground colour and tree mix
+- [x] Five biomes driving ground color and tree mix
 - [x] Custom water shader: rotated-octave waves, fresnel, distance fade,
       depth-based transparency and shoreline foam via the depth prepass
 - [x] Treeline and snowline that wander with noise instead of drawing contours
@@ -69,14 +69,14 @@ panel — because no amount of simulation depth rescues a god game whose hand fe
       tongue, with a founder and members, shown in the inspector
 - [x] Every person has a chronicle: born, wed, came of age, touched by the
       god, widowed, died — the inspector shows their life's last lines
-- [x] Gossip: witnesses tell neighbours what they saw; secondhand knowledge
+- [x] Gossip: witnesses tell neighbors what they saw; secondhand knowledge
       is counted apart from witness ("only in stories")
 - [x] Work: vocations rolled from temperament (the bold hunt), five jobs —
       gather, fish, hunt, mine, cut wood — worked dawn to mid-afternoon
 - [x] The stockpile: work fills it, the hungry eat from it when the bushes
       are bare; food/timber/stone in the HUD
-- [x] The town banner: a pole and cloth in the village's colour marks the
-      centre, where the store lives
+- [x] The town banner: a pole and cloth in the village's color marks the
+      center, where the store lives
 - [x] The god is named by its people, in their own tongue, at the founding
 - [x] Dev HUD hidden by default; Tab toggles it (function keys demoted)
 - [x] Inspector moved to the top right
@@ -95,7 +95,7 @@ panel — because no amount of simulation depth rescues a god game whose hand fe
       spirits are needs now — the exhausted stop showing up for work
 - [x] Notices: events toast in the bottom right and fade; foundings and the
       god's naming get gold-bordered fanfare
-- [x] Icon toolbar top centre, first button recenters on the settlement
+- [x] Icon toolbar top center, first button recenters on the settlement
 - [x] A real sky: procedural dome — blue overhead, drifting fBm clouds, sun
       glow — meeting the fog exactly at the horizon; cloudiness is the handle
       weather will turn
@@ -137,7 +137,7 @@ The design's central claim, built at the smallest scale that can prove it.
       the inspector explains every believer ("prayed, and no answer came")
 - [x] Belief as currency: the sum of living faith, shown in the HUD, spent on
       miracles
-- [x] The miracle hotbar (bottom centre, WoW-style, keys 1/2): Flourish
+- [x] The miracle hotbar (bottom center, WoW-style, keys 1/2): Flourish
       (grace, fills the bushes) and Smite (wrath, lightning that kills) — the
       same lightning read two ways: the bold see power, the timid see terror
 - [x] Ascension: sustained belief and a congregation of ten raise the god's
@@ -152,7 +152,7 @@ The design's central claim, built at the smallest scale that can prove it.
       asset), extracted to transparency and lit by its own glow
 - [x] Title screen: Begin / Settings / Quit, world generating behind it; the
       hand is the menu cursor, pointing, tapping buttons with its fingertip
-- [x] Settings: the colour of your hand, eight palette swatches, previewed
+- [x] Settings: the color of your hand, eight palette swatches, previewed
       live on the pointing hand itself
 - [x] Matter: things are made of stuff — mass, roundness, buoyancy. Thrown
       boulders roll downhill and crush what they meet; logs and bushes float;
@@ -166,7 +166,7 @@ The design's central claim, built at the smallest scale that can prove it.
       working effect (sawmill: felling yields more timber; blacksmith: faster
       work; tavern: evening cheer)
 - [x] Houses have variety: rolled dimensions, wall and roof materials and
-      colours — no two alike
+      colors — no two alike
 - [x] Population is housed or homeless: shelter caps births, the roofless
       sleep by the fire and their spirits are capped low
 - [x] Eleven trades: gatherer, fisher, hunter, miner, forester, carpenter,
@@ -179,7 +179,7 @@ The design's central claim, built at the smallest scale that can prove it.
       crops also grow slowly on their own
 - [x] The cook keeps the kitchen warm: while it is, a stored ration goes
       further and lifts spirits
-- [x] The healer tends the worst-hurt neighbour, following them if they move
+- [x] The healer tends the worst-hurt neighbor, following them if they move
 - [x] The priest preaches at the shrine: whatever they witnessed becomes the
       sermon; everyone in earshot gains secondhand knowledge and a little
       faith — the pulpit is a gossip engine with authority
@@ -188,7 +188,7 @@ The design's central claim, built at the smallest scale that can prove it.
       and a village with foundations waiting calls a mason into the trade
 - [x] The village has a shape: concentric rings of plots around the banner,
       civic buildings on the inner ring, houses outward, every door facing
-      the centre; fields take their own belt outside the houses; terrain
+      the center; fields take their own belt outside the houses; terrain
       still vetoes plots, so the rings bend around rivers and hills
 - [x] Wildlife keeps home ranges: herds stop diffusing across the map, half
       the wilderness lives within sight of the village, and the census logs
@@ -210,7 +210,7 @@ The design's central claim, built at the smallest scale that can prove it.
       across the whole building band (out to ~36 units) and moves the
       shoreline reward out to fishing reach (42-58) — no more beachfront
       banners drowning half the village plan
-- [x] Death rites: family and neighbours gather and weep over the dead
+- [x] Death rites: family and neighbors gather and weep over the dead
       (spirits fall, chronicles record it), then a bearer — the priest, when
       there is one — shoulders the body and carries it to a resting ground
       on the outskirts; the grave keeps the dead person's name and chronicle,
@@ -245,11 +245,11 @@ The design's central claim, built at the smallest scale that can prove it.
       zooms the world underneath
 - [x] Game-grade window chrome: edge-to-edge title bars with a gold thread,
       drop shadows, corner studs, inset list wells, ruled section headers;
-      windows open centred on the left and drag anywhere
+      windows open centerd on the left and drag anywhere
 - [x] THE PEOPLE as a full dossier: portrait plaque, every hover-card stat in
       aligned rows, WANTS / HAS SEEN / LIFE sections, zebra roster with a
       gold selected row, and a follow chevron per name
-- [x] THE VILLAGE ledger (toolbar bar-chart button): a big centred window of
+- [x] THE VILLAGE ledger (toolbar bar-chart button): a big centerd window of
       cards and bar gauges — souls, houses, believers; happiness, fed,
       housed; faith and believers; stores — with one line for the land
 - [x] Small talk: villagers voice their state or trade every little while —
@@ -373,7 +373,7 @@ because they never need to, and when they do, they die. Two halves:
   Caravans/horses (queued) ride the same thread. The far horizon of this
   thread is worksite camps at distant grounds — a forester's camp at the
   far wood — which is the natural seed of satellite hamlets someday.
-- *Distance kills.* Travellers carry nothing: hunger climbs on the walk
+- *Distance kills.* Travelers carry nothing: hunger climbs on the walk
   and the walk home is longer than a stomach. Expeditions need
   provisioning — a satchel of rations eaten on the road (a natural first
   citizen for Milestone 3.75's containers) — plus the already-agreed
@@ -476,7 +476,7 @@ become a STATE things pass through, not a deletion with drama:
 - *Properties, not scripts:* matter grows the fire triplet — flammability
   (does it catch), fuel (an oak burns all night, a bush is a flash), and
   dryness (the gate, written daily by weather and season). ONE transfer
-  rule: a burning thing radiates ignition at neighbours, wind-biased,
+  rule: a burning thing radiates ignition at neighbors, wind-biased,
   dryness-gated. The forest fire is emergent — no forest-fire code, just
   trees near trees.
 - *Burning is a life stage:* struck → real minutes of flame and smoke,
@@ -493,18 +493,18 @@ become a STATE things pass through, not a deletion with drama:
   that outrun the caster — the ultimate false-attribution engine.
 - *Engineering:* the grove system is ready — stand_alone() already
   detaches single trees; burning = that + a fire state; spread is a
-  neighbour query groves can answer. Care: concurrency caps (a forest
+  neighbor query groves can answer. Care: concurrency caps (a forest
   alight is a spectacle, not a slideshow) and a burnt-registry like
   StrippedGround but with a regrowth clock.
 
 **The legibility track runs in parallel (it's UI, not sim):**
 - **Job outfits (Baz's idea, agreed):** taking a trade dresses the body for
-  it — LAYERED over the personal genome-coloured tunic, never replacing it,
+  it — LAYERED over the personal genome-colored tunic, never replacing it,
   so a person reads as *themselves, dressed for work*. Farmer straw hat;
   fisher rush hat + waders; hunter hide half-cloak; forester strap + cap;
   miner hood + dusted apron; mason slate split apron; carpenter tool belt;
   cook the village's only white apron; healer herb-green sash; priest the
-  full robe in the god's colour; gatherer basket sling. Children plain;
+  full robe in the god's color; gatherer basket sling. Children plain;
   the retired plain — plain is itself information. Rides the existing
   rebuild-on-retrain/age machinery; roster busts and the paperdoll inherit
   it. Likely replaces the planned "job labels" overlay toggle.
@@ -518,7 +518,7 @@ become a STATE things pass through, not a deletion with drama:
 - **Powers gated by doctrine**, not by a purchase menu
 
 Success test: a player can perform the same action twice and get two different doctrines,
-and can explain afterwards why.
+and can explain afterward why.
 
 ---
 
@@ -547,7 +547,7 @@ from simple systems interacting, and these are the systems.
 - [x] **Construction**: villagers *build* the settlement — houses with variety,
   then the civic ladder up to shrine and town hall; masons and carpenters
   carry every block and log to staged build sites
-- **Seasons**: the calendar gains a year; growth, food and grass colour follow
+- **Seasons**: the calendar gains a year; growth, food and grass color follow
 - **Weather**: rain and wind riding the same `Sky` state; drought is Milestone 4's
   crisis and weather is what makes it legible
 
@@ -605,10 +605,10 @@ until the loop above is fun.
 ## Known debt
 
 - The tuning HUD is function keys. `bevy_egui` when it outgrows that.
-- Wildlife has no behaviour; deer, wolves and boars only wander.
+- Wildlife has no behavior; deer, wolves and boars only wander.
 - Children never grow up. Age is set at spawn; newborns stay small forever.
 - River courses do not branch or merge, basin endings are crude ponds, and the
-  first query in a fresh region traces its neighbourhood in one go — a one-off
+  first query in a fresh region traces its neighborhood in one go — a one-off
   spike that should move to a background task.
 - Pathfinding has no cache: every destination change is a fresh A*. Four routes
   per frame keeps it off the frame time, but a large population will queue.
@@ -635,7 +635,7 @@ order:
 
 **1. Doctrine — the egregore itself.** What the village believes the god IS,
 grown from what they witnessed; epithets, prayers as a queue, doctrine
-shaping villager behaviour. The game's soul; comes first so every later
+shaping villager behavior. The game's soul; comes first so every later
 crisis (raids, famines, schisms) lands as a theological event.
 
 **2. Defense — walls and a standing watch.** Palisades first, stone later:

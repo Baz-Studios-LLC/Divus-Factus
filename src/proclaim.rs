@@ -1,13 +1,13 @@
-//! Proclamations: the game's great days, sent to Ordo's centre stage.
+//! Proclamations: the game's great days, sent to Ordo's center stage.
 //!
 //! Brett: "When really big events happen these would be cards in the center
 //! of the screen that fade in and have lighting and particle effects...
 //! The color of the toast will dictate what kind of toast it is." The kit
 //! owns the stage, the card, the choreography and the confetti; THIS module
-//! owns which moments earn the trumpet, what they say, what colour they
+//! owns which moments earn the trumpet, what they say, what color they
 //! wear, what they sound like — and where a press on the card flies.
 //!
-//! Three colours, three registers: GOLD for works of the village, GREEN
+//! Three colors, three registers: GOLD for works of the village, GREEN
 //! for life, PINK for faith. Sparingly, by law — a proclamation a minute
 //! would be a doorbell.
 
@@ -71,7 +71,7 @@ fn proclaim_the_great_days(
     // A new banner rises. The FIRST is the player's own flag - the opening
     // has its own ceremony, and a trumpet over it would be the interface
     // applauding itself. Every founding after that is a colony, and a
-    // colony is exactly what centre stage is for.
+    // colony is exactly what center stage is for.
     for (settlement, town) in &founded {
         if !*any_town_yet {
             *any_town_yet = true;

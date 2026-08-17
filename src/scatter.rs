@@ -1,8 +1,8 @@
 //! Trees, rocks and bushes scattered across the terrain.
 //!
-//! Density follows the same moisture field the terrain colouring uses, so forest
+//! Density follows the same moisture field the terrain coloring uses, so forest
 //! grows where the ground is already drawn green and rocks appear where it is
-//! already grey — the scatter agrees with the landscape rather than being sprinkled
+//! already gray — the scatter agrees with the landscape rather than being sprinkled
 //! over it.
 //!
 //! Scenery is split by whether the simulation needs to touch it. Trees and rocks are
@@ -52,7 +52,7 @@ impl Plugin for ScatterPlugin {
                 ),
             )
             // PostUpdate, deliberately: chunks spawned during Update - by
-            // streaming or by a building levelling the ground - get their
+            // streaming or by a building leveling the ground - get their
             // scenery THIS frame, before anything renders. In Update the
             // scenery lagged the chunk by a frame and every construction
             // made the nearby forest blink.
@@ -66,7 +66,7 @@ impl Plugin for ScatterPlugin {
 /// The shapes of tree the generator knows.
 ///
 /// Silhouette is what distinguishes them at a distance, so each differs in outline
-/// rather than only in colour: a conifer tapers, a broadleaf is round and heavy, a
+/// rather than only in color: a conifer tapers, a broadleaf is round and heavy, a
 /// palm is bare-trunked with a crown, a snag is jagged.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TreeKind {
@@ -428,7 +428,7 @@ fn populate_chunks(
             (chunk.coord.y as f32 + 0.5) * CHUNK_SIZE,
         );
         let chunk_known = !veil_active || known.as_ref().is_some_and(|k| {
-            chunk_center.distance(k.centre.xz()) < k.radius + 32.0
+            chunk_center.distance(k.center.xz()) < k.radius + 32.0
                 || k.pockets.iter().any(|p| chunk_center.distance(p.at.xz()) < p.radius + 32.0)
         });
         if !chunk_known {
@@ -474,7 +474,7 @@ fn populate_chunks(
                 }
 
                 // Nothing grows in the river bed or on the bare bank strip. Without
-                // this, trees stand in the channel and on earth the colour pass
+                // this, trees stand in the channel and on earth the color pass
                 // just stripped bare.
                 if terrain.river_influence_at(x, z).is_some_and(|(_, d, w)| {
                     d < crate::terrain::rivers::CHANNEL_HALF_WIDTH * w * 1.4
@@ -546,7 +546,7 @@ fn populate_chunks(
                         if stripped.is_stripped(x, z) {
                             // Bare ground still burns the rock's dice, or
                             // carrying one rock off would reshuffle every
-                            // neighbour on the next chunk rebuild.
+                            // neighbor on the next chunk rebuild.
                             bake_rock(&mut MeshBuilder::default(), local, &mut rng);
                         } else {
                             // A REAL rock, however far from home. These were
@@ -579,7 +579,7 @@ fn populate_chunks(
                     // The square belongs to the village: no tree seeds
                     // inside the banner's circle, whatever the noise says.
                     let square = settlement.as_ref().is_some_and(|site| {
-                        Vec2::new(x - site.centre.x, z - site.centre.z).length() < 10.0
+                        Vec2::new(x - site.center.x, z - site.center.z).length() < 10.0
                     });
                     // Cut woodland comes back over four seasons; a pad, a
                     // square or ground cleared for good never does.
@@ -1165,7 +1165,7 @@ impl TreeBody {
 }
 
 /// Which grove-visual this standing tree is merged into. Groves are pure
-/// rendering: a handful of neighbouring trees drawn as one mesh, because
+/// rendering: a handful of neighboring trees drawn as one mesh, because
 /// a mesh per trunk taxed the frame for every tree standing. The trees
 /// themselves are full entities — meshless while merged — and every one
 /// of them can be felled, burned, or uprooted individually.
@@ -1204,7 +1204,7 @@ const GROVE_QUIET: f32 = 2.0;
 const GROVE_PROMPT: f32 = 0.0;
 
 /// How long a grove counts as warm. Slightly longer than the quiet itself, so
-/// a grove that has only just finished baking still recognises the next mark
+/// a grove that has only just finished baking still recognizes the next mark
 /// as churn rather than treating it as a fresh single fell.
 const GROVE_WARM: f32 = 2.5;
 
@@ -1337,7 +1337,7 @@ pub fn stand_alone(
 }
 
 /// A felled tree mid-fall: it leans, crashes, lies a beat, and sinks
-/// away. Pure theatre — the timber went home on the forester's shoulder —
+/// away. Pure theater — the timber went home on the forester's shoulder —
 /// but a tree that blinks out of the world breaks the fiction the whole
 /// game is built on.
 #[derive(Component)]
@@ -1461,7 +1461,7 @@ pub struct SacredFlora {
     pub amount: f32,
 }
 
-/// A stand of sacred flora, baked like a bush: smoke-grey herb stalks
+/// A stand of sacred flora, baked like a bush: smoke-gray herb stalks
 /// with pale tips, or a low green clump crowned in vivid blossom.
 fn spawn_sacred(
     commands: &mut Commands,
@@ -1665,7 +1665,7 @@ pub(crate) fn spawn_boulder(
 /// trees arent the same."
 ///
 /// Seeded from the spot itself, no branch anywhere can disturb its
-/// neighbours - and nobody has to remember to burn dice ever again.
+/// neighbors - and nobody has to remember to burn dice ever again.
 pub fn spot_seed(world_seed: u32, coord: IVec2, ix: i32, iz: i32) -> u64 {
     chunk_scatter_seed(world_seed, coord)
         ^ ((ix as u32 as u64) << 40)
@@ -1765,7 +1765,7 @@ fn cull_veiled_scatter(
         if should_show {
             shown += 1;
             furthest_shown =
-                furthest_shown.max(pos.xz().distance(known.centre.xz()));
+                furthest_shown.max(pos.xz().distance(known.center.xz()));
         } else {
             hidden += 1;
         }
@@ -1783,8 +1783,8 @@ fn cull_veiled_scatter(
             "VEIL PROBE: active {veil_active}, known radius {:.0} at {:.0},{:.0} + {} pockets \
              | scatter shown {shown} hidden {hidden}, furthest shown {furthest_shown:.0}",
             known.radius,
-            known.centre.x,
-            known.centre.z,
+            known.center.x,
+            known.center.z,
             known.pockets.len(),
         );
     }
@@ -2049,7 +2049,7 @@ mod tests {
         //
         // Seeding each spot from its own grid position is what makes that
         // impossible, so this is the property worth pinning: distinct per
-        // spot, stable across rebuilds, and untouched by its neighbours.
+        // spot, stable across rebuilds, and untouched by its neighbors.
         let seed = 2024;
         let chunk = IVec2::new(3, -7);
 
@@ -2069,7 +2069,7 @@ mod tests {
             }
         }
 
-        // And the same grid position in a neighbouring chunk is a
+        // And the same grid position in a neighboring chunk is a
         // different spot in the world, so it must roll differently.
         assert_ne!(
             spot_seed(seed, chunk, 5, 9),
@@ -2077,23 +2077,23 @@ mod tests {
         );
 
         // The draws themselves, not just the seeds: a spot's whole
-        // sequence has to survive its neighbour taking a different
+        // sequence has to survive its neighbor taking a different
         // branch, which is exactly what terracing does.
         let roll = |ix, iz| {
             let mut rng = Rng::new(spot_seed(seed, chunk, ix, iz));
             (0..6).map(|_| rng.range(0.0, 1.0)).collect::<Vec<_>>()
         };
         let quiet = roll(5, 9);
-        let mut neighbour = Rng::new(spot_seed(seed, chunk, 4, 9));
+        let mut neighbor = Rng::new(spot_seed(seed, chunk, 4, 9));
         for _ in 0..17 {
-            neighbour.range(0.0, 1.0);
+            neighbor.range(0.0, 1.0);
         }
-        assert_eq!(quiet, roll(5, 9), "a neighbour's draws moved this spot");
+        assert_eq!(quiet, roll(5, 9), "a neighbor's draws moved this spot");
     }
 
     #[test]
     fn chunk_scatter_seeds_are_stable_and_distinct() {
-        // A chunk must regenerate identically after unloading, and neighbours must
+        // A chunk must regenerate identically after unloading, and neighbors must
         // not share a layout. Both fall out of how the per-chunk seed is derived.
         let a = chunk_scatter_seed(2024, IVec2::new(3, -7));
         assert_eq!(a, chunk_scatter_seed(2024, IVec2::new(3, -7)), "not stable");

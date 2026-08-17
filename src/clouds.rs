@@ -7,7 +7,7 @@
 //! blew over the village is the bank you find on the ball when you zoom out.
 //!
 //! Nothing about it is stored or painted: the deck is a field over DIRECTIONS
-//! from the planet's centre, evaluated per pixel, drifting because the direction
+//! from the planet's center, evaluated per pixel, drifting because the direction
 //! it samples turns slowly about the planet's axis. Same construction as the
 //! terrain's own field, and for the same reason — a field on the sphere has no
 //! seam to come apart on and no crowding at the poles, which every flat cloud
@@ -33,7 +33,7 @@ use crate::palette;
 /// unit ball by any real fraction of its radius reads as a halo hanging around
 /// the planet rather than as its weather. Four hundred and sixty units cleared
 /// every possible peak and looked detached from space, which is exactly what
-/// Brett saw. At this height it is a fifty-metre-scale sky from below and two
+/// Brett saw. At this height it is a fifty-meter-scale sky from below and two
 /// percent of the radius from above, and the tallest few summits in the world
 /// stand up into it — which is what mountains do.
 ///
@@ -153,7 +153,7 @@ fn part_the_clouds(
 }
 
 /// Marks the deck. Excluded from the world bend: it is a sphere already
-/// standing in world space around the planet's centre, not a flat thing waiting
+/// standing in world space around the planet's center, not a flat thing waiting
 /// to be wrapped onto one.
 #[derive(Component)]
 pub struct CloudShell;
@@ -172,9 +172,9 @@ impl Plugin for CloudPlugin {
 /// The uniform the cloud shader reads.
 #[derive(Clone, ShaderType, Debug)]
 pub struct CloudParams {
-    /// rgb the lit cloud colour, a the deck's greatest opacity.
+    /// rgb the lit cloud color, a the deck's greatest opacity.
     pub tint: Vec4,
-    /// rgb the colour of cloud the sun has left.
+    /// rgb the color of cloud the sun has left.
     pub shade: Vec4,
     /// xyz toward the sun, w how much daylight there is.
     pub sun: Vec4,
@@ -258,7 +258,7 @@ fn raise_the_deck(
         // neither face may be thrown away.
         NotShadowCaster,
         NotShadowReceiver,
-        Transform::from_translation(crate::globe::planet_centre()),
+        Transform::from_translation(crate::globe::planet_center()),
         RenderLayers::from_layers(&[0, crate::globe::GLOBE_LAYER]),
     ));
 }
@@ -280,7 +280,7 @@ fn drive_the_deck(
     // without a god keeps its weather.
     let (above_sea, sightline) = cameras.single().map_or((0.0, None), |rig| {
         let eye = crate::globe::bent_camera_pose(rig).translation;
-        let above = eye.distance(crate::globe::planet_centre()) - crate::terrain::PLANET_RADIUS;
+        let above = eye.distance(crate::globe::planet_center()) - crate::terrain::PLANET_RADIUS;
         // The sight corridor: the line from the hand's ground to the eye,
         // carried on behind it. Both ends in WORLD space, the shell's own
         // frame - the focus is a flat sim point and must be seated first.
@@ -314,14 +314,14 @@ fn drive_the_deck(
             params.eye = eye.extend(CORRIDOR_FEATHER * corridor_weight);
         }
         // Cloud takes the light the ground takes: white at noon, gilded at
-        // dusk, and the sunless side goes the colour of the night sky rather
+        // dusk, and the sunless side goes the color of the night sky rather
         // than to black, so an overcast night is still a sky and not a lid.
         // Overdriven past white, for the same reason the sky is (see
         // `render::horizon_color`): the tonemapper darkens what it is handed,
-        // and cloud handed its own colour comes back grey. Cloud in sunlight is
+        // and cloud handed its own color comes back gray. Cloud in sunlight is
         // the brightest thing in a landscape and has to be written like it.
         //
-        // And mostly WHITE rather than the sun's own colour. Taking the sun's
+        // And mostly WHITE rather than the sun's own color. Taking the sun's
         // light straight made the deck cream at noon, because the key light is a
         // warm bone-white; a third of it is enough that dawn and dusk still gild
         // the tops without the middle of the day looking like old paper.
@@ -339,7 +339,7 @@ fn drive_the_deck(
             (0.80 + coverage * 0.18) * clarity,
         );
         // Cloud the sun has left. Not black and not slate: an overcast at night
-        // still catches the moon and the sky, so it stays a pale cold grey —
+        // still catches the moon and the sky, so it stays a pale cold gray —
         // dark enough to be night, light enough to still read as cloud.
         params.shade = LinearRgba::from(crate::calendar::mix_colors(
             palette::shade(&palette::SKY, 0.5),

@@ -68,7 +68,7 @@ const SPARK_SCATTER: f32 = 0.38;
 /// Throws a burst of flecks where something was just taken as an offering.
 ///
 /// Brett: "can we have the tree pop in a kind of particle burst animation?"
-/// The colours are the thing's own - bark and leaf for a tree, grey for
+/// The colors are the thing's own - bark and leaf for a tree, gray for
 /// stone, berry-red for food - so what it WAS is readable in the pop.
 pub fn burst_of(
     commands: &mut Commands,
@@ -118,7 +118,7 @@ pub fn burst_of(
 /// The puff: a breath of cloth, close against the body.
 ///
 /// The change-of-clothes gesture. The offering burst throws its essence
-/// metres and gathers it back grandly - right for a gift becoming stores,
+/// meters and gathers it back grandly - right for a gift becoming stores,
 /// far too much for a coat. These flecks are small, barely clear the
 /// silhouette, and settle back INTO the body, like cloth falling into
 /// place. Brett, twice: the swap's particles were "a little much", then
@@ -351,7 +351,7 @@ pub struct Matter {
     pub buoyant: bool,
     /// Visual radius, for spin rate and ground clearance.
     pub radius: f32,
-    /// How far the body's visual CENTRE sits above its origin. A tree is
+    /// How far the body's visual CENTER sits above its origin. A tree is
     /// built from its trunk base, so its heart is half its height up; a
     /// boulder is built around its middle and its heart is nought. Tumbling
     /// happens about the heart - about the origin, a thrown tree pivoted on
@@ -417,7 +417,7 @@ pub struct Rolling {
 pub struct Floating;
 
 /// One step of rolling: downhill pull, friction, and the decision to stop.
-/// Pure, so the behaviour is testable without a world.
+/// Pure, so the behavior is testable without a world.
 pub fn roll_step(velocity: Vec3, downhill: Vec3, roundness: f32, dt: f32) -> Vec3 {
     let pulled = velocity + downhill * GRAVITY * roundness * dt;
     // The less round it is, the harder the ground grips it.
@@ -641,7 +641,7 @@ fn the_water_claims(
             kind: crate::sfx::SfxKind::Splash,
             at: Some(transform.translation),
         });
-        // The splash: water-coloured flecks, gathering back to the ring.
+        // The splash: water-colored flecks, gathering back to the ring.
         burst_of(
             &mut commands,
             &mut meshes,
@@ -832,7 +832,7 @@ pub enum DepositKind {
     /// into places worth walking to.
     ///
     /// It is a deposit and not a building on purpose. Miners already work
-    /// deposits, the survey overlay already has a colour called "quarry rock",
+    /// deposits, the survey overlay already has a color called "quarry rock",
     /// and there is already a `Mine` for the other half of this — a drift
     /// driven into a hillside, which only hill country can offer. A quarry is
     /// what flat country gets instead.

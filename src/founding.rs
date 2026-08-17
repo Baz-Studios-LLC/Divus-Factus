@@ -57,7 +57,7 @@ impl GroundUnderTheFlag {
     }
 }
 
-/// The flag the god carries, and the parts of it that take a colour.
+/// The flag the god carries, and the parts of it that take a color.
 #[derive(Component)]
 struct TheFlag {
     cloth: Vec<Entity>,
@@ -160,7 +160,7 @@ const GRIP: Vec3 = Vec3::new(0.0, -0.30, -0.62);
 const HELD_UP_THE_POLE: f32 = 1.0;
 
 /// The flag's own size inside the fist. The hand's scale is inherited, so
-/// this is a fraction of it rather than a size in metres - which is the point:
+/// this is a fraction of it rather than a size in meters - which is the point:
 /// the flag now grows and shrinks WITH the hand instead of staying
 /// human-sized in a god's grip.
 const FLAG_IN_HAND: f32 = 0.9;
@@ -210,7 +210,7 @@ fn raise_the_flag(
     // an overlay camera above everything else so a cursor can never be
     // occluded - which meant the pole, an ordinary world object, was drawn in
     // the pass UNDERNEATH it and vanished behind the fist holding it. The
-    // shaft runs through the grip and a metre past it, and not one pixel of it
+    // shaft runs through the grip and a meter past it, and not one pixel of it
     // could be seen. Same pass as the hand, and the two sort against each
     // other properly.
     //
@@ -320,14 +320,14 @@ fn carry_the_flag(
         return;
     };
     // Where it IS is the hand's business now - it hangs off the fist. All this
-    // decides is whether there is a flag to see and what colour it reads.
+    // decides is whether there is a flag to see and what color it reads.
     if reading.at.is_none() {
         *showing = Visibility::Hidden;
         return;
     }
     *showing = Visibility::Inherited;
 
-    let colour = if reading.refusal.is_some() {
+    let color = if reading.refusal.is_some() {
         palette::shade(&palette::CLOTH_RED, 0.55)
     } else {
         palette::shade(&palette::CLOTH_GOLD, 0.85)
@@ -335,9 +335,9 @@ fn carry_the_flag(
     for piece in &flag.cloth {
         if let Ok(stuff) = cloth.get(*piece)
             && let Some(mut stuff) = materials.get_mut(&stuff.0)
-            && stuff.base_color != colour
+            && stuff.base_color != color
         {
-            stuff.base_color = colour;
+            stuff.base_color = color;
         }
     }
 }
@@ -350,7 +350,7 @@ fn say_the_ground(
     let Ok((mut text, mut ink)) = words.single_mut() else {
         return;
     };
-    let (said, colour) = match (reading.at, reading.refusal) {
+    let (said, color) = match (reading.at, reading.refusal) {
         (None, _) => (String::new(), palette::shade(&palette::BONE, 0.95)),
         (Some(_), Some(refusal)) => (
             refusal.to_string(),
@@ -378,8 +378,8 @@ fn say_the_ground(
     if text.0 != said {
         *text = Text::new(said);
     }
-    if ink.0 != colour {
-        *ink = TextColor(colour);
+    if ink.0 != color {
+        *ink = TextColor(color);
     }
 }
 
@@ -431,7 +431,7 @@ fn plant_it_unattended(
     // `x,z` plants the flag at exact coordinates - the harness for
     // founding-site bugs, because a player's chosen ground is part of
     // the reproduction. Brett's woods famine lived at -2364,-1799 and
-    // the survey's favourite spot could never have found it.
+    // the survey's favorite spot could never have found it.
     if let Some((x, z)) = dial
         .split_once(',')
         .and_then(|(x, z)| Some((x.trim().parse::<f32>().ok()?, z.trim().parse::<f32>().ok()?)))

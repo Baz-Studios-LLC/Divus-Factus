@@ -139,7 +139,7 @@ pub struct Musing {
     pub about: Option<String>,
     /// Whether this is truly VOICED — a scream, a cry for help. An idle
     /// musing is a thought and shows as one: people who talk to the wind
-    /// unsettle their neighbours.
+    /// unsettle their neighbors.
     pub aloud: bool,
 }
 
@@ -248,7 +248,7 @@ impl Tongue {
     /// Unlike [`Tongue::line`] this carries no memory and moves no
     /// knowledge - the story changed hands on the opener, and everything
     /// after it is interpretation. That split is what keeps a four-beat
-    /// conversation from propagating a rumour four times.
+    /// conversation from propagating a rumor four times.
     #[allow(dead_code)]
     pub fn turn(
         &mut self,
@@ -508,7 +508,7 @@ pub fn admissible(line: &str) -> bool {
 
 /// Whether a line speaks only of people the teller actually knows of.
 ///
-/// The truth gate. A model asked about "Feitreh, your neighbour" will now and
+/// The truth gate. A model asked about "Feitreh, your neighbor" will now and
 /// then reach for a name of its own — a cousin Marcus, a village elder nobody
 /// has ever heard of — and a single invented person on screen poisons the
 /// whole premise that the village is real. So the rule is structural rather
@@ -517,7 +517,7 @@ pub fn admissible(line: &str) -> bool {
 /// answered.
 ///
 /// There is deliberately NO exemption for the first word. The whole register —
-/// every written rumour, every worked example — runs lowercase, so the model
+/// every written rumor, every worked example — runs lowercase, so the model
 /// imitating its examples starts lowercase too, and a line that opens with a
 /// capital is already drifting. Exempting it as sentence case would be the one
 /// door left open ("Marcus saw it too" walks straight through), and the cost
@@ -660,11 +660,11 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(Retelling::hand_of(&told), Hand::Heard);
-        let rumoured = Witnessed {
+        let rumored = Witnessed {
             secondhand: 5,
             ..Default::default()
         };
-        assert_eq!(Retelling::hand_of(&rumoured), Hand::Distant);
+        assert_eq!(Retelling::hand_of(&rumored), Hand::Distant);
     }
 }
 

@@ -23,7 +23,7 @@ pub struct MeshBuilder {
     indices: Vec<u32>,
 }
 
-/// The eight corners of a unit cube centred on the origin.
+/// The eight corners of a unit cube centered on the origin.
 const CORNERS: [Vec3; 8] = [
     Vec3::new(-0.5, -0.5, -0.5),
     Vec3::new(0.5, -0.5, -0.5),
@@ -50,7 +50,7 @@ impl MeshBuilder {
         self.indices.is_empty()
     }
 
-    /// Adds a box, transformed by `transform`, in a flat colour.
+    /// Adds a box, transformed by `transform`, in a flat color.
     pub fn push_box(&mut self, transform: Transform, color: Color) {
         let matrix = transform.to_matrix();
         // Normals need the rotation but not the scale, or a non-uniform scale tilts
@@ -90,7 +90,7 @@ impl MeshBuilder {
 }
 
 /// Accumulates grass blades: single triangles with a bend weight in `uv.x`
-/// (0 at the roots, 1 at the tip) and a colour gradient from root to tip.
+/// (0 at the roots, 1 at the tip) and a color gradient from root to tip.
 ///
 /// Kept separate from [`MeshBuilder`] because blades are not boxes: they are the
 /// one thing in the game whose vertices the GPU moves every frame, and the wind

@@ -59,7 +59,7 @@ pub enum Sex {
 ///
 /// The single biggest contributor to a crowd reading as a *population* rather than
 /// as a batch of clones: a settlement of uniformly adult-sized figures looks
-/// manufactured no matter how much its colours vary.
+/// manufactured no matter how much its colors vary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Age {
     Child,
@@ -176,7 +176,7 @@ pub struct Proportions {
     pub neck_length: f32,
 }
 
-/// A colour choice: which ramp, and how far up it.
+/// A color choice: which ramp, and how far up it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Tone {
     pub ramp: usize,
@@ -224,7 +224,7 @@ pub struct CreatureGenome {
     pub gait: Gait,
     pub skin: Tone,
     pub cloth: Tone,
-    /// Second clothing colour, for trim, belts, sashes and hoods. Drawn from a
+    /// Second clothing color, for trim, belts, sashes and hoods. Drawn from a
     /// different ramp than `cloth` so the two always read as distinct.
     pub accent: Tone,
     pub hair: Tone,
@@ -285,7 +285,7 @@ impl CreatureGenome {
     fn built(species: Species, sex: Sex, age: Age, rng: &mut Rng) -> Self {
         let proportions = match species {
             // Deliberately not human proportions. Villagers are three or four
-            // pixels tall at normal zoom, and a realistically-proportioned figure
+            // pixels tall at normal zoom, and a realiztically-proportioned figure
             // at that size is an unreadable smear. Oversized heads and short legs
             // are what let a silhouette still read as a person — the same reason
             // pixel artists have always drawn characters this way.
@@ -396,7 +396,7 @@ impl CreatureGenome {
             tone
         };
 
-        // Elders grey. Sampling the bone ramp rather than a dedicated grey keeps it
+        // Elders gray. Sampling the bone ramp rather than a dedicated gray keeps it
         // inside the palette.
         let hair = if age == Age::Elder && rng.chance(0.8) {
             Tone {
@@ -456,7 +456,7 @@ impl CreatureGenome {
     ///
     /// Continuous traits average with a mutation nudge; discrete traits are
     /// inherited whole from one parent or the other. That produces children who
-    /// are recognisably of their parents without being an exact blend of them.
+    /// are recognizably of their parents without being an exact blend of them.
     // Exercised by tests; wired into the simulation when births land.
     #[allow(dead_code)]
     pub fn child_of(a: &CreatureGenome, b: &CreatureGenome, rng: &mut Rng) -> Self {
@@ -546,7 +546,7 @@ impl CreatureGenome {
             // Clothing, headwear and grooming are cultural, not genetic, so they are
             // re-rolled rather than inherited. When settlements gain doctrine, this
             // is where it will express itself — a village that decides the god
-            // favours the drowned will dress differently from one that does not.
+            // favors the drowned will dress differently from one that does not.
             cloth,
             accent,
             hair: if rng.chance(0.5) { a.hair } else { b.hair },

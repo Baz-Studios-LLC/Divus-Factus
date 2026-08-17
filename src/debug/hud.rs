@@ -56,7 +56,7 @@ pub(crate) fn spawn_hud(mut commands: Commands, mouse: Res<crate::keymap::MouseS
         // Hand-built rather than ui::dim, which already carries a
         // TextFont - a bundle with two of anything panics, the same trap
         // the splash line fell into. Dressed like the date's own small
-        // line, and centred at the top of the screen where it reads as
+        // line, and centered at the top of the screen where it reads as
         // an instrument rather than a subtitle.
         Text::new(""),
         ui::SerifFace,
@@ -71,7 +71,7 @@ pub(crate) fn spawn_hud(mut commands: Commands, mouse: Res<crate::keymap::MouseS
         },
         Node {
             position_type: PositionType::Absolute,
-            // The whole width, centring its own words: the text can
+            // The whole width, centering its own words: the text can
             // change length every half second, and a pinned left edge
             // would make it crawl.
             left: px(0),
@@ -344,7 +344,7 @@ pub(crate) fn handle_tuning_input(
 
     // Both hands of saturation live on F11 - richer plain, paler shifted.
     // It rode the backquote once (every overlay toggle drained the world's
-    // colour), then F12, where every press also tripped the screenshot key.
+    // color), then F12, where every press also tripped the screenshot key.
     if keys.just_pressed(KeyCode::F11) {
         let step = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
             -0.05
@@ -484,7 +484,7 @@ pub(crate) fn update_hud(
             HudValue::Chunks => chunk_count.to_string(),
             // The height of the climb, from the ground's zoom or the orbit's
             // own, whichever owns the camera - asked for from the middle of
-            // the round-world work, where every grey layer in the sky turned
+            // the round-world work, where every gray layer in the sky turned
             // out to live at a different altitude.
             HudValue::Altitude => {
                 format!("{:.0}", rigs.iter().next().map_or(0.0, |rig| rig.distance))
@@ -799,7 +799,7 @@ pub(crate) fn walk_the_ground_by_hand(
     // clicked where the hand is and the ground cleared way over in the
     // distance."
     let coord = terrain.chunk_of(flat.x, flat.z);
-    let centre = Vec3::new(
+    let center = Vec3::new(
         (coord.x as f32 + 0.5) * crate::terrain::CHUNK_SIZE,
         0.0,
         (coord.y as f32 + 0.5) * crate::terrain::CHUNK_SIZE,
@@ -808,7 +808,7 @@ pub(crate) fn walk_the_ground_by_hand(
     // the width of a chunk would leave its four corners dark and the map
     // would freckle.
     known.learn(
-        centre,
+        center,
         crate::terrain::CHUNK_SIZE * std::f32::consts::SQRT_2 * 0.5,
     );
     info!(

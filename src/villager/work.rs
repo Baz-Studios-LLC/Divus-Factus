@@ -300,19 +300,19 @@ pub(super) fn receive_offerings(
 ) {
     use crate::palette;
     for (offering, at, matter, lump, goods, food, sacred, genome, wild) in &offered {
-        // What this thing is worth, and what colour its essence bursts in.
+        // What this thing is worth, and what color its essence bursts in.
         // Wood pays the feller's rate, stone the rock's mass, a berry bush
         // the meals still on it, and a wild animal the hunter's own carcass
         // rate - Brett: "same with rocks or food (I should be able to grab
         // bushes or animals for the food)". A PERSON is never an offering,
         // which the query above enforces before any arithmetic can.
         // (timber, stone, clay, ore, berries, meat, incense, dye) - the whole
-        // pantry - plus the colours its essence bursts in.
+        // pantry - plus the colors its essence bursts in.
         let mut pays = [0.0f32; 8];
         // A withdrawn parcel FIRST, before the generic matter arm can claim
         // it: parcels wear `Matter` for physics, and the matter arm priced
         // every one of them as the stone its boulder-body pretended to be -
-        // clay came back as masonry and burst in grey. Brett: "the particles
+        // clay came back as masonry and burst in gray. Brett: "the particles
         // are stone colored not clay colored... same for food and wood." A
         // parcel pays back exactly the kind and amount that was drawn.
         let colors: Vec<Color> = if let Some(parcel) = goods {
@@ -543,7 +543,7 @@ pub(super) fn receive_offerings(
             store.larder.add(FoodKind::Meat, meat);
         }
         // The pop: the thing becomes its essence where everyone can see it,
-        // bursting in its own colours and gathering into what took it.
+        // bursting in its own colors and gathering into what took it.
         crate::matter::burst_of(
             &mut commands,
             &mut meshes,
@@ -614,7 +614,7 @@ pub(super) fn update_woodpile(
     }
 }
 
-/// A neighbour pitching in at someone else's build site.
+/// A neighbor pitching in at someone else's build site.
 #[derive(Component)]
 pub struct Helper(pub Entity);
 
@@ -683,7 +683,7 @@ pub(super) fn lend_a_hand(
         } else {
             target.0 = None;
             motion.flail = motion.flail.max(0.25);
-            // A neighbour's labour speeds the work but cannot finish it:
+            // A neighbor's labor speeds the work but cannot finish it:
             // the last of a building takes a carpenter's hand, so helped
             // progress stops just short and never runs past the cost —
             // "22 of 6 timber" is a lie no site should tell.
@@ -707,7 +707,7 @@ pub(super) fn lend_a_hand(
         }
     }
 
-    // Recruit: an idle neighbour near an active site, two helpers at most.
+    // Recruit: an idle neighbor near an active site, two helpers at most.
     // Only where the work can actually advance — a site still waiting on
     // its foundation stone needs a mason, not a crowd.
     for (site, site_at, construction, plan) in &sites {
@@ -790,7 +790,7 @@ pub(super) fn salvage_timber(
     // Every town's square, gathered before the mutable loops below: a loose
     // log is worth salvaging if it lies near ANY settlement, not just the one
     // the player is watching.
-    let centres: Vec<Vec3> = towns.iter().map(|(_, ground, _)| ground.centre).collect();
+    let centers: Vec<Vec3> = towns.iter().map(|(_, ground, _)| ground.center).collect();
 
     // Carriers in progress first.
     let mut carrying: Vec<Entity> = Vec::new();
@@ -865,9 +865,9 @@ pub(super) fn salvage_timber(
         if carrying.contains(&log) {
             continue;
         }
-        if !centres
+        if !centers
             .iter()
-            .any(|centre| log_at.translation.distance(*centre) <= 70.0)
+            .any(|center| log_at.translation.distance(*center) <= 70.0)
         {
             continue;
         }
@@ -1098,7 +1098,7 @@ pub(super) fn do_work(
         let Ok((ground, mut store)) = towns.get_mut(town) else {
             continue;
         };
-        let centre = ground.centre;
+        let center = ground.center;
         let woodpile = ground.woodpile;
         let workers_alive = alive_by_town.get(&town).copied().unwrap_or(0);
 
@@ -1130,7 +1130,7 @@ pub(super) fn do_work(
         // shift's end is hunger ON ARRIVAL, not hunger here - a worker
         // two hundred strides out must leave two hundred strides early.
         // Meals still in the satchel buy the road back.
-        let walk_home = transform.translation.distance(centre) / 2.4;
+        let walk_home = transform.translation.distance(center) / 2.4;
         let projected = needs.hunger + walk_home / SECONDS_TO_STARVE - rations_left * 0.6;
         // The food trades work through hunger only while the larder is
         // THIN. That exemption exists so a village does not starve beside
@@ -1234,7 +1234,7 @@ pub(super) fn do_work(
                         let angle = rng.0.range(0.0, std::f32::consts::TAU);
                         let (sin, cos) = angle.sin_cos();
                         let reach = rng.0.range(14.0, 30.0);
-                        let (x, z) = (centre.x + cos * reach, centre.z + sin * reach);
+                        let (x, z) = (center.x + cos * reach, center.z + sin * reach);
                         job.site = Vec3::new(x, 0.0, z);
                     }
                 }
@@ -2057,7 +2057,7 @@ pub(super) fn do_work(
                         .map(|t| t.rotation)
                         .unwrap_or_else(|| {
                             Quat::from_rotation_y({
-                                let toward = (centre - at).with_y(0.0);
+                                let toward = (center - at).with_y(0.0);
                                 let toward = toward.normalize_or_zero();
                                 (-toward.z).atan2(toward.x)
                             })
@@ -2149,7 +2149,7 @@ pub(super) fn do_work(
                 if vitality.harm <= 0.0 {
                     info!("{} nursed someone back to health", person.name);
                     if let Some(mut chronicle) = chronicle {
-                        chronicle.record(clock.day(), "nursed a neighbour back to health");
+                        chronicle.record(clock.day(), "nursed a neighbor back to health");
                     }
                     *activity = Activity::Idle;
                     commands.entity(entity).remove::<Job>();
@@ -2238,7 +2238,7 @@ mod tests {
         let pile = Vec3::new(10.0, 40.0, -6.0);
         app.world_mut().spawn((
             crate::villager::SettlementGround {
-                centre: pile,
+                center: pile,
                 radius: 40.0,
                 woodpile: pile,
                 foodpile: pile,
@@ -2288,7 +2288,7 @@ mod tests {
             let pile = Vec3::new(10.0, 40.0, -6.0);
             app.world_mut().spawn((
                 crate::villager::SettlementGround {
-                    centre: pile,
+                    center: pile,
                     radius: 40.0,
                     woodpile: pile,
                     foodpile: pile,
@@ -2401,14 +2401,14 @@ mod tests {
         assert!(loudest.is_some(), "a rich town still wants something");
     }
 
-    /// What the god's own deliveries pay, held against what labour pays.
+    /// What the god's own deliveries pay, held against what labor pays.
     ///
     /// A dropped tree must be worth what felling it is worth - the god saves
     /// the walk, not the arithmetic - or provisioning becomes either pointless
     /// or the only sane way to play. Stone scales with the rock: a loaf-sized
     /// stone is a stone, an outcrop is a working day.
     #[test]
-    fn an_offering_pays_what_the_labour_would_have() {
+    fn an_offering_pays_what_the_labor_would_have() {
         // A mature tree: the feller's own yield without a sawmill is 2.0
         // plus skill; the offering pays the skilless rate.
         let tree = crate::matter::Matter::felled_tree(1.0);

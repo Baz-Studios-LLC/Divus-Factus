@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn value_noise_is_continuous() {
-        // Neighbouring samples should not jump: interpolation, not white noise.
+        // Neighboring samples should not jump: interpolation, not white noise.
         let mut prev = value_2d(0.0, 0.0, 7);
         for i in 1..500 {
             let n = value_2d(i as f32 * 0.01, 0.0, 7);

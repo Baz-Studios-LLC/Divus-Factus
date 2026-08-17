@@ -36,7 +36,7 @@
     ]
   },
   {
-    "t": "The child came safely after a hard labour. I saw an answered prayer.",
+    "t": "The child came safely after a hard labor. I saw an answered prayer.",
     "tags": [
       "tell",
       "event:delivered",
@@ -117,7 +117,7 @@
     ]
   },
   {
-    "t": "Both survived. I thanked the healer first and {god} quietly afterwards.",
+    "t": "Both survived. I thanked the healer first and {god} quietly afterward.",
     "tags": [
       "tell",
       "event:delivered",
@@ -126,7 +126,7 @@
     ]
   },
   {
-    "t": "The labour was hard, then suddenly it was over. Maybe somebody listened.",
+    "t": "The labor was hard, then suddenly it was over. Maybe somebody listened.",
     "tags": [
       "tell",
       "event:delivered",
@@ -455,7 +455,7 @@
     ]
   },
   {
-    "t": "I saw {god}'s power land on a person. Nobody nearby spoke afterwards.",
+    "t": "I saw {god}'s power land on a person. Nobody nearby spoke afterward.",
     "tags": [
       "tell",
       "event:smote",
@@ -565,7 +565,7 @@
     ]
   },
   {
-    "t": "The bolt was real. The meaning came from frightened people afterwards.",
+    "t": "The bolt was real. The meaning came from frightened people afterward.",
     "tags": [
       "tell",
       "event:smote",
@@ -777,7 +777,7 @@
     ]
   },
   {
-    "t": "I ran towards {whom} only after {god} released them.",
+    "t": "I ran toward {whom} only after {god} released them.",
     "tags": [
       "tell",
       "event:thrown",
@@ -847,7 +847,7 @@
     ]
   },
   {
-    "t": "I ran when {whom} left the ground. Courage returned afterwards.",
+    "t": "I ran when {whom} left the ground. Courage returned afterward.",
     "tags": [
       "tell",
       "event:thrown",
@@ -1195,7 +1195,7 @@
     ]
   },
   {
-    "t": "You saw lightning. The judgment was added afterwards.",
+    "t": "You saw lightning. The judgment was added afterward.",
     "tags": [
       "reply",
       "event:smote",

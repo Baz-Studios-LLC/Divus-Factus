@@ -67,7 +67,7 @@ mode, but in play the belief system is delivered as people talking about you.
 
 This is also the answer to "how does the player perceive simulation depth?" Dwarf
 Fortress's depth is legible because it is text. Pixel figures at camera distance are dots.
-**Prayer and rumour are the UI for the entire simulation.**
+**Prayer and rumor are the UI for the entire simulation.**
 
 **Misinterpretation is never random.** It is motivated — derived from personality, from
 what else happened nearby, from doctrine already held. Random misreading feels like the

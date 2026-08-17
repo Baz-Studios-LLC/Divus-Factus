@@ -134,7 +134,7 @@ struct SaveGame {
     /// The banner as it flew: (cloth ramp, sigil index).
     #[serde(default)]
     banner: Option<(u32, u32)>,
-    centre: Vec3,
+    center: Vec3,
     woodpile: Vec3,
     worked: Vec<crate::terrain::WorkedGround>,
     known: KnownWorld,
@@ -297,7 +297,7 @@ fn process_requests(world: &mut World) {
     }
     // A load requested on the title screen is NOT consumed here: it waits
     // for enter_on_title_load to walk the state machine through the
-    // Loading door, and is honoured on the next frame, once the title has
+    // Loading door, and is honored on the next frame, once the title has
     // been left. Consuming it while still on the title restored the world
     // invisibly behind the title screen and left the player stranded on
     // it — the LOAD button that "did nothing". (Which of the two systems
@@ -364,7 +364,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
     let banner = world
         .get::<Settlement>(settlement_entity)
         .map(|s| (s.banner_ramp as u32, s.sigil as u32));
-    let centre = site.centre;
+    let center = site.center;
     let woodpile = site.woodpile;
 
     let (name, founded) = {
@@ -414,7 +414,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
     let known = {
         let k = world.resource::<KnownWorld>();
         KnownWorld {
-            centre: k.centre,
+            center: k.center,
             radius: k.radius,
             pockets: k
                 .pockets
@@ -777,7 +777,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         label_souls: people.len(),
         god,
         founded,
-        centre,
+        center,
         woodpile,
         worked,
         known,
@@ -983,7 +983,7 @@ fn apply(world: &mut World, save: SaveGame) {
 
     // 3. Re-raise the fixtures through the founding code, under the old names.
     world.insert_resource(RestoringSeed {
-        centre: save.centre,
+        center: save.center,
         name: save.label_settlement.clone(),
         god: save.god.clone(),
         founded: save.founded,
@@ -1924,7 +1924,7 @@ mod tests {
         world.insert_resource(crate::villager::DivineName("Hesh".to_string()));
         let settlement = world.spawn_empty().id();
         world.insert_resource(SettlementSite {
-            centre: Vec3::new(70.0, 0.0, 9.0),
+            center: Vec3::new(70.0, 0.0, 9.0),
             radius: 170.0,
             woodpile: Vec3::new(74.0, 0.0, 11.0),
             settlement,
