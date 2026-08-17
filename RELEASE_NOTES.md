@@ -1,46 +1,44 @@
-## A maker can draw where the goods go
+## The planet gets a climate
 
-Opificium can now author a **pallet**: not a point but a box, dragged out to
-the room a building sets aside for goods to stack in. The game reads them.
+The world had no idea where on itself anything was. Temperature was noise,
+so one survey found conifer forest at the pole *and* at the equator, with
+temperature rising toward the pole before falling again — and deserts
+turned up wherever the noise happened to dip.
 
-- **A storehouse stacks where its drawing says**, and holds what the drawing
-  gives it room for. The four corners it used to use, identical for every
-  storehouse whatever its shape, are gone.
-- **A pallet takes whatever the village needs it to.** The pallets are
-  shared out among the goods actually being stored, and shared out again
-  when that changes — six pallets over timber, stone and food deal two
-  each, and once a granary takes the food away the same six deal three each
-  to the two that remain. New goods join the deal the day the village first
-  has any.
-- **Goods fill one pallet before starting the next**, in rows and then
-  layers, each layer laid the other way about. How much a pallet holds is a
-  fact about the box that was drawn, not a number in the code.
-- **The granary is asked the same way**, so food is authored in both of its
-  homes.
+- **The sun decides the climate now.** Hot at the middle, cold at the ends,
+  with broad tropics and sharp cold caps. From orbit: a green belt, two
+  temperate bands, two white crowns.
+- **The rain has its own latitudes.** Air rises wet at the equator and
+  comes back down dry about thirty degrees out, which is why the deserts of
+  a real world sit in two belts either side of the equator rather than on
+  it — and why the rainforest is on it.
+- Noise stays in both, as *weather over the climate*: the bands never read
+  as painted stripes, and a warm valley can still sit inside a cold
+  latitude.
 
-A building that draws no pallets keeps the corners it always had. Nothing
-already authored changes.
+**Worlds will look different from the same seed.** Nothing breaks, but a
+world you have been playing has moved its forests.
 
-## Buildings stand at the size they were drawn
+## Every country has something of its own
 
-**A carried-in building is placed, leveled and cleared at its own
-footprint.** Only houses ever asked their drawing how big they were; every
-other kind used a size from the days the village drew its own buildings. So
-an authored storehouse of 6.4 by 10.6 meters was given a pad of 2.8 by 1.6 —
-a fifth of the building. On a slope that is one end hanging in the air and
-the other buried, with trees left standing inside the porches. **Expect the
-ground around larger buildings to look different.**
+They were five names for the same landscape in different greens. Now:
 
-## A clock tells the hour
+- **The desert grows cactus and brush** — a column with arms that go up
+  before they go out, and knots of dry sticks low enough to walk past. A
+  forester will not cut either for lumber.
+- **The north grows pines and keeps snow.** A pine is a spire rather than a
+  cone, narrowing fast, its top branches carrying snow — and snow lies on
+  northern ground whatever the altitude, patchy, in the flat and the
+  hollows.
+- **The marsh has reeds and standing water.** Thin blades out of wet
+  ground, mud instead of more grass underfoot, and pools lying in the flat.
+- **The wilderness belongs to the country it stands in.** Wolves keep the
+  north, boar own the reeds, the mixed woodland has everything, and dry
+  scrub is thin — a village founded there will feel it. Never empty,
+  though: every country keeps something a hunter can take.
 
-A drawn clock face gets hands: the hour hand turns twice a day, the minute
-hand twenty-four times, both from the top at dawn. The dial is the maker's
-carpentry; what it reads is the world's.
+## Elsewhere
 
-## Under the hood
-
-**Aspectus** — the game's own renderer — takes its first pass. The frosted
-glass behind an open book used to wake a second camera and render the entire
-world again into a small image. It is now a blur of the frame already drawn:
-no second scene, and the real screen rather than a stretched thumbnail of
-it.
+- **The village speaks American English** — labels, chronicle, speech and
+  all. It was British by accident rather than by decision, and the seam
+  that actually matters is that a speech bubble and a label agree.
