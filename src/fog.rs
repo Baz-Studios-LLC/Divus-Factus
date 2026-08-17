@@ -313,6 +313,8 @@ fn raise_the_veil(_time: Res<Time>, mut rising: ResMut<VeilRising>) {
 
 /// Keeps the veil's holes where the village's knowledge actually is.
 fn follow_the_known(
+    mut commands: Commands,
+    cameras: Query<Entity, With<crate::camera::GodCamera>>,
     mode: Res<FogMode>,
     state: Res<State<crate::GameState>>,
     known: Option<Res<KnownWorld>>,
@@ -351,6 +353,21 @@ fn follow_the_known(
     };
     for (_, material) in ground.iter_mut() {
         tell(&mut material.extension.params);
+    }
+    // AND ASPECTUS'S PASS, which veils everything the materials cannot reach -
+    // the villagers, the animals, the roofs. Told from the same knowledge in
+    // the same breath, so the painted ground and the pass over it can never
+    // disagree about where the village has walked.
+    for camera in &cameras {
+        let mut carried = crate::render::aspectus::VeilView::default();
+        tell(&mut carried.params);
+        // DIVUS_FACTUS_VEIL_DEBUG=1 paints the pass's own working instead of
+        // the world: green where it believes the village has walked, red
+        // where not, a hundred-meter checker to judge the reconstruction by.
+        if std::env::var("DIVUS_FACTUS_VEIL_DEBUG").is_ok_and(|dial| dial == "1") {
+            carried.params.dials.z = 1.0;
+        }
+        commands.entity(camera).insert(carried);
     }
 }
 

@@ -12,10 +12,10 @@
 //! - **[`frost`]** blurs the frame behind an open book. It earned its place by
 //!   deleting a camera: the book used to wake a second `Camera3d` that
 //!   rendered the whole world again into a 480x270 image.
-//! A second pass - the veil, reading depth so that villagers and animals are
-//! hidden by it too - is written but not landed: it runs without crashing now
-//! and paints the whole world black, which is a bug in the pass rather than in
-//! the plumbing. It waits on the branch `aspectus-veil-pass`.
+//! - **[`veil`]** reads the depth the world just wrote and veils everything
+//!   standing in unwalked country - villagers, animals, buildings, anything
+//!   that will ever be added - where the material veil could only cover what
+//!   opted in, one material at a time.
 //!
 //! What Bevy keeps, because replacing it would buy this game nothing: PBR
 //! lighting, shadow maps, transparency sorting, bloom.
@@ -30,13 +30,15 @@
 use bevy::prelude::*;
 
 pub mod frost;
+pub mod veil;
 
 pub use frost::Frost;
+pub use veil::VeilView;
 
 pub struct AspectusPlugin;
 
 impl Plugin for AspectusPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(frost::FrostPass);
+        app.add_plugins((frost::FrostPass, veil::VeilPass));
     }
 }
