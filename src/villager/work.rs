@@ -1037,6 +1037,7 @@ pub(super) fn do_work(
             Option<&mut CreatureMotion>,
             Has<Corpse>,
             &CreatureGenome,
+            Has<crate::creature::wildlife::Predator>,
         ),
         (With<Creature>, Without<Villager>),
     >,
@@ -1170,11 +1171,17 @@ pub(super) fn do_work(
         // walking, and the wolves are the deadline.
         if *vocation == Vocation::Guard {
             let at = transform.translation;
+            // ANYTHING THAT HUNTS, by its tag - not a hardcoded wolf.
+            //
+            // This read `species == Wolf`, which was true of every predator
+            // in the world on the day it was written and false the moment
+            // goblins existed. The wilderness had already been generalized to
+            // the `Predator` tag, so a goblin stalked lone villagers while the
+            // village's own spearmen walked past it: a village could raise an
+            // armory, muster six guards, and watch somebody be dragged off.
             let nearest_wolf = prey_query
                 .iter()
-                .filter(|(_, _, _, is_corpse, genome)| {
-                    !is_corpse && genome.species == Species::Wolf
-                })
+                .filter(|(_, _, _, is_corpse, _, hunts)| !is_corpse && *hunts)
                 .map(|(t, ..)| t.translation)
                 .filter(|w| w.distance(at) < 26.0)
                 .min_by(|a, b| a.distance(at).total_cmp(&b.distance(at)));
@@ -1189,13 +1196,10 @@ pub(super) fn do_work(
                     job.progress += dt;
                     if job.progress >= 1.1 {
                         job.progress = 0.0;
-                        for (wolf_t, mut vitality, wolf_motion, is_corpse, genome) in
+                        for (wolf_t, mut vitality, wolf_motion, is_corpse, genome, hunts) in
                             prey_query.iter_mut()
                         {
-                            if is_corpse
-                                || genome.species != Species::Wolf
-                                || wolf_t.translation.distance(at) > 2.2
-                            {
+                            if is_corpse || !hunts || wolf_t.translation.distance(at) > 2.2 {
                                 continue;
                             }
                             vitality.harm += 0.7;
@@ -1205,11 +1209,19 @@ pub(super) fn do_work(
                                 wolf_motion.flail = 1.0;
                             }
                             if vitality.harm >= 1.0 {
-                                info!("{} slew a wolf", person.name);
+                                // Named, because "slew a wolf" over a dead
+                                // goblin is the chronicle telling the player
+                                // something that did not happen.
+                                let what = match genome.species {
+                                    Species::Goblin => "a goblin",
+                                    Species::Bear | Species::PolarBear => "a bear",
+                                    _ => "a wolf",
+                                };
+                                info!("{} slew {what}", person.name);
                                 if let Some(chronicle) = chronicle.as_mut() {
                                     chronicle.record(
                                         clock.day(),
-                                        "stood between the village and a wolf, and won".to_string(),
+                                        format!("stood between the village and {what}, and won"),
                                     );
                                 }
                             }
@@ -1670,7 +1682,7 @@ pub(super) fn do_work(
         let mut hunting_carcass = false;
         if *vocation == Vocation::Hunter {
             match job.focus.and_then(|prey| prey_query.get(prey).ok()) {
-                Some((prey_transform, _, _, is_corpse, _)) => {
+                Some((prey_transform, _, _, is_corpse, _, _)) => {
                     job.site = prey_transform.translation;
                     hunting_carcass = is_corpse;
                 }
@@ -2165,7 +2177,7 @@ pub(super) fn do_work(
                 let Some(prey) = job.focus else {
                     continue;
                 };
-                let Ok((_, _vitality, _prey_motion, is_corpse, genome)) = prey_query.get_mut(prey)
+                let Ok((_, _vitality, _prey_motion, is_corpse, genome, _)) = prey_query.get_mut(prey)
                 else {
                     continue;
                 };
