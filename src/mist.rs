@@ -644,10 +644,7 @@ mod tests {
             burn_off(13.0 / 24.0) < 0.2,
             "the middle of the day is all but clear",
         );
-        assert!(
-            burn_off(3.0 / 24.0) > 0.9,
-            "the small hours gather it",
-        );
+        assert!(burn_off(3.0 / 24.0) > 0.9, "the small hours gather it",);
     }
 
     /// The curve must not jump. A morning that clears between one frame and the

@@ -540,7 +540,6 @@ mod tests {
         }
     }
 
-
     /// AND THE GAME'S OWN WORDS, not only the villagers'.
     ///
     /// The corpus gate above has guarded the lines people SAY for a long

@@ -326,9 +326,7 @@ fn bake_tree(builder: &mut MeshBuilder, position: Vec3, kind: TreeKind, rng: &mu
                     Transform::from_translation(
                         position + Vec3::new(cos * out, blade * 0.5, sin * out),
                     )
-                    .with_rotation(
-                        Quat::from_rotation_y(-angle) * Quat::from_rotation_z(lean),
-                    )
+                    .with_rotation(Quat::from_rotation_y(-angle) * Quat::from_rotation_z(lean))
                     .with_scale(Vec3::new(tall * 0.035, blade, tall * 0.035)),
                     palette::color_at(bark.shifted(rng.range_i(-1, 1)).palette_index()),
                 );
@@ -398,8 +396,7 @@ fn bake_tree(builder: &mut MeshBuilder, position: Vec3, kind: TreeKind, rng: &mu
                 // ...and then up, which is the shape everyone draws.
                 builder.push_box(
                     Transform::from_translation(
-                        position
-                            + Vec3::new(cos * reach, elbow + arm * 0.5, sin * reach),
+                        position + Vec3::new(cos * reach, elbow + arm * 0.5, sin * reach),
                     )
                     .with_rotation(Quat::from_rotation_y(-angle))
                     .with_scale(Vec3::new(thick * 0.8, arm, thick * 0.8)),
@@ -421,16 +418,9 @@ fn bake_tree(builder: &mut MeshBuilder, position: Vec3, kind: TreeKind, rng: &mu
                 let (sin, cos) = angle.sin_cos();
                 builder.push_box(
                     Transform::from_translation(
-                        position
-                            + Vec3::new(
-                                cos * span * 0.3,
-                                length * 0.35,
-                                sin * span * 0.3,
-                            ),
+                        position + Vec3::new(cos * span * 0.3, length * 0.35, sin * span * 0.3),
                     )
-                    .with_rotation(
-                        Quat::from_rotation_y(-angle) * Quat::from_rotation_x(lean),
-                    )
+                    .with_rotation(Quat::from_rotation_y(-angle) * Quat::from_rotation_x(lean))
                     .with_scale(Vec3::new(span * 0.16, length, span * 0.16)),
                     palette::color_at(bark.shifted(rng.range_i(-1, 1)).palette_index()),
                 );
@@ -626,8 +616,7 @@ fn populate_chunks(
     if chunks.is_empty() {
         return;
     }
-    let veil_active =
-        fog.as_ref().is_none_or(|f| f.0) && *state.get() == crate::GameState::Playing;
+    let veil_active = fog.as_ref().is_none_or(|f| f.0) && *state.get() == crate::GameState::Playing;
     let library = library.get_or_insert_with(|| ScatterMeshes::build(&mut meshes, world_seed.0));
     let today = clock.day();
     // DIVUS_FACTUS_SCARCE starves the land of berry bushes — the famine dial, for
@@ -643,10 +632,13 @@ fn populate_chunks(
             (chunk.coord.x as f32 + 0.5) * CHUNK_SIZE,
             (chunk.coord.y as f32 + 0.5) * CHUNK_SIZE,
         );
-        let chunk_known = !veil_active || known.as_ref().is_some_and(|k| {
-            chunk_center.distance(k.center.xz()) < k.radius + 32.0
-                || k.pockets.iter().any(|p| chunk_center.distance(p.at.xz()) < p.radius + 32.0)
-        });
+        let chunk_known = !veil_active
+            || known.as_ref().is_some_and(|k| {
+                chunk_center.distance(k.center.xz()) < k.radius + 32.0
+                    || k.pockets
+                        .iter()
+                        .any(|p| chunk_center.distance(p.at.xz()) < p.radius + 32.0)
+            });
         if !chunk_known {
             continue;
         }
@@ -1002,15 +994,17 @@ fn populate_chunks(
                 ))
                 .id();
             for (local, body) in bodies {
-                let stem = commands.spawn((
-                    Name::new(body.kind.called()),
-                    body,
-                    InGrove(grove),
-                    Transform::from_translation(local),
-                    Visibility::default(),
-                    crate::hand::PickRadius(1.6),
-                    ChildOf(entity),
-                )).id();
+                let stem = commands
+                    .spawn((
+                        Name::new(body.kind.called()),
+                        body,
+                        InGrove(grove),
+                        Transform::from_translation(local),
+                        Visibility::default(),
+                        crate::hand::PickRadius(1.6),
+                        ChildOf(entity),
+                    ))
+                    .id();
                 // Only what a forester could actually take is timber.
                 if body.kind.yields_timber() {
                     commands.entity(stem).insert(FellableTree { maturity: 1.0 });
@@ -1555,10 +1549,11 @@ pub fn stand_alone(
 ) {
     dirty.0.push(home.0);
     let mesh = body.bake(meshes);
-    commands
-        .entity(tree)
-        .remove::<InGrove>()
-        .insert((ScatterEntity, Mesh3d(mesh), MeshMaterial3d(material)));
+    commands.entity(tree).remove::<InGrove>().insert((
+        ScatterEntity,
+        Mesh3d(mesh),
+        MeshMaterial3d(material),
+    ));
 }
 
 /// A felled tree mid-fall: it leans, crashes, lies a beat, and sinks
@@ -1989,8 +1984,7 @@ fn cull_veiled_scatter(
         let should_show = !veil_active || known.knows_flat(pos.x, pos.z, 0.0);
         if should_show {
             shown += 1;
-            furthest_shown =
-                furthest_shown.max(pos.xz().distance(known.center.xz()));
+            furthest_shown = furthest_shown.max(pos.xz().distance(known.center.xz()));
         } else {
             hidden += 1;
         }
@@ -2389,7 +2383,12 @@ mod tests {
             arid.contains(&Cactus) && arid.contains(&Brush),
             "dry country should grow cactus and brush, and grows {arid:?}",
         );
-        for biome in [Biome::Temperate, Biome::Boreal, Biome::Wetland, Biome::Alpine] {
+        for biome in [
+            Biome::Temperate,
+            Biome::Boreal,
+            Biome::Wetland,
+            Biome::Alpine,
+        ] {
             let kinds = TreeKind::for_biome(biome);
             assert!(
                 !kinds.contains(&Cactus),
@@ -2406,8 +2405,8 @@ mod tests {
     /// was placing them correctly the whole time; only the label was wrong.
     #[test]
     fn a_plant_is_called_what_it_is() {
-        use TreeKind::*;
         use crate::terrain::Biome;
+        use TreeKind::*;
         for biome in [
             Biome::Temperate,
             Biome::Boreal,

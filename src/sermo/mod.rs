@@ -698,7 +698,10 @@ mod corpus_wiring_tests {
 
         // And the fallback reads: unnamed, a line at the head of a
         // sentence is still sentence-cased by `tidy`.
-        assert_eq!(tidy(&"{god} provided.".replace("{god}", "the god")), "The god provided.");
+        assert_eq!(
+            tidy(&"{god} provided.".replace("{god}", "the god")),
+            "The god provided."
+        );
     }
 
     /// A crude search for the definite singular, without pulling in a

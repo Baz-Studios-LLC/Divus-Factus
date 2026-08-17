@@ -8,8 +8,8 @@ use super::{person_phrase, state_phrase};
 use crate::camera::{CameraRig, FollowStyle, FollowTarget, GodCamera};
 use crate::creature::Corpse;
 use crate::hand::DivineHand;
-use crate::ui::PointerContext;
 use crate::ui;
+use crate::ui::PointerContext;
 use crate::villager::belief::Faith;
 use crate::villager::home::Home;
 use crate::villager::regard::Regard;
@@ -1115,9 +1115,21 @@ pub(crate) fn update_villager_profile(
                     ))
                     .id();
 
-                spawn_vital_card(&mut commands, vitals_grid, "HUNGER", hunger_str, hunger_color);
+                spawn_vital_card(
+                    &mut commands,
+                    vitals_grid,
+                    "HUNGER",
+                    hunger_str,
+                    hunger_color,
+                );
                 spawn_vital_card(&mut commands, vitals_grid, "REST", rest_str, rest_color);
-                spawn_vital_card(&mut commands, vitals_grid, "SPIRITS", spirits_str, spirits_color);
+                spawn_vital_card(
+                    &mut commands,
+                    vitals_grid,
+                    "SPIRITS",
+                    spirits_str,
+                    spirits_color,
+                );
                 spawn_vital_card(&mut commands, vitals_grid, "FAITH", faith_word, faith_color);
 
                 // 3. SHELTER
@@ -1194,7 +1206,8 @@ pub(crate) fn update_villager_profile(
                 if let Some(skills) = skills {
                     let mut crafts: Vec<(Vocation, f32)> = skills.0.clone();
                     crafts.sort_by(|a, b| b.1.total_cmp(&a.1));
-                    let practiced: Vec<_> = crafts.into_iter().filter(|(_, s)| *s > 0.005).collect();
+                    let practiced: Vec<_> =
+                        crafts.into_iter().filter(|(_, s)| *s > 0.005).collect();
                     if practiced.is_empty() {
                         commands.spawn((
                             ui::dim("Still learning the first trades of the village."),
@@ -1361,9 +1374,21 @@ pub(crate) fn update_villager_profile(
                 spawn_kin_row(&mut commands, kin_card, "WED TO", &spouse_str, spouse_col);
 
                 let parent_str = parentage
-                    .map(|p| format!("{} & {}", villager_name(&names, p.mother), villager_name(&names, p.father)))
+                    .map(|p| {
+                        format!(
+                            "{} & {}",
+                            villager_name(&names, p.mother),
+                            villager_name(&names, p.father)
+                        )
+                    })
                     .unwrap_or_else(|| "Unknown".to_string());
-                spawn_kin_row(&mut commands, kin_card, "BORN TO", &parent_str, ui::theme::text());
+                spawn_kin_row(
+                    &mut commands,
+                    kin_card,
+                    "BORN TO",
+                    &parent_str,
+                    ui::theme::text(),
+                );
 
                 let children: Vec<String> = parents
                     .iter()
@@ -1374,7 +1399,13 @@ pub(crate) fn update_villager_profile(
                     [] => "None in the village".to_string(),
                     list => list.join(", "),
                 };
-                spawn_kin_row(&mut commands, kin_card, "CHILDREN", &children_str, ui::theme::text());
+                spawn_kin_row(
+                    &mut commands,
+                    kin_card,
+                    "CHILDREN",
+                    &children_str,
+                    ui::theme::text(),
+                );
 
                 // 2. SOCIAL REGARD
                 spawn_section_header(&mut commands, well_entity, "SOCIAL REGARD & FEELINGS");
@@ -1425,17 +1456,23 @@ pub(crate) fn update_villager_profile(
                             let (feeling_label, bg_col, text_col) = if bond.warmth > 0.4 {
                                 (
                                     "Warmly",
-                                    crate::palette::shade(&crate::palette::CLOTH_GOLD, 0.25).with_alpha(0.6),
+                                    crate::palette::shade(&crate::palette::CLOTH_GOLD, 0.25)
+                                        .with_alpha(0.6),
                                     ui::theme::accent(),
                                 )
                             } else if bond.warmth < -0.4 {
                                 (
                                     "Resentful",
-                                    crate::palette::shade(&crate::palette::CLOTH_RUST, 0.25).with_alpha(0.6),
+                                    crate::palette::shade(&crate::palette::CLOTH_RUST, 0.25)
+                                        .with_alpha(0.6),
                                     Color::srgb(0.92, 0.45, 0.4),
                                 )
                             } else {
-                                ("Mixed", Color::WHITE.with_alpha(0.06), ui::theme::text_dim())
+                                (
+                                    "Mixed",
+                                    Color::WHITE.with_alpha(0.06),
+                                    ui::theme::text_dim(),
+                                )
                             };
                             let badge = commands
                                 .spawn((

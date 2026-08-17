@@ -1677,7 +1677,12 @@ pub(crate) fn surface_color(
         let flat = 1.0 - (slope / 0.16).clamp(0.0, 1.0);
         blend(
             composed,
-            palette::shade_blend(&palette::WATER, &palette::FOLIAGE, 0.35, 0.35 + shade_t * 0.3),
+            palette::shade_blend(
+                &palette::WATER,
+                &palette::FOLIAGE,
+                0.35,
+                0.35 + shade_t * 0.3,
+            ),
             lying * flat * 0.62,
         )
     } else {
@@ -2259,8 +2264,8 @@ fn stream_chunks(
         state.get(),
         crate::GameState::Choosing | crate::GameState::Playing
     ) && loaded
-            .first_zoom_cache
-            .is_some_and(|home| (center - home).abs().max_element() > 2)
+        .first_zoom_cache
+        .is_some_and(|home| (center - home).abs().max_element() > 2)
     {
         loaded.first_zoom_cache = None;
         loaded.first_zoom_missing = 0;
@@ -2557,9 +2562,17 @@ mod tests {
                     let lowland = 1.0 - (above / 90.0).clamp(0.0, 1.0);
                     let w = damp_mist.max(cold_mist * 0.75) * lowland;
                     sum += w;
-                    if w < 0.05 { dry += 1 } else { misty += 1 }
-                    if w > 0.5 { damp += 1 }
-                    if land.biome_for(x, z, h) == Biome::Wetland && w > 0.35 { cold += 1 }
+                    if w < 0.05 {
+                        dry += 1
+                    } else {
+                        misty += 1
+                    }
+                    if w > 0.5 {
+                        damp += 1
+                    }
+                    if land.biome_for(x, z, h) == Biome::Wetland && w > 0.35 {
+                        cold += 1
+                    }
                 }
             }
             println!(
@@ -2598,7 +2611,9 @@ mod tests {
                 }
             }
             let (peak, cx, cz) = best;
-            println!("\n  seed {seed}: summit {peak:.0}m at ({cx:.0}, {cz:.0}) - 3km cross-section:");
+            println!(
+                "\n  seed {seed}: summit {peak:.0}m at ({cx:.0}, {cz:.0}) - 3km cross-section:"
+            );
             let reach = 1500.0f32;
             let cols = 96;
             let mut ground = Vec::new();
@@ -2653,7 +2668,11 @@ mod tests {
             // Stand off from the summit so the whole massif is in frame.
             println!(
                 "  seed {seed}: summit {:.0}m at ({:.0}, {:.0})  -> AUTOPLANT={:.0},{:.0}",
-                best.0, best.1, best.2, best.1 + 700.0, best.2 + 700.0,
+                best.0,
+                best.1,
+                best.2,
+                best.1 + 700.0,
+                best.2 + 700.0,
             );
         }
     }
@@ -2707,9 +2726,15 @@ mod tests {
                  \x20   CREST p01 {:.3} p10 {:.3} p50 {:.3} p90 {:.3} p99 {:.3} max {:.3}\n\
                  \x20   DOME  p10 {:.3} p50 {:.3} p90 {:.3} max {:.3}  (1.0 is dead flat)",
                 inside.len(),
-                at(&inside, 0.01), at(&inside, 0.10), at(&inside, 0.50),
-                at(&inside, 0.90), at(&inside, 0.99), inside[inside.len() - 1],
-                at(&dome_of, 0.10), at(&dome_of, 0.50), at(&dome_of, 0.90),
+                at(&inside, 0.01),
+                at(&inside, 0.10),
+                at(&inside, 0.50),
+                at(&inside, 0.90),
+                at(&inside, 0.99),
+                inside[inside.len() - 1],
+                at(&dome_of, 0.10),
+                at(&dome_of, 0.50),
+                at(&dome_of, 0.90),
                 dome_of[dome_of.len() - 1],
             );
         }
@@ -2759,10 +2784,11 @@ mod tests {
                     let hr = land.height_at(x + e, z);
                     let hd = land.height_at(x, z - e);
                     let hu = land.height_at(x, z + e);
-                    if water > h + 0.2 { drowned_high += 1; }
-                    let grade = (((hr - hl) / (2.0 * e)).powi(2)
-                        + ((hu - hd) / (2.0 * e)).powi(2))
-                    .sqrt();
+                    if water > h + 0.2 {
+                        drowned_high += 1;
+                    }
+                    let grade =
+                        (((hr - hl) / (2.0 * e)).powi(2) + ((hu - hd) / (2.0 * e)).powi(2)).sqrt();
                     sum_slope += grade;
                     if grade < 0.06 {
                         flat_high += 1;
@@ -2854,10 +2880,14 @@ mod tests {
             let (ramp, shift) = biome.ground();
             let companion = biome.companion();
             // A representative middling slope of ordinary ground.
-            let c = crate::palette::shade_blend(ramp, companion, 0.11, (0.5 + shift).clamp(0.0, 1.0))
-                .to_linear();
+            let c =
+                crate::palette::shade_blend(ramp, companion, 0.11, (0.5 + shift).clamp(0.0, 1.0))
+                    .to_linear();
             swatches.push((name.to_string(), [c.red, c.green, c.blue]));
-            println!("PROBE {name:10} rgb {:.3} {:.3} {:.3}", c.red, c.green, c.blue);
+            println!(
+                "PROBE {name:10} rgb {:.3} {:.3} {:.3}",
+                c.red, c.green, c.blue
+            );
         }
         println!("PROBE --- distance between pairs:");
         let mut closest = f32::MAX;
@@ -2897,7 +2927,10 @@ mod tests {
             )
             .to_linear();
             drawn.push((name.to_string(), [c.red, c.green, c.blue]));
-            println!("PROBE {name:10} rgb {:.3} {:.3} {:.3}", c.red, c.green, c.blue);
+            println!(
+                "PROBE {name:10} rgb {:.3} {:.3} {:.3}",
+                c.red, c.green, c.blue
+            );
         }
         let mut nearest = f32::MAX;
         for i in 0..drawn.len() {
@@ -2973,7 +3006,11 @@ mod tests {
                         arid += 1.0;
                     }
                 }
-                if land_seen == 0.0 { 0.0 } else { arid / land_seen }
+                if land_seen == 0.0 {
+                    0.0
+                } else {
+                    arid / land_seen
+                }
             };
             let equator = arid_share(0.0);
             let subtropics = (arid_share(0.25) + arid_share(-0.25)) * 0.5;

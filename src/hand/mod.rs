@@ -1046,7 +1046,8 @@ fn handle_grab_and_release(
     // The ACTION button, which Black and White puts on the right: pick up,
     // carry, drop, throw. The left button is the land — see
     // `camera::orbit_and_pan`.
-    let inspecting_villager = (keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight))
+    let inspecting_villager = (keys.pressed(KeyCode::ShiftLeft)
+        || keys.pressed(KeyCode::ShiftRight))
         && hand.hovered.is_some_and(|e| matters.9.get(e).is_ok());
 
     if buttons.just_pressed(mouse.action())

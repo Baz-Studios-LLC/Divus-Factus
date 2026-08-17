@@ -335,8 +335,7 @@ fn stream_grass(
         }
     });
 
-    let veil_active =
-        fog.as_ref().is_none_or(|f| f.0) && *state.get() == crate::GameState::Playing;
+    let veil_active = fog.as_ref().is_none_or(|f| f.0) && *state.get() == crate::GameState::Playing;
 
     let mut wanted = Vec::new();
     for dz in -GRASS_RADIUS..=GRASS_RADIUS {

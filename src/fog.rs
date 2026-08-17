@@ -339,7 +339,9 @@ fn follow_the_known(
         *state.get() == crate::GameState::Playing,
         known.is_some(),
     );
-    let live = known.as_ref().map_or(0, |k| k.pockets.len().min(MAX_POCKETS));
+    let live = known
+        .as_ref()
+        .map_or(0, |k| k.pockets.len().min(MAX_POCKETS));
     let tell = |params: &mut FogParams| {
         params.tint.w = weight;
         if let Some(known) = known.as_ref() {

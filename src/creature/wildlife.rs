@@ -250,12 +250,7 @@ pub(super) fn wolves_hunt(
     tower_kinds: Query<&crate::villager::work::Building>,
     mut rng: Local<Option<Rng>>,
     mut hunters: Query<
-        (
-            &Transform,
-            &mut Wild,
-            &mut MoveTarget,
-            &mut CreatureMotion,
-        ),
+        (&Transform, &mut Wild, &mut MoveTarget, &mut CreatureMotion),
         (
             With<Creature>,
             With<Predator>,
@@ -735,7 +730,9 @@ mod biome_tests {
             let beasts = beasts_of(biome, TEMPERATE);
             assert!(!beasts.is_empty(), "{biome:?} has no living thing in it");
             assert!(
-                beasts.iter().any(|s| matches!(s, Species::Deer | Species::Boar)),
+                beasts
+                    .iter()
+                    .any(|s| matches!(s, Species::Deer | Species::Boar)),
                 "{biome:?} has predators and nothing for them or a hunter to \
                  take - a village founded there would starve",
             );
@@ -824,10 +821,7 @@ mod biome_tests {
     fn the_village_and_the_camp_dress_differently() {
         use crate::creature::genome::Garment;
         for cut in Garment::GOBLIN {
-            assert!(
-                !Garment::ALL.contains(&cut),
-                "{cut:?} is in both wardrobes",
-            );
+            assert!(!Garment::ALL.contains(&cut), "{cut:?} is in both wardrobes",);
         }
     }
 
@@ -873,10 +867,20 @@ mod biome_tests {
     /// hung from this at spawn, so this is where the roster is actually kept.
     #[test]
     fn the_hunters_are_the_ones_that_hunt() {
-        for species in [Species::Wolf, Species::Bear, Species::PolarBear, Species::Goblin] {
+        for species in [
+            Species::Wolf,
+            Species::Bear,
+            Species::PolarBear,
+            Species::Goblin,
+        ] {
             assert!(species.hunts(), "{species:?} should hunt");
         }
-        for species in [Species::Deer, Species::Boar, Species::Camel, Species::Penguin] {
+        for species in [
+            Species::Deer,
+            Species::Boar,
+            Species::Camel,
+            Species::Penguin,
+        ] {
             assert!(!species.hunts(), "{species:?} should not hunt");
         }
     }
@@ -899,7 +903,8 @@ mod biome_tests {
             );
             assert!(!goblin.satchel && !goblin.trousers, "goblins carry no kit");
             assert!(
-                goblin.height() < CreatureGenome::random(Species::Human, &mut Rng::new(seed)).height(),
+                goblin.height()
+                    < CreatureGenome::random(Species::Human, &mut Rng::new(seed)).height(),
                 "a goblin must be visibly shorter than a villager",
             );
         }
@@ -923,8 +928,14 @@ mod biome_tests {
         // Wetland is boar country and boreal is not: the one distinction the
         // table exists to make.
         assert!(
-            beasts_of(Biome::Wetland, TEMPERATE).iter().filter(|s| **s == Species::Boar).count()
-                > beasts_of(Biome::Boreal, TEMPERATE).iter().filter(|s| **s == Species::Boar).count(),
+            beasts_of(Biome::Wetland, TEMPERATE)
+                .iter()
+                .filter(|s| **s == Species::Boar)
+                .count()
+                > beasts_of(Biome::Boreal, TEMPERATE)
+                    .iter()
+                    .filter(|s| **s == Species::Boar)
+                    .count(),
             "the reeds should root with more boar than the frozen north",
         );
     }
@@ -984,10 +995,7 @@ pub(super) fn goblins_are_sighted(
     mut notices: MessageWriter<crate::ui::Notice>,
     goblins: Query<&Transform, (With<CreatureGenome>, Without<Villager>, Without<Corpse>)>,
     kinds: Query<&CreatureGenome>,
-    folk: Query<
-        (Entity, &Transform, &crate::villager::Person),
-        (With<Villager>, Without<Corpse>),
-    >,
+    folk: Query<(Entity, &Transform, &crate::villager::Person), (With<Villager>, Without<Corpse>)>,
 ) {
     if clock.elapsed - *last_alarm < ALARM_AGAIN_AFTER {
         return;

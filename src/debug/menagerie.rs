@@ -121,10 +121,7 @@ pub(crate) struct Exhibit;
 ///
 /// While it is open: LEFT and RIGHT walk the exhibits, R rolls a new one of the
 /// same kind, and ESC or SHIFT+F1 again shuts it.
-pub(crate) fn work_the_menagerie(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut bench: ResMut<Menagerie>,
-) {
+pub(crate) fn work_the_menagerie(keys: Res<ButtonInput<KeyCode>>, mut bench: ResMut<Menagerie>) {
     let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
     if shift && keys.just_pressed(KeyCode::F1) {
         bench.open = !bench.open;
@@ -272,7 +269,8 @@ pub(crate) fn mind_the_lens(
     // share of the glass whatever it is.
     let height = exhibits.single().map(|rig| rig.height).unwrap_or(1.7);
     let eye = STAGE + Vec3::new(0.0, height * 0.62, height * STANDOFF);
-    *transform = Transform::from_translation(eye).looking_at(STAGE + Vec3::Y * height * 0.5, Vec3::Y);
+    *transform =
+        Transform::from_translation(eye).looking_at(STAGE + Vec3::Y * height * 0.5, Vec3::Y);
 }
 
 /// Raises the bench: one sleeping camera, and a plain floor to stand on.
@@ -352,6 +350,9 @@ mod tests {
         let mut bench = Menagerie::default();
         bench.which = EXHIBITS.len() - 1;
         bench.which = (bench.which + 1) % EXHIBITS.len();
-        assert_eq!(bench.which, 0, "walking past the last exhibit returns to the first");
+        assert_eq!(
+            bench.which, 0,
+            "walking past the last exhibit returns to the first"
+        );
     }
 }

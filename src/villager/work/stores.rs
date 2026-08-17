@@ -660,7 +660,10 @@ fn granary_seat(store: &Stockpile, drawn: Option<&super::baked::Baked>) -> (Vec3
 }
 
 /// The drawing a standing building follows, for reading its marks.
-fn drawing_for(kind: BuildingKind, plan: Option<&super::buildings::Blueprint>) -> Option<&'static super::baked::Baked> {
+fn drawing_for(
+    kind: BuildingKind,
+    plan: Option<&super::buildings::Blueprint>,
+) -> Option<&'static super::baked::Baked> {
     let plan = plan?;
     super::baked::drawing_of(kind, plan.plan, &plan.drawing)
 }
@@ -1671,9 +1674,14 @@ mod tests {
     fn a_storehouse_with_no_pallets_drawn_still_stores() {
         let mut store = Stockpile::default();
         store.timber = 10.0;
-        let (seat, goal) =
-            storehouse_seat(PileKind::Timber, &store, false, None, &mut Stacked::default())
-                .expect("timber has a seat");
+        let (seat, goal) = storehouse_seat(
+            PileKind::Timber,
+            &store,
+            false,
+            None,
+            &mut Stacked::default(),
+        )
+        .expect("timber has a seat");
         assert_eq!(seat, Vec3::new(-0.9, 0.0, 0.5));
         assert_eq!(goal, 10, "ten timber, ten armloads");
     }

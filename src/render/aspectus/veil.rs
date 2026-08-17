@@ -56,18 +56,16 @@ use bevy::core_pipeline::fullscreen_material::fullscreen_material_system;
 use bevy::core_pipeline::schedule::Core3d;
 use bevy::core_pipeline::tonemapping::tonemapping;
 use bevy::core_pipeline::{Core3dSystems, FullscreenShader};
-use bevy::post_process::bloom::bloom;
 use bevy::ecs::error::BevyError;
 use bevy::ecs::system::lifetimeless::Read;
+use bevy::post_process::bloom::bloom;
 use bevy::prelude::*;
 use bevy::render::camera::ExtractedCamera;
 use bevy::render::extract_component::{
     ComponentUniforms, DynamicUniformIndex, ExtractComponent, ExtractComponentPlugin,
     UniformComponentPlugin,
 };
-use bevy::render::render_resource::binding_types::{
-    texture_depth_2d_multisampled, uniform_buffer,
-};
+use bevy::render::render_resource::binding_types::{texture_depth_2d_multisampled, uniform_buffer};
 use bevy::render::render_resource::*;
 use bevy::render::renderer::{RenderContext, RenderDevice, ViewQuery};
 use bevy::render::view::{
@@ -273,10 +271,7 @@ fn prepare_bind_groups(
     // unfiltered query reaches the hand camera, the portrait studio and the
     // capture rigs, none of which asked for readable depth, and the first bind
     // group built against an unreadable depth texture quits the application.
-    mut views: Query<
-        (Entity, &ViewDepthTexture, Option<&mut VeilBindGroup>),
-        With<VeilView>,
-    >,
+    mut views: Query<(Entity, &ViewDepthTexture, Option<&mut VeilBindGroup>), With<VeilView>>,
     pipeline: Option<Res<VeilPipeline>>,
     pipeline_cache: Res<PipelineCache>,
     view_uniforms: Res<ViewUniforms>,
@@ -362,6 +357,10 @@ pub(super) fn veil_pass(
             multiview_mask: None,
         });
     pass.set_pipeline(pipeline);
-    pass.set_bind_group(0, &group.bind_group, &[view_offset.offset, veil_index.index()]);
+    pass.set_bind_group(
+        0,
+        &group.bind_group,
+        &[view_offset.offset, veil_index.index()],
+    );
     pass.draw(0..3, 0..1);
 }

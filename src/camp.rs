@@ -77,9 +77,7 @@ pub fn raise_a_camp(
         let lean = rng.range(0.85, 1.05);
         builder.push_box(
             Transform::from_xyz(turn.cos() * 0.34, 0.42, turn.sin() * 0.34)
-                .with_rotation(
-                    Quat::from_rotation_y(-turn) * Quat::from_rotation_z(lean),
-                )
+                .with_rotation(Quat::from_rotation_y(-turn) * Quat::from_rotation_z(lean))
                 .with_scale(Vec3::new(0.13, 1.05, 0.13)),
             palette::shade(&palette::WOOD, rng.range(0.15, 0.35)),
         );
@@ -219,7 +217,9 @@ pub fn raise_a_camp(
                 Transform::from_translation(
                     base + Vec3::new(a.cos() * spread * 1.2, deck + 0.42, a.sin() * spread * 1.2),
                 )
-                .with_rotation(Quat::from_rotation_y(-a) * Quat::from_rotation_x(rng.range(-0.1, 0.1)))
+                .with_rotation(
+                    Quat::from_rotation_y(-a) * Quat::from_rotation_x(rng.range(-0.1, 0.1)),
+                )
                 .with_scale(Vec3::new(0.07, 0.07, spread * 2.3)),
                 palette::shade(&palette::WOOD, rng.range(0.15, 0.35)),
             );
@@ -233,11 +233,7 @@ pub fn raise_a_camp(
             let inward = 1.0 - up / deck * 0.55;
             builder.push_box(
                 Transform::from_translation(
-                    base + Vec3::new(
-                        (foot.x - base.x) * inward,
-                        up,
-                        (foot.z - base.z) * inward,
-                    ),
+                    base + Vec3::new((foot.x - base.x) * inward, up, (foot.z - base.z) * inward),
                 )
                 .with_rotation(Quat::from_rotation_y(-ladder_turn))
                 .with_scale(Vec3::new(0.06, 0.05, 0.52)),

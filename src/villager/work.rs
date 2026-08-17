@@ -2177,7 +2177,8 @@ pub(super) fn do_work(
                 let Some(prey) = job.focus else {
                     continue;
                 };
-                let Ok((_, _vitality, _prey_motion, is_corpse, genome, _)) = prey_query.get_mut(prey)
+                let Ok((_, _vitality, _prey_motion, is_corpse, genome, _)) =
+                    prey_query.get_mut(prey)
                 else {
                     continue;
                 };

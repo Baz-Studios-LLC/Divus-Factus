@@ -306,7 +306,13 @@ mod tests {
             "a village whose god has only ever punished them breaks",
         );
         assert!(
-            !village.permits(Tenet::EatTheDead, starving, merciful, trust, &barely_capable()),
+            !village.permits(
+                Tenet::EatTheDead,
+                starving,
+                merciful,
+                trust,
+                &barely_capable()
+            ),
             "a village whose god has been merciful holds, even starving",
         );
     }
@@ -318,7 +324,8 @@ mod tests {
         let village = Doctrine::default();
         let godless = example(&who_saw(&[]));
         let hungry = 0.8;
-        let faithless = village.permits(Tenet::EatTheDead, hungry, godless, 0.05, &one_of_the_few());
+        let faithless =
+            village.permits(Tenet::EatTheDead, hungry, godless, 0.05, &one_of_the_few());
         let devout = village.permits(Tenet::EatTheDead, hungry, godless, 0.95, &one_of_the_few());
         assert!(
             faithless && !devout,
@@ -334,12 +341,24 @@ mod tests {
         let mut village = Doctrine::default();
         let bearable = 0.62;
         assert!(
-            !village.permits(Tenet::EatTheDead, bearable, godless, 0.35, &one_of_the_few()),
+            !village.permits(
+                Tenet::EatTheDead,
+                bearable,
+                godless,
+                0.35,
+                &one_of_the_few()
+            ),
             "the first winter, this hunger is not enough",
         );
         village.set_precedent(Tenet::EatTheDead, 0.7);
         assert!(
-            village.permits(Tenet::EatTheDead, bearable, godless, 0.35, &one_of_the_few()),
+            village.permits(
+                Tenet::EatTheDead,
+                bearable,
+                godless,
+                0.35,
+                &one_of_the_few()
+            ),
             "the second winter, the same hunger is",
         );
 

@@ -182,7 +182,15 @@ struct SaveGame {
     /// them will not load: `serde` reads a five-element array into a
     /// five-tuple and nothing else. Brett: "Dont worry about preserving
     /// saves."
-    graves: Vec<(Vec3, Quat, u32, Person, Chronicle, crate::creature::Undoing, bool)>,
+    graves: Vec<(
+        Vec3,
+        Quat,
+        u32,
+        Person,
+        Chronicle,
+        crate::creature::Undoing,
+        bool,
+    )>,
     wildlife: Vec<(Vec3, CreatureGenome, f32, Vec3)>,
     // --- version 2: the rest of everything ---
     #[serde(default)]
@@ -694,7 +702,15 @@ fn gather(world: &mut World) -> Option<SaveGame> {
         })
         .collect();
 
-    let graves: Vec<(Vec3, Quat, u32, Person, Chronicle, crate::creature::Undoing, bool)> = world
+    let graves: Vec<(
+        Vec3,
+        Quat,
+        u32,
+        Person,
+        Chronicle,
+        crate::creature::Undoing,
+        bool,
+    )> = world
         .query::<(&Transform, &rites::Grave, &Person, &Chronicle)>()
         .iter(world)
         .map(|(t, grave, person, story)| {
@@ -1452,59 +1468,61 @@ fn apply(world: &mut World, save: SaveGame) {
         bushes: save.bushes.clone(),
     });
     world.resource_scope(|world, mut meshes: Mut<Assets<Mesh>>| {
-        world.resource_scope(|world, mut materials: Mut<Assets<crate::fog::GroundMaterial>>| {
-            world.resource_scope(|world, mut rng: Mut<crate::villager::SimRng>| {
-                // A restored boulder is ordinary scenery and wears the ground's
-                // own veil-carrying material, so a save loaded into unwalked
-                // country comes back veiled like everything around it.
-                let material = materials.add(crate::fog::GroundMaterial {
-                    base: StandardMaterial {
-                        base_color: crate::palette::shade(&crate::palette::STONE, 0.45),
-                        perceptual_roughness: 1.0,
-                        ..default()
-                    },
-                    extension: crate::fog::GroundVeil::default(),
-                });
-                let mut commands = world.commands();
-                for (pos, scale) in &save.boulders {
-                    let roll = crate::scatter::roll_rock(&mut rng.0);
-                    let boulder = crate::scatter::spawn_boulder(
-                        &mut commands,
-                        &mut meshes,
-                        material.clone(),
-                        *pos,
-                        &mut rng.0,
-                        roll,
-                        None,
-                    );
-                    commands.entity(boulder).insert(SavedBoulder);
-                    commands.entity(boulder).entry::<Transform>().and_modify({
-                        let scale = *scale;
-                        move |mut t| t.scale = scale
-                    });
-                }
-                // The deposits come back with exactly what was left in
-                // the ground; a worked-out vein stays worked out.
-                for (kind, pos, amount) in &save.deposits {
-                    crate::matter::spawn_deposit(
-                        &mut commands,
-                        &mut meshes,
-                        &mut materials,
-                        *pos,
-                        match kind {
-                            0 => crate::matter::DepositKind::Iron,
-                            2 => crate::matter::DepositKind::Stone,
-                            // Clay is the fallback rather than a case, so a
-                            // save written by a later build with a kind this
-                            // one has never heard of comes back as SOMETHING
-                            // in the ground instead of refusing to load.
-                            _ => crate::matter::DepositKind::Clay,
+        world.resource_scope(
+            |world, mut materials: Mut<Assets<crate::fog::GroundMaterial>>| {
+                world.resource_scope(|world, mut rng: Mut<crate::villager::SimRng>| {
+                    // A restored boulder is ordinary scenery and wears the ground's
+                    // own veil-carrying material, so a save loaded into unwalked
+                    // country comes back veiled like everything around it.
+                    let material = materials.add(crate::fog::GroundMaterial {
+                        base: StandardMaterial {
+                            base_color: crate::palette::shade(&crate::palette::STONE, 0.45),
+                            perceptual_roughness: 1.0,
+                            ..default()
                         },
-                        *amount,
-                    );
-                }
-            });
-        });
+                        extension: crate::fog::GroundVeil::default(),
+                    });
+                    let mut commands = world.commands();
+                    for (pos, scale) in &save.boulders {
+                        let roll = crate::scatter::roll_rock(&mut rng.0);
+                        let boulder = crate::scatter::spawn_boulder(
+                            &mut commands,
+                            &mut meshes,
+                            material.clone(),
+                            *pos,
+                            &mut rng.0,
+                            roll,
+                            None,
+                        );
+                        commands.entity(boulder).insert(SavedBoulder);
+                        commands.entity(boulder).entry::<Transform>().and_modify({
+                            let scale = *scale;
+                            move |mut t| t.scale = scale
+                        });
+                    }
+                    // The deposits come back with exactly what was left in
+                    // the ground; a worked-out vein stays worked out.
+                    for (kind, pos, amount) in &save.deposits {
+                        crate::matter::spawn_deposit(
+                            &mut commands,
+                            &mut meshes,
+                            &mut materials,
+                            *pos,
+                            match kind {
+                                0 => crate::matter::DepositKind::Iron,
+                                2 => crate::matter::DepositKind::Stone,
+                                // Clay is the fallback rather than a case, so a
+                                // save written by a later build with a kind this
+                                // one has never heard of comes back as SOMETHING
+                                // in the ground instead of refusing to load.
+                                _ => crate::matter::DepositKind::Clay,
+                            },
+                            *amount,
+                        );
+                    }
+                });
+            },
+        );
     });
     world.flush();
 

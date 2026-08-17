@@ -648,10 +648,7 @@ mod tests {
             .run_system_once(crate::creature::succumb_for_tests)
             .unwrap();
         let world = app.world();
-        assert!(
-            world.get::<Corpse>(dead).is_some(),
-            "the dead are a corpse",
-        );
+        assert!(world.get::<Corpse>(dead).is_some(), "the dead are a corpse",);
         assert!(
             world.get::<Person>(dead).is_some(),
             "and they keep their name, which is what the rites find them by",

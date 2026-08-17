@@ -1311,7 +1311,11 @@ fn repaint_patch_veil(
             let (x, z) = ground_coordinates(dir);
             let idx = gj * stride + gi;
             if idx < colors.len() {
-                colors[idx][3] = if known.knows(Vec3::new(x, 0.0, z)) { 1.0 } else { 0.0 };
+                colors[idx][3] = if known.knows(Vec3::new(x, 0.0, z)) {
+                    1.0
+                } else {
+                    0.0
+                };
             }
         }
     }

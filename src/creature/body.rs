@@ -515,16 +515,16 @@ fn spawn_garment_features(
             // so a goblin wears its hide on the same side every time it is
             // rebuilt - and it is rebuilt whenever the bench is opened or a
             // save is loaded.
-            let side = if genome.ear_tilt >= 0.25 { 1.0f32 } else { -1.0 };
+            let side = if genome.ear_tilt >= 0.25 {
+                1.0f32
+            } else {
+                -1.0
+            };
             let drape = commands
                 .spawn((
                     Name::new("Pelt"),
-                    Transform::from_xyz(
-                        side * torso_w * 0.16,
-                        leg_len + torso_len * 0.52,
-                        0.0,
-                    )
-                    .with_rotation(Quat::from_rotation_z(side * -0.72)),
+                    Transform::from_xyz(side * torso_w * 0.16, leg_len + torso_len * 0.52, 0.0)
+                        .with_rotation(Quat::from_rotation_z(side * -0.72)),
                     Visibility::default(),
                     ChildOf(body),
                 ))
