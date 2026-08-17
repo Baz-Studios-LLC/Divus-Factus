@@ -981,9 +981,13 @@ pub(super) fn goblins_are_sighted(
     clock: Res<crate::calendar::WorldClock>,
     mut last_alarm: Local<f64>,
     mut alarms: MessageWriter<crate::witness::DivineEvent>,
+    mut notices: MessageWriter<crate::ui::Notice>,
     goblins: Query<&Transform, (With<CreatureGenome>, Without<Villager>, Without<Corpse>)>,
     kinds: Query<&CreatureGenome>,
-    folk: Query<(Entity, &Transform), (With<Villager>, Without<Corpse>)>,
+    folk: Query<
+        (Entity, &Transform, &crate::villager::Person),
+        (With<Villager>, Without<Corpse>),
+    >,
 ) {
     if clock.elapsed - *last_alarm < ALARM_AGAIN_AFTER {
         return;
@@ -997,7 +1001,7 @@ pub(super) fn goblins_are_sighted(
     if camps.is_empty() {
         return;
     }
-    for (who, at) in &folk {
+    for (who, at, name) in &folk {
         let Some(seen) = camps
             .iter()
             .find(|green| green.distance(at.translation) < GOBLINS_NOTICED_AT)
@@ -1014,6 +1018,14 @@ pub(super) fn goblins_are_sighted(
             subject: Some(who),
             intensity: 0.85,
         });
+        // AND THE PLAYER IS TOLD. Brett: "this is the main way people see what
+        // is happening sometimes, so things should be there." This one was
+        // built without a notice at all - the fear went straight into the civic
+        // planner, and the first the god knew of a camp was an armory going up.
+        notices.write(crate::ui::Notice::new(format!(
+            "{} saw goblins out past the fields",
+            name.name
+        )));
         let _ = seen;
         return;
     }

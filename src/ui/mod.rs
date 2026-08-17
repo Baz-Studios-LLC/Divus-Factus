@@ -830,6 +830,45 @@ impl Notice {
         }
     }
 
+    /// A deed, and who saw it.
+    ///
+    /// Brett asked for this shape by name - "Plavin ate [person], 4 people saw
+    /// him do it" - and then for it everywhere: "Same for other things.
+    /// [person] kills [person]. No one saw him do it." So it lives here, once,
+    /// rather than being written out at each site that has a deed to report.
+    ///
+    /// WHO SAW IS HALF THE NEWS. Everything in this game that spreads, spreads
+    /// by being witnessed - fear, doctrine, a god's reputation - so a deed
+    /// nobody saw is genuinely a different event from the same deed in front of
+    /// four people, and the line the player reads should say which happened.
+    ///
+    /// `deed` is the whole clause ("Plavin ate Wethae"), `saw` the names of
+    /// everyone who witnessed it, and `them` the pronoun for the one who did it
+    /// - see [`Notice::pronoun`].
+    pub fn witnessed(deed: impl Into<String>, saw: &[&str], them: &str) -> Self {
+        let deed = deed.into();
+        let text = match saw.len() {
+            0 => format!("{deed}. Nobody saw"),
+            1 => format!("{deed}, {} saw {them} do it", saw[0]),
+            many => format!("{deed}, {many} people saw {them} do it"),
+        };
+        Notice {
+            text,
+            fanfare: true,
+            prayer: false,
+        }
+    }
+
+    /// The pronoun for whoever did it, from what the game already knows about
+    /// them. Falls back to `them` when there is no body to ask.
+    pub fn pronoun(sex: Option<crate::creature::genome::Sex>) -> &'static str {
+        match sex {
+            Some(crate::creature::genome::Sex::Female) => "her",
+            Some(crate::creature::genome::Sex::Male) => "him",
+            None => "them",
+        }
+    }
+
     pub fn fanfare(text: impl Into<String>) -> Self {
         Notice {
             text: text.into(),

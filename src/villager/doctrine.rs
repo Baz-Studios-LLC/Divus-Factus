@@ -292,6 +292,12 @@ mod tests {
 /// and never less.
 const WITHIN_REACH: f32 = 3.6;
 
+/// How far away somebody can be and still see it happen, in meters.
+///
+/// The same reach the event itself carries by, so the count in the notice and
+/// the people the story actually reaches are the same people.
+const SEEN_FROM: f32 = 40.0;
+
 /// How far off somebody will walk to one.
 ///
 /// THEY HAVE TO GO TO IT, which is not a detail. Nothing else in the game
@@ -383,12 +389,21 @@ pub(super) fn the_starving_and_the_dead(
     mut last_time: Local<f64>,
     mut doctrine: ResMut<Doctrine>,
     mut alarms: MessageWriter<crate::witness::DivineEvent>,
+    mut notices: MessageWriter<crate::ui::Notice>,
     // A DEAD VILLAGER IS NOT A VILLAGER. `succumb` strips `Villager`, `Needs`
     // and `Activity` off a body on the way to making it a corpse - so a query
     // for "a corpse that is one of ours" matched nothing, ever, and the whole
     // module sat silent through a forced famine with a body on the ground.
     // What marks one of the village's own dead is that they still have a name.
-    dead: Query<(Entity, &Transform), (With<crate::creature::Corpse>, With<super::Person>)>,
+    dead: Query<
+        (Entity, &Transform, &super::Person),
+        (With<crate::creature::Corpse>, With<super::Person>),
+    >,
+    // Everyone still standing, for counting who saw.
+    onlookers: Query<
+        (Entity, &Transform, &super::Person),
+        (With<super::Villager>, Without<crate::creature::Corpse>),
+    >,
     mut starving: Query<
         (
             &Transform,
@@ -398,6 +413,8 @@ pub(super) fn the_starving_and_the_dead(
             Option<&crate::villager::belief::Faith>,
             Option<&mut super::Chronicle>,
             &mut crate::creature::MoveTarget,
+            Entity,
+            Option<&crate::creature::genome::CreatureGenome>,
         ),
         (With<super::Villager>, Without<crate::creature::Corpse>),
     >,
@@ -405,25 +422,27 @@ pub(super) fn the_starving_and_the_dead(
     if clock.elapsed - *last_time < NOT_AGAIN_FOR {
         return;
     }
-    let bodies: Vec<(Entity, Vec3)> = dead
+    let bodies: Vec<(Entity, Vec3, String)> = dead
         .iter()
-        .map(|(entity, at)| (entity, at.translation))
+        .map(|(entity, at, who)| (entity, at.translation, who.name.clone()))
         .collect();
     if bodies.is_empty() {
         return;
     }
 
-    for (at, mut needs, person, held, faith, mut chronicle, mut target) in &mut starving {
+    for (at, mut needs, person, held, faith, mut chronicle, mut target, eater, genome) in
+        &mut starving
+    {
         // Desperation is hunger and nothing else for now. When thirst and cold
         // exist they belong in here too, and the shape does not change.
         let desperation = needs.hunger;
         if desperation < 0.5 {
             continue;
         }
-        let Some((body, body_at)) = bodies
+        let Some((body, body_at, ref eaten)) = bodies
             .iter()
-            .copied()
-            .filter(|(_, spot)| spot.distance(at.translation) < WILL_WALK_TO)
+            .cloned()
+            .filter(|(_, spot, _)| spot.distance(at.translation) < WILL_WALK_TO)
             .min_by(|a, b| {
                 a.1.distance(at.translation)
                     .total_cmp(&b.1.distance(at.translation))
@@ -469,6 +488,36 @@ pub(super) fn the_starving_and_the_dead(
         });
 
         info!("{} ate the dead", person.name);
+        // AND THE PLAYER IS TOLD, in as many words. This is the loudest thing
+        // that can happen in a village, and it was reaching the player only as
+        // a line in somebody's private chronicle and a few speech bubbles - so
+        // the one moment the whole system exists to produce could pass while
+        // the god was looking at a different valley.
+        //
+        // A FANFARE, which the game otherwise saves for foundings and namings.
+        // That is exactly right: this is a thing the village will remember as
+        // long as it remembers being founded.
+        //
+        // WHO, AND WHO SAW. Brett: "it should say 'Plavin ate [person],
+        // [person] saw him do it' or 'Plavin ate [person], 4 people saw him do
+        // it'." The witnesses are the whole point of the act - whether this
+        // becomes a thing the village does or a thing one man is never
+        // forgiven for is decided by how many were standing there.
+        let saw: Vec<&str> = onlookers
+            .iter()
+            .filter(|(who, spot, _)| {
+                *who != eater && spot.translation.distance(body_at) < SEEN_FROM
+            })
+            .map(|(_, _, who)| who.name.as_str())
+            .collect();
+        // NOBODY SAW is a different story entirely - a man carrying something
+        // alone, and a village with no idea. `Notice::witnessed` keeps that
+        // case, because it is the one where nothing spreads.
+        notices.write(crate::ui::Notice::witnessed(
+            format!("{} ate {eaten}", person.name),
+            &saw,
+            crate::ui::Notice::pronoun(genome.map(|g| g.sex)),
+        ));
         // ON THEIR OWN LIFE, because that is where it belongs. A person's
         // chronicle is the raw material their theology is spun from - and this
         // is the single loudest line any of them will ever carry.
