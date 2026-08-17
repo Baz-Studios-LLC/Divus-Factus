@@ -21,6 +21,7 @@ mod markers;
 mod matter;
 mod meshbuild;
 mod miracles;
+mod mist;
 mod music;
 mod navigation;
 mod noise;
@@ -258,6 +259,7 @@ fn main() {
             avatar::AvatarPlugin,
             founding::FoundingPlugin,
             fog::FogPlugin,
+            mist::MistPlugin,
             globe::GlobePlugin,
             debug::timings::TimingsPlugin,
             debug::ordo_trial::OrdoTrialPlugin,

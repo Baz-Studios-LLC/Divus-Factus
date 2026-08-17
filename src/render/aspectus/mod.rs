@@ -30,15 +30,17 @@
 use bevy::prelude::*;
 
 pub mod frost;
+pub mod mist;
 pub mod veil;
 
 pub use frost::Frost;
+pub use mist::{MistFieldImage, MistView};
 pub use veil::VeilView;
 
 pub struct AspectusPlugin;
 
 impl Plugin for AspectusPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((frost::FrostPass, veil::VeilPass));
+        app.add_plugins((frost::FrostPass, veil::VeilPass, mist::MistPass));
     }
 }

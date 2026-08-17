@@ -2475,6 +2475,91 @@ mod tests {
     use super::*;
     use bevy::mesh::VertexAttributeValues;
 
+    /// What would the MIST actually cover? A hand-run diagnostic.
+    /// `cargo test probe_mist_cover -- --ignored --nocapture`
+    #[test]
+    #[ignore = "a hand-run diagnostic, not a check"]
+    fn probe_mist_cover() {
+        for seed in [7u32, 19, 88] {
+            let land = Terrain::new(seed);
+            let span = 20000.0f32;
+            let side = 96u32;
+            let step = span / side as f32;
+            let (mut dry, mut damp, mut cold, mut misty, mut land_cells) = (0, 0, 0, 0, 0);
+            let mut sum = 0.0f32;
+            for iz in 0..side {
+                for ix in 0..side {
+                    let x = -span * 0.5 + ix as f32 * step;
+                    let z = -span * 0.5 + iz as f32 * step;
+                    let h = land.height_at(x, z);
+                    if h < WATER_LEVEL {
+                        continue;
+                    }
+                    land_cells += 1;
+                    let m = land.moisture_at(x, z);
+                    let t = land.temperature_for(x, z, h);
+                    // candidate mist law: damp air or cold air, and LOW GROUND
+                    // either way - mist is a thing that pools.
+                    let damp_mist = ((m - 0.54) / 0.22).clamp(0.0, 1.0);
+                    let cold_mist = ((0.30 - t) / 0.18).clamp(0.0, 1.0);
+                    let above = h - WATER_LEVEL;
+                    let lowland = 1.0 - (above / 90.0).clamp(0.0, 1.0);
+                    let w = damp_mist.max(cold_mist * 0.75) * lowland;
+                    sum += w;
+                    if w < 0.05 { dry += 1 } else { misty += 1 }
+                    if w > 0.5 { damp += 1 }
+                    if land.biome_for(x, z, h) == Biome::Wetland && w > 0.35 { cold += 1 }
+                }
+            }
+            println!(
+                "  seed {seed}: land {land_cells}  mist>5% {misty} ({:.0}%)  dry {dry}  \
+                 THICK(>0.5) {damp}  wetland-agreeing {cold}  mean weight {:.2}",
+                100.0 * misty as f32 / land_cells.max(1) as f32,
+                sum / land_cells.max(1) as f32,
+            );
+        }
+    }
+
+    /// What does it cost to ASK THE LAND ABOUT ITSELF over a grid?
+    ///
+    /// `cargo test probe_field_bake -- --ignored --nocapture`. The ground fog
+    /// needs biome and height at many points at once, and a shader cannot ask
+    /// - `moisture_at` and `temperature_for` run three octaves of seeded fbm
+    /// apiece, which is not something to reproduce in WGSL and hope stays in
+    /// step. So the field is baked on the processor, and this says what a bake
+    /// may cost: about half a microsecond a cell, which makes 64x64 a couple
+    /// of milliseconds and 128x128 about nine.
+    ///
+    /// READ THE FIRST ROW AS WARMUP, not as a measurement - it carries the
+    /// river index's own construction and reports fifty times the truth.
+    #[test]
+    #[ignore = "a hand-run diagnostic, not a check"]
+    fn probe_field_bake_cost() {
+        let land = Terrain::new(7);
+        for side in [64u32, 128, 256] {
+            let span = 4000.0f32;
+            let step = span / side as f32;
+            let start = std::time::Instant::now();
+            let mut sink = 0.0f32;
+            for iz in 0..side {
+                for ix in 0..side {
+                    let x = -span * 0.5 + ix as f32 * step;
+                    let z = -span * 0.5 + iz as f32 * step;
+                    let h = land.height_at(x, z);
+                    let b = land.biome_for(x, z, h);
+                    sink += h + b as u8 as f32;
+                }
+            }
+            let took = start.elapsed();
+            println!(
+                "  {side}x{side} = {} cells in {:?}  ({:.1} us/cell, sink {sink:.0})",
+                side * side,
+                took,
+                took.as_secs_f64() * 1e6 / (side * side) as f64,
+            );
+        }
+    }
+
     /// What color each country actually comes out, and how far apart those
     /// colors are. A hand-run diagnostic for biome work rather than a check:
     /// `cargo test probe_how_different -- --ignored --nocapture`.

@@ -228,7 +228,7 @@ fn init_pipeline(
 }
 
 #[derive(Component)]
-struct VeilPipelineId(CachedRenderPipelineId);
+pub(super) struct VeilPipelineId(CachedRenderPipelineId);
 
 fn prepare_pipelines(
     mut commands: Commands,
@@ -259,7 +259,7 @@ fn prepare_pipelines(
 /// come and go). A bind group holding the old buffer while the offsets index
 /// the new one overruns it, and the validation error quits the game.
 #[derive(Component)]
-struct VeilBindGroup {
+pub(super) struct VeilBindGroup {
     depth: TextureViewId,
     view_buffer: BufferId,
     veil_buffer: BufferId,
@@ -329,7 +329,7 @@ fn prepare_bind_groups(
     }
 }
 
-fn veil_pass(
+pub(super) fn veil_pass(
     view: ViewQuery<(
         Read<ViewTarget>,
         Read<ViewUniformOffset>,
