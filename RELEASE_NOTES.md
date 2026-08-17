@@ -1,41 +1,46 @@
-## Begin is a dive
+## A maker can draw where the goods go
 
-**Pressing Begin no longer shows a loading screen.** The camera simply
-falls out of the title vantage onto the ground you are about to found on.
-It always could — the descent has been in the code for months — but it
-asked whether the *current view* was finished building, and from a vantage
-that holds the whole planet the view wants no ground at all, so the answer
-was always no. The world under the landing is now built during the splash,
-while the studio mark is still fading.
+Opificium can now author a **pallet**: not a point but a box, dragged out to
+the room a building sets aside for goods to stack in. The game reads them.
 
-## The veil is a colour, not a thing
+- **A storehouse stacks where its drawing says**, and holds what the drawing
+  gives it room for. The four corners it used to use, identical for every
+  storehouse whatever its shape, are gone.
+- **A pallet takes whatever the village needs it to.** The pallets are
+  shared out among the goods actually being stored, and shared out again
+  when that changes — six pallets over timber, stone and food deal two
+  each, and once a granary takes the food away the same six deal three each
+  to the two that remain. New goods join the deal the day the village first
+  has any.
+- **Goods fill one pallet before starting the next**, in rows and then
+  layers, each layer laid the other way about. How much a pallet holds is a
+  fact about the box that was drawn, not a number in the code.
+- **The granary is asked the same way**, so food is authored in both of its
+  homes.
 
-The fog of war used to be an object: a copy of the ground, lifted into a
-bank tall enough to hide a wood. Every complaint about it came from that —
-a bank is a thing standing in the world, so it could be seen under, seen
-past, and end in a cliff.
+A building that draws no pallets keeps the corners it always had. Nothing
+already authored changes.
 
-**Unknown country is now simply painted**, and so is everything standing on
-it. That one change fixes the lot:
+## Buildings stand at the size they were drawn
 
-- **Trees, rocks and bushes on unwalked ground are hidden country too.**
-  They used to stand in full daylight on top of the fog.
-- **Rivers and the sea go under with their banks.** A bright teal ribbon
-  used to run out across the dark.
-- **No more edge.** There is nothing left for the near fog and the far fog
-  to disagree about, at any height or any angle.
-- **The border reads as a coastline** rather than a row of punched circles.
-- **Ground nobody has seen is not drawn at all**, which is a saving as well
-  as a tidiness.
-- **The world is not veiled before you plant the flag.** You are choosing
-  where to found; you may look wherever you like.
+**A carried-in building is placed, levelled and cleared at its own
+footprint.** Only houses ever asked their drawing how big they were; every
+other kind used a size from the days the village drew its own buildings. So
+an authored storehouse of 6.4 by 10.6 metres was given a pad of 2.8 by 1.6 —
+a fifth of the building. On a slope that is one end hanging in the air and
+the other buried, with trees left standing inside the porches. **Expect the
+ground around larger buildings to look different.**
 
-## Elsewhere
+## A clock tells the hour
 
-- **The land no longer floats.** Where the detailed ground met the distant
-  planet you could see under its edge to the sky. Every chunk now hems
-  itself.
-- **A maker's drawings come up evenly.** With two houses baked, the first
-  was being built two thirds of the time.
-- **Dev tool:** with the F1 panel open, shift-click the ground to mark that
-  chunk explored.
+A drawn clock face gets hands: the hour hand turns twice a day, the minute
+hand twenty-four times, both from the top at dawn. The dial is the maker's
+carpentry; what it reads is the world's.
+
+## Under the hood
+
+**Aspectus** — the game's own renderer — takes its first pass. The frosted
+glass behind an open book used to wake a second camera and render the entire
+world again into a small image. It is now a blur of the frame already drawn:
+no second scene, and the real screen rather than a stretched thumbnail of
+it.

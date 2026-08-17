@@ -2,7 +2,7 @@
 
 This folder is a **project**: one game's own authored work for
 [Opificium](https://github.com/Baz-Studios-LLC/Opificium), a maker's bench for
-buildings and animations. Opificium made this folder and this note.
+buildings and models. Opificium made this folder and this note.
 
 The bench and the game **share no code**. Everything that passes between them is a
 file described here.
@@ -15,10 +15,11 @@ file described here.
 | `data/palette.json` | the game      | the colour ramps the bench paints with            |
 | `data/kinds.json`   | either        | what a finished drawing may be baked AS           |
 | `data/widgets.json` | either        | the marks the bench may place, and their colours  |
-| `data/bodies/`      | the game      | bodies for the animation bench to pose            |
+| `data/materials.json` | either      | what parts may be BUILT of - wood, stone, clay    |
 | `templates/`        | you           | starting shapes to draw from                      |
 | `out/buildings/`    | the bench     | saved drawings, `.baz` - **the source of truth**  |
 | `out/baked/`        | the bench     | baked output, only if `install` is set empty      |
+| `out/models/`       | the bench     | models the kiln made, `.glb` - load these whole   |
 
 A `.baz` is JSON. It is the editable drawing and the thing worth keeping.
 
@@ -38,6 +39,38 @@ offers only what is listed, and a word it is given is passed through untouched:
 { "format": 1, "kinds": [ { "word": "house" }, { "word": "townhall", "label": "TOWN HALL" } ] }
 { "format": 1, "marks": [ { "mark": "door", "ramp": "cloth-green", "shade": 0.6 } ] }
 ```
+
+A mark is a POINT by default - a door is walked through, a hearth is stood at, and
+where it is and which way it faces is the whole of what a game needs. Give one a
+`size` and it becomes a VOLUME instead: a place with room in it, that a maker sets
+down and then drags to the room they mean.
+
+```json
+{ "format": 1, "marks": [ { "mark": "pallet", "size": [1.0, 1.0, 1.0] } ] }
+```
+
+That is for the places a game FILLS rather than stands in - a pallet goods stack
+onto, a pen, a plot, a stockpile. The declared size is only where a maker starts;
+what they drag it to is what the drawing keeps and what the bake carries. Which of
+a game's marks have an extent is the game's business, which is why it is declared
+here: a bench that knew what a pallet was would be a bench with one game's
+vocabulary in it.
+
+`materials.json` is the same kind of vocabulary, for what a part is BUILT of:
+
+```json
+{ "format": 1, "materials": ["wood", "stone", "clay", "thatch"] }
+```
+
+A maker sets it on a part from that part's own right-click menu, under MADE OF, and
+adds words this file does not have with `+ ANOTHER`. Leave the file out and the bench
+offers wood, stone and clay; write one and it offers exactly what you wrote.
+
+**A MATERIAL IS NOT A COLOUR.** `rgb` and `cloth` on a baked box are what a maker
+PAINTED. `material` is what the thing is BUILT of, and only one of those two should
+cost your game anything to gather. A box with no `material` is one nobody has spoken
+for - absent is not `wood`, and what an unspoken part costs is your decision rather
+than one this bench made quietly on your behalf.
 
 **These are contracts, not data.** The game matches these words against its own
 code. A word the game does not understand costs whatever it was attached to, and
