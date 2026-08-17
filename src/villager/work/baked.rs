@@ -643,6 +643,7 @@ fn called(kind: super::BuildingKind) -> &'static str {
         K::Well => "well",
         K::Smokehouse => "smokehouse",
         K::Armory => "armory",
+        K::Cemetery => "cemetery",
         K::Mill => "mill",
         K::Bakery => "bakery",
         K::Weaver => "weaver",

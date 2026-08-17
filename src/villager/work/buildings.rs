@@ -88,6 +88,9 @@ pub enum BuildingKind {
     /// Racked spears and a bell. Where a village that has seen goblins puts
     /// what it means to do about them.
     Armory,
+    /// Consecrated ground, a wall around it, and a gate. Where the village
+    /// puts its dead once it has enough of them to want somewhere proper.
+    Cemetery,
 }
 
 impl BuildingKind {
@@ -135,6 +138,9 @@ impl BuildingKind {
             // village can commit to, and a fright that passes should not
             // leave one half-built in the square.
             BuildingKind::Armory => 14.0,
+            // A wall and a gate: cheap in timber, and the stone below is what
+            // it is really made of.
+            BuildingKind::Cemetery => 6.0,
         }
     }
 
@@ -162,6 +168,7 @@ impl BuildingKind {
             // The mountain provides its own stone; the timber shores it up.
             BuildingKind::Mine => 0.0,
             BuildingKind::Armory => 8.0,
+            BuildingKind::Cemetery => 10.0,
         }
     }
 
@@ -171,6 +178,7 @@ impl BuildingKind {
         &[
             House, Longhouse, Sawmill, Blacksmith, Tavern, TownHall, Storehouse, Granary, Well,
             Smokehouse, Mill, Bakery, Weaver, Herbalist, Watchtower, Shrine, Dock, Mine, Armory,
+            Cemetery,
         ]
     }
 
@@ -192,6 +200,7 @@ impl BuildingKind {
             BuildingKind::Herbalist => "The herbalist's hut",
             BuildingKind::Watchtower => "The watchtower",
             BuildingKind::Armory => "The armory",
+            BuildingKind::Cemetery => "The cemetery",
             BuildingKind::Shrine => "The shrine",
             BuildingKind::Dock => "The dock",
             BuildingKind::Mine => "The mine",
@@ -224,6 +233,8 @@ pub struct CivicNeeds {
     /// tower is raised out of what the village has been through and told
     /// each other, not out of what a god's-eye census can see prowling.
     pub peril: f32,
+    /// How many of its own this village has put in the ground.
+    pub graves: usize,
     /// Couples who have courted long enough and have nowhere to be wed.
     /// Vows are made in the god's house, so a village with pairs waiting
     /// on one wants it built - which is the whole reason a shrine gets
@@ -261,12 +272,29 @@ pub const OWN_WORKS: &[(Vocation, BuildingKind, bool)] = &[
 /// candidate scores against what the village actually lacks, and the
 /// loudest need above a threshold gets ground broken. Soft population
 /// minimums keep hamlets from dreaming of town halls.
+/// EVERY KIND THE LADDER MAY PICK.
+///
+/// A kind missing from here is a kind the village can never build however
+/// loudly it scores - `next_civic` walks THIS, not `BuildingKind::every()`.
+/// The armory shipped in v0.3.38 scoring beautifully off peril and unable to
+/// be chosen, for exactly that reason, and nothing said so. The two roofs are
+/// deliberately absent: `plan_houses` raises those by need.
+pub const CIVIC_LADDER: [BuildingKind; 18] = {
+    use BuildingKind::*;
+    [
+        Well, Dock, Mine, Storehouse, Sawmill, Blacksmith, Smokehouse, Granary, Tavern, Mill,
+        Bakery, Weaver, Herbalist, Shrine, Watchtower, TownHall, Armory, Cemetery,
+    ]
+};
+
 pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Option<BuildingKind> {
     use BuildingKind::*;
-    let candidates = [
-        Well, Dock, Mine, Storehouse, Sawmill, Blacksmith, Smokehouse, Granary, Tavern, Mill,
-        Bakery, Weaver, Herbalist, Shrine, Watchtower, TownHall,
-    ];
+    // EVERY KIND THE LADDER MAY PICK, and a kind missing from here is a kind
+    // the village can never want however loudly it scores. The armory shipped
+    // in v0.3.38 scored beautifully and was never once built for exactly that
+    // reason; the cemetery would have gone the same way if a test had not
+    // asked the LADDER instead of the score.
+    let candidates = CIVIC_LADDER;
     // What the open yard holds before timber and stone are simply heaped.
     const YARD_HOLDS: f32 = 40.0;
     /// The most any single want may shout.
@@ -290,6 +318,9 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
         // runs, or it hides, and either way it has no hands to spare for
         // one. Fear that arrives earlier than this builds the watchtower.
         Armory => 12,
+        // Any village that has buried somebody is old enough to want a place
+        // to have done it.
+        Cemetery => 6,
         // Shelter is not civic ambition: both roofs are planned by need in
         // `plan_houses`, never by this ladder.
         House | Longhouse => 0,
@@ -405,7 +436,31 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
             // PEOPLE, so this rises with how many souls carry the fear rather
             // than with how many goblins there are - which is the difference
             // between a village that has seen them and a village that has not.
-            Armory => (needs.peril - 1.2).max(0.0) * 1.35,
+            // The floor is what keeps this a GOBLIN answer rather than a
+            // wolf one, and it had to be raised the moment the armory was
+            // actually reachable: at 1.2 a village with three souls carrying
+            // a mauling scored 2.43 for an armory against 1.20 for a
+            // watchtower, and started stockpiling spears over wolves. The
+            // tower is the answer to teeth and always was.
+            //
+            // `peril_of` sums over PEOPLE, so the two are separated by how far
+            // the fright traveled rather than by how bad it was: a mauling is
+            // carried by the bitten and whoever they told, which is a handful;
+            // a camp is seen and retold until half the village holds it. Five
+            // is above anything the woods produce and well under what a
+            // sighting spreads.
+            Armory => (needs.peril - 5.0).max(0.0) * 1.35,
+            // THE DEAD ASK FOR IT. Brett: "when a person dies it should
+            // increase a need for a cemetary to be built."
+            //
+            // Off the graves the village has actually dug, not off some
+            // notion of size - a village that has buried four people wants
+            // somewhere proper to have done it, and one that has buried
+            // nobody has never had the thought. It climbs steeply for the
+            // first few and then levels: the difference between no graves
+            // and three is the whole question, and between twenty and thirty
+            // is nothing at all.
+            Cemetery => (needs.graves as f32 / 3.0).min(2.4),
             // Measured from FOUR BELOW its own minimum, so the number
             // that says when a town has earned a hall is the number that
             // gives it one: a town standing exactly at the threshold
@@ -949,6 +1004,23 @@ impl Blueprint {
                 wall_h: 3.2,
                 walls: pal::shade(&pal::STONE, 0.45),
                 roof: pal::shade(&pal::WOOD, 0.28),
+                shed_roof: false,
+                stuff: BuildStuff::Stone,
+            },
+            // Low walls around consecrated ground rather than a building -
+            // wide, barely knee high, and open to the sky. The graves that
+            // stand inside it are their own architecture.
+            BuildingKind::Cemetery => Blueprint {
+                kind,
+                plan,
+                drawing: drawing.clone(),
+                // Set below, once for every kind.
+                mirrored: false,
+                half_w: 5.2,
+                half_d: 4.4,
+                wall_h: 0.7,
+                walls: pal::shade(&pal::STONE, 0.3),
+                roof: pal::shade(&pal::STONE, 0.35),
                 shed_roof: false,
                 stuff: BuildStuff::Stone,
             },
@@ -3199,6 +3271,11 @@ pub(crate) fn plan_houses(
         Query<(Entity, &Building, &crate::villager::MemberOf)>,
         Query<(&Blueprint, &ConstructionSite, &crate::villager::MemberOf)>,
         Query<&Transform, Or<(With<ConstructionSite>, With<Hut>, With<Building>)>>,
+        // The village's own dead, which is what makes it want a cemetery.
+        // Bundled in here rather than taken as its own parameter: this system
+        // sits at Bevy's ceiling and the tuple is what the file already does
+        // about that.
+        Query<(), With<crate::villager::rites::Grave>>,
     ),
 ) {
     *since_last += time.delta_secs();
@@ -3206,7 +3283,7 @@ pub(crate) fn plan_houses(
         return;
     }
     *since_last = 0.0;
-    let (civics, pending, roofs) = plots;
+    let (civics, pending, roofs, graves_dug) = plots;
 
     // One town plans per tick, taken strictly in turn. The census below is
     // not cheap, and running it once per town per tick would scale badly; the
@@ -3401,6 +3478,7 @@ pub(crate) fn plan_houses(
             foresters,
             fields: fields.iter().count(),
             peril,
+            graves: graves_dug.iter().count(),
             betrothed,
             pending_builds: pending
                 .iter()
@@ -3771,6 +3849,14 @@ pub(crate) fn plan_houses(
         // forty strides out. In the plaza it covered nothing but the
         // plaza.
         2..(ring_reach.min(5) + 1)
+    } else if kind == BuildingKind::Cemetery {
+        // OUT PAST EVERYTHING, and Brett said so before it existed: "that
+        // probably shoulnt be at the center of town either lol." Nobody wants
+        // the graves between the well and the tavern. The rings the rites
+        // already choose their resting ground in, so the wall goes up around
+        // the ground the village has been using rather than somewhere else
+        // entirely.
+        7..(ring_reach.max(8) + 2)
     } else if dwelling {
         1..ring_reach
     } else {
@@ -4175,6 +4261,91 @@ pub(crate) fn sermons(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A settled village with nothing else pressing, so a test can add the one
+    /// pressure it cares about and see what the ladder does with it.
+    fn a_quiet_village() -> CivicNeeds {
+        CivicNeeds {
+            population: 14,
+            stone: 60.0,
+            timber_stored: 60.0,
+            stone_stored: 60.0,
+            food_stored: 60.0,
+            avg_spirits: 0.9,
+            homeless: 0,
+            hurt: 0,
+            believers: 0,
+            fishers: 0,
+            farmers: 2,
+            foresters: 2,
+            fields: 2,
+            peril: 0.0,
+            graves: 0,
+            betrothed: 0,
+            pending_builds: 0,
+            shore_near: false,
+            miners: 0,
+            rock_near: false,
+        }
+    }
+
+    /// NOTHING THE VILLAGE CAN WANT IS UNREACHABLE.
+    ///
+    /// `next_civic` scores kinds and then picks from `CIVIC_LADDER`, so a kind
+    /// with a score and no entry there is one the village wants and can never
+    /// build. THE ARMORY SHIPPED THAT WAY in v0.3.38 - scoring off peril
+    /// exactly as designed, in a release, unbuildable - and nothing said so.
+    /// Found only because a cemetery test asked the LADDER rather than the
+    /// score.
+    ///
+    /// The two roofs are exempt: `plan_houses` raises those by need.
+    #[test]
+    fn every_civic_kind_is_on_the_ladder() {
+        for kind in BuildingKind::every() {
+            if matches!(kind, BuildingKind::House | BuildingKind::Longhouse) {
+                continue;
+            }
+            assert!(
+                CIVIC_LADDER.contains(kind),
+                "{kind:?} can be wanted and never chosen - it is missing from \
+                 CIVIC_LADDER",
+            );
+        }
+    }
+
+    /// A DEATH IS WHAT ASKS FOR A CEMETERY. Brett: "when a person dies it
+    /// should increase a need for a cemetary to be built."
+    ///
+    /// Asked of the ladder rather than of the score, because the score is not
+    /// the decision - five rules outrank it, and a want nothing ever picks is
+    /// not a want. See the note on `civic_ladder`.
+    #[test]
+    fn the_dead_ask_for_somewhere_to_lie() {
+        let quiet = a_quiet_village();
+        let bereaved = CivicNeeds {
+            graves: 6,
+            ..a_quiet_village()
+        };
+        // EVERYTHING ELSE ALREADY STANDS, so the graveyard is the only thing
+        // left the ladder could pick. That isolates the one question: with the
+        // field cleared, does the presence of graves decide it? A test that
+        // left the other wants in play would pass or fail on their scores
+        // rather than on this one.
+        let all_but_the_graveyard = |kind: BuildingKind| kind != BuildingKind::Cemetery;
+
+        assert_eq!(
+            next_civic(&quiet, all_but_the_graveyard),
+            None,
+            "a village that has lost nobody does not ask for a graveyard, even \
+             when it has nothing else left to build",
+        );
+        assert_eq!(
+            next_civic(&bereaved, all_but_the_graveyard),
+            Some(BuildingKind::Cemetery),
+            "and six graves is a village that wants somewhere proper to have \
+             put them",
+        );
+    }
 
     /// A mine stands ABOVE the ground it is cut into.
     ///
