@@ -4,6 +4,7 @@
 mod attention;
 mod avatar;
 mod calendar;
+mod camp;
 mod camera;
 mod carried;
 mod clouds;

@@ -2075,6 +2075,11 @@ pub(crate) fn spawn_settlement(
     let doorstep = doorstep.flatten();
     // The plot is leveled and cleared by now; everything below reads the
     // land as it finally stands.
+    // Taken before the terrain is borrowed out of the same tuple: the camps
+    // wear the ground's own veil-carrying material, like the boulders and the
+    // trees, so a camp in unwalked country is painted the veil's color along
+    // with the hillside it stands on.
+    let ground_material = ground.2.ground_material.clone();
     let terrain = &ground.0;
 
     // The light. It comes down BEFORE anything stands in it - that
@@ -2332,6 +2337,18 @@ pub(crate) fn spawn_settlement(
             ) else {
                 continue;
             };
+            // The camp itself - fire, huts, lookout - raised before the band
+            // that lives in it, so the goblins are placed around a thing that
+            // already exists rather than around a bare coordinate.
+            crate::camp::raise_a_camp(
+                &mut commands,
+                &mut meshes,
+                ground_material.clone(),
+                &terrain,
+                fire,
+                &mut wildlife_rng,
+            );
+
             let band = 4 + (camp as u32 % 4);
             for _ in 0..band {
                 // Gathered close, so the camp is one thing seen from the
@@ -2588,10 +2605,10 @@ fn point_camera_at_settlement(
             // pixels tall; and a steep pitch looks down on the top of a head,
             // which is the one angle that shows neither the face nor the
             // silhouette.
-            rig.distance = 15.0;
-            rig.target_distance = 15.0;
-            rig.pitch = 0.24;
-            rig.target_pitch = 0.24;
+            rig.distance = 22.0;
+            rig.target_distance = 22.0;
+            rig.pitch = 0.34;
+            rig.target_pitch = 0.34;
         }
     }
 }

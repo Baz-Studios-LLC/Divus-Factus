@@ -782,6 +782,55 @@ mod biome_tests {
         }
     }
 
+    /// One of the goblin cuts is males only, and the rule must hold at the
+    /// point the roll is MADE - a garment corrected afterward is a garment
+    /// that will one day be forgotten to correct.
+    #[test]
+    fn the_clout_is_worn_by_males_only() {
+        use crate::creature::genome::{CreatureGenome, Garment, Sex};
+        use crate::rng::Rng;
+        let mut seen_male_clout = false;
+        for seed in 0..400 {
+            let goblin = CreatureGenome::random(Species::Goblin, &mut Rng::new(seed));
+            if goblin.garment.males_only() {
+                assert_eq!(
+                    goblin.sex,
+                    Sex::Male,
+                    "a female goblin was dealt a male-only cut at seed {seed}",
+                );
+                seen_male_clout = true;
+            }
+        }
+        assert!(
+            seen_male_clout,
+            "four hundred goblins and not one in the clout - the cut is unreachable",
+        );
+        assert!(
+            Garment::goblin_wardrobe(Sex::Female)
+                .iter()
+                .all(|cut| !cut.males_only()),
+            "the female wardrobe offers a male-only cut",
+        );
+        assert_eq!(
+            Garment::goblin_wardrobe(Sex::Male).len(),
+            Garment::GOBLIN.len(),
+            "a male goblin may wear any of them",
+        );
+    }
+
+    /// And the two wardrobes never overlap. A villager in a loincloth reads as
+    /// a goblin who wandered in; a goblin in a robe reads as a bug.
+    #[test]
+    fn the_village_and_the_camp_dress_differently() {
+        use crate::creature::genome::Garment;
+        for cut in Garment::GOBLIN {
+            assert!(
+                !Garment::ALL.contains(&cut),
+                "{cut:?} is in both wardrobes",
+            );
+        }
+    }
+
     /// The desert has its own animal, and it is the one the desert is for.
     #[test]
     fn the_camel_belongs_to_the_desert_and_nowhere_else() {
@@ -843,10 +892,10 @@ mod biome_tests {
         assert!(Species::Penguin.is_biped() && !Species::Penguin.is_human());
         for seed in 0..24 {
             let goblin = CreatureGenome::random(Species::Goblin, &mut Rng::new(seed));
-            assert_eq!(
+            assert!(
+                Garment::GOBLIN.contains(&goblin.garment),
+                "a goblin wears the goblins' own cuts, not the village's: {:?}",
                 goblin.garment,
-                Garment::Loincloth,
-                "a goblin wears one thing and it is always the same thing",
             );
             assert!(!goblin.satchel && !goblin.trousers, "goblins carry no kit");
             assert!(

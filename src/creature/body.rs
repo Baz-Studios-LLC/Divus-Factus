@@ -476,6 +476,73 @@ fn spawn_garment_features(
             );
         }
 
+        Garment::Clout => {
+            // LESS THAN THE STRIP. Narrower across and shallower, sitting
+            // lower on the hip, so at a glance it reads as a goblin who could
+            // not be bothered rather than as the same loincloth resized.
+            let strip = leg_len * 0.19;
+            spawn_block(
+                commands,
+                assets,
+                body,
+                Vec3::new(0.0, leg_len - strip * 0.75, 0.0),
+                Vec3::new(torso_w * 0.78, strip, torso_d * 1.2),
+                genome.cloth,
+                "Clout",
+            );
+        }
+
+        Garment::Pelt => {
+            // The strip, and a hide over ONE shoulder above it.
+            let strip = leg_len * 0.26;
+            spawn_block(
+                commands,
+                assets,
+                body,
+                Vec3::new(0.0, leg_len - strip * 0.4, 0.0),
+                Vec3::new(torso_w * 1.12, strip, torso_d * 1.18),
+                genome.cloth,
+                "Loincloth",
+            );
+
+            // ASYMMETRIC ON PURPOSE, and it is the whole point of the cut: the
+            // village's own `Wrap` is a sash centered across the chest, and a
+            // centered band on a goblin would just read as that. Hung off one
+            // shoulder, the silhouette is lopsided, which is a thing no
+            // villager ever looks like.
+            //
+            // Which shoulder is decided by the genome rather than rolled here,
+            // so a goblin wears its hide on the same side every time it is
+            // rebuilt - and it is rebuilt whenever the bench is opened or a
+            // save is loaded.
+            let side = if genome.ear_tilt >= 0.25 { 1.0f32 } else { -1.0 };
+            let drape = commands
+                .spawn((
+                    Name::new("Pelt"),
+                    Transform::from_xyz(
+                        side * torso_w * 0.16,
+                        leg_len + torso_len * 0.52,
+                        0.0,
+                    )
+                    .with_rotation(Quat::from_rotation_z(side * -0.72)),
+                    Visibility::default(),
+                    ChildOf(body),
+                ))
+                .id();
+            spawn_block(
+                commands,
+                assets,
+                drape,
+                Vec3::ZERO,
+                // Long enough to reach from the shoulder to below the ribs,
+                // and kept inside the shoulders fore and aft so the arms swing
+                // clear of it.
+                Vec3::new(torso_w * 0.44, torso_len * 0.92, torso_d * 1.1),
+                genome.cloth.shifted(1),
+                "Pelt",
+            );
+        }
+
         Garment::Wrap => {
             // A sash across the chest, tilted so it does not read as another belt.
             let sash = commands

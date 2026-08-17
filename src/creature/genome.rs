@@ -199,12 +199,41 @@ pub enum Garment {
     Wrap,
     /// A strip at the hips and nothing else. What goblins wear.
     Loincloth,
+    /// A hide slung over one shoulder, with the strip beneath it.
+    Pelt,
+    /// Less than the strip, and males only.
+    Clout,
 }
 
 impl Garment {
-    /// What the village wears. The loincloth is deliberately not in it: a
+    /// What the village wears. The goblin cuts are deliberately not in it: a
     /// villager who rolled one would read as a goblin who had wandered in.
     pub const ALL: [Garment; 3] = [Garment::Tunic, Garment::Robe, Garment::Wrap];
+
+    /// What a goblin wears.
+    ///
+    /// Three, because one was a uniform. A camp in identical dress reads as
+    /// one goblin printed four times, and dress is most of what the eye has to
+    /// go on at the distance a camp is usually seen from - the ears do the
+    /// species, the clothes do the individual.
+    pub const GOBLIN: [Garment; 3] = [Garment::Loincloth, Garment::Pelt, Garment::Clout];
+
+    /// Whether this cut is worn by males only.
+    ///
+    /// One of the three is, which is a fact about the goblins rather than
+    /// about the renderer, so it lives here beside the cuts themselves rather
+    /// than as a condition buried in whoever happens to be rolling one.
+    pub fn males_only(self) -> bool {
+        matches!(self, Garment::Clout)
+    }
+
+    /// The cuts a goblin of this sex may be dealt.
+    pub fn goblin_wardrobe(sex: Sex) -> Vec<Garment> {
+        Garment::GOBLIN
+            .into_iter()
+            .filter(|cut| !cut.males_only() || sex == Sex::Male)
+            .collect()
+    }
 }
 
 /// Where a creature's head sits relative to its body, and how it carries itself.
@@ -629,11 +658,11 @@ impl CreatureGenome {
                 Headwear::None
             },
             garment: match species {
-                // A goblin wears one thing and it is always the same thing.
-                // That uniformity is the point: a village is a crowd of
-                // individuals and a camp is a pack, and the clothing says so
-                // before anybody moves.
-                Species::Goblin => Garment::Loincloth,
+                // Dealt from the goblins' own wardrobe, which is three cuts
+                // and not the village's - and one of the three is males only,
+                // so the roll is made against what this one may actually wear
+                // rather than rolled and then corrected.
+                Species::Goblin => *rng.pick(&Garment::goblin_wardrobe(sex)),
                 _ if human => *rng.pick(&Garment::ALL),
                 _ => Garment::Tunic,
             },
