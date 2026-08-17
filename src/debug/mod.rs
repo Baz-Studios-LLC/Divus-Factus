@@ -26,6 +26,7 @@ mod hud;
 mod inspector;
 pub(crate) mod layers;
 mod manifest;
+pub(crate) mod menagerie;
 pub(crate) mod ordo_trial;
 mod people;
 pub(crate) mod portrait;
@@ -73,10 +74,12 @@ impl Plugin for DebugPlugin {
             .init_resource::<ChronicleView>()
             .init_resource::<ChronicleStars>()
             .init_resource::<Manifestation>()
+            .init_resource::<menagerie::Menagerie>()
             .add_systems(
                 Startup,
                 (
                     spawn_hud,
+                    menagerie::build_the_menagerie,
                     spawn_world_panel.after(spawn_village_panel),
                     spawn_people_panel.after(spawn_village_panel),
                     villager_profile::spawn_villager_profile.after(spawn_people_panel),
@@ -122,6 +125,7 @@ impl Plugin for DebugPlugin {
                     toggle_dev_overlay,
                     toggle_roofs,
                     toggle_the_sea,
+                    menagerie::work_the_menagerie,
                     handle_toolbar,
                     screenshot_on_request,
                     people::filter_by_chip,
@@ -166,6 +170,20 @@ impl Plugin for DebugPlugin {
                     update_world_markers,
                 )
                     .chain(),
+            )
+            // The menagerie bench: build what is asked for, put it on the
+            // private layer, turn it, then frame it - in that order, because
+            // the lens frames off the exhibit's own height and there is
+            // nothing to measure until it exists.
+            .add_systems(
+                Update,
+                (
+                    menagerie::dress_the_exhibit,
+                    menagerie::turn_the_turntable,
+                    menagerie::mind_the_lens,
+                )
+                    .chain()
+                    .in_set(DebugSet::Rebuild),
             )
             // The portrait studio: booking before seating before stamping,
             // and the gallery hung last, all in one frame's walk.

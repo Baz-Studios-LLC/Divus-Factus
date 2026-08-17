@@ -2178,6 +2178,14 @@ pub(super) fn do_work(
                         Species::Deer => "brought down a deer",
                         Species::Boar => "brought down a boar",
                         Species::Wolf => "slew a wolf",
+                        Species::Camel => "brought down a camel",
+                        Species::Bear => "killed a bear",
+                        // Worth its own line in the chronicle. A hunter who
+                        // came home from this did not do the same thing as a
+                        // hunter who came home with a deer.
+                        Species::PolarBear => "killed a white bear of the ice",
+                        Species::Penguin => "took a seabird",
+                        Species::Goblin => "killed a goblin",
                         Species::Human => "brought down quarry",
                     };
                     info!("{} {}", person.name, quarry);

@@ -26,24 +26,61 @@
 ///
 /// Repeats are the weight - a slice with three deer in it is a country three
 /// times as likely to turn up deer as one with a single entry.
-pub fn beasts_of(biome: crate::terrain::Biome) -> &'static [crate::creature::genome::Species] {
+///
+/// How far from the equator a place has to be, as the sine of its latitude,
+/// before the ice animals belong to it. Beyond this the country is polar
+/// rather than merely northern - about fifty degrees, where a boreal forest
+/// gives out.
+const POLAR: f32 = 0.77;
+
+/// Which beasts belong in a country. `latitude` is the sine of the place's latitude, and it is taken as well as
+/// the biome because of the one thing a biome cannot say: WHICH pole.
+pub fn beasts_of(
+    biome: crate::terrain::Biome,
+    latitude: f32,
+) -> &'static [crate::creature::genome::Species] {
     use crate::creature::genome::Species::*;
     use crate::terrain::Biome;
+
+    // THE TWO POLES GET DIFFERENT ANIMALS, and they never meet.
+    //
+    // A polar bear and a penguin in one shot is the oldest mistake in the
+    // picture book, and the world already knows which end of itself it is
+    // looking at: `latitude` is the sine of it, straight off the sphere, and
+    // its SIGN is the one thing biome cannot tell you. So the north gets the
+    // bears and the south gets the birds - and a player who sails far enough
+    // finds a different world at the other end rather than the same one twice.
+    if latitude.abs() > POLAR {
+        return if latitude > 0.0 {
+            // The far north: white bears on the ice, and the wolves that
+            // followed the herds up.
+            &[PolarBear, PolarBear, Wolf, Deer]
+        } else {
+            // The far south belongs to the birds, in the numbers birds come
+            // in - and to nothing that would eat them on land.
+            &[Penguin, Penguin, Penguin, Penguin, Penguin, PolarBear]
+        };
+    }
+
     match biome {
         // Mixed woodland: the full company, and the one country where the
-        // wolf is at home rather than passing through.
-        Biome::Temperate => &[Deer, Deer, Deer, Boar, Boar, Wolf],
+        // wolf is at home rather than passing through. The bear is here too,
+        // and one bear in a wood is worth more than six of anything else.
+        Biome::Temperate => &[Deer, Deer, Deer, Boar, Boar, Wolf, Bear],
         // Cold conifer: wolves keep the north, and the deer that winter there
         // are worth the trouble. No boar - they root, and the ground is iron.
-        Biome::Boreal => &[Deer, Deer, Wolf, Wolf],
-        // Dry scrub: thin country. Something to hunt, but a village founded
-        // here will feel it.
-        Biome::Arid => &[Deer, Boar],
+        // Bear country properly, this.
+        Biome::Boreal => &[Deer, Deer, Wolf, Wolf, Bear, Bear],
+        // Dry scrub: thin country, and the camel is what thin country is FOR.
+        // Still something to hunt, because a village founded here must be able
+        // to eat - but the desert's own animal is the one that needs nothing.
+        Biome::Arid => &[Camel, Camel, Camel, Deer, Boar],
         // Damp and dense: boar country, where the rooting is good and the
         // cover is thick.
         Biome::Wetland => &[Boar, Boar, Boar, Deer, Wolf],
-        // Above the treeline there is little to graze, so little to hunt it.
-        Biome::Alpine => &[Deer, Wolf],
+        // Above the treeline there is little to graze, so little to hunt it -
+        // and the one bear that will climb that high.
+        Biome::Alpine => &[Deer, Wolf, Bear],
     }
 }
 
@@ -68,6 +105,21 @@ const HUNT_RANGE: f32 = 110.0;
 
 /// How near a wolf gets before prey bolts.
 const FLIGHT_RANGE: f32 = 26.0;
+
+/// This creature hunts.
+///
+/// A TAG, not a species check, and Brett asked for it that way while the
+/// goblins were still being drawn: "Predator should definitely be a tag, I plan
+/// on adding goblins too." It was `genome.species == Species::Wolf` in three
+/// places, which is the shape of thing that goes stale the moment a second
+/// predator exists - and the second, third and fourth arrived in one afternoon.
+///
+/// Being a component rather than a fact about a species also leaves room for
+/// the thing to change during a life: a beast that is tamed, or a goblin that
+/// is bought off, stops hunting by losing this, and nothing that reads it has
+/// to learn a new rule.
+#[derive(Component, Debug, Default)]
+pub struct Predator;
 
 /// A wild animal's own needs and rhythms.
 #[derive(Component, Debug, Default)]
@@ -104,7 +156,15 @@ pub(super) fn wild_hunger(time: Res<Time>, mut wild: Query<&mut Wild, Without<Co
 pub(super) fn graze_and_flee(
     terrain: Option<Res<Terrain>>,
     mut rng: Local<Option<Rng>>,
-    wolves: Query<(&Transform, &CreatureGenome), (With<Creature>, Without<Corpse>, Without<Held>)>,
+    hunters_about: Query<
+        &Transform,
+        (
+            With<Creature>,
+            With<Predator>,
+            Without<Corpse>,
+            Without<Held>,
+        ),
+    >,
     mut prey: Query<
         (
             &Transform,
@@ -127,10 +187,11 @@ pub(super) fn graze_and_flee(
     };
     let rng = rng.get_or_insert_with(|| Rng::new(0x57A6));
 
-    let wolf_positions: Vec<Vec3> = wolves
+    // EVERYTHING THAT HUNTS, by its tag. A deer that bolted from a wolf and
+    // grazed on beside a bear was the first thing this cost.
+    let wolf_positions: Vec<Vec3> = hunters_about
         .iter()
-        .filter(|(_, genome)| genome.species == Species::Wolf)
-        .map(|(transform, _)| transform.translation)
+        .map(|transform| transform.translation)
         .collect();
 
     for (transform, genome, mut wild, mut target, mut motion) in &mut prey {
@@ -191,13 +252,13 @@ pub(super) fn wolves_hunt(
     mut hunters: Query<
         (
             &Transform,
-            &CreatureGenome,
             &mut Wild,
             &mut MoveTarget,
             &mut CreatureMotion,
         ),
         (
             With<Creature>,
+            With<Predator>,
             Without<Corpse>,
             Without<Held>,
             Without<Airborne>,
@@ -249,10 +310,7 @@ pub(super) fn wolves_hunt(
     let mut strikes: Vec<Entity> = Vec::new();
     let mut eaten: Vec<Entity> = Vec::new();
 
-    for (transform, genome, mut wild, mut target, mut motion) in &mut hunters {
-        if genome.species != Species::Wolf {
-            continue;
-        }
+    for (transform, mut wild, mut target, mut motion) in &mut hunters {
         let at = transform.translation;
 
         if wild.busy > 0.0 {
@@ -518,8 +576,13 @@ pub(super) fn wolves_stalk(
     ),
     mut rng: ResMut<crate::villager::SimRng>,
     mut wolves: Query<
-        (&Transform, &CreatureGenome, &mut Wild, &mut MoveTarget),
-        (Without<Corpse>, Without<Held>, Without<Villager>),
+        (&Transform, &mut Wild, &mut MoveTarget),
+        (
+            With<Predator>,
+            Without<Corpse>,
+            Without<Held>,
+            Without<Villager>,
+        ),
     >,
     mut walkers: Query<
         (
@@ -559,8 +622,8 @@ pub(super) fn wolves_stalk(
         })
         .collect();
 
-    for (wolf_at, genome, mut wild, mut target) in &mut wolves {
-        if genome.species != Species::Wolf || wild.hunger < 0.35 {
+    for (wolf_at, mut wild, mut target) in &mut wolves {
+        if wild.hunger < 0.35 {
             continue;
         }
         let at = wolf_at.translation;
@@ -650,6 +713,10 @@ mod biome_tests {
     use crate::creature::genome::Species;
     use crate::terrain::Biome;
 
+    /// A latitude well inside the temperate band, for the questions that are
+    /// about country rather than about which pole.
+    const TEMPERATE: f32 = 0.2;
+
     const EVERY: [Biome; 5] = [
         Biome::Temperate,
         Biome::Boreal,
@@ -665,7 +732,7 @@ mod biome_tests {
     #[test]
     fn every_country_keeps_something_to_hunt() {
         for biome in EVERY {
-            let beasts = beasts_of(biome);
+            let beasts = beasts_of(biome, TEMPERATE);
             assert!(!beasts.is_empty(), "{biome:?} has no living thing in it");
             assert!(
                 beasts.iter().any(|s| matches!(s, Species::Deer | Species::Boar)),
@@ -675,12 +742,126 @@ mod biome_tests {
         }
     }
 
+    /// THE PENGUINS AND THE POLAR BEARS NEVER MEET.
+    ///
+    /// The oldest mistake in the picture book, and the one thing a biome alone
+    /// could never prevent - both poles are cold, and cold is all a biome
+    /// knows. The sign of the latitude is what keeps them apart.
+    #[test]
+    fn the_two_poles_get_different_animals() {
+        let north = beasts_of(Biome::Boreal, 0.95);
+        let south = beasts_of(Biome::Boreal, -0.95);
+        assert!(
+            north.contains(&Species::PolarBear) && !north.contains(&Species::Penguin),
+            "the far north is bears and no birds: {north:?}",
+        );
+        assert!(
+            south.contains(&Species::Penguin),
+            "the far south is where the penguins are: {south:?}",
+        );
+        assert!(
+            !south.iter().any(|s| *s == Species::Penguin)
+                || !north.iter().any(|s| *s == Species::Penguin),
+            "penguins must not be in both hemispheres",
+        );
+    }
+
+    /// And neither of them turns up in the middle of the world.
+    #[test]
+    fn the_ice_animals_keep_to_the_ice() {
+        for biome in EVERY {
+            let beasts = beasts_of(biome, TEMPERATE);
+            assert!(
+                !beasts.contains(&Species::Penguin),
+                "{biome:?} has penguins in temperate latitudes",
+            );
+            assert!(
+                !beasts.contains(&Species::PolarBear),
+                "{biome:?} has polar bears in temperate latitudes",
+            );
+        }
+    }
+
+    /// The desert has its own animal, and it is the one the desert is for.
+    #[test]
+    fn the_camel_belongs_to_the_desert_and_nowhere_else() {
+        assert!(
+            beasts_of(Biome::Arid, TEMPERATE).contains(&Species::Camel),
+            "the desert has no camel in it",
+        );
+        for biome in EVERY {
+            if biome == Biome::Arid {
+                continue;
+            }
+            assert!(
+                !beasts_of(biome, TEMPERATE).contains(&Species::Camel),
+                "{biome:?} has camels, which belong to the dry country",
+            );
+        }
+    }
+
+    /// A polar bear is BIGGER than a brown bear, which is the whole of why it
+    /// is a separate animal rather than a recolor. Brett asked for it by name.
+    #[test]
+    fn the_polar_bear_is_the_bigger_bear() {
+        use crate::creature::genome::CreatureGenome;
+        use crate::rng::Rng;
+        let mut brown = 0.0f32;
+        let mut white = 0.0f32;
+        for seed in 0..40 {
+            brown += CreatureGenome::random(Species::Bear, &mut Rng::new(seed)).height();
+            white += CreatureGenome::random(Species::PolarBear, &mut Rng::new(seed)).height();
+        }
+        assert!(
+            white > brown * 1.25,
+            "a polar bear must be decisively the bigger animal: {:.2} against {:.2}",
+            white / 40.0,
+            brown / 40.0,
+        );
+    }
+
+    /// Everything that hunts says so, and nothing that grazes does. The tag is
+    /// hung from this at spawn, so this is where the roster is actually kept.
+    #[test]
+    fn the_hunters_are_the_ones_that_hunt() {
+        for species in [Species::Wolf, Species::Bear, Species::PolarBear, Species::Goblin] {
+            assert!(species.hunts(), "{species:?} should hunt");
+        }
+        for species in [Species::Deer, Species::Boar, Species::Camel, Species::Penguin] {
+            assert!(!species.hunts(), "{species:?} should not hunt");
+        }
+    }
+
+    /// A goblin is not a villager, however upright it stands. The two questions
+    /// were one while the village was the only thing on two legs; the moment
+    /// something else was, every hat in the wardrobe was offered to it.
+    #[test]
+    fn a_goblin_stands_upright_without_being_one_of_the_village() {
+        use crate::creature::genome::{CreatureGenome, Garment};
+        use crate::rng::Rng;
+        assert!(Species::Goblin.is_biped() && !Species::Goblin.is_human());
+        assert!(Species::Penguin.is_biped() && !Species::Penguin.is_human());
+        for seed in 0..24 {
+            let goblin = CreatureGenome::random(Species::Goblin, &mut Rng::new(seed));
+            assert_eq!(
+                goblin.garment,
+                Garment::Loincloth,
+                "a goblin wears one thing and it is always the same thing",
+            );
+            assert!(!goblin.satchel && !goblin.trousers, "goblins carry no kit");
+            assert!(
+                goblin.height() < CreatureGenome::random(Species::Human, &mut Rng::new(seed)).height(),
+                "a goblin must be visibly shorter than a villager",
+            );
+        }
+    }
+
     /// And no country is only predators, or only one animal everywhere.
     #[test]
     fn the_countries_are_not_all_the_same_wilderness() {
         let mut seen: Vec<Vec<Species>> = Vec::new();
         for biome in EVERY {
-            let mut kinds: Vec<Species> = beasts_of(biome).to_vec();
+            let mut kinds: Vec<Species> = beasts_of(biome, TEMPERATE).to_vec();
             kinds.sort_by_key(|s| format!("{s:?}"));
             kinds.dedup();
             seen.push(kinds);
@@ -693,8 +874,8 @@ mod biome_tests {
         // Wetland is boar country and boreal is not: the one distinction the
         // table exists to make.
         assert!(
-            beasts_of(Biome::Wetland).iter().filter(|s| **s == Species::Boar).count()
-                > beasts_of(Biome::Boreal).iter().filter(|s| **s == Species::Boar).count(),
+            beasts_of(Biome::Wetland, TEMPERATE).iter().filter(|s| **s == Species::Boar).count()
+                > beasts_of(Biome::Boreal, TEMPERATE).iter().filter(|s| **s == Species::Boar).count(),
             "the reeds should root with more boar than the frozen north",
         );
     }

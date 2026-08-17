@@ -49,6 +49,25 @@ use crate::terrain::{Biome, Terrain, WATER_LEVEL};
 /// should move with it.
 pub const STARTING_POPULATION: usize = 10;
 
+/// How many goblin camps a new world gets.
+///
+/// Three. Few enough that finding one is an event and the map does not read as
+/// infested; enough that they are a feature of the world rather than a thing
+/// one unlucky village has.
+const GOBLIN_CAMPS: usize = 3;
+
+/// How far the nearest camp may be pitched from a new village, and how far the
+/// furthest.
+///
+/// Outside the home circle (170) by a good margin: a camp inside the ground the
+/// village already knows would be a fight on the first morning rather than
+/// something waiting out in the country to be found.
+const GOBLIN_CAMP_NEAREST: f32 = 320.0;
+const GOBLIN_CAMP_REACH: f32 = 900.0;
+
+/// How far a camp's own members spread around its fire.
+const GOBLIN_CAMP_SPREAD: f32 = 11.0;
+
 /// Seconds of not eating it takes to go from fed to starving.
 ///
 /// A day and a half (day = 600s). This is not a starvation simulator:
@@ -2259,8 +2278,13 @@ pub(crate) fn spawn_settlement(
         ) else {
             continue;
         };
+        // The country decides, and so does WHICH END OF THE WORLD it is: the
+        // sine of the latitude comes straight off the sphere, and its sign is
+        // the difference between the bears' pole and the penguins'.
+        let latitude = crate::terrain::direction_at(position.x, position.z).y;
         let species = *wildlife_rng.pick(crate::creature::wildlife::beasts_of(
             terrain.biome_at(position.x, position.z),
+            latitude,
         ));
         let genome = CreatureGenome::random(species, &mut wildlife_rng);
         let entity = spawn_creature(
@@ -2280,6 +2304,70 @@ pub(crate) fn spawn_settlement(
                 home: position,
             },
         ));
+    }
+
+    // GOBLIN CAMPS. Brett: "we should add goblins now while we are at it,
+    // shorter green humans in loin cloth style cloths, they should be in small
+    // camps."
+    //
+    // A CAMP, not a scatter, and the difference is the whole of what they are.
+    // Wildlife is dealt out one animal at a time and drifts into herds by
+    // habit; goblins are placed as a BAND - four to seven of them around one
+    // spot, sharing a home range, so the first sight of them is a group and
+    // the second is the same group still together. A lone goblin wandering the
+    // map would read as one more animal.
+    //
+    // Sited well beyond the village's own ring: near enough to be found, far
+    // enough that finding them is a journey somebody chose to make. They are
+    // born hunters (`Species::hunts`), so they carry the same `Predator` tag as
+    // the wolves and the wilderness already knows to run from them.
+    if restoring.is_none() {
+        for camp in 0..GOBLIN_CAMPS {
+            let Some(fire) = crate::creature::random_walkable_ring(
+                &terrain,
+                &mut wildlife_rng,
+                center,
+                GOBLIN_CAMP_NEAREST,
+                GOBLIN_CAMP_REACH,
+            ) else {
+                continue;
+            };
+            let band = 4 + (camp as u32 % 4);
+            for _ in 0..band {
+                // Gathered close, so the camp is one thing seen from the
+                // ridge rather than a handful of separate green dots.
+                let Some(at) = crate::creature::random_walkable_point(
+                    &terrain,
+                    &mut wildlife_rng,
+                    fire,
+                    GOBLIN_CAMP_SPREAD,
+                ) else {
+                    continue;
+                };
+                let genome = CreatureGenome::random(Species::Goblin, &mut wildlife_rng);
+                let entity = spawn_creature(
+                    &mut commands,
+                    &assets,
+                    genome,
+                    at,
+                    wildlife_rng.range(0.0, std::f32::consts::TAU),
+                    wildlife_rng.f32() * 6.0,
+                );
+                commands.entity(entity).insert((
+                    Activity::Idle,
+                    crate::creature::wildlife::Wild {
+                        hunger: wildlife_rng.range(0.0, 0.5),
+                        busy: 0.0,
+                        // HOME IS THE FIRE, not where each one happens to
+                        // stand. That single shared point is what keeps a camp
+                        // a camp: they wander their range and come back to the
+                        // same place, so it holds together over hours of play
+                        // without anything having to herd them.
+                        home: fire,
+                    },
+                ));
+            }
+        }
     }
 
     commands.insert_resource(explore::KnownWorld {
@@ -2399,6 +2487,7 @@ fn stretch_settlement(
 fn point_camera_at_settlement(
     site: Option<Res<SettlementSite>>,
     terrain_probe: Option<Res<Terrain>>,
+    camps: Query<(&Transform, &CreatureGenome), With<crate::creature::Creature>>,
     mut rigs: Query<&mut crate::camera::CameraRig>,
 ) {
     let (Some(site), Ok(mut rig)) = (site, rigs.single_mut()) else {
@@ -2466,6 +2555,43 @@ fn point_camera_at_settlement(
                     break 'search;
                 }
             }
+        }
+    }
+
+    // And DIVUS_FACTUS_AIM_GOBLINS points it at a camp instead. Camps are
+    // pitched three hundred meters out and further, so the settlement view
+    // never contains one - which makes photographing them otherwise a matter
+    // of flying the camera by hand and hoping.
+    //
+    // Aims at the MIDDLE of the band rather than at one goblin, so the shot is
+    // of a camp and not of somebody's back.
+    if crate::capture_path().is_some() && std::env::var("DIVUS_FACTUS_AIM_GOBLINS").is_ok() {
+        let green: Vec<Vec3> = camps
+            .iter()
+            .filter(|(_, genome)| genome.species == Species::Goblin)
+            .map(|(transform, _)| transform.translation)
+            .collect();
+        if let Some(first) = green.first() {
+            // One camp's worth: everybody within a camp's own spread of the
+            // first goblin found, so two camps do not average into the empty
+            // ground between them.
+            let band: Vec<Vec3> = green
+                .iter()
+                .copied()
+                .filter(|at| at.distance(*first) < GOBLIN_CAMP_SPREAD * 3.0)
+                .collect();
+            let middle = band.iter().copied().sum::<Vec3>() / band.len() as f32;
+            rig.focus = Vec3::new(middle.x, 0.0, middle.z);
+            rig.target_focus = rig.focus;
+            // CLOSE, and low. A goblin is barely over a meter, so the
+            // settlement's own comfortable standoff renders one about eight
+            // pixels tall; and a steep pitch looks down on the top of a head,
+            // which is the one angle that shows neither the face nor the
+            // silhouette.
+            rig.distance = 15.0;
+            rig.target_distance = 15.0;
+            rig.pitch = 0.24;
+            rig.target_pitch = 0.24;
         }
     }
 }

@@ -23,11 +23,46 @@ pub enum Species {
     Wolf,
     /// Four legs, heavy, short. Stubborn.
     Boar,
+    /// Long legs, long neck, a humped back. The desert's own.
+    Camel,
+    /// Heavy, slow, and not to be argued with. Woods and the north.
+    Bear,
+    /// The same again, bigger and white, and it keeps the far north.
+    PolarBear,
+    /// Upright, small, and it keeps the far SOUTH - see `wildlife::beasts_of`
+    /// for why the two poles get different animals.
+    Penguin,
+    /// Green, short, and it keeps a camp. Wears a loincloth and hunts.
+    Goblin,
 }
 
 impl Species {
+    /// Whether this creature stands on two legs.
+    ///
+    /// NOT the same question as [`Species::is_human`], and keeping them apart
+    /// is what lets a penguin exist. The skeleton is decided here; whether the
+    /// thing wears clothes and grows hair is decided there.
     pub fn is_biped(self) -> bool {
+        matches!(self, Species::Human | Species::Penguin | Species::Goblin)
+    }
+
+    /// Whether this creature is one of the village's own - the only kind that
+    /// has an age, a hairstyle, a hat and a coat.
+    pub fn is_human(self) -> bool {
         matches!(self, Species::Human)
+    }
+
+    /// Whether this creature hunts other creatures.
+    ///
+    /// Was a bare `== Wolf` in three places, which is exactly the shape of
+    /// thing that goes stale the moment a second predator is added - and a bear
+    /// that ambled past a deer without noticing would be the first thing
+    /// anybody saw.
+    pub fn hunts(self) -> bool {
+        matches!(
+            self,
+            Species::Wolf | Species::Bear | Species::PolarBear | Species::Goblin
+        )
     }
 
     #[allow(dead_code)]
@@ -42,6 +77,17 @@ impl Species {
             Species::Deer => 4.2,
             Species::Wolf => 4.8,
             Species::Boar => 2.8,
+            // A camel's walk is unhurried and covers ground anyway.
+            Species::Camel => 3.2,
+            // Bears look slow and are not. Under a wolf, over a boar - fast
+            // enough that walking away from one is a decision.
+            Species::Bear => 3.6,
+            Species::PolarBear => 3.8,
+            // A penguin on land is doing its worst work.
+            Species::Penguin => 1.3,
+            // Quicker than a villager on shorter legs, which is most of what
+            // makes them a nuisance rather than a sight.
+            Species::Goblin => 2.9,
         }
     }
 }
@@ -151,9 +197,13 @@ pub enum Garment {
     Robe,
     /// Torso plus a contrasting sash across the chest.
     Wrap,
+    /// A strip at the hips and nothing else. What goblins wear.
+    Loincloth,
 }
 
 impl Garment {
+    /// What the village wears. The loincloth is deliberately not in it: a
+    /// villager who rolled one would read as a goblin who had wandered in.
     pub const ALL: [Garment; 3] = [Garment::Tunic, Garment::Robe, Garment::Wrap];
 }
 
@@ -246,6 +296,19 @@ pub struct CreatureGenome {
     pub horns: bool,
     /// Whether the creature has a tail.
     pub tail: bool,
+    /// How far a goblin's ears tilt from horizontal, in radians. Positive is
+    /// up, negative is down, zero is straight out the side.
+    ///
+    /// Per individual, because a camp of goblins wearing identical ears reads
+    /// as a row of the same goblin - and the ears are the loudest thing about
+    /// them, so they are the worst part to have in lockstep. Brett: "some have
+    /// ears that are sticking slightly up so I'm having them straight out and
+    /// still have them slightly down."
+    ///
+    /// `serde(default)` because this arrived after saves existed: an old
+    /// genome loads with level ears rather than failing to load at all.
+    #[serde(default)]
+    pub ear_tilt: f32,
 }
 
 impl CreatureGenome {
@@ -331,6 +394,67 @@ impl CreatureGenome {
                 torso_length: rng.trait_value(0.46, 0.55),
                 neck_length: rng.trait_value(0.03, 0.07),
             },
+            // All legs and neck. A camel reads at a distance by being TALLER
+            // than everything around it and narrow with it - the silhouette is
+            // the animal, and on a bare horizon it is all anybody gets.
+            Species::Camel => Proportions {
+                scale: rng.trait_value(0.95, 1.15),
+                build: rng.trait_value(0.35, 0.65),
+                leg_length: rng.trait_value(0.46, 0.54),
+                arm_length: 0.0,
+                head_size: rng.trait_value(0.12, 0.16),
+                torso_length: rng.trait_value(0.34, 0.42),
+                neck_length: rng.trait_value(0.22, 0.30),
+            },
+            // The opposite silhouette: low, long and thick, with a head that
+            // carries. Short legs on a heavy body is the whole read.
+            Species::Bear => Proportions {
+                scale: rng.trait_value(0.9, 1.1),
+                build: rng.trait_value(0.75, 1.0),
+                leg_length: rng.trait_value(0.28, 0.35),
+                arm_length: 0.0,
+                head_size: rng.trait_value(0.20, 0.25),
+                torso_length: rng.trait_value(0.50, 0.58),
+                neck_length: rng.trait_value(0.04, 0.09),
+            },
+            // BIGGER. Brett asked for it by name, and the size is the point:
+            // a polar bear that read as a pale brown bear would be a recolor.
+            // Longer in the body and the neck than its cousin as well as
+            // larger overall, which is what the real difference looks like.
+            Species::PolarBear => Proportions {
+                scale: rng.trait_value(1.05, 1.28),
+                build: rng.trait_value(0.8, 1.0),
+                leg_length: rng.trait_value(0.30, 0.37),
+                arm_length: 0.0,
+                head_size: rng.trait_value(0.17, 0.21),
+                torso_length: rng.trait_value(0.54, 0.62),
+                neck_length: rng.trait_value(0.09, 0.14),
+            },
+            // Upright, and almost all torso: the legs are stubs and the head
+            // sits nearly on the shoulders. The arms are flippers, kept short
+            // enough that the swing reads as a waddle.
+            Species::Penguin => Proportions {
+                scale: rng.trait_value(0.85, 1.15),
+                build: rng.trait_value(0.55, 0.85),
+                leg_length: rng.trait_value(0.14, 0.20),
+                arm_length: rng.trait_value(0.26, 0.34),
+                head_size: rng.trait_value(0.21, 0.26),
+                torso_length: rng.trait_value(0.56, 0.66),
+                neck_length: rng.trait_value(0.01, 0.03),
+            },
+            // A person's plan, wrongly proportioned on purpose: short legs, a
+            // long reach and a head too big for either. Standing beside a
+            // villager it should be obvious that this is NOT one, before the
+            // color is read at all.
+            Species::Goblin => Proportions {
+                scale: rng.trait_value(0.88, 1.08),
+                build: rng.trait_value(0.2, 0.55),
+                leg_length: rng.trait_value(0.26, 0.32),
+                arm_length: rng.trait_value(0.36, 0.44),
+                head_size: rng.trait_value(0.26, 0.32),
+                torso_length: rng.trait_value(0.30, 0.36),
+                neck_length: rng.trait_value(0.01, 0.03),
+            },
         };
 
         let gait = Gait {
@@ -343,6 +467,17 @@ impl CreatureGenome {
                 Species::Deer => rng.trait_value(0.6, 0.95),
                 Species::Wolf => rng.trait_value(0.65, 1.0),
                 Species::Boar => rng.trait_value(0.4, 0.65),
+                // Long legs, slow swing: a camel's walk is a saunter, and a
+                // brisk one on those legs reads as a cartoon.
+                Species::Camel => rng.trait_value(0.34, 0.52),
+                Species::Bear | Species::PolarBear => rng.trait_value(0.30, 0.48),
+                // THE WADDLE. A wide swing on very short legs is exactly the
+                // thing the human arm is kept away from - and on a penguin it
+                // is the whole charm, so it gets the widest swing in the game.
+                Species::Penguin => rng.trait_value(0.9, 1.3),
+                // Scurrying. Wider and faster than a villager's, which reads
+                // as agitation even when they are only crossing a camp.
+                Species::Goblin => rng.trait_value(0.55, 0.85),
             },
             bounce: rng.trait_value(0.012, 0.032),
             sway: rng.trait_value(0.02, 0.07),
@@ -373,11 +508,65 @@ impl CreatureGenome {
                 ramp: palette::RAMP_EARTH,
                 step: rng.range_i(1, 3) as usize,
             },
+            Species::Camel => Tone {
+                ramp: palette::RAMP_SAND,
+                step: rng.range_i(2, 4) as usize,
+            },
+            Species::Bear => Tone {
+                ramp: palette::RAMP_WOOD,
+                step: rng.range_i(0, 2) as usize,
+            },
+            // Not white - nothing in this game is. The snow ramp's upper steps
+            // are a cold off-white, which is what a polar bear actually is
+            // against actual snow: a shade warmer than the ground it stands on.
+            Species::PolarBear => Tone {
+                ramp: palette::RAMP_SNOW,
+                step: rng.range_i(2, 4) as usize,
+            },
+            // The DARK half of the penguin - head and back. Its front is the
+            // `cloth` tone below, which is the one part of the clothing system
+            // an animal still uses: a penguin is the one creature in the world
+            // that really is two-tone.
+            Species::Penguin => Tone {
+                ramp: palette::RAMP_STONE,
+                step: rng.range_i(0, 1) as usize,
+            },
+            // GREEN, off the foliage ramp rather than a color of its own -
+            // this world's greens all come from one family, and a goblin the
+            // palette had never met would read as pasted in. The lower steps,
+            // so they are the dark green of the wood's underside rather than
+            // the bright green of a leaf in the sun.
+            Species::Goblin => Tone {
+                ramp: palette::RAMP_FOLIAGE,
+                // The UPPER steps. The lower ones are the near-black green of
+                // a wood's underside, and a goblin wearing them read as a dark
+                // smudge rather than as a green person - which is the one
+                // thing about them that has to land at a glance.
+                step: rng.range_i(2, 4) as usize,
+            },
         };
 
-        let cloth = Tone {
-            ramp: *rng.pick(palette::CLOTH_RAMPS),
-            step: rng.range_i(1, 4) as usize,
+        let cloth = match species {
+            // A PENGUIN'S FRONT. `cloth` dresses the torso of anything that
+            // stands upright, and the one animal that does is also the one
+            // animal that really is two-tone - so the coat it happens to
+            // inherit from the clothing system is its own white bib, and the
+            // dark `skin` above it is its head and back.
+            Species::Penguin => Tone {
+                ramp: palette::RAMP_BONE,
+                step: rng.range_i(3, 4) as usize,
+            },
+            // Whatever a goblin found. Off the earth and wood ramps, low
+            // steps: this is hide and sacking, not dyed cloth, and it must
+            // never look like something the village wove.
+            Species::Goblin => Tone {
+                ramp: *rng.pick(&[palette::RAMP_EARTH, palette::RAMP_WOOD]),
+                step: rng.range_i(0, 2) as usize,
+            },
+            _ => Tone {
+                ramp: *rng.pick(palette::CLOTH_RAMPS),
+                step: rng.range_i(1, 4) as usize,
+            },
         };
 
         // Accent must not land on the same ramp as the main garment, or trim and
@@ -410,7 +599,11 @@ impl CreatureGenome {
             }
         };
 
-        let human = species.is_biped();
+        // IS_HUMAN, not IS_BIPED, and the difference is a penguin in a hat.
+        // These two questions were the same one while the village was the only
+        // thing that stood upright; the moment something else did, every
+        // hairstyle, coat and satchel in the wardrobe was offered to it.
+        let human = species.is_human();
 
         CreatureGenome {
             species,
@@ -435,10 +628,14 @@ impl CreatureGenome {
             } else {
                 Headwear::None
             },
-            garment: if human {
-                *rng.pick(&Garment::ALL)
-            } else {
-                Garment::Tunic
+            garment: match species {
+                // A goblin wears one thing and it is always the same thing.
+                // That uniformity is the point: a village is a crowd of
+                // individuals and a camp is a pack, and the clothing says so
+                // before anybody moves.
+                Species::Goblin => Garment::Loincloth,
+                _ if human => *rng.pick(&Garment::ALL),
+                _ => Garment::Tunic,
             },
             belt: human && rng.chance(0.45),
             trousers: human && rng.chance(0.5),
@@ -448,7 +645,13 @@ impl CreatureGenome {
                 Species::Boar => rng.chance(0.8),
                 _ => false,
             },
-            tail: species != Species::Human,
+            // Everything that is not one of the village's own has a tail -
+            // except the penguin, whose tail at this scale is a smudge on the
+            // back of a bird that is already mostly torso.
+            tail: !species.is_human() && species != Species::Penguin,
+            // A wide spread, and deliberately not centered on level: more of
+            // them prick up than droop, so a camp reads as alert.
+            ear_tilt: rng.trait_value(-0.25, 0.75),
         }
     }
 
@@ -566,6 +769,7 @@ impl CreatureGenome {
             satchel: false,
             horns: if rng.chance(0.5) { a.horns } else { b.horns },
             tail: a.tail,
+            ear_tilt: (a.ear_tilt + b.ear_tilt) * 0.5,
         }
     }
 
@@ -577,6 +781,22 @@ impl CreatureGenome {
             Species::Deer => 1.5,
             Species::Wolf => 1.0,
             Species::Boar => 0.95,
+            // Taller than a person, which is the whole of what a camel is on a
+            // flat horizon.
+            Species::Camel => 2.1,
+            // At the shoulder, on all fours - a bear standing up would be half
+            // again this, and standing up is not something the rig does.
+            Species::Bear => 1.35,
+            // AND THE BIGGEST THING THAT WALKS. Brett: "bigger polar bears!"
+            // Half again a brown bear before its own scale roll, which on top
+            // of a larger scale range makes the largest of them near enough
+            // twice the animal - and taller at the shoulder than a villager is
+            // tall.
+            Species::PolarBear => 1.95,
+            Species::Penguin => 0.8,
+            // SHORTER THAN A VILLAGER, and by enough to read instantly when
+            // one is standing next to one. Two thirds of a person.
+            Species::Goblin => 1.15,
         };
         // Age scales the finished height rather than being folded into `scale`, so
         // an inherited `scale` always means "size as an adult". Otherwise a child's

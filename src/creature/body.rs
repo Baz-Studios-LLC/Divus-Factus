@@ -11,7 +11,7 @@
 
 use bevy::prelude::*;
 
-use super::genome::{CreatureGenome, Garment, HairStyle, Headwear, Tone};
+use super::genome::{CreatureGenome, Garment, HairStyle, Headwear, Species, Tone};
 use crate::palette;
 
 /// Shared mesh and material handles for every creature in the world.
@@ -222,6 +222,61 @@ fn spawn_head_features(
 ) {
     let hair = genome.hair;
 
+    // EARS, out of the sides of the head, and only goblins have them.
+    //
+    // Brett: "Can we give them ears in the side of their heads, that could help
+    // differentiate them." It does more than help - it is the only cue that
+    // survives the distance the game is actually played at. Green reads at ten
+    // meters and is gone by fifty; a SILHOUETTE reads as far as the figure
+    // does, and a head with points on it is a different animal at any range.
+    //
+    // Tapered in two blocks rather than one, so they come to something like a
+    // point without needing a mesh of their own, and angled up and back so the
+    // outline is a sweep instead of a pair of handles.
+    if genome.species == Species::Goblin {
+        for side in [-1.0f32, 1.0] {
+            let ear = commands
+                .spawn((
+                    Name::new("Ear"),
+                    // HALF A HEAD UP, which is the MIDDLE of the side of it.
+                    // `spawn_part` hangs the head's box half its own size above
+                    // the joint, so the head entity's origin sits at the chin -
+                    // and ears placed at a small y came out level with the jaw.
+                    // Brett: "let's have the ears come out of the middle of the
+                    // side of the head."
+                    // `side * tilt` and not `tilt`: the left ear points down
+                    // its own -X, so the same signed angle would send one ear
+                    // up and the other down. Multiplied by the side, a positive
+                    // tilt lifts both.
+                    Transform::from_xyz(side * head_size * 0.5, head_size * 0.5, 0.0)
+                        .with_rotation(Quat::from_rotation_z(side * genome.ear_tilt)),
+                    Visibility::default(),
+                    ChildOf(head),
+                ))
+                .id();
+            // The base, sunk into the skull so no gap opens as the head turns.
+            spawn_block(
+                commands,
+                assets,
+                ear,
+                Vec3::new(side * head_size * 0.16, 0.0, 0.0),
+                Vec3::new(head_size * 0.42, head_size * 0.30, head_size * 0.16),
+                genome.skin,
+                "Ear",
+            );
+            // And the tip, narrower and further out.
+            spawn_block(
+                commands,
+                assets,
+                ear,
+                Vec3::new(side * head_size * 0.46, head_size * 0.05, 0.0),
+                Vec3::new(head_size * 0.30, head_size * 0.16, head_size * 0.10),
+                genome.skin.shifted(-1),
+                "Ear Tip",
+            );
+        }
+    }
+
     match genome.hair_style {
         HairStyle::Bald => {}
 
@@ -401,6 +456,23 @@ fn spawn_garment_features(
                 Vec3::new(torso_w * 1.34, skirt_len, torso_d * 1.5),
                 genome.cloth.shifted(-1),
                 "Robe",
+            );
+        }
+
+        Garment::Loincloth => {
+            // A band at the hips and nothing above it, so the torso stays bare
+            // and the green shows. Short, and narrow enough that the legs swing
+            // clear of it - a goblin's stride is its own tell and must not be
+            // buried in cloth.
+            let strip = leg_len * 0.26;
+            spawn_block(
+                commands,
+                assets,
+                body,
+                Vec3::new(0.0, leg_len - strip * 0.4, 0.0),
+                Vec3::new(torso_w * 1.12, strip, torso_d * 1.18),
+                genome.cloth,
+                "Loincloth",
             );
         }
 

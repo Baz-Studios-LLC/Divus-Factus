@@ -303,6 +303,11 @@ pub fn spawn_creature(
                 Species::Deer => "Deer",
                 Species::Wolf => "Wolf",
                 Species::Boar => "Boar",
+                Species::Camel => "Camel",
+                Species::Bear => "Bear",
+                Species::PolarBear => "Polar Bear",
+                Species::Penguin => "Penguin",
+                Species::Goblin => "Goblin",
             }),
             Creature,
             Transform::from_translation(position).with_rotation(Quat::from_rotation_y(facing)),
@@ -314,6 +319,14 @@ pub fn spawn_creature(
             crate::hand::PickRadius(pick_radius),
         ))
         .id();
+
+    // THE HUNTING TAG, hung here so that everything born a hunter is one
+    // without any system having to know a list of species. What is on the
+    // entity is the authority from this point on: take it off and the creature
+    // stops hunting, whatever it was born as.
+    if genome.species.hunts() {
+        commands.entity(root).insert(wildlife::Predator);
+    }
 
     let rig = build_body(commands, assets, root, &genome);
     commands.entity(root).insert((genome, rig));
