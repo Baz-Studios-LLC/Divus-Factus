@@ -16,6 +16,7 @@
 //! somebody died here belongs to that.
 
 use bevy::prelude::*;
+use bevy::render::mesh::{Indices, PrimitiveTopology};
 
 /// A fleck of blood in the air.
 #[derive(Component)]
@@ -84,7 +85,8 @@ struct BloodStuff {
     fleck: Handle<StandardMaterial>,
     stain: Handle<StandardMaterial>,
     cube: Handle<Mesh>,
-    puddle: Handle<Mesh>,
+    /// The spatter shapes, dealt out by a wound's own position.
+    puddles: Vec<Handle<Mesh>>,
 }
 
 pub struct BloodPlugin;
@@ -126,15 +128,97 @@ fn stuff(
             ..default()
         }),
         cube: meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
-        puddle: meshes.add(Cuboid::new(1.0, 0.02, 1.0)),
+        puddles: (0..SPATTER_SHAPES)
+            .map(|i| meshes.add(spatter(i as u64)))
+            .collect(),
     };
     commands.insert_resource(BloodStuff {
         fleck: made.fleck.clone(),
         stain: made.stain.clone(),
         cube: made.cube.clone(),
-        puddle: made.puddle.clone(),
+        puddles: made.puddles.clone(),
     });
     Some(made)
+}
+
+/// How many spatter shapes are cut, once, and dealt out to every wound
+/// afterward.
+///
+/// Six is plenty. A stain is also randomly turned and scaled where it is
+/// spawned, so six shapes give far more than six distinct marks - and it
+/// costs six meshes for the life of the program rather than one per death.
+const SPATTER_SHAPES: usize = 6;
+
+/// One spatter: a blot where the blood pooled, and the specks it threw.
+///
+/// THE FIRST CUT OF THIS WAS A SQUARE. One flat unit cube, scaled - which on
+/// the ground reads as exactly what it is. Brett: "the blood doesn't look
+/// like blood splatter, it looks like a red square, lol."
+///
+/// This world is made of boxes and the blood should be too, so the answer is
+/// not a decal texture - it is MORE boxes, of uneven size and angle: a few
+/// broad quads overlapping off-center for the body of it, then a scatter of
+/// small ones thrown clear. All of it in one mesh, so a spatter still costs
+/// a single draw.
+///
+/// The quads are stacked in tiny y increments because they are otherwise
+/// coplanar and would argue over depth. Blending them over one another is
+/// deliberate: where they overlap the mark is darker, which is what a thick
+/// part of a puddle looks like.
+fn spatter(seed: u64) -> Mesh {
+    let mut rng = crate::rng::Rng::stream(seed, "spatter");
+    let mut positions: Vec<[f32; 3]> = Vec::new();
+    let mut normals: Vec<[f32; 3]> = Vec::new();
+    let mut uvs: Vec<[f32; 2]> = Vec::new();
+    let mut indices: Vec<u32> = Vec::new();
+
+    let mut quad = |center: Vec2, half: Vec2, yaw: f32, lift: f32| {
+        let (sin, cos) = yaw.sin_cos();
+        let turn = |x: f32, z: f32| Vec2::new(x * cos - z * sin, x * sin + z * cos);
+        let base = positions.len() as u32;
+        for (dx, dz) in [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
+            let at = center + turn(dx * half.x, dz * half.y);
+            positions.push([at.x, lift, at.y]);
+            normals.push([0.0, 1.0, 0.0]);
+            uvs.push([(dx + 1.0) * 0.5, (dz + 1.0) * 0.5]);
+        }
+        indices.extend([base, base + 2, base + 1, base, base + 3, base + 2]);
+    };
+
+    // THE BODY. Overlapping and off-center, so no edge of it is straight and
+    // the whole thing has no middle to speak of.
+    let mut lift = 0.0;
+    for _ in 0..4 {
+        let off = Vec2::new(rng.range(-0.22, 0.22), rng.range(-0.22, 0.22));
+        let half = Vec2::new(rng.range(0.26, 0.46), rng.range(0.24, 0.42));
+        quad(off, half, rng.range(0.0, std::f32::consts::TAU), lift);
+        lift += 0.004;
+    }
+
+    // WHAT IT THREW. Smaller the further out it went, and thrown to one side
+    // rather than in a ring - blood comes off a body in a direction.
+    let heading = rng.range(0.0, std::f32::consts::TAU);
+    for _ in 0..rng.range_i(10, 17) {
+        let out = rng.range(0.55, 2.1);
+        let angle = heading + rng.gaussian() * 0.7;
+        let (sin, cos) = angle.sin_cos();
+        let at = Vec2::new(cos * out, sin * out);
+        // Far specks are small, and none of them is square.
+        let scale = (1.5 - out * 0.55).max(0.14);
+        let half = Vec2::new(rng.range(0.05, 0.13) * scale, rng.range(0.04, 0.10) * scale);
+        quad(at, half, rng.range(0.0, std::f32::consts::TAU), lift);
+        lift += 0.004;
+    }
+
+    let mut mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        bevy::asset::RenderAssetUsages::MAIN_WORLD | bevy::asset::RenderAssetUsages::RENDER_WORLD,
+    );
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    mesh.insert_indices(Indices::U32(indices));
+    mesh
 }
 
 /// A wound throws blood, and leaves a mark where it was taken.
@@ -206,14 +290,24 @@ fn wounds_bleed(
                 born: clock.elapsed,
                 spread,
             },
-            Mesh3d(kit.puddle.clone()),
+            // WHICH shape, chosen off the ground it was spilled on, so the
+            // same spot always bleeds the same way and a reloaded save does
+            // not rearrange its dead.
+            Mesh3d(
+                kit.puddles[(crate::rng::hash_2d((at.x * 8.0) as i32, (at.z * 8.0) as i32, 0x1005)
+                    as usize)
+                    % kit.puddles.len()]
+                .clone(),
+            ),
             MeshMaterial3d(kit.stain.clone()),
             // FLAT, and seated by the globe. A stain spawned at a
             // `GlobalTransform` would sit on a sphere of radius six thousand
             // and nowhere near the body that bled.
             Transform::from_translation(Vec3::new(at.x, ground + 0.03, at.z))
                 .with_rotation(Quat::from_rotation_y(at.x + at.z))
-                .with_scale(Vec3::new(spread, 1.0, spread * 0.8)),
+                // Evenly, now. The shape is already lopsided; squashing it on
+                // one axis as well only made the square look like a rectangle.
+                .with_scale(Vec3::splat(spread)),
             crate::globe::RigidlySeated,
             bevy::light::NotShadowCaster,
         ));
@@ -270,7 +364,7 @@ fn stains_fade(
         // sixty percent per second, and the mark is a speck before anybody
         // looks at it.
         let shrink = dried(age as f32, stain.spread);
-        at.scale = Vec3::new(shrink, 1.0, shrink * 0.8);
+        at.scale = Vec3::splat(shrink);
     }
 }
 
@@ -280,6 +374,55 @@ mod tests {
 
     /// A stain outlives the fight and is gone the next day, which is what
     /// makes it worth having: the morning after tells you what happened.
+    #[test]
+    /// The mark is a SPATTER and not a square. This is pinned because the
+    /// first cut of it really was one flat unit cube, and on the ground that
+    /// reads as exactly what it is - Brett: "it looks like a red square, lol."
+    #[test]
+    fn a_stain_is_not_a_square() {
+        for seed in 0..SPATTER_SHAPES as u64 {
+            let mesh = spatter(seed);
+            let Some(bevy::render::mesh::VertexAttributeValues::Float32x3(points)) =
+                mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+            else {
+                panic!("a spatter has no points");
+            };
+
+            // Many pieces, not one.
+            assert!(
+                points.len() >= 40,
+                "spatter {seed} is only {} corners - too few to be anything but a slab",
+                points.len()
+            );
+
+            // And the pieces are of different sizes. Four quads of one size
+            // in a row would be a tiled square, which is a square.
+            let mut areas: Vec<f32> = Vec::new();
+            for quad in points.chunks(4) {
+                let wide = (quad[1][0] - quad[0][0]).hypot(quad[1][2] - quad[0][2]);
+                let deep = (quad[3][0] - quad[0][0]).hypot(quad[3][2] - quad[0][2]);
+                areas.push(wide * deep);
+            }
+            let biggest = areas.iter().copied().fold(0.0f32, f32::max);
+            let smallest = areas.iter().copied().fold(f32::MAX, f32::min);
+            assert!(
+                biggest > smallest * 8.0,
+                "spatter {seed} is all one size ({smallest:.4} to {biggest:.4}) - \
+                 a pool and the specks it threw should not measure the same"
+            );
+
+            // It reaches further than its own body: something was thrown.
+            let furthest = points
+                .iter()
+                .map(|p| p[0].hypot(p[2]))
+                .fold(0.0f32, f32::max);
+            assert!(
+                furthest > 0.8,
+                "spatter {seed} never got past its own puddle ({furthest:.2})"
+            );
+        }
+    }
+
     #[test]
     fn a_stain_dries_without_blinking_out() {
         let fresh = dried(0.0, 1.0);
@@ -294,5 +437,50 @@ mod tests {
         // Past its day it is clamped rather than inverted, because the clock
         // and not the curve is what despawns it.
         assert_eq!(dried(4.0, 1.0), dried(1.0, 1.0));
+    }
+}
+
+#[cfg(test)]
+mod look {
+    use super::*;
+
+    /// Prints the shapes as a picture, for a human to judge. Ignored: this is
+    /// a look at the thing, not a check on it.
+    #[test]
+    #[ignore]
+    fn draw_the_spatter() {
+        for seed in 0..2u64 {
+            let mesh = spatter(seed);
+            let Some(bevy::render::mesh::VertexAttributeValues::Float32x3(points)) =
+                mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+            else {
+                continue;
+            };
+            let mut grid = [[b' '; 73]; 37];
+            // Walk each quad in its OWN space and transform out, so a
+            // rotated quad draws rotated. Rasterizing its bounding box
+            // instead drew every one of them axis-aligned, which made the
+            // whole spatter look like the square it is not.
+            for quad in points.chunks(4) {
+                let o = Vec2::new(quad[0][0], quad[0][2]);
+                let u = Vec2::new(quad[1][0], quad[1][2]) - o;
+                let v = Vec2::new(quad[3][0], quad[3][2]) - o;
+                let steps = ((u.length() + v.length()) * 90.0) as i32;
+                for i in 0..=steps {
+                    for j in 0..=steps {
+                        let at = o + u * (i as f32 / steps as f32) + v * (j as f32 / steps as f32);
+                        let col = ((at.x + 1.8) / 3.6 * 72.0).round() as i32;
+                        let row = ((at.y + 1.8) / 3.6 * 36.0).round() as i32;
+                        if (0..73).contains(&col) && (0..37).contains(&row) {
+                            grid[row as usize][col as usize] = b'#';
+                        }
+                    }
+                }
+            }
+            println!("--- spatter {seed} ---");
+            for row in grid {
+                println!("{}", String::from_utf8_lossy(&row).trim_end());
+            }
+        }
     }
 }
