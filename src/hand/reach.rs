@@ -42,11 +42,9 @@ pub struct ShowTheReach(pub bool);
 
 impl Default for ShowTheReach {
     fn default() -> Self {
-        // ON FOR NOW, while this is being got right - Brett: "Lets make on
-        // the default state for now for testing though." It goes back to off
-        // once it has been seen working, which is what the settings switch is
-        // for.
-        ShowTheReach(true)
+        // Off, except that an unattended capture has no settings screen to
+        // click - `DIVUS_FACTUS_REACH=1` is how the ring gets photographed.
+        ShowTheReach(std::env::var("DIVUS_FACTUS_REACH").is_ok())
     }
 }
 
@@ -56,6 +54,31 @@ struct ReachRing;
 
 /// Segments around the ring.
 const AROUND: usize = 64;
+
+/// The ring's color. Brett: "we want it to be angelic and etherial."
+///
+/// A warm pale gold rather than the cold blue this started as - blue reads as
+/// magic, and gold near white reads as light. It is over 1.0 on every channel
+/// because the god's camera is HDR with bloom hanging off it, and that bloom
+/// is where the glow actually comes from: the ring is a soft thing seen
+/// through its own halo rather than a bright thing with a hard edge.
+const ANGELIC: [f32; 3] = [1.7, 1.52, 1.15];
+
+/// How far the shaft stands off the rim, as a fraction of the radius.
+///
+/// Tied to the radius rather than fixed, so a ring the size of a house is not
+/// wearing the same inch of haze a ring the size of a person is.
+const SMOKE_RISES: f32 = 1.9;
+
+/// How much wider the shaft is at the top than the ring is at the ground.
+///
+/// A GOD RAY, which is a cone standing on the circle rather than a wall
+/// around it - Brett: "maybe a god ray coming from the hand to it...
+/// something impressive but subtle if that make sense." Flaring upward is
+/// what makes it read as light arriving from somewhere above rather than as
+/// smoke leaving the ground. The hand hangs over the cursor, so the shaft
+/// points at it without having to know where it is.
+const FLARE: f32 = 1.5;
 
 /// Where the band's inner edge is, as a fraction of the radius.
 ///
@@ -89,14 +112,6 @@ const CLEARANCE: f32 = 0.45;
 /// that large pushes the fragment's depth out of the buffer's range entirely
 /// and the test can never pass, which is its own way of drawing nothing.
 const OVER_THE_WORLD: f32 = 8.0;
-
-/// TEMPORARY: how many times its true size the ring is drawn at.
-///
-/// Brett, while we get this seen at all: "Try making it way bigger for now to
-/// test too." MUST GO BACK TO 1.0 - the whole claim the ring makes is that it
-/// is exactly what the hand would take, and at six times that it is a lie
-/// that happens to be easy to find.
-const TESTING_BIGGER: f32 = 6.0;
 
 /// How far the cursor must move before the ring is rebuilt, in meters.
 ///
@@ -158,8 +173,7 @@ fn draw_the_reach(
 
     // EXACTLY WHAT THE HAND WOULD TAKE - the same number the pick itself
     // uses, or the ring is a lie that still looks right.
-    let radius =
-        super::forgiveness_at(rigs.single().map_or(80.0, |rig| rig.distance)) * TESTING_BIGGER;
+    let radius = super::forgiveness_at(rigs.single().map_or(80.0, |rig| rig.distance));
     let ground = terrain.base_height_at(at.x, at.z);
     let seat = Vec3::new(at.x, ground, at.z);
 
@@ -220,19 +234,19 @@ fn draw_the_reach(
 
 /// A flat band around `seat`, every corner bent onto the sphere.
 fn paint_the_ring(terrain: &crate::terrain::Terrain, seat: Vec3, radius: f32) -> Mesh {
-    let mut positions: Vec<[f32; 3]> = Vec::with_capacity((AROUND + 1) * 2);
-    let mut normals: Vec<[f32; 3]> = Vec::with_capacity((AROUND + 1) * 2);
-    let mut uvs: Vec<[f32; 2]> = Vec::with_capacity((AROUND + 1) * 2);
+    let mut positions: Vec<[f32; 3]> = Vec::with_capacity((AROUND + 1) * 3);
+    let mut normals: Vec<[f32; 3]> = Vec::with_capacity((AROUND + 1) * 3);
+    let mut uvs: Vec<[f32; 2]> = Vec::with_capacity((AROUND + 1) * 3);
     // Per-corner alpha: faint across the disc, bright at the rim. A hard band
     // of one strength reads as a decal somebody stuck on the grass; a disc
     // that gathers into its edge reads as light lying on the ground.
     let mut tints: Vec<[f32; 4]> = Vec::with_capacity((AROUND + 1) * 2);
-    let mut indices: Vec<u32> = Vec::with_capacity(AROUND * 6);
+    let mut indices: Vec<u32> = Vec::with_capacity(AROUND * 12);
 
     for i in 0..=AROUND {
         let angle = i as f32 / AROUND as f32 * std::f32::consts::TAU;
         let (sin, cos) = angle.sin_cos();
-        let mut corner = |reach: f32, glow: f32| {
+        let mut corner = |reach: f32, glow: f32, rise: f32| {
             let x = seat.x + cos * reach;
             let z = seat.z + sin * reach;
             // `height_at`, the same as the survey sheet - this has to be the
@@ -243,17 +257,23 @@ fn paint_the_ring(terrain: &crate::terrain::Terrain, seat: Vec3, radius: f32) ->
             // directly under the player's eye, and those are warm.
             let y = terrain.height_at(x, z) + CLEARANCE;
             let (bent, turn) = crate::globe::bend_frame(Vec3::new(x, y, z));
-            positions.push(bent.to_array());
+            positions.push((bent + turn * Vec3::Y * rise).to_array());
             normals.push((turn * Vec3::Y).to_array());
             uvs.push([i as f32 / AROUND as f32, 0.0]);
-            tints.push([0.62, 0.88, 1.0, glow]);
+            tints.push([ANGELIC[0], ANGELIC[1], ANGELIC[2], glow]);
         };
-        // Solid for now, both edges. The fade goes back on with the alpha.
-        corner(radius * BAND, 1.0);
-        corner(radius, 1.0);
+        // Faint across the disc and gathering into the rim, then smoke
+        // standing on the rim and gone by the top of it. Three rings of
+        // corners, so the alpha does all the shaping and the material stays
+        // the plain unlit one that is known to work.
+        corner(radius * BAND, 0.07, 0.0);
+        // The rim is where the shaft lands, so it is the brightest thing
+        // here - but only just. Subtle was the whole brief.
+        corner(radius, 0.30, 0.0);
+        corner(radius * FLARE, 0.0, radius * SMOKE_RISES);
 
         if i < AROUND {
-            let base = i as u32 * 2;
+            let base = i as u32 * 3;
             // WOUND TO FACE UP. This was the other way round, which points
             // every triangle at the ground - and a back face is culled, so
             // the ring was drawn, correctly placed, thirty-five units in
@@ -263,7 +283,11 @@ fn paint_the_ring(terrain: &crate::terrain::Terrain, seat: Vec3, radius: f32) ->
             // winds its quads `[a, c, b, a, d, c]`. Mine did not, and that
             // one transposition is what survived four attempts, a rewrite,
             // and every other difference being eliminated.
-            indices.extend([base, base + 3, base + 1, base, base + 2, base + 3]);
+            // The disc, wound face-up.
+            indices.extend([base, base + 4, base + 1, base, base + 3, base + 4]);
+            // And the smoke standing on its rim. Both faces, so it reads from
+            // any bearing - see `cull_mode` above.
+            indices.extend([base + 1, base + 5, base + 2, base + 1, base + 4, base + 5]);
         }
     }
 
