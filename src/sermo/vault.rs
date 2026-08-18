@@ -137,6 +137,12 @@ pub struct Vault {
 impl Vault {
     /// The connection, however the lock is doing. A poisoned mutex here means
     /// a thread died mid-query, and the words are still perfectly readable.
+    /// The connection, alone.
+    ///
+    /// THE ONE PLACE THAT LOCKS, and nothing called while the guard is alive
+    /// may take `&self` again — a plain `Mutex` is not re-entrant and the
+    /// second take never returns. Work that has to run under the guard takes
+    /// the connection, like [`tags_on`], so that it cannot lock at all.
     fn held(&self) -> std::sync::MutexGuard<'_, Connection> {
         self.db.lock().unwrap_or_else(|held| held.into_inner())
     }
@@ -363,9 +369,16 @@ impl Vault {
         }
         // The register wall. Cheaper as a second pass over the few lines that
         // survived the division than as more SQL, and far easier to read.
+        //
+        // ON THE CONNECTION ALREADY IN HAND. This pass ran through `tags_of`
+        // once, which takes the lock again - and this lock is not re-entrant,
+        // so the second take never returned. Nothing failed: the game simply
+        // STOPPED, the first time anybody prayed, because the register wall is
+        // what a prayer is. The test for this rule hung instead of failing,
+        // which is how it sat unnoticed.
         let mut kept = Vec::with_capacity(found.len());
         for line in found {
-            let tags = self.tags_of(line.id)?;
+            let tags = tags_on(&db, line.id)?;
             if must.iter().all(|need| tags.iter().any(|tag| tag == need)) {
                 kept.push(line);
             }
@@ -375,10 +388,7 @@ impl Vault {
 
     /// Every tag one line carries.
     pub fn tags_of(&self, line: u64) -> rusqlite::Result<Vec<String>> {
-        let db = self.held();
-        let mut ask = db.prepare_cached("SELECT tag FROM line_tag WHERE line = ?1")?;
-        ask.query_map([line as i64], |row| row.get(0))?
-            .collect::<rusqlite::Result<Vec<String>>>()
+        tags_on(&self.held(), line)
     }
 
     /// Every tag in the vault, and how many lines wear it.
@@ -400,6 +410,18 @@ impl Vault {
             .filter(|(tag, _)| !tag.is_empty())
             .collect())
     }
+}
+
+/// Every tag one line carries, on a connection already in hand.
+///
+/// A free function rather than a method BY DESIGN: it is called from inside
+/// [`Vault::eligible`], which is holding the lock, and anything that could take
+/// `&self` there is a deadlock waiting for the first prayer. Taking the
+/// connection makes locking twice impossible to write.
+fn tags_on(db: &Connection, line: u64) -> rusqlite::Result<Vec<String>> {
+    let mut ask = db.prepare_cached("SELECT tag FROM line_tag WHERE line = ?1")?;
+    ask.query_map([line as i64], |row| row.get(0))?
+        .collect::<rusqlite::Result<Vec<String>>>()
 }
 
 #[cfg(test)]
