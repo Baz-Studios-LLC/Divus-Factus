@@ -460,6 +460,30 @@ impl Tongue {
         slots: &[(&str, &str)],
         must: &[&str],
     ) -> Option<String> {
+        // THE VILLAGE'S NAME IS A SLOT, not a fact to be quoted.
+        //
+        // A generated line came back reading "That is good news for Shutel."
+        // Shutel is this run's settlement, so that line is false in every
+        // other village - and it got in because I started SENDING the
+        // settlement without giving it a slot to collapse into. A fact sent is
+        // a fact that must be pinned; this is the pin.
+        //
+        // `{place}` has existed in the corpus all along with nothing supplying
+        // it. Supplied here, one place for all three voices: the model may use
+        // the name, `slot_the_names` turns it back into `{place}` on the way
+        // to the vault, and authored lines may finally use it too.
+        let home = self
+            .dossiers
+            .get(&Entity::try_from_bits(speaker).unwrap_or(Entity::PLACEHOLDER))
+            .and_then(|who| who.settlement.clone());
+        let mut with_place: Vec<(&str, &str)> = slots.to_vec();
+        if let Some(home) = home.as_deref()
+            && !with_place.iter().any(|(key, _)| *key == "place")
+        {
+            with_place.push(("place", home));
+        }
+        let slots: &[(&str, &str)] = &with_place;
+
         let written = |me: &mut Self| {
             if must.is_empty() {
                 me.voice.pick(speaker, tags, slots, &mut me.dice)

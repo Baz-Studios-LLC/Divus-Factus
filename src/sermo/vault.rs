@@ -123,11 +123,17 @@ pub struct Candidate {
 /// but not `Sync`, and a Bevy resource must be both. Nothing contends for it -
 /// one system speaks to the vault at a time - so the lock costs nothing and
 /// buys the whole thing a place in the ECS.
-#[allow(dead_code)]
 pub struct Vault {
     db: std::sync::Mutex<Connection>,
 }
 
+// `bake`, `open` and `tag_census` are the next two pieces of this pipeline -
+// compiling the authored corpus into a shippable vault, and the coverage
+// report. They are written, tested, and not yet called by the running game.
+// Deleting them to quiet a warning would mean writing them twice; the allow
+// goes here rather than on the struct, which is where I put it first and which
+// covers the fields and not the methods.
+#[allow(dead_code)]
 impl Vault {
     /// The connection, however the lock is doing. A poisoned mutex here means
     /// a thread died mid-query, and the words are still perfectly readable.

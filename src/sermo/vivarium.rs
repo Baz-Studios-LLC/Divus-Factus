@@ -103,6 +103,21 @@ struct Moment {
     facts: SocialTruth,
     #[serde(skip_serializing_if = "Option::is_none")]
     heard: Option<String>,
+    /// LINES ALREADY WRITTEN FOR THIS SHAPE OF MOMENT, so the model can avoid
+    /// them.
+    ///
+    /// Brett's run produced three near-identical wolf lines and two prayers
+    /// that both began "steady my heart" - because nothing told the model what
+    /// it had already said. Variety is the entire reason this system exists:
+    /// "the same event may have a lot of different lines. We want to make sure
+    /// that the user doesn't see repeated lines as much as possible."
+    ///
+    /// Rejecting duplicates afterwards would only waste the call. Sending them
+    /// is what the model's context window is FOR - Brett: "we do have a
+    /// massive context on the model we are using, we can pass whatever we need
+    /// to."
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    already_said: Vec<String>,
 }
 
 /// Descriptive simulation truth for the writer. Unlike `tags`, these facts
@@ -196,6 +211,7 @@ impl Moment {
         };
         let world_facts = world_facts(&tags);
         Moment {
+            already_said: Vec::new(),
             speaker,
             register,
             tags,
@@ -306,6 +322,9 @@ pub struct Vivarium {
     ready: Vec<ReadyLine>,
     pending: HashSet<String>,
     exhausted: HashSet<String>,
+    /// Every line already written for each shape of moment, so the next
+    /// request can be told not to write them again. See `Moment::already_said`.
+    said_before: HashMap<String, Vec<String>>,
     log: PathBuf,
 }
 
@@ -349,6 +368,7 @@ impl Vivarium {
             ready: Vec::new(),
             pending: HashSet::new(),
             exhausted: HashSet::new(),
+            said_before: HashMap::new(),
             log,
         })
     }
@@ -378,8 +398,16 @@ impl Vivarium {
         facts: SocialTruth,
     ) -> Option<String> {
         self.drain();
-        let moment = Moment::new(speaker, tags, slots, heard, facts);
+        let mut moment = Moment::new(speaker, tags, slots, heard, facts);
         let key = moment.key();
+        // What this shape of moment has already been given. Capped: a hundred
+        // is plenty to steer away from and far short of anything the context
+        // would notice.
+        moment.already_said = self
+            .said_before
+            .get(&key)
+            .map(|said| said.iter().rev().take(100).cloned().collect())
+            .unwrap_or_default();
         if let Some(candidate) = self.cache.remove(&key) {
             // Asked again straight away, so the next moment of this shape has
             // a fresh line waiting rather than starting from silence.
@@ -455,6 +483,12 @@ impl Vivarium {
             self.pending.remove(&result.key);
             match result.answer {
                 Ok(candidate) => {
+                    // Remembered against this shape of moment, so the next
+                    // request for it is told not to write this again.
+                    self.said_before
+                        .entry(result.key.clone())
+                        .or_default()
+                        .push(candidate.text.clone());
                     self.cache.insert(result.key.clone(), candidate.clone());
                     self.ready.push(ReadyLine {
                         speaker: result.moment.speaker,
@@ -604,7 +638,7 @@ fn request_candidate(
                 "role": "developer",
                 "content": [{
                     "type": "input_text",
-                    "text": "You write candidate dialogue for a medieval village simulation. Return only the required JSON. The truth packet is complete: never introduce a person, object, event, motive, relationship, place, weather, time of day, or condition it does not contain. This is a village of ten to forty people with no lord, no king, no coin and no market; it has a longhouse, huts, a shrine, a storehouse, fields, a mine, a dock and a tavern, and it elects a mayor only once a town hall stands. Never mention a rank, trade, building or custom the packet has not named. `speaker_is` gives the speaker's pronoun - use it and never guess. One tag says how the speaker knows: `saw` means THEY witnessed it themselves, `heard` means somebody told them, and `distant` means it has been round the village several times. Write from the one you are given: with `heard` do not claim to have seen it, and with `saw` do not attribute it to somebody else. `world_facts` and `topic_facts` are the plain meanings of engine state; never repeat an engine tag or label in the line. When present, `conversation_intent` says what this beat is trying to do. Fulfill it naturally, without describing the intent. Ordinary American English, sentence case, one or two short sentences, eighteen words maximum. Concrete everyday speech; no poetry, archaic diction, modern slang, narration, stage direction, or explanation. Thoughts are first-person private thoughts, never third-person narration or stat readouts. Generated names are private context: do not use them in the returned text. Use 'the god' if the god is genuinely relevant; the game will render the current name. Only the `prayer` register may address or ask the god directly. `chat:*`, `reply`, `tell`, and `muse` are never prayers and must not address the god. A reply reacts directly to the quoted speech if present. Use ordinary work words: foresters speak of woods, trees, timber, and felling; miners of quarry, rock, stone, and veins; farmers of fields, crops, soil, and harvest; builders of houses, walls, timber, and roofs; hunters of woods, trails, and game; fishers of rivers, shores, and nets. Never call a person a cutter or call their work 'my cutting'. Never say morale, wavering, muse, trait, or the raw event labels Delivered, Uprooted, Perished, Flourished, Beckoned, or DoubtSown. `tags` must be a nonempty subset of the supplied tags and include the register. `grounding` lists only supplied tags or fact fields that shaped the sentence."
+                    "text": "You write candidate dialogue for a medieval village simulation. Return only the required JSON. The truth packet is complete: never introduce a person, object, event, motive, relationship, place, weather, time of day, or condition it does not contain. This is a village of ten to forty people with no lord, no king, no coin and no market; it has a longhouse, huts, a shrine, a storehouse, fields, a mine, a dock and a tavern, and it elects a mayor only once a town hall stands. Never mention a rank, trade, building or custom the packet has not named. `speaker_is` gives the speaker's pronoun - use it and never guess. One tag says how the speaker knows: `saw` means THEY witnessed it themselves, `heard` means somebody told them, and `distant` means it has been round the village several times. Write from the one you are given: with `heard` do not claim to have seen it, and with `saw` do not attribute it to somebody else. `world_facts` and `topic_facts` are the plain meanings of engine state; never repeat an engine tag or label in the line. When present, `conversation_intent` says what this beat is trying to do. Fulfill it naturally, without describing the intent. Ordinary American English, sentence case, one or two short sentences, eighteen words maximum. Concrete everyday speech; no poetry, archaic diction, modern slang, narration, stage direction, or explanation. Thoughts are first-person private thoughts, never third-person narration or stat readouts. Generated names are private context: do not use them in the returned text. Use 'the god' if the god is genuinely relevant; the game will render the current name. Only the `prayer` register may address or ask the god directly. `chat:*`, `reply`, `tell`, and `muse` are never prayers and must not address the god. A reply reacts directly to the quoted speech if present. Use ordinary work words: foresters speak of woods, trees, timber, and felling; miners of quarry, rock, stone, and veins; farmers of fields, crops, soil, and harvest; builders of houses, walls, timber, and roofs; hunters of woods, trails, and game; fishers of rivers, shores, and nets. Never call a person a cutter or call their work 'my cutting'. Never say morale, wavering, muse, trait, or the raw event labels Delivered, Uprooted, Perished, Flourished, Beckoned, or DoubtSown. `tags` must be a nonempty subset of the supplied tags and include the register. `grounding` lists only supplied tags or fact fields that shaped the sentence. `already_said` is every line already written for this exact situation: write something genuinely DIFFERENT from all of them - a different thought, not the same thought reworded. Vary what the speaker notices and what they do about it, not merely the adjectives. Do not open a prayer with the god's name every time."
                 }]
             },
             {
@@ -779,6 +813,7 @@ fn uses_private_name(lower: &str, moment: &Moment) -> Option<String> {
     [
         moment.facts.speaker_name.as_deref(),
         moment.facts.listener_name.as_deref(),
+        moment.facts.settlement_name.as_deref(),
     ]
     .into_iter()
     .flatten()
@@ -802,7 +837,23 @@ fn uses_private_name(lower: &str, moment: &Moment) -> Option<String> {
 /// Longest names first, so a name that contains another (`Sayia` inside
 /// `Sayiath`) cannot leave half a name behind.
 fn slot_the_names(text: &str, moment: &Moment) -> String {
+    // The slots the moment offered, plus the names it sent as FACTS - the
+    // speaker's own and their village's. Facts and slots were separate lists
+    // and only the slots were folded, which is how "That is good news for
+    // Shutel" reached the vault: the village's name went out as a fact, came
+    // back in the line, and had nothing to collapse into.
+    let speaker = moment.facts.speaker_name.clone();
+    let home = moment.facts.settlement_name.clone();
+    let extra: Vec<(String, String)> = [
+        speaker.map(|name| ("name".to_string(), name)),
+        home.map(|name| ("place".to_string(), name)),
+    ]
+    .into_iter()
+    .flatten()
+    .filter(|(slot, _)| !moment.slots.contains_key(slot))
+    .collect();
     let mut named: Vec<(&String, &String)> = moment.slots.iter().collect();
+    named.extend(extra.iter().map(|(slot, name)| (slot, name)));
     named.sort_by_key(|(_, value)| std::cmp::Reverse(value.len()));
     let mut said = text.to_string();
     for (slot, name) in named {
@@ -1060,6 +1111,37 @@ mod slots {
         assert_eq!(
             uses_private_name("i told prorae myself.", &moment).as_deref(),
             Some("Prorae")
+        );
+    }
+}
+
+#[cfg(test)]
+mod names_and_places {
+    use super::*;
+
+    /// A village's name is as run-specific as a person's, and must fold the
+    /// same way.
+    ///
+    /// Pinned because it did not: the settlement went out as a FACT while only
+    /// SLOTS were folded, and "That is good news for Shutel." went into the
+    /// vault to be said one day in a village called something else.
+    #[test]
+    fn a_village_name_folds_into_its_slot() {
+        let mut moment = Moment {
+            speaker: 1,
+            register: "chat".to_string(),
+            tags: vec!["chat".to_string()],
+            slots: Default::default(),
+            world_facts: Vec::new(),
+            facts: SocialTruth::default(),
+            heard: None,
+        };
+        moment.facts.settlement_name = Some("Shutel".to_string());
+        moment.facts.speaker_name = Some("Prorae".to_string());
+
+        assert_eq!(
+            slot_the_names("That is good news for Shutel, said Prorae.", &moment),
+            "That is good news for {place}, said {name}."
         );
     }
 }
