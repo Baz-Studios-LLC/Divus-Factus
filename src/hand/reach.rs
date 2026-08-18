@@ -81,11 +81,12 @@ const CLEARANCE: f32 = 0.14;
 
 /// How hard the ring wins the depth fight against the ground.
 ///
-/// Blood needed 8 to stop flickering where it lay. A ring is thinner and the
-/// grass stands in front of it as well, so it takes a great deal more: this
-/// is a pointer aid and it is allowed to be drawn over the world, the way a
-/// cursor is.
-const OVER_THE_WORLD: f32 = 2_000.0;
+/// EIGHT, which is what blood uses to lie on the earth without the ground
+/// eating it - and blood is the proof that eight is enough. This was two
+/// thousand on the theory that more is safer, and more is not safer: a bias
+/// that large pushes the fragment's depth out of the buffer's range entirely
+/// and the test can never pass, which is its own way of drawing nothing.
+const OVER_THE_WORLD: f32 = 8.0;
 
 /// TEMPORARY: how many times its true size the ring is drawn at.
 ///
@@ -121,7 +122,28 @@ fn draw_the_reach(
     mut materials: ResMut<Assets<StandardMaterial>>,
     ring: Query<Entity, With<ReachRing>>,
     mut standing: Local<Option<(Vec3, f32)>>,
+    mut said: Local<f32>,
+    clock: Res<Time>,
 ) {
+    // A LOUD PROBE, because this cannot be seen from an unattended capture:
+    // the cursor is nowhere in one, and where the ring lands on screen is
+    // exactly what a screenshot cannot tell me. `DIVUS_FACTUS_REACH_PROBE=1`
+    // says, twice a second, whether the system runs, whether the hand has a
+    // point on the ground, and how many rings are standing - which separates
+    // "never drawn" from "drawn and invisible" in one line.
+    *said += clock.delta_secs();
+    let telling = std::env::var("DIVUS_FACTUS_REACH_PROBE").is_ok() && *said > 0.5;
+    if telling {
+        *said = 0.0;
+        info!(
+            "reach: on={} held={} ground={:?} rings={}",
+            show.0,
+            hand.held.is_some(),
+            hand.cursor_world.map(|at| (at.x, at.z)),
+            ring.iter().count()
+        );
+    }
+
     let showing = show.0 && hand.held.is_none();
     let (Some(terrain), Some(at)) = (terrain, hand.cursor_world.filter(|_| showing)) else {
         for old in &ring {
@@ -206,9 +228,10 @@ fn paint_the_ring(terrain: &crate::terrain::Terrain, seat: Vec3, radius: f32) ->
             positions.push(bent.to_array());
             normals.push((turn * Vec3::Y).to_array());
             uvs.push([i as f32 / AROUND as f32, 0.0]);
-            tints.push([1.0, 1.0, 1.0, glow]);
+            tints.push([0.62, 0.88, 1.0, glow]);
         };
-        corner(radius * BAND, 0.18);
+        // Solid for now, both edges. The fade goes back on with the alpha.
+        corner(radius * BAND, 1.0);
         corner(radius, 1.0);
 
         if i < AROUND {
