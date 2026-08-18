@@ -261,6 +261,110 @@ pub struct Tongue {
     /// that only moves while the factory is running is the quickest way to
     /// see that it IS running.
     kept: usize,
+    /// WHO EVERYBODY IS, refreshed off the ECS a few times a second.
+    ///
+    /// The speech callers hand over an `Entity` and a bare name, which is all
+    /// the authored corpus ever needed - it fills `{whom}` and picks by tag.
+    /// A written line does not care who is speaking beyond their trade.
+    ///
+    /// A GENERATED line cares enormously. `SocialTruth` was designed for it
+    /// and then never filled in: every line generated so far was written from
+    /// the register, the tags, the slots and the quoted speech and NOTHING
+    /// else, which is why so many of them are vague. The model was not being
+    /// poetic by preference; it had nothing concrete to be specific about.
+    ///
+    /// Kept here rather than threaded through a dozen call sites, because the
+    /// callers already pass the one thing this needs.
+    dossiers: HashMap<Entity, Dossier>,
+}
+
+/// What the world knows about somebody, in the words a writer can use.
+///
+/// Deliberately plain English rather than engine values: the model is told
+/// "a forester" and "she", never `Vocation::Forester` or `Sex::Female`. An
+/// engine label in a truth packet comes back out in the line.
+#[derive(Clone, Default)]
+pub struct Dossier {
+    pub name: String,
+    /// "she", "he", or "they" - so a pronoun is chosen rather than guessed.
+    /// Nothing told the model this before, so half the pronouns it has
+    /// written were coin flips.
+    pub pronoun: &'static str,
+    pub trade: Option<&'static str>,
+    pub settlement: Option<String>,
+}
+
+/// Learns who everybody is, a few times a second.
+///
+/// THE TRUTH PACKET IS ONLY AS GOOD AS THIS. A generated line can only be
+/// specific about facts it was given, and until this existed it was given
+/// none: no name, no trade, no pronoun, no village. That is why the early
+/// lines read as vague and faintly literary - vagueness is what is left when
+/// a writer has nothing concrete to say.
+///
+/// Refreshed rather than event-driven on purpose. A villager's trade changes
+/// with the muster, their village can be founded around them, and a dossier
+/// that went stale would put a fisherman's words in a forester's mouth - a
+/// quiet, plausible lie, which is the worst kind. Three times a second is far
+/// cheaper than the speech it serves and never more than a third of a second
+/// out of date.
+fn the_tongue_learns_who_is_who(
+    time: Res<Time>,
+    mut since: Local<f32>,
+    mut tongue: ResMut<Tongue>,
+    folk: Query<(
+        Entity,
+        &crate::villager::Person,
+        &crate::creature::genome::CreatureGenome,
+        Option<&Vocation>,
+        Option<&crate::villager::MemberOf>,
+    )>,
+    towns: Query<&crate::villager::Settlement>,
+) {
+    *since += time.delta_secs();
+    if *since < 0.33 {
+        return;
+    }
+    *since = 0.0;
+    tongue.dossiers.clear();
+    for (who, person, genome, trade, home) in &folk {
+        let settlement = home
+            .and_then(|home| towns.get(home.0).ok())
+            .map(|town| town.name.clone());
+        tongue.dossiers.insert(
+            who,
+            Dossier {
+                name: person.name.clone(),
+                // Plain words, never `Sex::Female`: an engine label in the
+                // packet comes back out in the line.
+                pronoun: match genome.sex {
+                    crate::creature::genome::Sex::Female => "she",
+                    crate::creature::genome::Sex::Male => "he",
+                },
+                trade: trade.map(|trade| trade_in_words(*trade)),
+                settlement,
+            },
+        );
+    }
+}
+
+/// A trade as a person would say it, not as the enum spells it.
+fn trade_in_words(voice: Vocation) -> &'static str {
+    use Vocation as V;
+    match voice {
+        V::Gatherer => "a gatherer",
+        V::Fisher => "a fisher",
+        V::Hunter => "a hunter",
+        V::Miner => "a miner",
+        V::Forester => "a forester",
+        V::Builder => "a builder",
+        V::Farmer => "a farmer",
+        V::Cook => "a cook",
+        V::Healer => "a healer",
+        V::Priest => "the priest",
+        V::Explorer => "an explorer",
+        V::Guard => "a guard",
+    }
 }
 
 /// Carries the settings switch into the Tongue, and takes in whatever the
@@ -340,10 +444,19 @@ impl Tongue {
             // So a moment it has not met is SILENT until the words come
             // back - and then the person says them, and every equivalent
             // moment after that is answered at once.
+            // FRESH EVERY TIME. Brett: "the lines in chatgpt mode shouldnt be
+            // reused since its whole purpose is to generate fresh context."
+            //
+            // The cache is what made two villagers ten feet apart say "I saw
+            // green ones, they built something out there" in the same breath:
+            // one moment key, one answer, served twice. Reuse is right for the
+            // VAULT, which is a corpus and wants a line to serve many moments.
+            // It is wrong for the factory, whose entire job is to produce
+            // something that was not there before.
             Voice::Generated => self
                 .living
                 .as_mut()
-                .and_then(|v| v.ask(speaker, tags, slots, None)),
+                .and_then(|v| v.ask_afresh(speaker, tags, slots, None)),
             // THE VAULT ANSWERS OR NOBODY DOES. No falling back to the
             // written corpus, on purpose: an empty vault that quietly spoke
             // authored lines would sound exactly like the authored setting,
@@ -788,6 +901,7 @@ impl Plugin for SermoPlugin {
             voice_from: Voice::default(),
             vault,
             kept: 0,
+            dossiers: HashMap::new(),
         });
         app.add_systems(
             Update,
@@ -795,6 +909,7 @@ impl Plugin for SermoPlugin {
                 flush_the_want_list,
                 the_village_learns_the_name,
                 the_living_voice_answers,
+                the_tongue_learns_who_is_who,
             ),
         );
     }
@@ -1049,6 +1164,7 @@ mod corpus_wiring_tests {
             voice_from: Voice::Authored,
             vault: None,
             kept: 0,
+            dossiers: HashMap::new(),
         };
         let who = Entity::from_raw_u32(7).unwrap();
         tongue.muse(Musing {

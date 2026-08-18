@@ -55,6 +55,39 @@ const MAX_PENDING: usize = 12;
 const AWKWARD_WORK_PHRASES: &[&str] = &["cutter", "my cutting", "my cuttings"];
 const SYSTEM_WORDS: &[&str] = &["morale", "wavering", "muse", "trait"];
 
+/// THINGS THIS WORLD DOES NOT HAVE.
+///
+/// Brett, on a line about telling the mayor: "the town just started and there
+/// is no town hall or mayor." There is no mayor in this game at all, and never
+/// has been - the model reached for one because a village with no facts
+/// attached to it is a village it has to imagine, and what it imagines is the
+/// stock medieval one: mayors, lords, markets, taxes, coin.
+///
+/// This is the failure that matters most - Brett: "the entire simulation and
+/// realism falls apart if they start making stuff up" - and it is the one
+/// nothing else catches. An invented office is not a leaked name, not a system
+/// word, not an engine label. It is a plausible sentence about a thing that
+/// does not exist, which is exactly the shape of lie that does the damage.
+///
+/// A DENYLIST IS A PATCH, not the cure. The cure is a truth packet full enough
+/// that there is no vacuum to fill - see `Dossier`. This is the floor under
+/// it: whatever else goes wrong, nobody mentions a king.
+///
+/// KEPT SHORT, AND ONLY THINGS STRUCTURALLY ABSENT. The first version of this
+/// listed "mayor" - and Brett: "When a town hall is raised they do elect a
+/// mayor." There IS one. A denylist that bans real things is worse than none,
+/// because it silences true lines and nobody notices which.
+///
+/// So: no feudal hierarchy above the village, and no money economy. Those are
+/// absent by DESIGN rather than by not being built yet, which is the only
+/// thing that makes a word safe to ban. Anything a village might plausibly
+/// grow - livestock, carts, traders, a mayor - stays off this list, because
+/// the day it is added the ban becomes the bug.
+const NO_SUCH_THING: &[&str] = &[
+    "lord", "king", "queen", "prince", "baron", "knight", "castle", "bishop", "abbot", "sheriff",
+    "tax", "taxes", "rent", "coin",
+];
+
 /// The exact facts one candidate is allowed to speak from. This is deliberately
 /// much smaller than an ECS dump: omission means the model is not allowed to
 /// invent the fact.
@@ -314,6 +347,50 @@ impl Vivarium {
 
     /// Returns a validated cached candidate, or queues an equivalent request
     /// once. The caller can always fall back to the corpus immediately.
+    /// ALWAYS A NEW LINE, never one this run has already said.
+    ///
+    /// Brett: "the lines in chatgpt mode shouldnt be reused since its whole
+    /// purpose is to generate fresh context." The cache is what put the same
+    /// sentence in two mouths ten feet apart - one moment key, one answer,
+    /// served twice. Reuse belongs to the VAULT, which is a corpus and wants
+    /// one line to serve many moments; the factory's whole job is to make
+    /// something that was not there before.
+    ///
+    /// So a cached answer is SPENT here: taken, returned once, and dropped, so
+    /// the next equivalent moment asks again. What was said is not lost - it
+    /// went into the vault the moment it arrived.
+    pub fn ask_afresh(
+        &mut self,
+        speaker: u64,
+        tags: &[&str],
+        slots: &[(&str, &str)],
+        heard: Option<&str>,
+    ) -> Option<String> {
+        self.drain();
+        let moment = Moment::new(speaker, tags, slots, heard, SocialTruth::default());
+        let key = moment.key();
+        if let Some(candidate) = self.cache.remove(&key) {
+            // Asked again straight away, so the next moment of this shape has
+            // a fresh line waiting rather than starting from silence.
+            self.pending.remove(&key);
+            let _ = self.jobs.send(Job {
+                key,
+                moment: moment.clone(),
+            });
+            return Some(candidate.text);
+        }
+        if self.pending.len() >= MAX_PENDING {
+            return None;
+        }
+        if self.pending.insert(key.clone()) {
+            self.record("requested", &key, &moment, None, None);
+            if self.jobs.send(Job { key, moment }).is_err() {
+                warn!("the living voice's worker stopped");
+            }
+        }
+        None
+    }
+
     pub fn ask(
         &mut self,
         speaker: u64,
@@ -559,6 +636,11 @@ fn response_text(response: &Value) -> Option<String> {
 }
 
 fn validate(moment: &Moment, mut candidate: Candidate) -> std::result::Result<Candidate, String> {
+    // THE NAMES BECOME THEIR SLOTS FIRST, before anything judges the line -
+    // see `slot_the_names`. A sentence that named the person it was about is
+    // not a bad sentence, it is an unfinished one, and finishing it is a
+    // substitution the moment already has the answer to.
+    candidate.text = slot_the_names(&candidate.text, moment);
     let tidy = crate::sermo::tidy(&candidate.text);
     if !crate::sermo::admissible(&tidy) {
         return Err("candidate failed Sermo's local voice gate".to_string());
@@ -582,14 +664,27 @@ fn validate(moment: &Moment, mut candidate: Candidate) -> std::result::Result<Ca
     if raw_event_label(moment).is_some_and(|word| lower.contains(word)) {
         return Err("candidate repeated a raw event label".to_string());
     }
+    // Word boundaries, or "king" would take "asking" and "cart" would take
+    // "cartwheel" - a denylist that eats innocent words teaches nobody
+    // anything except to switch it off.
+    if let Some(invented) = NO_SUCH_THING
+        .iter()
+        .find(|word| says_the_word(&lower, word))
+    {
+        return Err(format!(
+            "candidate invented a {invented}, which this world has none of"
+        ));
+    }
     if moment.register != "prayer" && addresses_god(&lower, moment) {
         return Err("non-prayer candidate addressed the god".to_string());
     }
     if moment.register == "muse" && is_third_person_thought(&lower, moment) {
         return Err("thought was written as third-person narration".to_string());
     }
-    if uses_private_name(&lower, moment) {
-        return Err("candidate exposed a run-specific name".to_string());
+    if let Some(leftover) = uses_private_name(&lower, moment) {
+        return Err(format!(
+            "candidate named {leftover}, which has no slot to stand in for it"
+        ));
     }
     candidate.tags.sort_unstable();
     candidate.tags.dedup();
@@ -604,6 +699,29 @@ fn validate(moment: &Moment, mut candidate: Candidate) -> std::result::Result<Ca
     }
     candidate.text = tidy;
     Ok(candidate)
+}
+
+/// Whether the line says this word, as a word rather than as a fragment of
+/// one. "Asking" is not a king and "carter" is not a cart.
+fn says_the_word(lower: &str, word: &str) -> bool {
+    let edge = |c: Option<char>| c.is_none_or(|c| !c.is_alphanumeric() && c != '\'');
+    let mut from = 0;
+    while let Some(at) = lower[from..].find(word) {
+        let at = from + at;
+        let before = lower[..at].chars().next_back();
+        let after = lower[at + word.len()..].chars().next();
+        // A trailing "s" is the same word: mayors, lords, taxes.
+        let after_s = if after == Some('s') {
+            lower[at + word.len() + 1..].chars().next()
+        } else {
+            after
+        };
+        if edge(before) && (edge(after) || edge(after_s)) {
+            return true;
+        }
+        from = at + word.len();
+    }
+    false
 }
 
 fn raw_event_label(moment: &Moment) -> Option<&'static str> {
@@ -640,15 +758,58 @@ fn is_third_person_thought(lower: &str, moment: &Moment) -> bool {
         || lower.contains(" stands ")
 }
 
-fn uses_private_name(lower: &str, moment: &Moment) -> bool {
+/// A NAME LEFT STANDING, if any - one the moment has no slot for.
+///
+/// See [`slot_the_names`]: a name the moment CAN name is turned into its slot
+/// and the line is kept. This is only for the ones that cannot be, which are
+/// genuinely unusable: a sentence naming somebody the moment never mentioned
+/// could never be true again.
+fn uses_private_name(lower: &str, moment: &Moment) -> Option<String> {
     [
         moment.facts.speaker_name.as_deref(),
         moment.facts.listener_name.as_deref(),
-        moment.slots.get("whom").map(String::as_str),
     ]
     .into_iter()
     .flatten()
-    .any(|name| lower.contains(&name.to_ascii_lowercase()))
+    .find(|name| lower.contains(&name.to_ascii_lowercase()))
+    .map(str::to_string)
+}
+
+/// TURNS THE NAMES INTO THEIR SLOTS, so a line about Sayia becomes a line
+/// about whoever the moment is about.
+///
+/// Brett: "We should have a system where it turns a villager's name into a tag
+/// so that I can use that in a future sentence with the other villager's
+/// name." Which is exactly what the authored corpus has always done - a line
+/// reading `I saw {whom} go` is worth having, and the same line reading `I saw
+/// Sayia go` is worth one use and then never again.
+///
+/// This was FORTY-ONE OF FORTY-TWO REJECTIONS in the first real run: more than
+/// half of every call paid for was thrown away for writing down a name the
+/// moment had itself supplied. Now the name is put back where it came from.
+///
+/// Longest names first, so a name that contains another (`Sayia` inside
+/// `Sayiath`) cannot leave half a name behind.
+fn slot_the_names(text: &str, moment: &Moment) -> String {
+    let mut named: Vec<(&String, &String)> = moment.slots.iter().collect();
+    named.sort_by_key(|(_, value)| std::cmp::Reverse(value.len()));
+    let mut said = text.to_string();
+    for (slot, name) in named {
+        if name.is_empty() {
+            continue;
+        }
+        // Case-insensitively, because a line may open on the name.
+        let mut out = String::with_capacity(said.len());
+        let mut rest = said.as_str();
+        while let Some(at) = rest.to_ascii_lowercase().find(&name.to_ascii_lowercase()) {
+            out.push_str(&rest[..at]);
+            out.push_str(&format!("{{{slot}}}"));
+            rest = &rest[at + name.len()..];
+        }
+        out.push_str(rest);
+        said = out;
+    }
+    said
 }
 
 fn now_secs() -> u64 {
@@ -824,6 +985,70 @@ mod tests {
                 candidate("I hope the roof holds tonight.", &["muse"])
             )
             .is_ok()
+        );
+    }
+}
+
+#[cfg(test)]
+mod slots {
+    use super::*;
+
+    fn moment_naming(pairs: &[(&str, &str)]) -> Moment {
+        Moment {
+            speaker: 1,
+            register: "chat".to_string(),
+            tags: vec!["chat".to_string()],
+            slots: pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+            world_facts: Vec::new(),
+            facts: SocialTruth::default(),
+            heard: None,
+        }
+    }
+
+    /// A named line becomes a reusable one. This is the whole idea: forty-one
+    /// of forty-two rejections in the first real run were lines thrown away
+    /// for writing down a name the moment had itself supplied.
+    #[test]
+    fn a_name_becomes_its_slot() {
+        let moment = moment_naming(&[("whom", "Sayia"), ("god", "Tugim")]);
+        assert_eq!(
+            slot_the_names("I saw Sayia at the well, and I thanked Tugim.", &moment),
+            "I saw {whom} at the well, and I thanked {god}."
+        );
+    }
+
+    /// Case does not save a name, because a line may open on one.
+    #[test]
+    fn a_name_at_the_head_of_a_sentence_is_caught() {
+        let moment = moment_naming(&[("whom", "Sayia")]);
+        assert_eq!(
+            slot_the_names("Sayia says the nets are thin.", &moment),
+            "{whom} says the nets are thin."
+        );
+    }
+
+    /// Longest first, or a name inside another name leaves half of one behind.
+    #[test]
+    fn a_name_inside_a_name_does_not_leave_a_stump() {
+        let moment = moment_naming(&[("whom", "Sayia"), ("name", "Sayiath")]);
+        assert_eq!(
+            slot_the_names("Sayiath told Sayia.", &moment),
+            "{name} told {whom}."
+        );
+    }
+
+    /// A name the moment has NO slot for is still fatal - there is nothing to
+    /// stand in for it, so the line could never be true a second time.
+    #[test]
+    fn a_name_with_no_slot_is_still_refused() {
+        let mut moment = moment_naming(&[]);
+        moment.facts.listener_name = Some("Prorae".to_string());
+        assert_eq!(
+            uses_private_name("i told prorae myself.", &moment).as_deref(),
+            Some("Prorae")
         );
     }
 }
