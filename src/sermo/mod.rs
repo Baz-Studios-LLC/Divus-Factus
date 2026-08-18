@@ -327,6 +327,14 @@ pub struct Dossier {
     pub pronoun: &'static str,
     pub trade: Option<&'static str>,
     pub settlement: Option<String>,
+    /// Whether the god's eye was on them when this was last refreshed.
+    ///
+    /// Read to decide whether a line's WEAR is charged: a sentence nobody
+    /// heard leaves the pool as fresh as it found it. Up to a third of a
+    /// second stale, which for "was anybody watching" is close enough - the
+    /// alternative is threading a camera question through four speech
+    /// signatures and a dozen call sites.
+    pub watched: bool,
 }
 
 /// Learns who everybody is, a few times a second.
@@ -353,8 +361,10 @@ fn the_tongue_learns_who_is_who(
         &crate::creature::genome::CreatureGenome,
         Option<&Vocation>,
         Option<&crate::villager::MemberOf>,
+        &Transform,
     )>,
     towns: Query<&crate::villager::Settlement>,
+    eye: Option<Res<crate::attention::Attention>>,
 ) {
     *since += time.delta_secs();
     if *since < 0.33 {
@@ -362,7 +372,7 @@ fn the_tongue_learns_who_is_who(
     }
     *since = 0.0;
     tongue.dossiers.clear();
-    for (who, person, genome, trade, home) in &folk {
+    for (who, person, genome, trade, home, at) in &folk {
         let settlement = home
             .and_then(|home| towns.get(home.0).ok())
             .map(|town| town.name.clone());
@@ -378,6 +388,7 @@ fn the_tongue_learns_who_is_who(
                 },
                 trade: trade.map(|trade| trade_in_words(*trade)),
                 settlement,
+                watched: crate::attention::regard(eye.as_deref(), at.translation).worth_saying(),
             },
         );
     }
@@ -484,13 +495,25 @@ impl Tongue {
         }
         let slots: &[(&str, &str)] = &with_place;
 
+        // WAS ANYBODY THERE. A line said out of sight leaves the pool as fresh
+        // as it found it - see `Dossier::watched` and `Corpus::pick_within`.
+        let watched = Entity::try_from_bits(speaker)
+            .and_then(|who| self.dossiers.get(&who))
+            .is_none_or(|who| who.watched);
+
         let written = |me: &mut Self| {
-            if must.is_empty() {
+            let said = if must.is_empty() {
                 me.voice.pick(speaker, tags, slots, &mut me.dice)
             } else {
                 me.voice
                     .pick_within(speaker, tags, slots, must, &mut me.dice)
+            };
+            if watched {
+                me.voice.was_heard();
+            } else {
+                me.voice.was_unheard();
             }
+            said
         };
         match self.voice_from {
             Voice::Authored => written(self),
@@ -600,7 +623,13 @@ impl Tongue {
         }
         let (_, chosen) = best?;
         let (id, said) = (chosen.id, chosen.t.clone());
-        self.voice.now_said(speaker, id);
+        // The vault's lines wear the same way, and for the same reason.
+        let watched = Entity::try_from_bits(speaker)
+            .and_then(|who| self.dossiers.get(&who))
+            .is_none_or(|who| who.watched);
+        if watched {
+            self.voice.now_said(speaker, id);
+        }
         Some(corpus::dress(&said, slots, &mut self.dice))
     }
 

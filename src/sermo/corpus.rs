@@ -108,6 +108,9 @@ pub struct Corpus {
     /// moment's own tags, and written out as the authoring want-list -
     /// the corpus grows toward what the world actually produces.
     wanting: HashMap<String, u32>,
+    /// The line the last pick chose, waiting to learn whether anyone heard it.
+    /// See the note in `pick_within`.
+    last_picked: Option<(u64, u64)>,
 }
 
 /// A stable id for a line: FNV-1a over its words.
@@ -263,12 +266,17 @@ impl Corpus {
         }
         let (_, line, id) = best?;
         let words = dress(&line.t, slots, rng);
-        *self.heard.entry(id).or_default() += 1;
-        let ring = self.recent.entry(speaker).or_default();
-        ring.push(id);
-        if ring.len() > 12 {
-            ring.remove(0);
-        }
+        // WEAR IS NOT CHARGED HERE ANY MORE. It used to be, which meant a line
+        // was spent whether or not a soul heard it - and most speech in a
+        // village happens off-camera, so the fresh lines were being burned on
+        // an audience of nobody. By the time the player looked, everything had
+        // been "heard" and the scoring had flattened to dice: they got the
+        // most-worn lines in the corpus, systematically.
+        //
+        // The telling still happens - rumors must spread whether the god is
+        // watching or not, which is Brett's call and the right one. Only the
+        // WEAR waits to see if anybody was there. `Tongue::said` charges it.
+        self.last_picked = Some((speaker, id));
         Some(words)
     }
 
@@ -339,6 +347,19 @@ impl Corpus {
     }
 
     /// Marks a line as said, wherever it came from.
+    /// Charges the last pick's wear, if there was one - because somebody was
+    /// there to hear it.
+    pub fn was_heard(&mut self) {
+        if let Some((speaker, id)) = self.last_picked.take() {
+            self.now_said(speaker, id);
+        }
+    }
+
+    /// Forgets the last pick without charging it: said to an empty field.
+    pub fn was_unheard(&mut self) {
+        self.last_picked = None;
+    }
+
     pub fn now_said(&mut self, speaker: u64, id: u64) {
         *self.heard.entry(id).or_default() += 1;
         let ring = self.recent.entry(speaker).or_default();
@@ -813,5 +834,44 @@ mod tests {
                 "a prayer never borrows smalltalk, however worn its pool",
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod wear {
+    use super::*;
+
+    /// A line said where nobody could hear it stays fresh.
+    ///
+    /// This is the whole point: most speech in a village happens off camera,
+    /// and charging wear for it burned the fresh lines on an audience of
+    /// nobody. By the time the player looked, every line had been "heard" and
+    /// the scoring had flattened to dice - so they got the most-worn lines in
+    /// the corpus, every time.
+    #[test]
+    fn an_unheard_line_costs_the_pool_nothing() {
+        let mut voice = Corpus::load();
+        if voice.len() == 0 {
+            return; // assets are not beside the test runner
+        }
+        let mut dice = Rng::new(4);
+        let tags = ["muse", "wavering"];
+
+        let said = voice.pick(1, &tags, &[("god", "x")], &mut dice);
+        assert!(said.is_some(), "the corpus should answer a plain muse");
+        voice.was_unheard();
+        assert!(
+            voice.export_heard().is_empty(),
+            "nobody heard it, so nothing was spent"
+        );
+
+        let said = voice.pick(1, &tags, &[("god", "x")], &mut dice);
+        assert!(said.is_some());
+        voice.was_heard();
+        assert_eq!(
+            voice.export_heard().len(),
+            1,
+            "somebody heard that one, so it is spent"
+        );
     }
 }
