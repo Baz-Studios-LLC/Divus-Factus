@@ -42,9 +42,11 @@ pub struct ShowTheReach(pub bool);
 
 impl Default for ShowTheReach {
     fn default() -> Self {
-        // Off, except that an unattended capture has no settings screen to
-        // click - `DIVUS_FACTUS_REACH=1` is how the ring gets photographed.
-        ShowTheReach(std::env::var("DIVUS_FACTUS_REACH").is_ok())
+        // ON FOR NOW, while this is being got right - Brett: "Lets make on
+        // the default state for now for testing though." It goes back to off
+        // once it has been seen working, which is what the settings switch is
+        // for.
+        ShowTheReach(true)
     }
 }
 
@@ -55,11 +57,18 @@ struct ReachRing;
 /// Segments around the ring.
 const AROUND: usize = 64;
 
-/// How wide the painted band is, as a fraction of the radius.
+/// Where the band's inner edge is, as a fraction of the radius.
 ///
-/// A BAND, not a hairline. A one-pixel circle is a thing you squint at, and
-/// the whole point of this is to be readable at a glance.
-const BAND: f32 = 0.82;
+/// NEARLY THE WHOLE DISC. This was 0.82 - a rim of under a fifth of the
+/// radius - and at the close zoom where the reach floors out at 0.6m that is
+/// a ring the size of a dinner plate with an eleven centimeter rim, drawn
+/// under a hand model bigger than the whole thing. Brett had it switched on
+/// and was looking straight at it.
+///
+/// The reach really is that small up close, and the ring must not lie about
+/// it, so the answer is not a bigger circle - it is a circle you can see: a
+/// broad disc that fades out rather than a hairline.
+const BAND: f32 = 0.35;
 
 /// How high off the ground it sits, in meters.
 ///
@@ -77,6 +86,14 @@ const CLEARANCE: f32 = 0.14;
 /// is a pointer aid and it is allowed to be drawn over the world, the way a
 /// cursor is.
 const OVER_THE_WORLD: f32 = 2_000.0;
+
+/// TEMPORARY: how many times its true size the ring is drawn at.
+///
+/// Brett, while we get this seen at all: "Try making it way bigger for now to
+/// test too." MUST GO BACK TO 1.0 - the whole claim the ring makes is that it
+/// is exactly what the hand would take, and at six times that it is a lie
+/// that happens to be easy to find.
+const TESTING_BIGGER: f32 = 6.0;
 
 /// How far the cursor must move before the ring is rebuilt, in meters.
 ///
@@ -116,7 +133,8 @@ fn draw_the_reach(
 
     // EXACTLY WHAT THE HAND WOULD TAKE - the same number the pick itself
     // uses, or the ring is a lie that still looks right.
-    let radius = super::forgiveness_at(rigs.single().map_or(80.0, |rig| rig.distance));
+    let radius =
+        super::forgiveness_at(rigs.single().map_or(80.0, |rig| rig.distance)) * TESTING_BIGGER;
     let ground = terrain.base_height_at(at.x, at.z);
     let seat = Vec3::new(at.x, ground, at.z);
 
@@ -137,7 +155,11 @@ fn draw_the_reach(
         MeshMaterial3d(materials.add(StandardMaterial {
             // Over one, so the bloom already on the god's camera carries it -
             // which is where the "ethereal" is meant to come from.
-            base_color: Color::srgb(1.6, 2.6, 3.4),
+            // `base_color` is LDR whatever is written here, so the glow does
+            // not come from overdriving it - it comes from the bloom on the
+            // god's camera, and this is as bright as a color gets before it
+            // stops reading as a color at all.
+            base_color: Color::srgba(0.62, 0.88, 1.0, 0.55),
             unlit: true,
             alpha_mode: AlphaMode::Blend,
             depth_bias: OVER_THE_WORLD,
@@ -156,12 +178,16 @@ fn paint_the_ring(terrain: &crate::terrain::Terrain, seat: Vec3, radius: f32) ->
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity((AROUND + 1) * 2);
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity((AROUND + 1) * 2);
     let mut uvs: Vec<[f32; 2]> = Vec::with_capacity((AROUND + 1) * 2);
+    // Per-corner alpha: faint across the disc, bright at the rim. A hard band
+    // of one strength reads as a decal somebody stuck on the grass; a disc
+    // that gathers into its edge reads as light lying on the ground.
+    let mut tints: Vec<[f32; 4]> = Vec::with_capacity((AROUND + 1) * 2);
     let mut indices: Vec<u32> = Vec::with_capacity(AROUND * 6);
 
     for i in 0..=AROUND {
         let angle = i as f32 / AROUND as f32 * std::f32::consts::TAU;
         let (sin, cos) = angle.sin_cos();
-        let mut corner = |reach: f32| {
+        let mut corner = |reach: f32, glow: f32| {
             let x = seat.x + cos * reach;
             let z = seat.z + sin * reach;
             // `base_height_at`, never `height_at`: the latter takes the river
@@ -172,9 +198,10 @@ fn paint_the_ring(terrain: &crate::terrain::Terrain, seat: Vec3, radius: f32) ->
             positions.push(bent.to_array());
             normals.push((turn * Vec3::Y).to_array());
             uvs.push([i as f32 / AROUND as f32, 0.0]);
+            tints.push([1.0, 1.0, 1.0, glow]);
         };
-        corner(radius * BAND);
-        corner(radius);
+        corner(radius * BAND, 0.18);
+        corner(radius, 1.0);
 
         if i < AROUND {
             let base = i as u32 * 2;
@@ -189,6 +216,7 @@ fn paint_the_ring(terrain: &crate::terrain::Terrain, seat: Vec3, radius: f32) ->
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, tints);
     mesh.insert_indices(bevy::render::mesh::Indices::U32(indices));
     mesh
 }
