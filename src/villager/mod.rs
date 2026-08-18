@@ -28,8 +28,6 @@ pub mod regard;
 pub(crate) use gossip::*;
 
 use bevy::prelude::*;
-use bevy::time::common_conditions::on_timer;
-use std::time::Duration;
 
 use crate::creature::anim::CreatureMotion;
 use crate::creature::body::{CreatureAssets, build_body};
@@ -494,27 +492,47 @@ impl Plugin for VillagerPlugin {
                         // wrong house - none of these change meaning if the
                         // answer arrives a second late.
                         //
-                        // Not `assign_beds`, which was the first candidate and
-                        // is already better than throttled: its query carries
-                        // `Changed<Home>`, so it costs nothing on a frame when
-                        // nobody moved AND still answers a newborn instantly.
-                        // Change detection beats a timer wherever it applies.
-                        home::assign_homes.run_if(on_timer(Duration::from_millis(500))),
-                        home::rehome_the_misplaced.run_if(on_timer(Duration::from_secs(4))),
+                        // THE TIMERS ARE GONE, and the lesson is worth keeping:
+                        // THROTTLING A CHANGE-DETECTION SYSTEM DOES NOT REDUCE
+                        // ITS WORK, IT BUNCHES IT. A `Changed<T>` query matches
+                        // everything that changed since the system LAST RAN, so
+                        // running it once a second hands it a whole second's
+                        // worth of changed entities in one frame - the same work
+                        // in total, landing as a spike instead of a level cost.
+                        // Eleven of them on periods of half a second to four is
+                        // a hitch with a rhythm you can hear. Brett: "The FPS is
+                        // bouncing about every second between 80s and 20s."
+                        //
+                        // What they bought was under a millisecond: the whole of
+                        // `villager: the homes` measured 0.96ms. Not a trade.
+                        //
+                        // If a system ever DOES have to sweep everything on a
+                        // beat, the answer is Brett's - "could the check queue
+                        // instead of all happening at once" - a slice per frame,
+                        // not a timer. These were already a slice per frame.
+                        //
+                        // `assign_beds` was the first candidate here and was
+                        // already better than throttled for the same reason: its
+                        // query carries `Changed<Home>`, so it costs nothing on a
+                        // frame when nobody moved AND still answers a newborn
+                        // instantly. Change detection beats a timer wherever it
+                        // applies - and where it applies, a timer makes it worse.
+                        home::assign_homes,
+                        home::rehome_the_misplaced,
                         colony::muster_colonists,
                         colony::walk_to_the_new_ground,
-                        home::burn_weathered.run_if(on_timer(Duration::from_secs(4))),
+                        home::burn_weathered,
                         // Half a second: rain starting is player-visible, and a
                         // village that strolls indoors two seconds late reads
                         // as a village that did not notice the weather.
-                        home::take_shelter.run_if(on_timer(Duration::from_millis(500))),
-                        home::midday_meal.run_if(on_timer(Duration::from_millis(750))),
-                        home::family_supper.run_if(on_timer(Duration::from_millis(750))),
-                        home::tavern_evenings.run_if(on_timer(Duration::from_millis(750))),
-                        home::well_gatherings.run_if(on_timer(Duration::from_millis(750))),
-                        home::tavern_cheer.run_if(on_timer(Duration::from_secs(1))),
-                        home::tend_fire.run_if(on_timer(Duration::from_secs(2))),
-                        home::night_routine.run_if(on_timer(Duration::from_millis(500))),
+                        home::take_shelter,
+                        home::midday_meal,
+                        home::family_supper,
+                        home::tavern_evenings,
+                        home::well_gatherings,
+                        home::tavern_cheer,
+                        home::tend_fire,
+                        home::night_routine,
                         home::use_doors,
                         home::weariness,
                         home::burn,
