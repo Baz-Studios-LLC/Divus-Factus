@@ -225,9 +225,22 @@ impl Retelling {
         }
     }
 
-    /// Reads the hand from what a witness actually holds.
+    /// Whether this person SAW the thing they are about to talk about.
+    ///
+    /// Reads the memory they are actually telling, not a tally of their life.
+    /// This asked `witnessed.total > 0` - their lifetime count of everything
+    /// they had ever seen - so anybody who had once watched a tree come down
+    /// said "I saw" about every story they ever told, goblins included.
+    /// Brett: "I am not sure that the person who said it ever actually saw a
+    /// goblin." He had not.
+    ///
+    /// With no memory at all there is nothing to tell and nothing to claim, so
+    /// the mildest reading wins.
     pub fn hand_of(witnessed: &crate::witness::Witnessed) -> Hand {
-        if witnessed.total > 0 {
+        let Some(telling) = witnessed.recent.first() else {
+            return Hand::Heard;
+        };
+        if telling.firsthand {
             Hand::Witnessed
         } else if witnessed.secondhand > 2 {
             Hand::Distant
@@ -1104,23 +1117,38 @@ mod tests {
     }
 
     #[test]
-    fn how_you_know_is_read_from_what_you_hold() {
-        use crate::witness::Witnessed;
-        let seen = Witnessed {
-            total: 1,
+    fn how_you_know_is_read_from_the_memory_being_told() {
+        use crate::witness::{Memory, Witnessed};
+
+        let remembering = |firsthand: bool, secondhand: u32| Witnessed {
+            total: 3,
+            secondhand,
+            recent: vec![Memory {
+                kind: crate::witness::DivineEventKind::Mauled,
+                whom: None,
+                divine: false,
+                day: 1,
+                of: crate::witness::SubjectClass::Person,
+                firsthand,
+            }],
             ..Default::default()
         };
-        assert_eq!(Retelling::hand_of(&seen), Hand::Witnessed);
-        let told = Witnessed {
-            secondhand: 1,
-            ..Default::default()
-        };
-        assert_eq!(Retelling::hand_of(&told), Hand::Heard);
-        let rumored = Witnessed {
-            secondhand: 5,
-            ..Default::default()
-        };
-        assert_eq!(Retelling::hand_of(&rumored), Hand::Distant);
+
+        // SEEN, because THIS memory was seen - not because the teller has
+        // witnessed something at some point in their life. That was the old
+        // rule, and under it a villager who once watched a tree come down
+        // claimed to have seen the goblins.
+        assert_eq!(Retelling::hand_of(&remembering(true, 0)), Hand::Witnessed);
+
+        // The same person, with the same lifetime of witnessing behind them,
+        // telling something they were only told.
+        assert_eq!(Retelling::hand_of(&remembering(false, 1)), Hand::Heard);
+
+        // And a story that has been round the village enough times.
+        assert_eq!(Retelling::hand_of(&remembering(false, 5)), Hand::Distant);
+
+        // Nothing to tell claims nothing.
+        assert_eq!(Retelling::hand_of(&Witnessed::default()), Hand::Heard);
     }
 }
 

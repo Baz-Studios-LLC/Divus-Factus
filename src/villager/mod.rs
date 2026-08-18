@@ -3930,6 +3930,7 @@ mod tests {
             Person::born("Bob".into(), "Teller".into()),
             crate::witness::Witnessed {
                 recent: vec![crate::witness::Memory {
+                    firsthand: true,
                     kind: crate::witness::DivineEventKind::Thrown,
                     whom: None,
                     divine: true,
@@ -3999,6 +4000,7 @@ mod tests {
             Person::born("Bob".into(), "Teller".into()),
             crate::witness::Witnessed {
                 recent: vec![crate::witness::Memory {
+                    firsthand: true,
                     kind: crate::witness::DivineEventKind::Thrown,
                     whom: None,
                     divine: true,
@@ -4264,6 +4266,7 @@ mod tests {
             Person::born("Temewa".into(), "Kirap".into()),
             crate::witness::Witnessed {
                 recent: vec![crate::witness::Memory {
+                    firsthand: true,
                     kind: crate::witness::DivineEventKind::Smote,
                     whom: None,
                     divine,

@@ -1000,8 +1000,17 @@ pub(super) fn goblins_are_sighted(
     mut last_alarm: Local<f64>,
     mut alarms: MessageWriter<crate::witness::DivineEvent>,
     mut notices: MessageWriter<crate::ui::Notice>,
-    goblins: Query<&Transform, (With<CreatureGenome>, Without<Villager>, Without<Corpse>)>,
-    kinds: Query<&CreatureGenome>,
+    // ONE QUERY, BOTH COMPONENTS. This was two - transforms from one and
+    // species from another - zipped together, which pairs the Nth row of one
+    // with the Nth row of an entirely different set. `kinds` had no filters,
+    // so it counted villagers too, and the zip handed a deer's position back
+    // wearing somebody else's species.
+    //
+    // The village then "saw goblins" in a world that had none: Brett, seconds
+    // after a world opened, "there is no way they saw goblins yet", and a
+    // warning bell rang over nothing. Every false goblin line this session
+    // came from this line of code.
+    goblins: Query<(&Transform, &CreatureGenome), (Without<Villager>, Without<Corpse>)>,
     folk: Query<(Entity, &Transform, &crate::villager::Person), (With<Villager>, Without<Corpse>)>,
 ) {
     if clock.elapsed - *last_alarm < ALARM_AGAIN_AFTER {
@@ -1009,7 +1018,6 @@ pub(super) fn goblins_are_sighted(
     }
     let camps: Vec<Vec3> = goblins
         .iter()
-        .zip(kinds.iter())
         .filter(|(_, genome)| genome.species == Species::Goblin)
         .map(|(transform, _)| transform.translation)
         .collect();

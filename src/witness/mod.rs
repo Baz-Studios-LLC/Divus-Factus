@@ -908,6 +908,22 @@ pub struct Memory {
     /// What the act happened to - a person, a beast, or a mere thing.
     #[serde(default)]
     pub of: SubjectClass,
+    /// WHETHER THIS PERSON SAW IT, or was told.
+    ///
+    /// The distinction was kept only as two counters on the record - `total`
+    /// and `secondhand` - and `Retelling::hand_of` read the first of them, so
+    /// anybody who had ever witnessed ANYTHING reported "saw" for every story
+    /// they told, including ones they had only heard. A villager who once
+    /// watched a tree fall would say he saw the goblins.
+    ///
+    /// Brett, watching one do exactly that: "I am not sure that the person who
+    /// said it ever actually saw a goblin." He had not. It belongs on the
+    /// memory, because it is a fact about the memory.
+    ///
+    /// Old saves load as firsthand, which is what they meant when they were
+    /// written.
+    #[serde(default = "always")]
+    pub firsthand: bool,
 }
 
 /// Old saves predate doubt: their memories load as believed.
@@ -950,6 +966,9 @@ impl From<MemoryOnDisk> for Memory {
                 divine,
                 day,
                 of,
+                // A save written before the distinction existed meant
+                // firsthand, because that is what everything was then.
+                firsthand: true,
             },
             MemoryOnDisk::Bare(kind) => Memory {
                 kind,
@@ -957,6 +976,7 @@ impl From<MemoryOnDisk> for Memory {
                 divine: true,
                 day: 0,
                 of: SubjectClass::default(),
+                firsthand: true,
             },
         }
     }
@@ -1000,6 +1020,8 @@ impl Witnessed {
                 divine,
                 day,
                 of,
+                // Recorded by the one who was there.
+                firsthand: true,
             },
         );
         self.recent.truncate(Self::CAPACITY);
@@ -1015,6 +1037,13 @@ impl Witnessed {
     /// that split, so a rumor's reteller says "I was told" without any
     /// further bookkeeping.
     pub fn hear(&mut self, memory: Memory) {
+        // TOLD, not seen - however the teller came by it. A story loses its
+        // firsthand-ness the moment it is passed on, which is the whole
+        // difference between "I saw it" and "I heard".
+        let memory = Memory {
+            firsthand: false,
+            ..memory
+        };
         self.recent.insert(0, memory);
         self.recent.truncate(Self::CAPACITY);
         self.secondhand = self.secondhand.saturating_add(1);
@@ -1703,6 +1732,9 @@ mod tests {
                 divine: false,
                 day: 3,
                 of: SubjectClass::default(),
+                // `hear` overwrites this to false; set the honest value in
+                // so the fixture reads as what it is - a story being passed.
+                firsthand: false,
             });
             held
         };
