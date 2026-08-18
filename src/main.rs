@@ -215,6 +215,12 @@ fn main() {
                 }),
         )
         .init_state::<GameState>()
+        // A WIDER FIRST CASCADE SPENDS ITS TEXELS OVER MORE GROUND, and this is
+        // where they are bought back. Measured on this game: 1024 against 2048
+        // was 17.7ms against 17.7ms - the cost of a shadow pass here is how many
+        // times the world is redrawn into it, not how big the map is, because
+        // the frame is geometry-bound and not fill-bound.
+        .insert_resource(bevy::light::DirectionalLightShadowMap { size: 4096 })
         .init_resource::<WorldSeed>()
         .add_plugins((
             camera::CameraPlugin,
@@ -345,7 +351,18 @@ pub fn spawn_lighting(mut commands: Commands) {
             // geometry-bound, not fill-bound - the cost is how many times the
             // world is re-drawn into the shadow passes, not how big the map is.
             num_cascades: 4,
-            first_cascade_far_bound: 40.0,
+            // FORTY WAS SIZED TO NOTHING THE CAMERA DOES. The god sits over a
+            // hundred units up in ordinary play, so the near cascade ended well
+            // inside the view and every shadow worth looking at was drawn into a
+            // middle one. A caster outside a cascade's box is not drawn into it
+            // at all, so the shadow does not soften at that line - it STOPS.
+            // Brett, with a low sun behind a signpost: "see how it is cut off,
+            // as I move around the cut moves up or down."
+            //
+            // A low sun is what makes it visible: shadows at dusk are many times
+            // longer than the thing casting them, so they are the first to run
+            // out of the box. Two hundred covers the near view whole.
+            first_cascade_far_bound: 200.0,
             maximum_distance: crate::calendar::SHADOW_REACH,
             ..default()
         }
