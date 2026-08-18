@@ -441,7 +441,18 @@ pub(crate) fn update_hud(
 
     for (value, mut text) in &mut values {
         let fresh = match value {
-            HudValue::Fps => format!("{fps:.0} fps"),
+            // THE CLOCK BESIDE THE FRAMERATE. Brett: "can we get a timer for
+            // how long the game has been running?"
+            //
+            // Because a framerate with no age beside it cannot be argued
+            // about. Half of one afternoon's performance hunt went into not
+            // knowing whether a number came from a ten-second-old world still
+            // streaming its patches in or a ten-minute-old one that had
+            // settled - and those are opposite problems with opposite fixes.
+            HudValue::Fps => {
+                let up = time.elapsed_secs() as u32;
+                format!("{}:{:02}   {fps:.0} fps", up / 60, up % 60)
+            }
             HudValue::Date => clock
                 .as_ref()
                 .map_or_else(|| "-".to_string(), |c| c.date_phrase()),

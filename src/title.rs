@@ -136,6 +136,13 @@ enum ViewSwitch {
     /// A matter of taste about how the game feels in the hand, which is
     /// exactly the kind of thing that wants an A and a B a second apart.
     HandSnaps,
+    /// The ground fog. Off, and the world is clear to the horizon.
+    ///
+    /// Its own switch because it is the most expensive pass in the game - a
+    /// sixteen-step raymarch over every pixel, measured at about twelve
+    /// milliseconds a frame - and the first thing worth turning off when the
+    /// framerate is being argued about.
+    Mist,
     /// The ring on the ground showing how wide the hand's reach is.
     ///
     /// Off by default, and deliberately: it is an aid for anybody who wants
@@ -153,9 +160,10 @@ enum ViewSwitch {
 }
 
 impl ViewSwitch {
-    const ALL: [ViewSwitch; 10] = [
+    const ALL: [ViewSwitch; 11] = [
         ViewSwitch::Clouds,
         ViewSwitch::Veil,
+        ViewSwitch::Mist,
         ViewSwitch::Reach,
         ViewSwitch::HandSnaps,
         ViewSwitch::Layer(Layer::Scenery),
@@ -170,6 +178,7 @@ impl ViewSwitch {
         match self {
             ViewSwitch::Clouds => "clouds",
             ViewSwitch::Veil => "the veil",
+            ViewSwitch::Mist => "the fog",
             ViewSwitch::Reach => "the hand's reach",
             ViewSwitch::HandSnaps => "a rigid hand",
             ViewSwitch::Layer(layer) => layer.label(),
@@ -182,6 +191,7 @@ impl ViewSwitch {
         match self {
             ViewSwitch::Clouds => "weather over the world",
             ViewSwitch::Veil => "unwalked ground kept dark",
+            ViewSwitch::Mist => "ground fog in the valleys - the costliest pass",
             ViewSwitch::Reach => "a ring where the hand would close",
             ViewSwitch::HandSnaps => "the hand pinned to the pointer, not gliding",
             ViewSwitch::Layer(layer) => layer.note(),
@@ -1911,6 +1921,9 @@ fn handle_view_switches(
         match switch {
             ViewSwitch::Clouds => clear.0 = !clear.0,
             ViewSwitch::Veil => fog.0 = !fog.0,
+            ViewSwitch::Mist => {
+                crate::render::aspectus::set_mist_off(!crate::render::aspectus::mist_is_off());
+            }
             ViewSwitch::Reach => reach.0 = !reach.0,
             ViewSwitch::HandSnaps => snaps.0 = !snaps.0,
             ViewSwitch::Layer(layer) => layers.toggle(*layer),
@@ -1922,6 +1935,8 @@ fn handle_view_switches(
         // there is weather, so the sky being clear is the switch being off.
         ViewSwitch::Clouds => !clear.0,
         ViewSwitch::Veil => fog.0,
+        // The switch reads as the THING: fog on means fog is drawn.
+        ViewSwitch::Mist => !crate::render::aspectus::mist_is_off(),
         ViewSwitch::Reach => reach.0,
         ViewSwitch::HandSnaps => snaps.0,
         ViewSwitch::Layer(layer) => layers.shown(*layer),

@@ -214,6 +214,47 @@ impl DivineEventKind {
         }
     }
 
+    /// HOW IT LANDS ON THE HEART, -1 to 1: what it does to somebody's spirits
+    /// when they learn of it.
+    ///
+    /// Separate from [`alarm`](Self::alarm), which is unsigned and only asks
+    /// how frightening a thing is. A birth is unalarming AND good; a mending
+    /// is unalarming and better still. Fright and sorrow are not the same
+    /// axis, and a village needs both.
+    ///
+    /// Brett: "let's say somebody's happy and their neighbor tells them that
+    /// someone got struck by lightning and killed - that could adjust their
+    /// mood." It could not, before this: the story changed hands and the
+    /// listener's spirits did not move, so news travelled through a village
+    /// without ever making anyone feel anything.
+    pub fn heart(self) -> f32 {
+        match self {
+            // Somebody is dead. Nothing else in the game is this heavy.
+            DivineEventKind::Perished => -0.45,
+            DivineEventKind::Fell => -0.40,
+            DivineEventKind::Mauled => -0.35,
+            // Not grief but horror, and horror at your own neighbours.
+            DivineEventKind::AteTheDead => -0.50,
+            DivineEventKind::Smote => -0.30,
+            DivineEventKind::Quaked => -0.25,
+            DivineEventKind::Uprooted => -0.18,
+            DivineEventKind::GoblinsSeen => -0.20,
+            DivineEventKind::DoubtSown => -0.15,
+            DivineEventKind::Thrown => -0.12,
+            DivineEventKind::Impact => -0.10,
+            // Being picked up by a god is not painful. It is not nothing.
+            DivineEventKind::Lifted => -0.04,
+            DivineEventKind::SetDown => 0.02,
+            // And the good half, which a village needs as much.
+            DivineEventKind::Delivered => 0.30,
+            DivineEventKind::Mended => 0.28,
+            DivineEventKind::Provided => 0.22,
+            DivineEventKind::Flourished => 0.18,
+            DivineEventKind::Beckoned => 0.08,
+            DivineEventKind::Rained => 0.06,
+        }
+    }
+
     /// How frightening it is, 0 to 1.
     pub fn alarm(self) -> f32 {
         match self {

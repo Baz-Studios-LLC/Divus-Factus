@@ -38,7 +38,29 @@
 /// A/B is the only measurement that counts here, because frame times in this
 /// game drift several milliseconds between runs for reasons that have nothing
 /// to do with the change being tested.
+/// Passes switched off from the settings screen, by name.
+///
+/// AN ATOMIC, because a render pass runs in the render world and cannot read a
+/// game resource. Brett wanted the fog off while he watched the framerate -
+/// "Can we get a toggle in The View for the fog? I would like to test the game
+/// with the fog completely turned off" - and a shared bit is the whole
+/// mechanism that needs.
+pub static MIST_IS_OFF: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Turns the mist off, or on.
+pub fn set_mist_off(off: bool) {
+    MIST_IS_OFF.store(off, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether the mist is off right now.
+pub fn mist_is_off() -> bool {
+    MIST_IS_OFF.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 pub fn pass_is_wanted(name: &str) -> bool {
+    if name == "mist" && mist_is_off() {
+        return false;
+    }
     static OFF: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
     let off = OFF.get_or_init(|| {
         std::env::var("DIVUS_FACTUS_NO")

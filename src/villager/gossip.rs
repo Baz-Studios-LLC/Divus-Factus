@@ -499,6 +499,13 @@ const STALE_AFTER: u32 = 2;
 /// "conversations move too quick to read everything sometimes." Six
 /// seconds a beat is the pace of people actually talking, and it gives
 /// a passing god time to read a whole exchange without pausing.
+/// How much of a feeling survives being retold, against having been there.
+///
+/// A third. Being told a man is dead is not standing over him - but it is not
+/// nothing either, and a village that has passed bad news around all afternoon
+/// ought to be quieter for it.
+const HEARSAY_CARRIES: f32 = 0.34;
+
 pub(crate) const A_CHAT_RUNS: f64 = 24.0;
 
 /// Whoever has news finds an idle neighbor and goes TO them: both stop,
@@ -1009,6 +1016,7 @@ pub(crate) fn hold_conversations(
                     // can now retell it — as something told to them, never
                     // seen, and in their own stance.
                     witnessed.hear(heard);
+
                     if let Some(mut chronicle) = chronicle {
                         chronicle.hear(clock.day(), &teller_name, &told);
                     }
@@ -1088,15 +1096,35 @@ pub(crate) fn hold_conversations(
                     // hearts wed less, which is where a dread god's
                     // demographics quietly begin.
                     if let Some(mut morale) = listener_morale {
-                        let alarm = kind.alarm();
-                        if alarm > 0.5 {
-                            morale.spirits = (morale.spirits - alarm * 0.05).max(0.0);
-                            if let Some(stirred) = stirred.as_mut() {
+                        // WHAT THE NEWS WAS, not how frightening it was.
+                        //
+                        // This read `alarm()`, which is unsigned and only asks
+                        // how frightening a thing is - so it needed two gates
+                        // (above 0.5 is bad, below 0.1 is good) and everything
+                        // between moved nobody. Worse, a BIRTH lifted spirits
+                        // by exactly as much as rain did, because both are
+                        // unalarming, and news of a mauling and news of an
+                        // earthquake weighed the same to within a hair.
+                        //
+                        // `heart()` is signed and per-kind: a death is heavy, a
+                        // mending is light, and the middle of the range finally
+                        // does something.
+                        let felt = kind.heart() * HEARSAY_CARRIES;
+                        // The WARM feel other people's news more. It is the one
+                        // axis of the temperament that is about caring what
+                        // becomes of somebody else, so it is the one that
+                        // belongs here: a cold man hears the same words and
+                        // goes back to his work.
+                        let openness = voices
+                            .get(talk.partner)
+                            .ok()
+                            .and_then(|(_, temperament, _)| temperament.map(|t| t.warmth))
+                            .map_or(1.0, |warmth| 0.55 + warmth * 0.9);
+                        morale.spirits = (morale.spirits + felt * openness).clamp(0.0, 1.0);
+                        if let Some(stirred) = stirred.as_mut() {
+                            if felt < -0.1 {
                                 stirred.stir(clock.day(), "dark word weighed on them");
-                            }
-                        } else if alarm < 0.1 {
-                            morale.spirits = (morale.spirits + 0.03).min(1.0);
-                            if let Some(stirred) = stirred.as_mut() {
+                            } else if felt > 0.05 {
                                 stirred.stir(clock.day(), "good word lifted them");
                             }
                         }

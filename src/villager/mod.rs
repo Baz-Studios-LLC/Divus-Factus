@@ -28,6 +28,8 @@ pub mod regard;
 pub(crate) use gossip::*;
 
 use bevy::prelude::*;
+use bevy::time::common_conditions::on_timer;
+use std::time::Duration;
 
 use crate::creature::anim::CreatureMotion;
 use crate::creature::body::{CreatureAssets, build_body};
@@ -480,19 +482,39 @@ impl Plugin for VillagerPlugin {
                     )
                         .chain(),
                     (
-                        home::assign_homes,
-                        home::rehome_the_misplaced,
+                        // THROTTLED, because forty-two times a second is a rate
+                        // nothing here needs. Brett: "there has to be a ton of
+                        // systems that run every frame that would be better run
+                        // way less often. Even if small that has to be a win."
+                        //
+                        // He is right, and the rates below are chosen by what a
+                        // PLAYER could notice rather than by what is safe for
+                        // the simulation: a fire burning low, a household
+                        // deciding it is supper time, a villager stood in the
+                        // wrong house - none of these change meaning if the
+                        // answer arrives a second late.
+                        //
+                        // Not `assign_beds`, which was the first candidate and
+                        // is already better than throttled: its query carries
+                        // `Changed<Home>`, so it costs nothing on a frame when
+                        // nobody moved AND still answers a newborn instantly.
+                        // Change detection beats a timer wherever it applies.
+                        home::assign_homes.run_if(on_timer(Duration::from_millis(500))),
+                        home::rehome_the_misplaced.run_if(on_timer(Duration::from_secs(4))),
                         colony::muster_colonists,
                         colony::walk_to_the_new_ground,
-                        home::burn_weathered,
-                        home::take_shelter,
-                        home::midday_meal,
-                        home::family_supper,
-                        home::tavern_evenings,
-                        home::well_gatherings,
-                        home::tavern_cheer,
-                        home::tend_fire,
-                        home::night_routine,
+                        home::burn_weathered.run_if(on_timer(Duration::from_secs(4))),
+                        // Half a second: rain starting is player-visible, and a
+                        // village that strolls indoors two seconds late reads
+                        // as a village that did not notice the weather.
+                        home::take_shelter.run_if(on_timer(Duration::from_millis(500))),
+                        home::midday_meal.run_if(on_timer(Duration::from_millis(750))),
+                        home::family_supper.run_if(on_timer(Duration::from_millis(750))),
+                        home::tavern_evenings.run_if(on_timer(Duration::from_millis(750))),
+                        home::well_gatherings.run_if(on_timer(Duration::from_millis(750))),
+                        home::tavern_cheer.run_if(on_timer(Duration::from_secs(1))),
+                        home::tend_fire.run_if(on_timer(Duration::from_secs(2))),
+                        home::night_routine.run_if(on_timer(Duration::from_millis(500))),
                         home::use_doors,
                         home::weariness,
                         home::burn,
