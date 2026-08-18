@@ -61,9 +61,22 @@ const AROUND: usize = 64;
 /// the whole point of this is to be readable at a glance.
 const BAND: f32 = 0.82;
 
-/// How high off the ground it sits, in meters - just enough not to fight the
-/// terrain for the same depth.
-const CLEARANCE: f32 = 0.08;
+/// How high off the ground it sits, in meters.
+///
+/// The ground under it is sampled with `base_height_at`, but the terrain that
+/// gets DRAWN is a chunk mesh sampled at the chunk's own spacing and
+/// interpolated between - so between vertices the drawn surface can sit above
+/// the height the ring measured, and the ring is under the world. Blood hit
+/// exactly this and answered it with a depth bias; this does both.
+const CLEARANCE: f32 = 0.14;
+
+/// How hard the ring wins the depth fight against the ground.
+///
+/// Blood needed 8 to stop flickering where it lay. A ring is thinner and the
+/// grass stands in front of it as well, so it takes a great deal more: this
+/// is a pointer aid and it is allowed to be drawn over the world, the way a
+/// cursor is.
+const OVER_THE_WORLD: f32 = 2_000.0;
 
 /// How far the cursor must move before the ring is rebuilt, in meters.
 ///
@@ -127,6 +140,7 @@ fn draw_the_reach(
             base_color: Color::srgb(1.6, 2.6, 3.4),
             unlit: true,
             alpha_mode: AlphaMode::Blend,
+            depth_bias: OVER_THE_WORLD,
             ..default()
         })),
         // The corners carry the position; this is never moved. See the module
