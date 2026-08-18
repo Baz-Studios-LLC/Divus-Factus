@@ -35,6 +35,7 @@ use bevy::prelude::*;
 
 pub mod bench;
 mod corpus;
+pub mod vault;
 #[cfg(feature = "living-voice")]
 pub mod vivarium;
 

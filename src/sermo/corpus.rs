@@ -111,7 +111,7 @@ pub struct Corpus {
 }
 
 /// A stable id for a line: FNV-1a over its words.
-fn id_of(text: &str) -> u64 {
+pub(crate) fn id_of(text: &str) -> u64 {
     let mut hash: u64 = 0xcbf29ce484222325;
     for byte in text.as_bytes() {
         hash ^= *byte as u64;
