@@ -165,6 +165,29 @@ impl TreeKind {
     }
 }
 
+/// The middle of a baked plant and how far it reaches, from the corners it
+/// put into the mesh.
+///
+/// `middle` is measured up from the plant's own base, so a handle placed
+/// there sits inside the thing rather than under it; `reach` is whichever of
+/// its half-height and its horizontal radius is larger, which is what makes
+/// one sphere cover both a squat bush and a stand of reeds.
+fn plant_extent(corners: &[[f32; 3]], base: Vec3) -> (f32, f32) {
+    if corners.is_empty() {
+        return (0.8, 1.6);
+    }
+    let mut high = f32::MIN;
+    let mut wide = 0.0f32;
+    for corner in corners {
+        high = high.max(corner[1] - base.y);
+        wide = wide.max((corner[0] - base.x).hypot(corner[2] - base.z));
+    }
+    let middle = (high * 0.5).max(0.3);
+    // A floor, so a sapling is still catchable, and no ceiling: a full-grown
+    // broadleaf should be as easy to point at as it looks.
+    (middle, middle.max(wide).max(0.9))
+}
+
 /// Whether reeds could stand at this spot: close enough to still water, or
 /// on a river's bank.
 ///
@@ -786,7 +809,7 @@ fn populate_chunks(
 
                 // Dry and alpine country carries far fewer trees, which is most of
                 // what makes one region look unlike another from the air.
-                let tree_chance = match biome {
+                let tree_chance: f32 = match biome {
                     Biome::Arid => 0.10,
                     Biome::Alpine => 0.16,
                     Biome::Boreal => 0.55,
@@ -856,22 +879,38 @@ fn populate_chunks(
                     } else {
                         stripped.growth_at(x, z, today)
                     };
-                    if rng.chance(tree_chance * (0.55 + density)) {
-                        let mut kind = *rng.pick(TreeKind::for_biome(biome));
-                        // REEDS GROW AT THE WATER, and nowhere else. Brett:
-                        // "these things are EVERYWHERE!!! There are way to
-                        // manny, plus I am not even really sure what they
-                        // are."
-                        //
-                        // They were four sevenths of everything wet country
-                        // grew, over the whole biome - and wet country is not
-                        // a swamp from edge to edge, it is ordinary ground
-                        // with water in it. So a stand of reeds stood on dry
-                        // hillsides half a kilometer from the nearest puddle,
-                        // which is both wrong and the reason there were so
-                        // many. Now they need a shore or a bank, and anywhere
-                        // else the spot grows whatever else the country has.
-                        if kind == TreeKind::Reed && !reeds_could_stand(&terrain, x, z, height) {
+                    // REEDS ARE A WATER'S-EDGE PLANT, not a country's plant.
+                    //
+                    // They were four sevenths of everything wet country grew,
+                    // over the whole biome - and wet country is not a swamp
+                    // from edge to edge, it is ordinary ground with water in
+                    // it, so stands of reeds stood on dry hillsides half a
+                    // kilometer from the nearest puddle. Brett: "these things
+                    // are EVERYWHERE!!! There are way to manny."
+                    //
+                    // But the same table also meant a river running through
+                    // TEMPERATE country grew none at all, because reeds were
+                    // not on temperate's list - Brett: "shouldn't reeds grow
+                    // along river edges more often as well?" They should, and
+                    // in any country: a bank is a bank. So the shore decides
+                    // this and the biome does not, both ways.
+                    let bank = reeds_could_stand(&terrain, x, z, height);
+                    // A bank is green whatever the country is. Without this a
+                    // desert river - which is the one place in a desert that
+                    // anything grows - stayed as bare as the dunes, because
+                    // arid only seeds a tenth of its spots at all.
+                    let seeding = if bank {
+                        tree_chance.max(0.5)
+                    } else {
+                        tree_chance
+                    };
+                    if rng.chance(seeding * (0.55 + density)) {
+                        let mut kind = if bank && rng.chance(0.55) {
+                            TreeKind::Reed
+                        } else {
+                            *rng.pick(TreeKind::for_biome(biome))
+                        };
+                        if kind == TreeKind::Reed && !bank {
                             let dry: Vec<TreeKind> = TreeKind::for_biome(biome)
                                 .iter()
                                 .copied()
@@ -1051,16 +1090,23 @@ fn populate_chunks(
         for (_, members) in buckets {
             let anchor = members.iter().map(|(at, _)| *at).sum::<Vec3>() / members.len() as f32;
             let mut grove_mesh = MeshBuilder::default();
-            let mut bodies: Vec<(Vec3, TreeBody)> = Vec::new();
+            let mut bodies: Vec<(Vec3, TreeBody, f32, f32)> = Vec::new();
             for (local, kind) in &members {
                 let body = TreeBody::at(*kind, local.x, local.z);
+                // MEASURE WHAT WAS ACTUALLY BAKED, by watching the corners
+                // this one plant added. Every kind rolls its own dimensions
+                // inside `bake_tree`, so the alternative is re-rolling them
+                // out here and trusting the two to stay in step forever.
+                let before = grove_mesh.corners().len();
                 bake_tree(
                     &mut grove_mesh,
                     *local - anchor,
                     body.kind,
                     &mut Rng::new(body.seed),
                 );
-                bodies.push((*local, body));
+                let (middle, reach) =
+                    plant_extent(&grove_mesh.corners()[before..], *local - anchor);
+                bodies.push((*local, body, middle, reach));
             }
             let grove = commands
                 .spawn((
@@ -1074,15 +1120,22 @@ fn populate_chunks(
                     ChildOf(entity),
                 ))
                 .id();
-            for (local, body) in bodies {
+            for (local, body, middle, reach) in bodies {
                 let stem = commands
                     .spawn((
                         Name::new(body.kind.called()),
                         body,
                         InGrove(grove),
+                        // WHERE THE PLANT IS. This is also where the grove
+                        // re-bakes it, so it is the base and nothing else -
+                        // raising it here raised the geometry with it and
+                        // lifted whole stands off the ground.
                         Transform::from_translation(local),
                         Visibility::default(),
-                        crate::hand::PickRadius(1.6),
+                        // Pointed at around its middle, though, which is a
+                        // different fact. See `PickLift`.
+                        crate::hand::PickRadius(reach),
+                        crate::hand::PickLift(middle),
                         ChildOf(entity),
                     ))
                     .id();
@@ -2552,6 +2605,62 @@ mod tests {
 
             let distinct: std::collections::HashSet<_> = kinds.iter().collect();
             assert!(distinct.len() >= 2, "{biome:?} grows only one kind of tree");
+        }
+    }
+}
+
+#[cfg(test)]
+mod reeds {
+    use super::*;
+
+    /// A reed bed is a stand of many thin stalks, about half of them carrying
+    /// a cattail, and it stands UP.
+    ///
+    /// Pinned because it was none of those: six to nine thick stalks leaning
+    /// every way, which Brett read - correctly - as "a pile of sticks lol".
+    #[test]
+    fn a_reed_bed_is_not_a_pile_of_sticks() {
+        for seed in [1u64, 7, 44, 900] {
+            let mut builder = MeshBuilder::default();
+            bake_tree(
+                &mut builder,
+                Vec3::ZERO,
+                TreeKind::Reed,
+                &mut Rng::new(seed),
+            );
+            let corners = builder.corners();
+            // Eight corners a box: twenty stalks is the floor, and about half
+            // of them carry a head on top of that.
+            let boxes = corners.len() / 8;
+            assert!(
+                boxes >= 20,
+                "a bed of {boxes} pieces is a bundle, not a stand"
+            );
+
+            let high = corners.iter().map(|c| c[1]).fold(0.0f32, f32::max);
+            let wide = corners
+                .iter()
+                .map(|c| c[0].abs().max(c[2].abs()))
+                .fold(0.0f32, f32::max);
+            // TALLER THAN IT IS WIDE, which is what standing up means.
+            assert!(
+                high > wide * 1.6,
+                "a bed {high:.2} tall and {wide:.2} across is lying down"
+            );
+
+            // And the tops are at MANY heights. Brett: "all different
+            // heights." Every stalk ending together would be a comb.
+            let mut tops: Vec<i32> = corners
+                .iter()
+                .map(|c| (c[1] / high * 12.0) as i32)
+                .collect();
+            tops.sort_unstable();
+            tops.dedup();
+            assert!(
+                tops.len() >= 8,
+                "a bed whose corners land in {} bands is cut level",
+                tops.len()
+            );
         }
     }
 }

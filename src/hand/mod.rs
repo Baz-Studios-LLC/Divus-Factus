@@ -393,6 +393,22 @@ impl Plugin for HandPlugin {
 #[derive(Component)]
 pub struct PickRadius(pub f32);
 
+/// How far ABOVE its own origin a thing should be pointed at, in meters.
+///
+/// The pick sphere is centered on the entity, and for anything tall standing
+/// on the ground that is its feet - so a reed bed two and a half meters high
+/// could be seen and never touched, because the cattails a player actually
+/// aims at from a god's eye were a clear meter outside the sphere. Brett:
+/// "the normal looking ones I can see but not highlight or grab."
+///
+/// It is a SEPARATE component and not simply a taller `Transform`, which is
+/// what the first attempt did: a grove re-bakes each of its plants at that
+/// plant's transform, so raising them raised the geometry too and the whole
+/// stand lifted off the ground - "they are floatin". Where a thing IS and
+/// where it is POINTED AT are two different facts.
+#[derive(Component)]
+pub struct PickLift(pub f32);
+
 /// Freshly set down by the hand of god.
 ///
 /// The mark fades in under half a minute. Its whole purpose is answered
@@ -588,13 +604,15 @@ impl DivineHand {
 /// Closest object whose bounding sphere the ray passes through.
 fn pick_object(
     ray: Ray3d,
-    candidates: &Query<(Entity, &GlobalTransform, &PickRadius), Without<Held>>,
+    candidates: &Query<(Entity, &GlobalTransform, &PickRadius, Option<&PickLift>), Without<Held>>,
     max_distance: f32,
 ) -> Option<Entity> {
     let mut best: Option<(f32, Entity)> = None;
 
-    for (entity, transform, radius) in candidates.iter() {
-        let center = transform.translation();
+    for (entity, transform, radius, lift) in candidates.iter() {
+        // Up the thing's OWN up, which on a round world is not the world's.
+        let center =
+            transform.translation() + lift.map_or(Vec3::ZERO, |lift| transform.up() * lift.0);
         let to_center = center - ray.origin;
         let along = to_center.dot(*ray.direction);
 
@@ -669,7 +687,7 @@ fn update_hover(
     windows: Query<&Window, With<PrimaryWindow>>,
     cameras: Query<(&Camera, &GlobalTransform), With<GodCamera>>,
     rigs: Query<&CameraRig>,
-    candidates: Query<(Entity, &GlobalTransform, &PickRadius), Without<Held>>,
+    candidates: Query<(Entity, &GlobalTransform, &PickRadius, Option<&PickLift>), Without<Held>>,
     pointer: Res<PointerContext>,
     mut hand: ResMut<DivineHand>,
 ) {
