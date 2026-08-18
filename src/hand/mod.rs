@@ -606,6 +606,9 @@ fn pick_object(
     ray: Ray3d,
     candidates: &Query<(Entity, &GlobalTransform, &PickRadius, Option<&PickLift>), Without<Held>>,
     max_distance: f32,
+    // How far along the ray the ground is. Anything beyond it is behind a
+    // hill or under the map, whatever the cursor happens to line up with.
+    ground: f32,
 ) -> Option<Entity> {
     let mut best: Option<(f32, Entity)> = None;
 
@@ -617,6 +620,13 @@ fn pick_object(
         let along = to_center.dot(*ray.direction);
 
         if along < 0.0 || along > max_distance {
+            continue;
+        }
+
+        // Behind the ground. Its own radius is the allowance: a thing sitting
+        // ON a slope is a little past where the ray met the earth, and half a
+        // meter more so nothing on flat ground is lost to rounding.
+        if along > ground + radius.0 + 0.5 {
             continue;
         }
 
@@ -684,8 +694,6 @@ fn update_hand_ray(
 }
 
 fn update_hover(
-    windows: Query<&Window, With<PrimaryWindow>>,
-    cameras: Query<(&Camera, &GlobalTransform), With<GodCamera>>,
     rigs: Query<&CameraRig>,
     candidates: Query<(Entity, &GlobalTransform, &PickRadius, Option<&PickLift>), Without<Held>>,
     pointer: Res<PointerContext>,
@@ -703,17 +711,29 @@ fn update_hover(
         return;
     }
 
-    let (Ok(window), Ok((camera, camera_transform))) = (windows.single(), cameras.single()) else {
+    // THE SAME RAY THE HAND USES. This built its own from the camera's
+    // `GlobalTransform`, which is exactly what `update_hand_ray` documents at
+    // length as the wrong thing to do: that transform syncs in PostUpdate and
+    // is a frame stale, so while the camera was moving - a drag, a follow,
+    // the opening descent - the highlight was cast from where the eye had
+    // been and the grab from where it was. They disagreed about what was
+    // under the cursor, every frame the view was not perfectly still.
+    //
+    // This system is chained after the one that computes it, so it is fresh.
+    let Some(ray) = hand.cursor_ray else {
         return;
     };
-    let Some(cursor) = window.cursor_position() else {
-        return;
-    };
-    let Ok(ray) = camera.viewport_to_world(camera_transform, cursor) else {
-        return;
-    };
+    // What the ground is doing under the cursor, so nothing is picked THROUGH
+    // it. The pick is a ray against spheres and knows nothing about what is
+    // in the way, so a villager behind a hill was as pickable as one in front
+    // of it - and on a round world "behind a hill" includes everything past
+    // the near limb.
+    let ground = hand
+        .cursor_world
+        .map(|hit| hit.distance(ray.origin))
+        .unwrap_or(f32::MAX);
 
-    hand.hovered = pick_object(ray, &candidates, 600.0);
+    hand.hovered = pick_object(ray, &candidates, 600.0, ground);
 }
 
 /// A clean action-tap on a dwelling knocks on the roof.
