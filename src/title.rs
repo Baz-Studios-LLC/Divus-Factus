@@ -42,6 +42,7 @@ impl Plugin for TitlePlugin {
                     auto_title.run_if(in_state(GameState::Playing)),
                     handle_settings,
                     handle_view_switches,
+                    the_living_voice_says_where_it_stands,
                     style_menu_buttons,
                     // Before the codex's own Escape handling, so the frame
                     // that shuts the book sees it still open and yields -
@@ -1566,6 +1567,21 @@ pub(crate) fn build_sermo_page(commands: &mut Commands, parent: Entity) {
 
     spawn_switch(commands, parent, ViewSwitch::LivingVoice);
 
+    // WHY IT WILL NOT MOVE, when it will not. Kept as its own line and
+    // rewritten every frame from the one truth - whether a key was found at
+    // startup - so it cannot say one thing while the switch does another.
+    let standing = commands
+        .spawn((
+            LivingVoiceStanding,
+            ui::dim(""),
+            Node {
+                margin: UiRect::vertical(px(6)),
+                ..default()
+            },
+        ))
+        .id();
+    commands.entity(standing).insert(ChildOf(parent));
+
     // The plain truth about what the switch costs, because it is the only
     // setting in this game that reaches off the machine.
     for line in [
@@ -1664,6 +1680,38 @@ fn spawn_switch(commands: &mut Commands, screen: Entity, switch: ViewSwitch) {
     }
 }
 
+/// The line under the living voice's switch that says where it stands.
+#[derive(Component)]
+struct LivingVoiceStanding;
+
+/// Says plainly whether there is a key, and dims the switch when there is not.
+///
+/// A switch that can be flipped while doing nothing is the worst of the three
+/// possible designs; the other two are hiding it and explaining it, and
+/// explaining it is kinder to the person who has a key and has mistyped the
+/// variable's name.
+fn the_living_voice_says_where_it_stands(
+    tongue: Option<Res<crate::sermo::Tongue>>,
+    chosen: Res<crate::sermo::LivingVoice>,
+    mut standing: Query<&mut Text, With<LivingVoiceStanding>>,
+) {
+    let Ok(mut text) = standing.single_mut() else {
+        return;
+    };
+    let has_key = tongue.as_deref().is_some_and(|t| t.has_a_living_voice());
+    let said = if !has_key {
+        "No key found. Set OPENAI_API_KEY in the environment and start the game again; \
+         until then the village speaks from the corpus."
+    } else if chosen.0 {
+        "On. Villagers are speaking lines written as each moment arrives."
+    } else {
+        "A key is set. Turn this on and the village stops using the written corpus."
+    };
+    if text.0 != said {
+        *text = Text::new(said);
+    }
+}
+
 /// The knob inside a switch's track, which slides to say which way it is set.
 #[derive(Component)]
 struct SwitchKnob(ViewSwitch);
@@ -1679,6 +1727,7 @@ fn handle_view_switches(
     mut reach: ResMut<crate::hand::ShowTheReach>,
     mut snaps: ResMut<crate::hand::HandSnaps>,
     mut living: ResMut<crate::sermo::LivingVoice>,
+    tongue: Option<Res<crate::sermo::Tongue>>,
     mut layers: ResMut<crate::debug::layers::ViewLayers>,
     mut tracks: Query<(&ViewSwitch, &mut BackgroundColor, &mut BorderColor)>,
     mut knobs: Query<(&SwitchKnob, &mut Node, &mut BackgroundColor), Without<ViewSwitch>>,
@@ -1692,7 +1741,12 @@ fn handle_view_switches(
             ViewSwitch::Veil => fog.0 = !fog.0,
             ViewSwitch::Reach => reach.0 = !reach.0,
             ViewSwitch::HandSnaps => snaps.0 = !snaps.0,
-            ViewSwitch::LivingVoice => living.0 = !living.0,
+            // REFUSED WITHOUT A KEY. Turning it off is always allowed; it is
+            // only turning it ON that would be a lie, and a switch that lies
+            // is worse than one that is missing.
+            ViewSwitch::LivingVoice => {
+                living.0 = !living.0 && tongue.as_deref().is_some_and(|t| t.has_a_living_voice());
+            }
             ViewSwitch::Layer(layer) => layers.toggle(*layer),
         }
     }
@@ -1707,21 +1761,34 @@ fn handle_view_switches(
         ViewSwitch::LivingVoice => living.0,
         ViewSwitch::Layer(layer) => layers.shown(*layer),
     };
+    // A switch with nothing behind it reads as UNAVAILABLE rather than as
+    // merely off: fainter than an off switch, so the eye can tell the
+    // difference between "I have not turned this on" and "I cannot".
+    let usable = |switch: &ViewSwitch| {
+        *switch != ViewSwitch::LivingVoice
+            || tongue.as_deref().is_some_and(|t| t.has_a_living_voice())
+    };
     for (switch, mut fill, mut border) in &mut tracks {
         let lit = on(switch);
+        let can = usable(switch);
         *fill = BackgroundColor(if lit {
             theme::accent().with_alpha(0.30)
-        } else {
+        } else if can {
             theme::title_bg()
+        } else {
+            theme::title_bg().with_alpha(0.4)
         });
         *border = BorderColor::all(if lit {
             theme::accent()
-        } else {
+        } else if can {
             theme::panel_border().with_alpha(0.5)
+        } else {
+            theme::panel_border().with_alpha(0.18)
         });
     }
     for (knob, mut node, mut fill) in &mut knobs {
         let lit = on(&knob.0);
+        let can = usable(&knob.0);
         node.margin = if lit {
             UiRect::left(px(26))
         } else {
@@ -1729,8 +1796,10 @@ fn handle_view_switches(
         };
         *fill = BackgroundColor(if lit {
             theme::accent()
-        } else {
+        } else if can {
             theme::panel_border()
+        } else {
+            theme::panel_border().with_alpha(0.35)
         });
     }
 }

@@ -237,6 +237,18 @@ impl Tongue {
     /// not been asked about before, which it now will be. A brand-new moment
     /// is QUIET rather than delayed: nothing here waits on a network, and the
     /// next equivalent moment will have the line.
+    /// Whether there is a key to speak with at all.
+    ///
+    /// False on every machine that has not set `OPENAI_API_KEY`, which is
+    /// every machine but a developer's. The settings page asks this so the
+    /// switch can say WHY it will not move, rather than moving and doing
+    /// nothing - Brett: "Does the game gracefully tell the user if they are
+    /// missing a key that they cant use the feature and prevent them from
+    /// activating it?"
+    pub fn has_a_living_voice(&self) -> bool {
+        self.living.is_some()
+    }
+
     /// Whether generated speech is what a villager would answer with right
     /// now: the switch is on AND there is a key behind it.
     ///
