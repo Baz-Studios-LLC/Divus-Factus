@@ -14,5 +14,10 @@ __pycache__/
 # fork kept its key in a file beside the executable and a copied habit is how
 # these things get committed. Belt and braces.
 OpenAI-API-Key.txt
+# Whatever the file is called. Brett keeps one at OENAI_API_KEY.txt - the
+# typo is exactly why this globs rather than naming it, and why the launcher
+# below finds it by pattern instead of by an exact name.
+*API_KEY*.txt
+*API-KEY*.txt
 *.api-key
 .env

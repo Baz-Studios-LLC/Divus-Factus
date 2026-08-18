@@ -74,6 +74,7 @@ pub mod vivarium {
         pub speaker: u64,
         pub register: String,
         pub text: String,
+        pub tags: Vec<String>,
     }
 
     pub fn probe() {}
@@ -251,27 +252,133 @@ pub struct Tongue {
     /// and is simply not consulted, which keeps turning it on a switch rather
     /// than a restart.
     living: Option<vivarium::Vivarium>,
-    /// Whether that voice is the one speaking. Mirrored here from the
-    /// settings switch so the pick sites do not each need the resource.
-    living_speaks: bool,
+    /// Which of the three is answering. Mirrored here from the settings so
+    /// the pick sites do not each need the resource.
+    voice_from: Voice,
+    /// Everything the living voice has ever written down, and where it writes.
+    vault: Option<vault::Vault>,
+    /// How many lines it has put there this run, for the dev panel - a number
+    /// that only moves while the factory is running is the quickest way to
+    /// see that it IS running.
+    kept: usize,
 }
 
 /// Carries the settings switch into the Tongue, and takes in whatever the
 /// living voice finished writing since the last tick.
-fn the_living_voice_answers(chosen: Res<LivingVoice>, mut tongue: ResMut<Tongue>) {
-    tongue.hear_the_living(chosen.0);
+fn the_living_voice_answers(chosen: Res<Voice>, mut tongue: ResMut<Tongue>) {
+    tongue.speak_with(*chosen);
 }
 
-/// Whether generated speech is answering instead of the corpus.
+/// WHERE THE WORDS COME FROM. Three places, and they are genuinely different
+/// things rather than three settings of one thing.
 ///
-/// A RESOURCE and a settings switch rather than an environment variable,
-/// because it is a thing to try mid-run and hear the difference - Brett: "add
-/// a toggle to the Sermo tab in settings to use prewritten voices or ChatGPT
-/// voices."
-#[derive(Resource, Default)]
-pub struct LivingVoice(pub bool);
+/// Brett: "in the settings for sermo I can turn their voice to one of three
+/// different settings. Authored, ChatGPT or the database."
+#[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Voice {
+    /// The hand-written corpus in `assets/voice`. Instant, free, offline, and
+    /// the only one a player will ever hear.
+    #[default]
+    Authored,
+    /// Written as the moment arrives, and WRITTEN DOWN as it goes: every line
+    /// the model gives that passes the gates is put in the vault with its
+    /// tags. This is the factory.
+    Generated,
+    /// Everything the factory has made so far, read back off disk. No key, no
+    /// network, no cost - which is the whole point of having written it down.
+    Vault,
+}
+
+impl Voice {
+    pub fn label(self) -> &'static str {
+        match self {
+            Voice::Authored => "authored",
+            Voice::Generated => "ChatGPT",
+            Voice::Vault => "the vault",
+        }
+    }
+
+    pub fn note(self) -> &'static str {
+        match self {
+            Voice::Authored => "the written corpus - instant, and what ships",
+            Voice::Generated => "written as each moment arrives, and kept",
+            Voice::Vault => "everything ChatGPT has written so far, off disk",
+        }
+    }
+}
 
 impl Tongue {
+    /// ONE DOOR FOR ALL THREE VOICES, so no caller has to know which is on.
+    ///
+    /// Generated speech falls back to the authored corpus when it has nothing
+    /// yet - a moment the model has never met is quiet until the words come
+    /// back, and a written line beats silence in the meantime. The vault falls
+    /// back the same way, because it starts empty and fills as ChatGPT talks.
+    fn said(
+        &mut self,
+        speaker: u64,
+        tags: &[&str],
+        slots: &[(&str, &str)],
+        must: &[&str],
+    ) -> Option<String> {
+        let written = |me: &mut Self| {
+            if must.is_empty() {
+                me.voice.pick(speaker, tags, slots, &mut me.dice)
+            } else {
+                me.voice
+                    .pick_within(speaker, tags, slots, must, &mut me.dice)
+            }
+        };
+        match self.voice_from {
+            Voice::Authored => written(self),
+            // CHATGPT ANSWERS OR NOBODY DOES, the same as the vault.
+            // Falling back to the written corpus would mean most of what
+            // you heard while testing was the corpus wearing ChatGPT's
+            // name, and the generated voice could not be judged at all.
+            // Brett: "Same in ChatGPT mode, no fallback."
+            //
+            // So a moment it has not met is SILENT until the words come
+            // back - and then the person says them, and every equivalent
+            // moment after that is answered at once.
+            Voice::Generated => self
+                .living
+                .as_mut()
+                .and_then(|v| v.ask(speaker, tags, slots, None)),
+            // THE VAULT ANSWERS OR NOBODY DOES. No falling back to the
+            // written corpus, on purpose: an empty vault that quietly spoke
+            // authored lines would sound exactly like the authored setting,
+            // and there would be no way to tell whether the vault was being
+            // used at all. Silence is the honest reading of "nothing written
+            // for this yet", and it is also the coverage report - the moments
+            // that stay quiet are precisely the ones still to generate.
+            Voice::Vault => self.from_the_vault(speaker, tags, slots, must),
+        }
+    }
+
+    /// The best line the vault holds for this moment, scored the way the
+    /// authored corpus scores its own.
+    ///
+    /// The SELECTION is SQL and the RANKING is here - see [`vault`]. Specific
+    /// lines beat general ones, and the weighted dice break the tie.
+    fn from_the_vault(
+        &mut self,
+        _speaker: u64,
+        tags: &[&str],
+        slots: &[(&str, &str)],
+        must: &[&str],
+    ) -> Option<String> {
+        let found = self.vault.as_ref()?.eligible(tags, must, slots).ok()?;
+        let mut best: Option<(f32, &vault::Candidate)> = None;
+        for line in &found {
+            let score = line.tag_count as f32 * 10.0 + line.w * self.dice.range(0.0, 3.0);
+            if best.as_ref().is_none_or(|(top, _)| score > *top) {
+                best = Some((score, line));
+            }
+        }
+        let said = best?.1.t.clone();
+        Some(corpus::dress(&said, slots, &mut self.dice))
+    }
+
     /// Asks the living voice, if it is awake and the player has chosen it.
     ///
     /// `None` means either that the voice is off - in which case the corpus
@@ -291,41 +398,82 @@ impl Tongue {
         self.living.is_some()
     }
 
-    /// Whether generated speech is what a villager would answer with right
-    /// now: the switch is on AND there is a key behind it.
-    ///
-    /// Read by the dev panel, which is the one place that has to tell the
-    /// difference between "off" and "no key" while a game is running.
-    pub fn living_speaks(&self) -> bool {
-        self.living_speaks && self.living.is_some()
+    /// Which voice is actually answering, allowing for a chosen one that
+    /// cannot: ChatGPT with no key behind it speaks as the corpus does.
+    pub fn speaking_with(&self) -> Voice {
+        match self.voice_from {
+            Voice::Generated if self.living.is_none() => Voice::Authored,
+            Voice::Vault if self.vault.is_none() => Voice::Authored,
+            chosen => chosen,
+        }
     }
 
-    /// Turns the living voice on or off, and takes in whatever it finished
-    /// writing since the last tick.
+    /// Chooses which voice answers, and takes in - and WRITES DOWN - whatever
+    /// the living one finished since the last tick.
     ///
     /// THE WORDS CATCH UP. A moment the voice had never met went by in
     /// silence while it was being written, and when it arrives the person who
     /// was quiet says it - held as a musing, aloud unless it was a thought.
     /// Without this the FIRST of every kind of moment is lost for good and
     /// only the second one ever speaks, which on a rare beat means never.
-    pub fn hear_the_living(&mut self, chosen: bool) {
-        self.living_speaks = chosen;
+    pub fn speak_with(&mut self, chosen: Voice) {
+        self.voice_from = chosen;
         let Some(living) = self.living.as_mut() else {
             return;
         };
         let caught_up = living.take_ready();
-        if !chosen {
+        if chosen != Voice::Generated {
             // Still drained, or a switch flipped off and on again would spill
             // a backlog of lines into whoever happened to be standing there.
             return;
         }
         for line in caught_up {
+            // WRITTEN DOWN FIRST, because a line that is only spoken is a line
+            // paid for and thrown away. Brett: "it talks for them and
+            // automatically writes the lines to the data base with tags and
+            // everything."
+            if let Some(vault) = self.vault.as_ref() {
+                let kept = vault.remember(&corpus::Line {
+                    t: line.text.clone(),
+                    tags: line.tags.clone(),
+                    w: 1.0,
+                    once: false,
+                });
+                match kept {
+                    Ok(true) => self.kept += 1,
+                    Ok(false) => {}
+                    Err(error) => warn!("the vault would not take a line: {error}"),
+                }
+            }
+            // NOBODY IN PARTICULAR SAYS NOTHING. `line()` - the retelling
+            // path - passes 0 as a placeholder meaning "no speaker", and 0 is
+            // a perfectly valid entity: the catch-up put those lines in the
+            // mouth of whoever entity 0 happened to be, typically one of the
+            // first founders.
+            //
+            // Brett watched a man announce he had seen goblins in a world
+            // that had none: "the game had just started and there were no
+            // goblins and that dude said he saw one." He had not seen one.
+            // The line was written for a retelling with no speaker at all,
+            // and then handed to him.
+            //
+            // A line with no speaker is still worth having - it goes in the
+            // vault, where a real moment can find it later - but it must
+            // never be SAID by somebody the game did not choose.
+            if line.speaker == 0 {
+                continue;
+            }
             let Some(who) = Entity::try_from_bits(line.speaker) else {
                 continue;
             };
             let aloud = line.register != "muse";
             self.mused.entry(who).or_insert((line.text, aloud));
         }
+    }
+
+    /// How many lines the vault holds, and how many arrived this run.
+    pub fn vault_standing(&self) -> Option<(usize, usize)> {
+        Some((self.vault.as_ref()?.len(), self.kept))
     }
 
     /// A line for this telling, if the corpus has one. `None` falls back
@@ -355,24 +503,12 @@ impl Tongue {
             tags.push("retold");
         }
         let whom = of.whom.as_ref().map(|w| w.name.clone());
-        let mut slots: Vec<(&str, &str)> = vec![("god", self.god.as_str())];
+        let god = self.god.clone();
+        let mut slots: Vec<(&str, &str)> = vec![("god", god.as_str())];
         if let Some(whom) = whom.as_deref() {
             slots.push(("whom", whom));
         }
-        // The living voice first when it is the one speaking, and the corpus
-        // whenever it has nothing - which is every moment it has not been
-        // asked about yet, and every moment at all when it is switched off.
-        let generated = self
-            .living_speaks
-            .then(|| {
-                self.living
-                    .as_mut()
-                    .and_then(|v| v.ask(0, &tags, &slots, None))
-            })
-            .flatten();
-        generated
-            .or_else(|| self.voice.pick(0, &tags, &slots, &mut self.dice))
-            .map(|said| tidy(&said))
+        self.said(0, &tags, &slots, &[]).map(|said| tidy(&said))
     }
 
     /// A line for one beat of a conversation: the teller's followup, the
@@ -419,22 +555,11 @@ impl Tongue {
             tags.push("told");
         }
         tags.extend(voice.map(trade_tag));
-        let slots: Vec<(&str, &str)> = std::iter::once(("god", self.god.as_str()))
+        let god = self.god.clone();
+        let slots: Vec<(&str, &str)> = std::iter::once(("god", god.as_str()))
             .chain(whom.map(|whom| ("whom", whom)))
             .collect();
-        let generated = self
-            .living_speaks
-            .then(|| {
-                self.living
-                    .as_mut()
-                    .and_then(|v| v.ask(who.to_bits(), &tags, &slots, None))
-            })
-            .flatten();
-        generated
-            .or_else(|| {
-                self.voice
-                    .pick(who.to_bits(), &tags, &slots, &mut self.dice)
-            })
+        self.said(who.to_bits(), &tags, &slots, &[])
             .map(|said| tidy(&said))
     }
 
@@ -494,24 +619,13 @@ impl Tongue {
         let mut tags = vec!["muse", faith_tag(faith)];
         tags.extend(body.iter().copied());
         tags.push("prayer");
-        let slots: Vec<(&str, &str)> = std::iter::once(("god", self.god.as_str()))
+        let god = self.god.clone();
+        let slots: Vec<(&str, &str)> = std::iter::once(("god", god.as_str()))
             .chain(whom.map(|whom| ("whom", whom)))
             .collect();
         // The register wall: whatever the pool's condition, a prayer never
         // borrows smalltalk. Stale beats absurd.
-        let generated = self
-            .living_speaks
-            .then(|| {
-                self.living
-                    .as_mut()
-                    .and_then(|v| v.ask(who.to_bits(), &tags, &slots, None))
-            })
-            .flatten();
-        generated
-            .or_else(|| {
-                self.voice
-                    .pick_within(who.to_bits(), &tags, &slots, &["prayer"], &mut self.dice)
-            })
+        self.said(who.to_bits(), &tags, &slots, &["prayer"])
             .map(|said| tidy(&said))
     }
 
@@ -641,9 +755,29 @@ impl Plugin for SermoPlugin {
         if living.is_some() {
             info!("the living voice has a key and is waiting to be asked for");
         } else {
-            info!("no OPENAI_API_KEY: the village speaks from the corpus only");
+            // WHICH REASON, because there are two and they are fixed
+            // differently: a missing key is an environment problem and a
+            // missing feature is a build problem. Reporting both as "no key"
+            // sent Brett looking for a key he had already set.
+            if cfg!(feature = "living-voice") {
+                info!("no OPENAI_API_KEY in this process: the village speaks from the corpus only");
+            } else {
+                info!(
+                    "built without the `living-voice` feature: ChatGPT cannot be chosen. \
+                     Run `cargo run --release --features living-voice` to author dialogue."
+                );
+            }
         }
-        app.insert_resource(LivingVoice(false));
+        // Where the living voice keeps what it writes. Beside the logs
+        // rather than in `assets`, because it is not authored material and
+        // must never be mistaken for it.
+        let vault = vault::Vault::opened_for_writing(std::path::Path::new("logs/sermo.sqlite"))
+            .inspect_err(|error| warn!("no vault: {error}"))
+            .ok();
+        if let Some(vault) = vault.as_ref() {
+            info!("the vault holds {} lines", vault.len());
+        }
+        app.insert_resource(Voice::default());
         app.insert_resource(Tongue {
             voice,
             dice: crate::rng::Rng::new(0x1e11),
@@ -651,7 +785,9 @@ impl Plugin for SermoPlugin {
             replies: HashMap::new(),
             god: "the god".to_string(),
             living,
-            living_speaks: false,
+            voice_from: Voice::default(),
+            vault,
+            kept: 0,
         });
         app.add_systems(
             Update,
@@ -910,7 +1046,9 @@ mod corpus_wiring_tests {
             replies: HashMap::new(),
             god: "the god".to_string(),
             living: None,
-            living_speaks: false,
+            voice_from: Voice::Authored,
+            vault: None,
+            kept: 0,
         };
         let who = Entity::from_raw_u32(7).unwrap();
         tongue.muse(Musing {

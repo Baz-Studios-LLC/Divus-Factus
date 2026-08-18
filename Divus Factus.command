@@ -31,7 +31,28 @@ echo
 #   tail -f logs/latest.log
 mkdir -p logs
 [ -f logs/latest.log ] && mv -f logs/latest.log logs/previous.log
-cargo run --release 2>&1 | tee logs/latest.log
+
+# THE LIVING VOICE, when a key is sitting beside the game.
+#
+# The game finds and reads the key itself; all this has to decide is whether
+# to COMPILE the thing at all, since it is behind a cargo feature and a plain
+# build has no network client in it whatsoever.
+#
+# Globbed rather than named: the file here is OENAI_API_KEY.txt, and a rule
+# that only knew the correctly-spelled name would fail silently forever. Every
+# shape of it is gitignored.
+extra=()
+for candidate in *API_KEY*.txt *API-KEY*.txt OpenAI-API-Key.txt; do
+    [ -s "$candidate" ] || continue
+    extra=(--features living-voice)
+    echo "a key file is here ($candidate): building with the living voice"
+    break
+done
+if [ ${#extra[@]} -eq 0 ]; then
+    echo "no key file found: building without the living voice"
+fi
+
+cargo run --release "${extra[@]}" 2>&1 | tee logs/latest.log
 
 status=${PIPESTATUS[0]}
 echo

@@ -44,7 +44,13 @@ use serde_json::{Value, json};
 const KEY_VAR: &str = "OPENAI_API_KEY";
 const MODEL_VAR: &str = "SERMO_LIVING_MODEL";
 const LOG_VAR: &str = "SERMO_LIVING_LOG";
-const DEFAULT_MODEL: &str = "gpt-5-mini";
+/// GPT-5.6 Luna: built for cost-sensitive, high-volume work, which is exactly
+/// what a million lines of dialogue is. Brett: "Its way smarter and cheaper."
+///
+/// `SERMO_LIVING_MODEL` overrides it without a rebuild, which is how two
+/// models get compared on the same moments before a spending decision that
+/// will be lived with for the whole corpus.
+const DEFAULT_MODEL: &str = "gpt-5.6-luna";
 const MAX_PENDING: usize = 12;
 const AWKWARD_WORK_PHRASES: &[&str] = &["cutter", "my cutting", "my cuttings"];
 const SYSTEM_WORDS: &[&str] = &["morale", "wavering", "muse", "trait"];
@@ -237,6 +243,18 @@ pub struct ReadyLine {
     pub speaker: u64,
     pub register: String,
     pub text: String,
+    /// THE TAGS THE LINE IS FILED UNDER, so it can be written into the vault
+    /// and found again. The model returns which of the moment's tags it
+    /// actually spoke from, and `validate` has already checked that they are
+    /// a subset of what was offered and that the register is among them - so
+    /// these are the tags a future moment must carry to be answered by this
+    /// sentence.
+    ///
+    /// Without them a generated line is a sentence with no address: sayable
+    /// once, and unfindable ever after. Brett: "it talks for them and
+    /// automatically writes the lines to the data base with tags and
+    /// everything."
+    pub tags: Vec<String>,
 }
 
 /// One development-only asynchronous model connection.
@@ -354,6 +372,7 @@ impl Vivarium {
                         speaker: result.moment.speaker,
                         register: result.moment.register.clone(),
                         text: candidate.text.clone(),
+                        tags: candidate.tags.clone(),
                     });
                     self.record(
                         "candidate",
@@ -453,7 +472,21 @@ fn request_candidate(
     );
     let body = json!({
         "model": model,
+        // NOT STORED SERVER-SIDE. Every line is already written to our own
+        // JSONL, which is the record that matters and the one that feeds the
+        // corpus.
         "store": false,
+        // NO REASONING, and this is the single biggest lever on what a
+        // million lines cost. Reasoning tokens bill as OUTPUT tokens, and a
+        // villager saying eighteen words does not need a chain of thought -
+        // left at the default the thinking would cost several times the
+        // sentence. `SERMO_LIVING_EFFORT` raises it if the lines come back
+        // worse; that is a judgement to make by reading them, not by
+        // guessing here.
+        "reasoning": {
+            "effort": std::env::var("SERMO_LIVING_EFFORT")
+                .unwrap_or_else(|_| "none".to_string())
+        },
         "text": {
             "verbosity": "low",
             "format": {
@@ -628,17 +661,47 @@ fn now_secs() -> u64 {
 /// Environment variables take precedence so a temporary key can be supplied
 /// without touching the project folder. The local file is a deliberate
 /// convenience for this private development fork and is ignored by Git.
-/// The key, from the environment and from nowhere else.
+/// The key: the environment first, then a key file beside the game.
 ///
-/// The fork this came from also read a file beside the executable, and that
-/// file is exactly the kind of thing that ends up in a commit or a release
-/// build. Here there is one source, it lives on the machine that runs the
-/// game, and a build with no key simply speaks from the corpus.
+/// The fork read a file and I took that out, because a file beside the
+/// executable is how a key ends up in a commit or a release. Brett wants the
+/// file back - "For now it can just read the file" - so it is back, with the
+/// two things that make it safe instead of convenient:
+///
+/// - EVERY shape of the name is gitignored, globbed rather than listed. The
+///   file here is `OENAI_API_KEY.txt`, and a rule that only knew the correct
+///   spelling would have protected nothing.
+/// - The key is never logged, never put in the JSONL, and never leaves this
+///   function except as a bearer token.
+///
+/// The environment still wins, so a shell that exports one overrides whatever
+/// is on disk.
 fn load_key() -> Option<String> {
-    std::env::var(KEY_VAR)
+    if let Some(key) = std::env::var(KEY_VAR)
         .ok()
         .map(|key| key.trim().to_string())
         .filter(|key| !key.is_empty())
+    {
+        return Some(key);
+    }
+    let here = std::fs::read_dir(".").ok()?;
+    for entry in here.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        let upper = name.to_uppercase();
+        if !upper.ends_with(".TXT") || !(upper.contains("API_KEY") || upper.contains("API-KEY")) {
+            continue;
+        }
+        let Ok(read) = std::fs::read_to_string(entry.path()) else {
+            continue;
+        };
+        let key = read.trim().to_string();
+        if !key.is_empty() {
+            info!("the living voice took its key from {name}");
+            return Some(key);
+        }
+    }
+    None
 }
 
 #[cfg(test)]

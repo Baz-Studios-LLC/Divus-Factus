@@ -43,6 +43,7 @@ impl Plugin for TitlePlugin {
                     handle_settings,
                     handle_view_switches,
                     the_living_voice_says_where_it_stands,
+                    handle_voice_choice,
                     style_menu_buttons,
                     // Before the codex's own Escape handling, so the frame
                     // that shuts the book sees it still open and yields -
@@ -129,12 +130,6 @@ enum ViewSwitch {
     Clouds,
     /// The fog of war over ground no village has walked.
     Veil,
-    /// Whether villagers speak lines written as they are needed, rather than
-    /// lines written in advance.
-    ///
-    /// Its own tab because it is not a view at all - it is who is talking -
-    /// and because it is the only setting here that reaches off the machine.
-    LivingVoice,
     /// Whether the hand goes rigid on the cursor instead of gliding to it.
     ///
     /// A matter of taste about how the game feels in the hand, which is
@@ -176,7 +171,6 @@ impl ViewSwitch {
             ViewSwitch::Veil => "the veil",
             ViewSwitch::Reach => "the hand's reach",
             ViewSwitch::HandSnaps => "a rigid hand",
-            ViewSwitch::LivingVoice => "the living voice",
             ViewSwitch::Layer(layer) => layer.label(),
         }
     }
@@ -189,7 +183,6 @@ impl ViewSwitch {
             ViewSwitch::Veil => "unwalked ground kept dark",
             ViewSwitch::Reach => "a ring where the hand would close",
             ViewSwitch::HandSnaps => "the hand pinned to the pointer, not gliding",
-            ViewSwitch::LivingVoice => "lines written as the moment arrives, not before",
             ViewSwitch::Layer(layer) => layer.note(),
         }
     }
@@ -1565,7 +1558,57 @@ pub(crate) fn build_sermo_page(commands: &mut Commands, parent: Entity) {
         .id();
     commands.entity(label).insert(ChildOf(parent));
 
-    spawn_switch(commands, parent, ViewSwitch::LivingVoice);
+    // THREE CHOICES, not a toggle - they are three different places the
+    // words come from, and only one can be answering.
+    let row = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: px(10),
+                margin: UiRect::vertical(px(8)),
+                ..default()
+            },
+            ChildOf(parent),
+        ))
+        .id();
+    for voice in [
+        crate::sermo::Voice::Authored,
+        crate::sermo::Voice::Generated,
+        crate::sermo::Voice::Vault,
+    ] {
+        let button = commands
+            .spawn((
+                VoiceChoice(voice),
+                ui::UiButton,
+                ui::KeepFace,
+                Node {
+                    padding: UiRect::axes(px(14), px(7)),
+                    border: UiRect::all(px(1)),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: px(2),
+                    ..default()
+                },
+                BackgroundColor(theme::title_bg()),
+                BorderColor::all(theme::panel_border().with_alpha(0.5)),
+                Interaction::default(),
+                ChildOf(row),
+            ))
+            .id();
+        let name = commands
+            .spawn((
+                Text::new(voice.label()),
+                ui::DisplayFace,
+                TextFont {
+                    font_size: FontSize::Px(15.0),
+                    ..default()
+                },
+                TextColor(theme::accent()),
+            ))
+            .id();
+        commands.entity(name).insert(ChildOf(button));
+        let note = commands.spawn(ui::dim(voice.note())).id();
+        commands.entity(note).insert(ChildOf(button));
+    }
 
     // WHY IT WILL NOT MOVE, when it will not. Kept as its own line and
     // rewritten every frame from the one truth - whether a key was found at
@@ -1680,6 +1723,48 @@ fn spawn_switch(commands: &mut Commands, screen: Entity, switch: ViewSwitch) {
     }
 }
 
+/// One of the three places the village's words can come from.
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+struct VoiceChoice(crate::sermo::Voice);
+
+/// Clicks choose a voice; the buttons then say which one is answering.
+fn handle_voice_choice(
+    clicks: Query<(&Interaction, &VoiceChoice), Changed<Interaction>>,
+    tongue: Option<Res<crate::sermo::Tongue>>,
+    mut chosen: ResMut<crate::sermo::Voice>,
+    mut buttons: Query<(&VoiceChoice, &mut BackgroundColor, &mut BorderColor)>,
+) {
+    for (interaction, want) in &clicks {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        // A voice with nothing behind it is refused rather than chosen and
+        // quietly ignored - ChatGPT needs a key, the vault needs to exist.
+        let possible = match want.0 {
+            crate::sermo::Voice::Generated => {
+                tongue.as_deref().is_some_and(|t| t.has_a_living_voice())
+            }
+            _ => true,
+        };
+        if possible {
+            *chosen = want.0;
+        }
+    }
+    for (voice, mut fill, mut border) in &mut buttons {
+        let lit = voice.0 == *chosen;
+        *fill = BackgroundColor(if lit {
+            theme::accent().with_alpha(0.30)
+        } else {
+            theme::title_bg()
+        });
+        *border = BorderColor::all(if lit {
+            theme::accent()
+        } else {
+            theme::panel_border().with_alpha(0.5)
+        });
+    }
+}
+
 /// The line under the living voice's switch that says where it stands.
 #[derive(Component)]
 struct LivingVoiceStanding;
@@ -1692,20 +1777,30 @@ struct LivingVoiceStanding;
 /// variable's name.
 fn the_living_voice_says_where_it_stands(
     tongue: Option<Res<crate::sermo::Tongue>>,
-    chosen: Res<crate::sermo::LivingVoice>,
     mut standing: Query<&mut Text, With<LivingVoiceStanding>>,
 ) {
-    let Ok(mut text) = standing.single_mut() else {
+    let (Ok(mut text), Some(tongue)) = (standing.single_mut(), tongue.as_deref()) else {
         return;
     };
-    let has_key = tongue.as_deref().is_some_and(|t| t.has_a_living_voice());
-    let said = if !has_key {
-        "No key found. Set OPENAI_API_KEY in the environment and start the game again; \
-         until then the village speaks from the corpus."
-    } else if chosen.0 {
-        "On. Villagers are speaking lines written as each moment arrives."
-    } else {
-        "A key is set. Turn this on and the village stops using the written corpus."
+    let (held, kept) = tongue.vault_standing().unwrap_or((0, 0));
+    let said = match tongue.speaking_with() {
+        crate::sermo::Voice::Authored if !tongue.has_a_living_voice() => format!(
+            "The written corpus is speaking. ChatGPT needs OPENAI_API_KEY in the environment; \
+             without one it cannot be chosen. The vault holds {held} lines."
+        ),
+        crate::sermo::Voice::Authored => format!(
+            "The written corpus is speaking. The vault holds {held} lines that ChatGPT has written."
+        ),
+        crate::sermo::Voice::Generated => format!(
+            "ChatGPT is speaking, and everything it says is being written to the vault with its \
+             tags. {kept} new lines this run; {held} in the vault. A moment it has not met is \
+             quiet until the words arrive."
+        ),
+        crate::sermo::Voice::Vault => format!(
+            "The vault is speaking: {held} lines, no key and no network. It does NOT fall back \
+             to the written corpus - a moment it has nothing for is silent, which is how you can \
+             see what it does and does not yet cover."
+        ),
     };
     if text.0 != said {
         *text = Text::new(said);
@@ -1726,8 +1821,6 @@ fn handle_view_switches(
     mut fog: ResMut<crate::fog::FogMode>,
     mut reach: ResMut<crate::hand::ShowTheReach>,
     mut snaps: ResMut<crate::hand::HandSnaps>,
-    mut living: ResMut<crate::sermo::LivingVoice>,
-    tongue: Option<Res<crate::sermo::Tongue>>,
     mut layers: ResMut<crate::debug::layers::ViewLayers>,
     mut tracks: Query<(&ViewSwitch, &mut BackgroundColor, &mut BorderColor)>,
     mut knobs: Query<(&SwitchKnob, &mut Node, &mut BackgroundColor), Without<ViewSwitch>>,
@@ -1741,12 +1834,6 @@ fn handle_view_switches(
             ViewSwitch::Veil => fog.0 = !fog.0,
             ViewSwitch::Reach => reach.0 = !reach.0,
             ViewSwitch::HandSnaps => snaps.0 = !snaps.0,
-            // REFUSED WITHOUT A KEY. Turning it off is always allowed; it is
-            // only turning it ON that would be a lie, and a switch that lies
-            // is worse than one that is missing.
-            ViewSwitch::LivingVoice => {
-                living.0 = !living.0 && tongue.as_deref().is_some_and(|t| t.has_a_living_voice());
-            }
             ViewSwitch::Layer(layer) => layers.toggle(*layer),
         }
     }
@@ -1758,16 +1845,9 @@ fn handle_view_switches(
         ViewSwitch::Veil => fog.0,
         ViewSwitch::Reach => reach.0,
         ViewSwitch::HandSnaps => snaps.0,
-        ViewSwitch::LivingVoice => living.0,
         ViewSwitch::Layer(layer) => layers.shown(*layer),
     };
-    // A switch with nothing behind it reads as UNAVAILABLE rather than as
-    // merely off: fainter than an off switch, so the eye can tell the
-    // difference between "I have not turned this on" and "I cannot".
-    let usable = |switch: &ViewSwitch| {
-        *switch != ViewSwitch::LivingVoice
-            || tongue.as_deref().is_some_and(|t| t.has_a_living_voice())
-    };
+    let usable = |_switch: &ViewSwitch| true;
     for (switch, mut fill, mut border) in &mut tracks {
         let lit = on(switch);
         let can = usable(switch);

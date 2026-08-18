@@ -111,6 +111,19 @@ pub struct Corpus {
 }
 
 /// A stable id for a line: FNV-1a over its words.
+/// Picks among a line's `{a|b}` choices and fills its slots.
+///
+/// Shared, because the vault says its lines the same way the corpus says its
+/// own - the alternation and the slots are properties of how a line is
+/// WRITTEN, not of where it is kept.
+pub(crate) fn dress(text: &str, slots: &[(&str, &str)], rng: &mut Rng) -> String {
+    let mut words = choose_among(text, rng);
+    for (key, value) in slots {
+        words = words.replace(&format!("{{{key}}}"), value);
+    }
+    words
+}
+
 pub(crate) fn id_of(text: &str) -> u64 {
     let mut hash: u64 = 0xcbf29ce484222325;
     for byte in text.as_bytes() {
@@ -249,10 +262,7 @@ impl Corpus {
             *self.wanting.entry(moment.join(" ")).or_default() += 1;
         }
         let (_, line, id) = best?;
-        let mut words = choose_among(&line.t, rng);
-        for (key, value) in slots {
-            words = words.replace(&format!("{{{key}}}"), value);
-        }
+        let words = dress(&line.t, slots, rng);
         *self.heard.entry(id).or_default() += 1;
         let ring = self.recent.entry(speaker).or_default();
         ring.push(id);

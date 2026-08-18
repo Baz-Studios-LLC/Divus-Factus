@@ -112,18 +112,38 @@ pub struct Candidate {
 }
 
 /// The corpus, on disk.
+///
+/// Some of what follows is not called by the running game yet: `bake` and
+/// `open` are for compiling the authored JSON into a vault and shipping it,
+/// and `tag_census` is the coverage report. They are tested, they are the
+/// next two pieces of the pipeline, and deleting them to silence a warning
+/// would mean writing them twice.
+///
+/// The connection is behind a `Mutex` because `rusqlite::Connection` is `Send`
+/// but not `Sync`, and a Bevy resource must be both. Nothing contends for it -
+/// one system speaks to the vault at a time - so the lock costs nothing and
+/// buys the whole thing a place in the ECS.
+#[allow(dead_code)]
 pub struct Vault {
-    db: Connection,
+    db: std::sync::Mutex<Connection>,
 }
 
 impl Vault {
+    /// The connection, however the lock is doing. A poisoned mutex here means
+    /// a thread died mid-query, and the words are still perfectly readable.
+    fn held(&self) -> std::sync::MutexGuard<'_, Connection> {
+        self.db.lock().unwrap_or_else(|held| held.into_inner())
+    }
+
     /// Opens a baked corpus, read-only.
     pub fn open(at: &Path) -> rusqlite::Result<Vault> {
         let db = Connection::open_with_flags(
             at,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )?;
-        Ok(Vault { db })
+        Ok(Vault {
+            db: std::sync::Mutex::new(db),
+        })
     }
 
     /// Builds a vault from lines, at `at`, replacing whatever was there.
@@ -198,12 +218,87 @@ impl Vault {
              CREATE INDEX line_tag_by_line ON line_tag(line);
              ANALYZE;",
         )?;
-        Ok(Vault { db })
+        Ok(Vault {
+            db: std::sync::Mutex::new(db),
+        })
+    }
+
+    /// Opens the vault a generated line goes into, making it if it is not
+    /// there yet.
+    ///
+    /// Read-WRITE, unlike [`Vault::open`], and it is a different thing from
+    /// the authored corpus on purpose: the JSON files are what a person wrote
+    /// and reviewed, and this is what the living voice has said. Keeping them
+    /// apart is what lets the settings offer them as three separate voices
+    /// rather than one blurred pile - Brett: "in the settings for sermo I can
+    /// turn their voice to one of three different settings. Authored, ChatGPT
+    /// or the database."
+    pub fn opened_for_writing(at: &Path) -> rusqlite::Result<Vault> {
+        if let Some(parent) = at.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let db = Connection::open(at)?;
+        db.execute_batch(
+            "CREATE TABLE IF NOT EXISTS line (
+                 id        INTEGER PRIMARY KEY,
+                 t         TEXT    NOT NULL,
+                 w         REAL    NOT NULL,
+                 once      INTEGER NOT NULL,
+                 tag_count INTEGER NOT NULL,
+                 slots     INTEGER NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS line_tag (
+                 line INTEGER NOT NULL,
+                 tag  TEXT    NOT NULL
+             );
+             CREATE INDEX IF NOT EXISTS line_tag_by_tag ON line_tag(tag);
+             CREATE INDEX IF NOT EXISTS line_tag_by_line ON line_tag(line);",
+        )?;
+        Ok(Vault {
+            db: std::sync::Mutex::new(db),
+        })
+    }
+
+    /// Writes one line down, with its tags.
+    ///
+    /// Keyed by the WORDS, so the same sentence arriving twice is stored once
+    /// however many moments produced it - which is the cheapest dedup there
+    /// is, and the one that matters most: a corpus of a million lines is only
+    /// worth having if they are a million DIFFERENT lines.
+    ///
+    /// Returns whether this was a sentence the vault had never held.
+    pub fn remember(&self, line: &Line) -> rusqlite::Result<bool> {
+        let db = self.held();
+        let id = super::corpus::id_of(&line.t) as i64;
+        let known: i64 = db.query_row("SELECT COUNT(*) FROM line WHERE id = ?1", [id], |row| {
+            row.get(0)
+        })?;
+        if known > 0 {
+            return Ok(false);
+        }
+        db.execute(
+            "INSERT INTO line (id, t, w, once, tag_count, slots) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![
+                id,
+                line.t,
+                line.w,
+                line.once as i32,
+                line.tags.len() as i64,
+                slots_wanted(&line.t) as i64,
+            ],
+        )?;
+        for tag in &line.tags {
+            db.execute(
+                "INSERT INTO line_tag (line, tag) VALUES (?1, ?2)",
+                rusqlite::params![id, tag],
+            )?;
+        }
+        Ok(true)
     }
 
     /// How many lines the vault holds.
     pub fn len(&self) -> usize {
-        self.db
+        self.held()
             .query_row("SELECT COUNT(*) FROM line", [], |row| row.get::<_, i64>(0))
             .unwrap_or(0) as usize
     }
@@ -242,7 +337,8 @@ impl Vault {
              HAVING COUNT(*) = l.tag_count",
             offered_hole = context.len() + 1
         );
-        let mut ask = self.db.prepare_cached(&sql)?;
+        let db = self.held();
+        let mut ask = db.prepare_cached(&sql)?;
         let mut binds: Vec<String> = context.iter().map(|tag| tag.to_string()).collect();
         binds.push(offered.to_string());
         let found = ask
@@ -273,9 +369,8 @@ impl Vault {
 
     /// Every tag one line carries.
     pub fn tags_of(&self, line: u64) -> rusqlite::Result<Vec<String>> {
-        let mut ask = self
-            .db
-            .prepare_cached("SELECT tag FROM line_tag WHERE line = ?1")?;
+        let db = self.held();
+        let mut ask = db.prepare_cached("SELECT tag FROM line_tag WHERE line = ?1")?;
         ask.query_map([line as i64], |row| row.get(0))?
             .collect::<rusqlite::Result<Vec<String>>>()
     }
@@ -287,9 +382,8 @@ impl Vault {
     /// A million lines that are four fifths hunger smalltalk is a worse corpus
     /// than fifty thousand spread evenly, and only this can tell them apart.
     pub fn tag_census(&self) -> rusqlite::Result<HashMap<String, usize>> {
-        let mut ask = self
-            .db
-            .prepare("SELECT tag, COUNT(*) FROM line_tag GROUP BY tag")?;
+        let db = self.held();
+        let mut ask = db.prepare("SELECT tag, COUNT(*) FROM line_tag GROUP BY tag")?;
         let counted = ask
             .query_map([], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as usize))

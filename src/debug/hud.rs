@@ -517,10 +517,20 @@ pub(crate) fn update_hud(
                     // WHICH VOICE is answering, because "off" and "no key"
                     // look identical from the outside and the difference is
                     // the whole question when a line does not appear.
-                    if tongue.living_speaks() {
-                        "the living voice".to_string()
-                    } else {
-                        format!("the corpus - {} lines", tongue.lines())
+                    // WHICH of the three is answering, and how the vault is
+                    // filling up while ChatGPT talks.
+                    match tongue.speaking_with() {
+                        crate::sermo::Voice::Authored => {
+                            format!("the corpus - {} lines", tongue.lines())
+                        }
+                        crate::sermo::Voice::Generated => {
+                            let (held, kept) = tongue.vault_standing().unwrap_or((0, 0));
+                            format!("ChatGPT - {kept} written this run, {held} in the vault")
+                        }
+                        crate::sermo::Voice::Vault => {
+                            let (held, _) = tongue.vault_standing().unwrap_or((0, 0));
+                            format!("the vault - {held} lines")
+                        }
                     }
                 },
             ),
