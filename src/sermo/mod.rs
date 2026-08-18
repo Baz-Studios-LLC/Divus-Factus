@@ -65,6 +65,16 @@ pub mod vivarium {
             None
         }
 
+        pub fn ask_afresh(
+            &mut self,
+            _speaker: u64,
+            _tags: &[&str],
+            _slots: &[(&str, &str)],
+            _heard: Option<&str>,
+        ) -> Option<String> {
+            None
+        }
+
         pub fn take_ready(&mut self) -> Vec<ReadyLine> {
             Vec::new()
         }
@@ -475,20 +485,34 @@ impl Tongue {
     /// lines beat general ones, and the weighted dice break the tie.
     fn from_the_vault(
         &mut self,
-        _speaker: u64,
+        speaker: u64,
         tags: &[&str],
         slots: &[(&str, &str)],
         must: &[&str],
     ) -> Option<String> {
         let found = self.vault.as_ref()?.eligible(tags, must, slots).ok()?;
+        // SCORED THE WAY THE CORPUS SCORES, which is the point of the whole
+        // exercise: a pool of twenty lines for one moment is only worth having
+        // if the pool is actually spread across. Ranking on specificity alone
+        // would pick whichever wears the most tags, every time, and twenty
+        // lines would sound like one.
+        //
+        // Specificity first, then how often the WORLD has heard it, then a
+        // penalty no fresh rival loses to if this speaker just said it - and
+        // the dice to break what is left.
         let mut best: Option<(f32, &vault::Candidate)> = None;
         for line in &found {
-            let score = line.tag_count as f32 * 10.0 + line.w * self.dice.range(0.0, 3.0);
+            let (heard, echoed) = self.voice.wear_of(speaker, line.id);
+            let echo = if echoed { 100.0 } else { 0.0 };
+            let score = line.tag_count as f32 * 10.0 - heard as f32 * 4.0 - echo
+                + line.w * self.dice.range(0.0, 3.0);
             if best.as_ref().is_none_or(|(top, _)| score > *top) {
                 best = Some((score, line));
             }
         }
-        let said = best?.1.t.clone();
+        let (_, chosen) = best?;
+        let (id, said) = (chosen.id, chosen.t.clone());
+        self.voice.now_said(speaker, id);
         Some(corpus::dress(&said, slots, &mut self.dice))
     }
 

@@ -321,6 +321,33 @@ impl Corpus {
     /// Restores the ledger from a save, so `once` means once per world
     /// and not once per sitting.
     #[allow(dead_code)] // likewise
+    /// How often a line has been heard in this world, and whether this
+    /// speaker has just said it.
+    ///
+    /// The vault scores its own lines and must score them the SAME WAY, or a
+    /// corpus of twenty lines for one moment would keep choosing whichever
+    /// wears the most tags. Brett, on why the whole system exists: "the same
+    /// event may have a lot of different lines. We want to make sure that the
+    /// user doesn't see repeated lines as much as possible."
+    pub fn wear_of(&self, speaker: u64, id: u64) -> (u32, bool) {
+        (
+            self.heard.get(&id).copied().unwrap_or(0),
+            self.recent
+                .get(&speaker)
+                .is_some_and(|said| said.contains(&id)),
+        )
+    }
+
+    /// Marks a line as said, wherever it came from.
+    pub fn now_said(&mut self, speaker: u64, id: u64) {
+        *self.heard.entry(id).or_default() += 1;
+        let ring = self.recent.entry(speaker).or_default();
+        ring.push(id);
+        if ring.len() > 12 {
+            ring.remove(0);
+        }
+    }
+
     pub fn import_heard(&mut self, heard: &[(u64, u32)]) {
         self.heard = heard.iter().copied().collect();
     }
