@@ -1,56 +1,62 @@
-## The dead stay dead, and the village has to deal with them
+## Your people stopped making things up
 
-A body used to quietly rot away where it fell, like a deer. It does not any
-more — and it turns out the village already knew what to do about it. Mourners
-gather, a bearer shoulders the body, and it is carried out past the fields to
-a resting ground where a headstone keeps the name and the whole life that
-ended under it.
+The worst thing a village can do is talk about a world that isn't there. A
+man would tell you he saw a goblin on a morning when no goblin existed. Every
+one of those doors is shut now.
 
-**All of that was written long ago and had never once run.** It was waiting on
-a body that was both a corpse and a villager at the same time, which is a thing
-this game cannot produce. So funerals are new to you even though the code is
-old.
+- **Nobody claims to have seen what they were only told.** Hearsay travels the
+  way it always did, but the person passing it on says they heard it, because
+  the game now remembers which of the two it was for them.
+- **No kings, no lords, no coin, no taxes.** A village that has none of those
+  things no longer speaks as though it does.
+- **The village's own name stopped leaking.** Lines meant for anywhere were
+  quietly picking up the name of the place they were first said in.
+- **And two people will not say the same sentence.** A line that goes out is
+  spent — but only if somebody was actually there to hear it, so the good
+  lines stop being burned on an empty field while you are looking elsewhere.
 
-## People have a grain now, and it passes to their children
+## A village will not work its food trades to death
 
-Every villager carries five things about who they are: how bold they are, how
-sharp, how warm toward other people, how badly they want their god to notice
-them — and what they are capable of when it costs somebody else.
+When the larder runs thin, the fishers and gatherers keep working through
+their own hunger — which is right, or a village starves beside an empty store
+with everyone too hungry to fish. What that rule was missing was a floor.
 
-- **Children inherit it.** They sit between their parents with a little wander,
-  so a family stays recognisably itself down the generations — and once in a
-  while a child is nothing like either of them.
-- **They inherit the grain, not the scars.** A man hardened by two bad winters
-  fathers the gentle boy he once was.
-- **And a life bends a person.** What you do to your people changes them — but
-  only so far. A gentle soul ground down by a terrible god ends up hard, never
-  monstrous. The monstrous have to be born, and they are rare.
+Hare lost four people in one morning, every one of them a food trade, every
+one of them standing at the gathering ground a hundred and fifty strides from
+home. They had been told to keep working, and hunger does not stop at hungry.
 
-## Whether a village holds together is about the god it has seen
+They now turn for home while the walk is still survivable. A gatherer who ate
+can gather again tomorrow.
 
-A starving village with a body in front of it faces a question, and the answer
-is not the same in every village.
+## The frame holds still
 
-- **A god who has healed and provided** is a reason to hold, and they hold —
-  even starving.
-- **A god who has smitten and thrown people** has taught them something else,
-  and they break earlier, and without much agony about it.
-- **A god who has never done anything at all** is the worst of the three.
-  Nothing has been demonstrated, so nothing is forbidden, and hunger is the
-  only argument in the room.
+Eleven of the village's own systems had been put on timers to save work. They
+did not save any: each one simply did a whole second's worth in a single
+frame, and the framerate bounced once a second for it. They are back to a
+little every frame.
 
-Most people would never, whatever is done to them, and that is the point —
-what a village does in its worst winter is the doing of a very few. Except for
-one case: **somebody simple and devout, under a violent god, may do a terrible
-thing believing it is what their god wants.** They are not wicked. They are
-agreeing.
+## Shadows reach the ground they belong to
 
-## Elsewhere
+At a low sun, a long shadow used to stop dead partway along, at a line that
+slid across the world as you moved. The near shadow detail only reached forty
+strides while you were watching from a hundred and thirty up, so most of what
+you looked at was drawn by a coarser pass that simply gave up at its edge.
+Shadows also carry four times the detail now, which this game gets for free.
 
-- **Guards fight anything hostile**, not only wolves — they would previously
-  watch a goblin drag somebody off.
-- **The village tells you what it did, and who saw**: "Greifei ate Pramel,
-  6 people saw her do it." A deed nobody witnessed says so, because that is a
-  different event.
-- Goblin sightings now reach the notices too, instead of the first news of a
-  camp being an armory going up.
+## The view remembers you
+
+Everything under **what the world shows you** now survives a restart — the
+clouds, the veil, the fog, the layers, the hand. Turn the fog off to see the
+land clearly and it stays off until you say otherwise.
+
+- **A switch for the ground fog**, which is the most expensive thing the game
+  draws and the first one worth trying if a scene runs heavy.
+- **A clock beside the framerate**, so a number has an age next to it. A world
+  two seconds old and a world two minutes old are not the same machine.
+
+## Furniture
+
+The codex closes from an **x in the top right**, where every other window in
+the game keeps its close, instead of a button docked in the footer. And the
+panel in the corner holds one width instead of breathing every time the world
+gives it a longer line to say.
