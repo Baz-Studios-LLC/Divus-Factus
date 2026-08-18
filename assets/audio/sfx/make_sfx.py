@@ -168,3 +168,21 @@ alarm = mix(alarm, tone(196 * 5.4, 0.35, 11.0, 0.13))
 # The clapper itself - a short woody knock under the ring.
 alarm = mix(alarm, noise(0.05, 60.0, 0.35))
 write("alarm.wav", alarm)
+
+# Alarm 4: a single clear strike modeled after the bright bell in Alarm 3.
+# Sustained 550 Hz hum body with beating partials and crisp metallic overtones.
+dur4 = 2.2
+alarm4 = tone(549.9, dur4, 1.3, 0.40)
+alarm4 = mix(alarm4, tone(551.7, dur4, 1.3, 0.30))
+alarm4 = mix(alarm4, tone(1082.0, dur4 * 0.7, 3.5, 0.10))
+alarm4 = mix(alarm4, tone(1299.0, dur4 * 0.8, 2.7, 0.45))
+alarm4 = mix(alarm4, tone(1687.5, dur4 * 0.6, 4.8, 0.45))
+alarm4 = mix(alarm4, tone(1692.4, dur4 * 0.6, 4.6, 0.50))
+alarm4 = mix(alarm4, tone(1989.3, dur4 * 0.5, 5.8, 0.38))
+alarm4 = mix(alarm4, tone(1993.0, dur4 * 0.5, 5.6, 0.32))
+alarm4 = mix(alarm4, tone(2881.0, dur4 * 0.4, 8.5, 0.28))
+alarm4 = mix(alarm4, tone(3940.0, dur4 * 0.3, 12.0, 0.22))
+alarm4 = mix(alarm4, tone(5150.0, dur4 * 0.2, 16.0, 0.14))
+alarm4 = mix(alarm4, lowpass(noise(0.04, 70.0, 0.40), 0.7))
+write("alarm4.wav", alarm4)
+

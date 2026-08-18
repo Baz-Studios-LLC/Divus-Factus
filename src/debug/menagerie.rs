@@ -59,6 +59,10 @@ const SPIN: f32 = 0.7;
 /// so the caption says so.
 const STANDOFF: f32 = 2.6;
 
+/// The caption under the turntable: which creature this is, and how big.
+#[derive(Component)]
+pub(crate) struct MenagerieCaption;
+
 /// Whether the bench is open, and what is on it.
 #[derive(Resource)]
 pub(crate) struct Menagerie {
@@ -224,6 +228,67 @@ pub(crate) fn turn_the_turntable(
             if already.get(part).is_err() {
                 commands.entity(part).insert(layer.clone());
             }
+        }
+    }
+}
+
+/// Names what is on the turntable, and says how big it is.
+///
+/// THE FRAMING HIDES SIZE ON PURPOSE - the lens sits back a multiple of the
+/// subject's own height, so a penguin and a polar bear fill the frame
+/// identically and nothing on screen says which is which. This module's own
+/// notes claimed "the caption says so" while there was no caption at all, and
+/// the cost of that showed up the first time Brett opened the bench: a black
+/// figure he could not name, which was the penguin - built on the biped plan,
+/// so it reads as a person in a pale robe. Brett: "Can we put on the screen
+/// what animal or species we are looking at?"
+pub(crate) fn name_the_exhibit(
+    mut commands: Commands,
+    bench: Res<Menagerie>,
+    mut caption: Query<(Entity, &mut Text, &mut Node), With<MenagerieCaption>>,
+    lens: Query<Entity, With<MenagerieCamera>>,
+) {
+    if !bench.open {
+        for (panel, ..) in &caption {
+            commands.entity(panel).despawn();
+        }
+        return;
+    }
+    let species = EXHIBITS[bench.which];
+    // Its full-grown height, which is the one fact the framing throws away.
+    let said = format!(
+        "{species:?}  -  {:.1}m  -  roll {}",
+        species.stands_about(),
+        bench.seed
+    );
+    let Ok(eye) = lens.single() else {
+        return;
+    };
+    match caption.single_mut() {
+        Ok((_, mut text, _)) => *text = Text::new(said),
+        Err(_) => {
+            commands.spawn((
+                MenagerieCaption,
+                Text::new(said),
+                TextFont {
+                    font_size: FontSize::Px(22.0),
+                    ..default()
+                },
+                TextColor(crate::ui::theme::accent()),
+                // ONTO THE BENCH'S OWN CAMERA. That camera draws at order 40
+                // with an opaque clear, over the whole game - so a caption
+                // left on the world's UI camera is painted first and then
+                // covered by the bench, which is exactly what happened.
+                UiTargetCamera(eye),
+                Node {
+                    position_type: PositionType::Absolute,
+                    bottom: px(48.0),
+                    left: px(0.0),
+                    width: percent(100.0),
+                    ..default()
+                },
+                TextLayout::justify(Justify::Center),
+            ));
         }
     }
 }

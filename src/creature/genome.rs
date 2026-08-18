@@ -92,6 +92,40 @@ impl Species {
     }
 }
 
+impl Species {
+    /// How tall a full-grown one stands, in meters, before its own roll.
+    ///
+    /// On the SPECIES rather than on a built genome, because the menagerie's
+    /// caption has to name a size for a creature it may not have rolled yet -
+    /// and because the framing there deliberately throws size away, holding
+    /// the lens back a multiple of the subject's own height so that a penguin
+    /// and a polar bear fill the frame identically.
+    pub fn stands_about(self) -> f32 {
+        match self {
+            Species::Human => 1.75,
+            Species::Deer => 1.5,
+            Species::Wolf => 1.0,
+            Species::Boar => 0.95,
+            // Taller than a person, which is the whole of what a camel is on a
+            // flat horizon.
+            Species::Camel => 2.1,
+            // At the shoulder, on all fours - a bear standing up would be half
+            // again this, and standing up is not something the rig does.
+            Species::Bear => 1.35,
+            // AND THE BIGGEST THING THAT WALKS. Brett: "bigger polar bears!"
+            // Half again a brown bear before its own scale roll, which on top
+            // of a larger scale range makes the largest of them near enough
+            // twice the animal - and taller at the shoulder than a villager is
+            // tall.
+            Species::PolarBear => 1.95,
+            Species::Penguin => 0.8,
+            // SHORTER THAN A VILLAGER, and by enough to read instantly when
+            // one is standing next to one. Two thirds of a person.
+            Species::Goblin => 1.15,
+        }
+    }
+}
+
 /// Biological sex. Half of who can bear a child with whom — which makes it
 /// half of demography, and demography is what decides whether a village that
 /// can die can also endure.
@@ -805,28 +839,7 @@ impl CreatureGenome {
     /// Total standing height in world units.
     pub fn height(&self) -> f32 {
         let p = &self.proportions;
-        let base = match self.species {
-            Species::Human => 1.75,
-            Species::Deer => 1.5,
-            Species::Wolf => 1.0,
-            Species::Boar => 0.95,
-            // Taller than a person, which is the whole of what a camel is on a
-            // flat horizon.
-            Species::Camel => 2.1,
-            // At the shoulder, on all fours - a bear standing up would be half
-            // again this, and standing up is not something the rig does.
-            Species::Bear => 1.35,
-            // AND THE BIGGEST THING THAT WALKS. Brett: "bigger polar bears!"
-            // Half again a brown bear before its own scale roll, which on top
-            // of a larger scale range makes the largest of them near enough
-            // twice the animal - and taller at the shoulder than a villager is
-            // tall.
-            Species::PolarBear => 1.95,
-            Species::Penguin => 0.8,
-            // SHORTER THAN A VILLAGER, and by enough to read instantly when
-            // one is standing next to one. Two thirds of a person.
-            Species::Goblin => 1.15,
-        };
+        let base = self.species.stands_about();
         // Age scales the finished height rather than being folded into `scale`, so
         // an inherited `scale` always means "size as an adult". Otherwise a child's
         // own smallness would be passed on to its children and the line would shrink

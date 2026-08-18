@@ -613,10 +613,177 @@ pub fn build_body(
     root: Entity,
     genome: &CreatureGenome,
 ) -> CreatureRig {
-    if genome.species.is_biped() {
-        build_biped(commands, assets, root, genome)
-    } else {
-        build_quadruped(commands, assets, root, genome)
+    match genome.species {
+        // A PENGUIN IS ITS OWN ANIMAL. It was built on the biped plan - a box
+        // head on a tall rectangular torso over two legs, with a pale front -
+        // and Brett, opening the bench on one: "Wow that looks like an
+        // enderman, we should do a bespeoke take for the penguin, lol", "its
+        // clearly wearing clothes and human proportioned lol". It was: the
+        // pale belly read as a tabard and the dark head as hair.
+        crate::creature::genome::Species::Penguin => build_penguin(commands, assets, root, genome),
+        species if species.is_biped() => build_biped(commands, assets, root, genome),
+        _ => build_quadruped(commands, assets, root, genome),
+    }
+}
+
+/// A penguin: a body standing on the ground, flippers, a bill, and feet.
+///
+/// Three things make it read as a penguin rather than as a short person, and
+/// all three are what the biped plan could not give it:
+///
+/// - NO LEGS. The body reaches the ground and the feet stick out from under
+///   it. Brett: "and penguin feet with no legs." Legs are most of what made
+///   the old one look like a person in a robe.
+/// - FLIPPERS, not arms: flat, held close, and reaching most of the way down
+///   the body.
+/// - A BILL. Brett: "With a bill or beak maybe." It is the one part that says
+///   bird outright, and on a body this simple it does most of the work.
+///
+/// The limbs are still registered in the rig so the animator drives them like
+/// anything else - the flippers take the arm swing, the feet the leg swing,
+/// which on a waddling bird is exactly the motion wanted.
+fn build_penguin(
+    commands: &mut Commands,
+    assets: &CreatureAssets,
+    root: Entity,
+    genome: &CreatureGenome,
+) -> CreatureRig {
+    let h = genome.height();
+    let th = genome.thickness();
+
+    // BILL AND FEET, in one warm tone. Not `genome.accent`, which is a CLOTH
+    // color off the dyed ramps - the first cut used it and gave the bird a
+    // magenta bill and magenta feet.
+    let horn = Tone {
+        ramp: crate::palette::RAMP_CLOTH_GOLD,
+        step: 3,
+    };
+
+    let body = commands
+        .spawn((
+            Name::new("Body"),
+            Transform::default(),
+            Visibility::default(),
+            ChildOf(root),
+        ))
+        .id();
+
+    // The body IS the animal: it starts at the ground and stops under the
+    // head. BROAD - as wide as it is tall through the middle, which is what
+    // keeps it from reading as a standing slab.
+    let wide = th * 3.1;
+    let deep = th * 2.5;
+    let tall = h * 0.66;
+    spawn_part(
+        commands,
+        assets,
+        body,
+        Vec3::ZERO,
+        Vec3::new(wide, tall, deep),
+        Vec3::Y,
+        genome.skin,
+        "Body",
+    );
+
+    // THE WHITE FRONT, proud of the body so it is its own shape and not a
+    // stripe - narrower than the body, so the dark carries around the sides
+    // the way it does on the bird.
+    spawn_part(
+        commands,
+        assets,
+        body,
+        Vec3::new(0.0, tall * 0.05, deep * 0.46),
+        Vec3::new(wide * 0.66, tall * 0.82, deep * 0.16),
+        Vec3::Y,
+        genome.cloth,
+        "Breast",
+    );
+
+    // The head sits straight on the shoulders. A penguin has no neck worth
+    // drawing, and giving it one was half of what made the old one tall.
+    let head_size = th * 1.7;
+    let head = spawn_part(
+        commands,
+        assets,
+        body,
+        Vec3::new(0.0, tall - head_size * 0.16, 0.0),
+        Vec3::splat(head_size),
+        Vec3::Y,
+        genome.skin,
+        "Head",
+    );
+
+    // THE BILL, out of the front of the face. Long and thin and level.
+    spawn_part(
+        commands,
+        assets,
+        head,
+        Vec3::new(0.0, head_size * 0.30, head_size * 0.44),
+        Vec3::new(head_size * 0.26, head_size * 0.20, head_size * 0.66),
+        Vec3::Z,
+        horn,
+        "Bill",
+    );
+
+    let mut limbs = Vec::with_capacity(4);
+
+    // FLIPPERS: flat boards down the sides, hung from the shoulder and held
+    // close. One segment's worth of bend, because a flipper does not have an
+    // elbow - the lower half is simply the rest of the flipper.
+    let flipper = tall * 0.62;
+    for (i, side) in [-1.0f32, 1.0].into_iter().enumerate() {
+        let (entity, lower, grip) = spawn_limb(
+            commands,
+            assets,
+            body,
+            Vec3::new(side * wide * 0.5, tall * 0.86, 0.0),
+            th * 0.24,
+            flipper,
+            0.5,
+            genome.skin,
+            genome.skin,
+            "Flipper",
+            "Flipper Tip",
+        );
+        limbs.push(Limb {
+            entity,
+            lower,
+            phase: (i as f32 + 1.0) * std::f32::consts::PI,
+            is_arm: true,
+            grip,
+        });
+    }
+
+    // FEET: flat and forward, straight out from under the body, with nothing
+    // between them and it.
+    let foot = th * 0.9;
+    for (i, side) in [-1.0f32, 1.0].into_iter().enumerate() {
+        let entity = spawn_part(
+            commands,
+            assets,
+            body,
+            Vec3::new(side * wide * 0.24, foot * 0.16, deep * 0.16),
+            Vec3::new(foot * 0.72, foot * 0.22, foot * 1.2),
+            Vec3::Z,
+            horn,
+            "Foot",
+        );
+        limbs.push(Limb {
+            entity,
+            lower: entity,
+            phase: i as f32 * std::f32::consts::PI,
+            is_arm: false,
+            grip: Vec3::ZERO,
+        });
+    }
+
+    CreatureRig {
+        body,
+        head,
+        head_rest: Quat::IDENTITY,
+        limbs,
+        tail: None,
+        height: h,
     }
 }
 

@@ -181,6 +181,7 @@ impl Plugin for DebugPlugin {
                     menagerie::dress_the_exhibit,
                     menagerie::turn_the_turntable,
                     menagerie::mind_the_lens,
+                    menagerie::name_the_exhibit,
                 )
                     .chain()
                     .in_set(DebugSet::Rebuild),
