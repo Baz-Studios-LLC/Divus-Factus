@@ -52,6 +52,11 @@ if [ ${#extra[@]} -eq 0 ]; then
     echo "no key file found: building without the living voice"
 fi
 
+# The shell knows what day it is and the game does not, so the date is handed
+# over rather than pulling a calendar library into the binary. It heads the run
+# report, which is the page Brett reads back after a test.
+export DIVUS_FACTUS_RUN_STAMP="$(date '+%a %b %-d, %-I:%M %p')"
+
 cargo run --release "${extra[@]}" 2>&1 | tee logs/latest.log
 
 status=${PIPESTATUS[0]}

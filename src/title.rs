@@ -129,7 +129,7 @@ struct BackButton;
 /// this game can turn on and off is not that. The keyboard was filling up with
 /// letters nobody would remember.
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
-enum ViewSwitch {
+pub(crate) enum ViewSwitch {
     /// The weather deck. Off, and the god can see the ground.
     Clouds,
     /// The fog of war over ground no village has walked.
@@ -1950,6 +1950,71 @@ struct SwitchKnob(ViewSwitch);
 /// watcher that writes the file — and the three must agree to the letter about
 /// which way each switch reads. One satchel with one pair of methods is that
 /// agreement; three copies of the same match were how they would drift.
+/// Whether the thing a switch NAMES is being shown.
+///
+/// A free function over the five, because there are two satchels onto this state
+/// — one that may change it and one that only watches — and they must not each
+/// carry their own reading of which way a switch faces. This is the one reading.
+fn switch_shows(
+    switch: ViewSwitch,
+    clear: &crate::clouds::TheSkyIsClear,
+    fog: &crate::fog::FogMode,
+    reach: &crate::hand::ShowTheReach,
+    snaps: &crate::hand::HandSnaps,
+    layers: &crate::debug::layers::ViewLayers,
+) -> bool {
+    match switch {
+        // The switch reads as the THING, not as its absence: "clouds on" means
+        // there is weather, so the sky being clear is the switch being off.
+        // Same for the fog: on means fog is drawn.
+        ViewSwitch::Clouds => !clear.0,
+        ViewSwitch::Veil => fog.0,
+        ViewSwitch::Mist => !crate::render::aspectus::mist_is_off(),
+        ViewSwitch::Reach => reach.0,
+        ViewSwitch::HandSnaps => snaps.0,
+        ViewSwitch::Layer(layer) => layers.shown(layer),
+    }
+}
+
+/// A window onto The View that cannot change it, for anything that only wants
+/// to know how the world is set — the run report, so far.
+#[derive(SystemParam)]
+pub(crate) struct TheViewSeen<'w> {
+    clear: Res<'w, crate::clouds::TheSkyIsClear>,
+    fog: Res<'w, crate::fog::FogMode>,
+    reach: Res<'w, crate::hand::ShowTheReach>,
+    snaps: Res<'w, crate::hand::HandSnaps>,
+    layers: Res<'w, crate::debug::layers::ViewLayers>,
+}
+
+impl TheViewSeen<'_> {
+    pub(crate) fn shows(&self, switch: ViewSwitch) -> bool {
+        switch_shows(
+            switch,
+            &self.clear,
+            &self.fog,
+            &self.reach,
+            &self.snaps,
+            &self.layers,
+        )
+    }
+
+    /// What is switched off right now, in the words a person reads on the
+    /// settings page. Empty when the world is showing everything.
+    ///
+    /// Named by LABEL rather than by the file's own spelling: this goes into a
+    /// heading somebody has to read while comparing two framerates, and "the
+    /// fog" is worth more there than "fog".
+    pub(crate) fn what_is_off(&self) -> String {
+        ViewSwitch::ALL
+            .into_iter()
+            .filter(|switch| !self.shows(*switch))
+            .map(|switch| switch.label())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
 #[derive(SystemParam)]
 struct TheView<'w> {
     clear: ResMut<'w, crate::clouds::TheSkyIsClear>,
@@ -1962,17 +2027,14 @@ struct TheView<'w> {
 impl TheView<'_> {
     /// Whether the thing this switch NAMES is being shown.
     fn shows(&self, switch: ViewSwitch) -> bool {
-        match switch {
-            // The switch reads as the THING, not as its absence: "clouds on"
-            // means there is weather, so the sky being clear is the switch
-            // being off. Same for the fog: on means fog is drawn.
-            ViewSwitch::Clouds => !self.clear.0,
-            ViewSwitch::Veil => self.fog.0,
-            ViewSwitch::Mist => !crate::render::aspectus::mist_is_off(),
-            ViewSwitch::Reach => self.reach.0,
-            ViewSwitch::HandSnaps => self.snaps.0,
-            ViewSwitch::Layer(layer) => self.layers.shown(layer),
-        }
+        switch_shows(
+            switch,
+            &self.clear,
+            &self.fog,
+            &self.reach,
+            &self.snaps,
+            &self.layers,
+        )
     }
 
     /// Sets a switch, and touches nothing if it was already that way.

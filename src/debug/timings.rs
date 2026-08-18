@@ -304,6 +304,23 @@ pub fn report_timings(timings: Res<Timings>) {
             total * 1000.0 / frames as f64,
         );
     }
+
+    // And into the run report, which is what somebody reads afterward. It takes
+    // the same rows and thins them itself - this says its piece every two
+    // seconds and all of it would bury the framerate the report exists for.
+    super::report::note_systems(
+        over,
+        frames,
+        (counted > 0).then(|| {
+            let each = counted as f64;
+            (frame * 1000.0 / each, main * 1000.0 / each)
+        }),
+        &rows
+            .iter()
+            .filter(|(_, total, _)| total * 1000.0 / frames as f64 >= 0.30)
+            .map(|(name, total, _)| (name.to_string(), total * 1000.0 / frames as f64))
+            .collect::<Vec<_>>(),
+    );
 }
 
 /// Carried by both the game and the planet bench, so the systems they share can

@@ -29,6 +29,7 @@ mod manifest;
 pub(crate) mod menagerie;
 pub(crate) mod ordo_trial;
 mod people;
+mod report;
 pub(crate) mod portrait;
 pub(crate) mod spellbook;
 pub(crate) mod timings;
@@ -275,9 +276,16 @@ impl Plugin for DebugPlugin {
                 Update,
                 (
                     villager_profile::handle_profile_actions,
-                    report_frames.run_if(|| std::env::var("DIVUS_FACTUS_FRAMES").is_ok()),
+                    // ALWAYS, not behind a dial: the report is the thing Brett
+                    // reads back to me after a test, and an instrument that has
+                    // to be remembered is an instrument that is off when it
+                    // matters. The log line inside it still waits for
+                    // `DIVUS_FACTUS_FRAMES`.
+                    report::report_frames,
                 ),
             )
+            .add_systems(Startup, report::open_the_report)
+            .add_systems(Last, report::close_the_report)
             .add_systems(PostUpdate, villager_profile::open_villager_profile);
 
         // The parallel court's own inspector: DIVUS_FACTUS_AMBIGUITY=1
