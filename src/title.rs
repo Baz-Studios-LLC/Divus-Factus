@@ -44,6 +44,7 @@ impl Plugin for TitlePlugin {
                     handle_view_switches,
                     the_living_voice_says_where_it_stands,
                     handle_voice_choice,
+                    handle_batch_choice,
                     style_menu_buttons,
                     // Before the codex's own Escape handling, so the frame
                     // that shuts the book sees it still open and yields -
@@ -1610,6 +1611,54 @@ pub(crate) fn build_sermo_page(commands: &mut Commands, parent: Entity) {
         commands.entity(note).insert(ChildOf(button));
     }
 
+    // HOW MANY LINES A CALL ASKS FOR. Brett: "Maybe a setting in sermo
+    // settings to set that in game?" - because the right number is empirical
+    // and sweeping it from a menu beats sweeping it from a rebuild.
+    let batch_row = commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: px(8),
+                margin: UiRect::top(px(10)),
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            ChildOf(parent),
+        ))
+        .id();
+    let label = commands.spawn(ui::dim("lines per request")).id();
+    commands.entity(label).insert(ChildOf(batch_row));
+    for many in [1usize, 5, 10, 20, 40, 80] {
+        let button = commands
+            .spawn((
+                BatchChoice(many),
+                ui::UiButton,
+                ui::KeepFace,
+                Node {
+                    padding: UiRect::axes(px(11), px(5)),
+                    border: UiRect::all(px(1)),
+                    ..default()
+                },
+                BackgroundColor(theme::title_bg()),
+                BorderColor::all(theme::panel_border().with_alpha(0.5)),
+                Interaction::default(),
+                ChildOf(batch_row),
+            ))
+            .id();
+        let text = commands
+            .spawn((
+                Text::new(many.to_string()),
+                ui::DisplayFace,
+                TextFont {
+                    font_size: FontSize::Px(14.0),
+                    ..default()
+                },
+                TextColor(theme::accent()),
+            ))
+            .id();
+        commands.entity(text).insert(ChildOf(button));
+    }
+
     // WHY IT WILL NOT MOVE, when it will not. Kept as its own line and
     // rewritten every frame from the one truth - whether a key was found at
     // startup - so it cannot say one thing while the switch does another.
@@ -1720,6 +1769,36 @@ fn spawn_switch(commands: &mut Commands, screen: Entity, switch: ViewSwitch) {
         commands.entity(name).insert(ChildOf(words));
         let note = commands.spawn(ui::dim(switch.note())).id();
         commands.entity(note).insert(ChildOf(words));
+    }
+}
+
+/// How many lines one request asks for.
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+struct BatchChoice(usize);
+
+/// Clicks set the batch size; the buttons then say which is chosen.
+fn handle_batch_choice(
+    clicks: Query<(&Interaction, &BatchChoice), Changed<Interaction>>,
+    mut buttons: Query<(&BatchChoice, &mut BackgroundColor, &mut BorderColor)>,
+) {
+    for (interaction, want) in &clicks {
+        if *interaction == Interaction::Pressed {
+            crate::sermo::vivarium::ask_for(want.0);
+        }
+    }
+    let now = crate::sermo::vivarium::batch_size();
+    for (choice, mut fill, mut border) in &mut buttons {
+        let lit = choice.0 == now;
+        *fill = BackgroundColor(if lit {
+            theme::accent().with_alpha(0.30)
+        } else {
+            theme::title_bg()
+        });
+        *border = BorderColor::all(if lit {
+            theme::accent()
+        } else {
+            theme::panel_border().with_alpha(0.5)
+        });
     }
 }
 

@@ -88,11 +88,34 @@ const A_BATCH: usize = 20;
 /// pad - so a generous number is fairly safe, and the log prints how many came
 /// back against how many were asked for. Sweep it and read that line.
 fn a_batch() -> usize {
+    let set = ASKED_FOR.load(std::sync::atomic::Ordering::Relaxed);
+    if set > 0 {
+        return set;
+    }
     std::env::var("SERMO_BATCH")
         .ok()
         .and_then(|n| n.parse::<usize>().ok())
         .filter(|n| (1..=200).contains(n))
         .unwrap_or(A_BATCH)
+}
+
+/// How many the settings screen is asking for. Zero means nobody has said.
+///
+/// AN ATOMIC, not a resource, because this is read on the WORKER THREAD when a
+/// request is built and a worker has no ECS to ask. Brett wanted the number
+/// adjustable while playing - "Maybe a setting in sermo settings to set that in
+/// game?" - and a plain integer shared across a thread boundary is the whole
+/// mechanism that needs.
+pub static ASKED_FOR: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// How many lines a call asks for right now, for the settings to display.
+pub fn batch_size() -> usize {
+    a_batch()
+}
+
+/// Sets how many lines a call asks for.
+pub fn ask_for(many: usize) {
+    ASKED_FOR.store(many.clamp(1, 200), std::sync::atomic::Ordering::Relaxed);
 }
 const AWKWARD_WORK_PHRASES: &[&str] = &["cutter", "my cutting", "my cuttings"];
 const SYSTEM_WORDS: &[&str] = &["morale", "wavering", "muse", "trait"];

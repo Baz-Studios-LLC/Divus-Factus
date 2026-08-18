@@ -100,6 +100,12 @@ pub mod vivarium {
     }
 
     pub fn probe() {}
+
+    pub fn batch_size() -> usize {
+        0
+    }
+
+    pub fn ask_for(_many: usize) {}
 }
 use crate::villager::work::Vocation;
 use crate::witness::{DivineEventKind, Whom};
