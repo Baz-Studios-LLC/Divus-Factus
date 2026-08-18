@@ -464,6 +464,34 @@ impl Voice {
 }
 
 impl Tongue {
+    /// WAS ANYBODY THERE. A line said out of sight leaves the pool as fresh as
+    /// it found it — see [`Dossier::watched`] and [`corpus::Corpus::pick_within`].
+    ///
+    /// Anybody with no dossier counts as watched: the dossiers are a moment
+    /// behind the world, and a soul this system has not met yet must cost its
+    /// line rather than get it free.
+    fn was_anybody_there(&self, speaker: u64) -> bool {
+        Entity::try_from_bits(speaker)
+            .and_then(|who| self.dossiers.get(&who))
+            .is_none_or(|who| who.watched)
+    }
+
+    /// Settles what the last pick cost: charged if a soul was there to hear it,
+    /// forgiven if the field was empty.
+    ///
+    /// EVERY pick must be settled, and that is the whole discipline of deferred
+    /// wear. Three of the five places that pick went unsettled when the wear
+    /// first moved out of `pick_within`, so musings and cries never wore out at
+    /// all — which flattens the picker's freshness term to nothing on the two
+    /// paths that carry most of the village's speech.
+    fn settle(&mut self, speaker: u64) {
+        if self.was_anybody_there(speaker) {
+            self.voice.was_heard();
+        } else {
+            self.voice.was_unheard();
+        }
+    }
+
     /// ONE DOOR FOR ALL THREE VOICES, so no caller has to know which is on.
     ///
     /// Generated speech falls back to the authored corpus when it has nothing
@@ -501,12 +529,6 @@ impl Tongue {
         }
         let slots: &[(&str, &str)] = &with_place;
 
-        // WAS ANYBODY THERE. A line said out of sight leaves the pool as fresh
-        // as it found it - see `Dossier::watched` and `Corpus::pick_within`.
-        let watched = Entity::try_from_bits(speaker)
-            .and_then(|who| self.dossiers.get(&who))
-            .is_none_or(|who| who.watched);
-
         let written = |me: &mut Self| {
             let said = if must.is_empty() {
                 me.voice.pick(speaker, tags, slots, &mut me.dice)
@@ -514,11 +536,7 @@ impl Tongue {
                 me.voice
                     .pick_within(speaker, tags, slots, must, &mut me.dice)
             };
-            if watched {
-                me.voice.was_heard();
-            } else {
-                me.voice.was_unheard();
-            }
+            me.settle(speaker);
             said
         };
         match self.voice_from {
@@ -847,11 +865,12 @@ impl Tongue {
         if let Some(about) = of.about.as_deref() {
             tags.push(about);
         }
-        let Some(said) = self
+        let said = self
             .voice
             .pick(of.who.to_bits(), &tags, &[], &mut self.dice)
-            .map(|said| tidy(&said))
-        else {
+            .map(|said| tidy(&said));
+        self.settle(of.who.to_bits());
+        let Some(said) = said else {
             return;
         };
         if of.is_reply() {
@@ -909,11 +928,12 @@ impl Tongue {
     ) {
         let mut tags = vec!["yell", why, faith_tag(faith)];
         tags.extend(voice.map(trade_tag));
-        if let Some(said) = self
+        let said = self
             .voice
             .pick(who.to_bits(), &tags, &[], &mut self.dice)
-            .map(|said| tidy(&said))
-        {
+            .map(|said| tidy(&said));
+        self.settle(who.to_bits());
+        if let Some(said) = said {
             // Straight into the mouth, over anything they were musing:
             // nobody finishes a thought about their boots while a wolf
             // has hold of them.

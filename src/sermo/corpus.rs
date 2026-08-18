@@ -198,6 +198,12 @@ impl Corpus {
         must: &[&str],
         rng: &mut Rng,
     ) -> Option<String> {
+        // WHATEVER THE LAST PICK WAS, IT IS SETTLED NOW. A pick that finds
+        // nothing returns before it can name a line, so without this a miss
+        // would leave the previous pick standing and the next `was_heard`
+        // would charge the wrong line's wear - the one bug in this scheme
+        // that would be invisible, because the wear still adds up.
+        self.last_picked = None;
         let said = self.recent.entry(speaker).or_default().clone();
         let mut best: Option<(f32, &Line, u64)> = None;
         for line in &self.lines {
@@ -688,7 +694,9 @@ mod tests {
         }
     }
 
-    fn corpus(lines: &[(&str, &[&str], bool)]) -> Corpus {
+    /// Reachable from the `wear` tests below as well, so both describe the
+    /// same little corpus rather than two.
+    pub(super) fn corpus(lines: &[(&str, &[&str], bool)]) -> Corpus {
         Corpus {
             lines: lines
                 .iter()
@@ -701,6 +709,23 @@ mod tests {
                 .collect(),
             ..Default::default()
         }
+    }
+
+    /// A pick with somebody there to hear it, which is what charges the wear.
+    ///
+    /// The game settles every pick this way (`Tongue::settle`); a test that
+    /// picked without settling would be describing a village nobody listens to,
+    /// where no line ever wears out.
+    fn heard(
+        voice: &mut Corpus,
+        speaker: u64,
+        tags: &[&str],
+        slots: &[(&str, &str)],
+        rng: &mut Rng,
+    ) -> Option<String> {
+        let said = voice.pick(speaker, tags, slots, rng);
+        voice.was_heard();
+        said
     }
 
     #[test]
@@ -720,35 +745,29 @@ mod tests {
         ]);
         let mut rng = Rng::new(7);
         // The specific line wins the moment it fits.
-        let said = voice
-            .pick(1, &["muse", "roofless", "night"], &[], &mut rng)
-            .unwrap();
+        let said = heard(&mut voice, 1, &["muse", "roofless", "night"], &[], &mut rng).unwrap();
         assert_eq!(said, "third night on the cold ground");
         // A slot the moment cannot fill rules a line out entirely.
-        assert!(
-            voice
-                .pick(1, &["tell", "event:lightning"], &[], &mut rng)
-                .is_none()
-        );
+        assert!(heard(&mut voice, 1, &["tell", "event:lightning"], &[], &mut rng).is_none());
         // Filled, said once - and never again, even for a new speaker.
-        let told = voice
-            .pick(
-                2,
-                &["tell", "event:lightning"],
-                &[("whom", "Feitreh")],
-                &mut rng,
-            )
-            .unwrap();
+        let told = heard(
+            &mut voice,
+            2,
+            &["tell", "event:lightning"],
+            &[("whom", "Feitreh")],
+            &mut rng,
+        )
+        .unwrap();
         assert_eq!(told, "the sky split for Feitreh");
         assert!(
-            voice
-                .pick(
-                    3,
-                    &["tell", "event:lightning"],
-                    &[("whom", "Feitreh")],
-                    &mut rng
-                )
-                .is_none()
+            heard(
+                &mut voice,
+                3,
+                &["tell", "event:lightning"],
+                &[("whom", "Feitreh")],
+                &mut rng
+            )
+            .is_none()
         );
         // The ledger round-trips through a save.
         let saved = voice.export_heard();
@@ -759,14 +778,14 @@ mod tests {
         )]);
         fresh.import_heard(&saved);
         assert!(
-            fresh
-                .pick(
-                    4,
-                    &["tell", "event:lightning"],
-                    &[("whom", "Feitreh")],
-                    &mut rng
-                )
-                .is_none()
+            heard(
+                &mut fresh,
+                4,
+                &["tell", "event:lightning"],
+                &[("whom", "Feitreh")],
+                &mut rng
+            )
+            .is_none()
         );
     }
 
@@ -789,7 +808,7 @@ mod tests {
         // And a pool leaned on three times reports itself worn.
         let mut thin = corpus(&[("again", &["muse"], false)]);
         for speaker in 0..3 {
-            thin.pick(speaker, &["muse"], &[], &mut rng).unwrap();
+            heard(&mut thin, speaker, &["muse"], &[], &mut rng).unwrap();
         }
         assert!(thin.wanting.keys().any(|k| k.starts_with("(worn pool)")));
     }
@@ -872,6 +891,28 @@ mod wear {
             voice.export_heard().len(),
             1,
             "somebody heard that one, so it is spent"
+        );
+    }
+
+    /// A pick that finds nothing charges nothing — not even the line before it.
+    ///
+    /// The failure this pins is the invisible kind: a miss returns before it can
+    /// name a line, so a `was_heard` after one used to charge whatever the
+    /// PREVIOUS pick had chosen. The wear still adds up, on the wrong line, and
+    /// the only symptom is a corpus that wears out in the wrong places.
+    #[test]
+    fn a_pick_that_finds_nothing_spends_nothing() {
+        let mut voice = super::tests::corpus(&[("some weather", &["muse"], false)]);
+        let mut dice = Rng::new(11);
+
+        // Chosen, and left unsettled, exactly as an unresolved pick would.
+        assert!(voice.pick(1, &["muse"], &[], &mut dice).is_some());
+        // Then a moment the corpus has nothing for.
+        assert!(voice.pick(1, &["cry", "drowning"], &[], &mut dice).is_none());
+        voice.was_heard();
+        assert!(
+            voice.export_heard().is_empty(),
+            "a miss charged the line before it"
         );
     }
 }

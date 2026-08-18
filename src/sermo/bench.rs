@@ -70,7 +70,12 @@ pub fn run() {
                     .collect();
                 for _ in 0..times {
                     speaker = speaker.wrapping_add(1);
-                    match voice.pick(speaker, &tags, &SLOTS, &mut dice) {
+                    let said = voice.pick(speaker, &tags, &SLOTS, &mut dice);
+                    // The bench is an audience. Charging the hearing is what
+                    // makes `x8` show a pool wearing thin instead of the same
+                    // freshest line eight times.
+                    voice.was_heard();
+                    match said {
                         Some(said) => println!("  {said}"),
                         None => {
                             println!("  (nothing in the corpus fits those tags)");
@@ -151,6 +156,7 @@ fn exchange(voice: &mut Corpus, dice: &mut Rng, topic: &str, speaker: &mut u64) 
             // it either has words for that act or the written phrasing
             // answers instead, which is not the corpus's business.
             .or_else(|| voice.pick(seed, base, &SLOTS, dice));
+        voice.was_heard();
         match said {
             Some(said) => println!("  {who}: {said}"),
             None => println!("  {who}: ...  ({role} has nothing for this)"),
