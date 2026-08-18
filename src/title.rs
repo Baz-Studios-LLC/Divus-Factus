@@ -128,6 +128,14 @@ enum ViewSwitch {
     Clouds,
     /// The fog of war over ground no village has walked.
     Veil,
+    /// The ring on the ground showing how wide the hand's reach is.
+    ///
+    /// Off by default, and deliberately: it is an aid for anybody who wants
+    /// to see what the cursor will take, not part of how the world looks.
+    /// Brett: "I think we should paint an ethereal circle on the ground that
+    /// signifies the selection area. This should be a toggle in the menu that
+    /// defaults to off but can be turned on."
+    Reach,
     /// One of the world's own layers, held in [`ViewLayers`].
     ///
     /// Two switches above keep their state elsewhere because they had owners
@@ -137,9 +145,10 @@ enum ViewSwitch {
 }
 
 impl ViewSwitch {
-    const ALL: [ViewSwitch; 8] = [
+    const ALL: [ViewSwitch; 9] = [
         ViewSwitch::Clouds,
         ViewSwitch::Veil,
+        ViewSwitch::Reach,
         ViewSwitch::Layer(Layer::Scenery),
         ViewSwitch::Layer(Layer::Patches),
         ViewSwitch::Layer(Layer::Water),
@@ -152,6 +161,7 @@ impl ViewSwitch {
         match self {
             ViewSwitch::Clouds => "clouds",
             ViewSwitch::Veil => "the veil",
+            ViewSwitch::Reach => "the hand's reach",
             ViewSwitch::Layer(layer) => layer.label(),
         }
     }
@@ -162,6 +172,7 @@ impl ViewSwitch {
         match self {
             ViewSwitch::Clouds => "weather over the world",
             ViewSwitch::Veil => "unwalked ground kept dark",
+            ViewSwitch::Reach => "a ring where the hand would close",
             ViewSwitch::Layer(layer) => layer.note(),
         }
     }
@@ -1607,6 +1618,7 @@ fn handle_view_switches(
     clicks: Query<(&Interaction, &ViewSwitch), Changed<Interaction>>,
     mut clear: ResMut<crate::clouds::TheSkyIsClear>,
     mut fog: ResMut<crate::fog::FogMode>,
+    mut reach: ResMut<crate::hand::ShowTheReach>,
     mut layers: ResMut<crate::debug::layers::ViewLayers>,
     mut tracks: Query<(&ViewSwitch, &mut BackgroundColor, &mut BorderColor)>,
     mut knobs: Query<(&SwitchKnob, &mut Node, &mut BackgroundColor), Without<ViewSwitch>>,
@@ -1618,6 +1630,7 @@ fn handle_view_switches(
         match switch {
             ViewSwitch::Clouds => clear.0 = !clear.0,
             ViewSwitch::Veil => fog.0 = !fog.0,
+            ViewSwitch::Reach => reach.0 = !reach.0,
             ViewSwitch::Layer(layer) => layers.toggle(*layer),
         }
     }
@@ -1627,6 +1640,7 @@ fn handle_view_switches(
         // there is weather, so the sky being clear is the switch being off.
         ViewSwitch::Clouds => !clear.0,
         ViewSwitch::Veil => fog.0,
+        ViewSwitch::Reach => reach.0,
         ViewSwitch::Layer(layer) => layers.shown(*layer),
     };
     for (switch, mut fill, mut border) in &mut tracks {

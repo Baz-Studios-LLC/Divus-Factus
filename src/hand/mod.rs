@@ -18,6 +18,9 @@
 //! function answers the same question analytically and is always available, even
 //! where no chunk has been built.
 
+pub mod reach;
+pub use reach::ShowTheReach;
+
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
@@ -363,6 +366,7 @@ impl Plugin for HandPlugin {
                 Update,
                 apply_hand_style.run_if(resource_changed::<HandStyle>),
             )
+            .add_plugins(reach::ReachPlugin)
             .add_systems(Startup, spawn_hand_cursor)
             .add_systems(Startup, brew_hover_glow)
             .init_resource::<CarryTune>()
@@ -602,6 +606,65 @@ impl DivineHand {
 }
 
 /// Closest object whose bounding sphere the ray passes through.
+/// How far outside a thing the cursor may be and still be pointing at it,
+/// as a fraction of how far away the camera is.
+///
+/// A FRACTION, because the pick happens in meters and the player is aiming in
+/// pixels: half a meter is a fat target from ten meters up and invisible from
+/// two hundred. Scaling with the zoom keeps the forgiveness the same size
+/// under the cursor at every distance.
+///
+/// Brett: "Right now selection is pixel perfect to a mouse pointer that is
+/// hidden. The hand sits above that mouse so sometimes it is difficult to
+/// figure out what you are selecting... First we need to widen the selection
+/// a bit."
+const FORGIVENESS: f32 = 0.035;
+
+/// The narrowest and widest that forgiveness may get, in meters.
+///
+/// The floor keeps a close-up view from demanding pixel accuracy; the ceiling
+/// stops a view from orbit turning into a net that catches half a village.
+const FORGIVENESS_RANGE: (f32, f32) = (0.6, 4.0);
+
+/// How wide a miss still counts, at this camera distance.
+pub fn forgiveness_at(camera_distance: f32) -> f32 {
+    (camera_distance * FORGIVENESS).clamp(FORGIVENESS_RANGE.0, FORGIVENESS_RANGE.1)
+}
+
+/// Of everything the cursor came near, which one it is actually pointing at.
+///
+/// Each candidate is given as `(thing, miss, radius)`: how far the cursor
+/// passed from its middle, and how big it is.
+///
+/// SIZE DECIDES WHETHER THE CURSOR IS ON A THING, AND NOTHING ELSE. What wins
+/// among everything it is on is simply whichever it passed nearest - the most
+/// literal reading of "what am I pointing at" there is.
+///
+/// Both of the obvious alternatives are magnets, and Brett asked for the
+/// magnet gone entirely: "some buildings and other things have a magnet like
+/// effect with the hand and it makes selecting things next to it difficult
+/// because it snaps." Ranking by `miss / radius` gives a six-meter longhouse
+/// a six-meter catchment, so it takes clicks from three meters away that were
+/// meant for a villager half a meter off. Ranking by distance to the SURFACE
+/// is no better: the cursor is three meters deep inside the longhouse and a
+/// tenth of a meter inside the villager, so the building wins again for being
+/// big enough to be deeply inside of. Only the center distance is free of it.
+pub(crate) fn most_aimed_at<T>(
+    near: impl Iterator<Item = (T, f32, f32)>,
+    forgiveness: f32,
+) -> Option<T> {
+    let mut best: Option<(f32, T)> = None;
+    for (thing, miss, radius) in near {
+        if miss - radius > forgiveness {
+            continue;
+        }
+        if best.as_ref().is_none_or(|(nearest, _)| miss < *nearest) {
+            best = Some((miss, thing));
+        }
+    }
+    best.map(|(_, thing)| thing)
+}
+
 fn pick_object(
     ray: Ray3d,
     candidates: &Query<(Entity, &GlobalTransform, &PickRadius, Option<&PickLift>), Without<Held>>,
@@ -609,42 +672,37 @@ fn pick_object(
     // How far along the ray the ground is. Anything beyond it is behind a
     // hill or under the map, whatever the cursor happens to line up with.
     ground: f32,
+    // How far outside a thing still counts as pointing at it, in meters.
+    forgiveness: f32,
 ) -> Option<Entity> {
-    let mut best: Option<(f32, Entity)> = None;
+    let near = candidates
+        .iter()
+        .filter_map(|(entity, transform, radius, lift)| {
+            // Up the thing's OWN up, which on a round world is not the world's.
+            let center =
+                transform.translation() + lift.map_or(Vec3::ZERO, |lift| transform.up() * lift.0);
+            let to_center = center - ray.origin;
+            let along = to_center.dot(*ray.direction);
 
-    for (entity, transform, radius, lift) in candidates.iter() {
-        // Up the thing's OWN up, which on a round world is not the world's.
-        let center =
-            transform.translation() + lift.map_or(Vec3::ZERO, |lift| transform.up() * lift.0);
-        let to_center = center - ray.origin;
-        let along = to_center.dot(*ray.direction);
+            if along < 0.0 || along > max_distance {
+                return None;
+            }
 
-        if along < 0.0 || along > max_distance {
-            continue;
-        }
+            // Behind the ground. Its own radius is the allowance: a thing sitting
+            // ON a slope is a little past where the ray met the earth, and half a
+            // meter more so nothing on flat ground is lost to rounding.
+            if along > ground + radius.0 + 0.5 {
+                return None;
+            }
 
-        // Behind the ground. Its own radius is the allowance: a thing sitting
-        // ON a slope is a little past where the ray met the earth, and half a
-        // meter more so nothing on flat ground is lost to rounding.
-        if along > ground + radius.0 + 0.5 {
-            continue;
-        }
+            // Perpendicular distance from the ray to the sphere center.
+            let closest = ray.origin + *ray.direction * along;
+            let miss = closest.distance(center);
 
-        // Perpendicular distance from the ray to the sphere center.
-        let closest = ray.origin + *ray.direction * along;
-        let miss = closest.distance(center);
+            Some((entity, miss, radius.0))
+        });
 
-        // A little forgiveness for small targets, but not a magnet: the halo
-        // used to be wide enough that pointing *between* two villagers was
-        // impossible. What wins is whatever the cursor is most centered on,
-        // not whatever is nearest the camera.
-        let score = miss / radius.0;
-        if score <= 1.15 && best.is_none_or(|(s, _)| score < s) {
-            best = Some((score, entity));
-        }
-    }
-
-    best.map(|(_, e)| e)
+    most_aimed_at(near, forgiveness)
 }
 
 fn update_hand_ray(
@@ -733,7 +791,8 @@ fn update_hover(
         .map(|hit| hit.distance(ray.origin))
         .unwrap_or(f32::MAX);
 
-    hand.hovered = pick_object(ray, &candidates, 600.0, ground);
+    let reach = forgiveness_at(rigs.single().map_or(80.0, |rig| rig.distance));
+    hand.hovered = pick_object(ray, &candidates, 600.0, ground, reach);
 }
 
 /// A clean action-tap on a dwelling knocks on the roof.
@@ -2019,6 +2078,68 @@ fn animate_hand(
                 * (1.0 - splay)
                 + 0.32 * splay),
         );
+    }
+}
+
+#[cfg(test)]
+mod aiming {
+    use super::*;
+
+    /// A big thing does not steal a click aimed at a small one beside it.
+    ///
+    /// Brett: "some buildings and other things have a magnet like effect with
+    /// the hand and it makes selecting things next to it difficult because it
+    /// snaps. Remove the magnet effect entirely."
+    ///
+    /// The old rule scored `miss / radius`, so a longhouse six meters wide
+    /// beat a villager the cursor was practically on: 3.0/6.0 = 0.5 against
+    /// 0.4/0.5 = 0.8. Size won the contest instead of aim.
+    #[test]
+    fn the_big_thing_has_no_magnet() {
+        let longhouse = ("longhouse", 3.0, 6.0);
+        let villager = ("villager", 0.4, 0.5);
+        assert_eq!(
+            most_aimed_at([longhouse, villager].into_iter(), 1.0),
+            Some("villager"),
+            "the building pulled a click that was on somebody standing next to it"
+        );
+
+        // And the building still takes a click that is actually on it.
+        assert_eq!(
+            most_aimed_at(
+                [("longhouse", 1.0, 6.0), ("villager", 4.0, 0.5)].into_iter(),
+                1.0
+            ),
+            Some("longhouse")
+        );
+    }
+
+    /// Pointing between two things still picks the nearer one, which is what
+    /// the forgiveness must not undo.
+    #[test]
+    fn between_two_of_a_size_the_nearer_wins() {
+        assert_eq!(
+            most_aimed_at([("left", 0.9, 0.5), ("right", 0.6, 0.5)].into_iter(), 1.0),
+            Some("right")
+        );
+    }
+
+    /// Nothing at all, when the cursor is nowhere near anything.
+    #[test]
+    fn a_wide_miss_selects_nothing() {
+        assert_eq!(
+            most_aimed_at([("villager", 9.0, 0.5)].into_iter(), 1.0),
+            None
+        );
+    }
+
+    /// The forgiveness holds its size under the cursor as the view pulls
+    /// back, and is bounded at both ends.
+    #[test]
+    fn forgiveness_follows_the_zoom() {
+        assert!(forgiveness_at(10.0) < forgiveness_at(120.0));
+        assert_eq!(forgiveness_at(1.0), FORGIVENESS_RANGE.0, "no floor");
+        assert_eq!(forgiveness_at(9_000.0), FORGIVENESS_RANGE.1, "no ceiling");
     }
 }
 

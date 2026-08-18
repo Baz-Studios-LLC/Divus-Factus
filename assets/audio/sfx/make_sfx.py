@@ -8,7 +8,8 @@ random.seed(0x1CE)
 def write(name, samples):
     peak = max(1e-9, max(abs(s) for s in samples))
     norm = 0.92 / peak if peak > 0.92 else 1.0
-    path = os.path.join("assets/audio/sfx", name)
+    out_dir = "assets/audio/sfx" if os.path.exists("assets/audio/sfx") else os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(out_dir, name)
     with wave.open(path, "w") as w:
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR)
         w.writeframes(b"".join(struct.pack("<h", int(max(-1, min(1, s * norm)) * 32767)) for s in samples))
@@ -157,17 +158,13 @@ write("proclaim_faith.wav", faith)
 # changed the first time this was written in the middle.
 #
 # The alarm: the warning bell. Everything the prayer chime is not - low
-# where the chime is high, struck three times where the chime rings once,
+# where the chime is high, struck once where the chime rings once,
 # and hard enough to carry over a field. The partials are the same kind of
 # inharmonic stack, because it is the same bell; it is just being hit like
 # somebody means it.
-STRIKE = 0.34
-alarm = silence(STRIKE * 2 + 1.6)
-for i in range(3):
-    hit = tone(196, 1.7, 2.1, 0.55)
-    hit = mix(hit, tone(196 * 2.74, 0.8, 6.0, 0.30))
-    hit = mix(hit, tone(196 * 5.4, 0.35, 11.0, 0.13))
-    # The clapper itself - a short woody knock under the ring.
-    hit = mix(hit, noise(0.05, 60.0, 0.35))
-    alarm = mix(alarm, hit, STRIKE * i)
+alarm = tone(196, 1.7, 2.1, 0.55)
+alarm = mix(alarm, tone(196 * 2.74, 0.8, 6.0, 0.30))
+alarm = mix(alarm, tone(196 * 5.4, 0.35, 11.0, 0.13))
+# The clapper itself - a short woody knock under the ring.
+alarm = mix(alarm, noise(0.05, 60.0, 0.35))
 write("alarm.wav", alarm)
