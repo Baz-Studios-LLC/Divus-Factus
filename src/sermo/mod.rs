@@ -47,6 +47,7 @@ pub mod vivarium;
 /// optimizer removes the whole path, and a release build has no HTTP client
 /// linked into it at all.
 #[cfg(not(feature = "living-voice"))]
+#[allow(dead_code)] // the stub exists so the call sites compile; nothing reads it
 pub mod vivarium {
     pub struct Vivarium;
 
@@ -65,12 +66,13 @@ pub mod vivarium {
             None
         }
 
-        pub fn ask_afresh(
+        pub fn ask_afresh_of(
             &mut self,
             _speaker: u64,
             _tags: &[&str],
             _slots: &[(&str, &str)],
             _heard: Option<&str>,
+            _facts: SocialTruth,
         ) -> Option<String> {
             None
         }
@@ -78,6 +80,16 @@ pub mod vivarium {
         pub fn take_ready(&mut self) -> Vec<ReadyLine> {
             Vec::new()
         }
+    }
+
+    /// The same shape as the real one, so `what_is_true_of` reads identically
+    /// whether or not the living voice is compiled in. Nothing reads these.
+    #[derive(Default)]
+    pub struct SocialTruth {
+        pub speaker_name: Option<String>,
+        pub speaker_is: Option<String>,
+        pub traits: Vec<String>,
+        pub settlement_name: Option<String>,
     }
 
     pub struct ReadyLine {
@@ -476,10 +488,12 @@ impl Tongue {
             // VAULT, which is a corpus and wants a line to serve many moments.
             // It is wrong for the factory, whose entire job is to produce
             // something that was not there before.
-            Voice::Generated => self
-                .living
-                .as_mut()
-                .and_then(|v| v.ask_afresh(speaker, tags, slots, None)),
+            Voice::Generated => {
+                let facts = self.what_is_true_of(speaker);
+                self.living
+                    .as_mut()
+                    .and_then(|v| v.ask_afresh_of(speaker, tags, slots, None, facts))
+            }
             // THE VAULT ANSWERS OR NOBODY DOES. No falling back to the
             // written corpus, on purpose: an empty vault that quietly spoke
             // authored lines would sound exactly like the authored setting,
@@ -488,6 +502,43 @@ impl Tongue {
             // for this yet", and it is also the coverage report - the moments
             // that stay quiet are precisely the ones still to generate.
             Voice::Vault => self.from_the_vault(speaker, tags, slots, must),
+        }
+    }
+
+    /// EVERYTHING THE WORLD KNOWS about the person about to speak.
+    ///
+    /// This is the fix for lines that read as vague and faintly literary. The
+    /// packet carried a register, some tags and the quoted speech and nothing
+    /// else, so the model had nothing concrete to be specific ABOUT - and what
+    /// it does with a vacuum is fill it from its own idea of a medieval
+    /// village, which is where the mayor came from. Vagueness and invention
+    /// are the same symptom.
+    ///
+    /// Only PLAIN WORDS go in. "A forester", never `Vocation::Forester`; "she"
+    /// rather than `Sex::Female`. An engine label put into a packet comes back
+    /// out in a line.
+    ///
+    /// And only things that are TRUE of this person right now, because
+    /// everything in here is something the villager is permitted to say - and
+    /// anything they say has to be pinned by a tag before the line can safely
+    /// be replayed. That is the real budget on how much goes in here, and it
+    /// is a design budget rather than a token one.
+    fn what_is_true_of(&self, speaker: u64) -> vivarium::SocialTruth {
+        let Some(who) = Entity::try_from_bits(speaker) else {
+            return vivarium::SocialTruth::default();
+        };
+        let Some(dossier) = self.dossiers.get(&who) else {
+            return vivarium::SocialTruth::default();
+        };
+        vivarium::SocialTruth {
+            speaker_name: Some(dossier.name.clone()),
+            speaker_is: Some(dossier.pronoun.to_string()),
+            traits: dossier
+                .trade
+                .map(|t| vec![t.to_string()])
+                .unwrap_or_default(),
+            settlement_name: dossier.settlement.clone(),
+            ..Default::default()
         }
     }
 

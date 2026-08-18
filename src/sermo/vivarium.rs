@@ -112,6 +112,14 @@ struct Moment {
 pub struct SocialTruth {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub speaker_name: Option<String>,
+    /// "she", "he" or "they" - so a pronoun is CHOSEN rather than guessed.
+    ///
+    /// Nothing told the model this before, so every pronoun it wrote was a
+    /// coin flip, and slotting a name froze the wrong one into a line that
+    /// would then be replayed forever. Brett saw it coming: "should we add
+    /// gender to that in case the lines use pronouns?"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speaker_is: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub traits: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -359,15 +367,18 @@ impl Vivarium {
     /// So a cached answer is SPENT here: taken, returned once, and dropped, so
     /// the next equivalent moment asks again. What was said is not lost - it
     /// went into the vault the moment it arrived.
-    pub fn ask_afresh(
+    /// As [`Vivarium::ask_afresh`], with what the world knows about the
+    /// speaker - see `Tongue::what_is_true_of`.
+    pub fn ask_afresh_of(
         &mut self,
         speaker: u64,
         tags: &[&str],
         slots: &[(&str, &str)],
         heard: Option<&str>,
+        facts: SocialTruth,
     ) -> Option<String> {
         self.drain();
-        let moment = Moment::new(speaker, tags, slots, heard, SocialTruth::default());
+        let moment = Moment::new(speaker, tags, slots, heard, facts);
         let key = moment.key();
         if let Some(candidate) = self.cache.remove(&key) {
             // Asked again straight away, so the next moment of this shape has
@@ -593,7 +604,7 @@ fn request_candidate(
                 "role": "developer",
                 "content": [{
                     "type": "input_text",
-                    "text": "You write candidate dialogue for a medieval village simulation. Return only the required JSON. The truth packet is complete: never introduce a person, object, event, motive, relationship, place, weather, time of day, or condition it does not contain. `world_facts` and `topic_facts` are the plain meanings of engine state; never repeat an engine tag or label in the line. When present, `conversation_intent` says what this beat is trying to do. Fulfill it naturally, without describing the intent. Ordinary American English, sentence case, one or two short sentences, eighteen words maximum. Concrete everyday speech; no poetry, archaic diction, modern slang, narration, stage direction, or explanation. Thoughts are first-person private thoughts, never third-person narration or stat readouts. Generated names are private context: do not use them in the returned text. Use 'the god' if the god is genuinely relevant; the game will render the current name. Only the `prayer` register may address or ask the god directly. `chat:*`, `reply`, `tell`, and `muse` are never prayers and must not address the god. A reply reacts directly to the quoted speech if present. Use ordinary work words: foresters speak of woods, trees, timber, and felling; miners of quarry, rock, stone, and veins; farmers of fields, crops, soil, and harvest; builders of houses, walls, timber, and roofs; hunters of woods, trails, and game; fishers of rivers, shores, and nets. Never call a person a cutter or call their work 'my cutting'. Never say morale, wavering, muse, trait, or the raw event labels Delivered, Uprooted, Perished, Flourished, Beckoned, or DoubtSown. `tags` must be a nonempty subset of the supplied tags and include the register. `grounding` lists only supplied tags or fact fields that shaped the sentence."
+                    "text": "You write candidate dialogue for a medieval village simulation. Return only the required JSON. The truth packet is complete: never introduce a person, object, event, motive, relationship, place, weather, time of day, or condition it does not contain. This is a village of ten to forty people with no lord, no king, no coin and no market; it has a longhouse, huts, a shrine, a storehouse, fields, a mine, a dock and a tavern, and it elects a mayor only once a town hall stands. Never mention a rank, trade, building or custom the packet has not named. `speaker_is` gives the speaker's pronoun - use it and never guess. One tag says how the speaker knows: `saw` means THEY witnessed it themselves, `heard` means somebody told them, and `distant` means it has been round the village several times. Write from the one you are given: with `heard` do not claim to have seen it, and with `saw` do not attribute it to somebody else. `world_facts` and `topic_facts` are the plain meanings of engine state; never repeat an engine tag or label in the line. When present, `conversation_intent` says what this beat is trying to do. Fulfill it naturally, without describing the intent. Ordinary American English, sentence case, one or two short sentences, eighteen words maximum. Concrete everyday speech; no poetry, archaic diction, modern slang, narration, stage direction, or explanation. Thoughts are first-person private thoughts, never third-person narration or stat readouts. Generated names are private context: do not use them in the returned text. Use 'the god' if the god is genuinely relevant; the game will render the current name. Only the `prayer` register may address or ask the god directly. `chat:*`, `reply`, `tell`, and `muse` are never prayers and must not address the god. A reply reacts directly to the quoted speech if present. Use ordinary work words: foresters speak of woods, trees, timber, and felling; miners of quarry, rock, stone, and veins; farmers of fields, crops, soil, and harvest; builders of houses, walls, timber, and roofs; hunters of woods, trails, and game; fishers of rivers, shores, and nets. Never call a person a cutter or call their work 'my cutting'. Never say morale, wavering, muse, trait, or the raw event labels Delivered, Uprooted, Perished, Flourished, Beckoned, or DoubtSown. `tags` must be a nonempty subset of the supplied tags and include the register. `grounding` lists only supplied tags or fact fields that shaped the sentence."
                 }]
             },
             {
