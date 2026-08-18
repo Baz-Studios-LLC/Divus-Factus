@@ -168,6 +168,14 @@ fn draw_the_reach(
         // The corners carry the position; this is never moved. See the module
         // head, and `survey`, which does the same.
         Transform::default(),
+        // AND THE BEND MUST NOT TOUCH IT. This is what buried three attempts:
+        // an identity transform is not "already in world space" to the bend,
+        // it is a flat point at the origin waiting to be wrapped, and
+        // wrapping it seats the whole thing about twenty-eight units under
+        // the ground. The survey sheet had the same hole, which is why the
+        // resource heatmap stopped drawing too - and why copying it faithfully
+        // copied the fault.
+        crate::globe::BentInPlace,
         bevy::light::NotShadowCaster,
         bevy::light::NotShadowReceiver,
     ));

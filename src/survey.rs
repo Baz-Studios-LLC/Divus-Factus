@@ -356,6 +356,13 @@ fn refresh_survey(
             ..default()
         })),
         Transform::default(),
+        // ALREADY BENT, corner by corner - so the world's bend must not touch
+        // it. Without this the sheet is treated as a flat thing waiting to be
+        // wrapped, and bending an identity transform seats it about
+        // twenty-eight units UNDER the ground: the god's sight opened, the
+        // legend appeared, and the map itself was buried. Exactly the way
+        // every river in the world once sank. See `BentInPlace`.
+        crate::globe::BentInPlace,
         NotShadowCaster,
         NotShadowReceiver,
     ));
