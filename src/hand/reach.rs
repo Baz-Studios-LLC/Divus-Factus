@@ -79,7 +79,7 @@ const SMOKE_RISES: f32 = 0.55;
 /// what makes it read as light arriving from somewhere above rather than as
 /// smoke leaving the ground. The hand hangs over the cursor, so the shaft
 /// points at it without having to know where it is.
-const FLARE: f32 = 1.18;
+const FLARE: f32 = 1.07;
 
 /// Where the band's inner edge is, as a fraction of the radius.
 ///
@@ -92,7 +92,7 @@ const FLARE: f32 = 1.18;
 /// The reach really is that small up close, and the ring must not lie about
 /// it, so the answer is not a bigger circle - it is a circle you can see: a
 /// broad disc that fades out rather than a hairline.
-const BAND: f32 = 0.35;
+const BAND: f32 = 0.68;
 
 /// How high off the ground it sits, in meters.
 ///
