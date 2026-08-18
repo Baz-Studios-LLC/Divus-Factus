@@ -241,61 +241,6 @@ pub fn close_span(name: &'static str) -> impl Fn(Res<Timings>) {
 }
 
 /// Says where the frames went, every couple of seconds.
-/// Prints the render graph's own timings, worst pass first.
-///
-/// `DIVUS_FACTUS_GPU=1`. The stopwatch beside this measures the SIMULATION and
-/// found it innocent; this reads the other half. Every span the render graph
-/// records - each Aspectus pass, the main opaque pass, shadows, bloom - with
-/// the time the GPU actually spent in it.
-pub fn report_the_render_graph(
-    store: Res<bevy::diagnostic::DiagnosticsStore>,
-    time: Res<Time<Real>>,
-    mut since: Local<f32>,
-) {
-    if std::env::var("DIVUS_FACTUS_GPU").is_err() {
-        return;
-    }
-    *since += time.delta_secs();
-    if *since < 1.0 {
-        return;
-    }
-    *since = 0.0;
-
-    let mut spent: Vec<(String, f64)> = store
-        .iter()
-        .filter_map(|d| {
-            let path = d.path().as_str();
-            // The render graph's spans, in milliseconds, and the frame time
-            // beside them so a pass can be read as a share of the whole.
-            (path.contains("elapsed_gpu") || path.contains("frame_time"))
-                // THE LATEST, not the smoothed average. Bevy smooths over a
-                // long window, and world generation is a single frame of
-                // THIRTY-TWO SECONDS - after which the average is worthless
-                // for the rest of the run, and an A/B that reads it compares
-                // two runs' startup costs rather than their steady state.
-                .then(|| Some((path.to_string(), d.value()?)))
-                .flatten()
-        })
-        .filter(|(_, ms)| *ms > 0.05)
-        .collect();
-    spent.sort_by(|a, b| b.1.total_cmp(&a.1));
-    if spent.is_empty() {
-        info!("gpu: the render graph reported nothing - timestamps may be unsupported here");
-        return;
-    }
-    let told = spent
-        .iter()
-        .take(12)
-        .map(|(name, ms)| {
-            let short = name.rsplit('/').next().unwrap_or(name);
-            let owner = name.split('/').nth(1).unwrap_or("");
-            format!("{owner}:{short} {ms:.2}ms")
-        })
-        .collect::<Vec<_>>()
-        .join("  ");
-    info!("gpu: {told}");
-}
-
 pub fn report_timings(timings: Res<Timings>) {
     if !timings.on {
         return;
@@ -381,9 +326,6 @@ impl Plugin for TimingsPlugin {
         // main-world minus Update's spans, derived, not probed.
         app.init_resource::<Timings>()
             .add_systems(First, open_the_frame)
-            .add_systems(
-                Last,
-                (close_the_frame, report_timings, report_the_render_graph).chain(),
-            );
+            .add_systems(Last, (close_the_frame, report_timings).chain());
     }
 }

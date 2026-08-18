@@ -52,6 +52,48 @@ const LOG_VAR: &str = "SERMO_LIVING_LOG";
 /// will be lived with for the whole corpus.
 const DEFAULT_MODEL: &str = "gpt-5.6-luna";
 const MAX_PENDING: usize = 12;
+
+/// HOW MANY LINES ONE CALL ASKS FOR. Brett's idea, and the best one of the
+/// night: "What if we had it generate 20 instead of 1? Only one is shown in
+/// game, but the other 19 are saved."
+///
+/// The economics are far more lopsided than twenty-to-one. The expensive part
+/// of a call is the PROMPT - the whole voice specification and the truth packet
+/// - sent every time to get eighteen words back. Twenty lines in one call sends
+/// that prompt ONCE. Input cost stays flat and output rises twentyfold from a
+/// tiny base, which on Luna's pricing is closer to a tenfold cut per line than
+/// a wash.
+///
+/// And the variety is better, not merely cheaper. Twenty separate calls each
+/// reach for the most obvious phrasing in isolation; one call producing twenty
+/// sees all twenty at once and can deliberately differentiate them. That is
+/// the repetition problem attacked at its source rather than patched with
+/// `already_said` afterwards.
+///
+/// UP TO twenty, never exactly twenty - see the prompt. Demanding a count
+/// invites padding, and a padded batch fills the vault with the rewordings the
+/// whole exercise exists to avoid.
+const A_BATCH: usize = 20;
+
+/// The batch size actually asked for, `SERMO_BATCH` overriding the default.
+///
+/// A KNOB BECAUSE THE RIGHT NUMBER IS EMPIRICAL. Brett: "20 is just a random
+/// number. Should we do more, less?" - and the answer is not in the pricing,
+/// it is in how many genuinely distinct thoughts one narrow moment supports.
+/// A forester telling firsthand about goblins may have ten real things to say;
+/// asking for fifty buys forty rewordings, which is the exact pollution this
+/// system exists to avoid.
+///
+/// It is a CEILING and not a quota - the prompt says stop early rather than
+/// pad - so a generous number is fairly safe, and the log prints how many came
+/// back against how many were asked for. Sweep it and read that line.
+fn a_batch() -> usize {
+    std::env::var("SERMO_BATCH")
+        .ok()
+        .and_then(|n| n.parse::<usize>().ok())
+        .filter(|n| (1..=200).contains(n))
+        .unwrap_or(A_BATCH)
+}
 const AWKWARD_WORK_PHRASES: &[&str] = &["cutter", "my cutting", "my cuttings"];
 const SYSTEM_WORDS: &[&str] = &["morale", "wavering", "muse", "trait"];
 
@@ -177,6 +219,13 @@ struct Candidate {
     grounding: Vec<String>,
 }
 
+/// What one call comes back with: a batch, of which one is spoken and the rest
+/// are kept. See [`A_BATCH`].
+#[derive(Clone, Debug, Deserialize)]
+struct Batch {
+    lines: Vec<Candidate>,
+}
+
 impl Moment {
     fn new(
         speaker: u64,
@@ -291,7 +340,8 @@ struct Job {
 struct Result {
     key: String,
     moment: Moment,
-    answer: std::result::Result<Candidate, String>,
+    /// How many the model offered, and which of them survived the gate.
+    answer: std::result::Result<(usize, Vec<Candidate>), String>,
 }
 
 /// A completed line waiting to rejoin the main-thread presentation flow.
@@ -482,27 +532,47 @@ impl Vivarium {
         for result in arrived {
             self.pending.remove(&result.key);
             match result.answer {
-                Ok(candidate) => {
-                    // Remembered against this shape of moment, so the next
-                    // request for it is told not to write this again.
-                    self.said_before
-                        .entry(result.key.clone())
-                        .or_default()
-                        .push(candidate.text.clone());
-                    self.cache.insert(result.key.clone(), candidate.clone());
-                    self.ready.push(ReadyLine {
-                        speaker: result.moment.speaker,
-                        register: result.moment.register.clone(),
-                        text: candidate.text.clone(),
-                        tags: candidate.tags.clone(),
-                    });
-                    self.record(
-                        "candidate",
-                        &result.key,
-                        &result.moment,
-                        Some(&candidate),
-                        None,
+                Ok((asked, kept)) if !kept.is_empty() => {
+                    info!(
+                        "the living voice wrote {} lines for one moment, of {asked} offered",
+                        kept.len()
                     );
+                    // ONE IS SPOKEN, ALL ARE KEPT. Brett: "Only one is shown in
+                    // game, but the other 19 are saved."
+                    //
+                    // Every one is remembered against this shape of moment, so
+                    // the next request for it is told not to write any of them
+                    // again - which is what stops the second batch being a
+                    // rewording of the first.
+                    let remembered = self.said_before.entry(result.key.clone()).or_default();
+                    for line in &kept {
+                        remembered.push(line.text.clone());
+                    }
+                    // The first goes to whoever asked; the rest go straight to
+                    // the vault by way of `take_ready`, which is what puts a
+                    // line on disk.
+                    for line in &kept {
+                        self.ready.push(ReadyLine {
+                            speaker: result.moment.speaker,
+                            register: result.moment.register.clone(),
+                            text: line.text.clone(),
+                            tags: line.tags.clone(),
+                        });
+                        self.record("candidate", &result.key, &result.moment, Some(line), None);
+                    }
+                    // The cache holds one for the moment that asked. The rest
+                    // are already written down and will be found by the vault.
+                    if let Some(first) = kept.into_iter().next() {
+                        self.cache.insert(result.key.clone(), first);
+                    }
+                }
+                Ok((asked, _)) => {
+                    // Every line in the batch broke a rule. Worth saying out
+                    // loud: it means the prompt and the gate disagree, and the
+                    // JSONL holds each reason.
+                    let why = format!("all {asked} lines in the batch were refused");
+                    self.exhausted.insert(result.key.clone());
+                    self.record("rejected", &result.key, &result.moment, None, Some(&why));
                 }
                 Err(error) => {
                     self.exhausted.insert(result.key.clone());
@@ -572,8 +642,19 @@ fn work_loop(work: Receiver<Job>, done: Sender<Result>, key: String, model: Stri
         .build()
         .expect("Vivarium HTTP client");
     for job in work {
-        let answer = request_candidate(&client, &key, &model, &job.moment)
-            .and_then(|candidate| validate(&job.moment, candidate));
+        // EVERY LINE IN THE BATCH IS JUDGED ON ITS OWN. A batch of twenty is
+        // twenty chances to break a rule, and one bad line must not cost the
+        // other nineteen - so the gate runs per line and the survivors come
+        // back together. Rejections are free and are recorded with their
+        // reasons, which is how the prompt gets better.
+        let answer = request_candidate(&client, &key, &model, &job.moment).map(|batch| {
+            let asked = batch.len();
+            let kept: Vec<Candidate> = batch
+                .into_iter()
+                .filter_map(|line| validate(&job.moment, line).ok())
+                .collect();
+            (asked, kept)
+        });
         let _ = done.send(Result {
             key: job.key,
             moment: job.moment,
@@ -587,9 +668,10 @@ fn request_candidate(
     key: &str,
     model: &str,
     moment: &Moment,
-) -> std::result::Result<Candidate, String> {
+) -> std::result::Result<Vec<Candidate>, String> {
     let prompt = format!(
-        "Write one Sermo utterance for this truth packet:\n{}",
+        "Write up to {} genuinely different Sermo utterances for this truth packet:\n{}",
+        a_batch(),
         serde_json::to_string_pretty(moment).map_err(|error| error.to_string())?
     );
     let body = json!({
@@ -615,21 +697,32 @@ fn request_candidate(
                 "type": "json_schema",
                 "name": "sermo_utterance",
                 "strict": true,
+                // A BATCH, not a line. See `A_BATCH`.
                 "schema": {
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
-                        "text": { "type": "string" },
-                        "tags": {
+                        "lines": {
                             "type": "array",
-                            "items": { "type": "string" }
-                        },
-                        "grounding": {
-                            "type": "array",
-                            "items": { "type": "string" }
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "text": { "type": "string" },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": { "type": "string" }
+                                    },
+                                    "grounding": {
+                                        "type": "array",
+                                        "items": { "type": "string" }
+                                    }
+                                },
+                                "required": ["text", "tags", "grounding"]
+                            }
                         }
                     },
-                    "required": ["text", "tags", "grounding"]
+                    "required": ["lines"]
                 }
             }
         },
@@ -638,7 +731,7 @@ fn request_candidate(
                 "role": "developer",
                 "content": [{
                     "type": "input_text",
-                    "text": "You write candidate dialogue for a medieval village simulation. Return only the required JSON. The truth packet is complete: never introduce a person, object, event, motive, relationship, place, weather, time of day, or condition it does not contain. This is a village of ten to forty people with no lord, no king, no coin and no market; it has a longhouse, huts, a shrine, a storehouse, fields, a mine, a dock and a tavern, and it elects a mayor only once a town hall stands. Never mention a rank, trade, building or custom the packet has not named. `speaker_is` gives the speaker's pronoun - use it and never guess. One tag says how the speaker knows: `saw` means THEY witnessed it themselves, `heard` means somebody told them, and `distant` means it has been round the village several times. Write from the one you are given: with `heard` do not claim to have seen it, and with `saw` do not attribute it to somebody else. `world_facts` and `topic_facts` are the plain meanings of engine state; never repeat an engine tag or label in the line. When present, `conversation_intent` says what this beat is trying to do. Fulfill it naturally, without describing the intent. Ordinary American English, sentence case, one or two short sentences, eighteen words maximum. Concrete everyday speech; no poetry, archaic diction, modern slang, narration, stage direction, or explanation. Thoughts are first-person private thoughts, never third-person narration or stat readouts. Generated names are private context: do not use them in the returned text. Use 'the god' if the god is genuinely relevant; the game will render the current name. Only the `prayer` register may address or ask the god directly. `chat:*`, `reply`, `tell`, and `muse` are never prayers and must not address the god. A reply reacts directly to the quoted speech if present. Use ordinary work words: foresters speak of woods, trees, timber, and felling; miners of quarry, rock, stone, and veins; farmers of fields, crops, soil, and harvest; builders of houses, walls, timber, and roofs; hunters of woods, trails, and game; fishers of rivers, shores, and nets. Never call a person a cutter or call their work 'my cutting'. Never say morale, wavering, muse, trait, or the raw event labels Delivered, Uprooted, Perished, Flourished, Beckoned, or DoubtSown. `tags` must be a nonempty subset of the supplied tags and include the register. `grounding` lists only supplied tags or fact fields that shaped the sentence. `already_said` is every line already written for this exact situation: write something genuinely DIFFERENT from all of them - a different thought, not the same thought reworded. Vary what the speaker notices and what they do about it, not merely the adjectives. Do not open a prayer with the god's name every time."
+                    "text": "You write candidate dialogue for a medieval village simulation. Return only the required JSON. The truth packet is complete: never introduce a person, object, event, motive, relationship, place, weather, time of day, or condition it does not contain. This is a village of ten to forty people with no lord, no king, no coin and no market; it has a longhouse, huts, a shrine, a storehouse, fields, a mine, a dock and a tavern, and it elects a mayor only once a town hall stands. Never mention a rank, trade, building or custom the packet has not named. `speaker_is` gives the speaker's pronoun - use it and never guess. One tag says how the speaker knows: `saw` means THEY witnessed it themselves, `heard` means somebody told them, and `distant` means it has been round the village several times. Write from the one you are given: with `heard` do not claim to have seen it, and with `saw` do not attribute it to somebody else. `world_facts` and `topic_facts` are the plain meanings of engine state; never repeat an engine tag or label in the line. When present, `conversation_intent` says what this beat is trying to do. Fulfill it naturally, without describing the intent. Ordinary American English, sentence case, one or two short sentences, eighteen words maximum. Concrete everyday speech; no poetry, archaic diction, modern slang, narration, stage direction, or explanation. Thoughts are first-person private thoughts, never third-person narration or stat readouts. Generated names are private context: do not use them in the returned text. Use 'the god' if the god is genuinely relevant; the game will render the current name. Only the `prayer` register may address or ask the god directly. `chat:*`, `reply`, `tell`, and `muse` are never prayers and must not address the god. A reply reacts directly to the quoted speech if present. Use ordinary work words: foresters speak of woods, trees, timber, and felling; miners of quarry, rock, stone, and veins; farmers of fields, crops, soil, and harvest; builders of houses, walls, timber, and roofs; hunters of woods, trails, and game; fishers of rivers, shores, and nets. Never call a person a cutter or call their work 'my cutting'. Never say morale, wavering, muse, trait, or the raw event labels Delivered, Uprooted, Perished, Flourished, Beckoned, or DoubtSown. `tags` must be a nonempty subset of the supplied tags and include the register. `grounding` lists only supplied tags or fact fields that shaped the sentence. Return UP TO 20 lines for this one moment, in `lines`. They must be genuinely different from each other - different thoughts, not one thought reworded twenty ways: vary what the speaker notices, what they feel about it, and what they intend to do. Stop early rather than pad; twelve good lines are worth more than twenty with eight rewordings among them. Every line must independently obey every rule here. `already_said` is every line already written for this exact situation: write nothing that repeats any of them. Vary what the speaker notices and what they do about it, not merely the adjectives. Do not open a prayer with the god's name every time."
                 }]
             },
             {
@@ -661,8 +754,12 @@ fn request_candidate(
         response_text(&response).ok_or_else(|| "API response had no output text".to_string())?;
     let parsed: Value = serde_json::from_str(&text)
         .map_err(|error| format!("structured response was not JSON: {error}"))?;
-    serde_json::from_value(parsed)
-        .map_err(|error| format!("structured response did not match Sermo's shape: {error}"))
+    let batch: Batch = serde_json::from_value(parsed)
+        .map_err(|error| format!("structured response did not match Sermo's shape: {error}"))?;
+    if batch.lines.is_empty() {
+        return Err("the batch came back empty".to_string());
+    }
+    Ok(batch.lines)
 }
 
 fn response_text(response: &Value) -> Option<String> {
