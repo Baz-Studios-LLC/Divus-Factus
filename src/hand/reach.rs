@@ -63,7 +63,7 @@ const AROUND: usize = 64;
 /// because the god's camera is HDR with bloom hanging off it, and that bloom
 /// is where the glow actually comes from: the ring is a soft thing seen
 /// through its own halo rather than a bright thing with a hard edge.
-const ANGELIC: [f32; 3] = [1.9, 1.58, 0.86];
+const ANGELIC: [f32; 3] = [1.95, 1.62, 0.52];
 
 /// How far the shaft stands off the rim, as a fraction of the radius.
 ///

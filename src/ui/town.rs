@@ -85,7 +85,20 @@ pub(crate) fn spawn_town_strip(mut commands: Commands) {
     // reaching in to set padding was being quietly overwritten every time
     // the theme moved, which is exactly how the name ended up sitting on
     // the top edge with two pixels over it.
-    let strip = commands.spawn((ordo::hanging_rail(), ChildOf(rail))).id();
+    // INTERACTIVE, so the hand knows it is over an interface and points.
+    //
+    // `track_pointer` counts any node carrying an `Interaction`, and this
+    // plate carried none - so the god's hand stayed in its world pose over
+    // the town's own strip, open-palmed as though it meant to pick the panel
+    // up. Brett: "can we make this menu have the pointer finger when you
+    // mouse over it?"
+    //
+    // On the PLATE and not on the rail above it: the rail runs the full width
+    // of the screen to center this, and marking that would turn the whole top
+    // edge of the world into interface.
+    let strip = commands
+        .spawn((ordo::hanging_rail(), Interaction::default(), ChildOf(rail)))
+        .id();
 
     let name = commands
         .spawn((TownStripName, ordo::heading(""), ChildOf(strip)))
