@@ -68,7 +68,7 @@ const MAX_PENDING: usize = 12;
 /// reach for the most obvious phrasing in isolation; one call producing twenty
 /// sees all twenty at once and can deliberately differentiate them. That is
 /// the repetition problem attacked at its source rather than patched with
-/// `already_said` afterwards.
+/// `already_said` afterward.
 ///
 /// UP TO twenty, never exactly twenty - see the prompt. Demanding a count
 /// invites padding, and a padded batch fills the vault with the rewordings the
@@ -177,7 +177,7 @@ struct Moment {
     /// "the same event may have a lot of different lines. We want to make sure
     /// that the user doesn't see repeated lines as much as possible."
     ///
-    /// Rejecting duplicates afterwards would only waste the call. Sending them
+    /// Rejecting duplicates afterward would only waste the call. Sending them
     /// is what the model's context window is FOR - Brett: "we do have a
     /// massive context on the model we are using, we can pass whatever we need
     /// to."

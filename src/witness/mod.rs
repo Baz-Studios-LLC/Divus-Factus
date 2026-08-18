@@ -225,7 +225,7 @@ impl DivineEventKind {
     /// Brett: "let's say somebody's happy and their neighbor tells them that
     /// someone got struck by lightning and killed - that could adjust their
     /// mood." It could not, before this: the story changed hands and the
-    /// listener's spirits did not move, so news travelled through a village
+    /// listener's spirits did not move, so news traveled through a village
     /// without ever making anyone feel anything.
     pub fn heart(self) -> f32 {
         match self {
@@ -233,7 +233,7 @@ impl DivineEventKind {
             DivineEventKind::Perished => -0.45,
             DivineEventKind::Fell => -0.40,
             DivineEventKind::Mauled => -0.35,
-            // Not grief but horror, and horror at your own neighbours.
+            // Not grief but horror, and horror at your own neighbors.
             DivineEventKind::AteTheDead => -0.50,
             DivineEventKind::Smote => -0.30,
             DivineEventKind::Quaked => -0.25,

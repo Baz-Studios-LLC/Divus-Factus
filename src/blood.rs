@@ -372,9 +372,6 @@ fn stains_fade(
 mod tests {
     use super::*;
 
-    /// A stain outlives the fight and is gone the next day, which is what
-    /// makes it worth having: the morning after tells you what happened.
-    #[test]
     /// The mark is a SPATTER and not a square. This is pinned because the
     /// first cut of it really was one flat unit cube, and on the ground that
     /// reads as exactly what it is - Brett: "it looks like a red square, lol."
@@ -423,6 +420,8 @@ mod tests {
         }
     }
 
+    /// A stain outlives the fight and is gone the next day, which is what
+    /// makes it worth having: the morning after tells you what happened.
     #[test]
     fn a_stain_dries_without_blinking_out() {
         let fresh = dried(0.0, 1.0);
