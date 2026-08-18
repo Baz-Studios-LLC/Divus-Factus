@@ -72,12 +72,14 @@ const BAND: f32 = 0.35;
 
 /// How high off the ground it sits, in meters.
 ///
-/// The ground under it is sampled with `base_height_at`, but the terrain that
-/// gets DRAWN is a chunk mesh sampled at the chunk's own spacing and
-/// interpolated between - so between vertices the drawn surface can sit above
-/// the height the ring measured, and the ring is under the world. Blood hit
-/// exactly this and answered it with a depth bias; this does both.
-const CLEARANCE: f32 = 0.14;
+/// THE SURVEY SHEET'S OWN NUMBER, and arrived at the same way everything else
+/// here finally was: by asking what the working thing does. It floats 0.45,
+/// which is a great deal more than the 0.14 that seemed generous, and it
+/// measures with `height_at` rather than `base_height_at` - two different
+/// surfaces. The base height ignores the rivers and the carving, so wherever
+/// they differ a ring measured against it is UNDER the ground that actually
+/// gets drawn, and a seventh of a meter is not enough to climb out.
+const CLEARANCE: f32 = 0.45;
 
 /// How hard the ring wins the depth fight against the ground.
 ///
@@ -124,6 +126,7 @@ fn draw_the_reach(
     mut standing: Local<Option<(Vec3, f32)>>,
     mut said: Local<f32>,
     clock: Res<Time>,
+    eyes: Query<&GlobalTransform, With<crate::camera::GodCamera>>,
 ) {
     // A LOUD PROBE, because this cannot be seen from an unattended capture:
     // the cursor is nowhere in one, and where the ring lands on screen is
@@ -170,10 +173,22 @@ fn draw_the_reach(
     for old in &ring {
         commands.entity(old).despawn();
     }
+    let painted = paint_the_ring(&terrain, seat, radius);
+    if std::env::var("DIVUS_FACTUS_REACH_PROBE").is_ok()
+        && let Some(bevy::render::mesh::VertexAttributeValues::Float32x3(points)) =
+            painted.attribute(Mesh::ATTRIBUTE_POSITION)
+    {
+        info!(
+            "reach mesh: {} corners, first {:?}, eye {:?}",
+            points.len(),
+            points.first(),
+            eyes.iter().next().map(|g| g.translation())
+        );
+    }
     commands.spawn((
         Name::new("The hand's reach"),
         ReachRing,
-        Mesh3d(meshes.add(paint_the_ring(&terrain, seat, radius))),
+        Mesh3d(meshes.add(painted)),
         MeshMaterial3d(materials.add(StandardMaterial {
             // Over one, so the bloom already on the god's camera carries it -
             // which is where the "ethereal" is meant to come from.
@@ -220,10 +235,13 @@ fn paint_the_ring(terrain: &crate::terrain::Terrain, seat: Vec3, radius: f32) ->
         let mut corner = |reach: f32, glow: f32| {
             let x = seat.x + cos * reach;
             let z = seat.z + sin * reach;
-            // `base_height_at`, never `height_at`: the latter takes the river
-            // index's write lock and can solve a whole unseen region on the
-            // way past, and this runs whenever the cursor moves.
-            let y = terrain.base_height_at(x, z) + CLEARANCE;
+            // `height_at`, the same as the survey sheet - this has to be the
+            // surface that is DRAWN, not the one underneath it. It takes the
+            // river index's write lock and can be slow on ground nobody has
+            // solved yet, which is why the ring only rebuilds when the cursor
+            // has actually moved: these hundred and thirty cells are the ones
+            // directly under the player's eye, and those are warm.
+            let y = terrain.height_at(x, z) + CLEARANCE;
             let (bent, turn) = crate::globe::bend_frame(Vec3::new(x, y, z));
             positions.push(bent.to_array());
             normals.push((turn * Vec3::Y).to_array());
@@ -236,7 +254,16 @@ fn paint_the_ring(terrain: &crate::terrain::Terrain, seat: Vec3, radius: f32) ->
 
         if i < AROUND {
             let base = i as u32 * 2;
-            indices.extend([base, base + 1, base + 3, base, base + 3, base + 2]);
+            // WOUND TO FACE UP. This was the other way round, which points
+            // every triangle at the ground - and a back face is culled, so
+            // the ring was drawn, correctly placed, thirty-five units in
+            // front of the eye, and facing away from it the whole time.
+            //
+            // The survey sheet, which is where all of this was copied from,
+            // winds its quads `[a, c, b, a, d, c]`. Mine did not, and that
+            // one transposition is what survived four attempts, a rewrite,
+            // and every other difference being eliminated.
+            indices.extend([base, base + 3, base + 1, base, base + 2, base + 3]);
         }
     }
 
