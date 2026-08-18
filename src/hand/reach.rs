@@ -16,29 +16,22 @@
 //! The GLOW is free either way: the god's camera is HDR with bloom already
 //! hanging off it, so a ring drawn brighter than white blooms on its own.
 //!
-//! # THIS DOES NOT DRAW YET
+//! # WHAT WAS WRONG THE FIRST TIME
 //!
-//! Everything here runs and nothing appears. What has been ruled out, so the
-//! next person does not spend the hour again:
+//! It drew nothing, and an hour went into the wrong half of the problem -
+//! the mesh handle, the material, the depth, the round world's bend - all of
+//! which turned out to be fine. Blowing the radius up to sixty meters put it
+//! on screen immediately and settled it: the drawing was never broken.
 //!
-//! - the system runs, every frame, with a sane seat and radius (probed)
-//! - the entity exists, one of it, and follows the cursor (probed)
-//! - the bend seats it correctly - the drop of ~325m at 1970m out is exactly
-//!   the curvature of a six thousand meter world, so it is on the ground
-//! - `ViewVisibility` is TRUE, so it passes culling and is handed to the
-//!   renderer
-//! - it is not the shader: a plain unlit `StandardMaterial` at 6.0 blue draws
-//!   nothing either
-//! - it is not the geometry: a plain `Cuboid` on the same entity draws nothing
-//! - it is not depth: three meters of clearance above the ground changes
-//!   nothing
-//! - it is not the mesh handle: `uuid_handle!` with `Assets::insert` was
-//!   replaced with an ordinary `meshes.add`, and that changed nothing either
+//! What was broken was the SHAPE. This was a vertical skirt and nothing else,
+//! and a vertical ribbon seen from a god's eye is seen EDGE ON - a couple of
+//! pixels of haze, which the mist swallows whole. The thing Brett asked for
+//! was a circle painted on the GROUND, and that is what reads from above.
+//! The skirt is still here, doing what it was always for: it is the smoke.
 //!
-//! An entity that passes visibility with a valid mesh and a valid material
-//! and produces no pixels is doing something structural, and the next move is
-//! to compare this line by line against a `RigidlySeated` thing that DOES
-//! draw - a blood stain is the closest one.
+//! The lesson worth keeping: when something renders nowhere, make it
+//! enormous before taking anything apart. Six minutes of that would have
+//! saved the hour.
 
 use bevy::asset::Asset;
 use bevy::prelude::*;
@@ -83,6 +76,12 @@ const AROUND: usize = 72;
 /// How high off the ground the ring's base sits, in meters. Just enough not
 /// to fight the terrain for the same depth.
 const CLEARANCE: f32 = 0.06;
+
+/// Where the flat band's inner edge is, as a fraction of the radius.
+///
+/// A band rather than a hairline: a one-pixel circle is a thing you squint
+/// at, and this has to be readable at a glance or it is not worth drawing.
+const BAND: f32 = 0.88;
 
 #[derive(Clone, Copy, ShaderType, Default)]
 pub struct ReachParams {
@@ -183,7 +182,16 @@ fn draw_the_reach(
 
     match ring.single_mut() {
         Ok((_, mine, material, mut at)) => {
-            meshes.insert(&mine.0, skirt);
+            // REPLACE THE MESH IN PLACE, and notice when that fails.
+            //
+            // `Assets::insert` hands back a `Result` and this discarded it -
+            // which the compiler said out loud and I read past. A silently
+            // refused insert means the ring keeps whatever shape it was born
+            // with while its entity goes on following the cursor, which is
+            // exactly the kind of half-working that is hardest to see.
+            if let Some(mut held) = meshes.get_mut(&mine.0) {
+                *held = skirt;
+            }
             // The ring FOLLOWS the cursor. It is one entity for the life of
             // the run rather than a fresh one per frame, so this is where it
             // moves; the mesh under it is rebuilt in place.
@@ -223,10 +231,10 @@ fn draw_the_reach(
 /// corner still samples the real ground under it, which is what lets the ring
 /// lie across a slope instead of cutting into it.
 fn build_the_skirt(terrain: &crate::terrain::Terrain, seat: Vec3, radius: f32, rise: f32) -> Mesh {
-    let mut positions: Vec<[f32; 3]> = Vec::with_capacity((AROUND + 1) * 2);
-    let mut normals: Vec<[f32; 3]> = Vec::with_capacity((AROUND + 1) * 2);
-    let mut uvs: Vec<[f32; 2]> = Vec::with_capacity((AROUND + 1) * 2);
-    let mut indices: Vec<u32> = Vec::with_capacity(AROUND * 6);
+    let mut positions: Vec<[f32; 3]> = Vec::with_capacity((AROUND + 1) * 3);
+    let mut normals: Vec<[f32; 3]> = Vec::with_capacity((AROUND + 1) * 3);
+    let mut uvs: Vec<[f32; 2]> = Vec::with_capacity((AROUND + 1) * 3);
+    let mut indices: Vec<u32> = Vec::with_capacity(AROUND * 12);
 
     for i in 0..=AROUND {
         let angle = i as f32 / AROUND as f32 * std::f32::consts::TAU;
@@ -240,12 +248,29 @@ fn build_the_skirt(terrain: &crate::terrain::Terrain, seat: Vec3, radius: f32, r
 
         let foot = Vec3::new(cos * radius, lift, sin * radius);
         let head = foot + Vec3::Y * rise;
+        // The inner edge of the flat band, on the ground.
+        let inner = Vec3::new(cos * radius * BAND, lift, sin * radius * BAND);
         // Facing outward, which is only used to keep the mesh well-formed -
         // the shader is unlit.
         let out = [cos, 0.0, sin];
 
+        // THE FLAT BAND FIRST, which is the circle a player actually reads.
+        //
+        // This began as a vertical skirt alone, and a vertical ribbon seen
+        // from a god's eye is seen EDGE ON - a couple of pixels of haze that
+        // the mist swallows whole. What makes a ring on the ground legible
+        // from above is a ring on the ground. The skirt is still here; it is
+        // the smoke, and now it has something to come off.
+        //
+        // Both of its corners carry `uv.y = 0`, so the shader treats the
+        // whole band as the bright ring and nothing else has to know about
+        // it.
+        positions.push(inner.to_array());
+        normals.push([0.0, 1.0, 0.0]);
+        uvs.push([i as f32 / AROUND as f32, 0.0]);
+
         positions.push(foot.to_array());
-        normals.push(out);
+        normals.push([0.0, 1.0, 0.0]);
         uvs.push([i as f32 / AROUND as f32, 0.0]);
 
         positions.push(head.to_array());
@@ -253,8 +278,11 @@ fn build_the_skirt(terrain: &crate::terrain::Terrain, seat: Vec3, radius: f32, r
         uvs.push([i as f32 / AROUND as f32, 1.0]);
 
         if i < AROUND {
-            let base = i as u32 * 2;
-            indices.extend([base, base + 1, base + 3, base, base + 3, base + 2]);
+            let base = i as u32 * 3;
+            // The band lying on the ground.
+            indices.extend([base, base + 1, base + 4, base, base + 4, base + 3]);
+            // And the smoke standing on its outer edge.
+            indices.extend([base + 1, base + 2, base + 5, base + 1, base + 5, base + 4]);
         }
     }
 
