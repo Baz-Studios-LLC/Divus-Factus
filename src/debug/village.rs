@@ -2412,7 +2412,7 @@ pub(crate) fn build_settings_page(commands: &mut Commands, page: Entity) {
     let tabs = ui::tab_bar(
         commands,
         page,
-        &["KEYBINDS", "THE HAND", "VIDEO & SOUND", "THE VIEW"],
+        &["KEYBINDS", "THE HAND", "VIDEO & SOUND", "THE VIEW", "SERMO"],
     );
     for (index, tab_page) in tabs.iter().copied().enumerate() {
         commands.entity(tab_page).insert((
@@ -2766,6 +2766,7 @@ pub(crate) fn build_settings_page(commands: &mut Commands, page: Entity) {
     // rather than four more letters on the keyboard. A hotkey is for something
     // reached for mid-thought; none of these are.
     crate::title::build_view_switches(commands, tabs[3]);
+    crate::title::build_sermo_page(commands, tabs[4]);
 }
 
 /// The music volume readout on the sound card.

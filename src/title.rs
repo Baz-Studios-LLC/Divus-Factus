@@ -128,6 +128,12 @@ enum ViewSwitch {
     Clouds,
     /// The fog of war over ground no village has walked.
     Veil,
+    /// Whether villagers speak lines written as they are needed, rather than
+    /// lines written in advance.
+    ///
+    /// Its own tab because it is not a view at all - it is who is talking -
+    /// and because it is the only setting here that reaches off the machine.
+    LivingVoice,
     /// Whether the hand goes rigid on the cursor instead of gliding to it.
     ///
     /// A matter of taste about how the game feels in the hand, which is
@@ -169,6 +175,7 @@ impl ViewSwitch {
             ViewSwitch::Veil => "the veil",
             ViewSwitch::Reach => "the hand's reach",
             ViewSwitch::HandSnaps => "a rigid hand",
+            ViewSwitch::LivingVoice => "the living voice",
             ViewSwitch::Layer(layer) => layer.label(),
         }
     }
@@ -181,6 +188,7 @@ impl ViewSwitch {
             ViewSwitch::Veil => "unwalked ground kept dark",
             ViewSwitch::Reach => "a ring where the hand would close",
             ViewSwitch::HandSnaps => "the hand pinned to the pointer, not gliding",
+            ViewSwitch::LivingVoice => "lines written as the moment arrives, not before",
             ViewSwitch::Layer(layer) => layer.note(),
         }
     }
@@ -1539,6 +1547,48 @@ pub(crate) fn build_view_switches(commands: &mut Commands, parent: Entity) {
     commands.entity(label).insert(ChildOf(screen));
 
     for switch in ViewSwitch::ALL {
+        spawn_switch(commands, screen, switch);
+    }
+}
+
+/// The living voice's own page: what it is, and the one switch that chooses it.
+pub(crate) fn build_sermo_page(commands: &mut Commands, parent: Entity) {
+    let label = commands
+        .spawn((
+            ui::dim("who is speaking, and where the words come from"),
+            Node {
+                margin: UiRect::top(px(4)),
+                ..default()
+            },
+        ))
+        .id();
+    commands.entity(label).insert(ChildOf(parent));
+
+    spawn_switch(commands, parent, ViewSwitch::LivingVoice);
+
+    // The plain truth about what the switch costs, because it is the only
+    // setting in this game that reaches off the machine.
+    for line in [
+        "The corpus is thousands of authored lines. It is instant, it is free,",
+        "and it works with no network at all.",
+        "",
+        "The living voice writes each line as the moment arrives, from a packet",
+        "of the truth about that moment and nothing else. It needs OPENAI_API_KEY",
+        "in the environment; without one this switch does nothing.",
+        "",
+        "Nothing ever waits on it. A moment it has not met is quiet, and the next",
+        "one like it has the line. Everything it writes is recorded to",
+        "logs/sermo-living.jsonl - which is the point: those lines are the raw",
+        "material for the authored corpus.",
+    ] {
+        let said = commands.spawn(ui::dim(line)).id();
+        commands.entity(said).insert(ChildOf(parent));
+    }
+}
+
+/// One switch: a track, a knob, its name and what it does.
+fn spawn_switch(commands: &mut Commands, screen: Entity, switch: ViewSwitch) {
+    {
         let row = commands
             .spawn((
                 Node {
@@ -1628,6 +1678,7 @@ fn handle_view_switches(
     mut fog: ResMut<crate::fog::FogMode>,
     mut reach: ResMut<crate::hand::ShowTheReach>,
     mut snaps: ResMut<crate::hand::HandSnaps>,
+    mut living: ResMut<crate::sermo::LivingVoice>,
     mut layers: ResMut<crate::debug::layers::ViewLayers>,
     mut tracks: Query<(&ViewSwitch, &mut BackgroundColor, &mut BorderColor)>,
     mut knobs: Query<(&SwitchKnob, &mut Node, &mut BackgroundColor), Without<ViewSwitch>>,
@@ -1641,6 +1692,7 @@ fn handle_view_switches(
             ViewSwitch::Veil => fog.0 = !fog.0,
             ViewSwitch::Reach => reach.0 = !reach.0,
             ViewSwitch::HandSnaps => snaps.0 = !snaps.0,
+            ViewSwitch::LivingVoice => living.0 = !living.0,
             ViewSwitch::Layer(layer) => layers.toggle(*layer),
         }
     }
@@ -1652,6 +1704,7 @@ fn handle_view_switches(
         ViewSwitch::Veil => fog.0,
         ViewSwitch::Reach => reach.0,
         ViewSwitch::HandSnaps => snaps.0,
+        ViewSwitch::LivingVoice => living.0,
         ViewSwitch::Layer(layer) => layers.shown(*layer),
     };
     for (switch, mut fill, mut border) in &mut tracks {

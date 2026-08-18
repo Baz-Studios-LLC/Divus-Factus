@@ -513,7 +513,16 @@ pub(crate) fn update_hud(
             HudValue::Watching => watching.to_string(),
             HudValue::Teller => voice.as_ref().map_or_else(
                 || "silent".to_string(),
-                |tongue| format!("the corpus - {} lines", tongue.lines()),
+                |tongue| {
+                    // WHICH VOICE is answering, because "off" and "no key"
+                    // look identical from the outside and the difference is
+                    // the whole question when a line does not appear.
+                    if tongue.living_speaks() {
+                        "the living voice".to_string()
+                    } else {
+                        format!("the corpus - {} lines", tongue.lines())
+                    }
+                },
             ),
             HudValue::Aperture => format!("f/{:.0}", look.aperture),
             HudValue::Focus => format!("{:.2}x", look.focus_bias),

@@ -35,6 +35,7 @@ use bevy::prelude::*;
 
 pub mod bench;
 mod corpus;
+pub mod vivarium;
 use crate::villager::work::Vocation;
 use crate::witness::{DivineEventKind, Whom};
 
@@ -203,9 +204,76 @@ pub struct Tongue {
     mused: HashMap<Entity, (String, bool)>,
     /// Replies picked and waiting for the conversation's beat.
     replies: HashMap<Entity, String>,
+    /// THE LIVING VOICE, when there is a key for it and the player has asked
+    /// for it. Present but silent otherwise: the worker exists from startup
+    /// and is simply not consulted, which keeps turning it on a switch rather
+    /// than a restart.
+    living: Option<vivarium::Vivarium>,
+    /// Whether that voice is the one speaking. Mirrored here from the
+    /// settings switch so the pick sites do not each need the resource.
+    living_speaks: bool,
 }
 
+/// Carries the settings switch into the Tongue, and takes in whatever the
+/// living voice finished writing since the last tick.
+fn the_living_voice_answers(chosen: Res<LivingVoice>, mut tongue: ResMut<Tongue>) {
+    tongue.hear_the_living(chosen.0);
+}
+
+/// Whether generated speech is answering instead of the corpus.
+///
+/// A RESOURCE and a settings switch rather than an environment variable,
+/// because it is a thing to try mid-run and hear the difference - Brett: "add
+/// a toggle to the Sermo tab in settings to use prewritten voices or ChatGPT
+/// voices."
+#[derive(Resource, Default)]
+pub struct LivingVoice(pub bool);
+
 impl Tongue {
+    /// Asks the living voice, if it is awake and the player has chosen it.
+    ///
+    /// `None` means either that the voice is off - in which case the corpus
+    /// answers exactly as it always has - or that this is a situation it has
+    /// not been asked about before, which it now will be. A brand-new moment
+    /// is QUIET rather than delayed: nothing here waits on a network, and the
+    /// next equivalent moment will have the line.
+    /// Whether generated speech is what a villager would answer with right
+    /// now: the switch is on AND there is a key behind it.
+    ///
+    /// Read by the dev panel, which is the one place that has to tell the
+    /// difference between "off" and "no key" while a game is running.
+    pub fn living_speaks(&self) -> bool {
+        self.living_speaks && self.living.is_some()
+    }
+
+    /// Turns the living voice on or off, and takes in whatever it finished
+    /// writing since the last tick.
+    ///
+    /// THE WORDS CATCH UP. A moment the voice had never met went by in
+    /// silence while it was being written, and when it arrives the person who
+    /// was quiet says it - held as a musing, aloud unless it was a thought.
+    /// Without this the FIRST of every kind of moment is lost for good and
+    /// only the second one ever speaks, which on a rare beat means never.
+    pub fn hear_the_living(&mut self, chosen: bool) {
+        self.living_speaks = chosen;
+        let Some(living) = self.living.as_mut() else {
+            return;
+        };
+        let caught_up = living.take_ready();
+        if !chosen {
+            // Still drained, or a switch flipped off and on again would spill
+            // a backlog of lines into whoever happened to be standing there.
+            return;
+        }
+        for line in caught_up {
+            let Some(who) = Entity::try_from_bits(line.speaker) else {
+                continue;
+            };
+            let aloud = line.register != "muse";
+            self.mused.entry(who).or_insert((line.text, aloud));
+        }
+    }
+
     /// A line for this telling, if the corpus has one. `None` falls back
     /// to the written phrasing at every caller, same as always.
     pub fn line(&mut self, of: &Retelling) -> Option<String> {
@@ -237,8 +305,19 @@ impl Tongue {
         if let Some(whom) = whom.as_deref() {
             slots.push(("whom", whom));
         }
-        self.voice
-            .pick(0, &tags, &slots, &mut self.dice)
+        // The living voice first when it is the one speaking, and the corpus
+        // whenever it has nothing - which is every moment it has not been
+        // asked about yet, and every moment at all when it is switched off.
+        let generated = self
+            .living_speaks
+            .then(|| {
+                self.living
+                    .as_mut()
+                    .and_then(|v| v.ask(0, &tags, &slots, None))
+            })
+            .flatten();
+        generated
+            .or_else(|| self.voice.pick(0, &tags, &slots, &mut self.dice))
             .map(|said| tidy(&said))
     }
 
@@ -289,8 +368,19 @@ impl Tongue {
         let slots: Vec<(&str, &str)> = std::iter::once(("god", self.god.as_str()))
             .chain(whom.map(|whom| ("whom", whom)))
             .collect();
-        self.voice
-            .pick(who.to_bits(), &tags, &slots, &mut self.dice)
+        let generated = self
+            .living_speaks
+            .then(|| {
+                self.living
+                    .as_mut()
+                    .and_then(|v| v.ask(who.to_bits(), &tags, &slots, None))
+            })
+            .flatten();
+        generated
+            .or_else(|| {
+                self.voice
+                    .pick(who.to_bits(), &tags, &slots, &mut self.dice)
+            })
             .map(|said| tidy(&said))
     }
 
@@ -355,8 +445,19 @@ impl Tongue {
             .collect();
         // The register wall: whatever the pool's condition, a prayer never
         // borrows smalltalk. Stale beats absurd.
-        self.voice
-            .pick_within(who.to_bits(), &tags, &slots, &["prayer"], &mut self.dice)
+        let generated = self
+            .living_speaks
+            .then(|| {
+                self.living
+                    .as_mut()
+                    .and_then(|v| v.ask(who.to_bits(), &tags, &slots, None))
+            })
+            .flatten();
+        generated
+            .or_else(|| {
+                self.voice
+                    .pick_within(who.to_bits(), &tags, &slots, &["prayer"], &mut self.dice)
+            })
             .map(|said| tidy(&said))
     }
 
@@ -472,14 +573,40 @@ impl Plugin for SermoPlugin {
         }
         let voice = corpus::Corpus::load();
         info!("the village speaks from the corpus - {} lines", voice.len());
+        // The worker wakes wherever there is a key, and stays quiet until
+        // somebody asks for it in the settings. On a machine with no
+        // `OPENAI_API_KEY` there is simply no living voice and the switch
+        // says as much.
+        // `DIVUS_FACTUS_SERMO_PROBE=1` asks the API one question and prints
+        // what came back, which is how a key gets checked without playing a
+        // game to find out.
+        if std::env::var("DIVUS_FACTUS_SERMO_PROBE").is_ok() {
+            vivarium::probe();
+        }
+        let living = vivarium::Vivarium::awake();
+        if living.is_some() {
+            info!("the living voice has a key and is waiting to be asked for");
+        } else {
+            info!("no OPENAI_API_KEY: the village speaks from the corpus only");
+        }
+        app.insert_resource(LivingVoice(false));
         app.insert_resource(Tongue {
             voice,
             dice: crate::rng::Rng::new(0x1e11),
             mused: HashMap::new(),
             replies: HashMap::new(),
             god: "the god".to_string(),
+            living,
+            living_speaks: false,
         });
-        app.add_systems(Update, (flush_the_want_list, the_village_learns_the_name));
+        app.add_systems(
+            Update,
+            (
+                flush_the_want_list,
+                the_village_learns_the_name,
+                the_living_voice_answers,
+            ),
+        );
     }
 }
 
@@ -728,6 +855,8 @@ mod corpus_wiring_tests {
             mused: HashMap::new(),
             replies: HashMap::new(),
             god: "the god".to_string(),
+            living: None,
+            living_speaks: false,
         };
         let who = Entity::from_raw_u32(7).unwrap();
         tongue.muse(Musing {

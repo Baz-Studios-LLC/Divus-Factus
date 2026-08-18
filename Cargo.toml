@@ -8,6 +8,15 @@ winres = "0.1"
 
 [dependencies]
 bevy = { version = "0.19.0", features = ["serialize", "wav", "file_watcher"] }
+# The living voice's one call out of the process. Blocking on purpose: it runs
+# on its own worker thread and the game never waits for it, so an async runtime
+# would be a second scheduler bought for nothing. rustls rather than the
+# system's TLS, so a release does not depend on what the player's machine has.
+reqwest = { version = "0.12", default-features = false, features = [
+    "blocking",
+    "json",
+    "rustls-tls",
+] }
 # Brett's own UI kit, at ../Ordo. A PATH dependency on purpose: while both move
 # together a path is what you want, and a pinned rev is what you want the day
 # this ships against it. See ../Ordo/FIRST-PORT.md - this is that first port,

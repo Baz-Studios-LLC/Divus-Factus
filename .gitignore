@@ -8,3 +8,11 @@ __pycache__/
 *.pyc
 /scratch_test.wav
 /logs
+
+# THE KEY IS NEVER IN THIS REPOSITORY. The living voice reads
+# `OPENAI_API_KEY` from the environment and from nowhere else, but the sister
+# fork kept its key in a file beside the executable and a copied habit is how
+# these things get committed. Belt and braces.
+OpenAI-API-Key.txt
+*.api-key
+.env
