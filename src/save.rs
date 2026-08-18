@@ -1173,7 +1173,12 @@ fn apply(world: &mut World, save: SaveGame) {
                     MemberOf(settlement_entity),
                     Transform::from_translation(b.pos).with_rotation(b.rot),
                     Visibility::default(),
-                    crate::hand::PickRadius(b.blueprint.half_w.max(b.blueprint.half_d) + 0.9),
+                    // The building's OWN size, with no margin baked in - the
+                    // hand's forgiveness is the one allowance and it is
+                    // applied to everything equally. A margin here was a
+                    // second one, and a second one on the biggest things in
+                    // the world is a magnet.
+                    crate::hand::PickRadius(b.blueprint.half_w.max(b.blueprint.half_d)),
                     crate::hand::Rooted,
                     // One piece, wherever on the sphere the save was made.
                     crate::globe::RigidlySeated,

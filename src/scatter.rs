@@ -174,7 +174,7 @@ impl TreeKind {
 /// one sphere cover both a squat bush and a stand of reeds.
 fn plant_extent(corners: &[[f32; 3]], base: Vec3) -> (f32, f32) {
     if corners.is_empty() {
-        return (0.8, 1.6);
+        return (0.8, 1.0);
     }
     let mut high = f32::MIN;
     let mut wide = 0.0f32;
@@ -183,9 +183,17 @@ fn plant_extent(corners: &[[f32; 3]], base: Vec3) -> (f32, f32) {
         wide = wide.max((corner[0] - base.x).hypot(corner[2] - base.z));
     }
     let middle = (high * 0.5).max(0.3);
-    // A floor, so a sapling is still catchable, and no ceiling: a full-grown
-    // broadleaf should be as easy to point at as it looks.
-    (middle, middle.max(wide).max(0.9))
+    // HOW WIDE IT IS, and never how TALL. This used to take the larger of the
+    // two, so an eight meter broadleaf carried a four meter pick sphere and
+    // grabbed everything standing within four meters of its trunk - most of
+    // which is open ground with somebody else on it. Brett: "trees and some
+    // other things still have a magnet effect, can we remove all of that?"
+    //
+    // A plant's grabbable size is its own outline: a trunk and a canopy are
+    // a couple of meters across however far up they go, and the handle sits
+    // at the middle of the height (see `PickLift`) so the canopy is still
+    // where the cursor finds it.
+    (middle, wide.max(0.7))
 }
 
 /// Whether reeds could stand at this spot: close enough to still water, or

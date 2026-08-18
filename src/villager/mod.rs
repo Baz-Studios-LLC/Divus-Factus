@@ -1283,7 +1283,11 @@ pub(crate) fn spawn_town(
             // The banner is the town's face: hover it and the inspector opens
             // on the settlement. Rooted — a god who can uproot the town square
             // is a bug, not a feature. Yet.
-            crate::hand::PickRadius(3.4),
+            // The banner's own post and cloth, not a circle around the
+            // square: 3.4 meters made the town's face the answer to any
+            // click within four meters of it, villagers standing there
+            // included.
+            crate::hand::PickRadius(1.1),
             crate::hand::Rooted,
             // The founders arrive with a few days' provisions, not nothing:
             // the first bad berry season should be a scare, not a wipe.

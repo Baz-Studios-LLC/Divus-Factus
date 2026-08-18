@@ -415,7 +415,10 @@ pub struct HandSnaps(pub bool);
 
 impl Default for HandSnaps {
     fn default() -> Self {
-        HandSnaps(std::env::var("DIVUS_FACTUS_HAND_SNAPS").is_ok())
+        // RIGID BY DEFAULT, on Brett's call once he had felt both: "can we
+        // make the ridged hand the default." The glide is still one switch
+        // away for anybody who wants the suspended reading.
+        HandSnaps(true)
     }
 }
 
@@ -632,29 +635,28 @@ impl DivineHand {
 }
 
 /// Closest object whose bounding sphere the ray passes through.
-/// How far outside a thing the cursor may be and still be pointing at it,
-/// as a fraction of how far away the camera is.
+/// How far the hand reaches past its own edge, as a multiple of its size.
 ///
-/// A FRACTION, because the pick happens in meters and the player is aiming in
-/// pixels: half a meter is a fat target from ten meters up and invisible from
-/// two hundred. Scaling with the zoom keeps the forgiveness the same size
-/// under the cursor at every distance.
+/// THE REACH IS THE HAND'S OWN FOOTPRINT, which is both the honest model and
+/// the one that looks right. This was its own curve on the camera distance,
+/// and the hand's size is a DIFFERENT curve on the same distance - so the two
+/// drifted apart as the view moved and the ring was a dinner plate under a
+/// huge palm up close and a wide pool under a small one far out. Brett: "the
+/// circle doesnt scale with the hand the same when you zoom in and out."
 ///
-/// Brett: "Right now selection is pixel perfect to a mouse pointer that is
-/// hidden. The hand sits above that mouse so sometimes it is difficult to
-/// figure out what you are selecting... First we need to widen the selection
-/// a bit."
-const FORGIVENESS: f32 = 0.035;
-
-/// The narrowest and widest that forgiveness may get, in meters.
+/// Tied to `world_scale_at`, they cannot drift: whatever the hand covers is
+/// what the hand takes, at every zoom, and the ring drawn at this radius is a
+/// true picture of it.
 ///
-/// The floor keeps a close-up view from demanding pixel accuracy; the ceiling
-/// stops a view from orbit turning into a net that catches half a village.
-const FORGIVENESS_RANGE: (f32, f32) = (0.6, 4.0);
+/// Brett, on why there is any forgiveness at all: "Right now selection is
+/// pixel perfect to a mouse pointer that is hidden. The hand sits above that
+/// mouse so sometimes it is difficult to figure out what you are selecting...
+/// First we need to widen the selection a bit."
+const REACH_OF_THE_HAND: f32 = 1.6;
 
 /// How wide a miss still counts, at this camera distance.
 pub fn forgiveness_at(camera_distance: f32) -> f32 {
-    (camera_distance * FORGIVENESS).clamp(FORGIVENESS_RANGE.0, FORGIVENESS_RANGE.1)
+    world_scale_at(camera_distance) * REACH_OF_THE_HAND
 }
 
 /// Of everything the cursor came near, which one it is actually pointing at.
@@ -2169,13 +2171,23 @@ mod aiming {
         );
     }
 
-    /// The forgiveness holds its size under the cursor as the view pulls
-    /// back, and is bounded at both ends.
+    /// The reach stays in step with the hand at every zoom.
+    ///
+    /// This is the claim the ring makes on screen, and the two used to be
+    /// separate curves on the camera distance - which drifted apart exactly
+    /// where a player would notice, between a close look and a far one.
     #[test]
-    fn forgiveness_follows_the_zoom() {
-        assert!(forgiveness_at(10.0) < forgiveness_at(120.0));
-        assert_eq!(forgiveness_at(1.0), FORGIVENESS_RANGE.0, "no floor");
-        assert_eq!(forgiveness_at(9_000.0), FORGIVENESS_RANGE.1, "no ceiling");
+    fn the_reach_keeps_step_with_the_hand() {
+        for distance in [8.0f32, 20.0, 80.0, 400.0, 1_400.0] {
+            let ratio = forgiveness_at(distance) / world_scale_at(distance);
+            assert!(
+                (ratio - REACH_OF_THE_HAND).abs() < 1e-4,
+                "at {distance} the reach is {ratio} of the hand, not {REACH_OF_THE_HAND}"
+            );
+        }
+        // And it still opens up as the view pulls back, which is what keeps
+        // it the same size under the cursor.
+        assert!(forgiveness_at(10.0) < forgiveness_at(400.0));
     }
 }
 

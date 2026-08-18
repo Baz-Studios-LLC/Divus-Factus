@@ -2109,7 +2109,12 @@ pub(crate) fn raise_the_founding_hall(
             Transform::from_translation(at - Vec3::Y * buried)
                 .with_rotation(Quat::from_rotation_y(yaw)),
             Visibility::default(),
-            crate::hand::PickRadius(reach + 0.9),
+            // THE THING'S OWN SIZE. The margin that used to be added
+            // here was a second allowance on top of the hand's own, and a
+            // second allowance on the biggest objects in the world is a
+            // magnet. Brett: "Does anything still have the magnet lock
+            // thing, we should remove them all."
+            crate::hand::PickRadius(reach),
             crate::hand::Rooted,
             Building {
                 kind: BuildingKind::Longhouse,
@@ -3752,7 +3757,7 @@ pub(crate) fn plan_houses(
                 plan.clone(),
                 Transform::from_translation(face).with_rotation(Quat::from_rotation_y(yaw)),
                 Visibility::default(),
-                crate::hand::PickRadius(plan.half_d + 0.9),
+                crate::hand::PickRadius(plan.half_d),
                 crate::hand::Rooted,
             ))
             .id();
@@ -3819,7 +3824,7 @@ pub(crate) fn plan_houses(
                 plan.clone(),
                 Transform::from_translation(shore).with_rotation(Quat::from_rotation_y(yaw)),
                 Visibility::default(),
-                crate::hand::PickRadius(plan.half_d + 0.9),
+                crate::hand::PickRadius(plan.half_d),
                 crate::hand::Rooted,
             ))
             .id();
@@ -4094,7 +4099,7 @@ pub(crate) fn plan_houses(
                 plan.clone(),
                 Transform::from_translation(at).with_rotation(Quat::from_rotation_y(yaw)),
                 Visibility::default(),
-                crate::hand::PickRadius(plan.half_w.max(plan.half_d) + 0.9),
+                crate::hand::PickRadius(plan.half_w.max(plan.half_d)),
                 crate::hand::Rooted,
             ))
             .id();
