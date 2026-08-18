@@ -6,13 +6,29 @@ edition = "2024"
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"
 
+[features]
+# THE LIVING VOICE IS A TOOL, NOT A PRODUCT. Brett: "The living voice will be
+# stripped out before launch. It is just my way of generating dialogue."
+#
+# So it is a feature and not a module somebody has to remember to delete.
+# Building without it takes the whole thing out - the module, the settings
+# switch, and `reqwest` with its TLS stack - which means a release cannot make
+# a network call rather than merely being unlikely to. That is a far better
+# thing to be able to say, and it is checked by the compiler instead of by a
+# person going through a checklist on release day.
+#
+# `cargo run --features living-voice` to author dialogue. Plain `cargo build`
+# for anything a player would ever run.
+living-voice = ["dep:reqwest"]
+
 [dependencies]
 bevy = { version = "0.19.0", features = ["serialize", "wav", "file_watcher"] }
-# The living voice's one call out of the process. Blocking on purpose: it runs
-# on its own worker thread and the game never waits for it, so an async runtime
-# would be a second scheduler bought for nothing. rustls rather than the
-# system's TLS, so a release does not depend on what the player's machine has.
-reqwest = { version = "0.12", default-features = false, features = [
+# The living voice's one call out of the process, and OPTIONAL - see the
+# `living-voice` feature. Blocking on purpose: it runs on its own worker thread
+# and the game never waits for it, so an async runtime would be a second
+# scheduler bought for nothing. rustls rather than the system's TLS, so a
+# release does not depend on what the player's machine has.
+reqwest = { version = "0.12", optional = true, default-features = false, features = [
     "blocking",
     "json",
     "rustls-tls",

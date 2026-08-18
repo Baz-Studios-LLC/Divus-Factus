@@ -35,7 +35,48 @@ use bevy::prelude::*;
 
 pub mod bench;
 mod corpus;
+#[cfg(feature = "living-voice")]
 pub mod vivarium;
+
+/// The living voice, absent - see the `living-voice` feature in `Cargo.toml`.
+///
+/// A stub rather than a scattering of `#[cfg]`s at every call site: the Tongue
+/// asks the same questions either way and gets `None`, which is exactly what
+/// it gets when the voice is present and has not met this moment yet. The
+/// optimizer removes the whole path, and a release build has no HTTP client
+/// linked into it at all.
+#[cfg(not(feature = "living-voice"))]
+pub mod vivarium {
+    pub struct Vivarium;
+
+    impl Vivarium {
+        pub fn awake() -> Option<Vivarium> {
+            None
+        }
+
+        pub fn ask(
+            &mut self,
+            _speaker: u64,
+            _tags: &[&str],
+            _slots: &[(&str, &str)],
+            _heard: Option<&str>,
+        ) -> Option<String> {
+            None
+        }
+
+        pub fn take_ready(&mut self) -> Vec<ReadyLine> {
+            Vec::new()
+        }
+    }
+
+    pub struct ReadyLine {
+        pub speaker: u64,
+        pub register: String,
+        pub text: String,
+    }
+
+    pub fn probe() {}
+}
 use crate::villager::work::Vocation;
 use crate::witness::{DivineEventKind, Whom};
 
