@@ -32,6 +32,7 @@ mod place;
 mod planet;
 mod proclaim;
 mod raid;
+mod remembered;
 mod render;
 mod rng;
 mod save;

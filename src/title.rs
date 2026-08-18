@@ -9,6 +9,7 @@
 //! machines still building the world when Begin is pressed.
 
 use bevy::asset::RenderAssetUsages;
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
@@ -20,7 +21,8 @@ pub struct TitlePlugin;
 
 impl Plugin for TitlePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::Splash), spawn_splash)
+        app.add_systems(PreStartup, the_view_is_remembered)
+            .add_systems(OnEnter(GameState::Splash), spawn_splash)
             .add_systems(OnExit(GameState::Splash), despawn_splash)
             .add_systems(OnEnter(GameState::Title), spawn_title)
             .add_systems(OnExit(GameState::Title), begin_farewell)
@@ -42,6 +44,7 @@ impl Plugin for TitlePlugin {
                     auto_title.run_if(in_state(GameState::Playing)),
                     handle_settings,
                     handle_view_switches,
+                    the_view_is_written_down,
                     the_living_voice_says_where_it_stands,
                     handle_voice_choice,
                     handle_batch_choice,
@@ -182,6 +185,47 @@ impl ViewSwitch {
             ViewSwitch::Reach => "the hand's reach",
             ViewSwitch::HandSnaps => "a rigid hand",
             ViewSwitch::Layer(layer) => layer.label(),
+        }
+    }
+
+    /// What this switch is called in the remembered file.
+    ///
+    /// Written names of its own, not the label a player reads: labels are prose
+    /// and get reworded, and a reworded name reads back as a switch nobody ever
+    /// touched. Never change one of these for the same reason.
+    fn written(self) -> String {
+        match self {
+            ViewSwitch::Clouds => "clouds".to_string(),
+            ViewSwitch::Veil => "veil".to_string(),
+            ViewSwitch::Mist => "fog".to_string(),
+            ViewSwitch::Reach => "reach".to_string(),
+            ViewSwitch::HandSnaps => "rigid-hand".to_string(),
+            // The dial's spelling, lowered: one name per layer, already chosen
+            // and already written into this project's measurement history.
+            ViewSwitch::Layer(layer) => format!("layer-{}", layer.dial().to_ascii_lowercase()),
+        }
+    }
+
+    /// Whether THIS RUN's environment has already spoken about this switch.
+    ///
+    /// A commanded switch is neither restored from the file nor written to it,
+    /// and both halves of that matter. A dial is an instruction about one
+    /// launch, so it must beat a file clicked days ago — and it must not LEAK
+    /// into that file either, or a single measurement run with the fog dialed
+    /// off would quietly become how the game opens from then on.
+    fn commanded(self) -> bool {
+        let dial = |name: &str| std::env::var(name).is_ok();
+        match self {
+            ViewSwitch::Clouds => dial("DIVUS_FACTUS_CLOUDS"),
+            ViewSwitch::Veil => dial("DIVUS_FACTUS_FOG"),
+            ViewSwitch::Mist => crate::render::aspectus::pass_is_forbidden("mist"),
+            ViewSwitch::Reach => dial("DIVUS_FACTUS_REACH"),
+            // No dial of its own: it is a matter of taste, not a measurement.
+            ViewSwitch::HandSnaps => false,
+            ViewSwitch::Layer(layer) => {
+                dial(&format!("DIVUS_FACTUS_LAYER_{}", layer.dial()))
+                    || (layer == Layer::Shadows && dial("DIVUS_FACTUS_SHADOWS"))
+            }
         }
     }
 
@@ -1900,17 +1944,111 @@ fn the_living_voice_says_where_it_stands(
 #[derive(Component)]
 struct SwitchKnob(ViewSwitch);
 
+/// Everything The View's switches govern, in one satchel.
+///
+/// Three systems need all of it — the clicks, the restore at startup, and the
+/// watcher that writes the file — and the three must agree to the letter about
+/// which way each switch reads. One satchel with one pair of methods is that
+/// agreement; three copies of the same match were how they would drift.
+#[derive(SystemParam)]
+struct TheView<'w> {
+    clear: ResMut<'w, crate::clouds::TheSkyIsClear>,
+    fog: ResMut<'w, crate::fog::FogMode>,
+    reach: ResMut<'w, crate::hand::ShowTheReach>,
+    snaps: ResMut<'w, crate::hand::HandSnaps>,
+    layers: ResMut<'w, crate::debug::layers::ViewLayers>,
+}
+
+impl TheView<'_> {
+    /// Whether the thing this switch NAMES is being shown.
+    fn shows(&self, switch: ViewSwitch) -> bool {
+        match switch {
+            // The switch reads as the THING, not as its absence: "clouds on"
+            // means there is weather, so the sky being clear is the switch
+            // being off. Same for the fog: on means fog is drawn.
+            ViewSwitch::Clouds => !self.clear.0,
+            ViewSwitch::Veil => self.fog.0,
+            ViewSwitch::Mist => !crate::render::aspectus::mist_is_off(),
+            ViewSwitch::Reach => self.reach.0,
+            ViewSwitch::HandSnaps => self.snaps.0,
+            ViewSwitch::Layer(layer) => self.layers.shown(layer),
+        }
+    }
+
+    /// Sets a switch, and touches nothing if it was already that way.
+    ///
+    /// The guard is not politeness: these are `ResMut`, and writing one marks it
+    /// changed whether or not it changed, waking whatever watches it. Restoring
+    /// nine switches to the state they already held should cost nothing.
+    fn show(&mut self, switch: ViewSwitch, on: bool) {
+        if self.shows(switch) == on {
+            return;
+        }
+        match switch {
+            ViewSwitch::Clouds => self.clear.0 = !on,
+            ViewSwitch::Veil => self.fog.0 = on,
+            ViewSwitch::Mist => crate::render::aspectus::set_mist_off(!on),
+            ViewSwitch::Reach => self.reach.0 = on,
+            ViewSwitch::HandSnaps => self.snaps.0 = on,
+            ViewSwitch::Layer(layer) => self.layers.toggle(layer),
+        }
+    }
+}
+
+/// Puts The View back the way the last launch left it.
+///
+/// `PreStartup`, so the first frame is already drawn the way it was asked for
+/// rather than flickering through the defaults on its way there.
+fn the_view_is_remembered(mut view: TheView) {
+    let kept = crate::remembered::kept();
+    for switch in ViewSwitch::ALL {
+        if switch.commanded() {
+            continue;
+        }
+        // Only a switch that was actually written about: a name with no line is
+        // left at today's default, so a switch can change its own default
+        // without overruling anybody who had already made up their mind.
+        if let Some(on) = kept.switch(&switch.written()) {
+            view.show(switch, on);
+        }
+    }
+}
+
+/// Writes The View down whenever it moves.
+///
+/// A WATCHER, not a line in the click handler, because the switches are not the
+/// only hand on these: the veil answers a key as well, and a setting that
+/// remembered the mouse but not the keyboard would be right about half the time,
+/// which is worse than being wrong. Eleven bools compared once a frame is not a
+/// cost worth avoiding.
+fn the_view_is_written_down(view: TheView, mut before: Local<Vec<(ViewSwitch, bool)>>) {
+    if before.is_empty() {
+        // The first frame: the dials have had their say and the file has been
+        // read, so THIS is the state changes are measured against. Nothing is
+        // written — there is nothing new to say yet.
+        *before = ViewSwitch::ALL
+            .into_iter()
+            .filter(|switch| !switch.commanded())
+            .map(|switch| (switch, view.shows(switch)))
+            .collect();
+        return;
+    }
+    if !before.iter().any(|(switch, was)| view.shows(*switch) != *was) {
+        return;
+    }
+    for (switch, was) in before.iter_mut() {
+        *was = view.shows(*switch);
+    }
+    crate::remembered::keep(before.iter().map(|(switch, on)| (switch.written(), *on)));
+}
+
 /// Clicks flip a switch; the knob and the track then say so.
 ///
 /// Reads the same state the world reads, so the switch cannot drift out of step
 /// with what it governs — there is one truth and the switch is a window onto it.
 fn handle_view_switches(
     clicks: Query<(&Interaction, &ViewSwitch), Changed<Interaction>>,
-    mut clear: ResMut<crate::clouds::TheSkyIsClear>,
-    mut fog: ResMut<crate::fog::FogMode>,
-    mut reach: ResMut<crate::hand::ShowTheReach>,
-    mut snaps: ResMut<crate::hand::HandSnaps>,
-    mut layers: ResMut<crate::debug::layers::ViewLayers>,
+    mut view: TheView,
     mut tracks: Query<(&ViewSwitch, &mut BackgroundColor, &mut BorderColor)>,
     mut knobs: Query<(&SwitchKnob, &mut Node, &mut BackgroundColor), Without<ViewSwitch>>,
 ) {
@@ -1918,29 +2056,10 @@ fn handle_view_switches(
         if *interaction != Interaction::Pressed {
             continue;
         }
-        match switch {
-            ViewSwitch::Clouds => clear.0 = !clear.0,
-            ViewSwitch::Veil => fog.0 = !fog.0,
-            ViewSwitch::Mist => {
-                crate::render::aspectus::set_mist_off(!crate::render::aspectus::mist_is_off());
-            }
-            ViewSwitch::Reach => reach.0 = !reach.0,
-            ViewSwitch::HandSnaps => snaps.0 = !snaps.0,
-            ViewSwitch::Layer(layer) => layers.toggle(*layer),
-        }
+        view.show(*switch, !view.shows(*switch));
     }
 
-    let on = |switch: &ViewSwitch| match switch {
-        // The switch reads as the THING, not as its absence: "clouds on" means
-        // there is weather, so the sky being clear is the switch being off.
-        ViewSwitch::Clouds => !clear.0,
-        ViewSwitch::Veil => fog.0,
-        // The switch reads as the THING: fog on means fog is drawn.
-        ViewSwitch::Mist => !crate::render::aspectus::mist_is_off(),
-        ViewSwitch::Reach => reach.0,
-        ViewSwitch::HandSnaps => snaps.0,
-        ViewSwitch::Layer(layer) => layers.shown(*layer),
-    };
+    let on = |switch: &ViewSwitch| view.shows(*switch);
     let usable = |_switch: &ViewSwitch| true;
     for (switch, mut fill, mut border) in &mut tracks {
         let lit = on(switch);
@@ -2063,6 +2182,30 @@ fn handle_choice(
 
 #[cfg(test)]
 mod tests {
+    use super::ViewSwitch;
+
+    /// Every switch answers to its own name in the remembered file.
+    ///
+    /// Two switches sharing a name is not a compile error and not a visible
+    /// bug: the file simply holds one line, the second switch reads the first
+    /// one's state, and the two flip together on the next launch for reasons
+    /// nobody would think to look for here.
+    #[test]
+    fn every_switch_has_a_name_of_its_own() {
+        let mut named: Vec<String> = ViewSwitch::ALL
+            .into_iter()
+            .map(ViewSwitch::written)
+            .collect();
+        let all = named.len();
+        named.sort();
+        named.dedup();
+        assert_eq!(named.len(), all, "two switches share a remembered name");
+        assert!(
+            named.iter().all(|name| !name.contains(' ')),
+            "a space in a name would split the line the file is read by: {named:?}"
+        );
+    }
+
     /// The planet's middle lands level with the menu's.
     ///
     /// Both are placed from `MENU_TOP`, so the only way they can part company

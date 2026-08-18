@@ -52,15 +52,23 @@ pub fn set_mist_off(off: bool) {
     MIST_IS_OFF.store(off, std::sync::atomic::Ordering::Relaxed);
 }
 
-/// Whether the mist is off right now.
+/// Whether the mist is off right now — by the switch, or by the dial that
+/// forbade it before the window opened.
+///
+/// The dial is folded in HERE rather than only in [`pass_is_wanted`] so that
+/// there is one truth: the settings screen reads this to draw its switch, and a
+/// switch reading on over a pass that a command line had already forbidden
+/// would be a switch that lies.
 pub fn mist_is_off() -> bool {
-    MIST_IS_OFF.load(std::sync::atomic::Ordering::Relaxed)
+    MIST_IS_OFF.load(std::sync::atomic::Ordering::Relaxed) || pass_is_forbidden("mist")
 }
 
-pub fn pass_is_wanted(name: &str) -> bool {
-    if name == "mist" && mist_is_off() {
-        return false;
-    }
+/// Whether THIS RUN's command line forbade a pass outright.
+///
+/// Stronger than the switch and unanswerable by it, which is the point: a dial
+/// is an instruction about one launch, and a measurement run that quietly obeyed
+/// a settings file clicked days ago would be worthless.
+pub fn pass_is_forbidden(name: &str) -> bool {
     static OFF: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
     let off = OFF.get_or_init(|| {
         std::env::var("DIVUS_FACTUS_NO")
@@ -70,7 +78,11 @@ pub fn pass_is_wanted(name: &str) -> bool {
             .filter(|word| !word.is_empty())
             .collect()
     });
-    !off.iter().any(|word| word == name)
+    off.iter().any(|word| word == name)
+}
+
+pub fn pass_is_wanted(name: &str) -> bool {
+    !(pass_is_forbidden(name) || (name == "mist" && mist_is_off()))
 }
 
 use bevy::prelude::*;
