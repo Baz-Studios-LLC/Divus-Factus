@@ -195,7 +195,9 @@ fn draw_the_reach(
             // The ring FOLLOWS the cursor. It is one entity for the life of
             // the run rather than a fresh one per frame, so this is where it
             // moves; the mesh under it is rebuilt in place.
-            at.translation = seat;
+            // NOTHING TO MOVE. The corners carry the position; see
+            // `build_the_skirt`. The transform stays where it was born.
+            let _ = &mut at;
             if let Some(mut existing) = materials.get_mut(&material.0) {
                 existing.params = params;
             }
@@ -207,14 +209,14 @@ fn draw_the_reach(
                 ReachRing(mesh.clone()),
                 Mesh3d(mesh),
                 MeshMaterial3d(materials.add(ReachMaterial { params })),
-                // Placed flat and seated rigidly, with the ring's own corners
-                // measured from here - the same way a blood stain and a
-                // chunk of scenery are placed. An identity transform does NOT
-                // mean "already in world space": the bend rewrites it from
-                // the origin, and the ring ends up on the far side of the
-                // world.
-                Transform::from_translation(seat),
-                crate::globe::RigidlySeated,
+                // THE SURVEY SHEET'S WAY, which is the one thing in this game
+                // that already paints across the ground and works: every
+                // corner is bent into seated space when the mesh is built,
+                // and the entity itself keeps an identity transform and is
+                // never moved again. A transform that never changes is never
+                // re-bent, so the mesh alone decides where the ring is - and
+                // rebuilding the mesh is how it follows the cursor.
+                Transform::default(),
                 Visibility::default(),
                 bevy::light::NotShadowCaster,
                 bevy::light::NotShadowReceiver,
@@ -223,13 +225,14 @@ fn draw_the_reach(
     }
 }
 
-/// A skirt of quads around `seat`: its bottom edge on the ground, its top
-/// edge `rise` above.
+/// A band on the ground around `seat`, and the smoke standing on its outer
+/// edge.
 ///
-/// Built in the seat's OWN space, so the entity carrying it can be seated on
-/// the sphere once, rigidly, like every other baked thing in this game. Each
-/// corner still samples the real ground under it, which is what lets the ring
-/// lie across a slope instead of cutting into it.
+/// Every corner is bent onto the sphere HERE, and the entity that wears this
+/// keeps an identity transform - the survey sheet's arrangement, and the only
+/// one in this game already proven to lay something flat across the ground.
+/// Each corner samples the real height under it, so the ring lies across a
+/// slope rather than cutting into it.
 fn build_the_skirt(terrain: &crate::terrain::Terrain, seat: Vec3, radius: f32, rise: f32) -> Mesh {
     let mut positions: Vec<[f32; 3]> = Vec::with_capacity((AROUND + 1) * 3);
     let mut normals: Vec<[f32; 3]> = Vec::with_capacity((AROUND + 1) * 3);
@@ -246,14 +249,18 @@ fn build_the_skirt(terrain: &crate::terrain::Terrain, seat: Vec3, radius: f32, r
         // solve a whole unseen region on the way past.
         let lift = terrain.base_height_at(x, z) - seat.y + CLEARANCE;
 
-        let foot = Vec3::new(cos * radius, lift, sin * radius);
-        let head = foot + Vec3::Y * rise;
-        // The inner edge of the flat band, on the ground.
-        let inner = Vec3::new(cos * radius * BAND, lift, sin * radius * BAND);
-        // Facing outward, which is only used to keep the mesh well-formed -
-        // the shader is unlit.
-        let out = [cos, 0.0, sin];
-
+        // Bent one corner at a time, in world terms, exactly as the survey
+        // sheet does it.
+        let (foot, turn) = crate::globe::bend_frame(Vec3::new(x, seat.y + lift, z));
+        let up = turn * Vec3::Y;
+        let head = foot + up * rise;
+        let (inner, _) = crate::globe::bend_frame(Vec3::new(
+            seat.x + cos * radius * BAND,
+            seat.y + lift,
+            seat.z + sin * radius * BAND,
+        ));
+        let out = (turn * Vec3::new(cos, 0.0, sin)).to_array();
+        let flat_up = up.to_array();
         // THE FLAT BAND FIRST, which is the circle a player actually reads.
         //
         // This began as a vertical skirt alone, and a vertical ribbon seen
@@ -266,11 +273,11 @@ fn build_the_skirt(terrain: &crate::terrain::Terrain, seat: Vec3, radius: f32, r
         // whole band as the bright ring and nothing else has to know about
         // it.
         positions.push(inner.to_array());
-        normals.push([0.0, 1.0, 0.0]);
+        normals.push(flat_up);
         uvs.push([i as f32 / AROUND as f32, 0.0]);
 
         positions.push(foot.to_array());
-        normals.push([0.0, 1.0, 0.0]);
+        normals.push(flat_up);
         uvs.push([i as f32 / AROUND as f32, 0.0]);
 
         positions.push(head.to_array());
