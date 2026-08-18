@@ -48,6 +48,13 @@ pub(crate) enum HudValue {
     DepthOfField,
 }
 
+/// How wide the dev panel holds itself.
+///
+/// Wide enough for the zoom row wearing its longest clause - level span, shown,
+/// standing, and a backlog in the thousands - because that row is the widest
+/// thing in the panel and the only one that changes shape.
+const HUD_WIDTH: f32 = 400.0;
+
 pub(crate) fn spawn_hud(mut commands: Commands, mouse: Res<crate::keymap::MouseScheme>) {
     // The dev overlay, hidden until the backquote asks for it. It borrows
     // the HUD's own live values — a row here is a HudValue and a Node.
@@ -86,11 +93,18 @@ pub(crate) fn spawn_hud(mut commands: Commands, mouse: Res<crate::keymap::MouseS
 
     // Both panels come from the interface kit; this module only decides what
     // words go in them.
+    // A HELD WIDTH, which is what the kit's `min_width` is for: "so panels
+    // with changing content hold their shape instead of breathing." Every row
+    // here changes as the world does, and the zoom row changes SHAPE - it grows
+    // a whole clause while the tree catches up. Brett: "This window changes
+    // when zoom level gets owed appended to the end, can we give this a stable
+    // width?" Sized to the widest row's widest state, so nothing here can push
+    // the edge out.
     let hud = ui::panel(
         &mut commands,
         ui::Anchor::TopLeft,
         Some("DIVUS FACTUS"),
-        None,
+        Some(HUD_WIDTH),
     );
     commands
         .entity(hud.root)
@@ -512,7 +526,7 @@ pub(crate) fn update_hud(
                     String::new()
                 };
                 format!(
-                    "L{}-{} / {} shown / {} standing{owed}",
+                    "L{}-{} / {} shown of {}{owed}",
                     detail.coarsest, detail.finest, detail.shown, detail.built
                 )
             }

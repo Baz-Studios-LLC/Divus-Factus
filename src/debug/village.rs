@@ -661,25 +661,16 @@ pub(crate) fn spawn_village_panel(mut commands: Commands) {
         ))
         .id();
     let _ = date;
-    let close = commands
-        .spawn((
-            CodexClose,
-            ui::UiButton,
-            Interaction::default(),
-            Node {
-                margin: UiRect::left(auto()),
-                padding: UiRect::axes(px(12), px(4)),
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(3)),
-                ..default()
-            },
-            BackgroundColor(ui::theme::panel_bg().with_alpha(0.4)),
-            BorderColor::all(ui::theme::panel_border()),
-            ui::HoverHint::new("Close", "or press the codex key"),
-            ChildOf(book.footer),
-        ))
-        .id();
-    commands.spawn((ui::dim("CLOSE"), ChildOf(close)));
+    // THE KIT'S OWN CORNER, not a button in the footer. Brett: "this window
+    // has a close button in the lower right hand corner, but other windows have
+    // an X in the top right, can we change this to the top right X?" - and a
+    // close that moves house between windows is a close the eye has to hunt
+    // for. Ordo draws and places the mark; what closing MEANS is still ours.
+    commands.entity(book.close).insert((
+        CodexClose,
+        ui::UiButton,
+        ui::HoverHint::new("Close", "or press the codex key"),
+    ));
 
     build_settings_page(&mut commands, settings_page);
     build_prayers_page(&mut commands, prayers_page);
