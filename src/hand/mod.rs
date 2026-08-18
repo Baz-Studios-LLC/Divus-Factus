@@ -362,6 +362,7 @@ impl Plugin for HandPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DivineHand>()
             .init_resource::<HandStyle>()
+            .init_resource::<HandSnaps>()
             .add_systems(
                 Update,
                 apply_hand_style.run_if(resource_changed::<HandStyle>),
@@ -390,6 +391,31 @@ impl Plugin for HandPlugin {
                     .chain()
                     .after(CameraSet),
             );
+    }
+}
+
+/// How quickly the hand closes on where it is meant to be, over the world.
+///
+/// The glide is what makes it read as suspended rather than pinned, and it
+/// was tuned by hand. It only became noticeable when the reach ring appeared
+/// beside it moving instantly - Brett: "the circle keeps up perfectly with
+/// the mouse, but the hand lags slightly behind."
+const HAND_GLIDE: f32 = 14.0;
+
+/// Whether the hand gives up its glide and goes rigid on the cursor.
+///
+/// A SWITCH IN THE SETTINGS, so both readings can be felt back to back
+/// without a restart - Brett: "Can we try it both ways? The ring follows the
+/// hand or the hand is perfect to the mouse?", then "Maybe that could be a
+/// toggle too in the settings." Which is the right call: this is a matter of
+/// taste about how the game feels in the hand, and taste wants an A and a B
+/// a second apart, not two launches.
+#[derive(Resource)]
+pub struct HandSnaps(pub bool);
+
+impl Default for HandSnaps {
+    fn default() -> Self {
+        HandSnaps(std::env::var("DIVUS_FACTUS_HAND_SNAPS").is_ok())
     }
 }
 
@@ -786,9 +812,17 @@ fn update_hover(
     // in the way, so a villager behind a hill was as pickable as one in front
     // of it - and on a round world "behind a hill" includes everything past
     // the near limb.
+    //
+    // BENT FIRST. `cursor_world` is a FLAT point - the space the simulation
+    // runs in, which is what every other reader of it wants - while the ray
+    // and every candidate's `GlobalTransform` are seated on the sphere.
+    // Measuring one against the other gave a distance between two different
+    // universes, and it came out short: everything in the world read as
+    // standing behind the ground, and the hand stopped picking anything up at
+    // all. The same flat-for-seated mistake that hid the ring, one file over.
     let ground = hand
         .cursor_world
-        .map(|hit| hit.distance(ray.origin))
+        .map(|hit| crate::globe::bend_frame(hit).0.distance(ray.origin))
         .unwrap_or(f32::MAX);
 
     let reach = forgiveness_at(rigs.single().map_or(80.0, |rig| rig.distance));
@@ -1683,6 +1717,7 @@ fn world_scale_at(distance: f32) -> f32 {
 fn animate_hand(
     time: Res<Time<Real>>,
     hand: Res<DivineHand>,
+    snaps: Res<HandSnaps>,
     pointer: Res<PointerContext>,
     buttons: Res<ButtonInput<MouseButton>>,
     mouse: Res<crate::keymap::MouseScheme>,
@@ -1939,7 +1974,8 @@ fn animate_hand(
     // pointer that trails the mouse reads as a pointer that misses — and a
     // hand PLANTED on the ground is rigid with it: any glide left in the
     // follow reads as the palm skating over the turf it is holding.
-    let follow = 1.0 - (-14.0 * dt).exp();
+    let glide = if snaps.0 { 60.0 } else { HAND_GLIDE };
+    let follow = 1.0 - (-glide * dt).exp();
     let follow = follow + (1.0 - follow) * blend.max(rig.clutch);
     transform.translation = transform.translation.lerp(position, follow);
 

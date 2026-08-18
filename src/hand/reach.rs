@@ -57,18 +57,19 @@ const AROUND: usize = 64;
 
 /// The ring's color. Brett: "we want it to be angelic and etherial."
 ///
-/// A warm pale gold rather than the cold blue this started as - blue reads as
-/// magic, and gold near white reads as light. It is over 1.0 on every channel
+/// A warm GOLD rather than the cold blue this started as - blue reads as
+/// magic and gold reads as light. Brett: "I think it should be a little more
+/// yellowish." It is over 1.0 on every channel
 /// because the god's camera is HDR with bloom hanging off it, and that bloom
 /// is where the glow actually comes from: the ring is a soft thing seen
 /// through its own halo rather than a bright thing with a hard edge.
-const ANGELIC: [f32; 3] = [1.7, 1.52, 1.15];
+const ANGELIC: [f32; 3] = [1.9, 1.58, 0.86];
 
 /// How far the shaft stands off the rim, as a fraction of the radius.
 ///
 /// Tied to the radius rather than fixed, so a ring the size of a house is not
 /// wearing the same inch of haze a ring the size of a person is.
-const SMOKE_RISES: f32 = 1.9;
+const SMOKE_RISES: f32 = 0.55;
 
 /// How much wider the shaft is at the top than the ring is at the ground.
 ///
@@ -78,7 +79,7 @@ const SMOKE_RISES: f32 = 1.9;
 /// what makes it read as light arriving from somewhere above rather than as
 /// smoke leaving the ground. The hand hangs over the cursor, so the shaft
 /// points at it without having to know where it is.
-const FLARE: f32 = 1.5;
+const FLARE: f32 = 1.18;
 
 /// Where the band's inner edge is, as a fraction of the radius.
 ///
@@ -137,6 +138,19 @@ fn draw_the_reach(
     terrain: Option<Res<crate::terrain::Terrain>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    // WHERE THE HAND ACTUALLY IS, not where the mouse is.
+    //
+    // Brett: "the circle keeps up perfectly with the mouse, but the hand lags
+    // slightly behind." It does, on purpose - the hand glides into place so
+    // it reads as suspended rather than pinned, and that glide was tuned by
+    // hand and marked PERFECT in `animate_hand`. The ring snapping to the raw
+    // cursor is what made the lag visible, so the ring follows the HAND
+    // instead. They are one gesture and should move as one.
+    //
+    // The hand is excluded from the world's bend and places itself in seated
+    // space already, so its position comes back through `unbend`.
+    palm: Query<&Transform, With<super::HandModel>>,
+    snaps: Res<super::HandSnaps>,
     ring: Query<Entity, With<ReachRing>>,
     mut standing: Local<Option<(Vec3, f32)>>,
     mut said: Local<f32>,
@@ -174,8 +188,21 @@ fn draw_the_reach(
     // EXACTLY WHAT THE HAND WOULD TAKE - the same number the pick itself
     // uses, or the ring is a lie that still looks right.
     let radius = super::forgiveness_at(rigs.single().map_or(80.0, |rig| rig.distance));
-    let ground = terrain.base_height_at(at.x, at.z);
-    let seat = Vec3::new(at.x, ground, at.z);
+    // TWO WAYS TO KEEP THEM TOGETHER, and Brett asked to feel both: "Can we
+    // try it both ways? The ring follows the hand or the hand is perfect to
+    // the mouse?" By default the ring rides on the HAND, which keeps the
+    // glide `animate_hand` was tuned for. With `DIVUS_FACTUS_HAND_SNAPS=1`
+    // the hand gives up its glide and goes rigid on the cursor, and then the
+    // ring may as well ride the cursor too - they are the same point.
+    let under_the_hand = if snaps.0 {
+        at
+    } else {
+        palm.single()
+            .map(|at| crate::globe::unbend(at.translation))
+            .unwrap_or(at)
+    };
+    let ground = terrain.height_at(under_the_hand.x, under_the_hand.z);
+    let seat = Vec3::new(under_the_hand.x, ground, under_the_hand.z);
 
     if standing
         .is_some_and(|(was, r)| was.distance(seat) < WORTH_REDRAWING && (r - radius).abs() < 0.05)
