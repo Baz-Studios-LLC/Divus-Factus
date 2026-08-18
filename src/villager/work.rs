@@ -64,6 +64,27 @@ const PLINTH_TOP: f32 = 0.35;
 /// Hunger above which a worker downs tools and sees to themself.
 const DOWN_TOOLS_HUNGER: f32 = HUNGRY_THRESHOLD + 0.1;
 
+/// Hunger ON ARRIVAL past which nobody may be kept at their work, whatever
+/// the village needs.
+///
+/// A floor under [`DOWN_TOOLS_HUNGER`]'s one exemption, not a threshold of its
+/// own: the food trades may work hungry for a thin larder, and may not work
+/// themselves to death for it. Death is 1.0, and this leaves the margin.
+const TOO_LATE_TO_WALK: f32 = 0.88;
+
+/// Whether a worker stays at their work, given how hungry they will be when
+/// they get home and whether the village needs them out there now.
+///
+/// Its own function so the law can be read and tested in one place, because it
+/// is a law and not a tuning: a village must not be able to work its food
+/// trades to death, however badly it needs feeding.
+fn stays_at_work(projected: f32, needed_now: bool) -> bool {
+    if projected <= DOWN_TOOLS_HUNGER {
+        return true;
+    }
+    needed_now && projected < TOO_LATE_TO_WALK
+}
+
 /// What one hunt's kill is worth in stored food.
 const CARCASS_FOOD: f32 = 3.0;
 
@@ -1138,8 +1159,22 @@ pub(super) fn do_work(
         // an empty store with its fishers too hungry to fish; left on
         // while the store was full, it meant a gatherer a hundred and
         // twenty strides out never turned for home at all.
-        let works_through_hunger = feeds_the_village && larder_thin;
-        if !on_shift || (projected > DOWN_TOOLS_HUNGER && !works_through_hunger) {
+        //
+        // AND IT IS ABOUT COMFORT, NEVER ABOUT SURVIVAL. With no floor
+        // under it, the fishers do not feed the village - they die at the
+        // water. Hare lost four in a morning, every one of them a food
+        // trade, every one of them at the gathering ground about a hundred
+        // and fifty strides out: "Zetae starved on the road, 147 strides
+        // from a larder that held food." The exemption told them to keep
+        // working and they obeyed it into the ground.
+        //
+        // So it lifts the moment the walk home stops being survivable.
+        // `projected` is hunger ON ARRIVAL, so a worker at this figure has
+        // already left it nearly too late; the gap to 1.0 is the room to
+        // be wrong about their pace. A live gatherer who ate can gather
+        // again tomorrow, which is worth more to a thin larder than a dead
+        // one who worked an hour longer.
+        if !on_shift || !stays_at_work(projected, feeds_the_village && larder_thin) {
             *activity = Activity::Idle;
             target.0 = None;
             commands.entity(entity).remove::<Job>();
@@ -2237,6 +2272,39 @@ pub(super) fn do_work(
 
 #[cfg(test)]
 mod tests {
+    /// A thin larder may keep a fisher working hungry. It may not work her
+    /// to death.
+    ///
+    /// Hare lost four in one morning to the version without the floor, every
+    /// one of them a food trade standing at a gathering ground a hundred and
+    /// fifty strides out. Brett's law: a village that starves itself is a bug,
+    /// not difficulty.
+    #[test]
+    fn nobody_is_worked_to_death_for_a_thin_larder() {
+        use super::{DOWN_TOOLS_HUNGER, TOO_LATE_TO_WALK, stays_at_work};
+        let hungry = DOWN_TOOLS_HUNGER + 0.05;
+
+        assert!(
+            stays_at_work(hungry, true),
+            "a food trade must work through hunger while the larder is thin"
+        );
+        assert!(
+            !stays_at_work(hungry, false),
+            "everybody else goes home hungry"
+        );
+        assert!(
+            !stays_at_work(TOO_LATE_TO_WALK, true),
+            "the exemption must not outlast the walk home"
+        );
+        // And the floor has to leave room to actually get there: death is at
+        // 1.0, and the walk itself is already inside `projected`.
+        assert!(TOO_LATE_TO_WALK < 1.0);
+        assert!(
+            stays_at_work(DOWN_TOOLS_HUNGER, false),
+            "a worker who is merely peckish keeps working"
+        );
+    }
+
     use super::*;
 
     /// The offering loop, end to end, in a bare world: a divinely-set-down
