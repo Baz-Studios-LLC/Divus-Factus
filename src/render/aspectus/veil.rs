@@ -336,6 +336,10 @@ pub(super) fn veil_pass(
     mut ctx: RenderContext,
 ) {
     let (target, view_offset, veil_index, group, pipeline_id) = view.into_inner();
+    // Priced with `DIVUS_FACTUS_NO=veil` - see `pass_is_wanted`.
+    if !super::pass_is_wanted("veil") {
+        return;
+    }
     let Some(pipeline) = pipeline_cache.get_render_pipeline(pipeline_id.0) else {
         return;
     };

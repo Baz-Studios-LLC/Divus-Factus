@@ -356,6 +356,10 @@ pub(super) fn mist_pass(
     mut ctx: RenderContext,
 ) {
     let (target, view_offset, mist_index, group, pipeline_id) = view.into_inner();
+    // Priced with `DIVUS_FACTUS_NO=mist` - see `pass_is_wanted`.
+    if !super::pass_is_wanted("mist") {
+        return;
+    }
     let Some(pipeline) = pipeline_cache.get_render_pipeline(pipeline_id.0) else {
         return;
     };

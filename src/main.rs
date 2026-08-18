@@ -268,6 +268,20 @@ fn main() {
             debug::timings::TimingsPlugin,
             debug::ordo_trial::OrdoTrialPlugin,
         ))
+        // GPU TIME PER PASS, behind `DIVUS_FACTUS_GPU=1`.
+        //
+        // The main-world stopwatch only fires above 25ms of simulation, and a
+        // fourteen-minute soak fired it ZERO times while the game still felt
+        // sluggish. The splash screen - no village, no villagers, no
+        // pathfinding - ran at 39fps. When the simulation is that innocent the
+        // cost is in the render graph, and this is the only instrument that
+        // reads it.
+        //
+        // Behind a flag because it asks the GPU for timestamps, which is not
+        // free and not something a player should pay for.
+        // Frame time is already measured for the dev panel; this adds only the
+        // render graph's own spans.
+        .add_plugins(bevy::render::diagnostic::RenderDiagnosticsPlugin)
         .add_systems(Startup, spawn_lighting)
         .run();
 }

@@ -27,6 +27,30 @@
 //! the hover highlight stop being real geometry), and a tilt-shift depth of
 //! field keyed to height in frame rather than to a virtual lens.
 
+/// Whether a pass may run at all, for measuring what it costs.
+///
+/// `DIVUS_FACTUS_NO=mist,veil,frost` turns them off, comma separated. This is
+/// the only way to price a full-screen pass in this game: the main-world
+/// stopwatch says the SIMULATION is innocent - zero slow frames in fourteen
+/// minutes - while frames were taking 96ms, so seventy of those milliseconds
+/// are being spent past Update, where nothing was measuring.
+///
+/// A/B is the only measurement that counts here, because frame times in this
+/// game drift several milliseconds between runs for reasons that have nothing
+/// to do with the change being tested.
+pub fn pass_is_wanted(name: &str) -> bool {
+    static OFF: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    let off = OFF.get_or_init(|| {
+        std::env::var("DIVUS_FACTUS_NO")
+            .unwrap_or_default()
+            .split(',')
+            .map(|word| word.trim().to_ascii_lowercase())
+            .filter(|word| !word.is_empty())
+            .collect()
+    });
+    !off.iter().any(|word| word == name)
+}
+
 use bevy::prelude::*;
 
 pub mod frost;
