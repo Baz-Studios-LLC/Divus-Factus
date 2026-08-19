@@ -296,7 +296,43 @@ pub(crate) fn spawn_villager_profile(
         ChildOf(root),
     ));
 
+    // THE FOLDER: the tabs and the page they open, with NOTHING between them.
+    //
+    // This is why the tab borders did not meet the panel's. Brett: "the vertical
+    // tab lines don't connect to the horz." The trick a folder tab is built on is
+    // that the active one paints its BOTTOM border in the page's own color, so
+    // the line appears to open where the tab stands - and it overlaps the page by
+    // a pixel to do it, which the strip already asked for with a -1 margin.
+    //
+    // But the strip and the page were siblings under a root carrying a twelve
+    // pixel `row_gap`, so the eraser sat twelve pixels above the line it was
+    // meant to erase and clawed back only one. A wrapper with no gap is the
+    // whole fix; cancelling the gap with a -13 margin would have worked until
+    // somebody changed the root's spacing.
+    let folder = commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                flex_grow: 1.0,
+                min_height: px(0.0),
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            ChildOf(root),
+        ))
+        .id();
+
     // --- Tab Strip ---
+    //
+    // ABOVE THE PAGE, and that is the second half of the folder. The active tab
+    // paints its bottom border in the page's own color to erase the line and
+    // open the folder there - but the page is a LATER sibling, so it painted its
+    // own top border back over the top and the tab still read as a closed box.
+    // Brett: "the selected tab (Overview) has a line on the bottom of it taking
+    // away that folder tab look."
+    //
+    // Geometry was only half of it: the tabs had to touch the page AND be drawn
+    // over it. One is a wrapper, the other is a z-index.
     let tab_strip = commands
         .spawn((
             Node {
@@ -306,7 +342,8 @@ pub(crate) fn spawn_villager_profile(
                 margin: UiRect::bottom(px(-1.0)),
                 ..default()
             },
-            ChildOf(root),
+            ZIndex(1),
+            ChildOf(folder),
         ))
         .id();
 
@@ -403,7 +440,7 @@ pub(crate) fn spawn_villager_profile(
                 flex_direction: FlexDirection::Column,
                 ..default()
             },
-            ChildOf(root),
+            ChildOf(folder),
         ))
         .id();
 
@@ -694,50 +731,6 @@ pub(crate) fn handle_profile_actions(
             }
         }
     }
-}
-
-fn spawn_section_header(commands: &mut Commands, parent: Entity, title: &str) {
-    let header_node = commands
-        .spawn((
-            Node {
-                width: Val::Percent(100.0),
-                flex_direction: FlexDirection::Row,
-                align_items: AlignItems::Center,
-                column_gap: px(8.0),
-                margin: UiRect::top(px(4.0)),
-                ..default()
-            },
-            ChildOf(parent),
-        ))
-        .id();
-    commands.spawn((
-        Node {
-            width: px(10.0),
-            height: px(1.5),
-            ..default()
-        },
-        BackgroundColor(ui::theme::accent().with_alpha(0.7)),
-        ChildOf(header_node),
-    ));
-    commands.spawn((
-        ui::DisplayFace,
-        Text::new(title),
-        TextFont {
-            font_size: FontSize::Px(11.5),
-            ..default()
-        },
-        TextColor(ui::theme::accent()),
-        ChildOf(header_node),
-    ));
-    commands.spawn((
-        Node {
-            flex_grow: 1.0,
-            height: px(1.0),
-            ..default()
-        },
-        BackgroundColor(ui::theme::panel_border().with_alpha(0.3)),
-        ChildOf(header_node),
-    ));
 }
 
 fn spawn_vital_card(
@@ -1073,7 +1066,7 @@ pub(crate) fn update_villager_profile(
         match profile.tab {
             ProfileTab::Overview => {
                 // 1. CURRENT DOING
-                spawn_section_header(&mut commands, well_entity, "CURRENT DOING");
+                ui::section_header(&mut commands, well_entity, "CURRENT DOING");
                 let doing_card = commands
                     .spawn((
                         Node {
@@ -1100,7 +1093,7 @@ pub(crate) fn update_villager_profile(
                 ));
 
                 // 2. VITALS & NEEDS
-                spawn_section_header(&mut commands, well_entity, "VITALS & NEEDS");
+                ui::section_header(&mut commands, well_entity, "VITALS & NEEDS");
                 let vitals_grid = commands
                     .spawn((
                         Node {
@@ -1133,7 +1126,7 @@ pub(crate) fn update_villager_profile(
                 spawn_vital_card(&mut commands, vitals_grid, "FAITH", faith_word, faith_color);
 
                 // 3. SHELTER
-                spawn_section_header(&mut commands, well_entity, "SHELTER & HEARTH");
+                ui::section_header(&mut commands, well_entity, "SHELTER & HEARTH");
                 let shelter_card = commands
                     .spawn((
                         Node {
@@ -1163,7 +1156,7 @@ pub(crate) fn update_villager_profile(
             }
             ProfileTab::Skills => {
                 // 1. CURRENT CALLING
-                spawn_section_header(&mut commands, well_entity, "CURRENT CALLING");
+                ui::section_header(&mut commands, well_entity, "CURRENT CALLING");
                 let calling_box = commands
                     .spawn((
                         Node {
@@ -1202,7 +1195,7 @@ pub(crate) fn update_villager_profile(
                 }
 
                 // 2. SKILL PROGRESSION
-                spawn_section_header(&mut commands, well_entity, "SKILL PROGRESSION");
+                ui::section_header(&mut commands, well_entity, "SKILL PROGRESSION");
                 if let Some(skills) = skills {
                     let mut crafts: Vec<(Vocation, f32)> = skills.0.clone();
                     crafts.sort_by(|a, b| b.1.total_cmp(&a.1));
@@ -1321,7 +1314,7 @@ pub(crate) fn update_villager_profile(
                 }
 
                 // 3. TODAY'S ACTIVITY
-                spawn_section_header(&mut commands, well_entity, "TODAY'S ACTIVITY");
+                ui::section_header(&mut commands, well_entity, "TODAY'S ACTIVITY");
                 let act_card = commands
                     .spawn((
                         Node {
@@ -1347,7 +1340,7 @@ pub(crate) fn update_villager_profile(
             }
             ProfileTab::Bonds => {
                 // 1. HOUSEHOLD & KIN
-                spawn_section_header(&mut commands, well_entity, "HOUSEHOLD & KIN");
+                ui::section_header(&mut commands, well_entity, "HOUSEHOLD & KIN");
                 let kin_card = commands
                     .spawn((
                         Node {
@@ -1408,7 +1401,7 @@ pub(crate) fn update_villager_profile(
                 );
 
                 // 2. SOCIAL REGARD
-                spawn_section_header(&mut commands, well_entity, "SOCIAL REGARD & FEELINGS");
+                ui::section_header(&mut commands, well_entity, "SOCIAL REGARD & FEELINGS");
                 if let Some(regard) = regard {
                     let mut bonds = regard.bonds.iter().collect::<Vec<_>>();
                     bonds.sort_by(|left, right| right.warmth.abs().total_cmp(&left.warmth.abs()));
@@ -1524,7 +1517,7 @@ pub(crate) fn update_villager_profile(
             }
             ProfileTab::Inner => {
                 // 1. CHARACTER & TEMPERAMENT
-                spawn_section_header(&mut commands, well_entity, "CHARACTER & TEMPERAMENT");
+                ui::section_header(&mut commands, well_entity, "CHARACTER & TEMPERAMENT");
                 let char_card = commands
                     .spawn((
                         Node {
@@ -1555,7 +1548,7 @@ pub(crate) fn update_villager_profile(
                 ));
 
                 // 2. DIVINE BELIEF
-                spawn_section_header(&mut commands, well_entity, "DIVINE BELIEF");
+                ui::section_header(&mut commands, well_entity, "DIVINE BELIEF");
                 let faith_card = commands
                     .spawn((
                         Node {
@@ -1606,7 +1599,7 @@ pub(crate) fn update_villager_profile(
                 ));
 
                 // 3. LAST WORDS SPOKEN
-                spawn_section_header(&mut commands, well_entity, "LAST SPOKEN WORDS");
+                ui::section_header(&mut commands, well_entity, "LAST SPOKEN WORDS");
                 if let Some(said) = recently_said.and_then(|s| s.0.last()) {
                     let quote_card = commands
                         .spawn((
@@ -1661,7 +1654,7 @@ pub(crate) fn update_villager_profile(
                 }
 
                 // 4. RECENT INNER STIRRING
-                spawn_section_header(&mut commands, well_entity, "RECENT INNER STIRRING");
+                ui::section_header(&mut commands, well_entity, "RECENT INNER STIRRING");
                 if let Some(stirring) = stirrings.and_then(|s| s.0.last()) {
                     let stir_card = commands
                         .spawn((
@@ -1716,7 +1709,7 @@ pub(crate) fn update_villager_profile(
                 }
             }
             ProfileTab::Chronicle => {
-                spawn_section_header(&mut commands, well_entity, "PERSONAL LIFE CHRONICLE");
+                ui::section_header(&mut commands, well_entity, "PERSONAL LIFE CHRONICLE");
                 if let Some(chronicle) = chronicle {
                     if chronicle.events.is_empty() {
                         commands.spawn((

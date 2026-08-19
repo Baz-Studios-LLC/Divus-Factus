@@ -2516,17 +2516,29 @@ pub fn section_header(commands: &mut Commands, parent: Entity, label_text: &str)
             ChildOf(parent),
         ))
         .id();
-    let rule = |commands: &mut Commands| {
+    // A SHORT RUN, THE WORDS, A RUN TO THE EDGE - and the two runs differ in
+    // length and in nothing else. Brett: "I like on the centered ones how the
+    // line looks like it is the same weight on both sides of the word. I think I
+    // would like the tick headers if the line was the same on both sides."
+    //
+    // Left-aligned rather than centered because sections stack: down a tall
+    // window every label starts at the same x, where a centered one lands
+    // somewhere new on each line depending how long its words are. The same
+    // shape now lives in Ordo as `ordo::section`, which is where it belongs -
+    // this stays until the panels move over.
+    let rule = |commands: &mut Commands, lead: bool| {
         commands
             .spawn(Node {
-                flex_grow: 1.0,
+                width: if lead { px(14) } else { Val::Auto },
+                flex_grow: if lead { 0.0 } else { 1.0 },
+                flex_shrink: 0.0,
                 height: px(1),
                 ..default()
             })
             .insert(BackgroundColor(theme::panel_border()))
             .id()
     };
-    let left = rule(commands);
+    let left = rule(commands, true);
     commands.entity(left).insert(ChildOf(row));
     let text = commands
         .spawn((
@@ -2540,7 +2552,7 @@ pub fn section_header(commands: &mut Commands, parent: Entity, label_text: &str)
         ))
         .id();
     let _ = text;
-    let right = rule(commands);
+    let right = rule(commands, false);
     commands.entity(right).insert(ChildOf(row));
     row
 }
