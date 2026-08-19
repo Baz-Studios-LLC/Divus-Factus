@@ -2392,26 +2392,48 @@ pub struct TabButton {
 /// A tabbed row plus one content page per label. The first tab starts
 /// active. Pages are plain columns the caller fills.
 pub fn tab_bar(commands: &mut Commands, parent: Entity, labels: &[&str]) -> Vec<Entity> {
+    // FOLDER TABS, which is what the profile window proved and Brett asked for
+    // everywhere: "the settings page should use the new tabs."
+    //
+    // Two things make a folder rather than a row of buttons, and they are easy to
+    // get half right. The strip must TOUCH the page - hence the -1 margin, and no
+    // gap between them - and it must be DRAWN OVER it, because the page is a
+    // later sibling and would otherwise paint its own top border straight back
+    // over the tab's opening. Geometry and paint order both.
     let bar = commands
         .spawn((
             Node {
                 width: percent(100),
                 flex_direction: FlexDirection::Row,
                 column_gap: px(4),
-                margin: UiRect::bottom(px(4)),
+                margin: UiRect::bottom(px(-1)),
                 ..default()
             },
+            ZIndex(1),
             ChildOf(parent),
         ))
         .id();
     let mut pages = Vec::with_capacity(labels.len());
     for (index, label_text) in labels.iter().enumerate() {
+        // The page is the board the folder opens into, so it needs an edge for
+        // the tab to join and a fill for the active tab's bottom border to be
+        // painted in. Square at the top left, where the first tab meets it.
         let page = commands
             .spawn((
                 Node {
                     width: percent(100),
+                    flex_grow: 1.0,
+                    min_height: px(0),
                     flex_direction: FlexDirection::Column,
                     row_gap: px(theme::GAP),
+                    padding: UiRect::all(px(12)),
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius {
+                        top_left: px(0),
+                        top_right: px(3),
+                        bottom_left: px(3),
+                        bottom_right: px(3),
+                    },
                     display: if index == 0 {
                         Display::Flex
                     } else {
@@ -2419,6 +2441,8 @@ pub fn tab_bar(commands: &mut Commands, parent: Entity, labels: &[&str]) -> Vec<
                     },
                     ..default()
                 },
+                BackgroundColor(theme::card_bg()),
+                BorderColor::all(theme::card_border()),
                 ChildOf(parent),
             ))
             .id();
@@ -2428,20 +2452,26 @@ pub fn tab_bar(commands: &mut Commands, parent: Entity, labels: &[&str]) -> Vec<
                 UiButton,
                 Node {
                     padding: UiRect::axes(px(22), px(8)),
-                    border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(px(0)),
+                    border: UiRect {
+                        top: if index == 0 { px(3) } else { px(1) },
+                        left: px(1),
+                        right: px(1),
+                        bottom: px(1),
+                    },
+                    border_radius: BorderRadius {
+                        top_left: px(3),
+                        top_right: px(3),
+                        bottom_left: px(0),
+                        bottom_right: px(0),
+                    },
                     ..default()
                 },
                 BackgroundColor(if index == 0 {
-                    theme::title_bg()
+                    theme::card_bg()
                 } else {
-                    Color::BLACK.with_alpha(0.18)
+                    Color::BLACK.with_alpha(0.32)
                 }),
-                BorderColor::all(if index == 0 {
-                    theme::card_border()
-                } else {
-                    theme::panel_border().with_alpha(0.4)
-                }),
+                folder_edge(index == 0),
                 Interaction::default(),
                 ChildOf(bar),
             ))
@@ -2461,12 +2491,38 @@ pub fn tab_bar(commands: &mut Commands, parent: Entity, labels: &[&str]) -> Vec<
     pages
 }
 
+/// The four edges of a folder tab: gold along the top when it is the open one,
+/// and a bottom painted in the PAGE'S OWN FILL so the line appears to open there.
+///
+/// Its own function because the active and inactive states are set in two places
+/// - once at build and once on every click - and a folder tab whose two places
+/// disagree is a tab with a line under it, which is exactly the bug that took two
+/// passes to kill in the profile window.
+fn folder_edge(active: bool) -> BorderColor {
+    if active {
+        BorderColor {
+            top: theme::accent(),
+            left: theme::card_border(),
+            right: theme::card_border(),
+            bottom: theme::card_bg(),
+        }
+    } else {
+        BorderColor {
+            top: Color::WHITE.with_alpha(0.06),
+            left: theme::panel_border().with_alpha(0.25),
+            right: theme::panel_border().with_alpha(0.25),
+            bottom: theme::card_border(),
+        }
+    }
+}
+
 /// Tab clicks swap the visible page within their bar.
 #[allow(clippy::type_complexity)]
 pub fn switch_tabs(
     clicked: Query<(Entity, &Interaction, &TabButton), Changed<Interaction>>,
     all_tabs: Query<(Entity, &TabButton)>,
     mut pages: Query<&mut Node, Without<TabButton>>,
+    mut tabs: Query<&mut Node, With<TabButton>>,
     mut borders: Query<&mut BorderColor, With<TabButton>>,
     mut fills: Query<&mut BackgroundColor, With<TabButton>>,
 ) {
@@ -2483,18 +2539,20 @@ pub fn switch_tabs(
                 node.display = if active { Display::Flex } else { Display::None };
             }
             if let Ok(mut border) = borders.get_mut(other) {
-                *border = BorderColor::all(if active {
-                    theme::accent().with_alpha(0.85)
-                } else {
-                    theme::panel_border().with_alpha(0.35)
-                });
+                *border = folder_edge(active);
             }
             if let Ok(mut fill) = fills.get_mut(other) {
                 fill.0 = if active {
-                    theme::title_bg().into()
+                    theme::card_bg().into()
                 } else {
-                    Color::BLACK.with_alpha(0.18)
+                    Color::BLACK.with_alpha(0.32)
                 };
+            }
+            // The open tab's top border is thicker, so the width moves with the
+            // color or the gold line only appears on the tab that was built
+            // active.
+            if let Ok(mut node) = tabs.get_mut(other) {
+                node.border.top = if active { px(3) } else { px(1) };
             }
         }
     }
