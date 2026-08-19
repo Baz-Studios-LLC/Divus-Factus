@@ -2948,15 +2948,25 @@ pub const GROWTH_LARDER: f32 = 1.5;
 /// time `births` wakes, whether or not a child comes of it.
 pub static GROWTH_THINKING: std::sync::RwLock<String> = std::sync::RwLock::new(String::new());
 
-fn can_grow_to(living: usize, average_hunger: f32, food_stored: f32, cap: usize) -> bool {
+fn can_grow_to(living: usize, average_hunger: f32, food_stored: f32) -> bool {
     // Births need SURPLUS, not merely absence of famine: a child arrives
     // into a larder holding at least a meal and a half per head, or the
-    // village overshoots its food supply and starves at the cap - growth
-    // constrained by hunger before hunger ever kills.
-    living >= 2
-        && living < cap
-        && average_hunger < GROWTH_HUNGER
-        && food_stored >= living as f32 * GROWTH_LARDER
+    // village overshoots its food supply and starves - growth constrained by
+    // hunger before hunger ever kills.
+    //
+    // THE ROOF IS NOT A GATE ANY MORE. Brett: "So the shelter cap shouldn't
+    // prevent kids. Overpopulation drives new towns." Which is the better
+    // model - a crowded village is a story, a village that quietly stops
+    // having children is a mystery - and it turned out to be unblocking
+    // something as well as improving it.
+    //
+    // `colony::fullness` asks for `souls > beds` before a party will go out and
+    // found anywhere. While births stopped AT the cap, souls could never exceed
+    // beds, so the one door out of a full town was waiting on a state that
+    // births were forbidden to produce. Colonies were reachable only by losing
+    // houses. Food is the brake now, and crowding is the pressure that empties
+    // a square rather than the wall that quiets it.
+    living >= 2 && average_hunger < GROWTH_HUNGER && food_stored >= living as f32 * GROWTH_LARDER
 }
 
 /// Brings children into fed villages.
@@ -3281,12 +3291,17 @@ pub fn fertility(borne: u32) -> f32 {
 
 /// How long a mother nurses before she may bear again.
 ///
-/// Half a season. It was twenty-four days - most of one - and with the four
-/// or five mothers a young village has, that shut the nursery more often
-/// than it left it open, which is a good part of why a town would sit at
-/// seventeen for years. Brett: "Maybe the cooldown for a new child could be
-/// reduced to 14 as well."
-pub const NURSING_DAYS: f64 = 14.0;
+/// A week. It was twenty-four days, then fourteen, and is seven now - Brett:
+/// "Lets drop nursing to 7 days." With the four or five mothers a young village
+/// has, a long nursery shut the village's growth more often than it left it
+/// open, which is a good part of why a town would sit at seventeen for years.
+///
+/// This is the REAL pace of a village now that family size is a wish rather
+/// than a dice roll: a couple's total is what they were aiming at, and nursing
+/// only decides how quickly they get there. Halving it does not make bigger
+/// families, it makes the same families sooner - which is what a god watching a
+/// hamlet become a town actually wants to see.
+pub const NURSING_DAYS: f64 = 7.0;
 
 #[derive(Component)]
 pub struct NewMother {
@@ -3432,8 +3447,6 @@ fn births(
         .count();
     let held = if living < 2 {
         "too few souls"
-    } else if living >= cap {
-        "NO ROOM - build houses"
     } else if average_hunger >= GROWTH_HUNGER {
         "HUNGER - the village eats too late"
     } else if food_stored < living as f32 * GROWTH_LARDER {
@@ -3458,7 +3471,7 @@ fn births(
         );
     }
 
-    if !can_grow_to(living, average_hunger, food_stored, cap) || !rng.0.chance(0.6) {
+    if !can_grow_to(living, average_hunger, food_stored) || !rng.0.chance(0.6) {
         return;
     }
     if mothers.is_empty() {
@@ -4344,29 +4357,52 @@ mod tests {
         assert!((elapsed - SECONDS_STARVING_TO_DIE).abs() < 1.0);
     }
 
+    /// FOOD IS THE ONLY BRAKE ON BIRTHS. The roof is not one.
+    ///
+    /// Brett: "the shelter cap shouldn't prevent kids. Overpopulation drives new
+    /// towns." And that is also what makes the colony door reachable at all -
+    /// see the note on `can_grow_to` and `colony::fullness`.
     #[test]
-    fn villages_grow_only_when_fed_and_roofed_by_the_cap() {
-        let cap = 24;
+    fn villages_grow_when_fed_however_crowded() {
+        assert!(can_grow_to(2, 0.3, 20.0), "a fed pair should be able to grow");
         assert!(
-            can_grow_to(2, 0.3, 20.0, cap),
-            "a fed pair should be able to grow"
-        );
-        assert!(
-            !can_grow_to(1, 0.0, 20.0, cap),
+            !can_grow_to(1, 0.0, 20.0),
             "one villager cannot grow a village"
         );
-        assert!(!can_grow_to(cap, 0.0, 999.0, cap), "the cap must hold");
         assert!(
-            !can_grow_to(10, 0.2, 5.0, cap),
+            !can_grow_to(10, 0.2, 5.0),
             "a thin larder must gate births before hunger does"
         );
         assert!(
-            !can_grow_to(10, 0.9, 99.0, cap),
+            !can_grow_to(10, 0.9, 99.0),
             "a starving village must not grow"
         );
+        // The crowded case, which used to be forbidden: a town with far more
+        // souls than beds still bears, and the crowding is what sends a party
+        // out to found somewhere else.
         assert!(
-            can_grow_to(cap, 0.0, 99.0, cap + 10),
-            "a town hall must raise the roof",
+            can_grow_to(40, 0.2, 200.0),
+            "a crowded but well fed town must still bear children"
+        );
+    }
+
+    /// A town can now reach the state a colony party waits for.
+    ///
+    /// The regression this pins is a DEADLOCK, not a wrong number: while the
+    /// birth gate held population at the bed count, `colony::fullness` - which
+    /// asks for more souls than beds - could never be true from growth alone,
+    /// so the only road out of a full village was losing a house to weather.
+    #[test]
+    fn a_town_can_outgrow_its_beds_now() {
+        let beds = 20;
+        let souls = 26;
+        assert!(
+            can_grow_to(souls, 0.2, souls as f32 * 2.0),
+            "growth must be able to carry a town past its beds"
+        );
+        assert!(
+            crate::villager::colony::fullness(souls, beds, souls as f32 * 2.0),
+            "and a town past its beds with food put by is ready to send a party"
         );
     }
 

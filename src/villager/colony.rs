@@ -58,8 +58,12 @@ const PARTY_FLOOR: usize = 5;
 /// The most adults who will leave in one party. Children ride along on top.
 const PARTY_CEILING: usize = 8;
 
-/// A town this big has outgrown one square whatever its comforts.
-const FULL_TOWN: usize = 22;
+/// How far past its beds a town must be crowded before the pressure to leave is
+/// certain, as a share of the beds it has.
+///
+/// A quarter. One soul over on a twenty-bed town is a mutter; five over is
+/// everybody talking about it.
+const CROWDED_BY: f32 = 0.25;
 
 /// How far a colony must stand from every existing town. Past the parent's
 /// DAILY working ground, so two squares are not felling the same grove —
@@ -135,7 +139,33 @@ const BARRED_FOR: f64 = 1800.0;
 /// head — buds a daughter. Villages must thrive; colonies are what
 /// thriving looks like when the square runs out.
 pub fn fullness(souls: usize, beds: usize, food: f32) -> bool {
-    souls >= FULL_TOWN && souls > beds && food >= souls as f32 * 1.5
+    crowding(souls, beds) > 0.0 && food >= souls as f32 * 1.5
+}
+
+/// How hard a town is pushing its people out: nothing until it is past its beds,
+/// then rising with the crowd.
+///
+/// Brett: "the only thing that caps a town is beds, when population gets past
+/// that it should build pressure for people to leave and found their own town."
+///
+/// BEDS ONLY, which is what this rule is. It used to demand twenty-two souls as
+/// well, so a hamlet of twelve packed into eight beds built no pressure at all -
+/// it simply stayed crowded forever. The floor that matters is elsewhere and is
+/// about arithmetic rather than comfort: a town keeps `PARENT_FLOOR` and a party
+/// needs `PARTY_FLOOR`, so nobody leaves a village that cannot spare them.
+///
+/// Returned as PRESSURE rather than a yes or no, because "build pressure" is the
+/// behavior asked for: read as a chance each muster, a town one bed over dithers
+/// for a while and a town a quarter over empties into the frontier quickly.
+pub fn crowding(souls: usize, beds: usize) -> f32 {
+    if souls <= beds {
+        return 0.0;
+    }
+    let over = (souls - beds) as f32;
+    // Against the beds it HAS, so crowding is proportional: two over is a
+    // crisis in a hamlet and a rounding error in a city.
+    let enough = (beds.max(4) as f32) * CROWDED_BY;
+    (over / enough).clamp(0.0, 1.0)
 }
 
 /// The fracture door, judged for one heart: enough open hatreds that
@@ -405,7 +435,13 @@ pub(super) fn muster_colonists(
             })
             .max_by_key(|(_, grudges)| *grudges);
 
-        let full = fullness(souls, beds, store.food());
+        // THE PRESSURE, ROLLED. A town past its beds is likelier to send a
+        // party the more crowded it is, rather than sending one the instant it
+        // is one bed over - which is what "build pressure" means and what makes
+        // a village that is merely snug read differently from one that is
+        // bursting.
+        let pressure = crowding(souls, beds);
+        let full = fullness(souls, beds, store.food()) && rng.0.chance(pressure);
         if aggrieved.is_none() && !full {
             continue;
         }
@@ -922,6 +958,24 @@ mod tests {
         assert!(fullness(24, 20, 60.0));
     }
 
+    /// BEDS ARE THE ONLY CAP, and the pressure rises with the crowd.
+    ///
+    /// The case this was blind to: a hamlet crowded into a few beds. It wanted
+    /// twenty-two souls before any crowding counted, so a village of twelve in
+    /// eight beds stayed packed forever and never budded.
+    #[test]
+    fn crowding_builds_with_the_crowd_at_any_size() {
+        assert_eq!(crowding(8, 20), 0.0, "room to spare is no pressure");
+        assert_eq!(crowding(20, 20), 0.0, "exactly full is not yet crowded");
+        // A hamlet packed into what it has: pressure, where there was none.
+        assert!(crowding(12, 8) > 0.0, "a crowded hamlet must want out");
+        // And it rises.
+        assert!(crowding(22, 20) < crowding(26, 20));
+        // Certain once a quarter of the beds over.
+        assert_eq!(crowding(25, 20), 1.0);
+        assert!(fullness(12, 8, 40.0), "and a fed crowded hamlet is full");
+    }
+
     #[test]
     fn a_starving_town_does_not_bud() {
         // More mouths than beds but a thin larder: this town PRAYS, it does
@@ -929,9 +983,17 @@ mod tests {
         assert!(!fullness(24, 20, 10.0));
     }
 
+    /// A town with room is never full, however small.
+    ///
+    /// This used to read "a SMALL town is never full" and check twelve souls in
+    /// four beds - which is three times its beds and now the clearest case of a
+    /// village that should be pushing people out. What keeps a small town whole
+    /// is that it cannot SPARE anybody: `PARENT_FLOOR` and `PARTY_FLOOR` are
+    /// asked before any of this, and they are about arithmetic, not comfort.
     #[test]
-    fn a_small_town_is_never_full() {
-        assert!(!fullness(12, 4, 100.0));
+    fn a_town_with_room_is_never_full() {
+        assert!(!fullness(12, 20, 100.0));
+        assert!(PARENT_FLOOR + PARTY_FLOOR > 12, "and twelve cannot spare five");
     }
 
     #[test]
