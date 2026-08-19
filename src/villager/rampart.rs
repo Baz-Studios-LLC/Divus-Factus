@@ -159,6 +159,27 @@ fn gates_for(tier: RampartTier) -> Vec<f32> {
 /// town of enough souls with timber to spare fences itself, so the ring
 /// can be walked, watched and soaked. `DIVUS_FACTUS_FENCE=1` raises it on
 /// the first morning instead, for the harness.
+/// The wall the flag raises with the town, and where its gates stand.
+///
+/// Brett, on the founding town: "probably a wall and a tower too", and "the
+/// towers should be near the gates too". A town of thirty that came up out of
+/// the earth already fenced reads as established in a way no arrangement of
+/// buildings does - it says somebody decided where the inside was.
+///
+/// A FENCE and not a stone wall, deliberately: posts and rails are what a town
+/// this size builds, and it leaves `RampartTier::Wall` and the castle wall as
+/// things to earn. Built from the same `ring_for` and `gates_for` the village's
+/// own fence uses, so the god's wall and the village's are the same wall.
+pub fn founding_rampart(souls: usize) -> Rampart {
+    let tier = RampartTier::Fence;
+    Rampart {
+        tier,
+        radius: ring_for(tier, souls),
+        gates: gates_for(tier),
+        standing: false,
+    }
+}
+
 pub(crate) fn raise_the_fence(
     mut commands: Commands,
     mut towns: Query<(Entity, &super::Settlement, &super::work::Stockpile), Without<Rampart>>,

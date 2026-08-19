@@ -2466,6 +2466,12 @@ pub(crate) fn spawn_settlement(
             .iter()
             .map(|(tree, at)| (tree, at.translation()))
             .collect();
+        // THE WALL FIRST, because the watch is sited on its gates. Handed to the
+        // town rather than built by it: `raise_the_fence` wants fourteen souls
+        // and a hundred and twenty timber, which a town that rose this morning
+        // has not earned - and a wall is most of what makes the opening read as
+        // a place somebody already decided the inside of.
+        let wall = rampart::founding_rampart(STARTING_POPULATION);
         let (terrain, chunks, chunk_assets, stripped, grass) = &mut ground;
         let rose = work::buildings::raise_the_founding_town(
             &mut commands,
@@ -2480,8 +2486,10 @@ pub(crate) fn spawn_settlement(
             settlement,
             center,
             doorstep,
+            Some(&wall),
             &mut rng,
         );
+        commands.entity(settlement).insert(wall);
         info!(
             "the flag raises {settlement_name}: a hall and {rose} more, {} beds for {} souls",
             work::buildings::founding_beds(),

@@ -2349,6 +2349,7 @@ pub(crate) fn raise_the_founding_town(
     settlement: Entity,
     center: Vec3,
     hall_at: Option<Vec3>,
+    wall: Option<&crate::villager::rampart::Rampart>,
     rng: &mut Rng,
 ) -> usize {
     // Everything already standing, so nothing is raised on top of anything: the
@@ -2401,6 +2402,85 @@ pub(crate) fn raise_the_founding_town(
                 continue;
             };
             let at = Vec3::new(x, terrain.height_at(x, z), z);
+            let (_, _, stood) = raise_whole(
+                RaisingWhole {
+                    commands,
+                    meshes,
+                    materials,
+                    terrain,
+                    chunks,
+                    chunk_assets,
+                    stripped,
+                    grass,
+                },
+                standing,
+                settlement,
+                plan,
+                at,
+                yaw,
+            );
+            taken.push((stood, reach));
+            raised += 1;
+        }
+    }
+
+    // AND A WATCH ON EVERY GATE. Brett: "the towers should be near the gates
+    // too" - which is where a watch belongs and where the planner would never
+    // put one, since it sites towers by ring and knows nothing about the wall.
+    //
+    // Just INSIDE the line, by a tower's own breadth and a lane: on the line it
+    // would stand in the fence's own posts, and outside it the thing it is
+    // watching for gets to it first. A tower's dread is what wolves will not
+    // hunt inside of, so putting it at the gate covers the ground everybody
+    // actually walks.
+    if let Some(wall) = wall {
+        for gate in &wall.gates {
+            let plan = Blueprint::roll(BuildingKind::Watchtower, rng);
+            let reach = plan.half_w.max(plan.half_d);
+            // NEAR the gate, not exactly at it. The fence ring stands a
+            // hundred and forty strides out - `ring_for` sizes it for the town
+            // the town will be - and the flag only ever vetted the ground within
+            // the home circle, so the exact gate bearing is as likely as not to
+            // be water or a cliff face. Measured on the first walled founding:
+            // two of three gates had nothing to stand a tower on.
+            //
+            // So the arc beside the gate is searched, and a little of the depth
+            // behind it, nearest first. A watch twenty strides along the fence
+            // from its gate is still the gate's watch.
+            let spot = (0..)
+                .map(|n| n as f32)
+                .take_while(|step| *step <= 5.0)
+                .flat_map(|step| {
+                    let swing = step * 0.09;
+                    [gate - swing, gate + swing].into_iter().flat_map(move |bearing| {
+                        [0.0f32, 9.0, 18.0]
+                            .into_iter()
+                            .map(move |back| (bearing, back))
+                    })
+                })
+                .find_map(|(bearing, back)| {
+                    let inset = wall.radius - reach - 5.0 - back;
+                    let (sin, cos) = bearing.sin_cos();
+                    let (x, z) = (center.x + cos * inset, center.z + sin * inset);
+                    if !terrain.is_walkable(x, z) {
+                        return None;
+                    }
+                    let at = Vec3::new(x, terrain.height_at(x, z), z);
+                    (at.y > crate::terrain::WATER_LEVEL + 1.0
+                        && taken
+                            .iter()
+                            .all(|(other, room)| other.distance(at) > room + reach + 6.0))
+                    .then_some(at)
+                });
+            let Some(at) = spot else {
+                warn!(
+                    "no ground for a watch anywhere near the gate at {:.2} radians",
+                    gate
+                );
+                continue;
+            };
+            // Facing out, the way a lookout faces.
+            let yaw = std::f32::consts::PI - gate;
             let (_, _, stood) = raise_whole(
                 RaisingWhole {
                     commands,
