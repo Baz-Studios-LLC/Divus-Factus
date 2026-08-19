@@ -111,6 +111,7 @@ fn survey_the_land(
     seed: Option<Res<crate::WorldSeed>>,
     mut chunks: Option<ResMut<crate::terrain::LoadedChunks>>,
     mut rigs: Query<&mut crate::camera::CameraRig>,
+    clock: Option<ResMut<crate::calendar::WorldClock>>,
 ) {
     let (Some(terrain), Some(seed)) = (terrain, seed) else {
         return;
@@ -143,6 +144,25 @@ fn survey_the_land(
     if let Ok(mut rig) = rigs.single_mut() {
         rig.focus = at;
         rig.target_focus = at;
+    }
+
+    // AND THE HOUR IS SET TO THAT GROUND, not to the world's reference point.
+    // The clock opens mid-morning by design - "the first thing the player sees
+    // should be the world lit well, not a night they had no say in" - but one
+    // clock serves every longitude, and this ground is wherever the land
+    // happened to be best. A site a quarter of the way round the world was
+    // getting that mid-morning as midnight. Brett: "it should always land them
+    // on the daylight side."
+    //
+    // The dial still wins: somebody who asked for dusk asked for dusk.
+    if let Some(mut clock) = clock
+        && std::env::var("DIVUS_FACTUS_CLOCK").is_err()
+    {
+        let day = clock.day().saturating_sub(1);
+        let hour = crate::calendar::a_good_hour_over(at.x, at.z, day);
+        clock.elapsed = (crate::calendar::DAY_SECONDS * hour) as f64
+            + crate::calendar::DAY_SECONDS as f64 * day as f64;
+        info!("the god arrives over that ground in the morning of its own day");
     }
 }
 

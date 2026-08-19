@@ -25,6 +25,67 @@ pub const DAY_SECONDS: f32 = 600.0;
 /// Fraction of the day the sun is up.
 const DAYLIGHT_FRACTION: f32 = 0.72;
 
+/// The hour to arrive at, for a place to be in good daylight when you do.
+///
+/// THE WORLD KEEPS ONE CLOCK AND HAS MANY LONGITUDES. `WorldClock::default`
+/// opens at 0.22 - mid-morning - which is mid-morning AT THE WORLD'S REFERENCE
+/// POINT, and the ground a game opens on is wherever the land happened to be
+/// best. A site a quarter of the way round is in the dark at that hour, and the
+/// player is dropped into a night they had no say in. Brett: "it should always
+/// land them on the daylight side."
+///
+/// Found by scanning rather than by inverting the sun's own arithmetic: the
+/// elevation depends on the season as well as the hour, and a search over two
+/// hundred steps of one day is a few microseconds once per world.
+///
+/// Returns the same MID-MORNING the default means, measured from that place's
+/// own noon instead of from the origin's.
+///
+/// Takes the FLAT ground coordinates rather than a direction, and does both
+/// steps itself, because there are two frames here and mixing them is silent:
+/// `terrain::direction_at` speaks the planet's own, where home is +Z, while the
+/// sun is placed in the world's, where home is +Y. `planet_stance` is the
+/// quarter turn between them. Asking a caller to remember that is asking for a
+/// bug that reads as "the sun is just wrong somehow" - which is exactly how
+/// this landed the god in the dark the first time.
+pub fn a_good_hour_over(x: f32, z: f32, day: u32) -> f32 {
+    let place = crate::globe::planet_stance() * crate::terrain::direction_at(x, z);
+    let sun_over = |hour: f32| {
+        WorldClock {
+            elapsed: (DAY_SECONDS * hour) as f64 + DAY_SECONDS as f64 * day as f64,
+        }
+        .sun_position()
+        .dot(place)
+    };
+
+    // Local noon: the hour this ground has the sun highest over it.
+    let mut noon = (f32::MIN, 0.0f32);
+    for step in 0..240 {
+        let hour = step as f32 / 240.0;
+        let lit = sun_over(hour);
+        if lit > noon.0 {
+            noon = (lit, hour);
+        }
+    }
+
+    // Then back down the morning to about three quarters of that height, which
+    // is what mid-morning IS. NOT a fixed step back from noon, which was the
+    // first attempt and lands in the dark: a place a quarter of the world east
+    // has its noon at the origin's sunrise, and its morning is only a quarter
+    // of a day long by this clock, not a third. The offset has to be a
+    // fraction of the light, not a number of hours.
+    let target = noon.0 * 0.75;
+    let mut hour = noon.1;
+    for step in 1..240 {
+        let back = (noon.1 - step as f32 / 240.0).rem_euclid(1.0);
+        if sun_over(back) <= target {
+            hour = back;
+            break;
+        }
+    }
+    hour
+}
+
 /// How far from the eye the sun's cascades reach, and so how far shadows can
 /// possibly land. Sized to the world: the default configuration covers a few
 /// dozen units, which on a map this size means shadows stop a short way from the
@@ -247,6 +308,9 @@ impl WorldClock {
     }
 
     /// Whether decent people are asleep.
+    ///
+    /// A note for [`a_good_hour_over`]: this reads the world's one clock, and
+    /// the world has only one. See there.
     pub fn is_night(&self) -> bool {
         let t = self.time_of_day();
         t >= 0.74 || t < 0.03
@@ -747,6 +811,38 @@ fn hang_the_sky(
 
 #[cfg(test)]
 mod tests {
+    /// Wherever the land turns out to be best, the god arrives in daylight.
+    ///
+    /// One clock, many longitudes: the default mid-morning is mid-morning at
+    /// the world's reference point, and a village a quarter of the way round
+    /// gets it as midnight. Checked at the far side of the world, which is the
+    /// case that was broken, and at home, which must not move.
+    #[test]
+    fn the_god_arrives_in_daylight_wherever_the_ground_is() {
+        let round = crate::terrain::planet_circumference();
+        for (name, x, z) in [
+            ("home", 0.0, 0.0),
+            ("a quarter east", round * 0.25, 0.0),
+            ("the far side", round * 0.5, 0.0),
+            ("a quarter west", -round * 0.25, 0.0),
+            ("north and east", round * 0.3, round * 0.1),
+        ] {
+            let place =
+                crate::globe::planet_stance() * crate::terrain::direction_at(x, z);
+            let hour = super::a_good_hour_over(x, z, 0);
+            let clock = super::WorldClock {
+                elapsed: (super::DAY_SECONDS * hour) as f64,
+            };
+            let lit = clock.sun_position().dot(place);
+            assert!(
+                lit > 0.25,
+                "{name} opens with the sun {lit:.2} over it at hour {hour:.2} - \
+                 that is dusk or worse"
+            );
+        }
+    }
+
+
     /// The measured visibility ladder: camera distance against how much of the
     /// frame changed when shadows were taken away, at dawn and at noon both.
     ///

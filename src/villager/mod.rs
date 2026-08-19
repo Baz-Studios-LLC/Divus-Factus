@@ -1152,6 +1152,31 @@ fn score_town_ground(
     let water_fraction = reach_water as f32 / reach_samples as f32;
     let flatness = 1.0 - terrain.slope_at(x, z);
 
+    // THE GROUND UNDER THE TOWN ITSELF, which the walk-band above says nothing
+    // about. Shore in reach is an asset - a dock feeds a village - but the
+    // reward for it peaks when the waterline is about fifty strides out, and
+    // fifty strides is where the houses go. Brett: "when I start the game it
+    // always puts me right on the beach... inland is fine, building on the
+    // beach isnt as good."
+    //
+    // Graded, not a refusal, because a river through the near ring is a
+    // DIFFERENT thing from surf on three sides and this cannot tell them apart.
+    // A town wants dry ground to stand on and water to walk to.
+    let mut near_water = 0;
+    let mut near_samples = 0;
+    for angle_step in 0..12 {
+        let angle = angle_step as f32 / 12.0 * std::f32::consts::TAU;
+        for distance in [14.0, 22.0, 30.0] {
+            let sx = x + angle.cos() * distance;
+            let sz = z + angle.sin() * distance;
+            near_samples += 1;
+            if terrain.is_submerged(sx, sz) {
+                near_water += 1;
+            }
+        }
+    }
+    let dry_ground = 1.0 - near_water as f32 / near_samples as f32;
+
     // Some shoreline in reach is desirable, a lot is a peninsula. Peak
     // the reward around a quarter of the outer band being water.
     let shoreline = 1.0 - ((water_fraction - 0.25) / 0.25).abs().min(1.0);
@@ -1200,6 +1225,11 @@ fn score_town_ground(
         + flatness * 2.0
         + timberland * 3.0
         + stoneland * 1.0
+        // Weighted to outrank the strongest possible yearning for the sea
+        // (1.5), so no roll of that die can seat a town in the surf - while a
+        // site that is dry underfoot AND has shore in reach still beats one
+        // with no water at all, which is the whole point.
+        + dry_ground * 3.0
         + shoreline * coastal_yearning;
     Some((score, Vec3::new(x, height, z), timberland, stoneland))
 }

@@ -945,7 +945,7 @@ pub(crate) fn fold_onto_the_sphere(focus: Vec3) -> Vec3 {
 /// home, naming the same ground by a number three laps away.
 ///
 /// Then Begin is pressed and the descent flies to the village. Every one of
-/// those laps gets travelled, at descent speed. Brett: "if you let the title
+/// those laps gets traveled, at descent speed. Brett: "if you let the title
 /// screen run for a while and then click begin, the world spins super fast
 /// during the zoom in, and rotates a lot."
 ///
