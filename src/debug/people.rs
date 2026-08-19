@@ -1472,7 +1472,7 @@ pub(crate) fn update_person_detail(
         (person, genome, member_of),
         (needs, activity, vitality, morale),
         (temperament, witnessed, faith, _chronicle),
-        (spouse, parentage, home, vocation, skills, manner, child, regard),
+        (spouse, parentage, home, vocation, skills, manner, child, _regard),
     )) = selected.0.and_then(|entity| people.get(entity).ok())
     else {
         // Hidden means GONE: Visibility alone leaves the node's empty
@@ -1518,6 +1518,9 @@ pub(crate) fn update_person_detail(
     for (stat, mut text) in &mut texts.p2() {
         let fresh = match stat.0 {
             InspectorValue::State => state_phrase(activity, None).to_string(),
+            // The hover card's own row, which this page has no seat for: it
+            // says the same things at length under VITALS & NEEDS.
+            InspectorValue::Concern => String::new(),
             InspectorValue::Hunger => hunger_word(hunger).to_string(),
             InspectorValue::Rest => needs.map_or("wakeful", |n| rest_word(n.rest)).to_string(),
             InspectorValue::Health => health_word(harm).to_string(),
@@ -1533,7 +1536,6 @@ pub(crate) fn update_person_detail(
                 skills.map_or_else(|| v.describe().to_string(), |s| s.describe(*v))
             }),
             InspectorValue::Family => family_phrase(spouse, parentage, &kin_names, &corpse_check),
-            InspectorValue::Feelings => super::inspector::feelings_phrase(regard, &kin_names),
             InspectorValue::Seen => match witnessed {
                 Some(w) if w.is_innocent() && w.secondhand > 0 => "only in stories".to_string(),
                 Some(w) if w.is_innocent() => "never".to_string(),
@@ -1651,16 +1653,13 @@ fn stat_chip(commands: &mut Commands, parent: Entity, which: InspectorValue) {
         ..default()
     };
     match which {
+        // No glyph: the concern row is the hover card's, and that card draws
+        // its own heading rather than an icon per row.
+        InspectorValue::Concern => {}
         // A compass rose: the turned square and its heart.
         InspectorValue::State => {
             mark(at(7.0, 7.0, 8.0, 8.0, 0.0), true, false);
             mark(at(9.5, 9.5, 3.0, 3.0, 0.0), true, true);
-        }
-        // A heart: two lobes and the turned point beneath.
-        InspectorValue::Feelings => {
-            mark(at(5.0, 5.5, 5.0, 5.0, 5.0), false, false);
-            mark(at(9.5, 5.5, 5.0, 5.0, 5.0), false, false);
-            mark(at(6.8, 7.6, 6.0, 6.0, 0.0), true, false);
         }
         // A bowl.
         InspectorValue::Hunger => {

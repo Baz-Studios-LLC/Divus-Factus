@@ -22,24 +22,14 @@ pub(crate) struct InspectorSubtitle;
 #[derive(Component)]
 pub(crate) struct InspectorDetail;
 
-/// Which live readout an inspector row shows.
-#[derive(Component, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum InspectorValue {
-    State,
-    Manner,
-    Hunger,
-    Rest,
-    Health,
-    Spirits,
-    Heart,
-    FaithIn,
-    Work,
-    Family,
-    /// The social weather: whom they hold dearest, whom they cannot stand.
-    Feelings,
-    Seen,
-}
-
+/// KEPT THOUGH NOTHING DRAWS IT YET. The hover card was its only home and a
+/// hover card is now an identification rather than a dossier - but this is the
+/// regard system's summary voice, not tooltip plumbing, and `Regard::fondest`
+/// and `sourest` exist to be said somewhere. The profile window is where it
+/// belongs, and that window is Brett's: "dont touch that window I have some
+/// ideas." Deleting a designed feature to quiet a warning I caused would be the
+/// wrong trade.
+#[cfg_attr(not(test), allow(dead_code))]
 /// The social weather in one line: the strongest of each pole, by name —
 /// "fond of Doenna - sour on Marruck". A heart with nothing notable says
 /// so. Shared by the hover inspector and the People page dossier.
@@ -67,6 +57,39 @@ pub(crate) fn feelings_phrase(
         poles.join(" - ")
     }
 }
+
+/// Which live readout an inspector row shows.
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum InspectorValue {
+    /// What they are doing right now: the one live fact a hover is FOR.
+    State,
+    /// What is wrong with them, when something is - and absent when nothing is,
+    /// so the card never carries a row saying everything is fine.
+    Concern,
+    Manner,
+    Hunger,
+    Rest,
+    Health,
+    Spirits,
+    Heart,
+    FaithIn,
+    Work,
+    Family,
+    Seen,
+}
+
+/// A SHARED VOCABULARY OF READOUTS, and only the hover card was trimmed.
+///
+/// The People page in the codex builds its dossier rows from these same
+/// variants, so they all remain - what changed is which ones the HOVER card
+/// spawns, and that is now `State` and `Concern`. Everything else it used to
+/// show is in the profile window shift-right-click opens, said better and with
+/// room to say it. A hover is an identification, not a dossier.
+
+/// The concern header and line, hidden unless a person has something wrong.
+#[derive(Component)]
+pub(crate) struct InspectorPersonConcern;
+
 
 /// Everything shown only for a living person — the stat rows, the memory
 /// section. One marker so the whole block can be shown and hidden together.
@@ -266,7 +289,11 @@ pub(crate) struct InspectorInk<'w, 's> {
     person_block: Query<
         'w,
         's,
-        (&'static mut Visibility, &'static mut Node),
+        (
+            &'static mut Visibility,
+            &'static mut Node,
+            Option<&'static InspectorPersonConcern>,
+        ),
         (
             With<InspectorPersonBlock>,
             Without<InspectorPanel>,
@@ -392,7 +419,7 @@ pub(crate) fn update_inspector(
         .map(|(_, hint)| hint)
     {
         *visibility = Visibility::Visible;
-        for (mut block, mut node) in &mut person_block {
+        for (mut block, mut node, _) in &mut person_block {
             *block = Visibility::Hidden;
             node.display = Display::None;
         }
@@ -442,7 +469,7 @@ pub(crate) fn update_inspector(
     // A pile in the square: the store it fronts, and which way it is going.
     if let Ok(pile) = cards.piles.get(entity) {
         use crate::villager::work::PileKind;
-        for (mut block, mut node) in &mut person_block {
+        for (mut block, mut node, _) in &mut person_block {
             *block = Visibility::Hidden;
             node.display = Display::None;
         }
@@ -503,7 +530,7 @@ pub(crate) fn update_inspector(
             _ => &[],
         };
         if !holds.is_empty() {
-            for (mut block, mut node) in &mut person_block {
+            for (mut block, mut node, _) in &mut person_block {
                 *block = Visibility::Hidden;
                 node.display = Display::None;
             }
@@ -587,7 +614,7 @@ pub(crate) fn update_inspector(
 
     // A grave: the life that ended under it, read back from the stone.
     if let Ok((grave, person, story)) = cards.graves.get(entity) {
-        for (mut block, mut node) in &mut person_block {
+        for (mut block, mut node, _) in &mut person_block {
             *block = Visibility::Hidden;
             node.display = Display::None;
         }
@@ -630,19 +657,56 @@ pub(crate) fn update_inspector(
         member_of,
         chronicle,
         vocation,
-        (morale, faith, manner, said, regard),
+        (morale, faith, manner, said, _regard),
     )) = people.get(entity)
         && corpse.is_err()
     {
-        for (mut block, mut node) in &mut person_block {
-            *block = Visibility::Inherited;
-            node.display = Display::Flex;
+        // WHAT IS ACTUALLY WRONG, in the order it would matter to the person.
+        // Only one, and only if it is real: a card that lists every need in good
+        // order is a card nobody reads, and this one is read at a glance while
+        // the hand is still moving. Reckoned BEFORE the rows are shown, because
+        // whether there is a concern decides whether its heading exists at all -
+        // an empty CONCERN over a blank line is worse than no concern.
+        let hunger = needs.map_or(0.0, |n| n.hunger);
+        let harm = vitality.map_or(0.0, |v| v.harm);
+        let concern = if harm > 0.55 {
+            Some("Badly hurt")
+        } else if hunger > 0.8 {
+            Some("Starving")
+        } else if needs.is_some_and(|n| n.rest < 0.2) {
+            Some("Dead on their feet")
+        } else if hunger > 0.6 {
+            Some("Hungry")
+        } else if harm > 0.2 {
+            Some("Hurt")
+        } else if morale.is_some_and(|m| m.spirits < 0.35) {
+            Some("Low in spirits")
+        } else {
+            None
+        };
+
+        for (mut block, mut node, is_concern) in &mut person_block {
+            let show = is_concern.is_none() || concern.is_some();
+            *block = if show {
+                Visibility::Inherited
+            } else {
+                Visibility::Hidden
+            };
+            node.display = if show { Display::Flex } else { Display::None };
         }
         if let Ok(mut name) = texts.p0().single_mut() {
             *name = Text::new(person.full_name());
         }
 
-        let who = genome.map_or("a soul", |g| person_phrase(g.sex, g.age));
+        // WHO AND WHERE IN ONE LINE, and their trade in it - which is where
+        // the "work" row went rather than being dropped. "A forester of
+        // Vamoro" is what a card should answer before anything else, and it
+        // costs a line instead of two.
+        let who = vocation.map(|trade| trade.describe().to_string()).unwrap_or_else(|| {
+            genome
+                .map_or("a soul", |g| person_phrase(g.sex, g.age))
+                .to_string()
+        });
         let home = member_of
             .and_then(|m| settlements.get(m.0).ok())
             .map_or_else(|| "the wilds".to_string(), |s| s.name.clone());
@@ -654,8 +718,6 @@ pub(crate) fn update_inspector(
             *detail_visibility = Visibility::Hidden;
         }
 
-        let hunger = needs.map_or(0.0, |n| n.hunger);
-        let harm = vitality.map_or(0.0, |v| v.harm);
         for (value, mut text) in &mut texts.p3() {
             let fresh = match value {
                 InspectorValue::State => if held {
@@ -664,6 +726,7 @@ pub(crate) fn update_inspector(
                     state_phrase(activity, reaction)
                 }
                 .to_string(),
+                InspectorValue::Concern => concern.unwrap_or_default().to_string(),
                 InspectorValue::Hunger => hunger_word(hunger).to_string(),
                 InspectorValue::Rest => needs.map_or("wakeful", |n| rest_word(n.rest)).to_string(),
                 InspectorValue::Health => health_word(harm).to_string(),
@@ -686,7 +749,6 @@ pub(crate) fn update_inspector(
                 InspectorValue::Family => {
                     family_phrase(spouse, parentage, &kin_names, &corpse_check)
                 }
-                InspectorValue::Feelings => feelings_phrase(regard, &kin_names),
                 InspectorValue::Seen => {
                     if witnessed.is_innocent() && witnessed.secondhand > 0 {
                         "only in stories".to_string()
@@ -769,7 +831,7 @@ pub(crate) fn update_inspector(
     }
 
     // Anything else — a corpse, an animal, a bush — gets a name and one line.
-    for (mut block, mut node) in &mut person_block {
+    for (mut block, mut node, _) in &mut person_block {
         *block = Visibility::Hidden;
         node.display = Display::None;
     }

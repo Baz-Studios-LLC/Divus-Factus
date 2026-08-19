@@ -139,8 +139,12 @@ pub(crate) fn spawn_hud(mut commands: Commands, mouse: Res<crate::keymap::MouseS
         commands.entity(row.value).insert(value);
     }
 
-    let look_section = commands.spawn(ui::section("LOOK")).id();
-    commands.entity(look_section).insert(ChildOf(hud.root));
+    // ONE WAY TO WRITE A SECTION, and this is it: a rule, the words, a rule.
+    // Brett, on the building cards: "I like the way it does dividers with the
+    // words in the middle like section headers." There used to be two helpers -
+    // this divider and a plain dim line - and which one a panel got was down to
+    // whoever wrote it. The plain one is gone.
+    ui::section_header(&mut commands, hud.root, "LOOK");
 
     let look_rows = [
         (HudValue::Aperture, "aperture", "F2/F3"),
@@ -238,44 +242,34 @@ pub(crate) fn spawn_hud(mut commands: Commands, mouse: Res<crate::keymap::MouseS
         TextColor(palette::shade(&palette::CLOTH_PINK, 0.92)),
     ));
 
-    let person_rows = [
-        (InspectorValue::State, "state"),
-        (InspectorValue::Hunger, "hunger"),
-        (InspectorValue::Rest, "rest"),
-        (InspectorValue::Health, "health"),
-        (InspectorValue::Spirits, "spirits"),
-        (InspectorValue::Heart, "heart"),
-        (InspectorValue::Manner, "manner"),
-        (InspectorValue::FaithIn, "faith"),
-        (InspectorValue::Work, "work"),
-        (InspectorValue::Family, "family"),
-        (InspectorValue::Feelings, "feelings"),
-        (InspectorValue::Seen, "seen you"),
-    ];
-    for (value, label) in person_rows {
-        let row = ui::stat_row(&mut commands, inspector.root, label, None);
-        commands.entity(row.value).insert(value);
-        commands.entity(row.row).insert(InspectorPersonBlock);
-    }
+    // A HOVER CARD SAYS WHO AND WHAT, NOT EVERYTHING. This carried twelve
+    // labelled rows - hunger, rest, health, spirits, heart, manner, faith,
+    // work, family, feelings, times seen - plus a life story and a memory
+    // list, and every one of them is in the profile window that shift-right-
+    // click opens. Brett: "the tooltip for a NPC can be drastically reduced
+    // since we have the shift right click window for NPCs."
+    //
+    // So it keeps the shape the building cards use, which is the one worth
+    // extending: a name, who they are in a phrase, the one live fact you
+    // hovered to learn, and a concern that only exists when the simulation has
+    // something real to put in it.
+    let doing = ui::stat_row(&mut commands, inspector.root, "doing", None);
+    commands.entity(doing.value).insert(InspectorValue::State);
+    commands.entity(doing.row).insert(InspectorPersonBlock);
 
-    let life_header = commands.spawn(ui::section("LIFE")).id();
+    let concern_header = ui::section_header(&mut commands, inspector.root, "CONCERN");
     commands
-        .entity(life_header)
-        .insert((ChildOf(inspector.root), InspectorPersonBlock));
-    let life = commands.spawn((InspectorLife, ui::dim(""))).id();
-    commands
-        .entity(life)
-        .insert((ChildOf(inspector.root), InspectorPersonBlock));
-
-    let memory_header = commands.spawn(ui::section("HAS SEEN")).id();
-    commands
-        .entity(memory_header)
-        .insert((ChildOf(inspector.root), InspectorPersonBlock));
-    let memories = commands.spawn((InspectorMemories, ui::dim(""))).id();
-    commands
-        .entity(memories)
-        .insert((ChildOf(inspector.root), InspectorPersonBlock));
+        .entity(concern_header)
+        .insert((InspectorPersonBlock, InspectorPersonConcern));
+    let concern = commands.spawn((InspectorValue::Concern, ui::body(""))).id();
+    commands.entity(concern).insert((
+        ChildOf(inspector.root),
+        InspectorPersonBlock,
+        InspectorPersonConcern,
+        TextColor(palette::shade(&palette::CLOTH_PINK, 0.92)),
+    ));
 }
+
 
 /// Nudges a value and reports whether it actually moved, so the caller only marks
 /// the resource changed when something did.

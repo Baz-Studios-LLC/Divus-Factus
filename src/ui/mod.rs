@@ -2729,22 +2729,6 @@ pub fn label(text: impl Into<String>) -> impl Bundle {
     )
 }
 
-/// A section header inside a panel: small, dim, set off by a little air above.
-pub fn section(text: impl Into<String>) -> impl Bundle {
-    (
-        Text::new(text),
-        SerifFace,
-        TextFont {
-            font_size: FontSize::Px(theme::SMALL_SIZE),
-            ..default()
-        },
-        TextColor(theme::text_dim()),
-        Node {
-            margin: UiRect::top(px(7)),
-            ..default()
-        },
-    )
-}
 
 /// Quiet text: hints, key bindings, labels.
 pub fn dim(text: impl Into<String>) -> impl Bundle {
