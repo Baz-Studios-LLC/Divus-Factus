@@ -296,6 +296,16 @@ pub(crate) fn morning_muster(
         (With<Villager>, Without<Corpse>),
     >,
     courting: Query<&crate::villager::Courting, (With<Villager>, Without<Corpse>)>,
+    // WHAT THE VILLAGE HAS BURIED. Fear from memory alone could not answer a
+    // wolf: an event only reaches souls inside its carry, tens of meters, and a
+    // gatherer is killed a hundred and fifty strides out with nobody there. The
+    // one person who held that fear was the person the wolf killed, so a village
+    // could bury six and want no guard at all - measured, over fifteen days.
+    //
+    // A grave needs no witness. Somebody carried the body home and the whole
+    // village stood over it, which is the most reliable thing a village knows
+    // about the woods.
+    graves: Query<&crate::villager::rites::Grave>,
     ground: (
         Option<Res<crate::villager::explore::KnownWorld>>,
         // The tree's own Transform and the chunk it hangs from, NOT its
@@ -445,14 +455,27 @@ pub(crate) fn morning_muster(
     // Still off `peril`, which is counted in PEOPLE and not in enemies, so
     // this rises with how widely the fright has spread rather than with a
     // census of goblins nobody has met.
+    // The violent dead of the last fortnight, which is the same window a
+    // mauling frightens for - see `witness::PERIL_FADES`. Starvation is not in
+    // it: a guard cannot answer an empty larder, and posting one against hunger
+    // would take the hands that could have filled it.
+    let slain = graves
+        .iter()
+        .filter(|grave| grave.violent)
+        .filter(|grave| {
+            clock.day().saturating_sub(grave.day) as f32 <= crate::witness::PERIL_FADES
+        })
+        .count() as f32;
     let guards = if has(BuildingKind::Armory) {
         (peril / 2.0).ceil().max(2.0).min(6.0)
     } else if has(BuildingKind::Watchtower) {
         1.0
     } else {
-        // One spear per three frightened souls. A single survivor is
-        // already enough for one: somebody walks the treeline now.
-        (peril / 3.0).ceil().min(2.0)
+        // One spear per three frightened souls, and ONE PER GRAVE. A survivor is
+        // enough for a spear; somebody in the ground is worth the same, because
+        // a village that has buried one of its own to teeth is a village that
+        // knows. Whichever fear is louder decides.
+        (peril / 3.0).ceil().max(slain).min(2.0)
     };
 
     let raising = sites.iter().count() as f32;
