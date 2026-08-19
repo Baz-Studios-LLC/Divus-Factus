@@ -89,16 +89,25 @@ const HEIGHT_RANGE: f32 = 380.0;
 /// The shader thins it upward over this AND gives it a top, so a ridge can
 /// stand out of it like an island.
 ///
-/// TWENTY-TWO, down from thirty-four. Brett: "we need to turn down the fog
-/// some, it looks great but its too tall." Thirty-four meters is four or five
-/// times a longhouse, so what should read as mist lying in the low ground read
-/// as weather standing over the village - and the roofs, which are the thing
-/// the eye measures fog against, were inside it rather than above it.
+/// TEN, down from thirty-four. Brett: "we need to turn down the fog some, it
+/// looks great but its too tall", then "I suspect that the height should be
+/// about 10m truthfully." Thirty-four is four or five times a longhouse, so
+/// what should read as mist lying in the low ground read as weather standing
+/// over the village - and roofs are the thing the eye measures a fog bank
+/// against, so they have to be ABOVE it.
 ///
-/// It reads a little thinner as well as lower, because a shorter column is
-/// less air to look through. If the density wants coming back afterward,
-/// [`STRENGTH`] is that knob and this one is not.
-pub const MIST_DEPTH: f32 = 22.0;
+/// THIS AND [`STRENGTH`] ARE COUPLED FROM ABOVE, and the shader is where to
+/// see why: the upward falloff is `exp(-above / (deep * 0.55))`, a scale
+/// length proportional to the column, and the lid sits at the top of it. So
+/// the optical depth down a vertical ray scales LINEARLY with this. Cutting
+/// thirty-four to ten does not merely lower the top; it thins what the god
+/// looks down through to under a third.
+///
+/// Which is why `STRENGTH` moved with it. Looking HORIZONTALLY the two are
+/// independent - density at ground level is the field's own weight, whatever
+/// the height - so this pairing is about the overhead read, which is the read
+/// this game mostly has.
+pub const MIST_DEPTH: f32 = 10.0;
 
 /// How far the mist's cool side is pulled from the sky's own color toward a
 /// warm bone white.
@@ -379,7 +388,16 @@ const BONE: Vec3 = Vec3::new(0.86, 0.83, 0.76);
 /// fifth, and that this is what makes the cut uniform: thin air is governed
 /// by this one and the heaviest valley by the ceiling, so scaling only one of
 /// them would have thinned half the world and left the other half alone.
-const STRENGTH: f32 = 0.048;
+///
+/// DOUBLED when [`MIST_DEPTH`] came down to ten, and only partly: the height
+/// fell to under a third, so full compensation would be three and a half times
+/// this, and that would park most of the world against the `THICKEST` ceiling
+/// where a wet hollow and a dry shoulder stop being different from each other.
+/// Half the compensation keeps the bank present and keeps the variation.
+///
+/// If the answer after a look is "lower but thicker still", THIS is the knob,
+/// not the height - up to the point where the ceiling flattens it.
+const STRENGTH: f32 = 0.096;
 
 /// The most the mist may ever hide.
 ///
