@@ -117,6 +117,34 @@ pub(crate) enum InspectorHouseValue {
 #[derive(Component)]
 pub(crate) struct InspectorHouseConcern;
 
+/// Furniture that belongs only to a settlement's banner.
+#[derive(Component)]
+pub(crate) struct InspectorTownBlock;
+
+/// The live values in a settlement's banner.
+///
+/// THE BANNER USED TO BE ONE STRING of six facts joined by newlines - founding
+/// date, population, shelter, food, materials, and how frightened the town was -
+/// which is the richest card in the game delivered as a paragraph. Brett, on the
+/// dwelling card: "I like the way it does dividers with the words in the middle
+/// like section headers", and this is the card that needed them most.
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum InspectorTownValue {
+    Founded,
+    Shelter,
+    Food,
+    Stores,
+    Concern,
+}
+
+/// The town's concern, gone entirely when the village is at ease.
+///
+/// A village at ease is the ordinary case, and a heading over "The village is at
+/// ease" is a line spent saying nothing. It appears when there is fear to
+/// report, the same way the dwelling card's does.
+#[derive(Component)]
+pub(crate) struct InspectorTownConcern;
+
 /// The recent-memories text, in the villager's own phrasing.
 #[derive(Component)]
 pub(crate) struct InspectorMemories;
@@ -273,6 +301,7 @@ pub(crate) struct RisingSight<'w, 's> {
             Without<InspectorPersonBlock>,
             Without<InspectorDetail>,
             Without<InspectorHouseBlock>,
+            Without<InspectorTownBlock>,
         ),
     >,
 }
@@ -298,6 +327,25 @@ pub(crate) struct InspectorInk<'w, 's> {
             With<InspectorPersonBlock>,
             Without<InspectorPanel>,
             Without<InspectorHouseBlock>,
+        ),
+    >,
+    /// Disjoint from every other Visibility this system writes, proven on THIS
+    /// side: one `Without` per pair is enough, and keeping them here means a new
+    /// block never has to edit the queries that came before it.
+    town_block: Query<
+        'w,
+        's,
+        (
+            &'static mut Visibility,
+            &'static mut Node,
+            Option<&'static InspectorTownConcern>,
+        ),
+        (
+            With<InspectorTownBlock>,
+            Without<InspectorPanel>,
+            Without<InspectorPersonBlock>,
+            Without<InspectorHouseBlock>,
+            Without<InspectorDetail>,
         ),
     >,
     house_block: Query<
@@ -348,6 +396,11 @@ pub(crate) struct InspectorInk<'w, 's> {
                     Without<InspectorValue>,
                 ),
             >,
+            // APPENDED, NEVER INSERTED. A `ParamSet` is addressed by position,
+            // so a new query in the middle silently renumbers every `p4`, `p5`
+            // and `p6` in this file - and every one of them still compiles,
+            // writing the wrong words into the wrong surface.
+            Query<'w, 's, (&'static InspectorTownValue, &'static mut Text)>,
         ),
     >,
 }
@@ -384,6 +437,7 @@ pub(crate) fn update_inspector(
     let InspectorInk {
         mut panels,
         mut person_block,
+        mut town_block,
         mut house_block,
         mut texts,
     } = ink;
@@ -395,6 +449,10 @@ pub(crate) fn update_inspector(
     // matters as much as hidden visibility here: an empty section still has
     // height, which is how a card develops mysterious blank gutters.
     for (mut block, mut node, _) in &mut house_block {
+        *block = Visibility::Hidden;
+        node.display = Display::None;
+    }
+    for (mut block, mut node, _) in &mut town_block {
         *block = Visibility::Hidden;
         node.display = Display::None;
     }
@@ -1022,47 +1080,11 @@ pub(crate) fn update_inspector(
         }
     }
 
-    let (title, description) = if let Ok((construction, plan)) = rising.builds.get(entity) {
-        // A MATERIALS LIST, and it keeps its shape. Brett: "sometimes it says
-        // the amount of stone and timber needed correctly but then one of them
-        // drops off?" - it did, deliberately, the moment that material was
-        // complete. But a list that loses a row while you are reading it looks
-        // broken rather than finished, and "the tool tip is simply a materials
-        // list." So a material this building needs stays on the card until the
-        // building does not need it any more.
-        let footing = construction.footing_stone(plan.kind);
-        let frame = plan.kind.timber_cost();
-        let mut missing: Vec<(String, f32, f32)> = Vec::new();
-        let mut want = |name: &str, have: f32, needs: f32| {
-            if needs > 0.0 {
-                missing.push((name.to_string(), have, needs));
-            }
-        };
-        // THE LAST HALF-LOG IS NOT THE PLAYER'S TO BRING, so the frame reads
-        // as done once it is all that remains. Otherwise the card advertises a
-        // fifteenth log that the offering will refuse and put in the store, and
-        // the god feeds trees to a number that never moves: "if I put a tree on
-        // it it goes into the main storage and doesn't add to the 1 missing
-        // timber." Fourteen and a half also PRINTED as fourteen, `{:.0}` being
-        // a rounding of halves to even, so the card was a whole log out.
-        let laid = construction.progress.min(frame);
-        let reserve = crate::villager::work::buildings::A_CARPENTERS_HALF;
-        let shown = if frame - laid <= reserve { frame } else { laid };
-        let mut stuff = plan.stuff.word().to_string();
-        stuff[..1].make_ascii_uppercase();
-        want(&stuff, shown, frame);
-        // Called by its material, not by its job. Brett: "It should just say
-        // Stone." A materials list names materials.
-        want("Stone", construction.stone_laid.min(footing), footing);
-        // Numbers and nothing else. Brett: "The building a building tooltip
-        // doesn't need to say anything except what it is missing lol. If the
-        // timber is 7/7 for example that is all they need to put."
-        let lines: Vec<String> = missing
-            .iter()
-            .map(|(name, have, needs)| format!("{name} {have:.0}/{needs:.0}"))
-            .collect();
-        (format!("{}, rising", plan.kind.name()), lines.join("\n"))
-    } else if let Ok((settlement, store, peril)) = settlement_info.get(entity) {
+    // THE BANNER ANSWERS FIRST, and in sections rather than in a paragraph. It
+    // leaves the `(title, description)` chain below because that chain's whole
+    // shape is one title and one blob of prose - which is right for a tree and
+    // wrong for the richest card in the game.
+    if let Ok((settlement, store, peril)) = settlement_info.get(entity) {
         // The banner: the settlement's own dossier.
         let mut grown = 0;
         let mut children = 0;
@@ -1127,16 +1149,88 @@ pub(crate) fn update_inspector(
             }
             None => "The village is at ease".to_string(),
         };
-        (
-            settlement.name.clone(),
-            format!(
-                "Founded {}\n{population}\n{shelter}\nFood: {:.0} ({})\n{stores}\n{fear}",
-                crate::calendar::date_of_day(settlement.founded),
-                store.food(),
-                food_horizon(store.food(), mouths),
-            ),
-        )
+        for (mut block, mut node, fearful) in &mut town_block {
+            let show = fearful.is_none() || peril.is_some();
+            *block = if show {
+                Visibility::Inherited
+            } else {
+                Visibility::Hidden
+            };
+            node.display = if show { Display::Flex } else { Display::None };
+        }
+        if let Ok(mut name) = texts.p0().single_mut() {
+            *name = Text::new(settlement.name.clone());
+        }
+        if let Ok(mut subtitle) = texts.p1().single_mut() {
+            *subtitle = Text::new(population);
+        }
+        if let Ok((mut detail, mut detail_visibility)) = texts.p2().single_mut() {
+            *detail = Text::new("");
+            *detail_visibility = Visibility::Hidden;
+        }
+        for (value, mut text) in &mut texts.p7() {
+            let fresh = match value {
+                InspectorTownValue::Founded => {
+                    crate::calendar::date_of_day(settlement.founded)
+                }
+                InspectorTownValue::Shelter => shelter.clone(),
+                InspectorTownValue::Food => format!(
+                    "{:.0} - {}",
+                    store.food(),
+                    food_horizon(store.food(), mouths)
+                ),
+                InspectorTownValue::Stores => stores.clone(),
+                InspectorTownValue::Concern => fear.clone(),
+            };
+            if text.0 != fresh {
+                *text = Text::new(fresh);
+            }
+        }
+        return;
+    }
+
+    let (title, description) = if let Ok((construction, plan)) = rising.builds.get(entity) {
+        // A MATERIALS LIST, and it keeps its shape. Brett: "sometimes it says
+        // the amount of stone and timber needed correctly but then one of them
+        // drops off?" - it did, deliberately, the moment that material was
+        // complete. But a list that loses a row while you are reading it looks
+        // broken rather than finished, and "the tool tip is simply a materials
+        // list." So a material this building needs stays on the card until the
+        // building does not need it any more.
+        let footing = construction.footing_stone(plan.kind);
+        let frame = plan.kind.timber_cost();
+        let mut missing: Vec<(String, f32, f32)> = Vec::new();
+        let mut want = |name: &str, have: f32, needs: f32| {
+            if needs > 0.0 {
+                missing.push((name.to_string(), have, needs));
+            }
+        };
+        // THE LAST HALF-LOG IS NOT THE PLAYER'S TO BRING, so the frame reads
+        // as done once it is all that remains. Otherwise the card advertises a
+        // fifteenth log that the offering will refuse and put in the store, and
+        // the god feeds trees to a number that never moves: "if I put a tree on
+        // it it goes into the main storage and doesn't add to the 1 missing
+        // timber." Fourteen and a half also PRINTED as fourteen, `{:.0}` being
+        // a rounding of halves to even, so the card was a whole log out.
+        let laid = construction.progress.min(frame);
+        let reserve = crate::villager::work::buildings::A_CARPENTERS_HALF;
+        let shown = if frame - laid <= reserve { frame } else { laid };
+        let mut stuff = plan.stuff.word().to_string();
+        stuff[..1].make_ascii_uppercase();
+        want(&stuff, shown, frame);
+        // Called by its material, not by its job. Brett: "It should just say
+        // Stone." A materials list names materials.
+        want("Stone", construction.stone_laid.min(footing), footing);
+        // Numbers and nothing else. Brett: "The building a building tooltip
+        // doesn't need to say anything except what it is missing lol. If the
+        // timber is 7/7 for example that is all they need to put."
+        let lines: Vec<String> = missing
+            .iter()
+            .map(|(name, have, needs)| format!("{name} {have:.0}/{needs:.0}"))
+            .collect();
+        (format!("{}, rising", plan.kind.name()), lines.join("\n"))
     } else if let Ok(vitality) = corpse {
+
         let name = people
             .get(entity)
             .map(|(person, ..)| format!("the body of {}", person.full_name()))

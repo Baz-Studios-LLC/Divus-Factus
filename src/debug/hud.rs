@@ -242,6 +242,50 @@ pub(crate) fn spawn_hud(mut commands: Commands, mouse: Res<crate::keymap::MouseS
         TextColor(palette::shade(&palette::CLOTH_PINK, 0.92)),
     ));
 
+    // THE BANNER, in sections. The richest card in the game used to arrive as one
+    // paragraph of six facts joined by newlines; it now reads the way the
+    // dwelling card does, which is the shape Brett asked to see everywhere.
+    let town_block = |entity: Entity, commands: &mut Commands| {
+        commands.entity(entity).insert(InspectorTownBlock);
+    };
+    let town_header = ui::section_header(&mut commands, inspector.root, "THE TOWN");
+    town_block(town_header, &mut commands);
+    for (value, label) in [
+        (InspectorTownValue::Founded, "founded"),
+        (InspectorTownValue::Shelter, "shelter"),
+    ] {
+        let row = ui::stat_row(&mut commands, inspector.root, label, None);
+        town_block(row.row, &mut commands);
+        commands
+            .entity(row.value)
+            .insert((InspectorTownBlock, value));
+    }
+    let stores_header = ui::section_header(&mut commands, inspector.root, "STORES");
+    town_block(stores_header, &mut commands);
+    for (value, label) in [
+        (InspectorTownValue::Food, "food"),
+        (InspectorTownValue::Stores, "materials"),
+    ] {
+        let row = ui::stat_row(&mut commands, inspector.root, label, None);
+        town_block(row.row, &mut commands);
+        commands
+            .entity(row.value)
+            .insert((InspectorTownBlock, value));
+    }
+    let town_fear = ui::section_header(&mut commands, inspector.root, "CONCERN");
+    commands
+        .entity(town_fear)
+        .insert((InspectorTownBlock, InspectorTownConcern));
+    let fear = commands
+        .spawn((InspectorTownValue::Concern, ui::body("")))
+        .id();
+    commands.entity(fear).insert((
+        ChildOf(inspector.root),
+        InspectorTownBlock,
+        InspectorTownConcern,
+        TextColor(palette::shade(&palette::CLOTH_PINK, 0.92)),
+    ));
+
     // A HOVER CARD SAYS WHO AND WHAT, NOT EVERYTHING. This carried twelve
     // labelled rows - hunger, rest, health, spirits, heart, manner, faith,
     // work, family, feelings, times seen - plus a life story and a memory
