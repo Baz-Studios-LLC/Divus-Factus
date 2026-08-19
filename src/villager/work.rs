@@ -530,7 +530,10 @@ pub(super) fn receive_offerings(
             construction.stone_laid += laid;
             stone -= laid;
 
-            let frame_want = (plan.kind.timber_cost() - 0.5 - construction.progress).max(0.0);
+            let frame_want = (plan.kind.timber_cost()
+                - crate::villager::work::buildings::A_CARPENTERS_HALF
+                - construction.progress)
+                .max(0.0);
             let framed = timber.min(frame_want);
             construction.progress += framed;
             timber -= framed;

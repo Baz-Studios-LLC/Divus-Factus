@@ -961,24 +961,37 @@ pub(crate) fn update_inspector(
     }
 
     let (title, description) = if let Ok((construction, plan)) = rising.builds.get(entity) {
-        // This is a needs list, not a progress report. Completed materials
-        // disappear so the card answers the useful question: what still has
-        // to arrive before this building can be finished?
+        // A MATERIALS LIST, and it keeps its shape. Brett: "sometimes it says
+        // the amount of stone and timber needed correctly but then one of them
+        // drops off?" - it did, deliberately, the moment that material was
+        // complete. But a list that loses a row while you are reading it looks
+        // broken rather than finished, and "the tool tip is simply a materials
+        // list." So a material this building needs stays on the card until the
+        // building does not need it any more.
         let footing = construction.footing_stone(plan.kind);
         let frame = plan.kind.timber_cost();
         let mut missing: Vec<(String, f32, f32)> = Vec::new();
         let mut want = |name: &str, have: f32, needs: f32| {
-            if needs > 0.0 && have < needs {
+            if needs > 0.0 {
                 missing.push((name.to_string(), have, needs));
             }
         };
-        // The walls take their material's name; the footing is always stone
-        // and is called what it is, which keeps the two apart on a stone
-        // building without either line having to explain itself.
+        // THE LAST HALF-LOG IS NOT THE PLAYER'S TO BRING, so the frame reads
+        // as done once it is all that remains. Otherwise the card advertises a
+        // fifteenth log that the offering will refuse and put in the store, and
+        // the god feeds trees to a number that never moves: "if I put a tree on
+        // it it goes into the main storage and doesn't add to the 1 missing
+        // timber." Fourteen and a half also PRINTED as fourteen, `{:.0}` being
+        // a rounding of halves to even, so the card was a whole log out.
+        let laid = construction.progress.min(frame);
+        let reserve = crate::villager::work::buildings::A_CARPENTERS_HALF;
+        let shown = if frame - laid <= reserve { frame } else { laid };
         let mut stuff = plan.stuff.word().to_string();
         stuff[..1].make_ascii_uppercase();
-        want(&stuff, construction.progress.min(frame), frame);
-        want("Footing", construction.stone_laid.min(footing), footing);
+        want(&stuff, shown, frame);
+        // Called by its material, not by its job. Brett: "It should just say
+        // Stone." A materials list names materials.
+        want("Stone", construction.stone_laid.min(footing), footing);
         // Numbers and nothing else. Brett: "The building a building tooltip
         // doesn't need to say anything except what it is missing lol. If the
         // timber is 7/7 for example that is all they need to put."

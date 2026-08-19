@@ -93,6 +93,20 @@ pub enum BuildingKind {
     Cemetery,
 }
 
+/// The last of the frame, which no god may lay.
+///
+/// A building is finished by a PERSON. Many hands and a generous god speed a
+/// raising, and the final half-log is still somebody's to set - which is what
+/// keeps a village from being a thing the player builds directly.
+///
+/// Named because two places have to agree about it: the offering that stops
+/// short of it, and the card that must not ask for what it will not accept.
+/// While it was an inline `- 0.5` in one of them, the card advertised a
+/// fifteenth log, took the tree, and put it in the store. Brett: "if I put a
+/// tree on it it goes into the main storage and doesn't add to the 1 missing
+/// timber."
+pub const A_CARPENTERS_HALF: f32 = 0.5;
+
 impl BuildingKind {
     /// How many the finished roof sleeps. Zero for the kinds nobody
     /// beds down in, which is most of them.
