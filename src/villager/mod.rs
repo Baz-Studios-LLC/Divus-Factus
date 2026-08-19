@@ -3226,13 +3226,57 @@ pub struct Motherhood {
     pub borne: u32,
 }
 
-/// A couple's chance of another child, falling with each they already have.
+/// How many children a couple is aiming at.
 ///
-/// Not a hard cap: a large family stays *possible*, it just stops being the
-/// likely thing. Each birth takes roughly a third off the odds, so the first
-/// few children come readily and the seventh is a rarity worth remarking on.
+/// A DECISION, NOT A DICE ROLL PER TICK, and that is the whole change. The old
+/// model multiplied a couple's odds by 0.68 for each child they had, rolled
+/// every eighteen seconds - and with twenty checks a day, taking a third off
+/// the odds does not mean fewer children, it means a few hours later. A mother
+/// on her eighth still had a 73% chance of conceiving the day she stopped
+/// nursing, so family size was capped by her lifespan and by the village's
+/// houses, never by the curve that looked like it was in charge.
+///
+/// Brett: "I would like the average family to have about 4 children on
+/// average." That is only sayable if the want is a number a couple HAS. The
+/// weights below mean 4.11, aimed a little over four because reality shaves
+/// it: a widow bears no more, a hungry village bears none at all, and the
+/// shelter cap stops everybody at once.
+pub fn family_wished_for(rng: &mut Rng) -> u32 {
+    // Sums to one, mean 4.11. Two is the smallest wish anybody has - a couple
+    // wanting none is a story this game does not tell yet.
+    const WISHES: [(u32, f32); 7] = [
+        (2, 0.12),
+        (3, 0.22),
+        (4, 0.32),
+        (5, 0.19),
+        (6, 0.09),
+        (7, 0.04),
+        (8, 0.02),
+    ];
+    let mut roll = rng.range(0.0, 1.0);
+    for (children, weight) in WISHES {
+        if roll < weight {
+            return children;
+        }
+        roll -= weight;
+    }
+    4
+}
+
+/// What a couple is aiming at, drawn once and kept.
+#[derive(Component, Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct FamilyWish {
+    pub children: u32,
+}
+
+/// Which of the eligible mothers bears NEXT, not whether she may.
+///
+/// The cap is [`FamilyWish`]; this only spreads births across a village so the
+/// couple on their first is likelier than the couple on their fifth. Gentle on
+/// purpose - a hard falloff here would be the old bug back, quietly deciding
+/// family size in a place nobody would look for it.
 pub fn fertility(borne: u32) -> f32 {
-    0.68_f32.powi(borne as i32)
+    0.85_f32.powi(borne as i32)
 }
 
 /// How long a mother nurses before she may bear again.
@@ -3271,6 +3315,7 @@ fn births(
         Query<&work::Stockpile>,
         Query<&Motherhood>,
         Query<&regard::Regard>,
+        Query<&FamilyWish>,
     ),
     mut rng: ResMut<SimRng>,
     villagers: Query<
@@ -3300,7 +3345,7 @@ fn births(
     let Some(culture) = culture else {
         return;
     };
-    let (huts, longhouses, stores, borne, hearts) = shelter;
+    let (huts, longhouses, stores, borne, hearts, wishes) = shelter;
 
     let living = villagers.iter().count();
     let average_hunger = if living == 0 {
@@ -3340,11 +3385,18 @@ fn births(
     // marriage, family home and children?" - and nothing anywhere said.
     let mothers: Vec<_> = villagers
         .iter()
-        .filter(|(_, _, genome, _, _, spouse, recovery, _)| {
+        .filter(|(who, _, genome, _, _, spouse, recovery, _)| {
             genome.age == Age::Adult
                 && genome.sex == Sex::Female
                 && spouse.is_some()
                 && recovery.is_none_or(|r| clock.elapsed > r.until)
+                // THE FAMILY THEY ARE AIMING AT, which is the cap now.
+                && match wishes.get(*who) {
+                    Ok(wish) => borne.get(*who).map_or(0, |m| m.borne) < wish.children,
+                    // No wish drawn yet: she is eligible, and the smallest wish
+                    // anybody has is two, so a first child is inside every one.
+                    Err(_) => true,
+                }
         })
         .filter(|(_, _, _, _, _, spouse, _, _)| {
             // The husband must himself still be living — a widow bears no child.
@@ -3366,6 +3418,18 @@ fn births(
                 && recovery.is_some_and(|r| clock.elapsed <= r.until)
         })
         .count();
+    // Families who have what they wanted: the new reason a village levels off,
+    // and one that has to be visible or it reads as the old mystery.
+    let done = villagers
+        .iter()
+        .filter(|(who, _, g, _, _, spouse, _, _)| {
+            g.sex == Sex::Female
+                && spouse.is_some()
+                && wishes.get(*who).is_ok_and(|wish| {
+                    borne.get(*who).map_or(0, |m| m.borne) >= wish.children
+                })
+        })
+        .count();
     let held = if living < 2 {
         "too few souls"
     } else if living >= cap {
@@ -3374,6 +3438,8 @@ fn births(
         "HUNGER - the village eats too late"
     } else if food_stored < living as f32 * GROWTH_LARDER {
         "THE LARDER - not enough put by"
+    } else if mothers.is_empty() && done > 0 && nursing == 0 {
+        "EVERY FAMILY IS COMPLETE - no couple wants another"
     } else if mothers.is_empty() && nursing > 0 {
         "every mother is nursing"
     } else if mothers.is_empty() {
@@ -3385,7 +3451,7 @@ fn births(
         *said = format!(
             "{living}/{cap} souls (fire {} + {houses} houses + {long} long + {halls} hall), \
              hunger {average_hunger:.2}/{GROWTH_HUNGER:.2}, food {food_stored:.0}/{:.0}, \
-             mothers {} + {nursing} nursing\n  held by: {held}",
+             mothers {} + {nursing} nursing + {done} complete\n  held by: {held}",
             home::FIRE_CIRCLE_SHELTER,
             living as f32 * GROWTH_LARDER,
             mothers.len(),
@@ -3439,9 +3505,6 @@ fn births(
     }
     let (mother, mother_t, mother_g, _, mother_p, spouse, _, mother_home) = &mothers[pick];
     let already_borne = borne.get(*mother).map_or(0, |m| m.borne);
-    if !rng.0.chance(fertility(already_borne)) {
-        return;
-    }
     let father = spouse.expect("filtered above").0;
     let Ok((_, _, father_g, _, father_p, ..)) = villagers.get(father) else {
         return;
@@ -3450,6 +3513,14 @@ fn births(
     commands.entity(*mother).insert(Motherhood {
         borne: already_borne + 1,
     });
+    // Her family's size is decided at the first child and kept - drawn here
+    // rather than at the wedding so that no marriage anywhere has to know about
+    // it, and a couple who never bear never needed one.
+    if wishes.get(*mother).is_err() {
+        commands.entity(*mother).insert(FamilyWish {
+            children: family_wished_for(&mut rng.0),
+        });
+    }
     // A birth is followed by a stretch of nursing before the next.
     commands.entity(*mother).insert(NewMother {
         until: clock.elapsed + crate::calendar::DAY_SECONDS as f64 * NURSING_DAYS,
@@ -4103,6 +4174,53 @@ mod tests {
         );
     }
 
+    /// The average family wants about four, which is the number Brett asked for.
+    ///
+    /// Sampled rather than reasoned about, because the weights are a table and a
+    /// table is easy to edit into a different mean without noticing. Realized
+    /// families come out slightly UNDER this - a widow bears no more, a hungry
+    /// village bears none, and the shelter cap stops everybody at once - which
+    /// is why the wish is aimed a little over four rather than exactly at it.
+    #[test]
+    fn the_average_family_wants_about_four() {
+        let mut rng = Rng::new(20_260_819);
+        let mut total = 0u64;
+        let rounds = 40_000;
+        let mut fewest = u32::MAX;
+        let mut most = 0;
+        for _ in 0..rounds {
+            let wished = super::family_wished_for(&mut rng);
+            total += wished as u64;
+            fewest = fewest.min(wished);
+            most = most.max(wished);
+        }
+        let mean = total as f64 / rounds as f64;
+        assert!(
+            (4.0..4.25).contains(&mean),
+            "families want {mean:.2} children, which is not the four asked for"
+        );
+        // And the spread is a spread: a village of identical families is not a
+        // village. Two is the smallest wish anybody has.
+        assert_eq!(fewest, 2);
+        assert!(most >= 7, "no large families are ever wished for");
+    }
+
+    /// A family that has what it wanted bears no more.
+    ///
+    /// The rule the whole change rests on: the CAP is the wish, and the taper is
+    /// only about who bears next. If `fertility` ever becomes a hard falloff
+    /// again it will be deciding family size in a place nobody looks.
+    #[test]
+    fn the_taper_spreads_births_and_does_not_cap_them() {
+        // Never zero, however many they have - it is a weighting, not a gate.
+        for borne in 0..12 {
+            assert!(super::fertility(borne) > 0.0);
+        }
+        // And it does favor the couple with fewer.
+        assert!(super::fertility(0) > super::fertility(3));
+        assert!(super::fertility(3) > super::fertility(6));
+    }
+
     #[test]
     fn children_grow_into_adults_with_rebuilt_bodies() {
         let mut app = App::new();
@@ -4185,13 +4303,28 @@ mod tests {
 
     #[test]
     fn a_large_family_stays_possible_but_unlikely() {
-        // Not a hard cap: the seventh child is a rarity, not an impossibility,
-        // so a remarkable family can still happen.
+        // THIS TEST USED TO PIN THE OLD MODEL - "the seventh child is a rarity"
+        // read off `fertility(6) < 0.15` - and that model did not work: the
+        // curve was rolled twenty times a day, so a third off the odds bought a
+        // few hours rather than fewer children. Family size is a WISH now, and
+        // rarity belongs to the wish, not to the taper.
+        let mut rng = Rng::new(4_242);
+        let mut large = 0;
+        let rounds = 10_000;
+        for _ in 0..rounds {
+            if super::family_wished_for(&mut rng) >= 7 {
+                large += 1;
+            }
+        }
+        let share = large as f64 / rounds as f64;
+        assert!(
+            (0.03..0.10).contains(&share),
+            "families of seven or more are {:.1}% of them, which is not a rarity",
+            share * 100.0
+        );
+        // And the taper still favors the couple with fewer, without capping.
+        assert!(fertility(1) > fertility(6));
         assert!(fertility(6) > 0.0);
-        assert!(fertility(6) < 0.15, "a seventh child should be rare");
-        // And the early ones come readily enough to grow a village.
-        assert!(fertility(1) > 0.5);
-        assert!(fertility(2) > 0.3);
     }
 
     #[test]

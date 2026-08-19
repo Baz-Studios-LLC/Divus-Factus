@@ -169,7 +169,14 @@ pub(crate) fn plot_the_family(
     // readable.
     let base = APART * (1u32 << up.max(1).min(6)) as f32 * 0.5;
     climb(&mut plot, subject, kin, 0.0, 0.0, base, up);
-    descend(&mut plot, subject, kin, 0.0, 0.0, down);
+    // Children hang from THE HEARTH - the middle of the marriage line - not from
+    // the subject's own card, for the same reason ancestors drop from theirs.
+    let hearth = if (kin.spouse_of)(subject).is_some() {
+        APART * 0.8
+    } else {
+        0.0
+    };
+    descend(&mut plot, subject, kin, hearth, 0.0, down);
 
     // Brothers and sisters: everybody the parents had who is not the subject.
     if let Some((mother, _)) = (kin.parents_of)(subject) {
@@ -204,15 +211,24 @@ fn climb(
     let above = y - A_GENERATION;
     for (parent, at) in [(father, x - spread * 0.5), (mother, x + spread * 0.5)] {
         plot.seat(parent, Kin::Ancestor, at, above);
-        plot.branch_down((at, above), (x, y));
         climb(plot, parent, kin, at, above, spread * 0.5, left - 1);
     }
-    // The line joining a couple, drawn once rather than per parent.
+    // The marriage line joining them...
     plot.branches.push(Branch {
         x: x - spread * 0.5,
         y: above,
         w: spread,
         h: 0.0,
+    });
+    // ...and ONE drop from the middle of it. A child comes from a COUPLE, and a
+    // line run from each parent separately says something else - or worse, a
+    // line from one of them says the child is theirs alone. Brett: "This is not
+    // the right way to show a child of two people."
+    plot.branches.push(Branch {
+        x,
+        y: above,
+        w: 0.0,
+        h: y - above,
     });
 }
 
@@ -350,11 +366,21 @@ mod tests {
             let square = run.w.abs() < f32::EPSILON || run.h.abs() < f32::EPSILON;
             assert!(square, "{run:?} is a block, not a branch");
         }
-        // Every VERTICAL run has to start or finish on somebody's x, or it is
-        // hanging in the middle of the tree.
+        // Every VERTICAL run has to meet somebody - either a person's own x, or
+        // the middle of a marriage, which is where a couple's children hang from.
         for run in plot.branches.iter().filter(|r| r.w.abs() < f32::EPSILON) {
-            let met = plot.seats.iter().any(|seat| (seat.x - run.x).abs() < 0.01);
-            assert!(met, "{run:?} runs down to nobody");
+            let on_a_person = plot.seats.iter().any(|seat| (seat.x - run.x).abs() < 0.01);
+            let between_a_couple = plot.seats.iter().any(|one| {
+                plot.seats.iter().any(|other| {
+                    (one.y - other.y).abs() < 0.01
+                        && one.x < other.x
+                        && (((one.x + other.x) * 0.5) - run.x).abs() < 0.01
+                })
+            });
+            assert!(
+                on_a_person || between_a_couple,
+                "{run:?} runs down to nobody"
+            );
         }
     }
 
@@ -464,6 +490,27 @@ pub(crate) fn draw_the_family(
 ) -> Entity {
     let (least_x, least_y, most_x, most_y) = plot.bounds();
     let place = |x: f32, y: f32| Vec2::new((x - least_x) * UNIT.x, (y - least_y) * UNIT.y);
+
+    // A VIEWPORT OF ITS OWN, and this was missing. The canvas is absolutely
+    // positioned, so hung straight off the well it ignores the flow and lands on
+    // top of whatever is above it - Brett's shot of the tab opening has a
+    // grandfather sitting across "THE BLOOD". A relative box below the header
+    // gives the tree somewhere to be, something to be CLIPPED by when it is
+    // dragged, and - the part the centering needed - a real visible rectangle to
+    // be centered in. The well itself is as tall as its contents, so centering
+    // in that put the tree at the top.
+    let viewport = commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                flex_grow: 1.0,
+                min_height: Val::Px(260.0),
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            ChildOf(parent),
+        ))
+        .id();
     let canvas = commands
         .spawn((
             FamilyCanvas,
@@ -485,7 +532,7 @@ pub(crate) fn draw_the_family(
                 height: Val::Px((most_y - least_y) * UNIT.y + CARD.y),
                 ..default()
             },
-            ChildOf(parent),
+            ChildOf(viewport),
         ))
         .id();
 
