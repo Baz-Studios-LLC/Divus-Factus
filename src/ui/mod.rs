@@ -2400,6 +2400,27 @@ pub fn tab_bar(commands: &mut Commands, parent: Entity, labels: &[&str]) -> Vec<
     // gap between them - and it must be DRAWN OVER it, because the page is a
     // later sibling and would otherwise paint its own top border straight back
     // over the tab's opening. Geometry and paint order both.
+    // A FOLDER OF ITS OWN, and this was the half I left out. Brett: "Settings
+    // page tab has th same connection problem."
+    //
+    // The -1 margin and the z-index are both necessary and neither is enough: the
+    // bar and the pages are siblings, and their PARENT carries a `row_gap` - ten
+    // pixels on the settings frame - so the tab's opening sat ten pixels above
+    // the line it opens and clawed back one. The same mistake, in the same shape,
+    // as the profile window a few hours ago, which is what a shared widget is
+    // supposed to prevent rather than repeat.
+    let folder = commands
+        .spawn((
+            Node {
+                width: percent(100),
+                flex_grow: 1.0,
+                min_height: px(0),
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            ChildOf(parent),
+        ))
+        .id();
     let bar = commands
         .spawn((
             Node {
@@ -2410,7 +2431,7 @@ pub fn tab_bar(commands: &mut Commands, parent: Entity, labels: &[&str]) -> Vec<
                 ..default()
             },
             ZIndex(1),
-            ChildOf(parent),
+            ChildOf(folder),
         ))
         .id();
     let mut pages = Vec::with_capacity(labels.len());
@@ -2443,7 +2464,7 @@ pub fn tab_bar(commands: &mut Commands, parent: Entity, labels: &[&str]) -> Vec<
                 },
                 BackgroundColor(theme::card_bg()),
                 BorderColor::all(theme::card_border()),
-                ChildOf(parent),
+                ChildOf(folder),
             ))
             .id();
         let button = commands

@@ -519,6 +519,35 @@ const TEETH_REMEMBERED: f64 = 90.0;
 /// The run home. Whoever has teeth behind them makes for the square,
 /// where the fire and the other people are, and does not stop to be
 /// given a job on the way.
+/// How far from the square the woods let a lone villager alone.
+///
+/// A SAFE RADIUS THAT STARTS WIDE AND TIGHTENS. Brett, twice: "we're supposed to
+/// ensure the first town has a safety radius so no hostile mob should be
+/// spawning", then, after a guard was finally being posted, "people still dying
+/// to wolves in the beggining."
+///
+/// A standing guard was necessary and is nowhere near sufficient: a guard sees
+/// twenty-six strides and the working ring reaches a hundred and seventy, so the
+/// gatherer at its far edge is alone by the wolf's own definition and always
+/// will be. Ten founders cannot both feed themselves and escort each other.
+///
+/// So the first fortnight is grace. It opens at a hundred and eighty - past the
+/// whole working ring, which is what makes it a promise rather than a discount -
+/// and eases to the ordinary sixty by the fifteenth day, by which time there are
+/// hands enough for spears and the village has something to defend.
+///
+/// It is measured on the CALENDAR rather than on population, deliberately: a
+/// village that loses people stays fragile, and a rule keyed to headcount would
+/// hand the most grace to the villages already dying, which is a difficulty
+/// curve running backwards.
+fn safe_from_teeth(day: u32) -> f32 {
+    const GRACE: f32 = 14.0;
+    const AT_FIRST: f32 = 180.0;
+    const AFTERWARD: f32 = 60.0;
+    let eased = (day.saturating_sub(1) as f32 / GRACE).clamp(0.0, 1.0);
+    AT_FIRST - (AT_FIRST - AFTERWARD) * eased
+}
+
 pub(super) fn flee_to_safety(
     mut commands: Commands,
     clock: Res<crate::calendar::WorldClock>,
@@ -636,7 +665,7 @@ pub(super) fn wolves_stalk(
             .filter(|(who, spot, is_guard)| {
                 !is_guard
                     && spot.distance(at) < 42.0
-                    && spot.distance(site.center) > 60.0
+                    && spot.distance(site.center) > safe_from_teeth(clock.day())
                     && posts.iter().all(|post| post.distance(*spot) > 55.0)
                     && !folk
                         .iter()
@@ -950,6 +979,31 @@ mod biome_tests {
 
 #[cfg(test)]
 mod tests {
+    /// The first fortnight is grace, and it ends.
+    ///
+    /// Ten founders cannot feed themselves AND escort each other: the working
+    /// ring reaches a hundred and seventy and a guard sees twenty-six, so the
+    /// gatherer at its edge is alone by the wolf's own definition. A young
+    /// village gets the whole ring; a settled one gets sixty, and the same wolves
+    /// as ever.
+    #[test]
+    fn a_young_village_is_left_alone_and_a_grown_one_is_not() {
+        use super::safe_from_teeth;
+        // Day one: past the working ring, so nobody at work can be marked.
+        assert!(
+            safe_from_teeth(1) > crate::villager::work::WORK_REACH,
+            "the first day must cover the whole working ring"
+        );
+        // It tightens, and it settles.
+        assert!(safe_from_teeth(1) > safe_from_teeth(7));
+        assert!(safe_from_teeth(7) > safe_from_teeth(14));
+        assert_eq!(safe_from_teeth(15), 60.0);
+        assert_eq!(safe_from_teeth(400), 60.0, "grace does not come back");
+        // And the ordinary radius still leaves the square itself safe.
+        assert!(safe_from_teeth(999) >= 60.0);
+    }
+
+
     use super::*;
 
     #[test]
