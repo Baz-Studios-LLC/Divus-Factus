@@ -288,6 +288,9 @@ impl Vault {
         if known > 0 {
             return Ok(false);
         }
+        if already_thought(&db, line)? {
+            return Ok(false);
+        }
         db.execute(
             "INSERT INTO line (id, t, w, once, tag_count, slots) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             rusqlite::params![
@@ -412,6 +415,104 @@ impl Vault {
     }
 }
 
+/// How much of two lines has to be the same words before they are the same
+/// line wearing a different coat.
+///
+/// Measured against the corpus rather than guessed. At six tenths, the wolf's
+/// six ways of saying "keep out of the woods" collapse to one, while two lines
+/// that share an opening and then say DIFFERENT things - "A wolf attacked
+/// someone from the village" followed by "keep watch near the woods" against
+/// "I will look for its tracks" - come out at about four tenths and both live.
+/// The join is where the thought is, not the setup.
+const THE_SAME_THOUGHT: f32 = 0.6;
+
+/// Whether the vault already holds this thought in other words.
+///
+/// THE POINT OF THE WHOLE VAULT IS A MILLION LINES THAT ARE A MILLION LINES.
+/// Twenty-eight percent of the first six hundred had a near-twin in the same
+/// register - "keep away from the woods", "keep clear of the woods for now",
+/// "stay clear of the woods for now", "I'll stay out of the woods for now" -
+/// which is fifty thoughts in a thousand costumes, and no amount of generating
+/// fixes it because each call is blind to the last.
+///
+/// Compared only against lines sharing this one's RAREST tag. That is the whole
+/// scaling story: the rarest tag is the smallest set that must contain any true
+/// duplicate, since a duplicate wears the same tags. A line tagged `event:mauled
+/// trade:forester` is checked against the foresters, not against the corpus.
+fn already_thought(db: &Connection, line: &Line) -> rusqlite::Result<bool> {
+    let mine = words_of(&line.t);
+    if mine.is_empty() {
+        return Ok(false);
+    }
+    let Some(anchor) = rarest_tag(db, &line.tags)? else {
+        return Ok(false);
+    };
+    let mut ask = db.prepare_cached(
+        "SELECT l.t FROM line l JOIN line_tag t ON t.line = l.id WHERE t.tag = ?1",
+    )?;
+    let mut said = ask.query_map([anchor], |row| row.get::<_, String>(0))?;
+    Ok(said.any(|other| {
+        other
+            .map(|other| overlap(&mine, &words_of(&other)) >= THE_SAME_THOUGHT)
+            .unwrap_or(false)
+    }))
+}
+
+/// The tag of this line's that the fewest other lines wear.
+///
+/// A free function over the connection, like everything else that runs while
+/// the lock is held. See [`Vault::held`].
+fn rarest_tag(db: &Connection, tags: &[String]) -> rusqlite::Result<Option<String>> {
+    if tags.is_empty() {
+        return Ok(None);
+    }
+    let holes = (1..=tags.len())
+        .map(|i| format!("?{i}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    // A tag no line wears yet cannot have a duplicate under it, so it wins by
+    // being absent - which is why the count comes from a LEFT JOIN against the
+    // asked-for tags rather than from `line_tag` alone.
+    let mut ask = db.prepare_cached(&format!(
+        "SELECT t.tag, COUNT(t.line) FROM line_tag t WHERE t.tag IN ({holes})
+         GROUP BY t.tag ORDER BY COUNT(t.line) ASC LIMIT 1"
+    ))?;
+    let mut found = ask.query_map(params_from_iter(tags.iter()), |row| {
+        row.get::<_, String>(0)
+    })?;
+    match found.next() {
+        Some(tag) => Ok(Some(tag?)),
+        // Every tag is new, so nothing in the vault shares one.
+        None => Ok(None),
+    }
+}
+
+/// A line's words, lowered and stripped of everything else, without repeats.
+fn words_of(line: &str) -> Vec<String> {
+    let mut words: Vec<String> = line
+        .split_whitespace()
+        .map(|word| {
+            word.chars()
+                .filter(|c| c.is_alphanumeric() || *c == '{' || *c == '}')
+                .collect::<String>()
+                .to_ascii_lowercase()
+        })
+        .filter(|word| !word.is_empty())
+        .collect();
+    words.sort_unstable();
+    words.dedup();
+    words
+}
+
+/// How much two word-sets share, over everything either of them holds.
+fn overlap(a: &[String], b: &[String]) -> f32 {
+    if a.is_empty() || b.is_empty() {
+        return 0.0;
+    }
+    let shared = a.iter().filter(|word| b.contains(word)).count();
+    shared as f32 / (a.len() + b.len() - shared) as f32
+}
+
 /// Every tag one line carries, on a connection already in hand.
 ///
 /// A free function rather than a method BY DESIGN: it is called from inside
@@ -449,6 +550,50 @@ mod tests {
             std::process::id()
         ));
         Vault::bake(&at, lines).expect("bake")
+    }
+
+    /// The same thought in a different coat is not a new line.
+    ///
+    /// The rule the corpus most needed: a million lines are only worth having
+    /// if they are a million lines. Pins both directions - a reworded twin is
+    /// turned away, and a line that shares an opening but ends somewhere else
+    /// is kept, because the ending is where the thought is.
+    #[test]
+    fn a_reworded_twin_is_not_a_new_line() {
+        let vault = vault_of(&[line(
+            "A wolf attacked someone from the village. Keep clear of the woods for now.",
+            &["event:mauled", "tell"],
+        )]);
+        let twin = line(
+            "A wolf attacked someone from the village. Keep clear of the woods for a while.",
+            &["event:mauled", "tell"],
+        );
+        assert!(!vault.remember(&twin).unwrap(), "a rewording got in");
+        assert_eq!(vault.len(), 1);
+
+        // Same setup, different thought: the hunter is not saying what the
+        // others said.
+        let other = line(
+            "A wolf attacked someone from the village. I will look for its tracks.",
+            &["event:mauled", "tell"],
+        );
+        assert!(
+            vault.remember(&other).unwrap(),
+            "a line that ends somewhere new was turned away"
+        );
+        assert_eq!(vault.len(), 2);
+    }
+
+    /// Curly and straight punctuation are the same sentence.
+    #[test]
+    fn a_curly_apostrophe_is_not_a_second_line() {
+        let straight = "I saw {whom}'s child born safely.";
+        let curly = "I saw {whom}\u{2019}s child born safely.";
+        assert_eq!(
+            crate::sermo::tidy(curly),
+            crate::sermo::tidy(straight),
+            "the vault was keeping two of these"
+        );
     }
 
     /// EVERY tag must hold, not merely one of them. This is the whole

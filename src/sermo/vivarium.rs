@@ -469,18 +469,21 @@ impl Vivarium {
         slots: &[(&str, &str)],
         heard: Option<&str>,
         facts: SocialTruth,
+        written_before: &[String],
     ) -> Option<String> {
         self.drain();
         let mut moment = Moment::new(speaker, tags, slots, heard, facts);
         let key = moment.key();
-        // What this shape of moment has already been given. Capped: a hundred
-        // is plenty to steer away from and far short of anything the context
-        // would notice.
-        moment.already_said = self
-            .said_before
-            .get(&key)
-            .map(|said| said.iter().rev().take(100).cloned().collect())
-            .unwrap_or_default();
+        // What this shape of moment has already been given - FROM THE VAULT
+        // FIRST, which is the memory that survives a restart. This map is only
+        // what THIS session wrote, and on its own it meant every launch began
+        // by telling the model nothing had ever been written and then paying it
+        // to write those lines again.
+        //
+        // Capped at a hundred: plenty to steer away from, far short of anything
+        // the context window would notice, and the newest of the session's own
+        // lines get the seats the vault leaves free.
+        moment.already_said = what_has_been_said(written_before, self.said_before.get(&key));
         if let Some(candidate) = self.cache.remove(&key) {
             // Asked again straight away, so the next moment of this shape has
             // a fresh line waiting rather than starting from silence.
@@ -846,6 +849,11 @@ fn validate(moment: &Moment, mut candidate: Candidate) -> std::result::Result<Ca
     if moment.register == "muse" && is_third_person_thought(&lower, moment) {
         return Err("thought was written as third-person narration".to_string());
     }
+    if let Some(said) = guesses_a_gender(&tidy) {
+        return Err(format!(
+            "candidate called the person in a slot \"{said}\" - a slot may be anybody"
+        ));
+    }
     if let Some(leftover) = uses_private_name(&lower, moment) {
         return Err(format!(
             "candidate named {leftover}, which has no slot to stand in for it"
@@ -864,6 +872,59 @@ fn validate(moment: &Moment, mut candidate: Candidate) -> std::result::Result<Ca
     }
     candidate.text = tidy;
     Ok(candidate)
+}
+
+/// How many already-written lines the model is shown.
+///
+/// Plenty to steer away from, and far short of anything the context window
+/// would notice.
+const ENOUGH_TO_STEER_BY: usize = 100;
+
+/// Everything already written for a moment of this shape: the vault first,
+/// then whatever this session has added that the vault has not answered with.
+///
+/// Its own function because the ORDER is the whole point and it is easy to get
+/// backwards. The vault is the durable memory and goes in first; the session's
+/// map is a cache in front of it and only fills seats the vault left free.
+fn what_has_been_said(written_before: &[String], this_session: Option<&Vec<String>>) -> Vec<String> {
+    let mut said: Vec<String> = written_before
+        .iter()
+        .take(ENOUGH_TO_STEER_BY)
+        .cloned()
+        .collect();
+    // Newest first, so a short list carries the freshest of the session.
+    for line in this_session.into_iter().flatten().rev() {
+        if said.len() >= ENOUGH_TO_STEER_BY {
+            break;
+        }
+        if !said.contains(line) {
+            said.push(line.clone());
+        }
+    }
+    said
+}
+
+/// A gendered word in a line that also carries a person-shaped slot.
+///
+/// "I heard {whom} was attacked by a wolf. I hope she pulls through." reached
+/// the vault, and {whom} is whoever the moment puts there - so half the time
+/// that line is about a man and says "she". It is the same fault as inventing a
+/// goblin: a fact asserted that nobody checked, and this one asserts it about a
+/// real person the player knows. See [[divus-factus-nobody-makes-things-up]].
+///
+/// Only lines with a slot in them are judged. A line that says "she" about
+/// somebody the line itself named is fine, and lines with no person in them at
+/// all - "his own fault", a fisher speaking of himself - are not this rule's
+/// business, because a speaker's own pronoun IS known.
+fn guesses_a_gender(tidy: &str) -> Option<&'static str> {
+    const PERSON_SLOTS: [&str; 3] = ["{whom}", "{name}", "{spouse}"];
+    if !PERSON_SLOTS.iter().any(|slot| tidy.contains(slot)) {
+        return None;
+    }
+    let lower = tidy.to_ascii_lowercase();
+    ["she", "he", "her", "him", "his", "hers"]
+        .into_iter()
+        .find(|word| says_the_word(&lower, word))
 }
 
 /// Whether the line says this word, as a word rather than as a fragment of
@@ -1049,6 +1110,48 @@ fn load_key() -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    /// The model is told what the VAULT holds, not merely what this session
+    /// wrote.
+    ///
+    /// The bug this pins is invisible and expensive: the factory's note of what
+    /// it had written died with the process, so every launch told the model
+    /// nothing existed and paid it to write the same lines again. A quarter of
+    /// the first six hundred lines had a near-twin.
+    #[test]
+    fn the_vault_is_what_the_model_is_steered_by() {
+        use super::what_has_been_said;
+        let vault: Vec<String> = vec!["Keep clear of the woods.".into()];
+        let session: Vec<String> = vec![
+            "Keep clear of the woods.".into(),
+            "I will look for its tracks.".into(),
+        ];
+
+        let said = what_has_been_said(&vault, Some(&session));
+        assert_eq!(
+            said.len(),
+            2,
+            "the line in both places was counted twice: {said:?}"
+        );
+        assert_eq!(said[0], "Keep clear of the woods.", "the vault comes first");
+        assert!(said.contains(&"I will look for its tracks.".to_string()));
+
+        // With no vault and no session there is simply nothing to steer by,
+        // which is the first run and must not panic or invent.
+        assert!(what_has_been_said(&[], None).is_empty());
+    }
+
+    /// A vault deep enough to fill the list leaves no room for the session,
+    /// and never overruns the cap.
+    #[test]
+    fn the_list_stays_within_what_a_prompt_can_carry() {
+        use super::{ENOUGH_TO_STEER_BY, what_has_been_said};
+        let deep: Vec<String> = (0..500).map(|n| format!("line {n}")).collect();
+        let session: Vec<String> = vec!["from this session".into()];
+        let said = what_has_been_said(&deep, Some(&session));
+        assert_eq!(said.len(), ENOUGH_TO_STEER_BY);
+        assert!(!said.contains(&"from this session".to_string()));
+    }
+
     use super::*;
 
     #[test]
@@ -1187,6 +1290,7 @@ mod slots {
             world_facts: Vec::new(),
             facts: SocialTruth::default(),
             heard: None,
+            already_said: Vec::new(),
         }
     }
 
@@ -1255,6 +1359,7 @@ mod names_and_places {
             world_facts: Vec::new(),
             facts: SocialTruth::default(),
             heard: None,
+            already_said: Vec::new(),
         };
         moment.facts.settlement_name = Some("Shutel".to_string());
         moment.facts.speaker_name = Some("Prorae".to_string());

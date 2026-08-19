@@ -73,6 +73,7 @@ pub mod vivarium {
             _slots: &[(&str, &str)],
             _heard: Option<&str>,
             _facts: SocialTruth,
+            _written_before: &[String],
         ) -> Option<String> {
             None
         }
@@ -561,9 +562,13 @@ impl Tongue {
             // something that was not there before.
             Voice::Generated => {
                 let facts = self.what_is_true_of(speaker);
+                // WHAT HAS ALREADY BEEN WRITTEN FOR THIS MOMENT, off disk.
+                // Taken before the factory is borrowed, because both live on
+                // this struct.
+                let written = self.written_before(tags, slots, must);
                 self.living
                     .as_mut()
-                    .and_then(|v| v.ask_afresh_of(speaker, tags, slots, None, facts))
+                    .and_then(|v| v.ask_afresh_of(speaker, tags, slots, None, facts, &written))
             }
             // THE VAULT ANSWERS OR NOBODY DOES. No falling back to the
             // written corpus, on purpose: an empty vault that quietly spoke
@@ -574,6 +579,37 @@ impl Tongue {
             // that stay quiet are precisely the ones still to generate.
             Voice::Vault => self.from_the_vault(speaker, tags, slots, must),
         }
+    }
+
+    /// Every line the vault ALREADY holds for a moment of this shape.
+    ///
+    /// The factory kept its own note of what it had written and lost it every
+    /// time the game closed - so each session ChatGPT set about rewriting lines
+    /// it had written weeks ago, was told none of it, and produced them again.
+    /// A quarter of the first six hundred lines had a near-twin, and this is
+    /// half of why: not that the model repeats itself within a call, but that
+    /// nothing carried across calls.
+    ///
+    /// The vault is the durable memory - every accepted line goes into it the
+    /// moment it arrives - so it is the honest answer to "what has already been
+    /// said here", and it survives a restart. Asked with the same eligibility
+    /// the game itself uses, so what comes back is exactly the set that would
+    /// answer this moment.
+    ///
+    /// This is the cheaper half of the anti-duplicate work, and by a distance:
+    /// the gate at the vault door THROWS AWAY a line that has already been paid
+    /// for, while this stops it being written.
+    fn written_before(
+        &self,
+        tags: &[&str],
+        slots: &[(&str, &str)],
+        must: &[&str],
+    ) -> Vec<String> {
+        self.vault
+            .as_ref()
+            .and_then(|vault| vault.eligible(tags, must, slots).ok())
+            .map(|found| found.into_iter().map(|line| line.t).collect())
+            .unwrap_or_default()
     }
 
     /// EVERYTHING THE WORLD KNOWS about the person about to speak.
@@ -1156,7 +1192,22 @@ pub fn speaks_only_of(line: &str, known: &[&str]) -> bool {
 /// repaired at presentation while new lines are written properly in
 /// the JSON.
 pub fn tidy(line: &str) -> String {
-    let trimmed = line.trim().trim_matches('"').trim();
+    // ONE APOSTROPHE, ONE QUOTE. A model writes curly punctuation about half
+    // the time, and the vault keys lines by hashing their words - so "{whom}'s
+    // child born safely" and "{whom}\u{2019}s child born safely" are two lines
+    // to the database and one line to a reader. The corpus was carrying pairs
+    // of them. Straight, because that is what the authored corpus is written
+    // in and what the font sets identically anyway.
+    let straightened: String = line
+        .chars()
+        .map(|ch| match ch {
+            '\u{2018}' | '\u{2019}' | '\u{02bc}' => '\'',
+            '\u{201c}' | '\u{201d}' => '"',
+            '\u{2013}' | '\u{2014}' => '-',
+            other => other,
+        })
+        .collect();
+    let trimmed = straightened.trim().trim_matches('"').trim();
     let mut out = String::with_capacity(trimmed.len() + 1);
     let mut at_sentence_start = true;
     for ch in trimmed.chars() {
