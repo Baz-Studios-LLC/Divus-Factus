@@ -1025,6 +1025,10 @@ pub(super) fn do_work(
         Query<&Children>,
         Query<Entity, With<WoodLoad>>,
         Query<&Building>,
+        // APPENDED, and it has to be: everything below reads this tuple by
+        // INDEX, so inserting anywhere but the end silently renumbers every
+        // `context.3` in the file and still compiles.
+        Query<&crate::villager::study::Studies>,
     ),
     trades: (
         Query<&CarryingStone>,
@@ -1101,7 +1105,7 @@ pub(super) fn do_work(
             *alive_by_town.entry(member.0).or_default() += 1;
         }
     }
-    let (ref carrying, ref children, ref loads, ref _buildings) = context;
+    let (ref carrying, ref children, ref loads, ref _buildings, ref _learning) = context;
     let (carrying, children, loads) = (carrying, children, loads);
     let (
         carrying_stone,
@@ -1146,6 +1150,15 @@ pub(super) fn do_work(
         let center = ground.center;
         let woodpile = ground.woodpile;
         let workers_alive = alive_by_town.get(&town).copied().unwrap_or(0);
+        // WHAT THE TOWN HAS WORKED OUT, resolved once for this worker's whole
+        // turn. Every field of it is added at exactly one place below - see
+        // `study::Gift`, which is what keeps a tree of hundreds of nodes from
+        // costing hundreds of hooks.
+        let boons = context
+            .4
+            .get(town)
+            .map(|studies| studies.boons())
+            .unwrap_or_default();
 
         // Shifts end: at day's end, or when hunger calls. The food trades
         // do not down tools for hunger — their meal is at the worksite —
@@ -1911,7 +1924,7 @@ pub(super) fn do_work(
                     commands.entity(entity).remove::<Job>();
                     continue;
                 };
-                let mut picked = source.amount.min(A_BASKET + skill);
+                let mut picked = source.amount.min(A_BASKET + skill + boons.basket);
                 source.amount -= picked;
                 // What went into the gatherer does not also reach the sacks.
                 if ate_at_work {
@@ -1944,7 +1957,7 @@ pub(super) fn do_work(
 
             Vocation::Miner | Vocation::Builder => match job.focus {
                 // Bare high ground still yields loose stone.
-                None => store.stone += LOOSE_STONE + skill * 1.5,
+                None => store.stone += LOOSE_STONE + skill * 1.5 + boons.stone_per_trip,
                 // The mine: a drift into standing rock gives up stone by
                 // the cartload, and never runs out the way a boulder does.
                 Some(works)
@@ -1970,7 +1983,7 @@ pub(super) fn do_work(
                         // home. What it does not do is run out after four
                         // blows, which is the whole reason it exists.
                         crate::matter::DepositKind::Stone => {
-                            store.stone += LOOSE_STONE + skill * 1.5
+                            store.stone += LOOSE_STONE + skill * 1.5 + boons.stone_per_trip
                         }
                     }
                     if deposit.amount <= 0.5 {
@@ -1990,7 +2003,7 @@ pub(super) fn do_work(
                         commands.entity(entity).remove::<Job>();
                         continue;
                     };
-                    store.stone += LOOSE_STONE + skill * 1.5;
+                    store.stone += LOOSE_STONE + skill * 1.5 + boons.stone_per_trip;
                     // An outcrop gives up its stone slowly - the pick takes
                     // the same bite from a much bigger body - then chips
                     // away like any boulder once it is down to one.
@@ -2073,7 +2086,8 @@ pub(super) fn do_work(
                         3.0
                     } else {
                         2.0
-                    } + skill;
+                    } + skill
+                        + boons.timber_per_tree;
                     // And the near end of it. See `haul_wood`.
                     info!("a tree came down: {yield_:.0} timber shouldered");
                     commands
@@ -2169,7 +2183,7 @@ pub(super) fn do_work(
                                 12.0
                             } else {
                                 8.0
-                            },
+                            } + boons.harvest_per_field,
                         );
                         field.growth = 0.08;
                         // The yield is an act of the world too: those who
@@ -2228,6 +2242,10 @@ pub(super) fn do_work(
 
             // The priest stands the watch; the sermons system does the telling.
             Vocation::Priest => {}
+            // Study is not a job that finishes. `study::the_scholars_study`
+            // advances the town's current question out of everyone sitting in
+            // the library; standing at the post IS the work.
+            Vocation::Scholar => {}
             // Explorers never take ordinary jobs.
             Vocation::Explorer => {}
 
@@ -2707,7 +2725,7 @@ mod tests {
         // asserted at the price, and a soul below it.
         let just_enough = CivicNeeds {
             population: 14,
-            ..grown
+            ..grown.clone()
         };
         assert_eq!(
             next_civic(&just_enough, |k| built.contains(&k)),
@@ -2715,11 +2733,20 @@ mod tests {
         );
 
         // Thirteen does not.
+        //
+        // Asked of the HALL rather than of the whole ladder, which is what this
+        // has always been about: `assert_eq!(None)` also asserted that a town of
+        // thirteen wants nothing whatsoever, and that made every future building
+        // with a lower floor - the library, at twelve - a failure of this test
+        // rather than of anything it was written to protect.
         let hamlet = CivicNeeds {
             population: 13,
-            ..grown
+            ..grown.clone()
         };
-        assert_eq!(next_civic(&hamlet, |k| built.contains(&k)), None);
+        assert_ne!(
+            next_civic(&hamlet, |k| built.contains(&k)),
+            Some(BuildingKind::TownHall),
+        );
 
         // AND IT BEATS THE SHED. Brett's own village: fourteen souls, 245
         // timber, 27 stone, 83 food - and every ordinary want scoring

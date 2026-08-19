@@ -91,6 +91,9 @@ pub enum BuildingKind {
     /// Consecrated ground, a wall around it, and a gate. Where the village
     /// puts its dead once it has enough of them to want somewhere proper.
     Cemetery,
+    /// Shelves, a table and somewhere dry to keep what the town has worked out.
+    /// Where the scholars sit - see [`crate::villager::study`].
+    Library,
 }
 
 /// The last of the frame, which no god may lay.
@@ -155,6 +158,10 @@ impl BuildingKind {
             // A wall and a gate: cheap in timber, and the stone below is what
             // it is really made of.
             BuildingKind::Cemetery => 6.0,
+            // Shelves, and a great deal of them. A library is joinery more than
+            // it is masonry, and it is the most a town will have committed to
+            // that nobody eats or sleeps in.
+            BuildingKind::Library => 12.0,
         }
     }
 
@@ -183,6 +190,9 @@ impl BuildingKind {
             BuildingKind::Mine => 0.0,
             BuildingKind::Armory => 8.0,
             BuildingKind::Cemetery => 10.0,
+            // A dry floor is the whole point: books on damp ground are books
+            // for one winter.
+            BuildingKind::Library => 6.0,
         }
     }
 
@@ -241,7 +251,7 @@ impl BuildingKind {
         &[
             House, Longhouse, Sawmill, Blacksmith, Tavern, TownHall, Storehouse, Granary, Well,
             Smokehouse, Mill, Bakery, Weaver, Herbalist, Watchtower, Shrine, Dock, Mine, Armory,
-            Cemetery,
+            Cemetery, Library,
         ]
     }
 
@@ -264,6 +274,7 @@ impl BuildingKind {
             BuildingKind::Watchtower => "The watchtower",
             BuildingKind::Armory => "The armory",
             BuildingKind::Cemetery => "The cemetery",
+            BuildingKind::Library => "The library",
             BuildingKind::Shrine => "The shrine",
             BuildingKind::Dock => "The dock",
             BuildingKind::Mine => "The mine",
@@ -276,7 +287,7 @@ impl BuildingKind {
 /// A pure priority ladder, so the village's growth arc is legible: industry,
 /// then tools, then an evening hearth, then civic pride.
 /// Everything the civic chooser weighs, gathered from the living village.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct CivicNeeds {
     pub population: usize,
     pub stone: f32,
@@ -315,6 +326,15 @@ pub struct CivicNeeds {
     /// without it, which is how a material scarce by place reaches the
     /// planner without ever becoming a stall.
     pub clay: f32,
+    /// WHAT THE TOWN KNOWS.
+    ///
+    /// Carried whole rather than reduced to a flag, because the ladder asks it
+    /// two different questions: whether a kind is permitted at all, and how much
+    /// there is left to learn - which is what a library is wanted FOR. A
+    /// defaulted `Studies` knows nothing, so a town with no library is a town
+    /// that may not yet want the late ambitions. See
+    /// [`crate::villager::study`].
+    pub studies: crate::villager::study::Studies,
 }
 
 /// A trade and the works it will raise for ITSELF when the village has
@@ -333,6 +353,11 @@ pub const OWN_WORKS: &[(Vocation, BuildingKind, bool)] = &[
     (Vocation::Miner, BuildingKind::Mine, true),
     (Vocation::Forester, BuildingKind::Sawmill, false),
     (Vocation::Healer, BuildingKind::Herbalist, false),
+    // A scholar with nowhere to read raises the reading room, exactly as the
+    // priest raises the shrine. `at_once` is false: a library is the least
+    // urgent building in the world, and a town that downs baskets to shelve
+    // books deserves what happens next.
+    (Vocation::Scholar, BuildingKind::Library, false),
 ];
 
 /// Chooses the next civic building by NEED, not by a fixed ladder: each
@@ -346,11 +371,11 @@ pub const OWN_WORKS: &[(Vocation, BuildingKind, bool)] = &[
 /// The armory shipped in v0.3.38 scoring beautifully off peril and unable to
 /// be chosen, for exactly that reason, and nothing said so. The two roofs are
 /// deliberately absent: `plan_houses` raises those by need.
-pub const CIVIC_LADDER: [BuildingKind; 18] = {
+pub const CIVIC_LADDER: [BuildingKind; 19] = {
     use BuildingKind::*;
     [
         Well, Dock, Mine, Storehouse, Sawmill, Blacksmith, Smokehouse, Granary, Tavern, Mill,
-        Bakery, Weaver, Herbalist, Shrine, Watchtower, TownHall, Armory, Cemetery,
+        Bakery, Weaver, Herbalist, Shrine, Watchtower, TownHall, Armory, Cemetery, Library,
     ]
 };
 
@@ -388,6 +413,10 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
         // Any village that has buried somebody is old enough to want a place
         // to have done it.
         Cemetery => 6,
+        // A town, not a hamlet. Somebody has to be spared from the fields for a
+        // whole day at a time before reading is anything but a luxury - and the
+        // things a library unlocks are all late ambitions anyway.
+        Library => 12,
         // Shelter is not civic ambition: both roofs are planned by need in
         // `plan_houses`, never by this ladder.
         House | Longhouse => 0,
@@ -429,6 +458,13 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
             || needs.population < min_pop(kind)
             || needs.stone < kind.stone_cost()
             || needs.clay < kind.clay_cost()
+            // AND NOT YET WORKED OUT. A kind behind a topic nobody has read is
+            // not a candidate - which is the same shape as being priced out, and
+            // for the same reason: a want that cannot be met but keeps being
+            // chosen is a planner that never reaches the rest of its ladder.
+            // Only the LATE ambitions sit behind a book; the survival rungs are
+            // permitted to everybody. See `Studies::permits`.
+            || !needs.studies.permits(kind)
         {
             continue;
         }
@@ -538,6 +574,27 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
             // and three is the whole question, and between twenty and thirty
             // is nothing at all.
             Cemetery => (needs.graves as f32 / 3.0).min(2.4),
+            // THE WANT IS THE IGNORANCE. A town with everything still to work
+            // out wants a reading room badly; a town that has read all there is
+            // has no use for another one, and the want falls away on its own -
+            // the same shape as the storehouse's shortfall, which is the only
+            // honest way to write a want that can be satisfied.
+            // A FLAT WANT, and deliberately not scaled by how much there is
+            // left to learn.
+            //
+            // The tree is authored DATA and is meant to grow to hundreds of
+            // nodes - so a want proportional to what is unread would have the
+            // library outshouting the granary purely because somebody added
+            // rows, and every town in the world would build one first. What
+            // matters is whether the town has somewhere to read AT ALL. Pitched
+            // just over the threshold: a real shortfall always outranks it.
+            Library => {
+                if needs.studies.known.len() < crate::villager::study::THE_TREE.len() {
+                    0.7
+                } else {
+                    0.0
+                }
+            }
             // Measured from FOUR BELOW its own minimum, so the number
             // that says when a town has earned a hall is the number that
             // gives it one: a town standing exactly at the threshold
@@ -1087,6 +1144,23 @@ impl Blueprint {
             // Low walls around consecrated ground rather than a building -
             // wide, barely knee high, and open to the sky. The graves that
             // stand inside it are their own architecture.
+            // Tall and narrow, with the walls carrying the shelves: a reading
+            // room is a room you stand up in, and the height is what tells it
+            // apart from the sheds it will stand among.
+            BuildingKind::Library => Blueprint {
+                kind,
+                plan,
+                drawing: drawing.clone(),
+                // Set below, once for every kind.
+                mirrored: false,
+                half_w: 2.6,
+                half_d: 3.6,
+                wall_h: 2.3,
+                walls: pal::shade(&pal::STONE, 0.52),
+                roof: pal::shade(&pal::WOOD, 0.3),
+                shed_roof: false,
+                stuff: BuildStuff::Stone,
+            },
             BuildingKind::Cemetery => Blueprint {
                 kind,
                 plan,
@@ -3310,6 +3384,10 @@ pub(crate) fn plan_houses(
     mut turn: Local<usize>,
     mut rng: ResMut<SimRng>,
     mut stores: Query<&mut Stockpile>,
+    // What the town has worked out, which decides which of its later ambitions
+    // it is allowed to hold at all. A town with no `Studies` yet - the frame
+    // before `every_town_keeps_its_learning` reaches it - is simply ignorant.
+    learning: Query<&crate::villager::study::Studies>,
     mut notices: MessageWriter<crate::ui::Notice>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -3576,6 +3654,7 @@ pub(crate) fn plan_houses(
             miners,
             rock_near,
             clay: store_now.clay,
+            studies: learning.get(site.settlement).cloned().unwrap_or_default(),
         };
         next_civic(&needs, has_kind)
     };
@@ -3625,6 +3704,19 @@ pub(crate) fn plan_houses(
                     hands_at(*trade) > 0
                         && !has_kind(*works)
                         && store_now.timber >= 2.0
+                        // A TRADE MAY NOT BUILD WHAT THE TOWN HAS NOT WORKED OUT.
+                        //
+                        // This branch jumps the ladder, so without the same
+                        // permission the ladder honors, a research gate on any
+                        // OWN_WORKS kind would be a no-op - the healer would
+                        // raise the herbalist's hut on the founding morning and
+                        // `physick` would unlock a thing that already existed.
+                        // Harmless for the rest: nothing else here sits behind a
+                        // book.
+                        && learning
+                            .get(site.settlement)
+                            .map(|studies| studies.permits(*works))
+                            .unwrap_or(true)
                         && match works {
                             BuildingKind::Dock => shore_near,
                             BuildingKind::Mine => rock_near,
@@ -4408,6 +4500,17 @@ mod tests {
             // not the question, so every test that leans on this base keeps
             // reading the wants it was written to read.
             clay: 60.0,
+            // AND IT HAS READ ITS BOOKS, for the same reason: this base exists
+            // to isolate one want at a time, so knowledge must not be the
+            // variable unless a test says it is. The ignorance case has its own
+            // tests - see `study::tests`.
+            studies: crate::villager::study::Studies {
+                known: crate::villager::study::THE_TREE
+                    .iter()
+                    .map(|node| node.key.to_string())
+                    .collect(),
+                ..Default::default()
+            },
         }
     }
 

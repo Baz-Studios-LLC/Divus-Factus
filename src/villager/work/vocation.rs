@@ -38,6 +38,9 @@ pub enum Vocation {
     Healer,
     /// Keeps the shrine, and retells what the god has done.
     Priest,
+    /// Reads, and works things out. The one trade whose output is knowledge -
+    /// see [`crate::villager::study`] for what that means and what it costs.
+    Scholar,
     /// Walks past the cairns and brings back the world.
     Explorer,
     /// Spear and post: walks the edge, walks the roads, meets the wolves.
@@ -119,6 +122,7 @@ impl Vocation {
             Vocation::Priest => "priest",
             Vocation::Explorer => "explorer",
             Vocation::Guard => "guard",
+            Vocation::Scholar => "scholar",
         }
     }
 
@@ -139,6 +143,7 @@ impl Vocation {
             Vocation::Priest => "Priest",
             Vocation::Explorer => "Explorer",
             Vocation::Guard => "Guard",
+            Vocation::Scholar => "Scholar",
         }
     }
 
@@ -157,6 +162,7 @@ impl Vocation {
             Vocation::Priest => "keeps the shrine",
             Vocation::Explorer => "walks past the cairns",
             Vocation::Guard => "stands guard",
+            Vocation::Scholar => "reads and reckons",
         }
     }
 
@@ -175,6 +181,7 @@ impl Vocation {
             Vocation::Priest => "took up the litany",
             Vocation::Explorer => "took up the wayfarer's staff",
             Vocation::Guard => "took up the guard's spear",
+            Vocation::Scholar => "took up the books",
         }
     }
 }
@@ -183,8 +190,10 @@ impl Vocation {
 /// its absence toward the quiet work. Weighted, not deterministic — a timid
 /// hunter exists, and is a story.
 pub fn roll_vocation(boldness: f32, rng: &mut Rng) -> Vocation {
-    // Cook, healer and priest are missing on purpose: those callings are not
-    // rolled into, they are *called* into, when the village needs them.
+    // Cook, healer, priest and scholar are missing on purpose: those callings
+    // are not rolled into, they are *called* into, when the village needs them
+    // - which for the scholar means a fed town of twelve with something left to
+    // work out. Nobody is born a scholar in a village of eight.
     let weights = [
         (Vocation::Gatherer, 0.5 + (1.0 - boldness) * 0.8),
         (Vocation::Fisher, 0.9),
@@ -273,6 +282,8 @@ pub(crate) fn morning_muster(
         Query<&Stockpile>,
         Query<&Field>,
         Query<&crate::villager::civic::CivicPriority>,
+        // What the town knows, and what its scholars are stuck for want of.
+        Query<&crate::villager::study::Studies>,
     ),
     homeless: Query<
         (),
@@ -350,7 +361,7 @@ pub(crate) fn morning_muster(
     }
     *reckoned = clock.elapsed;
 
-    let (buildings, sites, stores, fields, decree) = town;
+    let (buildings, sites, stores, fields, decree, learning) = town;
     let (known, trees, chunks, terrain, site, bushes, game) = ground;
     let mouths = workers.iter().count();
     if mouths == 0 {
@@ -361,6 +372,20 @@ pub(crate) fn morning_muster(
     let food = store.map_or(0.0, |s| s.food());
     let timber = store.map_or(0.0, |s| s.timber);
     let masonry = store.map_or(0.0, |s| s.stone + s.clay);
+    let learning = learning.iter().next();
+    // Anything left on the shelves to work out. A town with no `Studies` yet
+    // knows nothing, which is the most there is to learn.
+    let more_to_learn = learning
+        .is_none_or(|known| known.known.len() < crate::villager::study::THE_TREE.len());
+    // WHAT THE SCHOLARS ARE WAITING ON, in hands.
+    //
+    // This is the whole point of the library: a blocked topic is a want with a
+    // name and an amount on it, and this is the first thing in the game that
+    // answers one. Every sample a topic can ask for - clay, stone, ore - is
+    // something a pick brings home, so the answer is miners.
+    let for_the_books = learning
+        .and_then(|known| known.wanting)
+        .map_or(0.0, |need| (need.short / 6.0).ceil().min(2.0));
     let has = |kind: BuildingKind| buildings.iter().any(|b| b.kind == kind);
 
     // The larder's floor rises with the population: twelve food is a
@@ -625,7 +650,10 @@ pub(crate) fn morning_muster(
         // miner, and only while the pile held under four - so a village
         // with a single scrap of stone mustered nobody to the rock and
         // then stood a whole day waiting on a footing that wanted four.
-        (Vocation::Miner, (stone_short * 0.5).ceil().min(3.0)),
+        (
+            Vocation::Miner,
+            (stone_short * 0.5).ceil().min(3.0) + for_the_books,
+        ),
         (
             Vocation::Cook,
             if has(BuildingKind::Tavern) { 1.0 } else { 0.0 },
@@ -653,6 +681,22 @@ pub(crate) fn morning_muster(
             },
         ),
         (Vocation::Guard, guards),
+        // THE BOOKS, and they are the last thing a town spares anybody for.
+        //
+        // One reader while there is anything left to work out, two once the
+        // town is big enough to lose two - reading is not hauling, so a third
+        // adds very little (see `the_scholars_study`). Gated on the town being
+        // FED, because a hungry village with a scholar in it is a village that
+        // has made a mistake, and on there being something left to learn, so
+        // the want falls away when the shelves are full.
+        (
+            Vocation::Scholar,
+            if more_to_learn && food > floor * 1.5 && mouths >= 12 {
+                if mouths >= 20 { 2.0 } else { 1.0 }
+            } else {
+                0.0
+            },
+        ),
     ];
     // The mayor's decree leans the muster: the standing priority raises
     // its trades' wants and touches nothing else, so a chain in a hurry
@@ -698,6 +742,11 @@ pub(crate) fn morning_muster(
         // filling up moves hands the same way.
         (put_by * 8.0) as u64 as f32,
         timber_deep as u8 as f32,
+        // A library going from stuck to reading, or the other way, changes who
+        // is wanted at the rock - so the muster has to take stock the day it
+        // happens rather than the next time something else moves.
+        for_the_books,
+        more_to_learn as u8 as f32,
         stone_deep as u8 as f32,
         guards,
         hurt.iter().filter(|(v, ..)| v.harm > 0.15).count().min(3) as f32,

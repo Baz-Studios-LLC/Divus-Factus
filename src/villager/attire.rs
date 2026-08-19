@@ -104,6 +104,15 @@ pub fn livery(vocation: Vocation) -> Livery {
             Headwear::Hood,
             Garment::Robe,
         ),
+        // Robed like the priest, because both are trades of the head rather
+        // than the hands - and inked blue rather than sacred purple, so the two
+        // are never mistaken for each other across a square.
+        Scholar => (
+            tone(palette::RAMP_CLOTH_BLUE, 2),
+            tone(palette::RAMP_BONE, 3),
+            Headwear::Hood,
+            Garment::Robe,
+        ),
         // The road and the wall.
         Explorer => (
             tone(palette::RAMP_CLOTH_SABLE, 2),

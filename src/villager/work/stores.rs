@@ -129,10 +129,26 @@ const MEALS_A_HEAD: f32 = 8.0;
 /// civic ambition that held nothing; now a town that wants a deeper
 /// larder has to build one.
 pub fn larder_ceiling(mouths: usize, storehouse: bool, granary: bool, smokehouse: bool) -> f32 {
+    larder_ceiling_with(mouths, storehouse, granary, smokehouse, 0.0)
+}
+
+/// The same, plus what the town has WORKED OUT about keeping food.
+///
+/// A separate entry point rather than a fifth argument everywhere, because most
+/// callers are asking a question about buildings and do not have a settlement in
+/// hand to ask about its books. See `study::Gift::LarderKeeps`.
+pub fn larder_ceiling_with(
+    mouths: usize,
+    storehouse: bool,
+    granary: bool,
+    smokehouse: bool,
+    learned: f32,
+) -> f32 {
     let roofed = SACKS_IN_THE_OPEN
         + if storehouse { STOREHOUSE_KEEPS } else { 0.0 }
         + if granary { GRANARY_KEEPS } else { 0.0 }
-        + if smokehouse { SMOKEHOUSE_KEEPS } else { 0.0 };
+        + if smokehouse { SMOKEHOUSE_KEEPS } else { 0.0 }
+        + learned;
     roofed.max(mouths as f32 * MEALS_A_HEAD)
 }
 
@@ -148,6 +164,9 @@ pub(crate) fn the_sacks_hold_what_they_hold(
     buildings: Query<(&Building, &crate::villager::MemberOf)>,
     folk: Query<&crate::villager::MemberOf, (With<Villager>, Without<Corpse>)>,
     mut towns: Query<(Entity, &crate::villager::Settlement, &mut Stockpile)>,
+    // What each town has worked out about keeping food. This is the one place
+    // the ceiling actually bites, so it is the one place that has to ask.
+    learning: Query<&crate::villager::study::Studies>,
 ) {
     *since += time.delta_secs();
     if *since < 10.0 {
@@ -161,11 +180,12 @@ pub(crate) fn the_sacks_hold_what_they_hold(
                 .any(|(b, member)| b.kind == kind && member.0 == town)
         };
         let mouths = folk.iter().filter(|member| member.0 == town).count();
-        let ceiling = larder_ceiling(
+        let ceiling = larder_ceiling_with(
             mouths,
             has(BuildingKind::Storehouse),
             has(BuildingKind::Granary),
             has(BuildingKind::Smokehouse),
+            learning.get(town).map_or(0.0, |s| s.boons().larder_keeps),
         );
         let held = store.food();
         if held <= ceiling {

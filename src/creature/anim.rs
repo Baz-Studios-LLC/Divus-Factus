@@ -100,6 +100,15 @@ fn work_arm_pose(
                 (-0.08, 0.70)
             }
         }
+        // A book held against the chest with both hands, the way somebody
+        // carries something they are halfway through.
+        Vocation::Scholar => {
+            if right {
+                (-0.22, 0.62)
+            } else {
+                (-0.26, 0.58)
+            }
+        }
         Vocation::Explorer => {
             if right {
                 (-0.16, 0.62)

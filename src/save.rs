@@ -249,6 +249,14 @@ struct SaveGame {
     /// Incense and dye in the store.
     #[serde(default)]
     sacred: (f32, f32),
+    /// WHAT THE TOWN HAS WORKED OUT, and what it is in the middle of.
+    ///
+    /// Keys rather than indices, so the tree can be re-authored - rows added,
+    /// reordered, a branch rewritten - without a save from last week silently
+    /// meaning something else. An unknown key is ignored on the way back in; see
+    /// `Studies::boons`.
+    #[serde(default)]
+    studies: Option<crate::villager::study::Studies>,
 }
 
 fn slots_dir() -> std::path::PathBuf {
@@ -423,6 +431,9 @@ fn gather(world: &mut World) -> Option<SaveGame> {
     let sacred = world
         .get::<Stockpile>(settlement_entity)
         .map_or((0.0, 0.0), |s| (s.incense, s.dye));
+    let studies = world
+        .get::<crate::villager::study::Studies>(settlement_entity)
+        .cloned();
     let deposits: Vec<(u8, Vec3, f32)> = world
         .query::<(&GlobalTransform, &crate::matter::Deposit)>()
         .iter(world)
@@ -866,6 +877,7 @@ fn gather(world: &mut World) -> Option<SaveGame> {
             }),
         larder,
         metals,
+        studies,
         deposits,
         sacred,
     })
@@ -1077,6 +1089,11 @@ fn apply(world: &mut World, save: SaveGame) {
         store.clay = save.metals.2;
         store.incense = save.sacred.0;
         store.dye = save.sacred.1;
+    }
+    // The books come back whole, or a restored town starts again from letters
+    // with everything it built still standing.
+    if let Some(learned) = save.studies.clone() {
+        world.entity_mut(settlement_entity).insert(learned);
     }
     for (pile, mut transform) in world
         .query::<(&StorePile, &mut Transform)>()

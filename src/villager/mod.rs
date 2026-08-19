@@ -19,6 +19,7 @@ pub mod names;
 pub mod rampart;
 pub mod rites;
 pub mod speech;
+pub mod study;
 pub mod tools;
 pub mod traits;
 pub mod work;
@@ -546,7 +547,17 @@ impl Plugin for VillagerPlugin {
                         // `divus-factus-bevy-limits`. Grouping the three that
                         // belong together keeps the count at twenty and reads
                         // better besides.
-                        (home::burn, camp::pitch_camp, camp::strike_camp).chain(),
+                        (
+                            home::burn,
+                            camp::pitch_camp,
+                            camp::strike_camp,
+                            // The books. `every_town_keeps_its_learning` first,
+                            // so a colony founded this frame is reading by the
+                            // next one.
+                            study::every_town_keeps_its_learning,
+                            study::the_scholars_study,
+                        )
+                            .chain(),
                         home::rouse_the_taken,
                         pursue_activity,
                         crate::scatter::regrow_food,

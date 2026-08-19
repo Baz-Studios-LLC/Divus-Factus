@@ -426,6 +426,7 @@ fn trade_in_words(voice: Vocation) -> &'static str {
         V::Cook => "a cook",
         V::Healer => "a healer",
         V::Priest => "the priest",
+        V::Scholar => "a scholar",
         V::Explorer => "an explorer",
         V::Guard => "a guard",
     }
@@ -1097,6 +1098,7 @@ fn trade_tag(voice: Vocation) -> &'static str {
         Vocation::Cook => "trade:cook",
         Vocation::Healer => "trade:healer",
         Vocation::Priest => "trade:priest",
+        Vocation::Scholar => "trade:scholar",
         Vocation::Explorer => "trade:explorer",
         Vocation::Guard => "trade:guard",
     }

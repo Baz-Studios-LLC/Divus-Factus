@@ -66,6 +66,7 @@ pub fn tool_label(vocation: Vocation) -> &'static str {
         Vocation::Cook => "cooking ladle",
         Vocation::Healer => "healer's satchel",
         Vocation::Priest => "prayer censer",
+        Vocation::Scholar => "reading book",
         Vocation::Explorer => "wayfarer's staff",
         Vocation::Guard => "guard spear",
     }
@@ -371,6 +372,19 @@ fn spawn_tool(
                 "Prayer Censer",
             );
         }
+        // A slab held flat: a book, and nothing else a village owns looks like
+        // one.
+        Vocation::Scholar => {
+            block(
+                commands,
+                assets,
+                pivot,
+                Vec3::new(0.0, 0.10, 0.0),
+                Vec3::new(0.30, 0.08, 0.24),
+                BONE,
+                "Reading Book",
+            );
+        }
         Vocation::Explorer => {
             block(
                 commands,
@@ -480,7 +494,7 @@ pub fn animate_work_tools(
                 Vocation::Guard => 4.2,
                 Vocation::Fisher => 2.4,
                 Vocation::Gatherer | Vocation::Farmer => 3.5,
-                Vocation::Cook | Vocation::Healer | Vocation::Priest => 2.8,
+                Vocation::Cook | Vocation::Healer | Vocation::Priest | Vocation::Scholar => 2.8,
                 Vocation::Explorer => 1.6,
             } + motion.idle_offset;
         // ONLY THE ANGLE NOW. Where the tool is, is settled by the joint it
@@ -496,6 +510,8 @@ pub fn animate_work_tools(
             Vocation::Cook => (-0.22, beat.sin() * 0.38),
             Vocation::Healer => (-0.15 + beat.sin() * 0.14, 0.12),
             Vocation::Priest => (0.08, beat.sin() * 0.22),
+            // Barely moving: a page turns, and that is the whole gesture.
+            Vocation::Scholar => (-0.24 + beat.sin() * 0.05, 0.0),
         };
         // THE PIVOT IS A WRIST, and that is the whole trick.
         //

@@ -258,6 +258,8 @@ pub(crate) fn take_up_work(
         Query<&Job, With<Villager>>,
     ),
     mut towns: Query<(&crate::villager::SettlementGround, &mut Stockpile)>,
+    // How far this town has learned to range. See `reach` below.
+    learning: Query<&crate::villager::study::Studies>,
     game: Query<
         (Entity, &Transform, &CreatureGenome),
         (
@@ -312,6 +314,14 @@ pub(crate) fn take_up_work(
         };
         let mouths = mouths_by_town.get(&home).copied().unwrap_or(0);
         let larder_thin = food < mouths as f32;
+        // HOW FAR THIS TOWN WILL GO, which is a thing it can learn.
+        //
+        // `WORK_REACH` is the walk a person makes and still gets home from
+        // before dark, and it is the ceiling on the whole map: nothing further
+        // out than this is worth anything to anybody. Roadcraft pushes it, which
+        // makes it the most valuable thing on the tree and the one that pairs
+        // with a night's camp. See `study::Gift::Reach` and `camp::pitch_camp`.
+        let reach = WORK_REACH + learning.get(home).map_or(0.0, |s| s.boons().reach);
         // Sheltering counts as available: rain sent them to the fire, but
         // rain does not excuse the able-bodied — least of all from raising
         // the roofs that would get them OUT of it. Without this, one long
@@ -395,7 +405,7 @@ pub(crate) fn take_up_work(
                         .filter(|(_, _, source)| source.amount > 0.5)
                         .map(|(bush, t, _)| (bush, t.translation)),
                     transform.translation,
-                    WORK_REACH,
+                    reach,
                     &known_far,
                     &permitted,
                 );
@@ -406,7 +416,7 @@ pub(crate) fn take_up_work(
                             .filter(|(_, _, flora)| flora.amount > 0.5)
                             .map(|(stand, t, _)| (stand, t.translation)),
                         transform.translation,
-                        WORK_REACH,
+                        reach,
                         &known_far,
                         &permitted,
                     )
@@ -426,7 +436,7 @@ pub(crate) fn take_up_work(
                     .filter(|(_, _, genome)| genome.species != Species::Human)
                     .map(|(kill, t, _)| (kill, t.translation)),
                 transform.translation,
-                WORK_REACH * 1.6,
+                reach * 1.6,
                 &known_far,
                 &permitted,
             )
@@ -436,7 +446,7 @@ pub(crate) fn take_up_work(
                         .filter(|(_, _, genome)| genome.species != Species::Human)
                         .map(|(prey, t, _)| (prey, t.translation)),
                     transform.translation,
-                    WORK_REACH * 1.6,
+                    reach * 1.6,
                     &known_far,
                     &permitted,
                 )
@@ -502,7 +512,7 @@ pub(crate) fn take_up_work(
                             })
                             .map(|(face, t, _)| (face, t.translation)),
                         transform.translation,
-                        WORK_REACH,
+                        reach,
                         &known_far,
                         &permitted,
                     )
@@ -513,7 +523,7 @@ pub(crate) fn take_up_work(
                         nearest_job(
                             boulders.iter().map(|(rock, t)| (rock, t.translation)),
                             transform.translation,
-                            WORK_REACH,
+                            reach,
                             &known_far,
                             &permitted,
                         )
@@ -534,7 +544,7 @@ pub(crate) fn take_up_work(
                         })
                         .map(|(vein, t, _)| (vein, t.translation)),
                     transform.translation,
-                    WORK_REACH,
+                    reach,
                     &known_far,
                     &permitted,
                 );
@@ -566,7 +576,7 @@ pub(crate) fn take_up_work(
                             })
                             .map(|(bank, t, _)| (bank, t.translation)),
                         transform.translation,
-                        WORK_REACH,
+                        reach,
                         &known_far,
                         &permitted,
                     )
@@ -588,7 +598,7 @@ pub(crate) fn take_up_work(
                     .filter(|(_, _, tree)| tree.harvestable())
                     .map(|(tree, t, _)| (tree, t.translation)),
                 transform.translation,
-                WORK_REACH,
+                reach,
                 &known_far,
                 &permitted,
             )
@@ -648,7 +658,7 @@ pub(crate) fn take_up_work(
                         nearest_job(
                             boulders.iter().map(|(rock, t)| (rock, t.translation)),
                             transform.translation,
-                            WORK_REACH,
+                            reach,
                             &known_far,
                             &permitted,
                         )
@@ -666,7 +676,7 @@ pub(crate) fn take_up_work(
                                 })
                                 .map(|(bank, t, _)| (bank, t.translation)),
                             transform.translation,
-                            WORK_REACH,
+                            reach,
                             &known_far,
                             &permitted,
                         )
@@ -687,7 +697,7 @@ pub(crate) fn take_up_work(
                             .iter()
                             .filter(|(_, _, f)| f.farmer == Entity::PLACEHOLDER)
                             .map(|(f, t, _)| (f, t.translation))
-                            .filter(|(_, at)| at.distance(transform.translation) < WORK_REACH)
+                            .filter(|(_, at)| at.distance(transform.translation) < reach)
                             .min_by(|a, b| {
                                 a.1.distance(transform.translation)
                                     .total_cmp(&b.1.distance(transform.translation))
@@ -800,6 +810,17 @@ pub(crate) fn take_up_work(
                 .map(|(shrine, at, _)| {
                     let at = at.translation;
                     Job::at(at, Some(shrine), at.distance(transform.translation))
+                }),
+
+            // And the scholar's is the library. No library, no job - which is
+            // what sends them to raise one, the way a priest raises a shrine.
+            // See OWN_WORKS.
+            Vocation::Scholar => buildings
+                .iter()
+                .find(|(_, _, b)| b.kind == BuildingKind::Library)
+                .map(|(library, at, _)| {
+                    let at = at.translation;
+                    Job::at(at, Some(library), at.distance(transform.translation))
                 }),
 
             // A guard's post is the tower if one stands, the village edge
@@ -920,7 +941,7 @@ pub(crate) fn take_up_work(
                 nearest_job(
                     boulders.iter().map(|(rock, t)| (rock, t.translation)),
                     transform.translation,
-                    WORK_REACH,
+                    reach,
                     &known_far,
                     &permitted,
                 )
@@ -933,7 +954,7 @@ pub(crate) fn take_up_work(
                         .filter(|(_, _, tree)| tree.harvestable())
                         .map(|(tree, t, _)| (tree, t.translation)),
                     transform.translation,
-                    WORK_REACH,
+                    reach,
                     &known_far,
                     &permitted,
                 )
@@ -946,7 +967,7 @@ pub(crate) fn take_up_work(
                         .filter(|(_, _, source)| source.amount > 0.5)
                         .map(|(bush, t, _)| (bush, t.translation)),
                     transform.translation,
-                    WORK_REACH,
+                    reach,
                     &known_far,
                     &permitted,
                 )
@@ -958,7 +979,7 @@ pub(crate) fn take_up_work(
                         .filter(|(_, _, genome)| genome.species != Species::Human)
                         .map(|(prey, t, _)| (prey, t.translation)),
                     transform.translation,
-                    WORK_REACH * 1.6,
+                    reach * 1.6,
                     &known_far,
                     &permitted,
                 )
