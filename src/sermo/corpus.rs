@@ -414,6 +414,10 @@ mod tests {
             "devout",
             "wavering",
             "doubting",
+            // how the spirits stand
+            "downcast",
+            "steady",
+            "heartened",
             // moments and states
             "devotion",
             "grudge",

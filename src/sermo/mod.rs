@@ -91,6 +91,7 @@ pub mod vivarium {
         pub speaker_is: Option<String>,
         pub traits: Vec<String>,
         pub settlement_name: Option<String>,
+        pub morale: Option<String>,
     }
 
     pub struct ReadyLine {
@@ -334,6 +335,11 @@ pub struct Dossier {
     pub pronoun: &'static str,
     pub trade: Option<&'static str>,
     pub settlement: Option<String>,
+    /// How their spirits stand, as of the last refresh.
+    ///
+    /// Kept as the raw figure rather than the band, so the tag and the packet's
+    /// words are both derived HERE and cannot drift apart.
+    pub spirits: f32,
     /// Whether the god's eye was on them when this was last refreshed.
     ///
     /// Read to decide whether a line's WEAR is charged: a sentence nobody
@@ -369,6 +375,7 @@ fn the_tongue_learns_who_is_who(
         Option<&Vocation>,
         Option<&crate::villager::MemberOf>,
         &Transform,
+        Option<&crate::villager::Morale>,
     )>,
     towns: Query<&crate::villager::Settlement>,
     eye: Option<Res<crate::attention::Attention>>,
@@ -379,7 +386,7 @@ fn the_tongue_learns_who_is_who(
     }
     *since = 0.0;
     tongue.dossiers.clear();
-    for (who, person, genome, trade, home, at) in &folk {
+    for (who, person, genome, trade, home, at, heart) in &folk {
         let settlement = home
             .and_then(|home| towns.get(home.0).ok())
             .map(|town| town.name.clone());
@@ -395,6 +402,10 @@ fn the_tongue_learns_who_is_who(
                 },
                 trade: trade.map(|trade| trade_in_words(*trade)),
                 settlement,
+                // Optional, because a soul may be read before their morale
+                // exists; the default is the same contented figure a villager
+                // is born with, which reads as "steady".
+                spirits: heart.map_or(0.8, |heart| heart.spirits),
                 watched: crate::attention::regard(eye.as_deref(), at.translation).worth_saying(),
             },
         );
@@ -506,6 +517,27 @@ impl Tongue {
         slots: &[(&str, &str)],
         must: &[&str],
     ) -> Option<String> {
+        // THE SPEAKER'S HEART, ADDED HERE so every register carries it and no
+        // caller has to remember. The packet has always described who somebody
+        // IS and never how they ARE, and a line the model wrote knowing the
+        // speaker was downcast may only ever be replayed to a downcast speaker
+        // - which is what this tag is for. A fact sent unpinned is a lie
+        // waiting for its second outing.
+        //
+        // Additive, and deliberately: the authored corpus wears no mood tags,
+        // so nothing it holds stops answering. A line only narrows if it CHOSE
+        // to wear one.
+        let mut with_mood: Vec<&str> = tags.to_vec();
+        let heart = Entity::try_from_bits(speaker)
+            .and_then(|who| self.dossiers.get(&who))
+            .map(|who| mood_tag(who.spirits));
+        if let Some(heart) = heart
+            && !with_mood.contains(&heart)
+        {
+            with_mood.push(heart);
+        }
+        let tags: &[&str] = &with_mood;
+
         // THE VILLAGE'S NAME IS A SLOT, not a fact to be quoted.
         //
         // A generated line came back reading "That is good news for Shutel."
@@ -645,6 +677,7 @@ impl Tongue {
                 .map(|t| vec![t.to_string()])
                 .unwrap_or_default(),
             settlement_name: dossier.settlement.clone(),
+            morale: Some(mood_words(dossier.spirits).to_string()),
             ..Default::default()
         }
     }
@@ -1005,6 +1038,45 @@ impl Tongue {
 }
 
 /// The faith bands and trades as corpus tags.
+/// How a soul's spirits stand, in three bands.
+///
+/// THE PACKET'S BIGGEST HOLE UNTIL NOW. Every field it carried was about who
+/// somebody IS - their name, their trade, their village - and none about how
+/// they are, so every line came out level in tone whatever had just happened to
+/// them. A corpus that reports facts and never feels them is a corpus of
+/// captions.
+///
+/// Three bands rather than a number, because a tag is what makes a fact safe to
+/// replay - see [[divus-factus-nobody-makes-things-up]] - and a tag has to be
+/// something a moment can be matched on. A line written for a downcast fisher
+/// answers only downcast fishers, forever.
+///
+/// The bands are wide on purpose. Spirits sit at 0.8 by default and a bad day
+/// moves them a little; splitting that range finely would make tags that almost
+/// never match and lines that can never be reused.
+pub(crate) fn mood_tag(spirits: f32) -> &'static str {
+    if spirits < 0.45 {
+        "downcast"
+    } else if spirits < 0.85 {
+        "steady"
+    } else {
+        "heartened"
+    }
+}
+
+/// The same three bands in the words a person would use, for the packet.
+///
+/// Plain speech, never the tag itself: the tag is a key the game matches on and
+/// the packet is a sentence the model reads. An engine label in a packet comes
+/// back out in a line.
+fn mood_words(spirits: f32) -> &'static str {
+    match mood_tag(spirits) {
+        "downcast" => "low, and finding the day heavy",
+        "heartened" => "in good spirits",
+        _ => "steady enough",
+    }
+}
+
 fn faith_tag(band: FaithBand) -> &'static str {
     match band {
         FaithBand::Sure => "devout",
@@ -1235,6 +1307,43 @@ pub fn tidy(line: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    /// A mood is a fact, so it comes with a tag to pin it.
+    ///
+    /// The rule this serves is the whole truth guarantee: anything the packet
+    /// tells the model may end up IN the line, and a line is replayed for years
+    /// afterward to whoever the tags match. Telling the model "she is downcast"
+    /// without a tag saying so produces a sad line that is later put in a happy
+    /// mouth. Bands, and the words the packet uses, are derived from the same
+    /// figure so they cannot disagree.
+    #[test]
+    fn every_mood_the_packet_speaks_has_a_tag_to_pin_it() {
+        use super::{mood_tag, mood_words};
+        // Every band is reachable, or the tag vocabulary is lying about what
+        // the game can say.
+        let bands: Vec<&str> = [0.0, 0.3, 0.5, 0.8, 0.9, 1.0]
+            .into_iter()
+            .map(mood_tag)
+            .collect();
+        for band in ["downcast", "steady", "heartened"] {
+            assert!(bands.contains(&band), "no spirits produce {band}");
+        }
+        // The words and the tag read the same figure, so a packet can never
+        // describe one mood while the tag pins another.
+        for spirits in [0.0, 0.44, 0.45, 0.84, 0.85, 1.0] {
+            let words = mood_words(spirits);
+            let expected = match mood_tag(spirits) {
+                "downcast" => "low, and finding the day heavy",
+                "heartened" => "in good spirits",
+                _ => "steady enough",
+            };
+            assert_eq!(words, expected, "at {spirits} the words and the tag part");
+        }
+        // And the default a villager is born with reads as ordinary, not as
+        // either extreme - most lines should not be written for a mood.
+        assert_eq!(mood_tag(super::super::villager::Morale::default().spirits), "steady");
+    }
+
+
     use super::*;
 
     #[test]
