@@ -43,7 +43,21 @@ pub const HOUSE_CAPACITY: usize = 4;
 /// A carried-in drawing still decides its own bed count - see
 /// `BuildingKind::sleeps` - so this is the floor under a village that has no
 /// drawings yet, and it must be one the opening can stand on.
-pub const LONGHOUSE_CAPACITY: usize = crate::villager::STARTING_POPULATION;
+///
+/// DECOUPLED FROM `STARTING_POPULATION`, which it used to be defined as.
+///
+/// That welding was right while the opening was ten souls walking out of one
+/// hall: the hall had to hold exactly the founding, and one constant said so.
+/// The opening is a whole town now - Brett: "you would still place the flag, but
+/// the whole town would rise instead of just a longhouse" - so the founding is
+/// housed by SEVERAL roofs and the longhouse is only one of them. Left welded,
+/// raising the founding to thirty would have made every longhouse in the world
+/// sleep thirty, silently, and the housing planner's whole arithmetic with it.
+///
+/// Ten is what a longhouse is. The opening's promise - that the founders all
+/// have beds - is now `shelter_capacity`'s to keep, and
+/// `the_founding_town_houses_its_founders` is the test that holds it.
+pub const LONGHOUSE_CAPACITY: usize = 10;
 
 /// How many can sleep rough in the fire's circle before the village is
 /// genuinely overfull. The founders' allowance, roughly.

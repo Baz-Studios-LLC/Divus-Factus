@@ -1514,54 +1514,18 @@ pub(super) fn do_work(
                 // A carried-in building brings its own shell, doors and
                 // furnishings out of its own marks, below. Only a kind
                 // the bench has not drawn gets the village's own walls.
-                let drawn = baked::drawing_of(kind, plan.plan, &plan.drawing);
-                match kind {
-                    BuildingKind::House => {
-                        done.insert(Hut);
-                        if drawn.is_none() {
-                            done.insert(Shell {
-                                half_w: plan.half_w,
-                                half_d: plan.half_d,
-                                doors: vec![Doorway::on_x_wall(plan.half_w, 0.0)],
-                            });
-                        }
-                    }
-                    BuildingKind::Longhouse => {
-                        done.insert(Longhouse);
-                        if drawn.is_none() {
-                            // One door per bay, mirroring the walls' own gaps.
-                            let d = plan.half_d;
-                            let bays = ((d * 2.0 / 3.4).round() as i32).clamp(3, 4);
-                            let doors = (0..bays)
-                                .map(|i| {
-                                    Doorway::on_x_wall(
-                                        plan.half_w,
-                                        -d + (i as f32 + 0.5) * (d * 2.0 / bays as f32),
-                                    )
-                                })
-                                .collect();
-                            done.insert(Shell {
-                                half_w: plan.half_w,
-                                half_d: plan.half_d,
-                                doors,
-                            });
-                        }
-                    }
-                    _ => {}
-                }
-                // The carried-in building furnishes itself: the beds it
-                // holds, the doors it opens, the table its people gather
-                // at, all read from the marks the bench wrote.
-                if let Some(work) = drawn {
-                    baked::furnish_baked(
-                        &mut commands,
-                        &mut meshes,
-                        &mut materials,
-                        house,
-                        work,
-                        plan.mirrored,
-                    );
-                }
+                // What a finished building of this kind IS, beyond its walls.
+                // ONE AUTHOR, shared with the god's own whole-raising - see
+                // `buildings::dress_the_finished`. This was a copy of that
+                // match, and a copy is two answers to "does a longhouse have a
+                // door per bay" waiting to drift apart.
+                buildings::dress_the_finished(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    house,
+                    &plan,
+                );
                 // A holding comes with its ground broken: a plot turned beside
                 // the house, waiting for whoever lives there to work it. Left
                 // unclaimed on purpose — the farmer who moves in takes it, and

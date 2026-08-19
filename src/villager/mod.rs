@@ -45,13 +45,32 @@ use crate::terrain::{Biome, Terrain, WATER_LEVEL};
 /// How many villagers the settlement starts with: five women and five
 /// men, all grown, dealt by the alternation in `found_the_village`.
 ///
-/// Ten because the hall sleeps ten. The founding village is housed from
-/// its first minute, which is the whole point - the first quarter-hour
-/// used to be twelve people in the dirt splitting a dozen hands between
-/// food, timber, stone and a frame, and losing at all four. If the bench
-/// longhouse is ever redrawn with a different number of beds, this
-/// should move with it.
-pub const STARTING_POPULATION: usize = 10;
+/// THIRTY, and a whole town rises to hold them.
+///
+/// It was ten, and ten was the number the founding hall slept: the light came
+/// down, one longhouse came up out of the earth, and ten people walked out of
+/// it. That opening was housed from its first minute, which was already a fix -
+/// the quarter-hour before it was twelve people in the dirt splitting a dozen
+/// hands between food, timber, stone and a frame, and losing at all four.
+///
+/// It was still the hardest stretch of the game, first, which is backwards.
+/// Brett: "I am also kicking around the idea of a small town being already
+/// established when the game starts to ease the growing pains of raising the
+/// first town... about 30 people and most buildings. This starts the player off
+/// with a lot to do and a stable town that can hold its own." And on the
+/// opening: "you would still place the flag, but the whole town would rise
+/// instead of just a longhouse."
+///
+/// So the flag stays and the theology with it - a god who makes thirty is a
+/// bigger god than one who makes ten - and what rises is a town: roofs for all
+/// of them, a wall with gates, a watch on the gates, and the civic core Brett
+/// named. What is deliberately NOT raised is the rest of the ladder, because a
+/// town given everything leaves its planner nothing to want and spends the whole
+/// progression before the first minute. See `raise_the_founding_town`.
+///
+/// The longhouse's bed count used to BE this number. It is not any more - see
+/// `home::LONGHOUSE_CAPACITY` for why that weld had to be cut first.
+pub const STARTING_POPULATION: usize = 30;
 
 /// How many goblin camps a new world gets.
 ///
@@ -2438,6 +2457,37 @@ pub(crate) fn spawn_settlement(
         )
     });
     let doorstep = doorstep.flatten();
+    // AND THE REST OF THE TOWN WITH IT. The hall is one building of eight; the
+    // founders need beds, water, sacks and somewhere to read, and a god that
+    // raises one longhouse for thirty people has left twenty of them in the
+    // dirt. See `THE_FOUNDING_TOWN`.
+    if restoring.is_none() {
+        let standing: Vec<(Entity, Vec3)> = woods
+            .iter()
+            .map(|(tree, at)| (tree, at.translation()))
+            .collect();
+        let (terrain, chunks, chunk_assets, stripped, grass) = &mut ground;
+        let rose = work::buildings::raise_the_founding_town(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            terrain,
+            chunks,
+            chunk_assets,
+            stripped,
+            grass,
+            &standing,
+            settlement,
+            center,
+            doorstep,
+            &mut rng,
+        );
+        info!(
+            "the flag raises {settlement_name}: a hall and {rose} more, {} beds for {} souls",
+            work::buildings::founding_beds(),
+            STARTING_POPULATION,
+        );
+    }
     // The plot is leveled and cleared by now; everything below reads the
     // land as it finally stands.
     // Taken before the terrain is borrowed out of the same tuple: the camps
@@ -2564,9 +2614,16 @@ pub(crate) fn spawn_settlement(
     // effects are the wedding rite's own - spouse both ways, her name
     // follows his house, hearts already warm - minus the ceremony, which
     // happened somewhere back down the road they came in on.
-    if restoring.is_none() && first_families.len() >= 4 {
+    if restoring.is_none() && first_families.len() >= work::buildings::FOUNDING_COUPLES * 2 {
         let day = clock.day();
-        for (wife_at, husband_at) in [(0usize, 1usize), (2, 3)] {
+        // One couple per founding house, taken off the front of the line. The
+        // founders alternate woman and man out of the door, so the pairs are
+        // (0,1), (2,3) and so on - and the count is `FOUNDING_COUPLES` rather
+        // than a literal, because it and the house count are the same number.
+        let pairs: Vec<(usize, usize)> = (0..work::buildings::FOUNDING_COUPLES)
+            .map(|n| (n * 2, n * 2 + 1))
+            .collect();
+        for (wife_at, husband_at) in pairs {
             let (wife, her) = first_families[wife_at].clone();
             let (husband, him) = first_families[husband_at].clone();
             commands.entity(wife).insert(Spouse(husband));
@@ -4882,12 +4939,20 @@ mod tests {
                 Sex::Male => men += 1,
             }
         }
-        assert_eq!((women, men), (5, 5));
-        // And the hall they wake up in holds exactly all of them.
         assert_eq!(
-            crate::villager::work::BuildingKind::Longhouse.sleeps(),
-            STARTING_POPULATION,
-            "the founding village must fit under its own roof"
+            (women, men),
+            (
+                crate::villager::STARTING_POPULATION / 2,
+                crate::villager::STARTING_POPULATION / 2
+            ),
+            "the founding is halved evenly, whatever its size"
+        );
+        // And the town they wake up in has a bed for every one of them. Asked
+        // of the whole composition now rather than of the one hall - see
+        // `the_founding_town_houses_its_founders`, which owns this promise.
+        assert!(
+            crate::villager::work::buildings::founding_beds() >= STARTING_POPULATION,
+            "the founding town must fit under its own roofs"
         );
     }
 

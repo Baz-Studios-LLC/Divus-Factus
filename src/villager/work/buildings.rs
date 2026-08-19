@@ -2147,6 +2147,86 @@ pub(crate) fn rise_out_of_the_earth(
     }
 }
 
+/// WHAT RISES WITH THE FLAG.
+///
+/// The opening was one longhouse and ten people. It is a town now - Brett: "you
+/// would still place the flag, but the whole town would rise instead of just a
+/// longhouse", of "about 30 people", with "Town hall and a library and a store
+/// house at a minimum for starting civic buildings".
+///
+/// Authored as a list so the composition is one place to tune and one place to
+/// test. `the_founding_town_houses_its_founders` reads it and holds the promise
+/// the old `LONGHOUSE_CAPACITY` weld used to: everybody has a bed on the first
+/// morning.
+///
+/// WHAT IS ABSENT IS AS DELIBERATE AS WHAT IS HERE. A town handed the whole
+/// ladder leaves its planner nothing to want, and the ladder is a great deal of
+/// what the player watches. So this is the stable core - water, food, timber, a
+/// seat, somewhere to read, somewhere to keep things - and the aspirations are
+/// left standing open: the blacksmith, the tavern, the mill, the bakery, the
+/// weaver, the herbalist, the armory, the cemetery, the dock, the mine. A lot to
+/// do, as ambition rather than as triage.
+///
+/// The library is here on Brett's call, over my own advice to withhold it. It
+/// earns its place: research begins on the first morning and the player watches
+/// the tree from `letters` onward rather than finding it half spent.
+pub const THE_FOUNDING_TOWN: &[(BuildingKind, usize)] = &[
+    // The civic core Brett named, and the three that make thirty souls stable:
+    // sweet water, somewhere dry for the sacks, and planks to build the rest.
+    (BuildingKind::TownHall, 1),
+    (BuildingKind::Library, 1),
+    (BuildingKind::Storehouse, 1),
+    (BuildingKind::Well, 1),
+    (BuildingKind::Granary, 1),
+    (BuildingKind::Sawmill, 1),
+    // And the roofs, which have to agree with WHO IS SEEDED or the arithmetic
+    // is a lie. Beds are not fungible: `home::wants_family_roof` sends the wed
+    // and the children to houses and everybody else to the longhouse, so a town
+    // of thirty strangers cannot sleep in a town built for families.
+    //
+    // Measured, on the first founding that actually rose: four houses and two
+    // longhouses is thirty-six beds for thirty souls, and SIX SLEPT ROUGH -
+    // twenty-six unwed founders against twenty longhouse beds, with the houses
+    // standing half empty beside them. One house per founding couple, and
+    // longhouse room for all the rest.
+    (BuildingKind::Longhouse, 3),
+    (BuildingKind::House, FOUNDING_COUPLES),
+];
+
+/// How many of the founders arrive already wed.
+///
+/// One per house in `THE_FOUNDING_TOWN`, and the two numbers are the same number
+/// on purpose - a couple with nowhere of their own is a couple the housing
+/// planner immediately breaks ground for, on the founding morning, over a town
+/// that has just been given everything.
+///
+/// It was two, against ten founders. Brett: "have two couples that are already
+/// married at game start... Ten strangers read as an expedition; two households
+/// and six single hands read as a MIGRATION." Thirty souls want more households
+/// than that to read the same way.
+pub const FOUNDING_COUPLES: usize = 3;
+
+/// How many of a kind the founding town gets.
+pub fn founding_count(kind: BuildingKind) -> usize {
+    THE_FOUNDING_TOWN
+        .iter()
+        .find(|(had, _)| *had == kind)
+        .map_or(0, |(_, many)| *many)
+}
+
+/// Beds under the roofs the flag raises.
+///
+/// DWELLINGS ONLY. `shelter_capacity` also counts the fire circle and the hall's
+/// headroom, and neither of those is a bed - the circle is sleeping rough, which
+/// is the thing the opening exists to avoid, and the hall's eight is room for a
+/// town to be a town in. Counting either would let a composition pass this test
+/// while people slept in the dirt.
+pub fn founding_beds() -> usize {
+    use crate::villager::home::{HOUSE_CAPACITY, LONGHOUSE_CAPACITY};
+    founding_count(BuildingKind::House) * HOUSE_CAPACITY
+        + founding_count(BuildingKind::Longhouse) * LONGHOUSE_CAPACITY
+}
+
 /// Raises a building whole, in one breath, on ground nobody worked for
 /// it — the god's own doing rather than a village's.
 ///
@@ -2205,21 +2285,211 @@ pub(crate) fn raise_the_founding_hall(
     // the z, which faced it a quarter of the way round the wrong way.
     let yaw = std::f32::consts::PI - angle;
 
-    // And the ground is LEVELED for it, the way it is for every other
-    // building. Skipping this on the grounds that the flag had already
-    // vetted the site was wrong: ground level enough for a village is
-    // nowhere near level enough for a hall twenty-five meters long, and
-    // the thing came up half buried.
-    // The pad is the hall's own rectangle, turned the way the hall is, with a
-    // pace of standing room around it. It used to be a circle wide enough to
-    // hold the corners, which is nearly twice the ground and every bit of it
-    // leveled - fine while nothing grew there, and a plateau once it did.
+    let (_, plan, at) = raise_whole(
+        RaisingWhole {
+            commands,
+            meshes,
+            materials,
+            terrain,
+            chunks,
+            chunk_assets,
+            stripped,
+            grass,
+        },
+        standing,
+        settlement,
+        plan,
+        at,
+        yaw,
+    );
+
+    // The doorstep, in the world: where the founding is about to be
+    // standing. Read off the drawing's own door when it has one.
+    // Outside its door, found the same way every route out of it is
+    // found - the drawing's shell reaches further than its doorway does,
+    // and a fixed step put ten people indoors.
+    let shell = Shell {
+        half_w: plan.half_w,
+        half_d: plan.half_d,
+        doors: super::baked::drawing_of(BuildingKind::Longhouse, plan.plan, &plan.drawing)
+            .map(|work| super::baked::doorways(work, plan.mirrored))
+            .filter(|doors: &Vec<Doorway>| !doors.is_empty())
+            .unwrap_or_else(|| vec![Doorway::on_x_wall(plan.half_w, 0.0)]),
+    };
+    let door = *shell.doors.first()?;
+    let (_, outside) = shell.door_stand(&door);
+    let step = at + Quat::from_rotation_y(yaw) * Vec3::new(outside.x, 0.0, outside.y);
+    Some(Vec3::new(step.x, terrain.height_at(step.x, step.z), step.z))
+}
+
+/// Raises the rest of the founding town around a hall that already stands.
+///
+/// The flag comes down, the light with it, and a TOWN comes up out of the earth
+/// - see `THE_FOUNDING_TOWN` for what and, more to the point, what not.
+///
+/// Sited with the planner's own `village_slots`, deliberately: a second layout
+/// rule would mean the town the god raises and the town the village grows are
+/// laid out by two different hands, and every building added afterward would
+/// read as an afterthought beside them. Civic works take the inner rings and the
+/// roofs begin one ring out, which is the convention `plan_houses` already keeps.
+///
+/// Returns how many rose, which the caller logs - a founding that quietly raised
+/// four of eight is a town with people sleeping outdoors and nothing saying so.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn raise_the_founding_town(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    terrain: &mut Terrain,
+    chunks: &mut crate::terrain::LoadedChunks,
+    chunk_assets: &crate::terrain::TerrainAssets,
+    stripped: &mut crate::scatter::StrippedGround,
+    grass: &mut crate::grass::GrassChunks,
+    standing: &[(Entity, Vec3)],
+    settlement: Entity,
+    center: Vec3,
+    hall_at: Option<Vec3>,
+    rng: &mut Rng,
+) -> usize {
+    // Everything already standing, so nothing is raised on top of anything: the
+    // hall first, then each building as it goes up.
+    let mut taken: Vec<(Vec3, f32)> = hall_at.map(|at| (at, 16.0)).into_iter().collect();
+    let mut raised = 0;
+
+    for (kind, many) in THE_FOUNDING_TOWN {
+        // The hall IS one of the longhouses. It went up first, by its own path,
+        // because the founders have to walk out of a door that exists.
+        let wanted = if *kind == BuildingKind::Longhouse && hall_at.is_some() {
+            many.saturating_sub(1)
+        } else {
+            *many
+        };
+        for _ in 0..wanted {
+            let plan = Blueprint::roll(*kind, rng);
+            let reach = plan.half_w.max(plan.half_d);
+            // Roofs begin one ring out and leave the plaza to the civic works,
+            // the same way `plan_houses` sorts them.
+            let rings = if matches!(kind, BuildingKind::House | BuildingKind::Longhouse) {
+                1..4
+            } else {
+                0..3
+            };
+            let mut slots = village_slots(center, rings, reach * 2.0);
+            // Shuffled, or every founding lays its town out in the same spiral.
+            for i in (1..slots.len()).rev() {
+                slots.swap(i, (rng.next_u32() as usize) % (i + 1));
+            }
+            let Some((x, z, yaw)) = slots
+                .into_iter()
+                .find(|(x, z, _)| {
+                    let at = Vec3::new(*x, terrain.height_at(*x, *z), *z);
+                    terrain.is_walkable(*x, *z)
+                        && at.y > crate::terrain::WATER_LEVEL + 1.0
+                        && taken
+                            .iter()
+                            .all(|(other, room)| other.distance(at) > room + reach + 6.0)
+                })
+                .map(|(x, z, yaw)| (x, z, yaw))
+            else {
+                // No ground for it. Said out loud rather than skipped: a
+                // founding short of a roof is the one failure the whole opening
+                // exists to prevent.
+                warn!(
+                    "the founding could find no ground for {}",
+                    kind.name().to_lowercase()
+                );
+                continue;
+            };
+            let at = Vec3::new(x, terrain.height_at(x, z), z);
+            let (_, _, stood) = raise_whole(
+                RaisingWhole {
+                    commands,
+                    meshes,
+                    materials,
+                    terrain,
+                    chunks,
+                    chunk_assets,
+                    stripped,
+                    grass,
+                },
+                standing,
+                settlement,
+                plan,
+                at,
+                yaw,
+            );
+            taken.push((stood, reach));
+            raised += 1;
+        }
+    }
+    raised
+}
+
+/// The world-building a whole-raised building needs, bundled.
+///
+/// Eight borrows, and every one of them is a thing the god has to touch to put a
+/// finished building on unworked ground: level it, clear it, redraw it, and stand
+/// something on it. Bundled because `raise_whole` is called once per building in
+/// `THE_FOUNDING_TOWN` and threading eight arguments through a loop is how the
+/// wrong terrain gets passed to the wrong chunk store.
+pub(crate) struct RaisingWhole<'a, 'w, 's> {
+    pub commands: &'a mut Commands<'w, 's>,
+    pub meshes: &'a mut Assets<Mesh>,
+    pub materials: &'a mut Assets<StandardMaterial>,
+    pub terrain: &'a mut Terrain,
+    pub chunks: &'a mut crate::terrain::LoadedChunks,
+    pub chunk_assets: &'a crate::terrain::TerrainAssets,
+    pub stripped: &'a mut crate::scatter::StrippedGround,
+    pub grass: &'a mut crate::grass::GrassChunks,
+}
+
+/// Raises one building whole, out of the earth, on ground nobody worked for it.
+///
+/// THE GOD'S OWN DOING rather than a village's, and the only path in the game
+/// that produces a finished building nobody built. It was the founding hall's
+/// private code until the opening became a whole town - Brett: "you would still
+/// place the flag, but the whole town would rise instead of just a longhouse" -
+/// and a second copy of "level the ground, clear the trees, redraw the chunks,
+/// stand the thing up and dress it" is exactly the kind of copy that drifts.
+///
+/// Returns the entity, the plan it was rolled from, and where it actually stands
+/// once the ground under it has been leveled.
+pub(crate) fn raise_whole(
+    world: RaisingWhole<'_, '_, '_>,
+    standing: &[(Entity, Vec3)],
+    settlement: Entity,
+    plan: Blueprint,
+    at: Vec3,
+    yaw: f32,
+) -> (Entity, Blueprint, Vec3) {
+    let RaisingWhole {
+        commands,
+        meshes,
+        materials,
+        terrain,
+        chunks,
+        chunk_assets,
+        stripped,
+        grass,
+    } = world;
+    let kind = plan.kind;
+    let reach = plan.half_w.max(plan.half_d);
+
+    // The ground is LEVELED for it, the way it is for every other building.
+    // Skipping this on the grounds that the flag had already vetted the site was
+    // wrong: ground level enough for a village is nowhere near level enough for
+    // a hall twenty-five meters long, and the thing came up half buried.
+    //
+    // The pad is the building's own rectangle, turned the way it is, with a pace
+    // of standing room around it. It used to be a circle wide enough to hold the
+    // corners, which is nearly twice the ground and every bit of it leveled -
+    // fine while nothing grew there, and a plateau once it did.
     let worked = terrain.terrace(at.x, at.z, plan.half_w, plan.half_d, yaw, 2.5, 2.4, at.y);
 
-    // The clearing, BEFORE the chunks are swapped - a scattered tree is
-    // a child of its chunk, and a chunk despawn takes its children with
-    // it, which is the same ordering every other site-clearing obeys.
-    // Nobody roofs over a living oak, and the god least of all.
+    // The clearing, BEFORE the chunks are swapped - a scattered tree is a child
+    // of its chunk, and a chunk despawn takes its children with it, which is the
+    // same ordering every other site-clearing obeys. Nobody roofs over a living
+    // oak, and the god least of all.
     for (tree, tree_at) in standing {
         if tree_at.distance(at) < worked + 4.0 {
             stripped.strip(tree_at.x, tree_at.z);
@@ -2236,20 +2506,20 @@ pub(crate) fn raise_the_founding_hall(
         at.z,
         worked + 4.0,
     );
-    // And the grass with it. Rebuilding the chunk leaves the grass where
-    // it was until something else happens to invalidate it, so the blades
-    // stood up through the floor and the porch for a good while after the
-    // hall arrived. Every other site does these two together.
+    // And the grass with it. Rebuilding the chunk leaves the grass where it was
+    // until something else happens to invalidate it, so the blades stood up
+    // through the floor and the porch for a good while after the hall arrived.
+    // Every other site does these two together.
     grass.invalidate_near(commands, at.x, at.z, worked + 4.0);
     let at = Vec3::new(at.x, terrain.height_at(at.x, at.z), at.z);
 
-    // How deep it starts. The whole building is set below the ground and
-    // comes up out of it, so what the player sees is the earth giving up
-    // a hall rather than one blinking into existence.
+    // How deep it starts. The whole building is set below the ground and comes
+    // up out of it, so what the player sees is the earth giving up a town rather
+    // than one blinking into existence.
     let buried = plan.wall_h * 2.4 + 4.0;
-    let hall = commands
+    let raised = commands
         .spawn((
-            Name::new(BuildingKind::Longhouse.name()),
+            Name::new(kind.name()),
             // One piece on any latitude - the founding hall was the building
             // Brett watched come out of the ground as cubism on the far side
             // of the world, because it rises through its own path and missed
@@ -2267,10 +2537,7 @@ pub(crate) fn raise_the_founding_hall(
             // thing, we should remove them all."
             crate::hand::PickRadius(reach),
             crate::hand::Rooted,
-            Building {
-                kind: BuildingKind::Longhouse,
-            },
-            Longhouse,
+            Building { kind },
             OutOfTheEarth {
                 from: at.y - buried,
                 to: at.y,
@@ -2280,42 +2547,70 @@ pub(crate) fn raise_the_founding_hall(
         .id();
     // Every stage at once: footing, frame, walls, roof.
     for stage in 0..=steps_for(&plan) {
-        raise_stage(commands, meshes, materials, hall, stage, &plan);
+        raise_stage(commands, meshes, materials, raised, stage, &plan);
     }
-    // And its beds, its table, its doors - out of the maker's own marks.
-    match super::baked::drawing_of(BuildingKind::Longhouse, plan.plan, &plan.drawing) {
-        Some(work) => {
-            super::baked::furnish_baked(commands, meshes, materials, hall, work, plan.mirrored)
-        }
-        None => {
-            commands.entity(hall).insert(Shell {
-                half_w: plan.half_w,
-                half_d: plan.half_d,
-                // AN OPENING, not a door. The hall the village raises by
-                // its own hand has a gap in its long wall and nothing in
-                // it - which is what a longhouse of this sort had.
-                doors: vec![Doorway::on_x_wall(plan.half_w, 0.0).open()],
-            });
-        }
-    }
+    dress_the_finished(commands, meshes, materials, raised, &plan);
+    (raised, plan, at)
+}
 
-    // The doorstep, in the world: where ten people are about to be
-    // standing. Read off the drawing's own door when it has one.
-    // Outside its door, found the same way every route out of it is
-    // found - the drawing's shell reaches further than its doorway does,
-    // and a fixed step put ten people indoors.
-    let shell = Shell {
-        half_w: plan.half_w,
-        half_d: plan.half_d,
-        doors: super::baked::drawing_of(BuildingKind::Longhouse, plan.plan, &plan.drawing)
-            .map(|work| super::baked::doorways(work, plan.mirrored))
-            .filter(|doors: &Vec<Doorway>| !doors.is_empty())
-            .unwrap_or_else(|| vec![Doorway::on_x_wall(plan.half_w, 0.0)]),
-    };
-    let door = *shell.doors.first()?;
-    let (_, outside) = shell.door_stand(&door);
-    let step = at + Quat::from_rotation_y(yaw) * Vec3::new(outside.x, 0.0, outside.y);
-    Some(Vec3::new(step.x, terrain.height_at(step.x, step.z), step.z))
+/// What a FINISHED building of this kind is, beyond its walls: its marker, its
+/// shell and doors, and the furniture a carried-in drawing brings with it.
+///
+/// ONE AUTHOR, called by the builder who lays the last piece and by the god who
+/// raises a town whole. Two copies of this would be two answers to "does a
+/// longhouse have a door per bay", and the copies would drift the first time
+/// somebody redrew one.
+pub(crate) fn dress_the_finished(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    building: Entity,
+    plan: &Blueprint,
+) {
+    let drawn = super::baked::drawing_of(plan.kind, plan.plan, &plan.drawing);
+    let mut done = commands.entity(building);
+    match plan.kind {
+        BuildingKind::House => {
+            done.insert(Hut);
+            if drawn.is_none() {
+                done.insert(Shell {
+                    half_w: plan.half_w,
+                    half_d: plan.half_d,
+                    doors: vec![Doorway::on_x_wall(plan.half_w, 0.0)],
+                });
+            }
+        }
+        BuildingKind::Longhouse => {
+            done.insert(Longhouse);
+            if drawn.is_none() {
+                // One door per bay, mirroring the walls' own gaps.
+                let d = plan.half_d;
+                let bays = ((d * 2.0 / 3.4).round() as i32).clamp(3, 4);
+                let doors = (0..bays)
+                    .map(|i| {
+                        Doorway::on_x_wall(
+                            plan.half_w,
+                            -d + (i as f32 + 0.5) * (d * 2.0 / bays as f32),
+                        )
+                    })
+                    .collect();
+                done.insert(Shell {
+                    half_w: plan.half_w,
+                    half_d: plan.half_d,
+                    doors,
+                });
+            }
+        }
+        // Every other kind's walls come out of `raise_stage`, and a carried-in
+        // drawing brings its own everything.
+        _ => {}
+    }
+    // The carried-in building furnishes itself: the beds it holds, the doors it
+    // opens, the table its people gather at, all read from the marks the bench
+    // wrote.
+    if let Some(work) = drawn {
+        super::baked::furnish_baked(commands, meshes, materials, building, work, plan.mirrored);
+    }
 }
 
 /// Shows the mason's slab and doorstep, the moment the last block is laid.
@@ -5187,34 +5482,47 @@ mod tests {
         assert!((per_house - per_long).abs() < 0.01);
     }
 
-    /// The village's own hall shelters the village's own founding.
+    /// THE FOUNDING TOWN HOUSES ITS FOUNDERS, on the first morning, in beds.
     ///
-    /// This is the one the wipe caught. The hall slept EIGHT against a
-    /// founding of ten and had done for as long as both numbers existed;
-    /// nothing noticed because an authored `longhouse1-10people` was carried
-    /// in over the top of it. The moment the drawings were cleared out to be
-    /// reauthored, the game's own hand was left holding a promise it could
-    /// not keep - two founders with nowhere to sleep on the first night.
+    /// This promise used to be kept by a constant: `LONGHOUSE_CAPACITY` was
+    /// DEFINED as `STARTING_POPULATION`, so the one hall that rose necessarily
+    /// held everybody, and this test asked the hall. A whole town rises now and
+    /// the weld had to be cut - see `home::LONGHOUSE_CAPACITY` - so the promise
+    /// has nowhere to live except here, read off the composition itself.
     ///
-    /// A modder may delete every drawing there is. What the game builds by
-    /// its own hand is the floor, and the floor has to hold.
+    /// It is the promise the whole opening rests on. Brett wants a town that "can
+    /// hold its own"; thirty people and twenty-eight beds is a town that starts
+    /// with two of them sleeping in the dirt and a planner already behind.
     #[test]
-    fn the_halls_the_game_builds_itself_sleep_the_founding() {
-        assert_eq!(
-            crate::villager::home::LONGHOUSE_CAPACITY,
-            crate::villager::STARTING_POPULATION,
-            "the hall the founders wake in must have a bed for each of them",
-        );
-
-        // And it is long enough to lay them out. Beds run in a row down one
-        // wall, one bed to a berth, so the shortest hall the dice can roll
-        // still has to give every berth more than a bed's own width.
-        let (short, _long) = super::longhouse_half_d();
-        let berths = crate::villager::home::LONGHOUSE_CAPACITY as f32;
-        let per_berth = short * 2.0 / berths;
+    fn the_founding_town_houses_its_founders() {
+        let beds = founding_beds();
         assert!(
-            per_berth > 0.62 * 1.5,
-            "berths are {per_berth:.2}m apart, which packs the beds into each other",
+            beds >= crate::villager::STARTING_POPULATION,
+            "the flag raises {beds} beds for {} founders",
+            crate::villager::STARTING_POPULATION,
+        );
+        // With room to grow into, but not so much that the town is a shell. A
+        // birth on the first evening must not put anybody outdoors, and a town
+        // with beds for twice its people never feels like it needs a second one.
+        assert!(
+            beds <= crate::villager::STARTING_POPULATION * 3 / 2,
+            "{beds} beds for {} founders is a town half empty",
+            crate::villager::STARTING_POPULATION,
+        );
+        // And no instant exodus: `colony::crowding` must read nothing at all on
+        // the founding morning, or the town starts shedding people it needs.
+        // Asked of the shelter the town actually has, fire circle and hall
+        // headroom included, because that is the number crowding is measured
+        // against.
+        let sheltered = crate::villager::home::shelter_capacity(
+            founding_count(BuildingKind::House),
+            founding_count(BuildingKind::Longhouse),
+            founding_count(BuildingKind::TownHall),
+        );
+        assert_eq!(
+            crate::villager::colony::crowding(crate::villager::STARTING_POPULATION, sheltered),
+            0.0,
+            "the founding town must not be crowded on the day it rises"
         );
     }
 
