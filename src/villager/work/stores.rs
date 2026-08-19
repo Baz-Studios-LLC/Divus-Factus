@@ -339,8 +339,23 @@ pub fn piece_seat(kind: PileKind, index: u16, stacked: &Stacked) -> Option<(Vec3
         // How many fit this pallet, by its drawn box rather than by any
         // number written here: the maker sized the room, and the room says
         // how much stands in it.
-        let across = (room.x / piece.x).floor().max(1.0) as u32;
-        let deep = (room.z / piece.z).floor().max(1.0) as u32;
+        // A SQUARE CELL, sized to the piece's LONGEST side, and both counts and
+        // both steps come from it.
+        //
+        // The old arithmetic counted with `piece.x` and `piece.z` and then
+        // stepped with them SWAPPED on every turned layer - so a woodpile's
+        // rows, five deep by a count measured against a quarter-meter, stepped
+        // one and a third meters each and marched clean out of a pallet barely a
+        // meter wide. Twenty-four logs in a line is thirty-one meters, which is
+        // what Brett was looking at: "there is also a wood pile graphic bug",
+        // and a beam lying across the whole square.
+        //
+        // Square cells cost a little room - a long piece no longer nests tight
+        // against its neighbor - and they make the count the same whichever way
+        // the layer lies, which is what `per_layer` below has to be true for.
+        let cell = piece.x.max(piece.z);
+        let across = (room.x / cell).floor().max(1.0) as u32;
+        let deep = (room.z / cell).floor().max(1.0) as u32;
         let high = (room.y / piece.y).floor().max(1.0) as u32;
         let per_layer = across * deep;
         let holds = per_layer * high;
@@ -354,15 +369,14 @@ pub fn piece_seat(kind: PileKind, index: u16, stacked: &Stacked) -> Option<(Vec3
         // Alternate the lie of each layer, the way a woodpile is actually
         // built - it is what stops a tall stack reading as a solid brick.
         let turned = layer % 2 == 1;
-        let (step_x, step_z) = if turned {
-            (piece.z, piece.x)
-        } else {
-            (piece.x, piece.z)
-        };
+        // The turn is the LOOK, not the layout: the piece spins on the spot
+        // inside its own square cell, so a turned layer reads as a woodpile
+        // built the way a person builds one and still stands where the pallet
+        // says.
         let spread = Vec3::new(
-            (col as f32 + 0.5) * step_x - room.x * 0.5,
+            (col as f32 + 0.5) * cell - room.x * 0.5,
             (layer as f32 + 0.5) * piece.y,
-            (row as f32 + 0.5) * step_z - room.z * 0.5,
+            (row as f32 + 0.5) * cell - room.z * 0.5,
         );
         return Some((*offset + spread, turned));
     }
@@ -1694,6 +1708,62 @@ pub(crate) fn log_stores(
 
 #[cfg(test)]
 mod tests {
+
+    /// NOTHING STANDS OUTSIDE THE PALLET IT WAS DEALT.
+    ///
+    /// The bug this pins was a beam lying across the whole town square. Every
+    /// piece is laid in rows across and then layers up, and the layers ALTERNATE
+    /// their lie the way a real woodpile does - but the count of how many fit
+    /// was measured against one axis of the piece and the STEP between them was
+    /// taken from the other, swapped, on every turned layer. A woodpile's rows
+    /// were counted against a quarter of a meter and stepped a meter and a
+    /// third, so twenty-four logs left the pallet in a thirty-one meter line.
+    ///
+    /// Checked over every kind and a range of pallet rooms, because the failure
+    /// only showed for a piece whose sides differ a lot - which is timber, and
+    /// nothing else.
+    #[test]
+    fn no_piece_is_stacked_outside_its_pallet() {
+        for kind in PileKind::every() {
+            let piece = piece_of(*kind);
+            for side in [0.6f32, 1.0, 1.4, 2.2, 3.0] {
+                let room = Vec3::splat(side);
+                let stacked = Stacked {
+                    seats: vec![(Vec3::ZERO, room)],
+                };
+                for index in 0..64u16 {
+                    let Some((at, _)) = piece_seat(*kind, index, &stacked) else {
+                        break;
+                    };
+                    // The piece's own footprint is a square cell of its longest
+                    // side, and the cell has to sit inside the room.
+                    let cell = piece.x.max(piece.z);
+                    let reach = (room.x * 0.5).max(cell * 0.5) + 0.001;
+                    assert!(
+                        at.x.abs() <= reach && at.z.abs() <= reach,
+                        "{kind:?} piece {index} stands at {at:?}, outside a {side} pallet"
+                    );
+                }
+            }
+        }
+    }
+
+    /// AND THE LAYERS STILL ALTERNATE, because that is what stops a tall stack
+    /// reading as one solid brick. The fix squared the cells; it must not have
+    /// squared the look.
+    #[test]
+    fn a_woodpile_still_crosses_its_layers() {
+        let stacked = Stacked {
+            seats: vec![(Vec3::ZERO, Vec3::splat(3.0))],
+        };
+        let mut lies = Vec::new();
+        for index in 0..24u16 {
+            if let Some((_, turned)) = piece_seat(PileKind::Timber, index, &stacked) {
+                lies.push(turned);
+            }
+        }
+        assert!(lies.contains(&true) && lies.contains(&false), "layers must cross");
+    }
 
     /// Goods fill one pallet before they start the next.
     ///
