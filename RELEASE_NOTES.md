@@ -1,82 +1,83 @@
-## Your people will not work themselves into the ground for you
+## The flag raises a town now, not a longhouse
 
-A village whose larder ran thin used to keep its fishers and gatherers at
-work through their own hunger — which is right, or a village starves beside
-an empty store with everyone too hungry to fish. What it never did was let
-them stop in time.
+You still choose the ground. What comes up out of the earth under the light is
+no longer one hall and ten strangers — it is **thirty souls and the town they
+live in**: a hall, a library, a storehouse, a well, a granary, a sawmill, three
+longhouses and three houses, a fence around all of it, and a watch standing at
+every gate that has ground to stand on.
 
-Hare lost four in one morning, every one of them a food trade, every one
-standing at the gathering ground a hundred and fifty strides from home. They
-had been told to keep working, and hunger does not stop at hungry. They turn
-for home now while the walk is still survivable.
+Three of the founders arrive already wed, each couple with a house of their own,
+and the rest take the longhouses. Everybody has a bed on the first morning, the
+sacks hold a migration's provisions, and the piles start under the storehouse
+roof instead of being carried in one armload at a time.
 
-- **And a gatherer brings home a basket.** One pick used to be a single meal
-  — a fine day's work if the berries are next door, and they stop being next
-  door within a day. Meanwhile the bush they had walked two minutes to reach
-  held five and regrew a full load in as long again, so they were leaving
-  four behind and walking back for them one at a time. The land was never
-  short of food. The basket was.
+- **What is missing is on purpose.** No blacksmith, no tavern, no mill, no
+  bakery, no weaver, no herbalist, no armory, no cemetery, no dock, no mine. A
+  town handed the whole ladder leaves nothing to want, and watching the ladder
+  is most of the game. You start with a lot to do, as ambition rather than as
+  triage.
 
-## Every village posts a guard on its first day
+## Your towns can work things out
 
-A village had no way to want a spear until it had already buried somebody —
-and the person who died holding that fear was usually the only one who held
-it, because a gatherer meets a wolf alone at the far edge of the fields. So
-towns were being eaten while appointing nobody.
+A library, and scholars to sit in it. There is a **branching tree** of
+twenty-seven things a town can learn — joinery, husbandry, preserving,
+brickwork, masonry, iron weapons, the plow — and every town picks its own way
+through it. Shift + right-click the library to watch.
 
-Now the spear is the first thing dealt every morning, before the axe and the
-basket. A fresh grave raises the want to two, and it stays raised for a
-fortnight — a bad autumn keeps somebody on the treeline into the winter.
+- **A topic has two halves and often a journey between them.** The scholars read
+  their way to the edge of what can be reasoned out, and then some questions
+  stop: nobody works out what ore is good for without a piece of ore on the
+  table. The town says what it wants, how much, and — since the library holds
+  the maps — where the nearest one it knows of is. The load arrives, and there
+  is still work to do with it in hand.
+- **The ground picks the path.** Nothing anywhere names a clay town. A town
+  standing on clay banks finds itself learning brickwork; a town under iron
+  hills ends up at the forge. Two towns on identical ground still diverge.
+- **And what they learn shows.** A truer joint gets another log out of every
+  tree, salt and smoke keep the larder deeper, roadcraft sends people further
+  afield than they would ever have walked, and brickwork is the only way an oven
+  ever gets built.
 
-## Families are the size a couple wants
+## Some things are only in some places
 
-Children used to arrive on a dice roll made twenty times a day, which meant
-family size was decided by how long a mother lived. A couple now has a
-number they are aiming at — most want four, a few want two, and one family
-in twenty wants seven or more.
+Clay is a creature of the waterline. An oven is fired brick and a forge hearth
+is clay-lined, so **a town with no water near it wants a bakery and cannot have
+one** until somebody travels. Iron wants the high country; stone wants broken
+ground.
 
-- **Beds no longer stop children being born.** Crowding is pressure to leave
-  and found somewhere new, not a wall that quietly ends a village's growth.
-- **Nursing is a week**, so the family a couple wanted arrives while the god
-  is still watching.
+- **Every town sows its own.** Deposits used to be scattered once, at the
+  world's founding, around the first village — which meant every colony after
+  it was founded with no quarry, no clay bank and no vein its people could ever
+  reach. They get their own ground now, and what it holds is up to where they
+  settled.
+- **And a quarry you can actually walk to.** Measured over four hundred sites on
+  ten maps, one village in eight had all three of its quarries outside a miner's
+  range: stone on the map, in the survey, in the founding log, and unfetchable.
+  None do now.
 
-## The fog lies in the low ground
+## A party on the road makes camp
 
-Ground mist, at last, rather than weather standing over the village: the
-trunks disappear into it and the roofs stand out of it like islands. It
-reads clean at any distance now — where it used to go grainy far off, the
-march was spending nearly all of its samples in empty air above the fog.
+Anyone whose road is longer than a day stops at dusk, lights a fire, puts up
+tents, and sleeps in them. Camp comes down in the morning and the ground is
+bare again.
 
-## Everything a card tells you, said the same way
+Which fixes something larger than comfort: sleep did not interrupt a journey, it
+**canceled** one. A surveyor who was caught by dark forgot why they had left,
+and set out again from the square the next morning — so anything past a
+half-day's walk was unreachable however well provisioned the party.
 
-- **A family tree**, on every villager's window. Grandparents down to
-  grandchildren, drawn with branches, and the dead are on it — click any
-  name to walk to them, drag it about, zoom in.
-- **The dead have their own shelf in the chronicle**, apart from the
-  weddings and the births. And a wolf's killing rings as loudly as it should:
-  it used to be filed as an ordinary day.
-- **The hover card on a person says who they are and what is wrong**, and
-  nothing else — the rest is in their window, said properly.
-- **A town's banner reads in sections** instead of a paragraph.
-- **One divider, everywhere.** Three different section headings had grown up
-  in different corners of the game; every panel draws the same one now.
+## Fixes
 
-## The god arrives inland, in the morning
-
-The opening ground was chosen with a reward for shoreline that peaked when
-the waterline sat about fifty strides from the square — which is where the
-houses go. A town wants water within a walk, not surf in the streets. And
-the hour is picked for that ground rather than for the world's reference
-point, so a village a quarter of the way round the world no longer opens at
-midnight.
-
-## Smaller things
-
-- **The view remembers you**: everything under *what the world shows you*
-  survives a restart.
-- **Shadows reach the ground they belong to** — at a low sun they used to
-  stop dead partway along, at a line that slid as you moved.
-- **The framerate holds steady.** Eleven of the village's own systems had
-  been put on timers to save work and saved none: each did a whole second's
-  worth in a single frame, and the framerate bounced once a second for it.
-- The codex closes from an **x in the top right**, like every other window.
+- **The world no longer flickers after you open the codex.** The frosted glass
+  behind the book is gone. It ran through the one piece of engine machinery that
+  fights this game's camera chain, and once it had run the screen alternated
+  bright and dark for the rest of the session.
+- **The woodpile stays on its pallet.** A single log lay across the whole town
+  square — twenty-four of them in a line, actually, laid end to end by a stack
+  that counted along one axis and stepped along the other.
+- **Every fire has its own flame.** One town's cold hearth used to blow out
+  every other fire in the world.
+- **Nobody walks to a fire in another country.** The roofless went to whichever
+  hearth the game happened to find first.
+- **A wolf kill rings as loudly as it should** in the chronicle, and the dead
+  have their own shelf apart from the living.
