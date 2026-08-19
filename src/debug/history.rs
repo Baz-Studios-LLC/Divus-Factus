@@ -20,8 +20,17 @@ pub(crate) struct HistoryPanel;
 /// The chronicle's shelves.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Ledger {
-    /// Births, weddings, comings of age, deaths.
+    /// Births, weddings, comings of age — and the hard days a village lives
+    /// through without burying anybody.
     Lives,
+    /// The dead, and how each of them came to it.
+    ///
+    /// Off the `Lives` shelf on Brett's ask - "can we get a death tab here
+    /// separate from the Lives tab" - and it is the right split for a game
+    /// whose whole subject is what a god's people suffer. Who died and why is
+    /// the question a player comes to this book with; it should not be filed
+    /// among the weddings.
+    Deaths,
     /// Ground broken, buildings raised, tools taken up.
     Works,
     /// Miracles, conversions, the naming of the god.
@@ -49,13 +58,21 @@ impl Ledger {
         ]) {
             Ledger::Faith
         } else if hit(&[
-            "born",
-            "wed",
-            "came of age",
             "starved",
+            "was killed",
             "laid to rest",
             "perish",
             "died",
+        ]) {
+            // BEFORE `Lives`, because these words are a subset of that shelf's
+            // and whichever arm runs first wins. Mauling, slaying and being
+            // broken against are NOT here: a mauling is survivable, and a slain
+            // wolf is a good day. Only the words that mean somebody is gone.
+            Ledger::Deaths
+        } else if hit(&[
+            "born",
+            "wed",
+            "came of age",
             "mauled",
             "slew",
             "broken against",
@@ -83,6 +100,10 @@ impl Ledger {
     pub(crate) fn color(self) -> Color {
         match self {
             Ledger::Lives => palette::shade(&palette::CLOTH_RED, 0.72),
+            // Bone, and deliberately not a deeper red: the dead should read
+            // as quiet on this page, not as an alarm. It is the one shelf the
+            // eye should be able to find without being shouted at.
+            Ledger::Deaths => palette::shade(&palette::BONE, 0.62),
             Ledger::Works => palette::shade(&palette::WOOD, 0.72),
             Ledger::Faith => palette::shade(&palette::CLOTH_GOLD, 0.85),
             Ledger::World => palette::shade(&palette::GRASS, 0.62),
@@ -132,6 +153,34 @@ pub(crate) fn spawn_glyph(commands: &mut Commands, parent: Entity, ledger: Ledge
                     ..default()
                 },
                 BackgroundColor(ink),
+                ChildOf(canvas),
+            ));
+        }
+        // A headstone: a rounded slab standing in its ground.
+        Ledger::Deaths => {
+            commands.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(4),
+                    top: px(2),
+                    width: px(8),
+                    height: px(11),
+                    border_radius: BorderRadius::top(px(4)),
+                    ..default()
+                },
+                BackgroundColor(ink),
+                ChildOf(canvas),
+            ));
+            commands.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(2),
+                    top: px(13),
+                    width: px(12),
+                    height: px(2),
+                    ..default()
+                },
+                BackgroundColor(ink.with_alpha(0.6)),
                 ChildOf(canvas),
             ));
         }
@@ -259,6 +308,11 @@ impl Importance {
             "came of age",
             "died",
             "starved",
+            // A WOLF KILL RANG AS ORDINARY. The list knew every word for dying
+            // except the one the game writes most - "Yori was killed by a wolf"
+            // - so the deaths a village actually suffers were filed below the
+            // importance filter and a player looking for them found weddings.
+            "killed",
             "laid to rest",
             "perish",
             "mauled",
@@ -442,6 +496,7 @@ pub(crate) fn spawn_chronicle_page(mut commands: Commands, codex: Res<super::vil
     };
     shelf_tab("ALL EVENTS", None);
     shelf_tab("LIVES", Some(Ledger::Lives));
+    shelf_tab("DEATHS", Some(Ledger::Deaths));
     shelf_tab("WORKS", Some(Ledger::Works));
     shelf_tab("FAITH", Some(Ledger::Faith));
     shelf_tab("THE WORLD", Some(Ledger::World));
@@ -1084,6 +1139,7 @@ pub(crate) fn update_chronicle(
         .id();
     for (ledger, name) in [
         (Ledger::Lives, "of lives"),
+        (Ledger::Deaths, "of the dead"),
         (Ledger::Works, "of works"),
         (Ledger::Faith, "of faith"),
         (Ledger::World, "of the world"),
@@ -1106,4 +1162,67 @@ pub(crate) fn update_chronicle(
         ));
     }
     let _ = shown;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Importance, Ledger};
+
+    /// The dead are on their own shelf, and only the dead.
+    ///
+    /// Filing is done by reading the event's own words, which is the kind of
+    /// rule that rots the moment somebody rewords a chronicle line. These are
+    /// the real sentences the game writes.
+    #[test]
+    fn the_dead_shelf_holds_the_dead() {
+        for said in [
+            "Yori was killed by a wolf",
+            "Taeshon starved on the road, 148 strides from a larder that held food",
+            "Lika was laid to rest",
+        ] {
+            assert!(
+                matches!(Ledger::of(said), Ledger::Deaths),
+                "not filed with the dead: {said}"
+            );
+        }
+    }
+
+    /// A hard day is not a death, and a won fight is not a death.
+    #[test]
+    fn surviving_is_not_dying() {
+        for said in [
+            "famine watch: Hare holds about 5 food for 11 mouths",
+            "Voblyr was born to Zimi and Wahe",
+        ] {
+            assert!(
+                matches!(Ledger::of(said), Ledger::Lives),
+                "wrongly filed with the dead: {said}"
+            );
+        }
+        // A mauling is survivable - that is the whole point of the warning
+        // bell - and a slain wolf is a good day. Neither is a death, wherever
+        // else they are shelved.
+        for said in [
+            "A wolf attacked someone from the village",
+            "Hyrvyre slew a wolf",
+        ] {
+            assert!(
+                !matches!(Ledger::of(said), Ledger::Deaths),
+                "a survivable day was filed with the dead: {said}"
+            );
+        }
+    }
+
+    /// A death still rings as loudly as it did.
+    ///
+    /// The shelf and the bell are separate readings of the same sentence, and
+    /// moving one must not quietly move the other - a death dropping to
+    /// `Common` would vanish under the importance filter.
+    #[test]
+    fn a_death_still_rings_important() {
+        assert!(matches!(
+            Importance::of("Yori was killed by a wolf"),
+            Importance::Important
+        ));
+    }
 }
