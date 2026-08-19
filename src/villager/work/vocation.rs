@@ -471,11 +471,25 @@ pub(crate) fn morning_muster(
     } else if has(BuildingKind::Watchtower) {
         1.0
     } else {
-        // One spear per three frightened souls, and ONE PER GRAVE. A survivor is
-        // enough for a spear; somebody in the ground is worth the same, because
-        // a village that has buried one of its own to teeth is a village that
-        // knows. Whichever fear is louder decides.
-        (peril / 3.0).ceil().max(slain).min(2.0)
+        // ONE SPEAR FROM THE FIRST DAY, before anything has happened. Brett:
+        // "Maybe they should want a little protection right off the rip from the
+        // beginning."
+        //
+        // Which is the right way round. Everything above this line is a village
+        // LEARNING to fear the woods - from what it carries, from what it has
+        // buried - and learning costs a life every time. Ten founders who post
+        // nobody until a wolf has taken one of them are ten founders who lose
+        // one, and the one it takes is a gatherer working alone at the far edge
+        // of the ring, which is exactly the mark a wolf looks for. The village
+        // that walks out of the woods to plant a flag already knows there are
+        // wolves in it.
+        //
+        // It costs a food trade out of ten hands and is worth it: a village down
+        // one gatherer eats a little later, and a village down one gatherer to
+        // teeth stops eating altogether - measured, twice, as the same spiral.
+        //
+        // The rest still rises above the floor: fear and graves take it to two.
+        (peril / 3.0).ceil().max(slain).max(1.0).min(2.0)
     };
 
     let raising = sites.iter().count() as f32;
