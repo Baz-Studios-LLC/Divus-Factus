@@ -1525,6 +1525,7 @@ pub(super) fn do_work(
                     &mut materials,
                     house,
                     &plan,
+                    buildings::Hands::Mortal,
                 );
                 // A holding comes with its ground broken: a plot turned beside
                 // the house, waiting for whoever lives there to work it. Left

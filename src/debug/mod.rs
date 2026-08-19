@@ -24,6 +24,7 @@ pub(crate) mod family;
 mod god;
 mod history;
 mod hud;
+mod inspect;
 mod inspector;
 pub(crate) mod layers;
 mod manifest;
@@ -73,6 +74,7 @@ impl Plugin for DebugPlugin {
             .init_resource::<RosterSort>()
             .init_resource::<people::RosterFilter>()
             .init_resource::<villager_profile::VillagerProfile>()
+            .init_resource::<inspect::Inspect>()
             .init_resource::<portrait::Portraits>()
             .init_resource::<ChronicleView>()
             .init_resource::<ChronicleStars>()
@@ -86,6 +88,7 @@ impl Plugin for DebugPlugin {
                     spawn_world_panel.after(spawn_village_panel),
                     spawn_people_panel.after(spawn_village_panel),
                     villager_profile::spawn_villager_profile.after(spawn_people_panel),
+                    inspect::spawn_inspect,
                     spawn_chronicle_page.after(spawn_village_panel),
                     spawn_village_panel,
                     spawn_god_panel.after(spawn_village_panel),
@@ -241,6 +244,17 @@ impl Plugin for DebugPlugin {
                 Update,
                 villager_profile::update_villager_profile.in_set(DebugSet::Rebuild),
             )
+            // The Inspect window: the frame is rebuilt only when its subject
+            // changes, and the numbers inside are refreshed every tick. Both in
+            // Rebuild, in that order - refreshing a body that is about to be
+            // thrown away writes into despawned entities.
+            .add_systems(
+                Update,
+                (inspect::dress_inspect, inspect::refresh_inspect)
+                    .chain()
+                    .in_set(DebugSet::Rebuild),
+            )
+            .add_systems(Update, inspect::close_inspect.in_set(DebugSet::Input))
             .add_systems(
                 Update,
                 (
@@ -290,7 +304,17 @@ impl Plugin for DebugPlugin {
             )
             .add_systems(Startup, report::open_the_report)
             .add_systems(Last, report::close_the_report)
-            .add_systems(PostUpdate, villager_profile::open_villager_profile);
+            .add_systems(
+                PostUpdate,
+                (
+                    villager_profile::open_villager_profile,
+                    // AFTER the profile, and it matters: both read the same
+                    // shift-right-click on the same `hand.hovered`. The profile
+                    // takes people; this takes what it leaves.
+                    inspect::open_on_shift_right_click,
+                )
+                    .chain(),
+            );
 
         // The parallel court's own inspector: DIVUS_FACTUS_AMBIGUITY=1
         // makes the scheduler list every unordered pair that shares

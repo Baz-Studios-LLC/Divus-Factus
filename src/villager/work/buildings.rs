@@ -2629,8 +2629,19 @@ pub(crate) fn raise_whole(
     for stage in 0..=steps_for(&plan) {
         raise_stage(commands, meshes, materials, raised, stage, &plan);
     }
-    dress_the_finished(commands, meshes, materials, raised, &plan);
+    dress_the_finished(commands, meshes, materials, raised, &plan, Hands::Divine);
     (raised, plan, at)
+}
+
+/// Whose hands raised a building, which changes what it is when finished.
+///
+/// Only the longhouse cares today, and it genuinely does - see the arm below.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Hands {
+    /// A villager laid the last piece.
+    Mortal,
+    /// It came up out of the earth under the light.
+    Divine,
 }
 
 /// What a FINISHED building of this kind is, beyond its walls: its marker, its
@@ -2646,6 +2657,7 @@ pub(crate) fn dress_the_finished(
     materials: &mut Assets<StandardMaterial>,
     building: Entity,
     plan: &Blueprint,
+    whose: Hands,
 ) {
     let drawn = super::baked::drawing_of(plan.kind, plan.plan, &plan.drawing);
     let mut done = commands.entity(building);
@@ -2659,6 +2671,21 @@ pub(crate) fn dress_the_finished(
                     doors: vec![Doorway::on_x_wall(plan.half_w, 0.0)],
                 });
             }
+        }
+        // A HALL THE GOD RAISED HAS AN OPENING; one a village built has doors.
+        //
+        // That difference is real and was nearly lost: sharing this function
+        // between the builder and the god's own raising made every founding hall
+        // grow a set of doors it never had, and the only thing that said so was
+        // `Doorway::open` going dead. The founding hall is a gap in a long wall
+        // with nothing in it - which is what a longhouse of this sort had.
+        BuildingKind::Longhouse if whose == Hands::Divine && drawn.is_none() => {
+            done.insert(Longhouse);
+            done.insert(Shell {
+                half_w: plan.half_w,
+                half_d: plan.half_d,
+                doors: vec![Doorway::on_x_wall(plan.half_w, 0.0).open()],
+            });
         }
         BuildingKind::Longhouse => {
             done.insert(Longhouse);
