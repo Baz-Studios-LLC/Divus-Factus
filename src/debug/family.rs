@@ -428,6 +428,20 @@ const UNIT: Vec2 = Vec2::new(118.0, 76.0);
 #[derive(Component)]
 pub(crate) struct FamilyCanvas;
 
+/// A card somebody can be walked to by clicking.
+///
+/// Brett: "Clicking on anyones name should open their panel and close the
+/// current one." Which is what turns a diagram into a way of getting about - a
+/// tree you can walk is how a player finds the great-grandmother nobody would
+/// ever have gone looking for.
+///
+/// The DEAD carry none of these, and the subject does not either. A dead
+/// ancestor has no panel to open - the window's own queries are `With<Villager>,
+/// Without<Corpse>` - so a click would swap a full page for an empty one, and
+/// the subject is already the page you are on.
+#[derive(Component)]
+pub(crate) struct KinCard(pub Entity);
+
 /// Everything the drawing needs to know about one person on the tree.
 pub(crate) struct Who {
     pub name: String,
@@ -461,6 +475,8 @@ pub(crate) fn draw_the_family(
                 scale: Vec2::splat(1.0),
                 ..default()
             },
+            // Hidden until it has been placed - see `FamilyView::placed`.
+            Visibility::Hidden,
             Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(0.0),
@@ -525,6 +541,11 @@ pub(crate) fn draw_the_family(
                 ChildOf(canvas),
             ))
             .id();
+        if seat.kin != Kin::Subject && !soul.dead {
+            commands
+                .entity(card)
+                .insert((KinCard(seat.who), Interaction::default()));
+        }
         commands.spawn((
             crate::ui::SerifFace,
             Text::new(if soul.dead {
@@ -565,6 +586,14 @@ pub(crate) struct FamilyView {
     pub close: f32,
     /// Whose tree this framing belongs to.
     pub of: Option<Entity>,
+    /// Whether the opening framing has been worked out yet.
+    ///
+    /// A canvas is spawned before its parent's rectangle exists, so anything
+    /// placed on the frame it is built lands at the window's corner and snaps
+    /// into place on the next one. Brett: "when you open the panel the tree is in
+    /// the upper left corner and then pops to the center?" It stays hidden until
+    /// this is true, so the first frame anybody sees is the placed one.
+    pub placed: bool,
 }
 
 impl Default for FamilyView {
@@ -573,6 +602,7 @@ impl Default for FamilyView {
             held: Vec2::ZERO,
             close: 1.0,
             of: None,
+            placed: false,
         }
     }
 }
@@ -597,13 +627,16 @@ pub(crate) fn drag_the_family(
     wheel: Res<bevy::input::mouse::AccumulatedMouseScroll>,
     primary: Query<&bevy::window::Window, With<bevy::window::PrimaryWindow>>,
     mut view: ResMut<FamilyView>,
+    // The well the tree sits in, for centering it on opening.
+    wells: Query<&ComputedNode>,
     mut canvas: Query<
         (
             &mut Node,
             &mut UiTransform,
+            &mut Visibility,
             &ComputedNode,
             &UiGlobalTransform,
-            &InheritedVisibility,
+            &ChildOf,
         ),
         // WITHOUT THIS IT IS EVERY NODE IN THE GAME. An unfiltered `&mut Node`
         // query matches the HUD, the codex and the hotbar, and this system would
@@ -615,15 +648,39 @@ pub(crate) fn drag_the_family(
         return;
     };
     let cursor = primary.cursor_position();
-    for (mut node, mut transform, computed, at, visible) in &mut canvas {
-        if !visible.get() {
+    for (mut node, mut transform, mut shown, computed, at, parent) in &mut canvas {
+        let scale = computed.inverse_scale_factor();
+        // CENTERED ON OPENING, once there is a parent rectangle to center in.
+        // Brett: "this is probably the right zoom level when you open the panel" -
+        // so nothing else about the opening view is touched.
+        // THE GATE IS THE CANVAS'S OWN, not the resource's. The page is rebuilt
+        // from nothing whenever the family changes - and every rebuild spawns a
+        // fresh hidden canvas, so a flag on the resource would stay true and
+        // leave the new one hidden for good. Which would have broken clicking a
+        // name, the feature added an hour ago, in the least obvious way.
+        if *shown == Visibility::Hidden {
+            // The FRAMING is worked out once per person; a rebuild reuses it, so
+            // a grandchild being born does not undo a drag.
+            if !view.placed {
+                let mine = computed.size() * scale;
+                let room = wells
+                    .get(parent.parent())
+                    .map(|well| well.size() * well.inverse_scale_factor())
+                    .unwrap_or(mine);
+                view.held = ((room - mine) * 0.5).max(Vec2::ZERO);
+                view.placed = true;
+            }
+            node.left = Val::Px(view.held.x);
+            node.top = Val::Px(view.held.y);
+            transform.scale = Vec2::splat(view.close);
+            // Only now is it worth looking at.
+            *shown = Visibility::Inherited;
             continue;
         }
         // Tested against the canvas's own visible box: it is the size of the
         // family, so this is generous, which is right - a tree is dragged from
         // wherever the hand happens to be resting on it.
         let over = cursor.is_some_and(|cursor| {
-            let scale = computed.inverse_scale_factor();
             let center = Vec2::new(at.translation.x, at.translation.y) * scale;
             let half = computed.size() * scale * 0.5;
             (cursor.x - center.x).abs() <= half.x && (cursor.y - center.y).abs() <= half.y
@@ -640,5 +697,39 @@ pub(crate) fn drag_the_family(
         node.left = Val::Px(view.held.x);
         node.top = Val::Px(view.held.y);
         transform.scale = Vec2::splat(view.close);
+    }
+}
+
+/// Walks the tree: a click on a name opens that person instead.
+///
+/// The tab is DELIBERATELY LEFT WHERE IT IS. Opening somebody from the world
+/// starts them on their overview, which is right - you asked about a person. But
+/// a click inside the tree is a step through the family, and being thrown to an
+/// overview every step would make walking a dynasty a matter of five clicks per
+/// generation.
+pub(crate) fn walk_the_family(
+    mut cards: Query<(&Interaction, &KinCard, &mut BorderColor), Changed<Interaction>>,
+    mut selected: ResMut<crate::debug::people::SelectedPerson>,
+    mut view: ResMut<FamilyView>,
+) {
+    for (how, card, mut border) in &mut cards {
+        match how {
+            Interaction::Pressed => {
+                selected.0 = Some(card.0);
+                // Their tree is a different shape, so it opens framed afresh.
+                *view = FamilyView {
+                    of: Some(card.0),
+                    ..Default::default()
+                };
+            }
+            // The only hint that a name can be walked to. Cheap, and it is what
+            // makes the feature discoverable at all.
+            Interaction::Hovered => {
+                *border = BorderColor::all(crate::ui::theme::accent());
+            }
+            Interaction::None => {
+                *border = BorderColor::all(crate::ui::theme::panel_border());
+            }
+        }
     }
 }

@@ -279,6 +279,7 @@ impl Plugin for DebugPlugin {
                 (
                     villager_profile::handle_profile_actions,
                     family::drag_the_family,
+                    family::walk_the_family,
                     // ALWAYS, not behind a dial: the report is the thing Brett
                     // reads back to me after a test, and an instrument that has
                     // to be remembered is an instrument that is off when it
