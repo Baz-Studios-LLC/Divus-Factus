@@ -1441,7 +1441,23 @@ fn begin_farewell(
     screens: Query<Entity, With<TitleScreen>>,
     buttons: Query<Entity, With<TitleMenu>>,
     settings: Query<Entity, With<SettingsScreen>>,
+    site: Option<Res<crate::villager::SettlementSite>>,
+    mut rigs: Query<&mut crate::camera::CameraRig>,
 ) {
+    // THE DRIFT HAS BEEN WALKING EAST THIS WHOLE TIME, and longitude in this
+    // game counts rather than wraps. A title left up for ten minutes leaves the
+    // camera three laps from home by the numbers while naming the same ground -
+    // and the descent then flies all three. Renaming it here costs nothing and
+    // is the last moment anybody can: after this the rig is chasing the world.
+    if let Ok(mut rig) = rigs.single_mut() {
+        let home = site.map(|site| site.center).unwrap_or(Vec3::ZERO);
+        let brought = crate::camera::nearest_lap_to(rig.focus, home);
+        // BOTH, and by the same step, or the rig would read the rename as a
+        // shove and fly the distance it thinks it just gained.
+        let step = brought.x - rig.focus.x;
+        rig.focus.x = brought.x;
+        rig.target_focus.x += step;
+    }
     for screen in &settings {
         commands.entity(screen).despawn();
     }

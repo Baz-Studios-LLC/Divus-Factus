@@ -935,6 +935,34 @@ pub(crate) fn fold_onto_the_sphere(focus: Vec3) -> Vec3 {
     canonical_near(focus, direction)
 }
 
+/// The same place, written as the longitude nearest a destination.
+///
+/// Longitude in this game is a running number rather than an angle: it stays
+/// CONTINUOUS so that panning never teleports, which is what `canonical_near`
+/// is for. The cost is that anything which walks in one direction long enough
+/// keeps counting - and the title screen's drift walks forever. Leave the title
+/// up for ten minutes and the camera's focus is three whole circumferences from
+/// home, naming the same ground by a number three laps away.
+///
+/// Then Begin is pressed and the descent flies to the village. Every one of
+/// those laps gets travelled, at descent speed. Brett: "if you let the title
+/// screen run for a while and then click begin, the world spins super fast
+/// during the zoom in, and rotates a lot."
+///
+/// This renames the position without moving it: same ground, smallest number,
+/// so the way there is never longer than half a lap.
+pub(crate) fn nearest_lap_to(focus: Vec3, destination: Vec3) -> Vec3 {
+    let round = crate::terrain::planet_circumference();
+    let mut x = focus.x;
+    while x - destination.x > round * 0.5 {
+        x -= round;
+    }
+    while destination.x - x > round * 0.5 {
+        x += round;
+    }
+    Vec3::new(x, focus.y, focus.z)
+}
+
 /// The canonical `(x, z)` for a direction, with longitude unwrapped toward the
 /// position it came from — so a step never teleports the coordinates across the
 /// date line, even though the place either side of it is the same place.
@@ -1216,6 +1244,42 @@ fn write_camera_transform(
 
 #[cfg(test)]
 mod tests {
+    /// A title left running does not cost the descent a lap.
+    ///
+    /// Longitude counts rather than wraps, so the drift's number grows without
+    /// bound while naming the same ground over and over. This is the rename
+    /// that keeps the way home short - and it must be a RENAME: the ground
+    /// referred to has to be the same ground, or the descent lands somewhere
+    /// else entirely.
+    #[test]
+    fn a_long_title_does_not_fly_the_world_twice() {
+        let round = crate::terrain::planet_circumference();
+        let home = Vec3::new(500.0, 0.0, 200.0);
+        // Three laps of drifting, plus a little.
+        let adrift = Vec3::new(500.0 + round * 3.0 + 80.0, 0.0, 200.0);
+
+        let brought = super::nearest_lap_to(adrift, home);
+        assert!(
+            (brought.x - home.x).abs() <= round * 0.5,
+            "still {} from home, of a {round} lap",
+            brought.x - home.x
+        );
+        // The same ground: what moved is a whole number of laps and nothing
+        // else.
+        let laps = (adrift.x - brought.x) / round;
+        assert!(
+            (laps - laps.round()).abs() < 1e-3,
+            "the rename moved the camera {laps} laps - not a whole number, so \
+             it is a different place"
+        );
+        assert_eq!(brought.z, adrift.z);
+
+        // Already near home: nothing to do, and no drift introduced.
+        let near = Vec3::new(520.0, 0.0, 200.0);
+        assert_eq!(super::nearest_lap_to(near, home), near);
+    }
+
+
     use super::*;
 
     /// Where a cursor at `ndc` lands on the planet, for a rig — the grab's
