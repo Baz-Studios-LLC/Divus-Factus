@@ -66,7 +66,8 @@ pub struct DebugPlugin;
 
 impl Plugin for DebugPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((FrameTimeDiagnosticsPlugin::default(), layers::LayerPlugin))
+        app.init_resource::<family::FamilyView>()
+            .add_plugins((FrameTimeDiagnosticsPlugin::default(), layers::LayerPlugin))
             .init_resource::<DebugState>()
             .init_resource::<SelectedPerson>()
             .init_resource::<RosterSort>()
@@ -277,6 +278,7 @@ impl Plugin for DebugPlugin {
                 Update,
                 (
                     villager_profile::handle_profile_actions,
+                    family::drag_the_family,
                     // ALWAYS, not behind a dial: the report is the thing Brett
                     // reads back to me after a test, and an instrument that has
                     // to be remembered is an instrument that is off when it

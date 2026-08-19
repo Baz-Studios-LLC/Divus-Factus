@@ -510,12 +510,17 @@ pub(crate) fn spawn_villager_profile(
                 },
                 BackgroundColor(ui::theme::card_bg()),
                 BorderColor::all(ui::theme::card_border()),
-                crate::ui::Scrollable,
                 bevy::ui::ScrollPosition::default(),
                 Interaction::default(),
                 ChildOf(page_node),
             ))
             .id();
+        // THE KIN PAGE KEEPS THE WHEEL FOR ITSELF. Every other page scrolls with
+        // it; on the tree it zooms, and a wheel that did both at once would zoom
+        // the family while sliding it out of the window.
+        if *tab_variant != ProfileTab::Kin {
+            commands.entity(card).insert(crate::ui::Scrollable);
+        }
 
         // If SKILLS tab, insert the interactive vocation reassignment grid
         if *tab_variant == ProfileTab::Skills {
@@ -620,6 +625,7 @@ pub(crate) fn open_villager_profile(
     villagers: Query<(), (With<Villager>, Without<Corpse>)>,
     mut profile: ResMut<VillagerProfile>,
     mut selected: ResMut<super::people::SelectedPerson>,
+    mut tree: ResMut<crate::debug::family::FamilyView>,
     mut press_at: Local<Option<Vec2>>,
 ) {
     let Ok(window) = windows.single() else {
@@ -652,6 +658,17 @@ pub(crate) fn open_villager_profile(
     selected.0 = Some(villager);
     profile.open = true;
     profile.tab = ProfileTab::Overview;
+
+    // A NEW PERSON GETS A FRESH VIEW OF THEIR TREE. The framing is kept across
+    // rebuilds on purpose - a grandchild being born must not throw away where
+    // the player had dragged to - but somebody else's tree is a different shape,
+    // and their framing would open it half off the window.
+    if tree.of != Some(villager) {
+        *tree = crate::debug::family::FamilyView {
+            of: Some(villager),
+            ..Default::default()
+        };
+    }
 }
 
 pub(crate) fn handle_profile_actions(

@@ -453,6 +453,14 @@ pub(crate) fn draw_the_family(
     let canvas = commands
         .spawn((
             FamilyCanvas,
+            // The handle the zoom turns. Scaled from its top left rather than
+            // its middle, so zooming in does not also slide the tree sideways -
+            // a zoom that moves what you were looking at is a zoom that fights
+            // the drag.
+            UiTransform {
+                scale: Vec2::splat(1.0),
+                ..default()
+            },
             Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(0.0),
@@ -538,4 +546,99 @@ pub(crate) fn draw_the_family(
         ));
     }
     canvas
+}
+
+// ---------------------------------------------------------------------------
+// Taking hold of it: drag to pan, wheel to zoom.
+// ---------------------------------------------------------------------------
+
+/// Where the tree has been dragged to and how far in it has been zoomed.
+///
+/// A RESOURCE, not a component, because the page is rebuilt from nothing every
+/// time the tab changes or the family does - and a view the player had arranged
+/// must not snap back to the middle because a grandchild was born. Reset when a
+/// different villager's window is opened, since their tree is a different shape
+/// and somebody else's framing means nothing on it.
+#[derive(Resource)]
+pub(crate) struct FamilyView {
+    pub held: Vec2,
+    pub close: f32,
+    /// Whose tree this framing belongs to.
+    pub of: Option<Entity>,
+}
+
+impl Default for FamilyView {
+    fn default() -> Self {
+        FamilyView {
+            held: Vec2::ZERO,
+            close: 1.0,
+            of: None,
+        }
+    }
+}
+
+/// How far in and out the tree may be zoomed.
+///
+/// Out to a third, because a dynasty six generations wide is the case that
+/// needs it; in to double, because the names are set at twelve pixels and past
+/// double it is a poster rather than a tree.
+const NEAREST: f32 = 2.0;
+const FURTHEST: f32 = 0.34;
+
+/// Drags the tree about and zooms it, while the pointer is over it.
+///
+/// Hit-tested by geometry rather than `Interaction`, the same as the wheel over
+/// a scrollable pane and for the same reason: the cards ARE the tree, so hover
+/// would be captured by whichever card the cursor rested on and the tree would
+/// pan only in the gaps between them.
+pub(crate) fn drag_the_family(
+    mouse: Res<ButtonInput<MouseButton>>,
+    moved: Res<bevy::input::mouse::AccumulatedMouseMotion>,
+    wheel: Res<bevy::input::mouse::AccumulatedMouseScroll>,
+    primary: Query<&bevy::window::Window, With<bevy::window::PrimaryWindow>>,
+    mut view: ResMut<FamilyView>,
+    mut canvas: Query<
+        (
+            &mut Node,
+            &mut UiTransform,
+            &ComputedNode,
+            &UiGlobalTransform,
+            &InheritedVisibility,
+        ),
+        // WITHOUT THIS IT IS EVERY NODE IN THE GAME. An unfiltered `&mut Node`
+        // query matches the HUD, the codex and the hotbar, and this system would
+        // have dragged the whole interface around.
+        With<FamilyCanvas>,
+    >,
+) {
+    let Ok(primary) = primary.single() else {
+        return;
+    };
+    let cursor = primary.cursor_position();
+    for (mut node, mut transform, computed, at, visible) in &mut canvas {
+        if !visible.get() {
+            continue;
+        }
+        // Tested against the canvas's own visible box: it is the size of the
+        // family, so this is generous, which is right - a tree is dragged from
+        // wherever the hand happens to be resting on it.
+        let over = cursor.is_some_and(|cursor| {
+            let scale = computed.inverse_scale_factor();
+            let center = Vec2::new(at.translation.x, at.translation.y) * scale;
+            let half = computed.size() * scale * 0.5;
+            (cursor.x - center.x).abs() <= half.x && (cursor.y - center.y).abs() <= half.y
+        });
+        if !over {
+            continue;
+        }
+        if mouse.pressed(MouseButton::Left) && moved.delta != Vec2::ZERO {
+            view.held += moved.delta;
+        }
+        if wheel.delta.y != 0.0 {
+            view.close = (view.close * (1.0 + wheel.delta.y * 0.12)).clamp(FURTHEST, NEAREST);
+        }
+        node.left = Val::Px(view.held.x);
+        node.top = Val::Px(view.held.y);
+        transform.scale = Vec2::splat(view.close);
+    }
 }
