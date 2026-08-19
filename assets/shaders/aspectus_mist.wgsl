@@ -128,6 +128,22 @@ fn density_at(at: vec3<f32>, ground: vec2<f32>) -> f32 {
     return weight * thinning * lid * inside;
 }
 
+/// How high a point stands over the land under it, for bracketing the march.
+///
+/// The same reckoning `density_at` does, without the density: it is used to find
+/// where along a ray the fog can possibly be, so the sixteen expensive samples
+/// can all be spent inside that stretch. Outside the bake there is no ground to
+/// be above, and a very large number is the honest answer - it reads as "no fog
+/// here", which is what the density function says there too.
+fn altitude_of(at: vec3<f32>, ground: vec2<f32>) -> f32 {
+    let uv = (ground - mist.field.xy) / mist.field.z;
+    if uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 {
+        return 1.0e6;
+    }
+    let baked = textureSampleLevel(field, field_sampler, uv, 0.0);
+    return length(at - mist.planet.xyz) - mist.planet.w - baked.g * mist.dials.y;
+}
+
 /// A per-pixel dither, so sixteen steps do not read as sixteen bands.
 fn shuffle(pixel: vec2<f32>) -> f32 {
     return fract(sin(dot(pixel, vec2<f32>(12.9898, 78.233))) * 43758.5453);
@@ -174,12 +190,53 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     let near_ground = flat_ground(eye + toward * 0.001);
     let far_ground = flat_ground(eye + toward * reach);
 
-    let step = reach / f32(STEPS);
+    // SPEND THE SAMPLES WHERE THE FOG IS. Sixteen steps across the whole reach
+    // is up to fifty meters a step, and the fog slab is ten deep - so at any
+    // distance most rays sampled it ONCE, or not at all, and the dither below
+    // decided which. A coin flip per pixel is exactly what salt-and-pepper looks
+    // like. Brett: "at a distance at night the fog has this dirty look", and
+    // "the fog up close looks perfect, it just has this heavy noise at a
+    // distance" - up close is precisely where the steps were already short
+    // enough to land inside the layer more than once.
+    //
+    // So the stretch of ray that CAN hold fog is bracketed first, with five
+    // cheap altitude probes, and the sixteen density samples are spent inside
+    // it. Five texture reads against sixteen saved from empty air, and a ray
+    // that never meets the fog at all now costs five and stops.
+    //
+    // Bracketed by PROBES rather than by solving the crossing, because a hill
+    // between the ends rises into a ray that a straight line says is clear, and
+    // a solve would clip the fog off its shoulder. The bracket keeps the
+    // neighbouring probe on each side, so the stretch is always wider than the
+    // fog rather than narrower.
+    let ceiling = mist.field.w * 1.35;
+    var lowest = 5;
+    var highest = -1;
+    for (var probe = 0; probe <= 4; probe = probe + 1) {
+        let part = f32(probe) / 4.0;
+        let along = reach * part;
+        let high = altitude_of(eye + toward * along, mix(near_ground, far_ground, part));
+        if high <= ceiling {
+            lowest = min(lowest, probe);
+            highest = max(highest, probe);
+        }
+    }
+    if highest < 0 {
+        // The whole ray runs above the fog: nothing to gather, and the cheapest
+        // frames in the game are the ones spent on sky.
+        return UNTOUCHED;
+    }
+    // `from` and `to` are RESERVED WORDS in WGSL, which the shader compiler
+    // says plainly and only at runtime - there is no cargo check for this.
+    let begins = reach * max(f32(lowest - 1), 0.0) / 4.0;
+    let ends = reach * min(f32(highest + 1), 4.0) / 4.0;
+
+    let step = (ends - begins) / f32(STEPS);
     let jitter = shuffle(in.uv * vec2<f32>(size)) * step;
     var gathered = 0.0;
     for (var i = 0; i < STEPS; i = i + 1) {
-        let along = jitter + f32(i) * step;
-        if along > reach {
+        let along = begins + jitter + f32(i) * step;
+        if along > ends {
             break;
         }
         let part = along / reach;
