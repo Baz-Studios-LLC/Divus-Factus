@@ -20,6 +20,7 @@ use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
 
 mod capture;
+pub(crate) mod family;
 mod god;
 mod history;
 mod hud;
