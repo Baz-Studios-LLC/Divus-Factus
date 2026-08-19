@@ -34,8 +34,32 @@ pub(crate) enum ProfileTab {
     Overview,
     Skills,
     Bonds,
+    /// The family tree: who they came from and who came from them.
+    Kin,
     Inner,
     Chronicle,
+}
+
+/// THE WHOLE BLOOD, living and dead.
+///
+/// Deliberately unfiltered, unlike the window's other kin queries: those carry
+/// `With<Villager>, Without<Corpse>` and a family tree drawn through them would
+/// quietly lose every ancestor who has died - which on a tree is most of the
+/// interesting ones. A grandmother in the ground is the reason to have a tree at
+/// all.
+#[derive(bevy::ecs::system::SystemParam)]
+pub(crate) struct TheBlood<'w, 's> {
+    kin: Query<'w, 's, (Entity, &'static Parentage)>,
+    spouses: Query<'w, 's, (Entity, &'static Spouse)>,
+    souls: Query<
+        'w,
+        's,
+        (
+            &'static Person,
+            Option<&'static crate::creature::genome::CreatureGenome>,
+            Has<Corpse>,
+        ),
+    >,
 }
 
 #[derive(Resource, Default)]
@@ -351,6 +375,7 @@ pub(crate) fn spawn_villager_profile(
         (ProfileTab::Overview, "OVERVIEW"),
         (ProfileTab::Skills, "SKILLS"),
         (ProfileTab::Bonds, "BONDS"),
+        (ProfileTab::Kin, "KIN"),
         (ProfileTab::Inner, "INNER"),
         (ProfileTab::Chronicle, "CHRONICLE"),
     ];
@@ -882,6 +907,7 @@ pub(crate) fn update_villager_profile(
     >,
     names: Query<&Person, With<Villager>>,
     parents: Query<(Entity, &Parentage), With<Villager>>,
+    blood: TheBlood,
     mut last_rendered: Local<Option<(Entity, ProfileTab, usize, usize, usize, usize, usize)>>,
 ) {
     let Ok(mut visibility) = roots.single_mut() else {
@@ -1515,6 +1541,68 @@ pub(crate) fn update_villager_profile(
                     ));
                 }
             }
+            ProfileTab::Kin => {
+                ui::section_header(&mut commands, well_entity, "THE BLOOD");
+                let parents_of = |who: Entity| {
+                    blood_kin_of(&blood, who)
+                };
+                let children_of = |who: Entity| {
+                    blood
+                        .kin
+                        .iter()
+                        .filter(|(_, born)| born.mother == who || born.father == who)
+                        .map(|(child, _)| child)
+                        .collect::<Vec<_>>()
+                };
+                let spouse_of = |who: Entity| {
+                    blood.spouses.get(who).ok().map(|(_, wed)| wed.0)
+                };
+                let plot = crate::debug::family::plot_the_family(
+                    entity,
+                    &crate::debug::family::Kinfolk {
+                        parents_of: &parents_of,
+                        children_of: &children_of,
+                        spouse_of: &spouse_of,
+                    },
+                    // Two up and two down: grandparents to grandchildren, which
+                    // is as much as a village a few generations old can fill and
+                    // as much as the well can show without dragging.
+                    2,
+                    2,
+                );
+                if plot.seats.len() <= 1 {
+                    commands.spawn((
+                        ui::dim(
+                            "No kin recorded. The founding generation sprang whole from the world.",
+                        ),
+                        ChildOf(well_entity),
+                    ));
+                } else {
+                    crate::debug::family::draw_the_family(
+                        &mut commands,
+                        well_entity,
+                        &plot,
+                        |who| {
+                            let (name, ink, dead) = blood
+                                .souls
+                                .get(who)
+                                .map(|(person, genome, dead)| {
+                                    (
+                                        person.full_name(),
+                                        genome.map_or(ui::theme::text(), |g| {
+                                            ui::theme::name_ink(g.sex)
+                                        }),
+                                        dead,
+                                    )
+                                })
+                                .unwrap_or_else(|_| {
+                                    ("someone forgotten".to_string(), ui::theme::text_dim(), true)
+                                });
+                            crate::debug::family::Who { name, ink, dead }
+                        },
+                    );
+                }
+            }
             ProfileTab::Inner => {
                 // 1. CHARACTER & TEMPERAMENT
                 ui::section_header(&mut commands, well_entity, "CHARACTER & TEMPERAMENT");
@@ -1824,4 +1912,13 @@ fn villager_name(names: &Query<&Person, With<Villager>>, entity: Entity) -> Stri
         .get(entity)
         .map(Person::full_name)
         .unwrap_or_else(|_| "someone absent".to_string())
+}
+
+/// The two people somebody was born to, if the world remembers them.
+fn blood_kin_of(blood: &TheBlood, who: Entity) -> Option<(Entity, Entity)> {
+    blood
+        .kin
+        .get(who)
+        .ok()
+        .map(|(_, born)| (born.mother, born.father))
 }

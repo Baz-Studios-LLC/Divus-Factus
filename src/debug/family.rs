@@ -161,7 +161,14 @@ pub(crate) fn plot_the_family(
         });
     }
 
-    climb(&mut plot, subject, kin, 0.0, 0.0, APART * 2.0, up);
+    // THE BASE SPREAD IS SET BY HOW DEEP WE ARE GOING, because the pedigree
+    // shape halves it every generation: ask for three generations from a base of
+    // two and the great-grandparents sit half a card apart, overlapping. Doubling
+    // the base per generation asked for keeps the TOP row at one unit of spacing
+    // whatever the depth, which is the row that decides whether a tree is
+    // readable.
+    let base = APART * (1u32 << up.max(1).min(6)) as f32 * 0.5;
+    climb(&mut plot, subject, kin, 0.0, 0.0, base, up);
     descend(&mut plot, subject, kin, 0.0, 0.0, down);
 
     // Brothers and sisters: everybody the parents had who is not the subject.
@@ -351,6 +358,43 @@ mod tests {
         }
     }
 
+    /// However deep it goes, the top row stays a card's width apart.
+    ///
+    /// The pedigree halves its spread each generation, so the base has to double
+    /// with the depth asked for or the oldest row - the one with the most people
+    /// in it - is the one that overlaps.
+    #[test]
+    fn the_oldest_generation_still_has_room() {
+        // A line of ancestors four deep: everybody has two parents.
+        let mut parents = std::collections::HashMap::new();
+        for who in 1u64..32 {
+            parents.insert(who, (who * 2, who * 2 + 1));
+        }
+        let family = Family {
+            parents,
+            kids: HashMap::new(),
+            spouses: HashMap::new(),
+        };
+        for depth in 1..=4 {
+            let plot = family.plot(1, depth, 0);
+            let oldest = plot
+                .seats
+                .iter()
+                .filter(|seat| seat.y == -(depth as f32))
+                .map(|seat| seat.x)
+                .collect::<Vec<_>>();
+            let mut sorted = oldest.clone();
+            sorted.sort_by(f32::total_cmp);
+            for pair in sorted.windows(2) {
+                assert!(
+                    pair[1] - pair[0] >= APART - 0.001,
+                    "at {depth} deep the oldest row is {:.2} apart, which overlaps",
+                    pair[1] - pair[0]
+                );
+            }
+        }
+    }
+
     /// A founder has no line upward, and that is not an error.
     #[test]
     fn the_first_generation_stands_alone() {
@@ -364,4 +408,134 @@ mod tests {
         assert!(plot.branches.is_empty());
         assert_eq!(plot.bounds(), (0.0, 0.0, 0.0, 0.0));
     }
+}
+
+// ---------------------------------------------------------------------------
+// The drawing: tree units into a canvas of cards and hairlines.
+// ---------------------------------------------------------------------------
+
+use bevy::prelude::*;
+
+/// A card's size, and what a tree unit is worth in pixels.
+///
+/// One unit is a card and a gap, so the spread arithmetic above lands cards
+/// beside each other rather than through each other.
+const CARD: Vec2 = Vec2::new(104.0, 30.0);
+const UNIT: Vec2 = Vec2::new(118.0, 76.0);
+
+/// Marks the canvas the tree is drawn on, so dragging and zooming have
+/// something to hold.
+#[derive(Component)]
+pub(crate) struct FamilyCanvas;
+
+/// Everything the drawing needs to know about one person on the tree.
+pub(crate) struct Who {
+    pub name: String,
+    pub ink: Color,
+    pub dead: bool,
+}
+
+/// Draws a plotted family into a parent, and returns the canvas.
+///
+/// Absolute positions inside one canvas, because branches are the point: a flex
+/// layout can place cards but cannot run a line between two of them, and a tree
+/// without its branches is a list with gaps. Everything is placed from the
+/// plot's least corner, so the canvas is exactly the size of the family and can
+/// be dragged around inside the well as one piece.
+pub(crate) fn draw_the_family(
+    commands: &mut Commands,
+    parent: Entity,
+    plot: &Plot,
+    who_is: impl Fn(Entity) -> Who,
+) -> Entity {
+    let (least_x, least_y, most_x, most_y) = plot.bounds();
+    let place = |x: f32, y: f32| Vec2::new((x - least_x) * UNIT.x, (y - least_y) * UNIT.y);
+    let canvas = commands
+        .spawn((
+            FamilyCanvas,
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(0.0),
+                top: Val::Px(0.0),
+                width: Val::Px((most_x - least_x) * UNIT.x + CARD.x),
+                height: Val::Px((most_y - least_y) * UNIT.y + CARD.y),
+                ..default()
+            },
+            ChildOf(parent),
+        ))
+        .id();
+
+    // THE BRANCHES FIRST, so cards paint over them: a hairline that runs under a
+    // card is invisible, and one that runs over it looks like a scratch.
+    for run in &plot.branches {
+        let at = place(run.x, run.y);
+        commands.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                // Branches leave a person's middle, so they start half a card in.
+                left: Val::Px(at.x + CARD.x * 0.5),
+                top: Val::Px(at.y + CARD.y * 0.5),
+                width: Val::Px((run.w * UNIT.x).max(1.0)),
+                height: Val::Px((run.h.abs() * UNIT.y).max(1.0)),
+                ..default()
+            },
+            // A run with a negative height climbs, so it is drawn from its top.
+            BackgroundColor(crate::ui::theme::panel_border()),
+            ChildOf(canvas),
+        ));
+    }
+
+    for seat in &plot.seats {
+        let at = place(seat.x, seat.y);
+        let soul = who_is(seat.who);
+        let card = commands
+            .spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(at.x),
+                    top: Val::Px(at.y),
+                    width: Val::Px(CARD.x),
+                    height: Val::Px(CARD.y),
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    border: UiRect::all(Val::Px(1.0)),
+                    border_radius: BorderRadius::all(Val::Px(2.0)),
+                    ..default()
+                },
+                BackgroundColor(if seat.kin == Kin::Subject {
+                    crate::ui::theme::title_bg()
+                } else {
+                    crate::ui::theme::panel_bg()
+                }),
+                // THE SUBJECT WEARS THE GOLD, so a tree of twenty faces still
+                // answers "which of these is the one I opened" at a glance.
+                BorderColor::all(if seat.kin == Kin::Subject {
+                    crate::ui::theme::accent()
+                } else {
+                    crate::ui::theme::panel_border()
+                }),
+                ChildOf(canvas),
+            ))
+            .id();
+        commands.spawn((
+            crate::ui::SerifFace,
+            Text::new(if soul.dead {
+                // The dagger is how a family tree has always said this.
+                format!("{} \u{2020}", soul.name)
+            } else {
+                soul.name.clone()
+            }),
+            TextFont {
+                font_size: bevy::text::FontSize::Px(12.0),
+                ..default()
+            },
+            TextColor(if soul.dead {
+                soul.ink.with_alpha(0.45)
+            } else {
+                soul.ink
+            }),
+            ChildOf(card),
+        ));
+    }
+    canvas
 }
