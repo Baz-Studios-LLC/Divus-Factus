@@ -2145,18 +2145,27 @@ impl Command for SowTheGround {
         }
         // Any chunk already standing was built before the pits were cut, so it
         // still shows unbroken ground with a quarry sitting on top of it.
+        //
+        // GATHERED AND REDRAWN ONCE, because quarry pits overlap: a chunk torn
+        // down for the second pit takes with it the replacement the first one
+        // put there, and the handle left behind is a despawned entity whose slot
+        // has already been reused. Three quarries, three of those.
+        let mut redraw: Vec<IVec2> = Vec::new();
         for at in &quarries {
-            crate::terrain::rebuild_chunks_near(
-                &mut commands,
-                &mut meshes,
-                &chunk_assets,
-                &terrain,
-                &mut loaded,
+            redraw.extend(crate::terrain::chunks_touching(
                 at.x,
                 at.z,
                 QUARRY_PIT + QUARRY_RIM,
-            );
+            ));
         }
+        crate::terrain::rebuild_these_chunks(
+            &mut commands,
+            &mut meshes,
+            &chunk_assets,
+            &terrain,
+            &mut loaded,
+            &redraw,
+        );
         info!(
             "the ground around {} holds {iron} iron veins, {banks} clay banks and {} quarries",
             self.town,
@@ -2435,11 +2444,21 @@ pub(crate) fn spawn_settlement(
 
     // The hall the god raised, and the doorstep the founders walk out
     // of. Only for a new world: a restored one already has its own.
+    // ONE LIST OF STANDING WOOD for the whole founding, and it shrinks as the
+    // town rises. The hall and the eleven buildings after it are raised in one
+    // frame, their clearings overlap, and a tree felled twice is a despawn of an
+    // entity already queued for despawn - which Bevy reports as "Entity not yet
+    // spawned" and is not obvious from that at all.
+    // Every chunk the founding dirties, gathered and redrawn ONCE at the end.
+    // Per-building redraws meant the same chunk was torn down and rebuilt up to
+    // a dozen times in one frame, each teardown despawning the replacement the
+    // last one had only queued.
+    let mut redraw: Vec<IVec2> = Vec::new();
+    let mut standing: Vec<(Entity, Vec3)> = woods
+        .iter()
+        .map(|(tree, at)| (tree, at.translation()))
+        .collect();
     let doorstep = restoring.is_none().then(|| {
-        let standing: Vec<(Entity, Vec3)> = woods
-            .iter()
-            .map(|(tree, at)| (tree, at.translation()))
-            .collect();
         let (terrain, chunks, chunk_assets, stripped, grass) = &mut ground;
         work::raise_the_founding_hall(
             &mut commands,
@@ -2450,10 +2469,11 @@ pub(crate) fn spawn_settlement(
             chunk_assets,
             stripped,
             grass,
-            &standing,
+            &mut standing,
             settlement,
             center,
             &mut rng,
+            &mut redraw,
         )
     });
     let doorstep = doorstep.flatten();
@@ -2462,10 +2482,6 @@ pub(crate) fn spawn_settlement(
     // raises one longhouse for thirty people has left twenty of them in the
     // dirt. See `THE_FOUNDING_TOWN`.
     if restoring.is_none() {
-        let standing: Vec<(Entity, Vec3)> = woods
-            .iter()
-            .map(|(tree, at)| (tree, at.translation()))
-            .collect();
         // THE WALL FIRST, because the watch is sited on its gates. Handed to the
         // town rather than built by it: `raise_the_fence` wants fourteen souls
         // and a hundred and twenty timber, which a town that rose this morning
@@ -2482,14 +2498,26 @@ pub(crate) fn spawn_settlement(
             chunk_assets,
             stripped,
             grass,
-            &standing,
+            &mut standing,
             settlement,
             center,
             doorstep,
             Some(&wall),
             &mut rng,
+            &mut redraw,
         );
         commands.entity(settlement).insert(wall);
+
+        // And the ground the whole founding worked, redrawn once.
+        let (terrain, chunks, chunk_assets, ..) = &mut ground;
+        crate::terrain::rebuild_these_chunks(
+            &mut commands,
+            &mut meshes,
+            chunk_assets,
+            terrain,
+            chunks,
+            &redraw,
+        );
 
         // AND THE STORES A TOWN OF THIRTY NEEDS TO BE A TOWN OF THIRTY.
         //

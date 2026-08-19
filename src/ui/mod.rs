@@ -58,10 +58,7 @@ impl Plugin for UiPlugin {
                     show_notices.run_if(in_state(crate::GameState::Playing)),
                     keep_the_prayer_shelf.run_if(in_state(crate::GameState::Playing)),
                     set_askings_aside.run_if(in_state(crate::GameState::Playing)),
-                    // The frosted glass and the standing-down shelves: one
-                    // subject - the book owning the screen. The glass
-                    // follows the god's own stance after the frost decides.
-                    (frost_the_world, hud_stands_down).chain(),
+                    hud_stands_down,
                     age_toasts,
                     style_buttons,
                     drag_windows,
@@ -444,7 +441,7 @@ fn speak(
                     side: say_side,
                 },
                 // The stand-down covers bubbles with the rest of the HUD:
-                // a word said under an open book plays to the frost.
+                // a word said under an open book plays to nobody.
                 GameHud,
                 // Under all interface chrome: a window dragged over a bubble
                 // must cover it. Ordo's own rung for world-anchored things.
@@ -2901,6 +2898,8 @@ fn track_pointer(panels: Query<&Interaction>, mut pointer: ResMut<PointerContext
 
 #[cfg(test)]
 mod tests {
+
+
     use super::*;
 
     #[test]
@@ -2941,71 +2940,6 @@ mod tests {
     }
 }
 
-/// Marks the god camera while its own eyes are closed for reading.
-#[derive(Component)]
-pub(crate) struct Frosted;
-
-/// While the book is open the world behind it goes to frosted glass.
-///
-/// ASPECTUS DOES THIS NOW, in a pass of ours over the frame already drawn -
-/// see `render::aspectus`. What stood here before woke a second `Camera3d`
-/// that rendered the entire world again into a 480x270 image with a Gaussian
-/// depth-of-field, and stretched that image back over the window with a
-/// fullscreen UI quad. Painted small, blurred wide, stretched huge: a clever
-/// way to buy an enormous blur, whose cost was never the pixels - it was
-/// submitting every chunk, tree and villager to the GPU a second time for as
-/// long as the book stayed open. A second camera also had to be kept in step
-/// with the first, which is why it was adopted as its child and had its lens
-/// and grading copied by hand every frame.
-///
-/// Sixteen texture reads over the finished frame cost no geometry at all,
-/// nothing has to be kept in step with anything, and it blurs the real screen
-/// rather than a thumbnail of it.
-pub(crate) fn frost_the_world(
-    mut commands: Commands,
-    books: Query<&Visibility, With<crate::debug::village::VillagePanel>>,
-    look: Res<crate::render::LookSettings>,
-    windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
-    gods: Query<(Entity, Has<Frosted>), With<crate::camera::GodCamera>>,
-) {
-    // DIVUS_FACTUS_FROST forces the glass on from boot, so the frost can
-    // be photographed and judged without a hand to open the book.
-    //
-    // The god camera keeps rendering the world under the book while it is
-    // open. Its layers must never be stripped: the streamer and every other
-    // camera-keyed governor follow what the window's camera sees.
-    let reading = books.iter().any(|v| *v != Visibility::Hidden)
-        || std::env::var("DIVUS_FACTUS_FROST").is_ok();
-    let window = windows.iter().next();
-    let width = window.map_or(1920.0, |w| w.width().max(1.0));
-    let aspect = window.map_or(16.0 / 9.0, |w| w.width().max(1.0) / w.height().max(1.0));
-    for (camera, frosted) in &gods {
-        if reading {
-            // The look's own frost dial is in pixels (F6/F7); the pass wants a
-            // fraction of the screen's width, so one number means one smear
-            // whatever the window is doing.
-            commands
-                .entity(camera)
-                .insert(crate::render::aspectus::Frost {
-                    strength: 1.0,
-                    radius: look.frost / width,
-                    aspect,
-                    _pad: 0.0,
-                });
-            if !frosted {
-                commands.entity(camera).insert(Frosted);
-            }
-        } else if frosted {
-            commands
-                .entity(camera)
-                .remove::<Frosted>()
-                // Taken off rather than left at zero strength: the pass runs
-                // whenever the component is there, and a shut book should not
-                // pay for a blur of nothing.
-                .remove::<crate::render::aspectus::Frost>();
-        }
-    }
-}
 
 /// The shelves stand down while the book is open: toasts and prayer cards
 /// live on the toast layer, ABOVE the book, and a tray ghosting over the

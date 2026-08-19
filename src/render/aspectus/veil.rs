@@ -52,7 +52,6 @@
 
 use std::any::type_name;
 
-use bevy::core_pipeline::fullscreen_material::fullscreen_material_system;
 use bevy::core_pipeline::schedule::Core3d;
 use bevy::core_pipeline::tonemapping::tonemapping;
 use bevy::core_pipeline::{Core3dSystems, FullscreenShader};
@@ -125,14 +124,10 @@ impl Plugin for VeilPass {
                 // -> tonemapping itself, so the veil becomes the world's last
                 // color before the lens and the curve, which is also what it
                 // is artistically - part of the world, not an effect on it.
-                //
-                // And before the frost: the book's glass should blur veiled
-                // ground, not veil a blurred world.
                 veil_pass
                     .in_set(Core3dSystems::PostProcess)
                     .before(bloom)
-                    .before(tonemapping)
-                    .before(fullscreen_material_system::<super::Frost>),
+                    .before(tonemapping),
             );
     }
 }

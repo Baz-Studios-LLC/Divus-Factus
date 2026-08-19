@@ -2473,6 +2473,31 @@ pub(crate) fn spawn_chunk(
 /// spawned in the same command batch, so there is never a frame where the
 /// world has a hole in it. (Despawning and letting streaming refill was a
 /// white flash of sky, once per ground-breaking, most visible at 8x.)
+/// Every chunk coordinate a circle of worked ground touches.
+///
+/// Split out so a caller that works the ground in SEVERAL places can rebuild
+/// each chunk exactly once. Raising a whole town calls this a dozen times over
+/// overlapping ground, and rebuilding a chunk twice in one frame means
+/// despawning an entity that exists only as a queued spawn - which Bevy reports
+/// as "Entity not yet spawned" and which reads like anything but what it is.
+pub(crate) fn chunks_touching(x: f32, z: f32, radius: f32) -> Vec<IVec2> {
+    let min = IVec2::new(
+        ((x - radius) / CHUNK_SIZE).floor() as i32,
+        ((z - radius) / CHUNK_SIZE).floor() as i32,
+    );
+    let max = IVec2::new(
+        ((x + radius) / CHUNK_SIZE).floor() as i32,
+        ((z + radius) / CHUNK_SIZE).floor() as i32,
+    );
+    let mut coords = Vec::new();
+    for cx in min.x..=max.x {
+        for cz in min.y..=max.y {
+            coords.push(IVec2::new(cx, cz));
+        }
+    }
+    coords
+}
+
 pub(crate) fn rebuild_chunks_near(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
@@ -2483,17 +2508,32 @@ pub(crate) fn rebuild_chunks_near(
     z: f32,
     radius: f32,
 ) {
-    let min = IVec2::new(
-        ((x - radius) / CHUNK_SIZE).floor() as i32,
-        ((z - radius) / CHUNK_SIZE).floor() as i32,
+    rebuild_these_chunks(
+        commands,
+        meshes,
+        assets,
+        terrain,
+        loaded,
+        &chunks_touching(x, z, radius),
     );
-    let max = IVec2::new(
-        ((x + radius) / CHUNK_SIZE).floor() as i32,
-        ((z + radius) / CHUNK_SIZE).floor() as i32,
-    );
-    for cx in min.x..=max.x {
-        for cz in min.y..=max.y {
-            let coord = IVec2::new(cx, cz);
+}
+
+/// Redraws exactly these chunks, each at most once.
+pub(crate) fn rebuild_these_chunks(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    assets: &TerrainAssets,
+    terrain: &Terrain,
+    loaded: &mut LoadedChunks,
+    coords: &[IVec2],
+) {
+    let mut done: std::collections::HashSet<IVec2> = std::collections::HashSet::new();
+    {
+        for coord in coords {
+            let coord = *coord;
+            if !done.insert(coord) {
+                continue;
+            }
             let Some(old) = loaded.entities.remove(&coord) else {
                 continue;
             };
@@ -2521,7 +2561,15 @@ pub(crate) fn rebuild_chunks_near(
                     replacement.insert(worn);
                 }
             });
-            commands.entity(old).despawn();
+            // TRY, not must. Two redraw passes can land in one command flush -
+            // the founding raises a whole town and then `SowTheGround` cuts its
+            // quarries, and where their ground overlaps the second pass despawns
+            // a replacement the first had only QUEUED. The net effect is right
+            // either way (both the spawn and the despawn apply, in order, and
+            // `loaded` holds the survivor); what is wrong is the noise, which
+            // Bevy reports as "Entity not yet spawned" and which reads like a
+            // much more serious bug than it is.
+            commands.entity(old).try_despawn();
         }
     }
 }

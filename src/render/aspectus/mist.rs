@@ -26,7 +26,6 @@
 
 use std::any::type_name;
 
-use bevy::core_pipeline::fullscreen_material::fullscreen_material_system;
 use bevy::core_pipeline::schedule::Core3d;
 use bevy::core_pipeline::tonemapping::tonemapping;
 use bevy::core_pipeline::{Core3dSystems, FullscreenShader};
@@ -123,8 +122,7 @@ impl Plugin for MistPass {
                     .in_set(Core3dSystems::PostProcess)
                     .before(super::veil::veil_pass)
                     .before(bloom)
-                    .before(tonemapping)
-                    .before(fullscreen_material_system::<super::Frost>),
+                    .before(tonemapping),
             );
     }
 }

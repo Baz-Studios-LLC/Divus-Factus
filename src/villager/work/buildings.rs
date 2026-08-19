@@ -2251,10 +2251,11 @@ pub(crate) fn raise_the_founding_hall(
     chunk_assets: &crate::terrain::TerrainAssets,
     stripped: &mut crate::scatter::StrippedGround,
     grass: &mut crate::grass::GrassChunks,
-    standing: &[(Entity, Vec3)],
+    standing: &mut Vec<(Entity, Vec3)>,
     settlement: Entity,
     center: Vec3,
     rng: &mut Rng,
+    redraw: &mut Vec<IVec2>,
 ) -> Option<Vec3> {
     let plan = Blueprint::roll(BuildingKind::Longhouse, rng);
     let reach = plan.half_w.max(plan.half_d);
@@ -2301,6 +2302,7 @@ pub(crate) fn raise_the_founding_hall(
         plan,
         at,
         yaw,
+        redraw,
     );
 
     // The doorstep, in the world: where the founding is about to be
@@ -2345,12 +2347,13 @@ pub(crate) fn raise_the_founding_town(
     chunk_assets: &crate::terrain::TerrainAssets,
     stripped: &mut crate::scatter::StrippedGround,
     grass: &mut crate::grass::GrassChunks,
-    standing: &[(Entity, Vec3)],
+    standing: &mut Vec<(Entity, Vec3)>,
     settlement: Entity,
     center: Vec3,
     hall_at: Option<Vec3>,
     wall: Option<&crate::villager::rampart::Rampart>,
     rng: &mut Rng,
+    redraw: &mut Vec<IVec2>,
 ) -> usize {
     // Everything already standing, so nothing is raised on top of anything: the
     // hall first, then each building as it goes up.
@@ -2418,6 +2421,7 @@ pub(crate) fn raise_the_founding_town(
                 plan,
                 at,
                 yaw,
+                redraw,
             );
             taken.push((stood, reach));
             raised += 1;
@@ -2497,6 +2501,7 @@ pub(crate) fn raise_the_founding_town(
                 plan,
                 at,
                 yaw,
+                redraw,
             );
             taken.push((stood, reach));
             raised += 1;
@@ -2536,11 +2541,16 @@ pub(crate) struct RaisingWhole<'a, 'w, 's> {
 /// once the ground under it has been leveled.
 pub(crate) fn raise_whole(
     world: RaisingWhole<'_, '_, '_>,
-    standing: &[(Entity, Vec3)],
+    standing: &mut Vec<(Entity, Vec3)>,
     settlement: Entity,
     plan: Blueprint,
     at: Vec3,
     yaw: f32,
+    // Chunks this raising dirtied. COLLECTED, not redrawn: a whole town works
+    // overlapping ground in one frame, and redrawing a chunk twice in a frame
+    // despawns an entity that exists only as a queued spawn. The caller flushes
+    // the union once - see `crate::terrain::rebuild_these_chunks`.
+    redraw: &mut Vec<IVec2>,
 ) -> (Entity, Blueprint, Vec3) {
     let RaisingWhole {
         commands,
@@ -2570,22 +2580,27 @@ pub(crate) fn raise_whole(
     // of its chunk, and a chunk despawn takes its children with it, which is the
     // same ordering every other site-clearing obeys. Nobody roofs over a living
     // oak, and the god least of all.
-    for (tree, tree_at) in standing {
-        if tree_at.distance(at) < worked + 4.0 {
-            stripped.strip(tree_at.x, tree_at.z);
-            commands.entity(*tree).despawn();
+    //
+    // AND THE LIST IS KEPT HONEST. A whole town is raised in one frame from one
+    // snapshot of the standing wood, and building plots overlap: two buildings
+    // whose clearings touched felled the same oak twice, which Bevy reports as
+    // "Entity not yet spawned" from a despawn of something already queued for
+    // despawn. Felled trees leave the list as they fall.
+    standing.retain(|(tree, tree_at)| {
+        if tree_at.distance(at) >= worked + 4.0 {
+            return true;
         }
-    }
-    crate::terrain::rebuild_chunks_near(
-        commands,
-        meshes,
-        chunk_assets,
-        terrain,
-        chunks,
-        at.x,
-        at.z,
-        worked + 4.0,
-    );
+        stripped.strip(tree_at.x, tree_at.z);
+        // TRY, because a scattered tree is a CHILD OF ITS CHUNK and a chunk
+        // rebuild takes its children with it. The founding fells for a dozen
+        // plots and then redraws the ground once, and `SowTheGround` cuts its
+        // quarries after that - so a tree can be felled here and carried off
+        // again by a chunk that was torn down for a quarry floor.
+        commands.entity(*tree).try_despawn();
+        false
+    });
+    redraw.extend(crate::terrain::chunks_touching(at.x, at.z, worked + 4.0));
+    let _ = (&chunk_assets, &chunks);
     // And the grass with it. Rebuilding the chunk leaves the grass where it was
     // until something else happens to invalidate it, so the blades stood up
     // through the floor and the porch for a good while after the hall arrived.

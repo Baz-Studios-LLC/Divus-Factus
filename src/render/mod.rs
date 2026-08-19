@@ -128,10 +128,6 @@ pub struct LookSettings {
     /// authored, and pushing them further under a warm key light drives the whole
     /// landscape toward lime.
     pub saturation: f32,
-    /// The reading frost: the glass camera's blur while the book is open,
-    /// as a circle of confusion in glass pixels (the glass is 270 tall).
-    /// Zero is clear glass.
-    pub frost: f32,
 }
 
 impl Default for LookSettings {
@@ -145,7 +141,6 @@ impl Default for LookSettings {
             focus_bias: 1.0,
             exposure: 0.05,
             saturation: 0.96,
-            frost: 80.0,
         }
     }
 }
@@ -432,8 +427,6 @@ fn apply_look_settings(
     >,
     mut existing: Query<&mut DepthOfField, With<GodCamera>>,
 ) {
-    // `look.frost` still drives the reading blur, but it is Aspectus's pass
-    // that reads it now (`ui::frost_the_world`), not a second camera's depth
     // of field - so there is nothing to set here.
     for (entity, rig, mut bloom, mut vignette, mut color_grading) in &mut effects {
         bloom.intensity = look.bloom;

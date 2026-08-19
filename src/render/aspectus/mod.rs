@@ -9,9 +9,6 @@
 //! at a time, and each job has to earn its place by doing something the
 //! pipeline was doing worse for this particular game.
 //!
-//! - **[`frost`]** blurs the frame behind an open book. It earned its place by
-//!   deleting a camera: the book used to wake a second `Camera3d` that
-//!   rendered the whole world again into a 480x270 image.
 //! - **[`veil`]** reads the depth the world just wrote and veils everything
 //!   standing in unwalked country - villagers, animals, buildings, anything
 //!   that will ever be added - where the material veil could only cover what
@@ -29,7 +26,7 @@
 
 /// Whether a pass may run at all, for measuring what it costs.
 ///
-/// `DIVUS_FACTUS_NO=mist,veil,frost` turns them off, comma separated. This is
+/// `DIVUS_FACTUS_NO=mist,veil` turns them off, comma separated. This is
 /// the only way to price a full-screen pass in this game: the main-world
 /// stopwatch says the SIMULATION is innocent - zero slow frames in fourteen
 /// minutes - while frames were taking 96ms, so seventy of those milliseconds
@@ -87,11 +84,9 @@ pub fn pass_is_wanted(name: &str) -> bool {
 
 use bevy::prelude::*;
 
-pub mod frost;
 pub mod mist;
 pub mod veil;
 
-pub use frost::Frost;
 pub use mist::{MistFieldImage, MistView};
 pub use veil::VeilView;
 
@@ -99,6 +94,6 @@ pub struct AspectusPlugin;
 
 impl Plugin for AspectusPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((frost::FrostPass, veil::VeilPass, mist::MistPass));
+        app.add_plugins((veil::VeilPass, mist::MistPass));
     }
 }

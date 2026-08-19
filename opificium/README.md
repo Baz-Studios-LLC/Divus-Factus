@@ -12,9 +12,9 @@ file described here.
 | path                | who writes it | what it is                                        |
 | ------------------- | ------------- | ------------------------------------------------- |
 | `opificium.json`   | you           | which folders this project uses. Every path has a default, so it may be nearly empty |
-| `data/palette.json` | the game      | the colour ramps the bench paints with            |
+| `data/palette.json` | the game      | the color ramps the bench paints with            |
 | `data/kinds.json`   | either        | what a finished drawing may be baked AS           |
-| `data/widgets.json` | either        | the marks the bench may place, and their colours  |
+| `data/widgets.json` | either        | the marks the bench may place, and their colors  |
 | `data/materials.json` | either      | what parts may be BUILT of - wood, stone, clay    |
 | `templates/`        | you           | starting shapes to draw from                      |
 | `out/buildings/`    | the bench     | saved drawings, `.baz` - **the source of truth**  |
@@ -26,7 +26,7 @@ A `.baz` is JSON. It is the editable drawing and the thing worth keeping.
 ## The palette, the kinds and the marks
 
 `data/palette.json` is the one file the game really must provide, or the bench
-paints in its own colours instead of the game's:
+paints in its own colors instead of the game's:
 
 ```json
 { "ramps": [ { "name": "wood", "steps": [[28,19,16], "...5 RGB steps..."] } ] }
@@ -66,7 +66,7 @@ A maker sets it on a part from that part's own right-click menu, under MADE OF, 
 adds words this file does not have with `+ ANOTHER`. Leave the file out and the bench
 offers wood, stone and clay; write one and it offers exactly what you wrote.
 
-**A MATERIAL IS NOT A COLOUR.** `rgb` and `cloth` on a baked box are what a maker
+**A MATERIAL IS NOT A COLOR.** `rgb` and `cloth` on a baked box are what a maker
 PAINTED. `material` is what the thing is BUILT of, and only one of those two should
 cost your game anything to gather. A box with no `material` is one nobody has spoken
 for - absent is not `wood`, and what an unspoken part costs is your decision rather
@@ -79,7 +79,7 @@ true, or have the game generate these two files the way it generates the palette
 
 ## What the bench hands the game
 
-Baking resolves a drawing into plain boxes with colours already looked up, and
+Baking resolves a drawing into plain boxes with colors already looked up, and
 writes it to **`../assets/buildings`** - the game's own assets folder, one step out
 of this one. That is the default and needs no setting; a game that keeps its assets
 elsewhere sets `install` in the manifest, and a game that wants nothing carried
@@ -111,8 +111,8 @@ anywhere sets it to `""`, which keeps bakes in `out/baked/`. That output is
 - `form` is the box's shape: `box`, `wedge`, `ridge`, `hip:<x>x<z>`, or
   `cut:<low>x<high>`. Both programs build each shape from their own code, so a new
   form must be written twice.
-- Local space is +Y up, metres, and every measurement is a whole number of
-  sixteenths of a metre.
+- Local space is +Y up, meters, and every measurement is a whole number of
+  sixteenths of a meter.
 
 Re-bake without opening a window:
 
