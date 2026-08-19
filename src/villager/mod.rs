@@ -1136,50 +1136,33 @@ fn score_town_ground(
 
     let buildable_fraction = level_room(terrain, x, z);
 
-    let mut reach_water = 0;
-    let mut reach_samples = 0;
-    for angle_step in 0..12 {
-        let angle = angle_step as f32 / 12.0 * std::f32::consts::TAU;
-        for distance in [42.0, 50.0, 58.0] {
-            let sx = x + angle.cos() * distance;
-            let sz = z + angle.sin() * distance;
-            reach_samples += 1;
-            if terrain.is_submerged(sx, sz) {
-                reach_water += 1;
-            }
-        }
-    }
-    let water_fraction = reach_water as f32 / reach_samples as f32;
     let flatness = 1.0 - terrain.slope_at(x, z);
 
-    // THE GROUND UNDER THE TOWN ITSELF, which the walk-band above says nothing
-    // about. Shore in reach is an asset - a dock feeds a village - but the
-    // reward for it peaks when the waterline is about fifty strides out, and
-    // fifty strides is where the houses go. Brett: "when I start the game it
-    // always puts me right on the beach... inland is fine, building on the
-    // beach isnt as good."
-    //
-    // Graded, not a refusal, because a river through the near ring is a
-    // DIFFERENT thing from surf on three sides and this cannot tell them apart.
-    // A town wants dry ground to stand on and water to walk to.
-    let mut near_water = 0;
-    let mut near_samples = 0;
-    for angle_step in 0..12 {
-        let angle = angle_step as f32 / 12.0 * std::f32::consts::TAU;
-        for distance in [14.0, 22.0, 30.0] {
-            let sx = x + angle.cos() * distance;
-            let sz = z + angle.sin() * distance;
-            near_samples += 1;
-            if terrain.is_submerged(sx, sz) {
-                near_water += 1;
+    // HOW FAR THE WATER IS, measured outward instead of guessed at from a
+    // single band. The band this replaced rewarded a quarter of the ring forty
+    // to sixty strides out being sea, which peaks when the waterline is about
+    // fifty strides from the square - and fifty strides is where the houses go.
+    // Brett, twice: "it always puts me right on the beach", then "right on the
+    // coast again lol".
+    let mut shore_at = f32::INFINITY;
+    'outward: for distance in [20.0, 35.0, 50.0, 70.0, 95.0, 125.0, 160.0, 200.0] {
+        for angle_step in 0..16 {
+            let angle = angle_step as f32 / 16.0 * std::f32::consts::TAU;
+            if terrain.is_submerged(x + angle.cos() * distance, z + angle.sin() * distance) {
+                shore_at = distance;
+                break 'outward;
             }
         }
     }
-    let dry_ground = 1.0 - near_water as f32 / near_samples as f32;
 
-    // Some shoreline in reach is desirable, a lot is a peninsula. Peak
-    // the reward around a quarter of the outer band being water.
-    let shoreline = 1.0 - ((water_fraction - 0.25) / 0.25).abs().min(1.0);
+    // ELBOW ROOM, which is what was missing: a town wants dry ground for a good
+    // walk in every direction before anything else is true of it. Nothing
+    // inside seventy strides, and full marks by a hundred and twenty.
+    let elbow_room = ((shore_at - 70.0) / 50.0).clamp(0.0, 1.0);
+    // And the sea within a walk is still worth wanting - a dock feeds a
+    // village, and this is the term a coastal people's yearning multiplies.
+    // Access, not frontage.
+    let shoreline = if shore_at <= 260.0 { 1.0 } else { 0.0 };
 
     // The materials band: what the founders could actually build from.
     // Sample the working-walk ring for ground that will bear trees (the
@@ -1225,11 +1208,12 @@ fn score_town_ground(
         + flatness * 2.0
         + timberland * 3.0
         + stoneland * 1.0
-        // Weighted to outrank the strongest possible yearning for the sea
-        // (1.5), so no roll of that die can seat a town in the surf - while a
-        // site that is dry underfoot AND has shore in reach still beats one
-        // with no water at all, which is the whole point.
-        + dry_ground * 3.0
+        // Room outranks everything the sea can offer: the strongest roll of
+        // `coastal_yearning` is 1.5, so no die can seat a town in the surf.
+        // What a coastal people get instead is the pick of the sites that
+        // ALREADY have their elbows - which is a village a short walk from
+        // the water rather than a village on the sand.
+        + elbow_room * 6.0
         + shoreline * coastal_yearning;
     Some((score, Vec3::new(x, height, z), timberland, stoneland))
 }
@@ -4518,5 +4502,52 @@ mod tests {
                 "seed {seed}: only {fraction:.2} of the settlement's surroundings are land",
             );
         }
+    }
+
+    /// A town is founded with its elbows out, not on the sand.
+    ///
+    /// Brett, twice in one evening: "it always puts me right on the beach",
+    /// then "right on the coast again lol". Shore in reach is worth having and
+    /// the scorer should still want it; what it may not do is put the houses
+    /// where the tide is.
+    ///
+    /// Stated as "most seeds, comfortably" rather than "every seed, absolutely",
+    /// because the scorer TRADES - a world whose only decent ground near the
+    /// origin is a headland should still found there rather than starve inland,
+    /// and a test that forbade it would be forbidding the right answer.
+    #[test]
+    fn a_town_is_founded_with_its_elbows_out() {
+        let seeds = [1u64, 2, 3, 7, 42, 2024, 20241101];
+        let mut roomy = 0;
+        for seed in seeds {
+            let terrain = Terrain::new(seed as u32);
+            let mut rng = Rng::stream(seed, "settlement");
+            let site = choose_settlement_site(&terrain, &mut rng);
+
+            let mut shore_at = f32::INFINITY;
+            'outward: for distance in [20.0, 35.0, 50.0, 70.0, 95.0, 125.0, 160.0, 200.0] {
+                for angle_step in 0..16 {
+                    let angle = angle_step as f32 / 16.0 * std::f32::consts::TAU;
+                    let x = site.x + angle.cos() * distance;
+                    let z = site.z + angle.sin() * distance;
+                    if terrain.is_submerged(x, z) {
+                        shore_at = distance;
+                        break 'outward;
+                    }
+                }
+            }
+            assert!(
+                shore_at > 20.0,
+                "seed {seed}: founded with water {shore_at} strides away - that is the beach"
+            );
+            if shore_at >= 70.0 {
+                roomy += 1;
+            }
+        }
+        assert!(
+            roomy * 2 > seeds.len(),
+            "only {roomy} of {} seeds founded clear of the water",
+            seeds.len()
+        );
     }
 }
