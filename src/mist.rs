@@ -88,7 +88,17 @@ const HEIGHT_RANGE: f32 = 380.0;
 /// How deep the mist lies over its ground, in meters, where it lies thickest.
 /// The shader thins it upward over this AND gives it a top, so a ridge can
 /// stand out of it like an island.
-pub const MIST_DEPTH: f32 = 34.0;
+///
+/// TWENTY-TWO, down from thirty-four. Brett: "we need to turn down the fog
+/// some, it looks great but its too tall." Thirty-four meters is four or five
+/// times a longhouse, so what should read as mist lying in the low ground read
+/// as weather standing over the village - and the roofs, which are the thing
+/// the eye measures fog against, were inside it rather than above it.
+///
+/// It reads a little thinner as well as lower, because a shorter column is
+/// less air to look through. If the density wants coming back afterward,
+/// [`STRENGTH`] is that knob and this one is not.
+pub const MIST_DEPTH: f32 = 22.0;
 
 /// How far the mist's cool side is pulled from the sky's own color toward a
 /// warm bone white.
