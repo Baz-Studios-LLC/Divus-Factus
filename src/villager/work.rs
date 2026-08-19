@@ -61,6 +61,26 @@ pub(crate) const WORK_REACH: f32 = 170.0;
 /// a slope.
 const PLINTH_TOP: f32 = 0.35;
 
+/// What a gatherer carries home from one bush.
+///
+/// THE WALK IS THE COST, NOT THE PICKING. One pick used to be a single meal,
+/// which is a fine day's work only if the berries are next door - and they
+/// stop being next door within the first day, because the near bushes get
+/// stripped and the ring of picked ground widens from there. At a hundred and
+/// fifty strides a round trip is two minutes of walking at 2.4 a stride, so a
+/// village of ten needing about twelve meals a day was sending people out for
+/// five, and each of them came back past their own hunger.
+///
+/// Meanwhile the bush they walked to holds FIVE (`FoodSource::CAPACITY`) and
+/// regrows a full load in two to four minutes. They were leaving four behind
+/// and walking back for them one at a time, and a full bush regrows nothing -
+/// so the land was not short of food at all. The basket was.
+///
+/// Two and a half, and up to three and a half in skilled hands: enough that a
+/// long walk pays, never so much that one gatherer strips a bush bare in a
+/// single visit and leaves the patch dead behind them.
+const A_BASKET: f32 = 2.5;
+
 /// Hunger above which a worker downs tools and sees to themself.
 const DOWN_TOOLS_HUNGER: f32 = HUNGRY_THRESHOLD + 0.1;
 
@@ -1888,7 +1908,7 @@ pub(super) fn do_work(
                     commands.entity(entity).remove::<Job>();
                     continue;
                 };
-                let mut picked = source.amount.min(1.0 + skill * 0.5);
+                let mut picked = source.amount.min(A_BASKET + skill);
                 source.amount -= picked;
                 // What went into the gatherer does not also reach the sacks.
                 if ate_at_work {
