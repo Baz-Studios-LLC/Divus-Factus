@@ -39,6 +39,9 @@ fn proclaim_the_great_days(
     mut sounds: MessageWriter<crate::sfx::PlaySfx>,
     mut legend_seen: Local<u8>,
     legend: Res<crate::villager::belief::Legend>,
+    // What they call you, for the card that announces that they call you
+    // something new.
+    divine_name: Option<Res<crate::villager::DivineName>>,
     towns: Query<&Settlement>,
     newborn: Query<(Entity, &Person, &MemberOf), Added<Parentage>>,
     raised: Query<(Entity, &Building, &MemberOf), Added<Building>>,
@@ -128,9 +131,21 @@ fn proclaim_the_great_days(
 
     // The legend climbs a tier: the people speak of you differently now.
     if legend.tier > *legend_seen {
+        // AND IT SAYS WHAT THEY CALL YOU. The card announced that a name had
+        // grown and then would not say what it had grown into - "the people
+        // speak of you as never before", while the notice in the corner had the
+        // actual words. Brett: "my name grows...what do they call me now? More
+        // information would be good." The epithet has been on `Legend` all
+        // along; this card simply never read it.
+        let called = match (divine_name.as_deref(), legend.epithet) {
+            (Some(name), Some(epithet)) => format!("they call you {} {epithet}", name.0),
+            (None, Some(epithet)) => format!("they call you {epithet}"),
+            // Before a god has been named, the tier is still worth announcing.
+            _ => "the people speak of you as never before".to_string(),
+        };
         stage.push(ordo::Proclamation {
             title: "YOUR NAME GROWS".into(),
-            line: "the people speak of you as never before".into(),
+            line: called,
             color: ink(&crate::palette::CLOTH_PINK),
             token: None,
         });
