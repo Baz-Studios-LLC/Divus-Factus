@@ -776,7 +776,20 @@ pub(crate) fn morning_muster(
             // wants shift a little daily, and a hair's advantage kept
             // outweighing the trade in hand - so nobody was ever a
             // second-day anything and no skill accrued.
-            |v: Vocation, left: f32| left * (0.55 + craft(v)) * if v == held { 1.9 } else { 1.0 };
+            |v: Vocation, left: f32| {
+                // THE SPEAR IS DEALT FIRST. Brett: "the town should always have
+                // one guard, that need should be top priority."
+                //
+                // A hand takes the trade with the largest remaining want, so one
+                // spear wanted lost to five gatherers wanted every single
+                // morning - the guard was last in a queue it never reached with
+                // ten hands. Weighted past every other want rather than sorted
+                // ahead of them, so it stays one want among many: the moment the
+                // post is filled its `left` is nought and the filter above drops
+                // it, and the rest of the morning is dealt exactly as before.
+                let first = if v == Vocation::Guard { 10.0 } else { 1.0 };
+                left * first * (0.55 + craft(v)) * if v == held { 1.9 } else { 1.0 }
+            };
         let best = wanted
             .iter()
             .filter(|(_, left)| *left > 0.0)
