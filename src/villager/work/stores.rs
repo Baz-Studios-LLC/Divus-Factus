@@ -688,6 +688,127 @@ fn drawing_for(
     super::baked::drawing_of(kind, plan.plan, &plan.drawing)
 }
 
+/// Seats a town's piles under the roofs that already stand, at once, with
+/// nobody carrying anything.
+///
+/// FOR A TOWN THAT WAS GIVEN ITS STOREHOUSE RATHER THAN BUILDING ONE.
+///
+/// The ordinary path is a haul: `stores_move_indoors` marks each pile `Rehouse`
+/// and `rehouse_stores` walks it in ONE ARMLOAD AT A TIME, recruiting an idle
+/// villager for each trip. That is right when a storehouse goes up over a town
+/// that has been heaping its goods in the square for a season - the carrying is
+/// the event.
+///
+/// It is wrong on the founding morning. The flag raises the storehouse and the
+/// piles in the same breath, so there was never a season of heaping and there is
+/// nothing to commemorate - and thirty people with a town to run spent their
+/// first day ferrying armloads twenty strides while Brett watched and asked the
+/// obvious question: "if they have a storehouse why are they stacking stuff
+/// outside?"
+///
+/// A `Command` because it needs the piles, the buildings, the stores and their
+/// drawings all at once, and because it has to run AFTER the founding's
+/// buildings exist rather than during the system that spawns them.
+///
+/// The seats themselves are `storehouse_seat` and `granary_seat` - the same
+/// arithmetic the haul aims at, so a pile put here and a pile carried here end
+/// up in the same place.
+pub(crate) struct SeatThePilesAtOnce {
+    pub town: Entity,
+}
+
+impl Command for SeatThePilesAtOnce {
+    type Out = ();
+
+    fn apply(self, world: &mut World) {
+        use bevy::ecs::system::SystemState;
+
+        let mut state: SystemState<(
+            Query<&Stockpile>,
+            Query<(
+                &Transform,
+                &Building,
+                &crate::villager::MemberOf,
+                Option<&super::buildings::Blueprint>,
+            )>,
+            Query<(Entity, &StorePile, &crate::villager::MemberOf)>,
+        )> = SystemState::new(world);
+        let Ok((stores, standing, piles)) = state.get(world) else {
+            return;
+        };
+
+        let Ok(store) = stores.get(self.town) else {
+            return;
+        };
+        let roof = |kind: BuildingKind| {
+            standing
+                .iter()
+                .find(|(_, b, m, _)| b.kind == kind && m.0 == self.town)
+                .map(|(at, _, _, plan)| (*at, plan.cloned()))
+        };
+        let granary = roof(BuildingKind::Granary);
+        let storehouse = roof(BuildingKind::Storehouse);
+        if granary.is_none() && storehouse.is_none() {
+            return;
+        }
+
+        // Gathered before anything is written: the queries above borrow the
+        // world, and seating a pile writes to it.
+        let mut seats: Vec<(Entity, Vec3, Quat, Stacked)> = Vec::new();
+        for (pile, kind, owner) in piles.iter() {
+            if owner.0 != self.town {
+                continue;
+            }
+            let mut dealt = Stacked::default();
+            let seated = if kind.0 == PileKind::Food && granary.is_some() {
+                granary.as_ref().map(|(at, plan)| {
+                    let (local, _) = granary_seat(store, drawing_for(BuildingKind::Granary, plan.as_ref()));
+                    (*at, local)
+                })
+            } else {
+                storehouse.as_ref().and_then(|(at, plan)| {
+                    storehouse_seat(
+                        kind.0,
+                        store,
+                        granary.is_some(),
+                        drawing_for(BuildingKind::Storehouse, plan.as_ref()),
+                        &mut dealt,
+                    )
+                    .map(|(local, _)| (*at, local))
+                })
+            };
+            if let Some((at, local)) = seated {
+                seats.push((
+                    pile,
+                    at.translation + at.rotation * local,
+                    at.rotation,
+                    dealt,
+                ));
+            }
+        }
+
+        let mut moved = 0;
+        for (pile, to, spin, dealt) in seats {
+            let Ok(mut entity) = world.get_entity_mut(pile) else {
+                continue;
+            };
+            if let Some(mut at) = entity.get_mut::<Transform>() {
+                at.translation = to;
+                at.rotation = spin;
+            }
+            // The deal drives the visible stack: `stack_on_the_pallets` watches
+            // `Changed<Stacked>` and lays the pieces out afresh.
+            entity.insert(dealt);
+            // And no haul is owed for a pile that is already home.
+            entity.remove::<Rehouse>();
+            moved += 1;
+        }
+        if moved > 0 {
+            info!("{moved} of the town's piles begin under a roof");
+        }
+    }
+}
+
 /// When the storehouse rises, the village carries its piles in under the
 /// eaves - and the granary takes the food sacks. Nothing teleports: each
 /// armload is walked across the square.

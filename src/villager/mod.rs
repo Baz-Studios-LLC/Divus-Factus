@@ -2508,6 +2508,17 @@ pub(crate) fn spawn_settlement(
         );
         commands.entity(settlement).insert(wall);
 
+        // AND THE PILES START UNDER THE ROOF THEY WERE GIVEN.
+        //
+        // Queued rather than done here: the storehouse and the granary are
+        // `commands.spawn`s from a moment ago and do not exist to be found yet.
+        // Brett: "if they have a storehouse why are they stacking stuff
+        // outside?" - because the piles are raised with the square and the
+        // ordinary path in is a haul, one armload at a time, which is the right
+        // ceremony for a storehouse a village BUILT and a silly way to spend the
+        // founding morning. See `SeatThePilesAtOnce`.
+        commands.queue(work::SeatThePilesAtOnce { town: settlement });
+
         // And the ground the whole founding worked, redrawn once.
         let (terrain, chunks, chunk_assets, ..) = &mut ground;
         crate::terrain::rebuild_these_chunks(
