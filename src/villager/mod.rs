@@ -2490,6 +2490,46 @@ pub(crate) fn spawn_settlement(
             &mut rng,
         );
         commands.entity(settlement).insert(wall);
+
+        // AND THE STORES A TOWN OF THIRTY NEEDS TO BE A TOWN OF THIRTY.
+        //
+        // `spawn_town` provisions a founding with four berries and two grain,
+        // which was right for ten people who were about to build everything
+        // themselves. Thirty souls on that would be a famine by the fourth day,
+        // and Brett asked for "a stable town that can hold its own".
+        //
+        // Set HERE and not in `spawn_town`, which colonies also come through -
+        // a colony carries what its charter took out of its parent's sacks (see
+        // `StockTheColony`) and must not be handed a founding's larder on top.
+        //
+        // WHAT IS DELIBERATELY ZERO: ore, iron, clay, incense and dye. Those are
+        // the things a town has to go and get, and the whole locality and
+        // research design turns on their being absent - the scholars' first
+        // sample-gated node is meant to publish a want that puts people on the
+        // road. A founding stocked with ore would be a library with nothing to
+        // ask for. See `study::Studies::wanting`.
+        commands.entity(settlement).insert(work::Stockpile {
+            // A migration's provisions: what thirty people carry in and what
+            // they took off the road on the way. Comfortably over the muster's
+            // hunger floor of `mouths * 1.2`, and nowhere near the larder
+            // ceiling the storehouse and granary raise.
+            larder: work::Larder {
+                berries: 60.0,
+                grain: 40.0,
+                meat: 30.0,
+                fish: 20.0,
+                ..default()
+            },
+            // A working pile, not a hoard: the next few rungs of the ladder and
+            // the fire's fuel, with the sawmill standing to keep it topped up.
+            timber: 90.0,
+            // Footings for the same. The quarries are a walk away and the town
+            // has miners; this is enough that the first blacksmith is not
+            // waiting on one pick.
+            stone: 30.0,
+            ..default()
+        });
+
         info!(
             "the flag raises {settlement_name}: a hall and {rose} more, {} beds for {} souls",
             work::buildings::founding_beds(),
