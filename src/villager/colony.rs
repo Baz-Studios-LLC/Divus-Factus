@@ -794,6 +794,7 @@ pub(super) fn walk_to_the_new_ground(
             &mut MoveTarget,
             &mut Needs,
             Option<&mut Rations>,
+            Has<super::camp::Camped>,
         ),
         (
             With<Villager>,
@@ -827,13 +828,35 @@ pub(super) fn walk_to_the_new_ground(
 
         // They raise the banner once most of them are standing on the ground.
         if arrived * 2 < walking {
-            for (_, at, colonist, mut activity, mut target, mut needs, mut rations) in &mut party {
+            for (_, at, colonist, mut activity, mut target, mut needs, mut rations, camped) in
+                &mut party
+            {
                 if colonist.leader != leader {
                     continue;
                 }
                 // A walker on their knees is left to their prayer — the
                 // road waits for the god's business, never the reverse.
                 if matches!(*activity, Activity::Praying) {
+                    continue;
+                }
+                // ASLEEP IN A TENT, and the road waits for that too. A party
+                // bound for ground days away used to walk straight through
+                // every night it met; now it stops, and the morning finds it
+                // where it lay. See `camp::pitch_camp`.
+                //
+                // THEY STILL EAT, though: this system is what feeds the march,
+                // so a camped walker skipped outright is a walker no food
+                // system can reach.
+                if camped {
+                    if let Some(meal) = super::explore::forage_tick(
+                        at.translation,
+                        time.delta_secs(),
+                        &mut needs,
+                        rations.as_deref_mut(),
+                        &mut bushes,
+                    ) {
+                        target.0 = Some(meal);
+                    }
                     continue;
                 }
                 // The road feeds itself: the satchel first, the heath

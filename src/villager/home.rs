@@ -457,7 +457,21 @@ pub(super) fn take_shelter(
         return;
     }
     let pouring = weather.intensity > 0.6;
-    let fire_pos = fires.iter().next().map(|f| f.translation);
+    // THE NEAREST HEARTH, not the first one the query happens to reach.
+    //
+    // `iter().next()` was one fire in a world with one village. Every town
+    // raises its own - and a traveling party's camp fire is a `Bonfire` too
+    // now, pitched a long way from any square by construction - so the first
+    // fire found could be one in a different country. The roofless of one
+    // village were liable to be sent walking to another village's fire, or to
+    // a tent ring on the far side of the map.
+    let hearths: Vec<Vec3> = fires.iter().map(|f| f.translation).collect();
+    let nearest_fire = |to: Vec3| {
+        hearths
+            .iter()
+            .copied()
+            .min_by(|a, b| a.distance(to).total_cmp(&b.distance(to)))
+    };
 
     for (transform, home, needs, mut activity, mut target, taking_cover) in &mut villagers {
         let taking_cover = taking_cover.is_some();
@@ -520,7 +534,7 @@ pub(super) fn take_shelter(
                 // first version left them Idle at the fire's exact center,
                 // so the idle wander walked them ten feet off and this
                 // system marched them straight back, all day, forever.
-                if let Some(fire) = fire_pos {
+                if let Some(fire) = nearest_fire(transform.translation) {
                     let stand = fire
                         + (transform.translation - fire)
                             .with_y(0.0)
@@ -711,31 +725,47 @@ pub(super) fn burn_weathered(
     }
 }
 
+/// EACH FIRE DRIVES ITS OWN FLAME, which took a second town to matter.
+///
+/// This was a loop over every fire wrapped around a loop over every flame in
+/// the world, so the last fire the query happened to reach set the height and
+/// the light of all of them. With one village that is invisible. Every town
+/// raises a hearth of its own, though - see `raise_town_fixtures` - so the
+/// morning a colony's cold ring came up, the mother town's flame went out with
+/// it, and a camp fire on the road would have blown out both.
+///
+/// The flames and the light are CHILDREN of their fire, so the fix is to ask
+/// the fire what belongs to it rather than to ask the world what exists.
 pub(super) fn burn(
     time: Res<Time>,
-    mut fires: Query<&mut Bonfire>,
+    mut fires: Query<(&mut Bonfire, Option<&Children>)>,
     mut flames: Query<&mut Transform, (With<Flame>, Without<Bonfire>)>,
     mut lights: Query<&mut PointLight, With<Firelight>>,
 ) {
     let dt = time.delta_secs();
     let t = time.elapsed_secs();
 
-    for mut fire in &mut fires {
+    for (mut fire, kindling) in &mut fires {
         fire.fuel = (fire.fuel - dt).max(0.0);
         let lit = fire.fuel > 0.0;
 
         // Flicker: two incommensurate sines, so it never loops visibly.
         let flicker = 0.8 + 0.2 * ((t * 9.0).sin() * 0.6 + (t * 23.0).sin() * 0.4);
         let size = if lit { flicker } else { 0.001 };
-        for mut flame in &mut flames {
-            flame.scale.y = flame.scale.y.signum() * size.abs();
-            let base = if flame.translation.y > 0.8 { 0.4 } else { 0.7 };
-            flame.scale.x = base * size;
-            flame.scale.z = base * size;
-            flame.scale.y = (base + 0.35) * size;
-        }
-        for mut light in &mut lights {
-            light.intensity = if lit { 1_600_000.0 * flicker } else { 0.0 };
+        let Some(kindling) = kindling else {
+            continue;
+        };
+        for piece in kindling {
+            if let Ok(mut flame) = flames.get_mut(*piece) {
+                flame.scale.y = flame.scale.y.signum() * size.abs();
+                let base = if flame.translation.y > 0.8 { 0.4 } else { 0.7 };
+                flame.scale.x = base * size;
+                flame.scale.z = base * size;
+                flame.scale.y = (base + 0.35) * size;
+            }
+            if let Ok(mut light) = lights.get_mut(*piece) {
+                light.intensity = if lit { 1_600_000.0 * flicker } else { 0.0 };
+            }
         }
     }
 }
@@ -1147,7 +1177,17 @@ pub(super) fn night_routine(
     // can stall for reasons this system will never enumerate - and a
     // sleeper standing bolt upright all night is worse than any of them.
     mut trudge: Local<std::collections::HashMap<Entity, (Vec3, f64)>>,
-    homes: Query<&Transform, (Or<(With<Hut>, With<Longhouse>)>, Without<Villager>)>,
+    // A TENT IS A SHELTER for exactly as long as it stands. Canvas over two
+    // bedrolls is not a home - see `camp::Camped` for why a camper is
+    // deliberately given no `Home` - but it is somewhere to lie down, and
+    // lying down is all this system does.
+    homes: Query<
+        &Transform,
+        (
+            Or<(With<Hut>, With<Longhouse>, With<super::camp::Tent>)>,
+            Without<Villager>,
+        ),
+    >,
     beds: Query<(&ChildOf, &Transform, &Bed), Without<Villager>>,
     fires: Query<&Transform, (With<Bonfire>, Without<Villager>)>,
     mut villagers: Query<
@@ -1156,6 +1196,7 @@ pub(super) fn night_routine(
             &Transform,
             Option<&Home>,
             Option<&BedSlot>,
+            Option<&super::camp::Camped>,
             &crate::creature::genome::CreatureGenome,
             &Needs,
             &mut Activity,
@@ -1172,7 +1213,21 @@ pub(super) fn night_routine(
     >,
 ) {
     let night = clock.is_night();
-    let fire_pos = fires.iter().next().map(|f| f.translation);
+    // THE NEAREST HEARTH, not the first one the query happens to reach.
+    //
+    // `iter().next()` was one fire in a world with one village. Every town
+    // raises its own - and a traveling party's camp fire is a `Bonfire` too
+    // now, pitched a long way from any square by construction - so the first
+    // fire found could be one in a different country. The roofless of one
+    // village were liable to be sent walking to another village's fire, or to
+    // a tent ring on the far side of the map.
+    let hearths: Vec<Vec3> = fires.iter().map(|f| f.translation).collect();
+    let nearest_fire = |to: Vec3| {
+        hearths
+            .iter()
+            .copied()
+            .min_by(|a, b| a.distance(to).total_cmp(&b.distance(to)))
+    };
 
     // Where each numbered bed stands, in the world: the building's own
     // rotation and place applied to the mattress's local offset.
@@ -1188,8 +1243,18 @@ pub(super) fn night_routine(
             })
     };
 
-    for (entity, transform, home, berth, genome, needs, mut activity, mut target, mut motion) in
-        &mut villagers
+    for (
+        entity,
+        transform,
+        home,
+        berth,
+        camped,
+        genome,
+        needs,
+        mut activity,
+        mut target,
+        mut motion,
+    ) in &mut villagers
     {
         if !night {
             if *activity == Activity::Sleeping {
@@ -1222,14 +1287,21 @@ pub(super) fn night_routine(
             continue;
         }
 
-        match home.map(|h| h.0) {
-            Some(building) => {
+        // A BEDROLL ON THE ROAD OUTRANKS A BED THREE HUNDRED STRIDES AWAY, and
+        // it is the same machinery either way: walk to the mattress, lie along
+        // it, be hidden by a roof the god can lift. The only difference is that
+        // this one will not exist tomorrow.
+        let bedroom = camped
+            .map(|camped| (camped.tent, Some(camped.berth)))
+            .or_else(|| home.map(|h| (h.0, berth.map(|slot| slot.0))));
+        match bedroom {
+            Some((building, slot)) => {
                 let Ok(site) = homes.get(building) else {
                     continue;
                 };
                 // Their OWN bed, by claimed number. No claim yet (or no
                 // such bed in an old save's home): the door will do.
-                let berth = berth.and_then(|slot| bed_of(building, slot.0, site));
+                let berth = slot.and_then(|slot| bed_of(building, slot, site));
                 let Some((bed_at, lie, site_spin)) = berth else {
                     if transform.translation.distance(site.translation) > 2.2 {
                         *activity = Activity::Sleeping;
@@ -1278,7 +1350,9 @@ pub(super) fn night_routine(
                 // to stand there all night, which is not what anybody
                 // does at a fire at three in the morning - and it made
                 // the roofless look content with the arrangement.
-                let Some(fire) = fire_pos else { continue };
+                let Some(fire) = nearest_fire(transform.translation) else {
+                    continue;
+                };
                 // Idle and wandering folk are drafted; the already-
                 // Sleeping stay in hand too, because the walk to the
                 // berth happens UNDER Sleeping - the first cut admitted

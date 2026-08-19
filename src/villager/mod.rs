@@ -9,6 +9,7 @@
 pub mod alarm;
 pub mod attire;
 pub mod belief;
+pub mod camp;
 pub mod civic;
 pub mod colony;
 pub mod doctrine;
@@ -535,7 +536,17 @@ impl Plugin for VillagerPlugin {
                         home::night_routine,
                         home::use_doors,
                         home::weariness,
-                        home::burn,
+                        // The fires, and the camps that are one for a night.
+                        //
+                        // NESTED, and it has to be: Bevy's `chain` is
+                        // implemented for tuples up to twenty and this group
+                        // was at exactly twenty. Two more systems here and the
+                        // whole registration stops compiling with a trait-bound
+                        // error that names no system - see
+                        // `divus-factus-bevy-limits`. Grouping the three that
+                        // belong together keeps the count at twenty and reads
+                        // better besides.
+                        (home::burn, camp::pitch_camp, camp::strike_camp).chain(),
                         home::rouse_the_taken,
                         pursue_activity,
                         crate::scatter::regrow_food,

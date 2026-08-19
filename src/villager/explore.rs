@@ -461,6 +461,7 @@ pub(super) fn expeditions(
             Option<&mut Chronicle>,
             &mut Needs,
             Option<&mut work::Rations>,
+            Has<crate::villager::camp::Camped>,
         ),
         (
             With<Villager>,
@@ -525,6 +526,7 @@ pub(super) fn expeditions(
         chronicle,
         mut needs,
         mut rations,
+        camped,
     ) in &mut explorers
     {
         if *vocation != work::Vocation::Explorer {
@@ -533,6 +535,34 @@ pub(super) fn expeditions(
 
         // An expedition underway runs to its end, whatever the hour.
         if let Some(mut expedition) = expedition {
+            // ASLEEP IN A TENT: the journey is PAUSED, not abandoned.
+            //
+            // This check has to come before the one below it, and that ordering
+            // is the whole of what camps fixed. Sleep used to end an expedition
+            // outright - the comment read "Sleep broke the journey; they will
+            // set out again", and set out again is exactly what they did, from
+            // the square, every single morning. Anything more than a half-day's
+            // walk away was therefore unreachable in principle, however well
+            // provisioned the party: a surveyor could only ever get as far as
+            // dusk and then forget why they had come. See `camp::pitch_camp`.
+            if camped {
+                // A CAMPER STILL EATS. The journey systems are what feed a
+                // party on the road - the satchel first, then the nearest bush
+                // - so skipping camped travelers outright left a hungry one
+                // with no food system able to reach them at all. They would
+                // have starved in the tent, which is a worse night than the
+                // one camps were written to fix.
+                if let Some(meal) = forage_tick(
+                    at.translation,
+                    dt,
+                    &mut needs,
+                    rations.as_deref_mut(),
+                    &mut bushes,
+                ) {
+                    target.0 = Some(meal);
+                }
+                continue;
+            }
             if *activity != Activity::Working {
                 // Sleep broke the journey; they will set out again.
                 commands.entity(entity).remove::<Expedition>();

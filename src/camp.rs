@@ -1,5 +1,9 @@
 //! Goblin camps: the places goblins keep.
 //!
+//! NOT [`crate::villager::camp`], which is the night's camp a traveling party
+//! pitches and strikes. Two different things called a camp; this is the one
+//! that stays put and is nobody's home but a goblin's.
+//!
 //! Brett: "goblin camps would be great too while we are at it... camp fire, a
 //! huts or two and a rickty card tower maybe?"
 //!
