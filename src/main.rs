@@ -215,12 +215,15 @@ fn main() {
                 }),
         )
         .init_state::<GameState>()
-        // A WIDER FIRST CASCADE SPENDS ITS TEXELS OVER MORE GROUND, and this is
-        // where they are bought back. Measured on this game: 1024 against 2048
-        // was 17.7ms against 17.7ms - the cost of a shadow pass here is how many
-        // times the world is redrawn into it, not how big the map is, because
-        // the frame is geometry-bound and not fill-bound.
-        .insert_resource(bevy::light::DirectionalLightShadowMap { size: 4096 })
+        // A NUMBER IS ONLY FREE AT THE SIZE IT WAS MEASURED AT. "1024 against
+        // 2048 was 17.7ms against 17.7ms" was measured on a lighter scene; this
+        // one carries NINE THOUSAND shadow casters, and 4096 is sixteen times
+        // the fill of this into every cascade, every frame. The run report
+        // caught what that cost: 46fps a minute in, decaying to 31 as the
+        // casters climbed past nine thousand, against the 75 the same machine
+        // had before the change. Brett: "the shadows hurt, maybe we can dump
+        // their resolution", then "lets try the shadows at 1024".
+        .insert_resource(bevy::light::DirectionalLightShadowMap { size: 1024 })
         .init_resource::<WorldSeed>()
         .add_plugins((
             camera::CameraPlugin,
@@ -361,8 +364,19 @@ pub fn spawn_lighting(mut commands: Commands) {
             //
             // A low sun is what makes it visible: shadows at dusk are many times
             // longer than the thing casting them, so they are the first to run
-            // out of the box. Two hundred covers the near view whole.
-            first_cascade_far_bound: 200.0,
+            // out of the box.
+            //
+            // A HUNDRED, NOT TWO HUNDRED, because the map is 1024 now. These two
+            // are one dial for how sharp a near shadow is: the cascade decides
+            // how much ground a map's texels are spread over, so widening the
+            // cascade and shrinking the map both coarsen it, and I did both at
+            // once. A hundred clears the cut at the altitude the game is
+            // actually played from without spreading one cascade over five
+            // times the ground it used to cover.
+            //
+            // If shadows come back blocky up close, THIS pairing is the reason,
+            // and the map is the half to raise.
+            first_cascade_far_bound: 100.0,
             maximum_distance: crate::calendar::SHADOW_REACH,
             ..default()
         }
