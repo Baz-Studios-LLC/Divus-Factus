@@ -1221,6 +1221,12 @@ pub(crate) fn update_inspector(
         // Called by its material, not by its job. Brett: "It should just say
         // Stone." A materials list names materials.
         want("Stone", construction.stone_laid.min(footing), footing);
+        // And the brick, which was bought and stacked the morning ground was
+        // broken - so it reads full from the first day and stays on the card
+        // anyway. A materials list names what the building is made of, and an
+        // oven is made of clay whether or not the god still owes any.
+        let brick = plan.kind.clay_cost();
+        want("Clay", brick, brick);
         // Numbers and nothing else. Brett: "The building a building tooltip
         // doesn't need to say anything except what it is missing lol. If the
         // timber is 7/7 for example that is all they need to put."

@@ -538,8 +538,41 @@ pub(crate) fn take_up_work(
                     &known_far,
                     &permitted,
                 );
+                // And the red bank, when the pile is comfortable and the
+                // brick is short.
+                //
+                // AHEAD OF IRON, and only in the branch where stone is deep.
+                // Behind iron it would never happen at all - a vein outlasts
+                // any village, so a miner who prefers ore digs ore for ever
+                // and the clay pile stays at nought. Ahead of it the whole
+                // errand is a few loads, finishes inside a day, and then the
+                // picks go back to the iron they were on. Nobody is mustered
+                // for this: it costs the village no hands, only the tail of a
+                // rich morning, which is exactly when the planner is about to
+                // want an oven.
+                //
+                // A village with no bank within reach falls straight through
+                // to the iron, so dry hill country loses nothing by wanting.
+                let clay_job = || {
+                    if clay >= BuildingKind::clay_reserve() {
+                        return None;
+                    }
+                    nearest_job(
+                        deposits
+                            .iter()
+                            .filter(|(_, _, deposit)| {
+                                deposit.kind == crate::matter::DepositKind::Clay
+                                    && deposit.amount > 0.5
+                            })
+                            .map(|(bank, t, _)| (bank, t.translation)),
+                        transform.translation,
+                        WORK_REACH,
+                        &known_far,
+                        &permitted,
+                    )
+                };
                 if stone >= 12.0 {
-                    ore_job.or(stone_job)
+                    clay_job().or(ore_job).or(stone_job)
                 } else {
                     stone_job.or(ore_job)
                 }

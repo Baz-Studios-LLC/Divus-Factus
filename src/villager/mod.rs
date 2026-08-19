@@ -1863,6 +1863,22 @@ pub(crate) fn found_settlement(
 const QUARRIES: usize = 3;
 const QUARRY_NEAREST: f32 = 90.0;
 const QUARRY_FURTHEST: f32 = 300.0;
+/// How far out the FIRST quarry may be, which is a different question from how
+/// far out the others may be.
+///
+/// A quarry nobody can walk to is not stone. `QUARRY_FURTHEST` is three
+/// hundred and `WORK_REACH` is a hundred and seventy, and measured over four
+/// hundred sites on ten maps, THIRTEEN PERCENT of villages were founded with
+/// every one of their three quarries outside a miner's walk - mean nearest a
+/// hundred and twenty-nine, worst two hundred and sixty-five. Those villages
+/// had stone on the map, in the survey overlay, listed in the founding log,
+/// and no way to fetch any of it; they lived on the alpine-ground fallback,
+/// and in rolling country there is no alpine ground either.
+///
+/// Short of `WORK_REACH` by the width of the square, because a miner walks
+/// from wherever they are standing rather than from the exact center of town,
+/// and the home circle is thirty-six across.
+const QUARRY_WITHIN_REACH: f32 = crate::villager::work::WORK_REACH - 36.0;
 /// How far apart, so working the stone is not one pit emptied — and so that
 /// two are never in the frame together.
 const QUARRY_APART: f32 = 90.0;
@@ -1925,6 +1941,280 @@ pub(crate) fn founding_flock_range(species: Species, flock: usize) -> (f32, f32)
     }
 }
 
+/// Salts the ground around a new town with what it will one day want: iron in
+/// the far hills, clay along the wet banks, and the quarries every footing in
+/// the civic ladder waits on.
+///
+/// A PROPERTY OF THE WORLD, NOT OF THE FOUNDING, and it took a while to notice
+/// it was not. All of this used to happen inline in `spawn_settlement`, which
+/// is a startup system that runs exactly once for the FIRST village - so every
+/// deposit in the world sat inside seven hundred units of one town's square.
+/// `WORK_REACH` is a hundred and seventy and `COLONY_SPACING` is asserted
+/// larger than it, so a colony was founded with no quarry, no clay bank and no
+/// iron vein that any of its people could ever walk to. They lived off the
+/// alpine-stone fallback and nothing else.
+///
+/// A `Command` rather than a system, because the sowing needs the terrain, two
+/// asset stores, the loaded chunks and every deposit already standing, and
+/// neither the founding system nor the colony's arrival system carries that
+/// set. `StockTheColony` next door solves the same problem the same way.
+///
+/// WHAT EACH PLACE GETS IS DECIDED BY THE PLACE. The rules below only ever ask
+/// the ground questions - is this within a stride of the tide, does it stand
+/// well above it, is it broken - so a colony on a river has clay and a colony
+/// in dry hill country does not, out of the same code. That asymmetry is the
+/// whole reason to send anybody anywhere.
+pub(crate) struct SowTheGround {
+    /// The town's square, which every reach below is measured from.
+    pub center: Vec3,
+    /// Whose ground this is, for the one log line that says what it holds.
+    pub town: String,
+}
+
+impl Command for SowTheGround {
+    type Out = ();
+
+    fn apply(self, world: &mut World) {
+        use crate::matter::{Deposit, DepositKind, spawn_deposit};
+        use bevy::ecs::system::SystemState;
+
+        let mut state: SystemState<(
+            Commands,
+            Res<Terrain>,
+            ResMut<crate::terrain::LoadedChunks>,
+            Res<crate::terrain::TerrainAssets>,
+            ResMut<Assets<Mesh>>,
+            ResMut<Assets<crate::fog::GroundMaterial>>,
+            Res<crate::WorldSeed>,
+            Query<(&Transform, &Deposit)>,
+        )> = SystemState::new(world);
+        let Ok((
+            mut commands,
+            terrain,
+            mut loaded,
+            chunk_assets,
+            mut meshes,
+            mut ground_materials,
+            seed,
+            standing,
+        )) = state.get_mut(world)
+        else {
+            return;
+        };
+
+        // Every town's ground is sown from its own stream, salted with where it
+        // stands - so two colonies are not handed the same map twice, and a
+        // town's deposits do not move because something unrelated drew a random
+        // number earlier in the morning.
+        let mut rng = Rng::stream(
+            seed.0 as u64,
+            &format!(
+                "sowing {}:{}",
+                self.center.x.round() as i64,
+                self.center.z.round() as i64
+            ),
+        );
+
+        // WHAT IS ALREADY IN THE GROUND. A colony founded downriver of its
+        // mother town must not sow a second bank on top of hers - the spacing
+        // rules below are about the WORLD's deposits, not this call's.
+        let already: Vec<(Vec3, DepositKind)> = standing
+            .iter()
+            .map(|(at, deposit)| (at.translation, deposit.kind))
+            .collect();
+        let taken = |at: Vec3, kind: DepositKind, apart: f32| {
+            already
+                .iter()
+                .any(|(other, k)| *k == kind && other.distance(at) < apart)
+        };
+
+        // What actually went in the ground, against what the rules offered:
+        // the gap between the two is the world already having one there.
+        let mut iron = 0;
+        let mut banks = 0;
+        for at in iron_veins(&terrain, self.center, &mut rng) {
+            if taken(at, DepositKind::Iron, IRON_APART) {
+                continue;
+            }
+            spawn_deposit(
+                &mut commands,
+                &mut meshes,
+                &mut ground_materials,
+                at,
+                DepositKind::Iron,
+                rng.range(16.0, 26.0),
+            );
+            iron += 1;
+        }
+        for at in clay_banks(&terrain, self.center, &mut rng) {
+            if taken(at, DepositKind::Clay, CLAY_APART) {
+                continue;
+            }
+            spawn_deposit(
+                &mut commands,
+                &mut meshes,
+                &mut ground_materials,
+                at,
+                DepositKind::Clay,
+                rng.range(24.0, 40.0),
+            );
+            banks += 1;
+        }
+
+        // And the quarries, which are where the village's stone comes from now
+        // that the ground is not strewn with it.
+        //
+        // CLOSER than iron and far more numerous, and both on purpose. Iron is
+        // a reason to explore; stone is an everyday errand that every footing
+        // in the civic ladder waits on, so a village that has to walk four
+        // hundred units for it simply never builds. The nearest ring starts
+        // just outside the home circle - far enough that the square is not a
+        // building site, near enough that a miner is back before noon.
+        //
+        // Sited on the most BROKEN ground each try can find, so a quarry
+        // stands where a quarry would: a bank, a bluff, a stony shoulder. That
+        // is a preference and not a requirement, which is the whole difference
+        // between this and the mine - see `BuildingKind::Mine`, whose siting
+        // wants a genuine face and so never finds one in rolling or coastal
+        // country. A village on a flat green shore gets its quarry regardless,
+        // because the alternative is a village that cannot build.
+        let quarries: Vec<Vec3> = quarry_sites(&terrain, self.center, &mut rng)
+            .into_iter()
+            .filter(|at| !taken(*at, DepositKind::Stone, QUARRY_APART))
+            .collect();
+        for at in &quarries {
+            // The pit first, then the stone standing in it. See `QUARRY_DEPTH`
+            // for why the ground is worked rather than the model made taller.
+            // `flatten` leaves the floor BARE, which is what a working quarry
+            // is, and keeps the scatter from seeding trees in the middle of it.
+            let floor = at.y - QUARRY_DEPTH;
+            terrain.flatten(at.x, at.z, QUARRY_PIT, QUARRY_RIM, floor);
+            spawn_deposit(
+                &mut commands,
+                &mut meshes,
+                &mut ground_materials,
+                Vec3::new(at.x, floor, at.z),
+                DepositKind::Stone,
+                // Deeper, because there are half as many. A village's whole
+                // civic ladder is under a hundred stone; one of these is
+                // several ladders, and running dry is the failure mode that
+                // matters - see `every_village_is_given_stone_to_build_with`.
+                rng.range(200.0, 300.0),
+            );
+        }
+        // Any chunk already standing was built before the pits were cut, so it
+        // still shows unbroken ground with a quarry sitting on top of it.
+        for at in &quarries {
+            crate::terrain::rebuild_chunks_near(
+                &mut commands,
+                &mut meshes,
+                &chunk_assets,
+                &terrain,
+                &mut loaded,
+                at.x,
+                at.z,
+                QUARRY_PIT + QUARRY_RIM,
+            );
+        }
+        info!(
+            "the ground around {} holds {iron} iron veins, {banks} clay banks and {} quarries",
+            self.town,
+            quarries.len(),
+        );
+        state.apply(world);
+    }
+}
+
+/// Where iron may be found from a given square, and how many veins.
+///
+/// FAR, AND HIGH. Iron is the one thing on the map that is worth an expedition
+/// rather than an errand - out past every trade's working walk, and only well
+/// above the tide, so lowland and coastal country simply does not have any.
+/// A town that wants iron has to send people.
+const IRON_VEINS: usize = 4;
+const IRON_NEAREST: f32 = 140.0;
+const IRON_FURTHEST: f32 = 460.0;
+const IRON_APART: f32 = 60.0;
+/// How far above the water a hillside has to stand before it is hill country.
+const IRON_UPLAND: f32 = 20.0;
+
+/// The hillsides within reach of a square that hold iron.
+///
+/// Pure, and separate from the sowing, so the claim "iron is a thing of the
+/// high country" is a claim a test can check on a hundred maps rather than a
+/// loop buried in a `Command`.
+pub(crate) fn iron_veins(terrain: &Terrain, center: Vec3, rng: &mut Rng) -> Vec<Vec3> {
+    let mut veins: Vec<Vec3> = Vec::new();
+    for _ in 0..400 {
+        if veins.len() >= IRON_VEINS {
+            break;
+        }
+        let angle = rng.range(0.0, std::f32::consts::TAU);
+        let reach = rng.range(IRON_NEAREST, IRON_FURTHEST);
+        let (sin, cos) = angle.sin_cos();
+        let (x, z) = (center.x + cos * reach, center.z + sin * reach);
+        if !terrain.is_walkable(x, z) {
+            continue;
+        }
+        let height = terrain.height_at(x, z);
+        if height <= WATER_LEVEL + IRON_UPLAND {
+            continue;
+        }
+        let at = Vec3::new(x, height, z);
+        if veins.iter().any(|v| v.distance(at) < IRON_APART) {
+            continue;
+        }
+        veins.push(at);
+    }
+    veins
+}
+
+/// How many clay banks a shoreline yields, and how far along it they run.
+///
+/// THE WIDEST REACH OF THE THREE, and strung out rather than heaped: working
+/// the clay means walking the shore, not emptying one pit. It starts almost at
+/// the square because a town founded on a river has clay in its own back
+/// garden, and that is fine - the scarcity is not distance, it is WHETHER THE
+/// WATER IS THERE AT ALL.
+const CLAY_BANKS: usize = 10;
+const CLAY_NEAREST: f32 = 40.0;
+const CLAY_FURTHEST: f32 = 700.0;
+const CLAY_APART: f32 = 25.0;
+/// The wet band a bank has to sit in: a stride above the tide at most. Above
+/// that it is a dry slope, and below it is the water.
+const CLAY_TIDEMARK: std::ops::Range<f32> = 0.5..3.5;
+
+/// The wet banks within reach of a square that hold clay.
+///
+/// The first material in the world that is genuinely SCARCE BY PLACE - see
+/// [`crate::villager::work::BuildingKind::clay_cost`] for the oven that wants
+/// it, and `SowTheGround` for why every town is sown its own.
+pub(crate) fn clay_banks(terrain: &Terrain, center: Vec3, rng: &mut Rng) -> Vec<Vec3> {
+    let mut banks: Vec<Vec3> = Vec::new();
+    for _ in 0..900 {
+        if banks.len() >= CLAY_BANKS {
+            break;
+        }
+        let angle = rng.range(0.0, std::f32::consts::TAU);
+        let reach = rng.range(CLAY_NEAREST, CLAY_FURTHEST);
+        let (sin, cos) = angle.sin_cos();
+        let (x, z) = (center.x + cos * reach, center.z + sin * reach);
+        if !terrain.is_walkable(x, z) {
+            continue;
+        }
+        let height = terrain.height_at(x, z);
+        if !(WATER_LEVEL + CLAY_TIDEMARK.start..WATER_LEVEL + CLAY_TIDEMARK.end).contains(&height) {
+            continue;
+        }
+        let at = Vec3::new(x, height, z);
+        if banks.iter().any(|b| b.distance(at) < CLAY_APART) {
+            continue;
+        }
+        banks.push(at);
+    }
+    banks
+}
+
 pub(crate) fn quarry_sites(terrain: &Terrain, center: Vec3, rng: &mut Rng) -> Vec<Vec3> {
     let mut sites: Vec<Vec3> = Vec::new();
     for attempt in 0..QUARRY_TRIES {
@@ -1932,7 +2222,17 @@ pub(crate) fn quarry_sites(terrain: &Terrain, center: Vec3, rng: &mut Rng) -> Ve
             break;
         }
         let angle = rng.range(0.0, std::f32::consts::TAU);
-        let reach = rng.range(QUARRY_NEAREST, QUARRY_FURTHEST);
+        // THE FIRST ONE IS THE EVERYDAY QUARRY and has to be inside a miner's
+        // walk; the ones after it are the far faces, worth the trip once the
+        // near one thins. Held only while there are tries to spend on it - the
+        // same patience the slope preference gets - because one quarry at two
+        // hundred is worth a great deal more to a village than none at all.
+        let furthest = if sites.is_empty() && attempt < QUARRY_PATIENCE {
+            QUARRY_WITHIN_REACH
+        } else {
+            QUARRY_FURTHEST
+        };
+        let reach = rng.range(QUARRY_NEAREST, furthest);
         let (sin, cos) = angle.sin_cos();
         let (x, z) = (center.x + cos * reach, center.z + sin * reach);
         if !terrain.is_walkable(x, z) {
@@ -1981,9 +2281,6 @@ pub(crate) fn spawn_settlement(
     clock: Res<crate::calendar::WorldClock>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    // Deposits are ground scenery and wear the veil-carrying material; the
-    // buildings and the glory above them do not.
-    mut ground_materials: ResMut<Assets<crate::fog::GroundMaterial>>,
     mut notices: MessageWriter<crate::ui::Notice>,
     restoring: Option<Res<RestoringSeed>>,
     chosen: Res<ChosenGround>,
@@ -2039,129 +2336,15 @@ pub(crate) fn spawn_settlement(
             "The village of {settlement_name} is founded, under the sign of {sign}"
         )));
 
-        // The land is salted with what the village will one day want:
-        // iron in the far hills, clay along the wet banks. Deliberately
-        // out past the home circle — deposits are why explorers matter,
-        // and the road to one is a road the village will wear itself.
-        let mut placed_iron = 0;
-        for _ in 0..400 {
-            if placed_iron >= 4 {
-                break;
-            }
-            let angle = rng.range(0.0, std::f32::consts::TAU);
-            let reach = rng.range(140.0, 460.0);
-            let (sin, cos) = angle.sin_cos();
-            let (x, z) = (center.x + cos * reach, center.z + sin * reach);
-            if !ground.0.is_walkable(x, z) {
-                continue;
-            }
-            let height = ground.0.height_at(x, z);
-            if height > crate::terrain::WATER_LEVEL + 20.0 {
-                crate::matter::spawn_deposit(
-                    &mut commands,
-                    &mut meshes,
-                    &mut ground_materials,
-                    Vec3::new(x, height, z),
-                    crate::matter::DepositKind::Iron,
-                    rng.range(16.0, 26.0),
-                );
-                placed_iron += 1;
-            }
-        }
-
-        // Clay is a creature of the waterline: wherever the coast runs,
-        // the wet banks along it are rich with it — strung out with a
-        // little space between banks, so working the clay means walking
-        // the shore rather than emptying one pit.
-        let mut clay_banks: Vec<Vec3> = Vec::new();
-        for _ in 0..900 {
-            if clay_banks.len() >= 10 {
-                break;
-            }
-            let angle = rng.range(0.0, std::f32::consts::TAU);
-            let reach = rng.range(40.0, 700.0);
-            let (sin, cos) = angle.sin_cos();
-            let (x, z) = (center.x + cos * reach, center.z + sin * reach);
-            if !ground.0.is_walkable(x, z) {
-                continue;
-            }
-            let height = ground.0.height_at(x, z);
-            if !(crate::terrain::WATER_LEVEL + 0.5..crate::terrain::WATER_LEVEL + 3.5)
-                .contains(&height)
-            {
-                continue;
-            }
-            let at = Vec3::new(x, height, z);
-            if clay_banks.iter().any(|b| b.distance(at) < 25.0) {
-                continue;
-            }
-            crate::matter::spawn_deposit(
-                &mut commands,
-                &mut meshes,
-                &mut ground_materials,
-                at,
-                crate::matter::DepositKind::Clay,
-                rng.range(24.0, 40.0),
-            );
-            clay_banks.push(at);
-        }
-        // And the quarries, which are where the village's stone comes from
-        // now that the ground is not strewn with it.
-        //
-        // CLOSER than iron and far more numerous, and both on purpose. Iron is
-        // a reason to explore; stone is an everyday errand that every footing
-        // in the civic ladder waits on, so a village that has to walk four
-        // hundred units for it simply never builds. The nearest ring starts
-        // just outside the home circle - far enough that the square is not a
-        // building site, near enough that a miner is back before noon.
-        //
-        // Sited on the most BROKEN ground each try can find, so a quarry
-        // stands where a quarry would: a bank, a bluff, a stony shoulder. That
-        // is a preference and not a requirement, which is the whole difference
-        // between this and the mine - see `BuildingKind::Mine`, whose siting
-        // wants a genuine face and so never finds one in rolling or coastal
-        // country. A village on a flat green shore gets its quarry regardless,
-        // because the alternative is a village that cannot build.
-        let quarries = quarry_sites(&ground.0, center, &mut rng);
-        for at in &quarries {
-            // The pit first, then the stone standing in it. See `QUARRY_DEPTH`
-            // for why the ground is worked rather than the model made taller.
-            // `flatten` leaves the floor BARE, which is what a working quarry
-            // is, and keeps the scatter from seeding trees in the middle of it.
-            let floor = at.y - QUARRY_DEPTH;
-            ground.0.flatten(at.x, at.z, QUARRY_PIT, QUARRY_RIM, floor);
-            crate::matter::spawn_deposit(
-                &mut commands,
-                &mut meshes,
-                &mut ground_materials,
-                Vec3::new(at.x, floor, at.z),
-                crate::matter::DepositKind::Stone,
-                // Deeper, because there are half as many. A village's whole
-                // civic ladder is under a hundred stone; one of these is
-                // several ladders, and running dry is the failure mode that
-                // matters - see `every_village_is_given_stone_to_build_with`.
-                rng.range(200.0, 300.0),
-            );
-        }
-        // Any chunk already standing was built before the pits were cut, so it
-        // still shows unbroken ground with a quarry sitting on top of it.
-        for at in &quarries {
-            crate::terrain::rebuild_chunks_near(
-                &mut commands,
-                &mut meshes,
-                &ground.2,
-                &ground.0,
-                &mut ground.1,
-                at.x,
-                at.z,
-                QUARRY_PIT + QUARRY_RIM,
-            );
-        }
-        info!(
-            "the land holds {placed_iron} iron veins, {} clay banks and {} quarries",
-            clay_banks.len(),
-            quarries.len()
-        );
+        // The ground gets what the ground gets: iron in the hills, clay on the
+        // wet banks, quarries wherever the land is broken. One copy of those
+        // rules, and every town founded after this one is sown by it too - see
+        // `SowTheGround` for the seven hundred units the whole world used to
+        // fit inside.
+        commands.queue(SowTheGround {
+            center,
+            town: settlement_name.clone(),
+        });
     }
 
     // The god is named by its people, in their own tongue - the player
@@ -4009,6 +4192,132 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// A QUARRY IS NO GOOD IF NOBODY CAN WALK TO IT.
+    ///
+    /// `QUARRY_FURTHEST` is three hundred and `WORK_REACH` is a hundred and
+    /// seventy, so a village handed three quarries at the far end of the ring
+    /// has three quarries and no stone. Nearest, not any - the others are for
+    /// when the first runs dry.
+    /// How far the nearest quarry actually falls, over many maps. Run with
+    /// `cargo test probe_the_walk_to_the_stone -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn probe_the_walk_to_the_stone() {
+        let mut worst: f32 = 0.0;
+        let mut over = 0;
+        let mut all = 0;
+        let mut sum = 0.0;
+        for seed in [7u32, 99, 2024, 4242, 31337, 555, 8080, 1, 12, 4001] {
+            let terrain = Terrain::new(seed);
+            let mut rng = Rng::stream(seed as u64, "quarry probe");
+            for _ in 0..40 {
+                let here = terrain.somewhere_inland();
+                let center = Vec3::new(here.x, terrain.height_at(here.x, here.y), here.y);
+                let nearest = quarry_sites(&terrain, center, &mut rng)
+                    .iter()
+                    .map(|at| Vec2::new(at.x - center.x, at.z - center.z).length())
+                    .fold(f32::INFINITY, f32::min);
+                all += 1;
+                sum += nearest;
+                worst = worst.max(nearest);
+                if nearest > crate::villager::work::WORK_REACH {
+                    over += 1;
+                }
+            }
+        }
+        println!(
+            "nearest quarry: mean {:.0}, worst {worst:.0}; {over} of {all} villages \
+             ({:.0}%) cannot reach their own stone",
+            sum / all as f32,
+            over as f32 / all as f32 * 100.0,
+        );
+    }
+
+    #[test]
+    fn every_village_has_a_quarry_within_a_miners_walk() {
+        for seed in [7u32, 99, 2024, 4242, 31337, 555, 8080, 1] {
+            let terrain = Terrain::new(seed);
+            let mut rng = Rng::stream(seed as u64, "quarry reach");
+            for _ in 0..6 {
+                let here = terrain.somewhere_inland();
+                let center = Vec3::new(here.x, terrain.height_at(here.x, here.y), here.y);
+                let nearest = quarry_sites(&terrain, center, &mut rng)
+                    .iter()
+                    .map(|at| Vec2::new(at.x - center.x, at.z - center.z).length())
+                    .fold(f32::INFINITY, f32::min);
+                assert!(
+                    nearest <= crate::villager::work::WORK_REACH,
+                    "seed {seed} put the nearest quarry {nearest:.0} out, past the \
+                     {} a miner will walk - the village has stone it cannot fetch",
+                    crate::villager::work::WORK_REACH,
+                );
+            }
+        }
+    }
+
+    /// CLAY IS A CREATURE OF THE WATERLINE, which is the whole reason it is
+    /// the first material worth traveling for. Every bank sown sits in the wet
+    /// band; nothing is ever put on a dry slope.
+    #[test]
+    fn clay_is_only_ever_found_at_the_water() {
+        for seed in [7u32, 99, 2024, 4242, 31337, 555] {
+            let terrain = Terrain::new(seed);
+            let mut rng = Rng::stream(seed as u64, "clay band");
+            for _ in 0..6 {
+                let here = terrain.somewhere_inland();
+                let center = Vec3::new(here.x, terrain.height_at(here.x, here.y), here.y);
+                for at in clay_banks(&terrain, center, &mut rng) {
+                    let over = at.y - crate::terrain::WATER_LEVEL;
+                    assert!(
+                        CLAY_TIDEMARK.contains(&over),
+                        "seed {seed} put a clay bank {over:.1} above the tide, \
+                         which is a dry hillside"
+                    );
+                    assert!(
+                        terrain.is_walkable(at.x, at.z),
+                        "a clay bank was put where nobody can stand"
+                    );
+                }
+            }
+        }
+    }
+
+    /// AND SOME COUNTRY SIMPLY HAS NONE.
+    ///
+    /// The other half of locality, and the half that is easy to lose: a rule
+    /// generous enough to always find clay is a rule that has made clay
+    /// universal again, and then the oven is just another thing made of timber
+    /// and stone. Sown around high ground, well inside the reach the banks are
+    /// looked for in, the water is not there and neither is the clay.
+    #[test]
+    fn dry_upland_country_has_no_clay_at_all() {
+        let mut dry = 0;
+        let mut tried = 0;
+        for seed in [7u32, 99, 2024, 4242, 31337, 555, 8080, 1] {
+            let terrain = Terrain::new(seed);
+            let mut rng = Rng::stream(seed as u64, "dry country");
+            for _ in 0..40 {
+                let here = terrain.somewhere_inland();
+                let height = terrain.height_at(here.x, here.y);
+                // Genuine upland: higher than the furthest a bank is looked
+                // for could plausibly fall back to the sea.
+                if height < crate::terrain::WATER_LEVEL + 60.0 {
+                    continue;
+                }
+                tried += 1;
+                if clay_banks(&terrain, Vec3::new(here.x, height, here.y), &mut rng).is_empty() {
+                    dry += 1;
+                }
+            }
+        }
+        assert!(tried > 0, "no upland country was found to ask about");
+        assert!(
+            dry > 0,
+            "{tried} upland sites and every one of them had clay - the material \
+             is not scarce by place, so nobody will ever travel for it"
+        );
     }
 
     #[test]

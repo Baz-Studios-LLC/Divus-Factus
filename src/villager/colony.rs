@@ -887,6 +887,21 @@ pub(super) fn walk_to_the_new_ground(
             food: charter.food,
             timber: charter.timber,
         });
+        // AND THE GROUND AROUND IT IS SOWN, exactly as the first village's was.
+        // Every deposit in the world used to be sown once, at startup, around
+        // village one - and `COLONY_SPACING` is asserted larger than
+        // `WORK_REACH`, so a colony could never reach any of it. Its miners had
+        // no quarry, its builders no clay bank, its explorers no vein: a town
+        // living entirely off the alpine-stone fallback, a hundred strides past
+        // the edge of a map that had everything on it.
+        //
+        // What this ground actually yields is up to the ground. A colony on a
+        // river gets clay and one in the dry hills does not, which is what
+        // makes going anywhere worth anything.
+        commands.queue(super::SowTheGround {
+            center: spot,
+            town: charter.name.clone(),
+        });
 
         let day = clock.day();
         let mut joined = 0usize;

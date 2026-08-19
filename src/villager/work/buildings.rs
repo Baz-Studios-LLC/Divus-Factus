@@ -186,6 +186,55 @@ impl BuildingKind {
         }
     }
 
+    /// Fired brick this kind wants in the yard before its ground may be
+    /// broken, and the first material in the world that is genuinely SCARCE
+    /// BY PLACE.
+    ///
+    /// Clay is a creature of the waterline — see the banks sown in
+    /// `spawn_settlement` — so a village on a river or a shore can have this
+    /// and a village up in dry hill country cannot, however rich it is in
+    /// everything else. That is the whole point: the map makes demands, and
+    /// wanting something the ground here does not give is what puts people on
+    /// the road.
+    ///
+    /// A PREREQUISITE, NOT A WALL MATERIAL, and that distinction is load
+    /// bearing. `BuildStuff` is deliberately interchangeable — a builder out
+    /// of brick finishes the house in wood rather than stalling for ever, and
+    /// that substitution exists because villages must thrive. So nothing
+    /// required can live in the walls: it lives in the FIXTURE. An oven is
+    /// bricks, made and stacked before the frame goes up, and the store pays
+    /// for them the morning ground is broken.
+    ///
+    /// Because the ladder skips a kind it cannot pay for, an unaffordable
+    /// want is never a stall - the village simply gets on with the next thing
+    /// it can afford. Adding another clay building is one number here.
+    pub fn clay_cost(self) -> f32 {
+        match self {
+            // The oven. There is no other way to build one.
+            BuildingKind::Bakery => 6.0,
+            // The forge hearth, which is clay-lined or it is a bonfire. Less
+            // than the oven and earlier on the ladder - a town of ten wants a
+            // blacksmith, and a town of fourteen wants a bakery, so this is the
+            // one most villages meet first.
+            BuildingKind::Blacksmith => 4.0,
+            _ => 0.0,
+        }
+    }
+
+    /// The deepest any one build's brick goes — what a village wants standing
+    /// in the pile so its miners are not sent to the bank the morning the
+    /// planner is ready to break ground.
+    ///
+    /// READ OFF THE TABLE, not typed twice. A second clay building raises this
+    /// on its own, which is the difference between one number and two numbers
+    /// that drift apart. The same rule the pallets are sized by.
+    pub fn clay_reserve() -> f32 {
+        BuildingKind::every()
+            .iter()
+            .map(|kind| kind.clay_cost())
+            .fold(0.0, f32::max)
+    }
+
     /// Every kind there is, so a rule about all of them can be written once.
     pub fn every() -> &'static [BuildingKind] {
         use BuildingKind::*;
@@ -262,6 +311,10 @@ pub struct CivicNeeds {
     /// Whether rising rocky ground stands within working reach — no
     /// mountainside, no mine.
     pub rock_near: bool,
+    /// Fired brick in the pile. Kinds with a `clay_cost` are not candidates
+    /// without it, which is how a material scarce by place reaches the
+    /// planner without ever becoming a stall.
+    pub clay: f32,
 }
 
 /// A trade and the works it will raise for ITSELF when the village has
@@ -366,7 +419,17 @@ pub fn next_civic(needs: &CivicNeeds, has: impl Fn(BuildingKind) -> bool) -> Opt
     let mut ranked: Vec<(f32, BuildingKind)> = Vec::new();
     let mut best: Option<(f32, BuildingKind)> = None;
     for kind in candidates {
-        if has(kind) || needs.population < min_pop(kind) || needs.stone < kind.stone_cost() {
+        // Priced out is not the same as unwanted: a kind the pile cannot pay
+        // for is simply not a candidate this morning, and the ladder goes on
+        // to the next thing. Clay joins stone here rather than at
+        // ground-breaking on purpose - a want that cannot be met but keeps
+        // being chosen is a planner that never reaches the rest of its
+        // ambitions, which is the failure mode a scarce material invites.
+        if has(kind)
+            || needs.population < min_pop(kind)
+            || needs.stone < kind.stone_cost()
+            || needs.clay < kind.clay_cost()
+        {
             continue;
         }
         let score = match kind {
@@ -3512,6 +3575,7 @@ pub(crate) fn plan_houses(
             shore_near,
             miners,
             rock_near,
+            clay: store_now.clay,
         };
         next_civic(&needs, has_kind)
     };
@@ -3701,6 +3765,24 @@ pub(crate) fn plan_houses(
         *said = format!("{}: {because}", kind.name().to_lowercase());
     }
     let _ = roofs;
+
+    // THE FIXTURES ARE PAID FOR BEFORE THE GROUND IS OPENED.
+    //
+    // A backstop, not the gate: the ladder already skips a kind the clay pile
+    // cannot cover, so this only ever catches the branches that jump the
+    // ladder - the dock, the hall, a trade raising its own works, a frightened
+    // village's tower. None of those wants clay today, and the day one does
+    // this is the difference between refusing the build and breaking ground on
+    // an oven nobody can brick.
+    if store_now.clay < kind.clay_cost() {
+        info!(
+            "{} waits on clay: {:.0} of {:.0} in the pile",
+            kind.name().to_lowercase(),
+            store_now.clay,
+            kind.clay_cost(),
+        );
+        return;
+    }
 
     // A mine is sited by the rock, not by the rings: the nearest walkable
     // ground beside rising stone takes the portal, driven uphill so the
@@ -4079,10 +4161,21 @@ pub(crate) fn plan_houses(
                 cleared += 1.0;
             }
         }
-        if cleared > 0.0
+        // The cleared timber in, and the fixtures paid for out. Both in one
+        // borrow, and both at the LAST moment before the plot exists: every
+        // way out of this system above here is a build that did not happen,
+        // and clay taken for one of those is clay burned on nothing.
+        //
+        // The whole clay cost at once rather than block by block, because
+        // that is what it is - the brick for the oven, made and stacked while
+        // the plot is measured out. Walls are a different thing and are
+        // deliberately interchangeable; see `clay_cost`.
+        let brick = plan.kind.clay_cost();
+        if (cleared > 0.0 || brick > 0.0)
             && let Ok(mut store) = stores.get_mut(site.settlement)
         {
             store.timber += cleared;
+            store.clay = (store.clay - brick).max(0.0);
         }
         crate::terrain::rebuild_chunks_near(
             &mut commands,
@@ -4311,6 +4404,96 @@ mod tests {
             shore_near: false,
             miners: 0,
             rock_near: false,
+            // Enough for an oven: a quiet village is one where materials are
+            // not the question, so every test that leans on this base keeps
+            // reading the wants it was written to read.
+            clay: 60.0,
+        }
+    }
+
+    /// THE FIRST MATERIAL THAT IS SCARCE BY PLACE.
+    ///
+    /// An oven is brick, and brick is clay, and clay is only found along a
+    /// waterline - so this is the first want in the game that a village can
+    /// hold and be unable to answer from its own valley. The whole reason to
+    /// go anywhere is that somewhere else has something.
+    #[test]
+    fn a_dry_village_cannot_raise_an_oven() {
+        let only_a_bakery_left = |k: BuildingKind| k != BuildingKind::Bakery;
+        let watered = CivicNeeds {
+            food_stored: 120.0,
+            clay: BuildingKind::Bakery.clay_cost(),
+            ..a_quiet_village()
+        };
+        assert_eq!(
+            next_civic(&watered, only_a_bakery_left),
+            Some(BuildingKind::Bakery),
+            "a village with clay in the pile and food to bake wants the oven",
+        );
+        let dry = CivicNeeds {
+            clay: BuildingKind::Bakery.clay_cost() - 1.0,
+            ..watered
+        };
+        assert_eq!(
+            next_civic(&dry, only_a_bakery_left),
+            None,
+            "one load short of a full oven is no oven at all",
+        );
+    }
+
+    /// PRICED OUT IS NOT A STALL.
+    ///
+    /// The gate that keeps a scarce material honest is the one in the
+    /// candidate loop, and it has to be there rather than at ground-breaking:
+    /// a planner that keeps choosing the thing it cannot pay for never
+    /// reaches the rest of its ambitions. A dry village goes on building.
+    #[test]
+    fn a_dry_village_gets_on_with_something_else() {
+        let dry = CivicNeeds {
+            food_stored: 120.0,
+            graves: 6,
+            clay: 0.0,
+            ..a_quiet_village()
+        };
+        let unbuilt = |_: BuildingKind| false;
+        let chosen = next_civic(&dry, unbuilt);
+        assert!(chosen.is_some(), "a dry village still wants something");
+        assert_ne!(
+            chosen,
+            Some(BuildingKind::Bakery),
+            "and the one thing it wants is not the one it cannot brick",
+        );
+    }
+
+    /// THE RESERVE IS READ OFF THE COSTS, so a second clay building does not
+    /// need anybody to remember a second number. See `clay_reserve`.
+    #[test]
+    fn the_brick_pile_is_sized_by_what_wants_brick() {
+        let deepest = BuildingKind::every()
+            .iter()
+            .map(|k| k.clay_cost())
+            .fold(0.0, f32::max);
+        assert_eq!(BuildingKind::clay_reserve(), deepest);
+        assert!(deepest > 0.0, "something in the world is made of brick");
+    }
+
+    /// WHERE THE BRICK IS PAID FOR, and the one coupling that would let a
+    /// clay building be built for free.
+    ///
+    /// `plan_civics` has three siting paths. The dock is sited by the water
+    /// and the mine by the rock, and both spawn their plot without touching
+    /// the clay pile; only the ring-sited path pays. Today neither of those
+    /// two wants clay, and this is what says so the day one does.
+    #[test]
+    fn every_clay_building_is_sited_by_the_rings() {
+        for kind in BuildingKind::every() {
+            if kind.clay_cost() > 0.0 {
+                assert!(
+                    !matches!(kind, BuildingKind::Dock | BuildingKind::Mine),
+                    "{:?} wants clay and is sited off the rings, where nothing pays for it",
+                    kind,
+                );
+            }
         }
     }
 
